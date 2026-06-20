@@ -22,6 +22,7 @@ const parseSafeDate = (value: string | Date | null | undefined, fallback: Date =
 interface DatePickerProps {
   value: string; // YYYY-MM-DD
   onChange: (value: string) => void;
+  mode?: "date" | "month";
   placeholder?: string;
   className?: string;
   showClear?: boolean;
@@ -31,7 +32,18 @@ interface DatePickerProps {
   triggerClassName?: string;
 }
 
-export function DatePicker({ value, onChange, placeholder = "选择日期", className, showClear = true, minDate, maxDate, isCompact, triggerClassName }: DatePickerProps) {
+export function DatePicker({
+  value,
+  onChange,
+  mode = "date",
+  placeholder = "选择日期",
+  className,
+  showClear = true,
+  minDate,
+  maxDate,
+  isCompact,
+  triggerClassName,
+}: DatePickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(() => parseSafeDate(value));
   const containerRef = useRef<HTMLDivElement>(null);
@@ -148,9 +160,22 @@ export function DatePicker({ value, onChange, placeholder = "选择日期", clas
     if (parsedMinDate && date < parsedMinDate) return;
     if (parsedMaxDate && date > parsedMaxDate) return;
 
-    onChange(format(date, "yyyy-MM-dd"));
+    onChange(format(date, mode === "month" ? "yyyy-MM" : "yyyy-MM-dd"));
     setIsOpen(false);
   };
+
+  const monthOptions = useMemo(
+    () => Array.from({ length: 12 }, (_, index) => startOfMonth(new Date(currentMonth.getFullYear(), index, 1))),
+    [currentMonth]
+  );
+
+  const isMonthDisabled = useCallback((date: Date) => {
+    const monthStart = startOfMonth(date);
+    const monthEnd = endOfMonth(date);
+    if (parsedMinDate && monthEnd < parsedMinDate) return true;
+    if (parsedMaxDate && monthStart > parsedMaxDate) return true;
+    return false;
+  }, [parsedMaxDate, parsedMinDate]);
 
   return (
     <div className={cn("relative w-full", className)} ref={containerRef}>
@@ -168,7 +193,7 @@ export function DatePicker({ value, onChange, placeholder = "选择日期", clas
         <div className="flex items-center justify-center gap-2 min-w-0 flex-1">
             {!isCompact && <CalendarIcon size={14} className={cn("shrink-0", selectedDate ? "text-primary" : "text-muted-foreground")} />}
             <span className={cn("truncate", selectedDate ? "text-foreground font-medium" : "text-muted-foreground")}>
-            {selectedDate ? format(selectedDate, "yyyy-MM-dd") : placeholder}
+            {selectedDate ? format(selectedDate, mode === "month" ? "yyyy-MM" : "yyyy-MM-dd") : placeholder}
             </span>
         </div>
         {showClear && selectedDate && (
@@ -215,7 +240,7 @@ export function DatePicker({ value, onChange, placeholder = "选择日期", clas
                         <ChevronLeft size={14} strokeWidth={3} />
                     </button>
                     <h4 className="text-sm font-bold text-foreground whitespace-nowrap">
-                    {format(currentMonth, "yyyy年 MM月")}
+                    {format(currentMonth, mode === "month" ? "yyyy年" : "yyyy年 MM月")}
                     </h4>
                     <button
                         type="button"
@@ -226,63 +251,97 @@ export function DatePicker({ value, onChange, placeholder = "选择日期", clas
                         <ChevronRight size={14} strokeWidth={3} />
                     </button>
                 </div>
-                <div className="flex gap-0.5 ml-2">
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); prevMonth(); }}
-                    className="rounded-xl p-1.5 hover:bg-slate-100 dark:hover:bg-white/8 text-muted-foreground hover:text-foreground transition-all"
-                    title="上一月"
-                  >
-                    <ChevronLeft size={18} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); nextMonth(); }}
-                    className="rounded-xl p-1.5 hover:bg-slate-100 dark:hover:bg-white/8 text-muted-foreground hover:text-foreground transition-all"
-                    title="下一月"
-                  >
-                    <ChevronRight size={18} />
-                  </button>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-7 mb-2 px-1">
-                {["一", "二", "三", "四", "五", "六", "日"].map((day) => (
-                  <div key={day} className="text-center text-[10px] font-bold text-muted-foreground py-1">
-                    {day}
-                  </div>
-                ))}
-              </div>
-
-              <div className="grid grid-cols-7 gap-1 px-1">
-                {days.map((day, idx) => {
-                  const isSelected = selectedDate && isSameDay(day, selectedDate);
-                  const isCurrentMonth = isSameMonth(day, currentMonth);
-                  const isTodayDate = isToday(day);
-                  const isBeforeMin = parsedMinDate ? startOfDay(day) < parsedMinDate : false;
-                  const isAfterMax = parsedMaxDate ? startOfDay(day) > parsedMaxDate : false;
-                  const isDisabled = isBeforeMin || isAfterMax;
-
-                  return (
+                {mode === "date" ? (
+                  <div className="flex gap-0.5 ml-2">
                     <button
-                      key={idx}
                       type="button"
-                      disabled={isDisabled}
-                      onClick={() => handleDateClick(day)}
-                      className={cn(
-                        "aspect-square w-full rounded-xl text-xs flex items-center justify-center transition-all duration-200 relative",
-                        !isCurrentMonth && "text-muted-foreground/50",
-                        isCurrentMonth && !isDisabled && "text-foreground hover:bg-primary/10 hover:text-primary",
-                        isDisabled && "text-muted-foreground/20 cursor-not-allowed",
-                        isSelected && "bg-primary text-primary-foreground font-bold shadow-lg shadow-primary/30 hover:bg-primary hover:text-primary-foreground",
-                        isTodayDate && !isSelected && "text-primary ring-1 ring-primary/30"
-                      )}
+                      onClick={(e) => { e.stopPropagation(); prevMonth(); }}
+                      className="rounded-xl p-1.5 hover:bg-slate-100 dark:hover:bg-white/8 text-muted-foreground hover:text-foreground transition-all"
+                      title="上一月"
                     >
-                      {format(day, "d")}
+                      <ChevronLeft size={18} />
                     </button>
-                  );
-                })}
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); nextMonth(); }}
+                      className="rounded-xl p-1.5 hover:bg-slate-100 dark:hover:bg-white/8 text-muted-foreground hover:text-foreground transition-all"
+                      title="下一月"
+                    >
+                      <ChevronRight size={18} />
+                    </button>
+                  </div>
+                ) : null}
               </div>
+
+              {mode === "month" ? (
+                <div className="grid grid-cols-3 gap-2 px-1">
+                  {monthOptions.map((monthDate) => {
+                    const isSelected = selectedDate
+                      ? selectedDate.getFullYear() === monthDate.getFullYear() && selectedDate.getMonth() === monthDate.getMonth()
+                      : false;
+                    const isCurrentMonth = isToday(monthDate);
+                    const isDisabled = isMonthDisabled(monthDate);
+
+                    return (
+                      <button
+                        key={format(monthDate, "yyyy-MM")}
+                        type="button"
+                        disabled={isDisabled}
+                        onClick={() => handleDateClick(monthDate)}
+                        className={cn(
+                          "h-12 rounded-xl text-xs flex items-center justify-center transition-all duration-200 relative",
+                          !isDisabled && "text-foreground hover:bg-primary/10 hover:text-primary",
+                          isDisabled && "text-muted-foreground/20 cursor-not-allowed",
+                          isSelected && "bg-primary text-primary-foreground font-bold shadow-lg shadow-primary/30 hover:bg-primary hover:text-primary-foreground",
+                          isCurrentMonth && !isSelected && "text-primary ring-1 ring-primary/30"
+                        )}
+                      >
+                        {format(monthDate, "M月")}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-7 mb-2 px-1">
+                    {["一", "二", "三", "四", "五", "六", "日"].map((day) => (
+                      <div key={day} className="text-center text-[10px] font-bold text-muted-foreground py-1">
+                        {day}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="grid grid-cols-7 gap-1 px-1">
+                    {days.map((day, idx) => {
+                      const isSelected = selectedDate && isSameDay(day, selectedDate);
+                      const isCurrentMonth = isSameMonth(day, currentMonth);
+                      const isTodayDate = isToday(day);
+                      const isBeforeMin = parsedMinDate ? startOfDay(day) < parsedMinDate : false;
+                      const isAfterMax = parsedMaxDate ? startOfDay(day) > parsedMaxDate : false;
+                      const isDisabled = isBeforeMin || isAfterMax;
+
+                      return (
+                        <button
+                          key={idx}
+                          type="button"
+                          disabled={isDisabled}
+                          onClick={() => handleDateClick(day)}
+                          className={cn(
+                            "aspect-square w-full rounded-xl text-xs flex items-center justify-center transition-all duration-200 relative",
+                            !isCurrentMonth && "text-muted-foreground/50",
+                            isCurrentMonth && !isDisabled && "text-foreground hover:bg-primary/10 hover:text-primary",
+                            isDisabled && "text-muted-foreground/20 cursor-not-allowed",
+                            isSelected && "bg-primary text-primary-foreground font-bold shadow-lg shadow-primary/30 hover:bg-primary hover:text-primary-foreground",
+                            isTodayDate && !isSelected && "text-primary ring-1 ring-primary/30"
+                          )}
+                        >
+                          {format(day, "d")}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
 
               <div className="mt-4 flex items-center justify-between border-t border-border/50 pt-3 px-1">
                   <button 
@@ -290,7 +349,7 @@ export function DatePicker({ value, onChange, placeholder = "选择日期", clas
                       onClick={(e) => { e.stopPropagation(); handleDateClick(new Date()); }}
                       className="text-[10px] font-bold text-primary hover:underline px-2 py-1"
                   >
-                      今天
+                      {mode === "month" ? "本月" : "今天"}
                   </button>
                   <button 
                     type="button"

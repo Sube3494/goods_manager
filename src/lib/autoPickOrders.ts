@@ -256,6 +256,10 @@ type MaiyatianOrderDetailResponse = {
       sku_code?: string;
       number?: string | number;
       thumb?: string;
+      pickup_time?: string | number;
+      pickupTime?: string | number;
+      picker_time?: string | number;
+      pickerTime?: string | number;
     }>;
     delivery?: {
       id?: string | number;
@@ -817,6 +821,25 @@ function parseCentsValue(rawValue: string | number | undefined) {
   return Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0;
 }
 
+function pickFirstValidTimeValue(...candidates: unknown[]) {
+  for (const candidate of candidates) {
+    if (typeof candidate === "number") {
+      if (Number.isFinite(candidate) && candidate > 0) {
+        return candidate;
+      }
+      continue;
+    }
+    if (typeof candidate === "string") {
+      const trimmed = candidate.trim();
+      if (!trimmed || trimmed === "0") {
+        continue;
+      }
+      return trimmed;
+    }
+  }
+  return undefined;
+}
+
 function parseCoordinate(rawValue: string | number | undefined) {
   const value = Number(rawValue || 0);
   return Number.isFinite(value) ? value : 0;
@@ -1036,17 +1059,71 @@ function buildListenedOrderFromQueryOrder(rawOrder: MaiyatianQueryOrder): AutoPi
 
 function parseDeliveryInfoFromDetail(detail: MaiyatianOrderDetailResponse["data"]) {
   const delivery = detail && detail.delivery && typeof detail.delivery === "object" ? detail.delivery : null;
-  if (!delivery) {
-    return undefined;
-  }
+  const deliveryRecord = delivery as Record<string, unknown> | null;
+  const detailRecord = detail as Record<string, unknown> | undefined;
+  const goods = Array.isArray(detail?.goods) ? detail.goods : [];
+  const isJdLike = String(
+    detailRecord?.channel_tag
+    || detailRecord?.source_tag
+    || detailRecord?.goods_channel_tag
+    || ""
+  ).trim().toLowerCase() === "daojia";
+  const firstGoodsWithTime = goods.find((item) => {
+    if (!item || typeof item !== "object") {
+      return false;
+    }
+    const record = item as Record<string, unknown>;
+    return Boolean(
+      record.pickup_time
+      || record.pickupTime
+      || record.picker_time
+      || record.pickerTime
+    );
+  }) as Record<string, unknown> | undefined;
 
-  const logisticName = String(delivery.logistic_name || "").trim();
-  const sendFee = parseCentsValue(delivery.send_fee);
-  const pickupTime = typeof delivery.pickup_time === "string" && delivery.pickup_time.includes("-")
-    ? String(delivery.pickup_time).trim()
-    : parseUnixTimestampToOrderTime(delivery.pickup_time);
-  const track = String(delivery.track || "").trim();
-  const riderName = String(delivery.delivery_name || "").trim() || undefined;
+  const logisticName = String(deliveryRecord?.logistic_name || deliveryRecord?.logisticName || "").trim();
+  const rawSendFee = deliveryRecord?.send_fee ?? deliveryRecord?.sendFee;
+  const sendFee = typeof rawSendFee === "string" || typeof rawSendFee === "number"
+    ? parseCentsValue(rawSendFee)
+    : 0;
+  const jdLikePickupCandidates = [
+    detail?.pickup_time,
+    detail?.pickupTime,
+    detail?.picker_time,
+    detail?.pickerTime,
+    firstGoodsWithTime?.pickup_time,
+    firstGoodsWithTime?.pickupTime,
+    firstGoodsWithTime?.picker_time,
+    firstGoodsWithTime?.pickerTime,
+    deliveryRecord?.pickup_time,
+    deliveryRecord?.pickupTime,
+    deliveryRecord?.pick_time,
+    deliveryRecord?.pickTime,
+    detail?.delivery_time,
+  ];
+  const normalPickupCandidates = [
+    deliveryRecord?.pickup_time,
+    deliveryRecord?.pickupTime,
+    deliveryRecord?.pick_time,
+    deliveryRecord?.pickTime,
+    detail?.pickup_time,
+    detail?.pickupTime,
+    detail?.picker_time,
+    detail?.pickerTime,
+    firstGoodsWithTime?.pickup_time,
+    firstGoodsWithTime?.pickupTime,
+    firstGoodsWithTime?.picker_time,
+    firstGoodsWithTime?.pickerTime,
+    detail?.delivery_time,
+  ];
+  const rawPickupTime = pickFirstValidTimeValue(...(isJdLike ? jdLikePickupCandidates : normalPickupCandidates));
+  const pickupTime = typeof rawPickupTime === "string" && rawPickupTime.includes("-")
+    ? String(rawPickupTime).trim()
+    : (typeof rawPickupTime === "string" || typeof rawPickupTime === "number"
+        ? parseUnixTimestampToOrderTime(rawPickupTime)
+        : undefined);
+  const track = String(deliveryRecord?.track || "").trim();
+  const riderName = String(deliveryRecord?.delivery_name || deliveryRecord?.riderName || "").trim() || undefined;
 
   if (!logisticName && sendFee <= 0 && !pickupTime && !track && !riderName) {
     return undefined;
@@ -1318,15 +1395,10 @@ async function enrichMaiyatianOrderByCookie(cookie: string, order: AutoPickInbou
     order.rawShopName = detailShopName;
   }
 
-  if (!isJD) {
-    const detailShopAddress = readPreferredMaiyatianShopAddress((detailData || {}) as Record<string, unknown>);
-    if (detailShopAddress) {
-      order.shopAddress = detailShopAddress;
-      order.rawShopAddress = detailShopAddress;
-    }
-  } else {
-    order.shopAddress = undefined;
-    order.rawShopAddress = undefined;
+  const detailShopAddress = readPreferredMaiyatianShopAddress((detailData || {}) as Record<string, unknown>);
+  if (detailShopAddress) {
+    order.shopAddress = detailShopAddress;
+    order.rawShopAddress = detailShopAddress;
   }
 
   const deliveryInfo = parseDeliveryInfoFromDetail(detailData);
@@ -2170,7 +2242,7 @@ export function normalizeAutoPickOrderPayload(payload: unknown): AutoPickInbound
       || input.merchant_name
       || ""
     ).trim() || undefined,
-    shopAddress: isJD ? undefined : String(
+    shopAddress: String(
       input.shopAddress
       || input.rawShopAddress
       || input.storeAddress
@@ -2185,9 +2257,11 @@ export function normalizeAutoPickOrderPayload(payload: unknown): AutoPickInbound
       || extend?.merchant_address
       || extend?.channelAddress
       || extend?.channel_address
+      || input.shop_name
+      || input.shopName
       || ""
     ).trim() || undefined,
-    rawShopAddress: isJD ? undefined : String(
+    rawShopAddress: String(
       input.rawShopAddress
       || input.shopAddress
       || input.storeAddress
@@ -2202,6 +2276,8 @@ export function normalizeAutoPickOrderPayload(payload: unknown): AutoPickInbound
       || extend?.merchant_address
       || extend?.channelAddress
       || extend?.channel_address
+      || input.shop_name
+      || input.shopName
       || ""
     ).trim() || undefined,
     isSubscribe: input.isSubscribe === true || input.isSubscribe === 1 || input.isSubscribe === "1" || input.is_subscribe === true || input.is_subscribe === 1 || input.is_subscribe === "1",
@@ -2216,15 +2292,51 @@ export function normalizeAutoPickOrderPayload(payload: unknown): AutoPickInbound
     actualPaid: Number.isFinite(Number(input.actualPaid)) ? Number(input.actualPaid) : 0,
     expectedIncome: Number.isFinite(Number(input.expectedIncome)) ? Number(input.expectedIncome) : undefined,
     platformCommission: Number.isFinite(Number(input.platformCommission)) ? Number(input.platformCommission) : 0,
-    delivery: input.delivery && typeof input.delivery === "object" ? {
-      logisticName: String((input.delivery as Record<string, unknown>).logisticName || "").trim() || undefined,
-      sendFee: Number.isFinite(Number((input.delivery as Record<string, unknown>).sendFee))
-        ? Number((input.delivery as Record<string, unknown>).sendFee)
-        : undefined,
-      pickupTime: String((input.delivery as Record<string, unknown>).pickupTime || "").trim() || undefined,
-      track: String((input.delivery as Record<string, unknown>).track || "").trim() || undefined,
-      riderName: String((input.delivery as Record<string, unknown>).riderName || "").trim() || undefined,
-    } : undefined,
+    delivery: (() => {
+      const deliveryRecord = input.delivery && typeof input.delivery === "object"
+        ? input.delivery as Record<string, unknown>
+        : null;
+      const rawPickupTime = isJD
+        ? pickFirstValidTimeValue(
+            input.pickup_time,
+            input.pickupTime,
+            input.picker_time,
+            input.pickerTime,
+            deliveryRecord?.pickup_time,
+            deliveryRecord?.pickupTime,
+            deliveryRecord?.pick_time,
+            deliveryRecord?.pickTime,
+            input.delivery_time,
+          )
+        : pickFirstValidTimeValue(
+            deliveryRecord?.pickup_time,
+            deliveryRecord?.pickupTime,
+            deliveryRecord?.pick_time,
+            deliveryRecord?.pickTime,
+            input.pickup_time,
+            input.pickupTime,
+            input.picker_time,
+            input.pickerTime,
+            input.delivery_time,
+          );
+      const normalizedDelivery = {
+        logisticName: String(deliveryRecord?.logisticName || deliveryRecord?.logistic_name || "").trim() || undefined,
+        sendFee: Number.isFinite(Number(deliveryRecord?.sendFee ?? deliveryRecord?.send_fee))
+          ? Number(deliveryRecord?.sendFee ?? deliveryRecord?.send_fee)
+          : undefined,
+        pickupTime: typeof rawPickupTime === "string" && rawPickupTime.includes("-")
+          ? String(rawPickupTime).trim()
+          : (typeof rawPickupTime === "string" || typeof rawPickupTime === "number"
+              ? parseUnixTimestampToOrderTime(rawPickupTime)
+              : undefined),
+        track: String(deliveryRecord?.track || "").trim() || undefined,
+        riderName: String(deliveryRecord?.riderName || deliveryRecord?.delivery_name || "").trim() || undefined,
+      };
+      if (!normalizedDelivery.logisticName && normalizedDelivery.sendFee == null && !normalizedDelivery.pickupTime && !normalizedDelivery.track && !normalizedDelivery.riderName) {
+        return undefined;
+      }
+      return normalizedDelivery;
+    })(),
     items: items.map((item) => {
       const current = typeof item === "object" && item ? item as Record<string, unknown> : {};
       return {

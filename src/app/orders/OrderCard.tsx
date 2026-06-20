@@ -1,6 +1,6 @@
 "use client";
 
-import { Component, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Component, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import {
   ArrowUp,
@@ -893,16 +893,21 @@ export function DetailStat({
 
 export function DetailBlock({
   label,
+  labelAccessory,
   value,
   className,
 }: {
   label: string;
+  labelAccessory?: ReactNode;
   value: string;
   className?: string;
 }) {
   return (
     <div className={cn("rounded-2xl border border-black/6 bg-black/2 px-3 py-3 dark:border-white/8 dark:bg-white/3 sm:px-3 sm:py-2.5", className)}>
-      <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">{label}</div>
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">{label}</div>
+        {labelAccessory}
+      </div>
       <div className="mt-1.5 wrap-break-word text-sm font-medium leading-5 text-foreground">{value}</div>
     </div>
   );
@@ -1796,13 +1801,21 @@ export function OrderCard({
                 <DetailStat label="履约方式" value={getFulfillmentLabel(order)} />
                 <DetailStat label="配送距离" value={pickup ? "-" : formatDistanceKm(order.distanceKm)} />
                 <DetailStat label={pickup ? "取货时间" : "最晚送达"} value={deadlineDisplay} />
+                <DetailStat
+                  label="订单坐标"
+                  value={order.longitude != null && order.latitude != null ? `${order.longitude}, ${order.latitude}` : "-"}
+                  valueClassName="break-all text-[13px] sm:text-sm"
+                />
               </div>
               <div className="mt-2 space-y-2 sm:mt-2.5 sm:space-y-2.5">
                 <div className="grid gap-2 sm:grid-cols-2 sm:gap-2.5">
-                  <DetailBlock label="系统门店" value={order.matchedShopName || "-"} />
-                  <DetailBlock label="订单坐标" value={order.longitude != null && order.latitude != null ? `${order.longitude}, ${order.latitude}` : "-"} />
                   <DetailBlock
                     label="门店地址"
+                    labelAccessory={order.matchedShopName ? (
+                      <span className="inline-flex max-w-[45%] items-center rounded-full border border-sky-400/20 bg-sky-500/12 px-2 py-0.5 text-[10px] font-medium leading-none text-sky-300">
+                        <span className="truncate">{order.matchedShopName}</span>
+                      </span>
+                    ) : null}
                     value={order.rawShopAddress || order.shopAddress || "-"}
                     className="sm:col-span-2"
                   />

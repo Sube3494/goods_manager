@@ -4,6 +4,70 @@ import { getAuthorizedUser, getAuthorizedUserAny } from "@/lib/auth";
 import { Prisma } from "../../../../../prisma/generated-client";
 import { returnOutboundOrderById } from "@/lib/outboundReturns";
 
+function readCustomerRemarkFromRawPayload(rawPayload: unknown) {
+  if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
+    return null;
+  }
+  const record = rawPayload as Record<string, unknown>;
+  const value = String(
+    record.customerRemark
+    || record.user_remark
+    || record.userRemark
+    || ""
+  ).trim();
+  return value || null;
+}
+
+export async function GET(
+  _request: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
+  try {
+    const user = await getAuthorizedUser("order:manage");
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { id } = await context.params;
+    const order = await prisma.autoPickOrder.findFirst({
+      where: {
+        id,
+        userId: user.id,
+      },
+      select: {
+        id: true,
+        sourceId: true,
+        longitude: true,
+        latitude: true,
+        delivery: true,
+        rawPayload: true,
+      },
+    });
+
+    if (!order) {
+      return NextResponse.json({ error: "订单不存在" }, { status: 404 });
+    }
+
+    return NextResponse.json({
+      order: {
+        id: order.id,
+        sourceId: order.sourceId,
+        longitude: order.longitude,
+        latitude: order.latitude,
+        delivery: order.delivery,
+        customerRemark: readCustomerRemarkFromRawPayload(order.rawPayload),
+        detailLoaded: true,
+        detailLoading: false,
+      },
+    });
+  } catch (error) {
+    console.error("Failed to get order detail:", error);
+    return NextResponse.json({
+      error: error instanceof Error ? error.message : "读取订单详情失败",
+    }, { status: 500 });
+  }
+}
+
 export async function PATCH(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
