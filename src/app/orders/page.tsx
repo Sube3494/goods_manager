@@ -1935,9 +1935,9 @@ export default function OrdersPage() {
                   )}
 
                   {/* 三列看板网格 */}
-                  <div className="grid grid-cols-3 gap-2 mt-2 border-t border-black/4 pt-3 dark:border-white/5 text-[10px]">
+                  <div className="grid grid-cols-3 gap-2 sm:gap-5 mt-2 border-t border-black/4 pt-3 dark:border-white/5 text-[10px]">
                     {/* 第一列：真单 */}
-                    <div className="flex flex-col gap-1.5 min-w-0 rounded-xl bg-black/1.5 p-2 dark:bg-white/1.5">
+                    <div className="flex flex-col gap-1.5 min-w-0 rounded-xl bg-black/1.5 p-2 dark:bg-white/1.5 sm:bg-transparent sm:dark:bg-transparent sm:p-0">
                       <div className="flex items-center justify-between rounded-lg bg-sky-500/8 px-1.5 py-0.5 text-sky-700 dark:bg-sky-500/12 dark:text-sky-400 font-medium text-[9px]">
                         <span className="truncate">真单</span>
                         <span className="shrink-0">{activeOverview.trueOrderCount}单</span>
@@ -1964,7 +1964,7 @@ export default function OrdersPage() {
                     </div>
 
                     {/* 第二列：刷单 */}
-                    <div className="flex flex-col gap-1.5 min-w-0 rounded-xl bg-black/1.5 p-2 dark:bg-white/1.5">
+                    <div className="flex flex-col gap-1.5 min-w-0 rounded-xl bg-black/1.5 p-2 dark:bg-white/1.5 sm:bg-transparent sm:dark:bg-transparent sm:p-0">
                       <div className="flex items-center justify-between rounded-lg bg-rose-500/8 px-1.5 py-0.5 text-rose-700 dark:bg-rose-500/12 dark:text-rose-400 font-medium text-[9px]">
                         <span className="truncate">刷单</span>
                         <span className="shrink-0">{activeOverview.brushCount}单</span>
@@ -1991,7 +1991,7 @@ export default function OrdersPage() {
                     </div>
 
                     {/* 第三列：取消 */}
-                    <div className="flex flex-col gap-1.5 min-w-0 rounded-xl bg-black/1.5 p-2 dark:bg-white/1.5">
+                    <div className="flex flex-col gap-1.5 min-w-0 rounded-xl bg-black/1.5 p-2 dark:bg-white/1.5 sm:bg-transparent sm:dark:bg-transparent sm:p-0">
                       <div className="flex items-center justify-between rounded-lg bg-slate-500/8 px-1.5 py-0.5 text-slate-600 dark:bg-slate-500/12 dark:text-slate-400 font-medium text-[9px]">
                         <span className="truncate">取消</span>
                         <span className="shrink-0">{activeOverview.cancelledCount}单</span>
