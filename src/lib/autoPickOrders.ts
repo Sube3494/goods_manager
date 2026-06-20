@@ -2792,6 +2792,7 @@ export async function syncAutoPickOrdersFromPlugin(userId: string, options: { st
     throw new Error(reason || `Auto-pick plugin request failed (${pluginResult.status})`);
   }
 
+  const cookie = await getMaiyatianCookieForUser(userId).catch(() => null);
   const normalized = pluginResult.data;
 
   const results = [];
@@ -2830,6 +2831,28 @@ export async function syncAutoPickOrdersFromPlugin(userId: string, options: { st
         });
         continue;
       }
+
+      if (cookie) {
+        const existing = await prisma.autoPickOrder.findFirst({
+          where: {
+            userId,
+            platform: current.platform || "",
+            orderNo: current.orderNo || "",
+          },
+          select: {
+            id: true,
+            customerRemark: true,
+          },
+        });
+
+        // 如果数据库没有此订单，或者有此订单但没有备注，则主动调用麦芽田详情接口获取详细备注
+        if (!existing || !existing.customerRemark) {
+          await enrichMaiyatianOrderByCookie(cookie, current).catch((e) => {
+            console.warn(`Failed to enrich order ${current.orderNo} during sync:`, e);
+          });
+        }
+      }
+
       results.push(await upsertAutoPickOrder(userId, current));
     } catch (error) {
       skipped += 1;
