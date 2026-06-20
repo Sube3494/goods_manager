@@ -2,7 +2,7 @@
 
 import { Component, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createPortal } from "react-dom";
 import {
   ArrowUp,
@@ -72,12 +72,18 @@ type OrderResponse = {
     validOrderCount: number;
     itemCount: number;
     totalDeliveryFee: number;
+    platformReceived?: Record<string, { amount: number; count: number }>;
   };
   overview?: {
     totalCount: number;
     trueOrderCount: number;
     brushCount: number;
     cancelledCount: number;
+    platformBreakdown?: {
+      truePlatformCounts: Record<string, number>;
+      brushPlatformCounts: Record<string, number>;
+      cancelledPlatformCounts: Record<string, number>;
+    };
   };
 };
 
@@ -941,11 +947,13 @@ function PromotionMetricCard({
   date,
   localShops,
   onRefresh,
+  isToday,
 }: {
   amount: number;
   date: string;
   localShops: LocalShopOption[];
   onRefresh?: () => void;
+  isToday?: boolean;
 }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
@@ -972,7 +980,9 @@ function PromotionMetricCard({
         >
           ¥{amount.toFixed(2)}
         </div>
-        <p className="mt-2 text-xs text-muted-foreground">{date} 推广费录入</p>
+        <p className="mt-2 text-xs text-muted-foreground">
+          {isToday ? "今日推广费录入" : `${date} 推广费录入`}
+        </p>
       </div>
 
       {isMounted && isModalOpen && (
@@ -991,6 +1001,8 @@ function PromotionMetricCard({
 
 export default function OrdersPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const tabParam = searchParams ? searchParams.get("tab") : null;
   const { showToast } = useToast();
   const [pageError, setPageError] = useState<string | null>(null);
 
@@ -1041,27 +1053,123 @@ export default function OrdersPage() {
   const hasLoadedIntegrationRef = useRef(false);
 
   const [activeTab, setActiveTab] = useState<OrdersTab>("today");
+
+  useEffect(() => {
+    if (tabParam === "all") {
+      setActiveTab("all");
+    } else if (tabParam === "today") {
+      setActiveTab("today");
+    }
+  }, [tabParam]);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+
+  useEffect(() => {
+    if (searchParams && searchParams.get("calendar") === "open") {
+      setIsCalendarOpen(true);
+    }
+  }, [searchParams]);
 
   const todayDate = useMemo(() => formatLocalDate(new Date()), []);
 
-  // 数据上报接收的状态
-  const [activeSummary, setActiveSummary] = useState({
-    receivedAmount: 0,
-    platformCommission: 0,
-    validOrderCount: 0,
-    itemCount: 0,
-    totalDeliveryFee: 0,
+  // 数据上报接收的状态（区分今日和全部Tab以支持缓存和秒切）
+  const [tabData, setTabData] = useState<Record<OrdersTab, {
+    summary: {
+      receivedAmount: number;
+      platformCommission: number;
+      validOrderCount: number;
+      itemCount: number;
+      totalDeliveryFee: number;
+      platformReceived?: Record<string, { amount: number; count: number }>;
+      platformDelivery?: Record<string, number>;
+      pureProfit: number;
+      platformProfit?: Record<string, { amount: number; count: number }>;
+    };
+    overview: {
+      totalCount: number;
+      trueOrderCount: number;
+      brushCount: number;
+      cancelledCount: number;
+      platformBreakdown?: {
+        truePlatformCounts: Record<string, number>;
+        brushPlatformCounts: Record<string, number>;
+        cancelledPlatformCounts: Record<string, number>;
+      };
+    };
+    total: number;
+    eligibleBrushSyncOrders: AutoPickOrder[];
+    isLoading: boolean;
+  }>>({
+    today: {
+      summary: {
+        receivedAmount: 0,
+        platformCommission: 0,
+        validOrderCount: 0,
+        itemCount: 0,
+        totalDeliveryFee: 0,
+        platformReceived: {},
+        platformDelivery: {},
+        pureProfit: 0,
+        platformProfit: {},
+      },
+      overview: {
+        totalCount: 0,
+        trueOrderCount: 0,
+        brushCount: 0,
+        cancelledCount: 0,
+        platformBreakdown: {
+          truePlatformCounts: {},
+          brushPlatformCounts: {},
+          cancelledPlatformCounts: {},
+        },
+      },
+      total: 0,
+      eligibleBrushSyncOrders: [],
+      isLoading: false,
+    },
+    all: {
+      summary: {
+        receivedAmount: 0,
+        platformCommission: 0,
+        validOrderCount: 0,
+        itemCount: 0,
+        totalDeliveryFee: 0,
+        platformReceived: {},
+        platformDelivery: {},
+        pureProfit: 0,
+        platformProfit: {},
+      },
+      overview: {
+        totalCount: 0,
+        trueOrderCount: 0,
+        brushCount: 0,
+        cancelledCount: 0,
+        platformBreakdown: {
+          truePlatformCounts: {},
+          brushPlatformCounts: {},
+          cancelledPlatformCounts: {},
+        },
+      },
+      total: 0,
+      eligibleBrushSyncOrders: [],
+      isLoading: false,
+    }
   });
-  const [activeOverview, setActiveOverview] = useState({
-    totalCount: 0,
-    trueOrderCount: 0,
-    brushCount: 0,
-    cancelledCount: 0,
-  });
-  const [activeTotal, setActiveTotal] = useState(0);
-  const [activeEligibleBrushSyncOrders, setActiveEligibleBrushSyncOrders] = useState<AutoPickOrder[]>([]);
-  const [isSubComponentLoading, setIsSubComponentLoading] = useState(false);
+
+  const activeSummary = tabData[activeTab].summary;
+  const activeOverview = tabData[activeTab].overview;
+  const activeTotal = tabData[activeTab].total;
+  const activeEligibleBrushSyncOrders = tabData[activeTab].eligibleBrushSyncOrders;
+  const isSubComponentLoading = tabData[activeTab].isLoading;
+
+  const [allOrdersMounted, setAllOrdersMounted] = useState(false);
+
+  useEffect(() => {
+    if (activeTab === "all" && !allOrdersMounted) {
+      setAllOrdersMounted(true);
+    }
+  }, [activeTab, allOrdersMounted]);
 
   // 推广费相关
   const [promotionAmount, setPromotionAmount] = useState(0);
@@ -1127,23 +1235,47 @@ export default function OrdersPage() {
     setRefreshTrigger((prev) => prev + 1);
   }, []);
 
-  const handleDataLoad = useCallback((data: {
-    summary: { receivedAmount: number; platformCommission: number; validOrderCount: number; itemCount: number; totalDeliveryFee: number };
-    overview: { totalCount: number; trueOrderCount: number; brushCount: number; cancelledCount: number };
+  const handleDataLoad = useCallback((tab: OrdersTab, data: {
+    summary: typeof tabData.today.summary;
+    overview: typeof tabData.today.overview;
     total: number;
     eligibleBrushSyncOrders: AutoPickOrder[];
     isLoading: boolean;
     promotionDate?: string;
   }) => {
-    setActiveSummary(data.summary);
-    setActiveOverview(data.overview);
-    setActiveTotal(data.total);
-    setActiveEligibleBrushSyncOrders(data.eligibleBrushSyncOrders);
-    setIsSubComponentLoading(data.isLoading);
-    if (data.promotionDate) {
+    setTabData((prev) => ({
+      ...prev,
+      [tab]: {
+        summary: data.summary,
+        overview: {
+          totalCount: data.overview?.totalCount || 0,
+          trueOrderCount: data.overview?.trueOrderCount || 0,
+          brushCount: data.overview?.brushCount || 0,
+          cancelledCount: data.overview?.cancelledCount || 0,
+          platformBreakdown: {
+            truePlatformCounts: data.overview?.platformBreakdown?.truePlatformCounts || {},
+            brushPlatformCounts: data.overview?.platformBreakdown?.brushPlatformCounts || {},
+            cancelledPlatformCounts: data.overview?.platformBreakdown?.cancelledPlatformCounts || {},
+          },
+        },
+        total: data.total,
+        eligibleBrushSyncOrders: data.eligibleBrushSyncOrders,
+        isLoading: data.isLoading,
+      }
+    }));
+    
+    if (data.promotionDate && tab === "today") {
       setPromotionDate(data.promotionDate);
     }
   }, []);
+
+  const handleTodayDataLoad = useCallback((data: any) => {
+    handleDataLoad("today", data);
+  }, [handleDataLoad]);
+
+  const handleAllDataLoad = useCallback((data: any) => {
+    handleDataLoad("all", data);
+  }, [handleDataLoad]);
 
   const fetchPromotionExpense = useCallback(async () => {
     if (!promotionDate) return;
@@ -1758,70 +1890,259 @@ export default function OrdersPage() {
               </button>
             </div>
 
-            <div className="grid items-start gap-3 lg:grid-cols-3 xl:grid-cols-4">
-              <div className="min-w-0 rounded-[20px] border border-black/8 bg-white/76 px-4 py-3.5 shadow-xs dark:border-white/10 dark:bg-white/5">
-                <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
-                  <div className="min-w-0">
-                    <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">总订单</div>
-                    <div className="mt-2 text-[30px] font-bold leading-none tracking-tight text-foreground">{activeOverview.totalCount}</div>
-                    {activeTab !== "today" && (
-                      <p className="mt-2 text-xs text-muted-foreground">当前筛选共 {activeTotal} 单</p>
-                    )}
+            <div className="grid items-stretch gap-3 md:grid-cols-2 lg:grid-cols-4">
+              {/* 总订单 / 商家实收 合并卡片 */}
+              <div className="min-w-0 rounded-[20px] border border-black/8 bg-white/76 px-4 py-3.5 shadow-xs dark:border-white/10 dark:bg-white/5 md:col-span-2 lg:col-span-2">
+                <div className="flex flex-col gap-2.5">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <div>
+                      <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">总订单</div>
+                      <div className="mt-2 text-[30px] font-black leading-none tracking-tight text-foreground">{activeOverview.totalCount}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">商家实收</div>
+                      <div className="mt-2 text-[30px] font-black leading-none tracking-tight text-emerald-600 dark:text-emerald-400">
+                        {toCurrency(activeSummary.receivedAmount - (activeTab === "today" ? promotionAmount : 0))}
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex min-w-24.5 max-w-31.5 flex-col items-stretch gap-1">
-                    <div className="inline-flex items-center justify-between rounded-full border border-sky-500/18 bg-sky-500/10 px-2.5 py-1 text-[10px] text-sky-700 dark:text-sky-400">
-                      <span className="truncate pr-2">真单</span>
-                      <span className="shrink-0 font-bold">{activeOverview.trueOrderCount} 单</span>
+
+                  {/* 订单成分比例进度条 */}
+                  {activeOverview.totalCount > 0 && (
+                    <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-black/6 dark:bg-white/10">
+                      {activeOverview.trueOrderCount > 0 && (
+                        <div
+                          style={{ width: `${(activeOverview.trueOrderCount / activeOverview.totalCount) * 100}%` }}
+                          className="bg-sky-500 transition-all duration-500"
+                          title={`真单 ${activeOverview.trueOrderCount}单`}
+                        />
+                      )}
+                      {activeOverview.brushCount > 0 && (
+                        <div
+                          style={{ width: `${(activeOverview.brushCount / activeOverview.totalCount) * 100}%` }}
+                          className="bg-rose-500 transition-all duration-500"
+                          title={`刷单 ${activeOverview.brushCount}单`}
+                        />
+                      )}
+                      {activeOverview.cancelledCount > 0 && (
+                        <div
+                          style={{ width: `${(activeOverview.cancelledCount / activeOverview.totalCount) * 100}%` }}
+                          className="bg-slate-400 dark:bg-slate-500 transition-all duration-500"
+                          title={`取消 ${activeOverview.cancelledCount}单`}
+                        />
+                      )}
                     </div>
-                    <div className="inline-flex items-center justify-between rounded-full border border-rose-500/18 bg-rose-500/10 px-2.5 py-1 text-[10px] text-rose-700 dark:text-rose-400">
-                      <span className="truncate pr-2">刷单</span>
-                      <span className="shrink-0 font-bold">{activeOverview.brushCount} 单</span>
+                  )}
+
+                  {/* 三列看板网格 */}
+                  <div className="grid grid-cols-3 gap-2 mt-2 border-t border-black/4 pt-3 dark:border-white/5 text-[10px]">
+                    {/* 第一列：真单 */}
+                    <div className="flex flex-col gap-1.5 min-w-0 rounded-xl bg-black/1.5 p-2 dark:bg-white/1.5">
+                      <div className="flex items-center justify-between rounded-lg bg-sky-500/8 px-1.5 py-0.5 text-sky-700 dark:bg-sky-500/12 dark:text-sky-400 font-medium text-[9px]">
+                        <span className="truncate">真单</span>
+                        <span className="shrink-0">{activeOverview.trueOrderCount}单</span>
+                      </div>
+                      <div className="flex flex-col gap-1 px-0.5">
+                        {activeOverview.platformBreakdown?.truePlatformCounts && Object.keys(activeOverview.platformBreakdown.truePlatformCounts).length > 0 ? (
+                          Object.entries(activeOverview.platformBreakdown.truePlatformCounts).map(([platform, count]) => {
+                            const meta = getPlatformBadgeMeta(platform);
+                            return (
+                              <div key={platform} className="flex items-center justify-between text-foreground/80 dark:text-white/80 text-[9px]">
+                                <span className="flex items-center gap-0.5 min-w-0">
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img src={meta.iconSrc} alt={meta.iconAlt} className="h-3 w-3 object-contain shrink-0" onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                                  <span className="truncate">{platform}</span>
+                                </span>
+                                <span className="shrink-0">{count}单</span>
+                              </div>
+                            );
+                          })
+                        ) : (
+                          <div className="text-muted-foreground/30 text-center py-0.5 text-[9px]">-</div>
+                        )}
+                      </div>
                     </div>
-                    <div className="inline-flex items-center justify-between rounded-full border border-slate-500/18 bg-slate-500/10 px-2.5 py-1 text-[10px] text-slate-600 dark:text-slate-400">
-                      <span className="truncate pr-2">取消</span>
-                      <span className="shrink-0 font-bold">{activeOverview.cancelledCount} 单</span>
+
+                    {/* 第二列：刷单 */}
+                    <div className="flex flex-col gap-1.5 min-w-0 rounded-xl bg-black/1.5 p-2 dark:bg-white/1.5">
+                      <div className="flex items-center justify-between rounded-lg bg-rose-500/8 px-1.5 py-0.5 text-rose-700 dark:bg-rose-500/12 dark:text-rose-400 font-medium text-[9px]">
+                        <span className="truncate">刷单</span>
+                        <span className="shrink-0">{activeOverview.brushCount}单</span>
+                      </div>
+                      <div className="flex flex-col gap-1 px-0.5">
+                        {activeOverview.platformBreakdown?.brushPlatformCounts && Object.keys(activeOverview.platformBreakdown.brushPlatformCounts).length > 0 ? (
+                          Object.entries(activeOverview.platformBreakdown.brushPlatformCounts).map(([platform, count]) => {
+                            const meta = getPlatformBadgeMeta(platform);
+                            return (
+                              <div key={platform} className="flex items-center justify-between text-foreground/80 dark:text-white/80 text-[9px]">
+                                <span className="flex items-center gap-0.5 min-w-0">
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img src={meta.iconSrc} alt={meta.iconAlt} className="h-3 w-3 object-contain shrink-0" onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                                  <span className="truncate">{platform}</span>
+                                </span>
+                                <span className="shrink-0">{count}单</span>
+                              </div>
+                            );
+                          })
+                        ) : (
+                          <div className="text-muted-foreground/30 text-center py-0.5 text-[9px]">-</div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* 第三列：取消 */}
+                    <div className="flex flex-col gap-1.5 min-w-0 rounded-xl bg-black/1.5 p-2 dark:bg-white/1.5">
+                      <div className="flex items-center justify-between rounded-lg bg-slate-500/8 px-1.5 py-0.5 text-slate-600 dark:bg-slate-500/12 dark:text-slate-400 font-medium text-[9px]">
+                        <span className="truncate">取消</span>
+                        <span className="shrink-0">{activeOverview.cancelledCount}单</span>
+                      </div>
+                      <div className="flex flex-col gap-1 px-0.5">
+                        {activeOverview.platformBreakdown?.cancelledPlatformCounts && Object.keys(activeOverview.platformBreakdown.cancelledPlatformCounts).length > 0 ? (
+                          Object.entries(activeOverview.platformBreakdown.cancelledPlatformCounts).map(([platform, count]) => {
+                            const meta = getPlatformBadgeMeta(platform);
+                            return (
+                              <div key={platform} className="flex items-center justify-between text-foreground/80 dark:text-white/80 text-[9px]">
+                                <span className="flex items-center gap-0.5 min-w-0">
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img src={meta.iconSrc} alt={meta.iconAlt} className="h-3 w-3 object-contain shrink-0" onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                                  <span className="truncate">{platform}</span>
+                                </span>
+                                <span className="shrink-0">{count}单</span>
+                              </div>
+                            );
+                          })
+                        ) : (
+                          <div className="text-muted-foreground/30 text-center py-0.5 text-[9px]">-</div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-              <MetricCard
-                label="商家实收"
-                value={toCurrency(activeSummary.receivedAmount - promotionAmount)}
-                hint={`有效订单 ${activeSummary.validOrderCount} 单`}
-              />
-              <MetricCard
-                label="总配送费"
-                value={toCurrency(activeSummary.totalDeliveryFee)}
-                hint={activeTab === "today" ? "今日订单汇总" : "当前筛选汇总"}
-              />
-              <PromotionMetricCard
-                amount={promotionAmount}
-                date={promotionDate || todayDate}
-                localShops={localShops}
-                onRefresh={fetchPromotionExpense}
-              />
+
+              {/* 平台纯利润分布卡片 */}
+              <div className="min-w-0 h-full rounded-[20px] border border-black/8 bg-white/76 px-4 py-3.5 shadow-xs dark:border-white/10 dark:bg-white/5">
+                <div className="flex flex-col gap-2.5">
+                  <div className="flex flex-row items-center justify-between sm:flex-col sm:items-start sm:justify-start">
+                    <div className="flex flex-col">
+                      <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">纯利润</div>
+                      <div className="mt-1 text-[10px] text-muted-foreground sm:mt-1.5 sm:text-xs">
+                        {activeTab === "today" ? "今日各平台纯利润汇总" : "当前筛选各平台纯利润汇总"}
+                      </div>
+                    </div>
+                    <div className={cn(
+                      "text-[22px] sm:text-[26px] font-bold leading-none tracking-tight sm:mt-2",
+                      activeSummary.pureProfit < 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"
+                    )}>
+                      {toCurrency(activeSummary.pureProfit)}
+                    </div>
+                  </div>
+                  {activeSummary.platformProfit && Object.entries(activeSummary.platformProfit).some(([, info]) => info.amount !== 0) ? (
+                    <div className="mt-2 flex flex-col gap-2 border-t border-black/4 pt-3 dark:border-white/5">
+                      {Object.entries(activeSummary.platformProfit).map(([platform, info]) => {
+                        if (info.amount === 0) return null;
+                        const meta = getPlatformBadgeMeta(platform);
+                        return (
+                          <div key={platform} className="flex items-center justify-between rounded-xl bg-black/1.5 px-3 py-1.5 dark:bg-white/1.5 text-[11px] text-foreground/80 dark:text-white/80">
+                            <span className="flex items-center gap-1.5 min-w-0">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={meta.iconSrc} alt={meta.iconAlt} className="h-3.5 w-3.5 object-contain shrink-0" onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                              <span className="truncate font-medium">{platform}</span>
+                            </span>
+                            <span className={cn(
+                              "font-bold shrink-0",
+                              info.amount < 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"
+                            )}>
+                              {toCurrency(info.amount)}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+
+              {/* 最右侧：配送费和推广费垂直列 */}
+              <div className={cn(
+                "h-full lg:col-span-1",
+                activeTab === "today" ? "grid grid-cols-2 gap-3 sm:flex sm:flex-col" : "flex flex-col gap-3"
+              )}>
+                {activeTab === "today" ? (
+                  <>
+                    <div className="flex-1 flex flex-col [&>div]:flex-1">
+                      <MetricCard
+                        label="总配送费"
+                        value={toCurrency(activeSummary.totalDeliveryFee)}
+                        hint="今日订单汇总"
+                      />
+                    </div>
+                    <div className="flex-1 flex flex-col [&>div]:flex-1">
+                      <PromotionMetricCard
+                        amount={promotionAmount}
+                        date={promotionDate || todayDate}
+                        localShops={localShops}
+                        onRefresh={fetchPromotionExpense}
+                        isToday={true}
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <div className="min-w-0 h-full rounded-[20px] border border-black/8 bg-white/76 px-4 py-3.5 shadow-xs dark:border-white/10 dark:bg-white/5 flex flex-col gap-2.5">
+                    <div>
+                      <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">总配送费</div>
+                      <div className="mt-2 text-[26px] font-bold leading-none tracking-tight text-foreground">{toCurrency(activeSummary.totalDeliveryFee)}</div>
+                      <div className="mt-1.5 text-xs text-muted-foreground">当前筛选各平台汇总</div>
+                    </div>
+                    <div className="flex flex-col gap-2 border-t border-black/4 pt-3 dark:border-white/5">
+                      {activeSummary.platformDelivery && Object.keys(activeSummary.platformDelivery).length > 0 ? (
+                        Object.entries(activeSummary.platformDelivery)
+                          .sort(([, a], [, b]) => b - a)
+                          .map(([platform, fee]) => {
+                            const meta = getPlatformBadgeMeta(platform);
+                            return (
+                              <div key={platform} className="flex items-center justify-between rounded-xl bg-black/1.5 px-3 py-1.5 dark:bg-white/1.5 text-[11px] text-foreground/80 dark:text-white/80">
+                                <span className="flex items-center gap-1.5 min-w-0">
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img src={meta.iconSrc} alt={meta.iconAlt} className="h-3.5 w-3.5 object-contain shrink-0" onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                                  <span className="truncate font-medium">{platform}</span>
+                                </span>
+                                <span className="font-bold shrink-0 text-blue-600 dark:text-blue-400">{toCurrency(fee)}</span>
+                              </div>
+                            );
+                          })
+                      ) : (
+                        <div className="text-muted-foreground/30 text-center py-1.5 text-[11px]">-</div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </section>
 
-        {activeTab === "today" ? (
+        <div className={activeTab === "today" ? "block" : "hidden"}>
           <TodayOrdersView
             refreshTrigger={refreshTrigger}
             onOpenCostBackfill={setBackfillTarget}
             onOpenMatchEditor={openMatchEditor}
             onOpenPurchaseDraft={setPurchaseDraft}
-            onDataLoad={handleDataLoad}
+            onDataLoad={handleTodayDataLoad}
             localShops={localShops}
           />
-        ) : (
-          <AllOrdersView
-            refreshTrigger={refreshTrigger}
-            onOpenCostBackfill={setBackfillTarget}
-            onOpenMatchEditor={openMatchEditor}
-            onOpenPurchaseDraft={setPurchaseDraft}
-            onDataLoad={handleDataLoad}
-            localShops={localShops}
-          />
+        </div>
+        {allOrdersMounted && (
+          <div className={activeTab === "all" ? "block" : "hidden"}>
+            <AllOrdersView
+              refreshTrigger={refreshTrigger}
+              onOpenCostBackfill={setBackfillTarget}
+              onOpenMatchEditor={openMatchEditor}
+              onOpenPurchaseDraft={setPurchaseDraft}
+              onDataLoad={handleAllDataLoad}
+              localShops={localShops}
+            />
+          </div>
         )}
       </div>
 
@@ -1924,6 +2245,20 @@ export default function OrdersPage() {
             setBackfillTarget(null);
             showToast("成本回填成功！净利润已重新计算", "success");
             triggerParentRefresh();
+          }}
+        />
+      )}
+
+      {isCalendarOpen && (
+        <PromotionCalendarModal
+          initialDate={todayDate}
+          localShops={localShops}
+          onClose={() => {
+            setIsCalendarOpen(false);
+            const params = new URLSearchParams(window.location.search);
+            params.delete("calendar");
+            const newSearch = params.toString();
+            router.replace(`/orders${newSearch ? `?${newSearch}` : ""}`);
           }}
         />
       )}

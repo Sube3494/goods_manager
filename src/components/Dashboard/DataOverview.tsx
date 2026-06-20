@@ -1,8 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Area, AreaChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Shop, StatsData } from "@/lib/types";
+import { PromotionCalendarModal } from "@/app/orders/PromotionCalendarModal";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { cn } from "@/lib/utils";
@@ -68,14 +70,22 @@ function CompactMetric({
   value,
   hint,
   tone = "default",
+  onClick,
 }: {
   label: string;
   value: string;
   hint?: string;
   tone?: "default" | "danger" | "success";
+  onClick?: () => void;
 }) {
   return (
-    <div className="min-w-0 overflow-hidden rounded-[18px] border border-black/8 bg-white/72 px-3 py-3 dark:border-white/10 dark:bg-white/4 sm:px-4 sm:py-3.5">
+    <div
+      onClick={onClick}
+      className={cn(
+        "min-w-0 overflow-hidden rounded-[18px] border border-black/8 bg-white/72 px-3 py-3 dark:border-white/10 dark:bg-white/4 sm:px-4 sm:py-3.5 transition-all duration-200",
+        onClick ? "cursor-pointer hover:bg-black/[0.03] active:scale-[0.98] dark:hover:bg-white/[0.08]" : ""
+      )}
+    >
       <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">{label}</div>
       <div
         className={cn(
@@ -214,7 +224,23 @@ export function DataOverview({
   onStartDateChange: (value: string) => void;
   onEndDateChange: (value: string) => void;
 }) {
+  const router = useRouter();
   const todayDate = new Date().toISOString().slice(0, 10);
+  const [isMounted, setIsMounted] = useState(false);
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  const mappedLocalShops = useMemo(() => {
+    return shopOptions.map((shop) => ({
+      id: shop.id || shop.name,
+      name: shop.name,
+      address: shop.address || "",
+    }));
+  }, [shopOptions]);
+
   const [profitPlatform, setProfitPlatform] = useState("all");
   const [orderPlatform, setOrderPlatform] = useState("all");
   const [orderScope, setOrderScope] = useState<"all" | "true">("all");
@@ -247,7 +273,7 @@ export function DataOverview({
   return (
     <div className="space-y-5 sm:space-y-8">
       <section className="min-w-0 overflow-hidden rounded-[24px] border border-black/8 bg-zinc-50/45 px-4 py-3 shadow-xs dark:border-white/10 dark:bg-white/4">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
           <div className="col-span-1 space-y-2">
             <label className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">店铺范围</label>
             <CustomSelect
@@ -364,8 +390,18 @@ export function DataOverview({
 
         <div className="mt-3.5 grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
           <CompactMetric label="平台扣费" value={money(data?.platformCommission)} hint="平台佣金与扣点" />
-          <CompactMetric label="配送支出" value={money(data?.deliveryExpense)} hint="配送相关成本" />
-          <CompactMetric label="推广支出" value={money(data?.promotionExpense)} hint="活动与推广消耗" />
+          <CompactMetric
+            label="配送支出"
+            value={money(data?.deliveryExpense)}
+            hint="配送相关成本"
+            onClick={() => router.push("/orders?tab=all")}
+          />
+          <CompactMetric
+            label="推广支出"
+            value={money(data?.promotionExpense)}
+            hint="活动与推广消耗"
+            onClick={() => setIsCalendarOpen(true)}
+          />
           <CompactMetric label="活跃店铺" value={int(data?.activeShopCount)} hint="当前范围有动销的店铺" />
         </div>
       </section>
@@ -530,6 +566,13 @@ export function DataOverview({
           </div>
         </Panel>
       </div>
+      {isMounted && isCalendarOpen && (
+        <PromotionCalendarModal
+          initialDate={todayDate}
+          localShops={mappedLocalShops}
+          onClose={() => setIsCalendarOpen(false)}
+        />
+      )}
     </div>
   );
 }

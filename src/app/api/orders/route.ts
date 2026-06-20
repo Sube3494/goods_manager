@@ -929,10 +929,15 @@ export async function GET(request: NextRequest) {
             select: {
               platform: true,
               status: true,
+              orderNo: true,
+              orderTime: true,
               actualPaid: true,
               expectedIncome: true,
               platformCommission: true,
               delivery: true,
+              rawPayload: true,
+              shopId: true,
+              shopAddress: true,
               items: {
                 select: {
                   quantity: true,
@@ -943,24 +948,36 @@ export async function GET(request: NextRequest) {
     ]);
     perf.lap("core-queries");
 
-    const outboundNoteNeedles = orders
-      .map((order) => String(order.orderNo || "").trim())
-      .filter(Boolean)
-      .map((orderNo) => `平台单号: ${orderNo}`);
+    const allOrdersForCost = [...orders, ...(summaryOrders || [])];
+    const orderTimes = allOrdersForCost.map((o) => o.orderTime).filter(Boolean);
+    let minDate: Date | null = null;
+    let maxDate: Date | null = null;
+    if (orderTimes.length > 0) {
+      const times = orderTimes.map((t) => new Date(t).getTime());
+      minDate = new Date(Math.min(...times));
+      maxDate = new Date(Math.max(...times));
+    }
 
+    const orderNos = new Set(allOrdersForCost.map((o) => String(o.orderNo || "").trim()).filter(Boolean));
     const outboundRows: OutboundLookupRow[] = [];
-    if (outboundNoteNeedles.length > 0) {
-      try {
-        outboundRows.push(...await prisma.outboundOrder.findMany({
-          where: {
-            userId: session.id,
-            status: {
-              not: "Returned",
-            },
-            OR: outboundNoteNeedles.map((needle) => ({
-              note: { contains: needle, mode: "insensitive" as const },
-            })),
-          },
+
+    if (orderNos.size > 0) {
+      const outboundWhere: Prisma.OutboundOrderWhereInput = {
+        userId: session.id,
+        status: {
+          not: "Returned",
+        },
+        ...(minDate && maxDate ? {
+          date: {
+            gte: new Date(minDate.getTime() - 24 * 60 * 60 * 1000),
+            lte: new Date(maxDate.getTime() + 24 * 60 * 60 * 1000),
+          }
+        } : {}),
+      };
+
+      const fetchAllOutboundOrders = async (includeCostSnapshot: boolean) => {
+        return prisma.outboundOrder.findMany({
+          where: outboundWhere,
           select: {
             id: true,
             note: true,
@@ -971,7 +988,7 @@ export async function GET(request: NextRequest) {
                 productId: true,
                 shopProductId: true,
                 quantity: true,
-                costSnapshot: true,
+                ...(includeCostSnapshot ? { costSnapshot: true } : {}),
                 shopProduct: {
                   select: {
                     productName: true,
@@ -990,52 +1007,27 @@ export async function GET(request: NextRequest) {
           orderBy: {
             createdAt: "desc",
           },
-        }));
+        });
+      };
+
+      let rawOutboundOrders = [];
+      try {
+        rawOutboundOrders = await fetchAllOutboundOrders(true);
       } catch (error) {
         if (!isPrismaMissingColumnError(error, "OutboundOrderItem.costSnapshot")) {
           throw error;
         }
-
-        outboundRows.push(...await prisma.outboundOrder.findMany({
-          where: {
-            userId: session.id,
-            status: {
-              not: "Returned",
-            },
-            OR: outboundNoteNeedles.map((needle) => ({
-              note: { contains: needle, mode: "insensitive" as const },
-            })),
-          },
-          select: {
-            id: true,
-            note: true,
-            status: true,
-            items: {
-              select: {
-                id: true,
-                productId: true,
-                shopProductId: true,
-                quantity: true,
-                shopProduct: {
-                  select: {
-                    productName: true,
-                    costPrice: true,
-                  },
-                },
-                product: {
-                  select: {
-                    name: true,
-                    costPrice: true,
-                  },
-                },
-              },
-            },
-          },
-          orderBy: {
-            createdAt: "desc",
-          },
-        }));
+        rawOutboundOrders = await fetchAllOutboundOrders(false);
       }
+
+      const filtered = rawOutboundOrders.filter((outbound) => {
+        const note = String(outbound.note || "");
+        const match = note.match(/平台单号:\s*([^\s|]+)/);
+        const orderNo = String(match?.[1] || "").trim();
+        return orderNo && orderNos.has(orderNo);
+      });
+
+      outboundRows.push(...(filtered as OutboundLookupRow[]));
     }
     perf.lap("outbound-lookup");
 
@@ -1262,6 +1254,12 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    const permissionsObj = userProfile?.permissions && typeof userProfile.permissions === "object" && !Array.isArray(userProfile.permissions)
+      ? userProfile.permissions as Record<string, unknown>
+      : {};
+    const integrationConfig = normalizeAutoPickIntegrationConfig(permissionsObj.autoPickIntegration);
+    const brushCommission = Math.round((integrationConfig.defaultBrushCommission || 0) * 100);
+
     const summary = !includeMetrics
       ? null
       : summaryOrders.reduce((acc, order) => {
@@ -1270,12 +1268,70 @@ export async function GET(request: NextRequest) {
           const cancelled = isAutoPickOrderCancelledStatus(order.status);
           const deleted = isAutoPickOrderDeletedStatus(order.status);
           if (!cancelled && !deleted) {
-            acc.receivedAmount += Math.max(0, Number(metrics.expectedIncome || 0));
+            const expected = Math.max(0, Number(metrics.expectedIncome || 0));
+            acc.receivedAmount += expected;
             acc.platformCommission += metrics.platformCommission;
             acc.validOrderCount += 1;
+
+            const platform = order.platform || "其他";
+            if (!acc.platformReceived[platform]) {
+              acc.platformReceived[platform] = { amount: 0, count: 0 };
+            }
+            acc.platformReceived[platform].amount += expected;
+            acc.platformReceived[platform].count += 1;
+
+            const deliveryFee = readDeliveryFee(order.delivery);
+            acc.totalDeliveryFee += deliveryFee;
+            if (deliveryFee > 0) {
+              acc.platformDelivery[platform] = (acc.platformDelivery[platform] || 0) + deliveryFee;
+            }
+
+            // 计算该 order 的 pureProfit
+            const lockedResolvedShop = readResolvedAutoPickShop(order.rawPayload);
+            const mappingDebug = resolveMappedShopDebug(
+              order.shopId,
+              readShopNameFromRawPayload(order.rawPayload) || null,
+              readShopAddressFromRawPayload(order.rawPayload) || order.shopAddress || null,
+              userProfile?.permissions
+            );
+            const matchedShopId = lockedResolvedShop?.id || null;
+            const matchedShopName = String(
+              String(lockedResolvedShop?.name || "").trim() || mappingDebug.localShopName || ""
+            ).trim();
+            const outboundMeta = outboundByOrderNo.get(order.orderNo) || null;
+            const hiddenDeletedOfflineIncome = deleted && order.platform === "线下交易";
+            const safeExpectedIncome = hiddenDeletedOfflineIncome
+              ? null
+              : (typeof metrics.expectedIncome === "number" ? metrics.expectedIncome : null);
+            const serviceFeeRate = order.platform === "线下交易"
+              ? 0
+              : (shopRateMap.get(matchedShopName) ?? 0.06);
+            const productCost = outboundMeta?.productCost || 0;
+            const missingCostItemCount = outboundMeta?.missingCostItemCount || 0;
+            const hasOutbound = Boolean(outboundMeta);
+            const productCostStatus = !hasOutbound
+              ? "pending-outbound" as const
+              : missingCostItemCount > 0
+                ? "pending-backfill" as const
+                : "ready" as const;
+            const isBrush = readMainSystemSelfDeliveryFlag(order.rawPayload);
+            const orderPureProfit = hiddenDeletedOfflineIncome
+              ? null
+              : isBrush
+              ? - (Math.abs(Number(order.platformCommission || 0)) + brushCommission)
+              : (productCostStatus === "ready"
+                ? Math.round(Number(safeExpectedIncome || 0) * (1 - serviceFeeRate)) - deliveryFee - productCost
+                : null);
+
+            const profitValue = typeof orderPureProfit === "number" && Number.isFinite(orderPureProfit) ? orderPureProfit : 0;
+            acc.pureProfit += profitValue;
+            if (!acc.platformProfit[platform]) {
+              acc.platformProfit[platform] = { amount: 0, count: 0 };
+            }
+            acc.platformProfit[platform].amount += profitValue;
+            acc.platformProfit[platform].count += 1;
           }
           acc.itemCount += order.items.reduce((sum: number, item) => sum + item.quantity, 0);
-          acc.totalDeliveryFee += readDeliveryFee(order.delivery);
           return acc;
         }, {
           receivedAmount: 0,
@@ -1283,7 +1339,33 @@ export async function GET(request: NextRequest) {
           validOrderCount: 0,
           itemCount: 0,
           totalDeliveryFee: 0,
+          platformReceived: {} as Record<string, { amount: number; count: number }>,
+          platformDelivery: {} as Record<string, number>,
+          pureProfit: 0,
+          platformProfit: {} as Record<string, { amount: number; count: number }>,
         });
+
+    const truePlatformCounts: Record<string, number> = {};
+    const brushPlatformCounts: Record<string, number> = {};
+    const cancelledPlatformCounts: Record<string, number> = {};
+
+    if (includeMetrics) {
+      for (const order of summaryOrders) {
+        const platform = order.platform || "其他";
+        const cancelled = isAutoPickOrderCancelledStatus(order.status) || isAutoPickOrderDeletedStatus(order.status);
+        if (cancelled) {
+          cancelledPlatformCounts[platform] = (cancelledPlatformCounts[platform] || 0) + 1;
+        } else {
+          const isBrush = readMainSystemSelfDeliveryFlag(order.rawPayload);
+          if (isBrush) {
+            brushPlatformCounts[platform] = (brushPlatformCounts[platform] || 0) + 1;
+          } else {
+            truePlatformCounts[platform] = (truePlatformCounts[platform] || 0) + 1;
+          }
+        }
+      }
+    }
+
     const overview = !includeMetrics
       ? null
       : {
@@ -1291,6 +1373,11 @@ export async function GET(request: NextRequest) {
           cancelledCount: cancelledTotal,
           brushCount: brushTotal,
           trueOrderCount: Math.max(0, total - cancelledTotal - brushTotal),
+          platformBreakdown: {
+            truePlatformCounts,
+            brushPlatformCounts,
+            cancelledPlatformCounts,
+          },
         };
 
     const productNames = Array.from(new Set(
@@ -1340,11 +1427,7 @@ export async function GET(request: NextRequest) {
       shopName: item.shop?.name || null,
     }));
 
-    const permissionsObj = userProfile?.permissions && typeof userProfile.permissions === "object" && !Array.isArray(userProfile.permissions)
-      ? userProfile.permissions as Record<string, unknown>
-      : {};
-    const integrationConfig = normalizeAutoPickIntegrationConfig(permissionsObj.autoPickIntegration);
-    const brushCommission = Math.round((integrationConfig.defaultBrushCommission || 0) * 100);
+
 
     const enrichedOrders = orders.map((order) => {
       const manualAmountOverride = readManualAmountOverride(order.rawPayload);

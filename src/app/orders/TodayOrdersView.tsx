@@ -27,9 +27,9 @@ interface TodayOrdersViewProps {
   onOpenCostBackfill: (order: AutoPickOrder) => void;
   onOpenMatchEditor: (order: AutoPickOrder, item: AutoPickOrderItem) => void;
   onOpenPurchaseDraft?: (draft: PurchaseOrder) => void;
-  onDataLoad: (data: {
-    summary: { receivedAmount: number; platformCommission: number; validOrderCount: number; itemCount: number; totalDeliveryFee: number };
-    overview: { totalCount: number; trueOrderCount: number; brushCount: number; cancelledCount: number };
+    onDataLoad: (data: {
+      summary: { receivedAmount: number; platformCommission: number; validOrderCount: number; itemCount: number; totalDeliveryFee: number; platformReceived?: Record<string, { amount: number; count: number }>; platformDelivery?: Record<string, number>; pureProfit: number; platformProfit?: Record<string, { amount: number; count: number }> };
+    overview: { totalCount: number; trueOrderCount: number; brushCount: number; cancelledCount: number; platformBreakdown?: { truePlatformCounts: Record<string, number>; brushPlatformCounts: Record<string, number>; cancelledPlatformCounts: Record<string, number> } };
     total: number;
     eligibleBrushSyncOrders: AutoPickOrder[];
     isLoading: boolean;
@@ -370,11 +370,36 @@ export function TodayOrdersView({
     const validOrders = filteredOrders.filter((item) => !isCancelledStatus(item.status) && !isDeletedStatus(item.status));
     const brushCount = validOrders.filter((item) => item.isMainSystemSelfDelivery && !isAbnormalStatus(item.status)).length;
     const trueOrderCount = Math.max(0, validOrders.length - brushCount);
+
+    const truePlatformCounts: Record<string, number> = {};
+    const brushPlatformCounts: Record<string, number> = {};
+    const cancelledPlatformCounts: Record<string, number> = {};
+
+    for (const item of filteredOrders) {
+      const platform = item.platform || "其他";
+      const cancelled = isCancelledStatus(item.status) || isDeletedStatus(item.status);
+      if (cancelled) {
+        cancelledPlatformCounts[platform] = (cancelledPlatformCounts[platform] || 0) + 1;
+      } else {
+        const isBrush = item.isMainSystemSelfDelivery && !isAbnormalStatus(item.status);
+        if (isBrush) {
+          brushPlatformCounts[platform] = (brushPlatformCounts[platform] || 0) + 1;
+        } else {
+          truePlatformCounts[platform] = (truePlatformCounts[platform] || 0) + 1;
+        }
+      }
+    }
+
     return {
       totalCount: filteredOrders.length,
       trueOrderCount,
       brushCount,
       cancelledCount,
+      platformBreakdown: {
+        truePlatformCounts,
+        brushPlatformCounts,
+        cancelledPlatformCounts,
+      },
     };
   }, [filteredOrders]);
 
@@ -410,42 +435,46 @@ export function TodayOrdersView({
         <div className="flex flex-col gap-4">
           <div className="flex items-center justify-between gap-3">
             <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">筛选</div>
-            {hasActiveFilters ? (
-              <button
-                type="button"
-                onClick={resetFilters}
-                className="inline-flex items-center gap-2 rounded-full border border-black/8 bg-white/85 px-4 py-2 text-xs font-black text-foreground transition-all hover:bg-white dark:border-white/10 dark:bg-white/5"
-              >
-                <X size={13} />
-                清空筛选
-              </button>
-            ) : null}
           </div>
 
           <div className="grid gap-3 lg:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))]">
-            <label className="flex h-11 items-center gap-3 rounded-xl border border-black/8 bg-white px-4 focus-within:ring-2 focus-within:ring-primary/10 dark:border-white/10 dark:bg-white/3">
-              <Search size={16} className="text-muted-foreground" />
-              <input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="搜索订单号、地址、商品名、SKU"
-                className="w-full bg-transparent text-sm outline-none"
+            <div className="flex items-center gap-2 min-w-0">
+              <label className="flex h-11 flex-1 items-center gap-3 rounded-xl border border-black/8 bg-white px-4 focus-within:ring-2 focus-within:ring-primary/10 dark:border-white/10 dark:bg-white/3 min-w-0">
+                <Search size={16} className="text-muted-foreground shrink-0" />
+                <input
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="搜索订单号、地址、商品名、SKU"
+                  className="w-full bg-transparent text-sm outline-none"
+                />
+              </label>
+              {hasActiveFilters ? (
+                <button
+                  type="button"
+                  onClick={resetFilters}
+                  title="清空所有筛选条件"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-black/8 bg-white/85 text-foreground hover:bg-white hover:border-black/12 active:scale-95 transition-all dark:border-white/10 dark:bg-white/3 dark:hover:bg-white/5 cursor-pointer"
+                >
+                  <X size={16} />
+                </button>
+              ) : null}
+            </div>
+            <div className="grid grid-cols-2 gap-3 sm:contents">
+              <CustomSelect
+                value={shop}
+                onChange={setShop}
+                options={shopOptions}
+                className="h-11"
+                triggerClassName="h-full rounded-xl border border-black/8 bg-white px-4 text-sm shadow-none dark:border-white/10 dark:bg-white/3"
               />
-            </label>
-            <CustomSelect
-              value={shop}
-              onChange={setShop}
-              options={shopOptions}
-              className="h-11"
-              triggerClassName="h-full rounded-xl border border-black/8 bg-white px-4 text-sm shadow-none dark:border-white/10 dark:bg-white/3"
-            />
-            <CustomSelect
-              value={platform}
-              onChange={setPlatform}
-              options={platformOptions}
-              className="h-11"
-              triggerClassName="h-full rounded-xl border border-black/8 bg-white px-4 text-sm shadow-none dark:border-white/10 dark:bg-white/3"
-            />
+              <CustomSelect
+                value={platform}
+                onChange={setPlatform}
+                options={platformOptions}
+                className="h-11"
+                triggerClassName="h-full rounded-xl border border-black/8 bg-white px-4 text-sm shadow-none dark:border-white/10 dark:bg-white/3"
+              />
+            </div>
             <CustomSelect
               value={status}
               onChange={setStatus}
@@ -487,23 +516,23 @@ export function TodayOrdersView({
         ) : null}
 
         {!isLoading && todayCompletedOrders.length > 0 ? (
-          <section className="rounded-[28px] border border-black/8 bg-white/76 p-3 shadow-xs dark:border-white/10 dark:bg-white/4">
+          <section className="flex flex-col gap-3">
             <button
               type="button"
               onClick={() => setShowCompletedToday((current) => !current)}
-              className="flex w-full items-center justify-between rounded-[22px] border border-black/8 bg-black/2 px-4 py-4 text-left transition-all hover:bg-black/3 dark:border-white/10 dark:bg-white/3"
+              className="flex w-full items-center justify-between rounded-[20px] border border-black/8 bg-white/76 px-5 py-4 text-left transition-all hover:bg-black/3 dark:border-white/10 dark:bg-white/5 shadow-xs"
             >
               <div>
-                <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">今日已完成</div>
-                <div className="mt-1 text-lg font-black text-foreground">{todayCompletedOrders.length} 单</div>
+                <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">今日已完成</div>
+                <div className="mt-1 text-lg font-bold text-foreground">{todayCompletedOrders.length} 单</div>
               </div>
-              <div className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-black/8 bg-white/85 dark:border-white/10 dark:bg-white/4">
+              <div className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-black/8 bg-black/2 transition-colors hover:bg-black/3 dark:border-white/10 dark:bg-white/3">
                 {showCompletedToday ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
               </div>
             </button>
 
             {showCompletedToday ? (
-              <div className="mt-4 grid gap-4">
+              <div className="grid gap-4">
                 {todayCompletedOrders.map((order) => (
                   <OrderCardErrorBoundary key={order.id} orderNo={order.orderNo || order.id}>
                     <OrderCard
@@ -524,23 +553,23 @@ export function TodayOrdersView({
         ) : null}
 
         {!isLoading && todayCancelledOrders.length > 0 ? (
-          <section className="rounded-[28px] border border-black/8 bg-white/76 p-3 shadow-xs dark:border-white/10 dark:bg-white/4">
+          <section className="flex flex-col gap-3">
             <button
               type="button"
               onClick={() => setShowCancelledToday((current) => !current)}
-              className="flex w-full items-center justify-between rounded-[22px] border border-black/8 bg-black/2 px-4 py-4 text-left transition-all hover:bg-black/3 dark:border-white/10 dark:bg-white/3"
+              className="flex w-full items-center justify-between rounded-[20px] border border-black/8 bg-white/76 px-5 py-4 text-left transition-all hover:bg-black/3 dark:border-white/10 dark:bg-white/5 shadow-xs"
             >
               <div>
-                <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">今日已取消</div>
-                <div className="mt-1 text-lg font-black text-foreground">{todayCancelledOrders.length} 单</div>
+                <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">今日已取消</div>
+                <div className="mt-1 text-lg font-bold text-foreground">{todayCancelledOrders.length} 单</div>
               </div>
-              <div className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-black/8 bg-white/85 dark:border-white/10 dark:bg-white/4">
+              <div className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-black/8 bg-black/2 transition-colors hover:bg-black/3 dark:border-white/10 dark:bg-white/3">
                 {showCancelledToday ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
               </div>
             </button>
 
             {showCancelledToday ? (
-              <div className="mt-4 grid gap-4">
+              <div className="grid gap-4">
                 {todayCancelledOrders.map((order) => (
                   <OrderCardErrorBoundary key={order.id} orderNo={order.orderNo || order.id}>
                     <OrderCard

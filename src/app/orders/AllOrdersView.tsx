@@ -27,8 +27,8 @@ interface AllOrdersViewProps {
   onOpenMatchEditor: (order: AutoPickOrder, item: AutoPickOrderItem) => void;
   onOpenPurchaseDraft?: (draft: PurchaseOrder) => void;
   onDataLoad: (data: {
-    summary: { receivedAmount: number; platformCommission: number; validOrderCount: number; itemCount: number; totalDeliveryFee: number };
-    overview: { totalCount: number; trueOrderCount: number; brushCount: number; cancelledCount: number };
+    summary: { receivedAmount: number; platformCommission: number; validOrderCount: number; itemCount: number; totalDeliveryFee: number; platformReceived?: Record<string, { amount: number; count: number }>; platformDelivery?: Record<string, number>; pureProfit: number; platformProfit?: Record<string, { amount: number; count: number }> };
+    overview: { totalCount: number; trueOrderCount: number; brushCount: number; cancelledCount: number; platformBreakdown?: { truePlatformCounts: Record<string, number>; brushPlatformCounts: Record<string, number>; cancelledPlatformCounts: Record<string, number> } };
     total: number;
     eligibleBrushSyncOrders: AutoPickOrder[];
     isLoading: boolean;
@@ -55,18 +55,47 @@ export function AllOrdersView({
     pageSize: ALL_ORDERS_BATCH_SIZE,
     totalPages: 1,
   });
-  const [summary, setSummary] = useState({
+  const [summary, setSummary] = useState<{
+    receivedAmount: number;
+    platformCommission: number;
+    validOrderCount: number;
+    itemCount: number;
+    totalDeliveryFee: number;
+    platformReceived?: Record<string, { amount: number; count: number }>;
+    platformDelivery?: Record<string, number>;
+    pureProfit: number;
+    platformProfit?: Record<string, { amount: number; count: number }>;
+  }>({
     receivedAmount: 0,
     platformCommission: 0,
     validOrderCount: 0,
     itemCount: 0,
     totalDeliveryFee: 0,
+    platformReceived: {},
+    platformDelivery: {},
+    pureProfit: 0,
+    platformProfit: {},
   });
-  const [overview, setOverview] = useState({
+  const [overview, setOverview] = useState<{
+    totalCount: number;
+    trueOrderCount: number;
+    brushCount: number;
+    cancelledCount: number;
+    platformBreakdown?: {
+      truePlatformCounts: Record<string, number>;
+      brushPlatformCounts: Record<string, number>;
+      cancelledPlatformCounts: Record<string, number>;
+    };
+  }>({
     totalCount: 0,
     trueOrderCount: 0,
     brushCount: 0,
     cancelledCount: 0,
+    platformBreakdown: {
+      truePlatformCounts: {},
+      brushPlatformCounts: {},
+      cancelledPlatformCounts: {},
+    },
   });
 
   const [platforms, setPlatforms] = useState<string[]>([]);
@@ -117,7 +146,7 @@ export function AllOrdersView({
       if (startDate) params.set("startDate", startDate);
       if (endDate) params.set("endDate", endDate);
       if (shop !== "all") params.set("shop", shop);
-      if (shop === "all" && !silent) {
+      if (!silent) {
         params.set("_metrics", "1");
       }
       if (silent) params.set("_lite", "1");
@@ -373,17 +402,43 @@ export function AllOrdersView({
         trueOrderCount: overview.trueOrderCount,
         brushCount: overview.brushCount,
         cancelledCount: overview.cancelledCount,
+        platformBreakdown: overview.platformBreakdown || { truePlatformCounts: {}, brushPlatformCounts: {}, cancelledPlatformCounts: {} },
       };
     }
     const cancelledCount = filteredOrders.filter((item) => isCancelledStatus(item.status) || isDeletedStatus(item.status)).length;
     const validOrders = filteredOrders.filter((item) => !isCancelledStatus(item.status) && !isDeletedStatus(item.status));
     const brushCount = validOrders.filter((item) => item.isMainSystemSelfDelivery && !isAbnormalStatus(item.status)).length;
     const trueOrderCount = Math.max(0, validOrders.length - brushCount);
+
+    const truePlatformCounts: Record<string, number> = {};
+    const brushPlatformCounts: Record<string, number> = {};
+    const cancelledPlatformCounts: Record<string, number> = {};
+
+    for (const item of filteredOrders) {
+      const platform = item.platform || "其他";
+      const cancelled = isCancelledStatus(item.status) || isDeletedStatus(item.status);
+      if (cancelled) {
+        cancelledPlatformCounts[platform] = (cancelledPlatformCounts[platform] || 0) + 1;
+      } else {
+        const isBrush = item.isMainSystemSelfDelivery && !isAbnormalStatus(item.status);
+        if (isBrush) {
+          brushPlatformCounts[platform] = (brushPlatformCounts[platform] || 0) + 1;
+        } else {
+          truePlatformCounts[platform] = (truePlatformCounts[platform] || 0) + 1;
+        }
+      }
+    }
+
     return {
       totalCount: filteredOrders.length,
       trueOrderCount,
       brushCount,
       cancelledCount,
+      platformBreakdown: {
+        truePlatformCounts,
+        brushPlatformCounts,
+        cancelledPlatformCounts,
+      },
     };
   }, [filteredOrders, overview, shop, meta.total]);
 
@@ -430,42 +485,46 @@ export function AllOrdersView({
         <div className="flex flex-col gap-4">
           <div className="flex items-center justify-between gap-3">
             <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">筛选</div>
-            {hasActiveFilters ? (
-              <button
-                type="button"
-                onClick={resetFilters}
-                className="inline-flex items-center gap-2 rounded-full border border-black/8 bg-white/85 px-4 py-2 text-xs font-black text-foreground transition-all hover:bg-white dark:border-white/10 dark:bg-white/5"
-              >
-                <X size={13} />
-                清空筛选
-              </button>
-            ) : null}
           </div>
 
           <div className="grid gap-3 lg:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))_minmax(0,1fr)_minmax(0,1fr)]">
-            <label className="flex h-11 items-center gap-3 rounded-xl border border-black/8 bg-white px-4 focus-within:ring-2 focus-within:ring-primary/10 dark:border-white/10 dark:bg-white/3">
-              <Search size={16} className="text-muted-foreground" />
-              <input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="搜索订单号、地址、商品名、SKU"
-                className="w-full bg-transparent text-sm outline-none"
+            <div className="flex items-center gap-2 min-w-0">
+              <label className="flex h-11 flex-1 items-center gap-3 rounded-xl border border-black/8 bg-white px-4 focus-within:ring-2 focus-within:ring-primary/10 dark:border-white/10 dark:bg-white/3 min-w-0">
+                <Search size={16} className="text-muted-foreground shrink-0" />
+                <input
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="搜索订单号、地址、商品名、SKU"
+                  className="w-full bg-transparent text-sm outline-none"
+                />
+              </label>
+              {hasActiveFilters ? (
+                <button
+                  type="button"
+                  onClick={resetFilters}
+                  title="清空所有筛选条件"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-black/8 bg-white/85 text-foreground hover:bg-white hover:border-black/12 active:scale-95 transition-all dark:border-white/10 dark:bg-white/3 dark:hover:bg-white/5 cursor-pointer"
+                >
+                  <X size={16} />
+                </button>
+              ) : null}
+            </div>
+            <div className="grid grid-cols-2 gap-3 sm:contents">
+              <CustomSelect
+                value={shop}
+                onChange={setShop}
+                options={shopOptions}
+                className="h-11"
+                triggerClassName="h-full rounded-xl border border-black/8 bg-white px-4 text-sm shadow-none dark:border-white/10 dark:bg-white/3"
               />
-            </label>
-            <CustomSelect
-              value={shop}
-              onChange={setShop}
-              options={shopOptions}
-              className="h-11"
-              triggerClassName="h-full rounded-xl border border-black/8 bg-white px-4 text-sm shadow-none dark:border-white/10 dark:bg-white/3"
-            />
-            <CustomSelect
-              value={platform}
-              onChange={setPlatform}
-              options={platformOptions}
-              className="h-11"
-              triggerClassName="h-full rounded-xl border border-black/8 bg-white px-4 text-sm shadow-none dark:border-white/10 dark:bg-white/3"
-            />
+              <CustomSelect
+                value={platform}
+                onChange={setPlatform}
+                options={platformOptions}
+                className="h-11"
+                triggerClassName="h-full rounded-xl border border-black/8 bg-white px-4 text-sm shadow-none dark:border-white/10 dark:bg-white/3"
+              />
+            </div>
             <CustomSelect
               value={status}
               onChange={setStatus}
@@ -473,23 +532,25 @@ export function AllOrdersView({
               className="h-11"
               triggerClassName="h-full rounded-xl border border-black/8 bg-white px-4 text-sm shadow-none dark:border-white/10 dark:bg-white/3"
             />
-            <DatePicker
-              value={startDate}
-              onChange={setStartDate}
-              placeholder="开始日期"
-              maxDate={endDate || todayDate}
-              className="h-11 w-full"
-              triggerClassName="h-full rounded-xl border border-black/8 bg-white px-4 text-sm shadow-none dark:border-white/10 dark:bg-white/3"
-            />
-            <DatePicker
-              value={endDate}
-              onChange={setEndDate}
-              placeholder="结束日期"
-              minDate={startDate || undefined}
-              maxDate={todayDate}
-              className="h-11 w-full"
-              triggerClassName="h-full rounded-xl border border-black/8 bg-white px-4 text-sm shadow-none dark:border-white/10 dark:bg-white/3"
-            />
+            <div className="grid grid-cols-2 gap-3 sm:contents">
+              <DatePicker
+                value={startDate}
+                onChange={setStartDate}
+                placeholder="开始日期"
+                maxDate={endDate || todayDate}
+                className="h-11 w-full"
+                triggerClassName="h-full rounded-xl border border-black/8 bg-white px-4 text-sm shadow-none dark:border-white/10 dark:bg-white/3"
+              />
+              <DatePicker
+                value={endDate}
+                onChange={setEndDate}
+                placeholder="结束日期"
+                minDate={startDate || undefined}
+                maxDate={todayDate}
+                className="h-11 w-full"
+                triggerClassName="h-full rounded-xl border border-black/8 bg-white px-4 text-sm shadow-none dark:border-white/10 dark:bg-white/3"
+              />
+            </div>
           </div>
         </div>
       </section>

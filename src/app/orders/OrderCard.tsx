@@ -165,10 +165,31 @@ export function getDeliveryFee(delivery: unknown) {
 export function summarizeOrders(orders: AutoPickOrder[]) {
   return orders.reduce((acc, order) => {
     if (!isCancelledStatus(order.status) && !isDeletedStatus(order.status)) {
-      acc.receivedAmount += Math.max(0, getExpectedIncome(order.expectedIncome, order.actualPaid, order.platformCommission));
+      const expectedIncome = Math.max(0, getExpectedIncome(order.expectedIncome, order.actualPaid, order.platformCommission));
+      acc.receivedAmount += expectedIncome;
       acc.platformCommission += Math.max(0, Number(order.platformCommission || 0));
       acc.validOrderCount += 1;
-      acc.totalDeliveryFee += getDeliveryFee(order.delivery);
+      const deliveryFee = getDeliveryFee(order.delivery);
+      acc.totalDeliveryFee += deliveryFee;
+
+      const platform = order.platform || "其他";
+      if (!acc.platformReceived[platform]) {
+        acc.platformReceived[platform] = { amount: 0, count: 0 };
+      }
+      acc.platformReceived[platform].amount += expectedIncome;
+      acc.platformReceived[platform].count += 1;
+
+      const orderPureProfit = typeof order.pureProfit === "number" && Number.isFinite(order.pureProfit) ? order.pureProfit : 0;
+      acc.pureProfit += orderPureProfit;
+      if (!acc.platformProfit[platform]) {
+        acc.platformProfit[platform] = { amount: 0, count: 0 };
+      }
+      acc.platformProfit[platform].amount += orderPureProfit;
+      acc.platformProfit[platform].count += 1;
+
+      if (deliveryFee > 0) {
+        acc.platformDelivery[platform] = (acc.platformDelivery[platform] || 0) + deliveryFee;
+      }
     } else {
       const platformStr = String(order.platform || "").trim().toLowerCase();
       const deliveryObj = order.delivery && typeof order.delivery === "object" && !Array.isArray(order.delivery)
@@ -189,6 +210,10 @@ export function summarizeOrders(orders: AutoPickOrder[]) {
     validOrderCount: 0,
     itemCount: 0,
     totalDeliveryFee: 0,
+    platformReceived: {} as Record<string, { amount: number; count: number }>,
+    platformDelivery: {} as Record<string, number>,
+    pureProfit: 0,
+    platformProfit: {} as Record<string, { amount: number; count: number }>,
   });
 }
 
@@ -597,7 +622,7 @@ export function MetricCard({
   return (
     <div className="rounded-[20px] border border-black/8 bg-white/76 px-4 py-3.5 shadow-xs dark:border-white/10 dark:bg-white/5">
       <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">{label}</div>
-      <div className="mt-2 text-[30px] font-black leading-none tracking-tight text-foreground">{value}</div>
+      <div className="mt-2 text-[22px] sm:text-[30px] font-black leading-none tracking-tight text-foreground">{value}</div>
       <p className="mt-2 text-xs text-muted-foreground">{hint}</p>
     </div>
   );
@@ -750,7 +775,7 @@ export function PromotionMetricCard({
         </div>
         <div
           onClick={() => setIsModalOpen(true)}
-          className="mt-2 text-[30px] font-black leading-none tracking-tight text-foreground cursor-pointer hover:opacity-85 transition-opacity duration-200"
+          className="mt-2 text-[22px] sm:text-[30px] font-black leading-none tracking-tight text-foreground cursor-pointer hover:opacity-85 transition-opacity duration-200"
         >
           ¥{amount.toFixed(2)}
         </div>
