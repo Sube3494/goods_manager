@@ -10,6 +10,7 @@ import {
   Clock3,
   Loader2,
   MapPin,
+  Navigation,
   Package2,
   Pencil,
   RefreshCw,
@@ -1596,30 +1597,78 @@ export function OrderCard({
                     <span className="shrink-0 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">{commissionDisplay.label}</span>
                     <span className="truncate text-sm font-semibold text-foreground">{commissionDisplay.value}</span>
                   </div>
+                  {order.delivery?.sendFee != null ? (
+                    <div className="flex min-w-0 items-center justify-between gap-2 rounded-2xl border border-black/8 bg-black/2 px-3 py-2 dark:border-white/10 dark:bg-white/3 sm:inline-flex sm:h-9 sm:justify-start sm:rounded-full sm:py-0">
+                      <span className="shrink-0 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">配送费</span>
+                      <span className="truncate text-sm font-semibold text-foreground">{toCurrency(order.delivery.sendFee)}</span>
+                    </div>
+                  ) : null}
                 </div>
               </div>
 
               <div className="min-w-0 flex-1">
-                <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs font-medium text-muted-foreground sm:hidden">
-                  <span className="inline-flex min-w-0 items-center gap-1.5">
-                    <Clock3 size={12} className="shrink-0" />
-                    <span className="truncate">{formatLocalDateTime(order.orderTime)}</span>
-                  </span>
-                  <span className="inline-flex min-w-0 items-center justify-end gap-1.5 text-right">
-                    <MapPin size={12} className="shrink-0" />
-                    <span className="truncate">{pickup ? "-" : (order.distanceKm != null ? formatDistanceKm(order.distanceKm) : "距离待同步")}</span>
-                  </span>
-                </div>
-                <div className="flex flex-col gap-1.5 text-xs font-medium text-muted-foreground sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4 sm:gap-y-2">
-                  <span className="hidden sm:inline-flex sm:items-center sm:gap-1.5">
+                {/* PC 端：展示单行时间、距离以及接在后面的配送地址 */}
+                <div className="hidden sm:flex sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4 sm:gap-y-2 text-xs font-medium text-muted-foreground">
+                  <span className="inline-flex items-center gap-1.5">
                     <Clock3 size={13} />
                     {formatLocalDateTime(order.orderTime)}
                   </span>
-                  <span className="hidden sm:inline-flex sm:items-center sm:gap-1.5">
-                    <MapPin size={13} />
-                    {pickup ? "-" : (order.distanceKm != null ? formatDistanceKm(order.distanceKm) : "距离待同步")}
+                  <span className="inline-flex items-center gap-1.5 max-w-[280px] md:max-w-[420px] lg:max-w-[560px] min-w-0">
+                    <MapPin size={13} className="shrink-0 text-slate-400 dark:text-zinc-500" />
+                    <span className="truncate shrink-0">{pickup ? "-" : (order.distanceKm != null ? formatDistanceKm(order.distanceKm) : "距离待同步")}</span>
+                    {!pickup && order.userAddress ? (
+                      <>
+                        <span className="mx-1 text-slate-300 dark:text-zinc-700 font-normal shrink-0">·</span>
+                        <span className="truncate text-foreground/80 font-normal" title={order.userAddress}>
+                          {order.userAddress}
+                        </span>
+                      </>
+                    ) : null}
                   </span>
                 </div>
+
+                {/* 移动端：展示精致小卡片面板，包含地址与配送费（优化后） */}
+                {pickup ? (
+                  <div className="mt-2.5 rounded-2xl border border-black/5 bg-black/2 p-2.5 dark:border-white/5 dark:bg-white/3 flex items-center justify-between text-xs font-medium sm:hidden">
+                    <span className="flex items-center gap-1.5 text-muted-foreground">
+                      <Clock3 size={12} className="shrink-0 text-slate-400 dark:text-zinc-500" />
+                      <span>{formatLocalDateTime(order.orderTime)}</span>
+                    </span>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-600 dark:text-amber-400">
+                      自提单
+                    </span>
+                  </div>
+                ) : (
+                  <div className="mt-2.5 rounded-2xl border border-black/5 bg-black/2 p-2.5 dark:border-white/5 dark:bg-white/3 space-y-2 text-xs font-medium sm:hidden">
+                    <div className="flex items-center justify-between text-muted-foreground">
+                      <span className="flex items-center gap-1.5">
+                        <Clock3 size={12} className="shrink-0 text-slate-400 dark:text-zinc-500" />
+                        <span>{formatLocalDateTime(order.orderTime)}</span>
+                      </span>
+                      <span className="flex items-center gap-1.5">
+                        <MapPin size={12} className="shrink-0 text-slate-400 dark:text-zinc-500" />
+                        <span>{order.distanceKm != null ? formatDistanceKm(order.distanceKm) : "距离待同步"}</span>
+                      </span>
+                    </div>
+                    
+                    <div className="flex items-center justify-between border-t border-black/6 pt-2 dark:border-white/8">
+                      <span className="flex items-center gap-1.5 text-muted-foreground">
+                        <Truck size={12} className="shrink-0 text-slate-400 dark:text-zinc-500" />
+                        <span>配送费</span>
+                      </span>
+                      <span className="font-semibold text-foreground">
+                        {order.delivery?.sendFee != null ? toCurrency(order.delivery.sendFee) : "-"}
+                      </span>
+                    </div>
+
+                    <div className="flex items-start gap-1.5 text-foreground/90 border-t border-black/6 pt-2 dark:border-white/8">
+                      <Navigation size={12} className="mt-0.5 shrink-0 text-slate-400 dark:text-zinc-500" />
+                      <span className="line-clamp-2 break-all text-left w-full leading-normal">
+                        {order.userAddress || "地址待同步"}
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
