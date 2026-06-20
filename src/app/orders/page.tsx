@@ -1944,7 +1944,9 @@ export default function OrdersPage() {
                       </div>
                       <div className="flex flex-col gap-1 px-0.5">
                         {activeOverview.platformBreakdown?.truePlatformCounts && Object.keys(activeOverview.platformBreakdown.truePlatformCounts).length > 0 ? (
-                          Object.entries(activeOverview.platformBreakdown.truePlatformCounts).map(([platform, count]) => {
+                          Object.entries(activeOverview.platformBreakdown.truePlatformCounts)
+                            .sort((a, b) => b[1] - a[1])
+                            .map(([platform, count]) => {
                             const meta = getPlatformBadgeMeta(platform);
                             return (
                               <div key={platform} className="flex items-center justify-between text-foreground/80 dark:text-white/80 text-[9px]">
@@ -1971,7 +1973,9 @@ export default function OrdersPage() {
                       </div>
                       <div className="flex flex-col gap-1 px-0.5">
                         {activeOverview.platformBreakdown?.brushPlatformCounts && Object.keys(activeOverview.platformBreakdown.brushPlatformCounts).length > 0 ? (
-                          Object.entries(activeOverview.platformBreakdown.brushPlatformCounts).map(([platform, count]) => {
+                          Object.entries(activeOverview.platformBreakdown.brushPlatformCounts)
+                            .sort((a, b) => b[1] - a[1])
+                            .map(([platform, count]) => {
                             const meta = getPlatformBadgeMeta(platform);
                             return (
                               <div key={platform} className="flex items-center justify-between text-foreground/80 dark:text-white/80 text-[9px]">
@@ -1998,7 +2002,9 @@ export default function OrdersPage() {
                       </div>
                       <div className="flex flex-col gap-1 px-0.5">
                         {activeOverview.platformBreakdown?.cancelledPlatformCounts && Object.keys(activeOverview.platformBreakdown.cancelledPlatformCounts).length > 0 ? (
-                          Object.entries(activeOverview.platformBreakdown.cancelledPlatformCounts).map(([platform, count]) => {
+                          Object.entries(activeOverview.platformBreakdown.cancelledPlatformCounts)
+                            .sort((a, b) => b[1] - a[1])
+                            .map(([platform, count]) => {
                             const meta = getPlatformBadgeMeta(platform);
                             return (
                               <div key={platform} className="flex items-center justify-between text-foreground/80 dark:text-white/80 text-[9px]">
