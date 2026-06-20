@@ -1,33 +1,23 @@
 "use client";
 
-import { Component, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Component, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import {
-  ArrowUp,
-  ArrowUpRight,
   Check,
   CheckCheck,
   ChevronDown,
   ChevronUp,
   Clock3,
-  Eye,
-  EyeOff,
   Loader2,
   MapPin,
   Package2,
   Pencil,
   RefreshCw,
-  Search,
-  Settings2,
   TriangleAlert,
   TimerReset,
   Truck,
   X,
-  Plus,
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
-import { format } from "date-fns";
-import { zhCN } from "date-fns/locale/zh-CN";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/Toast";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
@@ -119,8 +109,14 @@ export function formatTimingNumber(value: number) {
   return Number.isInteger(value) ? `${value}` : value.toFixed(1);
 }
 
-const TODAY_TAB_PAGE_SIZE = 9999;
-const ALL_ORDERS_BATCH_SIZE = 50;
+export function removeYear(timeStr?: string | null) {
+  if (!timeStr) return "-";
+  const trimmed = timeStr.trim();
+  if (/^\d{4}[-/]/.test(trimmed)) {
+    return trimmed.substring(5).replace("T", " ").replace(/\.\d+Z$/, "").replace(/Z$/, "");
+  }
+  return trimmed;
+}
 
 export function toCurrency(value: number | null | undefined) {
   const amount = Number(value || 0) / 100;
@@ -534,7 +530,7 @@ export function getProductCostStatusText(order: Pick<AutoPickOrder, "productCost
   return "";
 }
 
-export function getDeadlineDisplay(order: Pick<AutoPickOrder, "isPickup" | "deliveryDeadline" | "deliveryTimeRange">) {
+export function getDeadlineDisplay(order: Pick<AutoPickOrder, "isPickup" | "deliveryDeadline" | "deliveryTimeRange" | "orderTime" | "createdAt">) {
   const deadlineText = String(order.deliveryDeadline || "").trim();
   const rangeText = String(order.deliveryTimeRange || "").trim();
   const text = order.isPickup ? (rangeText || deadlineText) : (rangeText || deadlineText);
@@ -550,13 +546,42 @@ export function getDeadlineDisplay(order: Pick<AutoPickOrder, "isPickup" | "deli
     return text;
   }
 
-  const leadingRangeMatch = text.match(/^(.*?\d{1,2}:\d{2})\s*[-~至]/);
-  if (leadingRangeMatch?.[1]) {
-    return leadingRangeMatch[1].trim();
+  // 尝试提取规范的年-月-日日期前缀
+  let datePrefix = "";
+  const dateSource = deadlineText || String(order.orderTime || "") || String(order.createdAt || "");
+  const dateMatch = dateSource.match(/^(\d{4}[-/]\d{2}[-/]\d{2}|\d{2}[-/]\d{2})/);
+  if (dateMatch) {
+    datePrefix = dateMatch[0] + " ";
+  }
+
+  // 自动补齐秒级（如果只有 HH:mm 格式，补齐为 HH:mm:00）
+  const ensureSeconds = (val: string) => {
+    const trimmed = val.trim();
+    if (/\b\d{1,2}:\d{2}$/.test(trimmed)) {
+      return trimmed + ":00";
+    }
+    return trimmed;
+  };
+
+  // 如果包含范围连字符，则提取时间段的截止时间并拼接日期前缀
+  const parts = text.split(/\s*[-~至]\s*/);
+  if (parts.length > 1) {
+    const endTime = parts[parts.length - 1].trim();
+    const timeMatch = endTime.match(/\d{1,2}:\d{2}(:\d{2})?/);
+    if (timeMatch) {
+      return ensureSeconds(`${datePrefix}${timeMatch[0]}`);
+    }
+    return ensureSeconds(`${datePrefix}${endTime}`);
+  }
+
+  // 兜底：如果只是单一时间，也尝试仅抓取时分并拼接日期前缀
+  const timeMatch = text.match(/\d{1,2}:\d{2}(:\d{2})?/);
+  if (timeMatch) {
+    return ensureSeconds(`${datePrefix}${timeMatch[0]}`);
   }
 
   const firstTimeMatch = text.match(/^(.*?\d{1,2}:\d{2})/);
-  return firstTimeMatch?.[1]?.trim() || "-";
+  return firstTimeMatch?.[1] ? ensureSeconds(firstTimeMatch[1].trim()) : "-";
 }
 
 export function MetricCard({
@@ -919,14 +944,12 @@ export function ProductStripItem({
   showEditMatch = false,
   matchedProduct,
   showMatchStatus = false,
-  onClearManualMatch,
 }: {
   display: { name: string; sku: string; image: string | null; quantity: number };
   onEditMatch?: () => void;
   showEditMatch?: boolean;
   matchedProduct?: AutoPickOrderItem['matchedProduct'];
   showMatchStatus?: boolean;
-  onClearManualMatch?: () => void;
 }) {
   return (
     <div className="flex items-center gap-2.5 rounded-2xl border border-black/6 bg-white/70 px-2.5 py-2 dark:border-white/8 dark:bg-white/4 sm:gap-3 sm:rounded-[18px] sm:px-3 sm:py-2.5">
@@ -966,15 +989,7 @@ export function ProductStripItem({
         </div>
       </div>
       <div className="flex shrink-0 items-center gap-1.5">
-        {showMatchStatus && matchedProduct?.isManual && onClearManualMatch ? (
-          <button
-            type="button"
-            onClick={onClearManualMatch}
-            className="inline-flex h-8 shrink-0 items-center justify-center rounded-xl border border-black/8 bg-white/85 px-2.5 text-[11px] font-bold text-foreground transition-all hover:border-black/12 hover:bg-zinc-100 dark:border-white/10 dark:bg-white/6 dark:text-white dark:hover:border-white/20 dark:hover:bg-white/14"
-          >
-            恢复自动
-          </button>
-        ) : null}
+
         {showEditMatch && onEditMatch ? (
           <button
             type="button"
@@ -1067,7 +1082,6 @@ export function OrderCard({
   onRunAction,
   onOpenCostBackfill,
   onOpenMatchEditor,
-  onClearManualMatch,
   onRefresh,
 }: {
   order: AutoPickOrder;
@@ -1077,7 +1091,6 @@ export function OrderCard({
   onRunAction: (orderId: string, action: OrderAction) => void;
   onOpenCostBackfill: (order: AutoPickOrder) => void;
   onOpenMatchEditor: (order: AutoPickOrder, item: AutoPickOrderItem) => void;
-  onClearManualMatch: (order: AutoPickOrder, item: AutoPickOrderItem) => void;
   onRefresh?: () => void;
 }) {
   const [isProfitTooltipOpen, setIsProfitTooltipOpen] = useState(false);
@@ -1288,7 +1301,7 @@ export function OrderCard({
   return (
     <>
       <article className="overflow-visible rounded-[26px] border border-black/8 bg-white/78 shadow-xs transition-all hover:border-black/12 dark:border-white/10 dark:bg-white/4 sm:rounded-[30px]">
-      <div className="border-b border-black/6 px-3.5 py-3.5 dark:border-white/6 sm:px-5 sm:py-4">
+        <div className="border-b border-black/6 px-3.5 py-3.5 dark:border-white/6 sm:px-5 sm:py-4">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between sm:gap-4">
           <div className="min-w-0 flex-1">
             <div className="flex flex-col gap-2.5 sm:gap-3">
@@ -1328,15 +1341,35 @@ export function OrderCard({
                     </span>
                   ) : null}
                   {autoOutboundFailed ? (
-                    <button
-                      type="button"
-                      onClick={() => void onRunAction(order.id, "outbound")}
-                      disabled={actingId === `${order.id}:outbound`}
-                      className="inline-flex h-7 items-center gap-0.5 rounded-full border border-rose-500/15 bg-rose-500/10 px-1.5 text-[11px] font-medium leading-none text-rose-700 transition-all hover:border-rose-500/30 hover:bg-rose-500/15 disabled:cursor-not-allowed disabled:opacity-60 dark:text-rose-400 sm:h-8 sm:gap-1.5 sm:px-2.5 sm:text-[13px]"
-                    >
-                      <TriangleAlert size={10} className="sm:h-3 sm:w-3" />
-                      {actingId === `${order.id}:outbound` ? "处理中..." : "出库待处理"}
-                    </button>
+                    <div className="group/outbound relative">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void onRunAction(order.id, "outbound");
+                        }}
+                        disabled={actingId === `${order.id}:outbound`}
+                        className="inline-flex h-7 items-center gap-0.5 rounded-full border border-rose-500/15 bg-rose-500/10 px-1.5 text-[11px] font-medium leading-none text-rose-700 transition-all hover:border-rose-500/30 hover:bg-rose-500/15 disabled:cursor-not-allowed disabled:opacity-60 dark:text-rose-400 sm:h-8 sm:gap-1.5 sm:px-2.5 sm:text-[13px]"
+                      >
+                        <TriangleAlert size={10} className="sm:h-3 sm:w-3" />
+                        {actingId === `${order.id}:outbound` ? "处理中..." : "出库待处理"}
+                      </button>
+                      
+                      {/* Tooltip 浮层 */}
+                      <div className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 w-72 -translate-x-1/2 scale-95 opacity-0 transition-all duration-200 ease-out group-hover/outbound:pointer-events-auto group-hover/outbound:scale-100 group-hover/outbound:opacity-100">
+                        <div className="relative rounded-xl border border-slate-200/90 bg-white/98 px-3.5 py-2.5 text-xs shadow-xl dark:border-white/12 dark:bg-[#171b22]/96">
+                          {/* 小三角 */}
+                          <div className="absolute top-full left-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1 rotate-45 border-r border-b border-slate-200/90 bg-white dark:border-white/12 dark:bg-[#171b22]" />
+                          <div className="font-semibold text-rose-600 dark:text-rose-400 mb-1 flex items-center gap-1.5">
+                            <TriangleAlert size={12} className="shrink-0" />
+                            <span>自动出库失败原因</span>
+                          </div>
+                          <div className="text-[11px] leading-relaxed text-zinc-600 dark:text-zinc-300 wrap-break-word font-normal text-left">
+                            {order.autoOutboundError || "未知异常，请检查库存或点击重试。"}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   ) : null}
                   <StatusBadge order={order} />
                   {completed && (hasPureProfit || order.productCostStatus === "pending-backfill") ? (
@@ -1613,7 +1646,6 @@ export function OrderCard({
                     onEditMatch={() => onOpenMatchEditor(order, item)}
                     matchedProduct={item.matchedProduct}
                     showMatchStatus={displayIndex === 0}
-                    onClearManualMatch={() => onClearManualMatch(order, item)}
                   />
                 ))
               )}
@@ -1824,6 +1856,11 @@ export function OrderCard({
                     value={pickup ? "-" : order.userAddress}
                     className="sm:col-span-2"
                   />
+                  <DetailBlock
+                    label="顾客备注"
+                    value={order.customerRemark || "-"}
+                    className="sm:col-span-2"
+                  />
                   <DetailStat
                     label="订单编号"
                     value={order.orderNo}
@@ -1846,27 +1883,7 @@ export function OrderCard({
                     </div>
                   </div>
                 ) : null}
-                {autoOutboundFailed ? (
-                  <div className="rounded-2xl border border-rose-500/15 bg-rose-500/8 px-3 py-3 dark:bg-rose-500/8">
-                    <div className="grid grid-cols-2 gap-2 sm:gap-2.5">
-                      <DetailStat label="自动出库" value="失败" />
-                      <DetailStat label="尝试时间" value={order.autoOutboundAttemptedAt ? formatLocalDateTime(order.autoOutboundAttemptedAt) : "-"} />
-                    </div>
-                    <div className="mt-2 sm:mt-2.5">
-                      <DetailBlock label="失败原因" value={order.autoOutboundError || "-"} />
-                    </div>
-                    <div className="mt-3">
-                      <button
-                        type="button"
-                        onClick={() => void onRunAction(order.id, "outbound")}
-                        disabled={actingId === `${order.id}:outbound`}
-                        className="inline-flex h-9 items-center justify-center rounded-xl border border-rose-500/20 bg-rose-500/12 px-3 text-[12px] font-medium text-rose-700 transition-all hover:border-rose-500/35 hover:bg-rose-500/18 disabled:cursor-not-allowed disabled:opacity-60 dark:text-rose-300"
-                      >
-                        {actingId === `${order.id}:outbound` ? "正在检查库存..." : "创建采购单"}
-                      </button>
-                    </div>
-                  </div>
-                ) : null}
+
               </div>
             </section>
 
@@ -1888,8 +1905,16 @@ export function OrderCard({
                 <div className="grid grid-cols-2 gap-2 sm:gap-2.5">
                   <DetailStat label="物流平台" value={order.delivery?.logisticName || "第三方平台"} />
                   <DetailStat label="配送人" value={order.delivery?.riderName || "-"} />
-                  <DetailStat label="取餐时间" value={order.delivery?.pickupTime || "-"} />
-                  <DetailStat label="配送费" value={order.delivery?.sendFee != null ? toCurrency(order.delivery.sendFee) : "-"} />
+                  <DetailStat label="取餐时间" value={removeYear(order.delivery?.pickupTime)} />
+                  <DetailStat
+                    label={isAutoPickOrderCompletedStatus(order.status) ? "送达时间" : "最晚送达"}
+                    value={
+                      isAutoPickOrderCompletedStatus(order.status)
+                        ? removeYear(order.delivery?.completedTime || order.completedAt)
+                        : removeYear(getDeadlineDisplay(order))
+                    }
+                  />
+                  <DetailStat label="配送费" value={order.delivery?.sendFee != null ? toCurrency(order.delivery.sendFee) : "-"} className="col-span-2" />
                 </div>
                 <div className="mt-2 sm:mt-2.5">
                   <DetailBlock label="轨迹" value={order.delivery?.track || "暂无轨迹"} />

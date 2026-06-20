@@ -457,15 +457,15 @@ export function ProductFaqPanel({ showBackLink = true, compactHeader = false }: 
       </div>
 
       {activeDraft && isMounted && createPortal(
-        <div className="fixed inset-0 z-[100000] flex items-center justify-center p-4 sm:p-6">
+        <div className="fixed inset-0 flex items-center justify-center p-4 sm:p-6" style={{ zIndex: 100000 }}>
           <button
             type="button"
             aria-label="关闭编辑弹窗"
             onClick={() => setActiveDraft(null)}
             className="absolute inset-0 bg-[rgba(3,6,14,0.72)] backdrop-blur-md"
           />
-          <section className="relative z-10 flex max-h-[calc(100vh-2rem)] w-full max-w-3xl flex-col overflow-hidden rounded-[24px] border border-slate-200/90 bg-[linear-gradient(180deg,#ffffff,#f8fbff)] shadow-[0_28px_90px_rgba(148,163,184,0.28)] dark:border-white/[0.08] dark:bg-[linear-gradient(180deg,rgba(9,14,24,0.985),rgba(11,17,28,0.975))] dark:shadow-[0_28px_90px_rgba(2,6,23,0.52)]">
-            <div className="flex items-start justify-between gap-4 border-b border-slate-200/80 bg-[linear-gradient(90deg,rgba(255,255,255,0.96),rgba(59,130,246,0.06),transparent_55%)] p-4 dark:border-white/[0.06] dark:bg-[linear-gradient(90deg,rgba(255,255,255,0.03),rgba(59,130,246,0.04),transparent_55%)] sm:p-5">
+          <section className="relative z-10 flex max-h-[calc(100vh-2rem)] w-full max-w-3xl flex-col overflow-hidden rounded-[24px] border border-slate-200/90 bg-[linear-gradient(180deg,#ffffff,#f8fbff)] shadow-[0_28px_90px_rgba(148,163,184,0.28)] dark:border-white/8 dark:bg-[linear-gradient(180deg,rgba(9,14,24,0.985),rgba(11,17,28,0.975))] dark:shadow-[0_28px_90px_rgba(2,6,23,0.52)]">
+            <div className="flex items-start justify-between gap-4 border-b border-slate-200/80 bg-[linear-gradient(90deg,rgba(255,255,255,0.96),rgba(59,130,246,0.06),transparent_55%)] p-4 dark:border-white/6 dark:bg-[linear-gradient(90deg,rgba(255,255,255,0.03),rgba(59,130,246,0.04),transparent_55%)] sm:p-5">
               <div>
                 <div className="text-sm font-semibold text-foreground">{activeDraft.id ? "编辑问题" : "新建问题"}</div>
                 <p className="mt-1 text-xs text-muted-foreground">一条记录就是一问一答，直接关联对应商品。</p>
@@ -548,7 +548,7 @@ export function ProductFaqPanel({ showBackLink = true, compactHeader = false }: 
               </div>
             </div>
 
-            <div className="flex flex-col-reverse gap-2 border-t border-slate-200/80 bg-slate-50/80 p-4 dark:border-white/[0.06] dark:bg-[rgba(255,255,255,0.015)] sm:flex-row sm:justify-end sm:p-5">
+            <div className="flex flex-col-reverse gap-2 border-t border-slate-200/80 bg-slate-50/80 p-4 dark:border-white/6 dark:bg-[rgba(255,255,255,0.015)] sm:flex-row sm:justify-end sm:p-5">
               <button
                 onClick={() => setActiveDraft(null)}
                 className="h-10 w-full rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition-all hover:bg-slate-50 active:scale-95 dark:border-white/10 dark:bg-white/6 dark:text-foreground dark:hover:bg-white/10 sm:w-auto"
@@ -573,7 +573,7 @@ export function ProductFaqPanel({ showBackLink = true, compactHeader = false }: 
           <Loader2 size={24} className="animate-spin" />
         </div>
       ) : items.length === 0 ? (
-          <div className="flex min-h-[300px] flex-col items-center justify-center rounded-[24px] border border-dashed border-slate-200 bg-white/80 p-8 text-center shadow-[0_16px_40px_rgba(148,163,184,0.14)] dark:border-white/10 dark:bg-white/[0.03] dark:shadow-none">
+          <div className="flex min-h-[300px] flex-col items-center justify-center rounded-[24px] border border-dashed border-slate-200 bg-white/80 p-8 text-center shadow-[0_16px_40px_rgba(148,163,184,0.14)] dark:border-white/10 dark:bg-white/3 dark:shadow-none">
           <CircleHelp size={34} className="mb-3 text-muted-foreground" />
           <h2 className="text-lg font-semibold text-foreground">还没有常见问题</h2>
           <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">
@@ -596,7 +596,7 @@ export function ProductFaqPanel({ showBackLink = true, compactHeader = false }: 
                           <div className="mt-0.5 inline-flex h-6 min-w-6 shrink-0 items-center justify-center rounded-full border border-sky-200 bg-sky-50 px-1.5 text-[11px] font-semibold text-sky-700 shadow-[0_6px_16px_rgba(56,189,248,0.12)] dark:border-sky-300/20 dark:bg-sky-300/10 dark:text-sky-100 dark:shadow-[0_6px_16px_rgba(56,189,248,0.14)]">
                             {index + 1}
                           </div>
-                          <h2 className="min-w-0 flex-1 break-words text-[17px] font-medium leading-6 text-foreground sm:truncate">
+                          <h2 className="min-w-0 flex-1 wrap-break-word text-[17px] font-medium leading-6 text-foreground sm:truncate">
                             {row.entry.question || "未命名问题"}
                           </h2>
                         </div>
@@ -629,11 +629,11 @@ export function ProductFaqPanel({ showBackLink = true, compactHeader = false }: 
                         ) : (
                           <span className="text-[11px] text-slate-500 dark:text-slate-500 sm:hidden">未关联商品</span>
                         )}
-                        <div className="flex shrink-0 items-center gap-1 rounded-full border border-slate-200 bg-slate-50/90 px-1 py-1 dark:border-white/10 dark:bg-white/[0.04]">
+                        <div className="flex shrink-0 items-center gap-1 rounded-full border border-slate-200 bg-slate-50/90 px-1 py-1 dark:border-white/10 dark:bg-white/4">
                         <button
                           type="button"
                           onClick={() => void handleCopyAnswer(row.entry.answer || "")}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition-all hover:bg-slate-100 hover:text-foreground active:scale-95 dark:text-slate-300/78 dark:hover:bg-white/[0.06]"
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition-all hover:bg-slate-100 hover:text-foreground active:scale-95 dark:text-slate-300/78 dark:hover:bg-white/6"
                           title="复制答案"
                         >
                           <Copy size={14} />
@@ -646,7 +646,7 @@ export function ProductFaqPanel({ showBackLink = true, compactHeader = false }: 
                                 event.stopPropagation();
                                 setActiveDraft(toSingleEntryDraft(items.find((item) => item.id === row.parentId)!, row.entry.id));
                               }}
-                              className="inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition-all hover:bg-slate-100 hover:text-foreground active:scale-95 dark:text-slate-300/78 dark:hover:bg-white/[0.06]"
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition-all hover:bg-slate-100 hover:text-foreground active:scale-95 dark:text-slate-300/78 dark:hover:bg-white/6"
                               title="编辑"
                             >
                               <Pencil size={15} />

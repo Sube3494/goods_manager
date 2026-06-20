@@ -3,20 +3,7 @@ import prisma from "@/lib/prisma";
 import { getAuthorizedUser, getAuthorizedUserAny } from "@/lib/auth";
 import { Prisma } from "../../../../../prisma/generated-client";
 import { returnOutboundOrderById } from "@/lib/outboundReturns";
-
-function readCustomerRemarkFromRawPayload(rawPayload: unknown) {
-  if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
-    return null;
-  }
-  const record = rawPayload as Record<string, unknown>;
-  const value = String(
-    record.customerRemark
-    || record.user_remark
-    || record.userRemark
-    || ""
-  ).trim();
-  return value || null;
-}
+import { readCustomerRemarkFromRawPayload } from "@/lib/autoPickOrders";
 
 export async function GET(
   _request: NextRequest,
@@ -41,6 +28,7 @@ export async function GET(
         latitude: true,
         delivery: true,
         rawPayload: true,
+        customerRemark: true,
       },
     });
 
@@ -55,7 +43,7 @@ export async function GET(
         longitude: order.longitude,
         latitude: order.latitude,
         delivery: order.delivery,
-        customerRemark: readCustomerRemarkFromRawPayload(order.rawPayload),
+        customerRemark: order.customerRemark || readCustomerRemarkFromRawPayload(order.rawPayload),
         detailLoaded: true,
         detailLoading: false,
       },

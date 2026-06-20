@@ -648,6 +648,7 @@ model AutoPickOrder {
   platformCommission    Int                 @default(0)
   delivery              Json?
   rawPayload            Json?
+  customerRemark        String?
   lastSyncedAt          DateTime?
   autoCompleteAt        DateTime?
   createdAt             DateTime            @default(now())

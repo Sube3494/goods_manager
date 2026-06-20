@@ -6,7 +6,7 @@ import { useToast } from "@/components/ui/Toast";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { AutoPickOrder, AutoPickOrderItem } from "@/lib/types";
+import { AutoPickOrder, AutoPickOrderItem, PurchaseOrder, PurchaseStatus } from "@/lib/types";
 import { formatLocalDate } from "@/lib/dateUtils";
 import {
   OrderCard,
@@ -25,7 +25,7 @@ interface AllOrdersViewProps {
   refreshTrigger: number;
   onOpenCostBackfill: (order: AutoPickOrder) => void;
   onOpenMatchEditor: (order: AutoPickOrder, item: AutoPickOrderItem) => void;
-  onOpenPurchaseDraft?: (draft: any) => void;
+  onOpenPurchaseDraft?: (draft: PurchaseOrder) => void;
   onDataLoad: (data: {
     summary: { receivedAmount: number; platformCommission: number; validOrderCount: number; itemCount: number; totalDeliveryFee: number };
     overview: { totalCount: number; trueOrderCount: number; brushCount: number; cancelledCount: number };
@@ -285,10 +285,10 @@ export function AllOrdersView({
             const today = new Date();
             const draft = {
               id: `PO-${today.toISOString().slice(0, 10).replace(/-/g, "")}-${Math.floor(Math.random() * 1000).toString().padStart(3, "0")}`,
-              status: "Confirmed",
+              status: "Confirmed" as PurchaseStatus,
               type: "Purchase",
               date: today.toLocaleString('sv-SE').slice(0, 16).replace('T', ' '),
-              items: data.insufficientItems.map((item: any) => ({
+              items: data.insufficientItems.map((item: { productId?: string; shopProductId?: string; name?: string; image?: string | null; missingQuantity: number; mappedShopName?: string }) => ({
                 productId: item.productId || null,
                 shopProductId: item.shopProductId || null,
                 product: {
@@ -341,19 +341,7 @@ export function AllOrdersView({
     }
   };
 
-  const clearManualMatch = async (order: AutoPickOrder, item: AutoPickOrderItem) => {
-    try {
-      const response = await fetch(`/api/orders/${order.id}/items/${item.id}/match`, { method: "DELETE" });
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.error || "清除手动匹配失败");
-      }
-      showToast("已清除手动匹配，已切换回条码匹配", "success");
-      void fetchOrders({ silent: true });
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : "操作失败", "error");
-    }
-  };
+
 
   // 数据统计与过滤处理
   const shopOptions = useMemo(() => {
@@ -528,7 +516,6 @@ export function AllOrdersView({
                   onRunAction={runAction}
                   onOpenCostBackfill={onOpenCostBackfill}
                   onOpenMatchEditor={onOpenMatchEditor}
-                  onClearManualMatch={clearManualMatch}
                   onRefresh={() => fetchOrders({ silent: true })}
                 />
               </OrderCardErrorBoundary>

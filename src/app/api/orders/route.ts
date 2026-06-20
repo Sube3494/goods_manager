@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
-import { normalizeAutoPickIntegrationConfig } from "@/lib/autoPickOrders";
+import { normalizeAutoPickIntegrationConfig, readCustomerRemarkFromRawPayload } from "@/lib/autoPickOrders";
 import { parseAsShanghaiTime } from "@/lib/dateUtils";
 import { doesAutoPickOrderRequirePickConfirmation, isAutoPickOrderCancelledStatus, isAutoPickOrderDeletedStatus, isAutoPickOtherPickupOrder, isAutoPickPickCompleted, isAutoPickPickupOrder, resolveAutoPickBusinessStatus } from "@/lib/autoPickOrderStatus";
 import { createRequestPerfTracker } from "@/lib/perf";
@@ -772,6 +772,7 @@ export async function GET(request: NextRequest) {
           { userAddress: { contains: query, mode: "insensitive" as const } },
           { platform: { contains: query, mode: "insensitive" as const } },
           { sourceId: { contains: query, mode: "insensitive" as const } },
+          { customerRemark: { contains: query, mode: "insensitive" as const } },
           {
             items: {
               some: {
@@ -841,6 +842,7 @@ export async function GET(request: NextRequest) {
           platformCommission: true,
           delivery: true,
           rawPayload: true,
+          customerRemark: true,
           lastSyncedAt: true,
           autoCompleteAt: true,
           createdAt: true,
@@ -1388,6 +1390,7 @@ export async function GET(request: NextRequest) {
         autoCompleteJobStatus: order.autoCompleteJob?.status || null,
         autoCompleteJobError: order.autoCompleteJob?.lastError || null,
         autoCompleteJobAttempts: order.autoCompleteJob?.attempts ?? null,
+        customerRemark: order.customerRemark || readCustomerRemarkFromRawPayload(order.rawPayload),
       };
     }).map((order) => {
       const lockedResolvedShop = readResolvedAutoPickShop(order.rawPayload);

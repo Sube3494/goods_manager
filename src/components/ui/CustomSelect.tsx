@@ -40,6 +40,13 @@ export function CustomSelect({
 }: CustomSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  
+  const handleOpenChange = useCallback((open: boolean) => {
+    setIsOpen(open);
+    if (!open) {
+      setSearchQuery("");
+    }
+  }, []);
   const [dropdownPosition, setDropdownPosition] = useState<{
     top: number;
     left: number;
@@ -70,11 +77,7 @@ export function CustomSelect({
     }
   }, [isOpen, searchable]);
 
-  useEffect(() => {
-    if (!isOpen && searchQuery) {
-      setSearchQuery("");
-    }
-  }, [isOpen, searchQuery]);
+
 
   useEffect(() => {
     onOpenChange?.(isOpen);
@@ -83,12 +86,12 @@ export function CustomSelect({
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (containerRef.current && !containerRef.current.parentElement?.contains(event.target as Node)) {
-        setIsOpen(false);
+        handleOpenChange(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  }, [handleOpenChange]);
 
   const updatePosition = useCallback(() => {
     if (isOpen && containerRef.current) {
@@ -127,7 +130,7 @@ export function CustomSelect({
       <button
         ref={containerRef}
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => handleOpenChange(!isOpen)}
         className={cn(
           "flex w-full h-full items-center justify-between bg-white dark:bg-white/5 border border-border dark:border-white/10 px-2.5 text-left text-xs transition-all outline-none ring-offset-background",
           !triggerClassName?.includes("rounded-") && "rounded-lg",
@@ -142,13 +145,13 @@ export function CustomSelect({
             value={isOpen ? searchQuery : selectedLabel}
             onChange={(e) => {
               if (!isOpen) {
-                setIsOpen(true);
+                handleOpenChange(true);
               }
               setSearchQuery(e.target.value);
             }}
-            onFocus={() => setIsOpen(true)}
+            onFocus={() => handleOpenChange(true)}
             onClick={(e) => e.stopPropagation()}
-            placeholder={placeholder}
+            placeholder={searchPlaceholder}
             className={cn(
               "w-full bg-transparent outline-none text-xs font-normal",
               !value && !searchQuery && "text-muted-foreground"
@@ -182,7 +185,7 @@ export function CustomSelect({
                 translateY: dropdownPosition.showAbove ? '-100%' : '0%',
                 willChange: 'transform, opacity'
               } as React.CSSProperties}
-              className="rounded-2xl bg-white/95 dark:bg-[#0c1222]/95 backdrop-blur-2xl border border-black/[0.08] dark:border-white/10 shadow-2xl dark:shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] focus:outline-none overflow-hidden"
+              className="rounded-2xl bg-white/95 dark:bg-[#0c1222]/95 backdrop-blur-2xl border border-black/8 dark:border-white/10 shadow-2xl dark:shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] focus:outline-none overflow-hidden"
             >
               <div className="max-h-60 overflow-auto p-1.5 py-2">
                 {filteredOptions.length > 0 ? (
@@ -192,8 +195,7 @@ export function CustomSelect({
                       type="button"
                       onClick={() => {
                         onChange(option.value);
-                        setIsOpen(false);
-                        setSearchQuery("");
+                        handleOpenChange(false);
                       }}
                       className={cn(
                         "relative flex w-full select-none items-center rounded-xl py-2.5 pl-3 pr-7 text-xs outline-none transition-colors hover:bg-slate-100 dark:hover:bg-white/8 cursor-pointer font-medium text-foreground",
@@ -217,7 +219,7 @@ export function CustomSelect({
                         onClick={(e) => {
                           e.stopPropagation();
                           onAddNew();
-                          setIsOpen(false);
+                          handleOpenChange(false);
                         }}
                         className="mx-auto flex items-center gap-1.5 px-3 py-1.5 bg-primary text-primary-foreground text-[11px] font-bold rounded-lg hover:bg-primary/90 transition-all active:scale-95 shadow-sm"
                       >

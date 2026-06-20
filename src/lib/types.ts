@@ -132,6 +132,7 @@ export interface AutoPickDelivery {
   pickupTime?: string;
   track?: string;
   riderName?: string;
+  completedTime?: string;
 }
 
 export interface AutoPickOrderItem {
@@ -248,6 +249,7 @@ export interface AutoPickOrder {
   firstMissingCostPurchaseOrderId?: string | null;
   firstMissingCostPurchaseOrderItemId?: string | null;
   lastSyncedAt?: string | null;
+  customerRemark?: string | null;
   createdAt?: string;
   updatedAt?: string;
   detailLoaded?: boolean;

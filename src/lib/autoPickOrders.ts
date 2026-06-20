@@ -4,12 +4,10 @@ import { getBaseAutoPickStatusDisplay, isAutoPickOrderAbnormalStatus, isAutoPick
 import { Prisma } from "../../prisma/generated-client";
 import { createHash, randomBytes } from "crypto";
 import { AutoPickIntegrationConfig, AutoPickMaiyatianShop, AutoPickMaiyatianShopMapping, AutoPickSelfDeliveryTimingConfig } from "@/lib/types";
-import { ProductService } from "@/services/productService";
 import { InventoryService } from "@/services/inventoryService";
 import { emitAutoPickOrderEvent } from "@/lib/autoPickOrderEvents";
 import { FinanceMath } from "@/lib/math";
 import { buildShopDedupeKey, findMatchingShopRecord, normalizeExternalId, normalizeShopAddress, normalizeShopAddressKey, normalizeShopNameKey, isShopNameMatch } from "@/lib/shopIdentity";
-import { AUTO_INBOUND_TYPE } from "@/lib/purchaseOrderTypes";
 import { getOutboundOrderItemSchemaErrorMessage } from "@/lib/prismaSchemaCompat";
 
 export type AutoPickInboundItem = {
@@ -51,6 +49,7 @@ export type AutoPickInboundOrder = {
     pickupTime?: string;
     track?: string;
     riderName?: string;
+    completedTime?: string;
   };
   items?: AutoPickInboundItem[];
   unencryptedPhone?: string;
@@ -58,6 +57,7 @@ export type AutoPickInboundOrder = {
   unencryptedAddress?: string;
   customerName?: string;
   customerPhone?: string;
+  customerRemark?: string;
   [key: string]: unknown;
 };
 
@@ -137,8 +137,7 @@ const MAIYATIAN_ORDER_LIST_PATH = "/order/list/?&";
 const MAIYATIAN_QUERY_LIST_PATH = "/query/list/?&";
 const MAIYATIAN_REAL_USER_INFO_PATH = "/order/getRealUserInfo/?f=json&id=";
 const MAIYATIAN_ORDER_DETAIL_PATH = "/order/detail/?detail=1&f=json&id=";
-const MAIYATIAN_DELIVERY_SUBMIT_PATH = "/delivery/submit/?f=json";
-const MAIYATIAN_DELIVERY_TRACK_PATH = "/delivery/track/?f=json&token=";
+
 const MAIYATIAN_MEAL_COMPLETE_PATH = "/order/mealComplete/?f=json";
 const AUTO_PICK_CONFIRM_LISTEN_INTERVAL_MS = 1500;
 const AUTO_PICK_STATE_LISTEN_INTERVAL_MS = 5000;
@@ -404,6 +403,55 @@ function readResolvedAutoPickShop(rawPayload: unknown) {
   };
 }
 
+export function readCustomerRemarkFromRawPayload(rawPayload: unknown): string | null {
+  if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
+    return null;
+  }
+
+  const readRemarkFromRecord = (record: Record<string, unknown>) => {
+    const value = String(
+      record.customerRemark
+      || record.user_remark
+      || record.userRemark
+      || record.buyer_remark
+      || record.buyerRemark
+      || record.remark
+      || record.memo
+      || record.note
+      || ""
+    ).trim();
+    return value || null;
+  };
+
+  const root = rawPayload as Record<string, unknown>;
+  const directValue = readRemarkFromRecord(root);
+  if (directValue) {
+    return directValue;
+  }
+
+  const nestedCandidates = [
+    root.data,
+    root.extend,
+    root.order,
+    root.orderInfo,
+    root.order_info,
+    root.extra,
+    root.payload,
+  ];
+
+  for (const candidate of nestedCandidates) {
+    if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
+      continue;
+    }
+    const nestedValue = readRemarkFromRecord(candidate as Record<string, unknown>);
+    if (nestedValue) {
+      return nestedValue;
+    }
+  }
+
+  return null;
+}
+
 function mergeAutoPickSystemMeta(
   basePayload: Record<string, unknown>,
   existingRawPayload: unknown,
@@ -416,6 +464,14 @@ function mergeAutoPickSystemMeta(
 
   if (!("pickProgress" in nextPayload) && "pickProgress" in existingRecord) {
     nextPayload.pickProgress = existingRecord.pickProgress;
+  }
+
+  // 继承旧的备注字段，防止一键同步（列表数据无备注）覆盖了旧有的备注数据
+  const remarkKeys = ["customerRemark", "user_remark", "userRemark", "buyer_remark", "buyerRemark", "remark", "memo", "note"];
+  for (const key of remarkKeys) {
+    if ((!(key in nextPayload) || !nextPayload[key]) && (key in existingRecord) && existingRecord[key]) {
+      nextPayload[key] = existingRecord[key];
+    }
   }
 
   if (!nextSystemMeta) {
@@ -465,25 +521,7 @@ function normalizeMaiyatianCookie(value: string) {
   return value.trim();
 }
 
-function readCookieValue(cookie: string, key: string) {
-  const normalizedKey = String(key || "").trim();
-  if (!normalizedKey) return "";
 
-  const parts = String(cookie || "")
-    .split(";")
-    .map((item) => item.trim())
-    .filter(Boolean);
-
-  for (const part of parts) {
-    const separatorIndex = part.indexOf("=");
-    if (separatorIndex <= 0) continue;
-    const currentKey = part.slice(0, separatorIndex).trim();
-    if (currentKey !== normalizedKey) continue;
-    return part.slice(separatorIndex + 1).trim();
-  }
-
-  return "";
-}
 
 function findMappedShopNameFromAutoPickConfig(
   maiyatianShopId: string | null,
@@ -877,12 +915,7 @@ function parseAmountsFromRawValues(platform: string, rawValues: {
   };
 }
 
-function hasResolvedAmountInfo(order: AutoPickInboundOrder | null | undefined) {
-  if (!order) return false;
-  const actualPaid = Number(order.actualPaid || 0);
-  const platformCommission = Number(order.platformCommission || 0);
-  return actualPaid > 0 || platformCommission > 0;
-}
+
 
 function readPreferredMaiyatianShopName(rawOrder: Record<string, unknown>) {
   const extend = rawOrder.extend && typeof rawOrder.extend === "object" && !Array.isArray(rawOrder.extend)
@@ -1061,7 +1094,7 @@ function parseDeliveryInfoFromDetail(detail: MaiyatianOrderDetailResponse["data"
   const delivery = detail && detail.delivery && typeof detail.delivery === "object" ? detail.delivery : null;
   const deliveryRecord = delivery as Record<string, unknown> | null;
   const detailRecord = detail as Record<string, unknown> | undefined;
-  const goods = Array.isArray(detail?.goods) ? detail.goods : [];
+  const goods = detail && Array.isArray(detail.goods) ? detail.goods : [];
   const isJdLike = String(
     detailRecord?.channel_tag
     || detailRecord?.source_tag
@@ -1125,7 +1158,17 @@ function parseDeliveryInfoFromDetail(detail: MaiyatianOrderDetailResponse["data"
   const track = String(deliveryRecord?.track || "").trim();
   const riderName = String(deliveryRecord?.delivery_name || deliveryRecord?.riderName || "").trim() || undefined;
 
-  if (!logisticName && sendFee <= 0 && !pickupTime && !track && !riderName) {
+  const rawFinishedTime = deliveryRecord?.finished_time
+    ?? deliveryRecord?.finishedTime
+    ?? detail?.finished_time
+    ?? detail?.finishedTime;
+  const completedTime = typeof rawFinishedTime === "string" && rawFinishedTime.includes("-")
+    ? String(rawFinishedTime).trim()
+    : (typeof rawFinishedTime === "string" || typeof rawFinishedTime === "number"
+        ? parseUnixTimestampToOrderTime(rawFinishedTime)
+        : undefined);
+
+  if (!logisticName && sendFee <= 0 && !pickupTime && !track && !riderName && !completedTime) {
     return undefined;
   }
 
@@ -1135,6 +1178,7 @@ function parseDeliveryInfoFromDetail(detail: MaiyatianOrderDetailResponse["data"
     pickupTime,
     track,
     riderName,
+    completedTime,
   };
 }
 
@@ -1406,6 +1450,21 @@ async function enrichMaiyatianOrderByCookie(cookie: string, order: AutoPickInbou
     order.delivery = deliveryInfo;
   }
 
+  const customerRemark = detailData ? String(
+    detailData.customerRemark
+    || detailData.user_remark
+    || detailData.userRemark
+    || detailData.buyer_remark
+    || detailData.buyerRemark
+    || detailData.remark
+    || detailData.memo
+    || detailData.note
+    || ""
+  ).trim() : "";
+  if (customerRemark) {
+    order.customerRemark = customerRemark;
+  }
+
   const amountInfo = parseAmountsFromDetail(detailData, order.platform);
   if (amountInfo) {
     order.actualPaid = amountInfo.actualPaid;
@@ -1416,6 +1475,11 @@ async function enrichMaiyatianOrderByCookie(cookie: string, order: AutoPickInbou
   const detailItems = buildItemsFromDetailJSON(detailData);
   if (detailItems.length > 0) {
     order.items = detailItems;
+  }
+
+  const detailRemark = detailDataObj?.user_remark || detailDataObj?.remark || detailDataObj?.buyer_remark || detailDataObj?.memo;
+  if (detailRemark) {
+    order.customerRemark = String(detailRemark).trim();
   }
 
   const detailOrderTime = String(detailData.order_time || "").trim();
@@ -1596,51 +1660,7 @@ async function submitMaiyatianFormByCookie(
   };
 }
 
-async function submitMaiyatianPickupCompleteByCookie(cookie: string, sourceId: string, orderNo = "") {
-  if (!sourceId) {
-    return {
-      ok: false,
-      reason: "missing-pickup-complete-id",
-      orderNo,
-      detail: null,
-    };
-  }
 
-  return await submitMaiyatianFormByCookie(cookie, MAIYATIAN_DELIVERY_SUBMIT_PATH, {
-    id: sourceId,
-    logisticTag: "picker",
-  }, "pickup-complete-submitted");
-}
-
-async function submitMaiyatianCompleteDeliveryByCookie(cookie: string, sourceId: string, deliveryId: string, orderNo = "") {
-  const token = readCookieValue(cookie, "token");
-  if (!token) {
-    return {
-      ok: false,
-      reason: "missing-maiyatian-token",
-      orderNo,
-      detail: null,
-    };
-  }
-
-  if (!sourceId || !deliveryId) {
-    return {
-      ok: false,
-      reason: "missing-complete-delivery-params",
-      orderNo,
-      detail: null,
-    };
-  }
-
-  return await submitMaiyatianFormByCookie(cookie, `${MAIYATIAN_DELIVERY_TRACK_PATH}${encodeURIComponent(token)}`, {
-    id: sourceId,
-    delivery_id: deliveryId,
-    status: "50",
-    delivery_name: "",
-    delivery_phone: "",
-    tag: "oneself",
-  }, "complete-delivery-submitted");
-}
 
 export async function submitMaiyatianMealCompleteByCookie(cookie: string, sourceId: string, orderNo = "") {
   if (!sourceId) {
@@ -2215,6 +2235,24 @@ export function normalizeAutoPickOrderPayload(payload: unknown): AutoPickInbound
 
   const normalized: AutoPickInboundOrder = {
     id: String(input.id || "").trim(),
+    customerRemark: String(
+      input.customerRemark
+      || input.user_remark
+      || input.userRemark
+      || input.buyer_remark
+      || input.buyerRemark
+      || input.remark
+      || input.memo
+      || input.note
+      || ""
+    ).trim() || undefined,
+    user_remark: input.user_remark !== undefined ? String(input.user_remark).trim() : undefined,
+    userRemark: input.userRemark !== undefined ? String(input.userRemark).trim() : undefined,
+    buyer_remark: input.buyer_remark !== undefined ? String(input.buyer_remark).trim() : undefined,
+    buyerRemark: input.buyerRemark !== undefined ? String(input.buyerRemark).trim() : undefined,
+    remark: input.remark !== undefined ? String(input.remark).trim() : undefined,
+    memo: input.memo !== undefined ? String(input.memo).trim() : undefined,
+    note: input.note !== undefined ? String(input.note).trim() : undefined,
     shopId,
     deliveryId: normalizeAutoPickDeliveryId(input.deliveryId),
     city: Number.isFinite(Number(input.city)) ? Number(input.city) : undefined,
@@ -2319,6 +2357,17 @@ export function normalizeAutoPickOrderPayload(payload: unknown): AutoPickInbound
             input.pickerTime,
             input.delivery_time,
           );
+      const rawFinishedTime = deliveryRecord?.finished_time
+        ?? deliveryRecord?.finishedTime
+        ?? input.finishedTime
+        ?? input.finished_time
+        ?? input.completedAt;
+      const completedTime = typeof rawFinishedTime === "string" && rawFinishedTime.includes("-")
+        ? String(rawFinishedTime).trim()
+        : (typeof rawFinishedTime === "string" || typeof rawFinishedTime === "number"
+            ? parseUnixTimestampToOrderTime(rawFinishedTime)
+            : undefined);
+
       const normalizedDelivery = {
         logisticName: String(deliveryRecord?.logisticName || deliveryRecord?.logistic_name || "").trim() || undefined,
         sendFee: Number.isFinite(Number(deliveryRecord?.sendFee ?? deliveryRecord?.send_fee))
@@ -2331,8 +2380,9 @@ export function normalizeAutoPickOrderPayload(payload: unknown): AutoPickInbound
               : undefined),
         track: String(deliveryRecord?.track || "").trim() || undefined,
         riderName: String(deliveryRecord?.riderName || deliveryRecord?.delivery_name || "").trim() || undefined,
+        completedTime,
       };
-      if (!normalizedDelivery.logisticName && normalizedDelivery.sendFee == null && !normalizedDelivery.pickupTime && !normalizedDelivery.track && !normalizedDelivery.riderName) {
+      if (!normalizedDelivery.logisticName && normalizedDelivery.sendFee == null && !normalizedDelivery.pickupTime && !normalizedDelivery.track && !normalizedDelivery.riderName && !normalizedDelivery.completedTime) {
         return undefined;
       }
       return normalizedDelivery;
@@ -2473,6 +2523,7 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
         deliveryDeadline: true,
         deliveryTimeRange: true,
         delivery: true,
+        customerRemark: true,
         rawPayload: true,
         items: {
           select: {
@@ -2591,6 +2642,7 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
       platformCommission: Math.round(Number(normalized.platformCommission || 0)),
       delivery: nextDeliveryValue,
       rawPayload: asPrismaJsonValue(nextRawPayloadWithResolvedShop),
+      customerRemark: normalized.customerRemark ?? null,
       lastSyncedAt: new Date(),
     } satisfies Prisma.AutoPickOrderUncheckedCreateInput;
 
@@ -2617,6 +2669,9 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
       platformCommission: Math.round(Number(normalized.platformCommission || 0)),
       delivery: nextDeliveryValue,
       rawPayload: asPrismaJsonValue(nextRawPayloadWithResolvedShop),
+      // 备注：优先使用平台同步回来的值；如果平台没有返回（null/空），则保留数据库中已有的备注，
+      // 避免一键同步时把用户手动添加/平台历史备注覆盖为空。
+      customerRemark: normalized.customerRemark || existing?.customerRemark || readCustomerRemarkFromRawPayload(existing?.rawPayload) || null,
       lastSyncedAt: new Date(),
     } satisfies Prisma.AutoPickOrderUncheckedUpdateInput;
 
@@ -3099,7 +3154,6 @@ function mergeAutoPickOrderItemRawPayload(
   basePayload: Record<string, unknown>,
   existingRawPayload: unknown
 ) {
-  const existingRecord = readAutoPickRawPayloadRecord(existingRawPayload);
   const nextPayload = { ...basePayload };
   const manualMatchedProduct = readManualMatchedProductFromOrderItemRawPayload(existingRawPayload);
   if (!manualMatchedProduct) {
@@ -4137,22 +4191,10 @@ async function resolveBrushOrderItemsForAutoPickOrder(
     }
 
     const productName = toAutoPickBaseProductName(item.productName);
-    const normalizedName = toNormalizedText(productName);
     const normalizedSku = normalizeAutoPickSkuForMatch(item.productNo);
     const allSameSkuCandidates = normalizedSku ? (shopProductSkuMap.get(normalizedSku) || []) : [];
-    const allNameCandidates = normalizedName ? (shopProductNameMap.get(normalizedName) || []) : [];
-    const allFuzzyCandidates = normalizedName
-      ? normalizedShopProductEntries.filter((candidate) =>
-          candidate.normalizedProductName !== normalizedName
-          && (
-            candidate.normalizedProductName.includes(normalizedName)
-            || normalizedName.includes(candidate.normalizedProductName)
-          )
-        ).slice(0, 10)
-      : [];
+
     const sameSkuCandidates = allSameSkuCandidates.filter((candidate) => isCandidateInMappedShop(candidate.shopId, candidate.shopName));
-    const shopNameCandidates = allNameCandidates.filter((candidate) => isCandidateInMappedShop(candidate.shopId, candidate.shopName));
-    const fuzzyCandidates = allFuzzyCandidates.filter((candidate) => isCandidateInMappedShop(candidate.shopId, candidate.shopName));
     const sameShopSkuCandidate = sameSkuCandidates.find((candidate) => {
       const candidateProductId = candidate.productId || candidate.sourceProductId;
       return Boolean(candidateProductId);
@@ -4478,49 +4520,7 @@ async function resolveOutboundItemsForAutoPickOrder(
   };
 }
 
-async function resolveAutoInboundCompensationCostPrice(
-  tx: Prisma.TransactionClient,
-  userId: string,
-  item: { productId: string | null; shopProductId: string | null }
-) {
-  if (item.shopProductId) {
-    const shopProduct = await tx.shopProduct.findFirst({
-      where: {
-        id: item.shopProductId,
-        shop: { userId },
-      },
-      select: {
-        costPrice: true,
-        product: {
-          select: {
-            costPrice: true,
-          },
-        },
-      },
-    });
 
-    return FinanceMath.add(
-      Number(shopProduct?.costPrice) || Number(shopProduct?.product?.costPrice) || 0,
-      0
-    );
-  }
-
-  if (item.productId) {
-    const product = await tx.product.findFirst({
-      where: {
-        id: item.productId,
-        userId,
-      },
-      select: {
-        costPrice: true,
-      },
-    });
-
-    return FinanceMath.add(Number(product?.costPrice) || 0, 0);
-  }
-
-  return 0;
-}
 
 export async function createOutboundFromAutoPickOrder(
   userId: string,
