@@ -312,6 +312,10 @@ export function AllOrdersView({
         if (response.status === 409 && data.reason === "insufficient-stock" && Array.isArray(data.insufficientItems)) {
           if (onOpenPurchaseDraft) {
             const today = new Date();
+            const draftShopName = data.insufficientItems[0]?.mappedShopName || "";
+            const matchedShop = draftShopName
+              ? localShops.find((shop) => shop.name === draftShopName)
+              : undefined;
             const draft = {
               id: `PO-${today.toISOString().slice(0, 10).replace(/-/g, "")}-${Math.floor(Math.random() * 1000).toString().padStart(3, "0")}`,
               status: "Confirmed" as PurchaseStatus,
@@ -336,8 +340,8 @@ export function AllOrdersView({
               extraFees: 0,
               totalAmount: 0,
               discountAmount: 0,
-              shippingAddress: "",
-              shopName: data.insufficientItems[0]?.mappedShopName || "",
+              shippingAddress: matchedShop?.address || "",
+              shopName: draftShopName,
             };
             onOpenPurchaseDraft(draft);
             showToast("库存不足，已为您生成采购草稿单，请输入成本并确认入库", "warning");

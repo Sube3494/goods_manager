@@ -471,17 +471,18 @@ export function getOrderItemDisplay(item: AutoPickOrderItem) {
   const matchedProduct = item.matchedProduct;
   return {
     name: matchedProduct?.name || item.productName || "未命名商品",
-    sku: item.productNo || matchedProduct?.sku || "-",
+    sku: matchedProduct?.sku || item.productNo || "-",
     image: matchedProduct?.image || item.thumb || null,
     quantity: item.quantity,
   };
 }
 
 export function getExpandedOrderItemDisplays(item: AutoPickOrderItem) {
+  const matchedProduct = item.matchedProduct;
   if (Array.isArray(item.displayItems) && item.displayItems.length > 0) {
     return item.displayItems.map((displayItem) => ({
       name: displayItem.name || item.productName || "未命名商品",
-      sku: displayItem.sku || item.productNo || "-",
+      sku: displayItem.sku || matchedProduct?.sku || item.productNo || "-",
       image: displayItem.image || item.thumb || null,
       quantity: displayItem.quantity,
     }));

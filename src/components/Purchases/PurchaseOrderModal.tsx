@@ -663,6 +663,23 @@ export function PurchaseOrderModal({
     }
   }, [formData.shippingAddress, addressList, formData.shopName]);
 
+  useEffect(() => {
+    if (!formData.shopName || formData.shippingAddress || addressList.length === 0) {
+      return;
+    }
+
+    const matched = addressList.find((address) => address.label === formData.shopName);
+    if (!matched?.address) {
+      return;
+    }
+
+    setFormData((prev) => (
+      prev.shippingAddress
+        ? prev
+        : { ...prev, shippingAddress: matched.address }
+    ));
+  }, [formData.shopName, formData.shippingAddress, addressList]);
+
 
   const calculateTotal = useCallback(() => {
     const itemsTotal = formData.items.reduce((sum, item) => sum + (item.quantity * item.costPrice), 0);
@@ -1254,7 +1271,7 @@ export function PurchaseOrderModal({
                                     suppliers={suppliers}
                                     onUpdate={updateItem}
                                     onRemove={removeItem}
-                                    costPriceInput={costPriceDrafts[getPurchaseItemKey(item)] ?? String(item.costPrice ?? "")}
+                                    costPriceInput={costPriceDrafts[getPurchaseItemKey(item)] ?? (item.costPrice ? String(item.costPrice) : "")}
                                     onCostPriceInputChange={handleCostPriceInputChange}
                                     onCostPriceInputBlur={handleCostPriceInputBlur}
                                     allowCostEdit={canBackfillReceivedCosts}
