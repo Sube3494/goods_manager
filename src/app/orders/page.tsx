@@ -53,6 +53,7 @@ import { ORDER_SHORTAGE_PURCHASE_NOTE_KEYWORD } from "@/lib/purchaseOrderTypes";
 
 type OrderAction = "self-delivery" | "complete-delivery" | "pickup-complete" | "sync" | "outbound";
 type OrdersTab = "today" | "all";
+type PurchaseDraftPayload = PurchaseOrder & { sourceOrderId?: string };
 
 type OrderResponse = {
   items: AutoPickOrder[];
@@ -1202,7 +1203,7 @@ export default function OrdersPage() {
   
   const [isCreateOfflineOpen, setIsCreateOfflineOpen] = useState(false);
   const [backfillTarget, setBackfillTarget] = useState<AutoPickOrder | null>(null);
-  const [purchaseDraft, setPurchaseDraft] = useState<PurchaseOrder | null>(null);
+  const [purchaseDraft, setPurchaseDraft] = useState<PurchaseDraftPayload | null>(null);
   
   const [isMatchPickerOpen, setIsMatchPickerOpen] = useState(false);
   const [isSavingMatch, setIsSavingMatch] = useState(false);
@@ -1771,7 +1772,7 @@ export default function OrdersPage() {
     ));
   }, []);
 
-  const savePurchaseDraft = useCallback(async (data: PurchaseOrder) => {
+  const savePurchaseDraft = useCallback(async (data: PurchaseDraftPayload) => {
     const existingNote = String(data.note || "").trim();
     const taggedNote = existingNote.includes(ORDER_SHORTAGE_PURCHASE_NOTE_KEYWORD)
       ? existingNote
@@ -1789,7 +1790,30 @@ export default function OrdersPage() {
     if (!response.ok) {
       throw new Error(payload?.error || "创建采购单失败");
     }
-    showToast("采购单已创建并入库", "success");
+
+    const sourceOrderId = String(data.sourceOrderId || "").trim();
+    if (sourceOrderId) {
+      const outboundResponse = await fetch(`/api/orders/${sourceOrderId}/outbound`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          matchedShopName: data.shopName || "",
+        }),
+      });
+      const outboundPayload = await outboundResponse.json().catch(() => ({}));
+
+      if (!outboundResponse.ok) {
+        const outboundMessage = getOrderActionErrorMessage(
+          outboundPayload?.error || outboundPayload?.message || "自动出库失败"
+        );
+        showToast(`采购单已创建并入库，请手动重试出库：${outboundMessage}`, "warning");
+        setPurchaseDraft(null);
+        triggerParentRefresh();
+        return;
+      }
+    }
+
+    showToast(sourceOrderId ? "采购单已创建入库，并已自动出库" : "采购单已创建并入库", "success");
     setPurchaseDraft(null);
     triggerParentRefresh();
   }, [showToast, triggerParentRefresh]);

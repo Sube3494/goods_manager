@@ -21,12 +21,13 @@ import {
 } from "./OrderCard";
 
 type OrderAction = "self-delivery" | "complete-delivery" | "pickup-complete" | "sync" | "outbound" | "sync-brush";
+type PurchaseDraftPayload = PurchaseOrder & { sourceOrderId?: string };
 
 interface AllOrdersViewProps {
   refreshTrigger: number;
   onOpenCostBackfill: (order: AutoPickOrder) => void;
   onOpenMatchEditor: (order: AutoPickOrder, item: AutoPickOrderItem) => void;
-  onOpenPurchaseDraft?: (draft: PurchaseOrder) => void;
+  onOpenPurchaseDraft?: (draft: PurchaseDraftPayload) => void;
   onDataLoad: (data: {
     summary: { receivedAmount: number; platformCommission: number; validOrderCount: number; itemCount: number; totalDeliveryFee: number; platformReceived?: Record<string, { amount: number; count: number }>; platformDelivery?: Record<string, number>; pureProfit: number; platformProfit?: Record<string, { amount: number; count: number }> };
     overview: { totalCount: number; trueOrderCount: number; brushCount: number; cancelledCount: number; platformBreakdown?: { truePlatformCounts: Record<string, number>; brushPlatformCounts: Record<string, number>; cancelledPlatformCounts: Record<string, number> } };
@@ -346,6 +347,7 @@ export function AllOrdersView({
               discountAmount: 0,
               shippingAddress: matchedShop?.address || "",
               shopName: draftShopName,
+              sourceOrderId: orderId,
             };
             onOpenPurchaseDraft(draft);
             showToast("库存不足，已为您生成采购草稿单，请输入成本并确认入库", "warning");

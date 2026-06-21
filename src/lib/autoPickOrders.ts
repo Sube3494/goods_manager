@@ -3158,7 +3158,9 @@ function readManualMatchedProductFromOrderItemRawPayload(rawPayload: unknown) {
   const manual = candidate as AutoPickManualMatchedProductMeta;
   const id = String(manual.id || "").trim();
   const name = String(manual.name || "").trim();
-  if (!id || !name) {
+  const sourceType = manual.sourceType === "shopProduct" ? "shopProduct" as const : "product" as const;
+  const shopProductId = String(manual.shopProductId || "").trim() || null;
+  if (!id || !name || sourceType !== "shopProduct" || !shopProductId) {
     return null;
   }
 
@@ -3167,8 +3169,8 @@ function readManualMatchedProductFromOrderItemRawPayload(rawPayload: unknown) {
     name,
     sku: String(manual.sku || "").trim() || null,
     image: String(manual.image || "").trim() || null,
-    sourceType: manual.sourceType === "shopProduct" ? "shopProduct" as const : "product" as const,
-    shopProductId: String(manual.shopProductId || "").trim() || null,
+    sourceType,
+    shopProductId,
     shopName: String(manual.shopName || "").trim() || null,
   };
 }
@@ -4205,11 +4207,35 @@ async function resolveBrushOrderItemsForAutoPickOrder(
 
   for (const item of order.items) {
     const manualMatchedProduct = readManualMatchedProductFromOrderItemRawPayload(item.rawPayload);
-    if (manualMatchedProduct?.id) {
-      resolvedItems.push({
-        productId: manualMatchedProduct.id,
-        quantity: Math.max(1, Number(item.quantity || 1) || 1),
+    if (manualMatchedProduct?.shopProductId) {
+      const matchedShopProduct = await tx.shopProduct.findFirst({
+        where: {
+          id: manualMatchedProduct.shopProductId,
+          shop: { userId },
+        },
+        select: {
+          productId: true,
+          sourceProductId: true,
+        },
       });
+
+      if (matchedShopProduct) {
+        const resolvedProductId = String(
+          matchedShopProduct.productId
+          || matchedShopProduct.sourceProductId
+          || ""
+        ).trim();
+
+        if (resolvedProductId) {
+          resolvedItems.push({
+            productId: resolvedProductId,
+            quantity: Math.max(1, Number(item.quantity || 1) || 1),
+          });
+          continue;
+        }
+      }
+
+      missingItems.push(item.productName || "未命名商品");
       continue;
     }
 

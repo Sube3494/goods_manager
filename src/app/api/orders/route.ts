@@ -135,6 +135,7 @@ type MatchedCatalogProduct = {
   jdSkuId?: string | null;
   image?: string | null;
   sourceType: "product" | "shopProduct";
+  shopProductId?: string | null;
   shopId?: string | null;
   shopName?: string | null;
   isManual?: boolean;
@@ -295,7 +296,9 @@ function readManualMatchedProduct(rawPayload: unknown): MatchedCatalogProduct | 
   const record = candidate as Record<string, unknown>;
   const id = String(record.id || "").trim();
   const name = String(record.name || "").trim();
-  if (!id || !name) {
+  const sourceType = record.sourceType === "shopProduct" ? "shopProduct" : "product";
+  const shopProductId = String(record.shopProductId || "").trim();
+  if (!id || !name || sourceType !== "shopProduct" || !shopProductId) {
     return null;
   }
 
@@ -304,7 +307,8 @@ function readManualMatchedProduct(rawPayload: unknown): MatchedCatalogProduct | 
     name,
     sku: String(record.sku || "").trim() || null,
     image: String(record.image || "").trim() || null,
-    sourceType: record.sourceType === "shopProduct" ? "shopProduct" : "product",
+    sourceType,
+    shopProductId,
     shopName: String(record.shopName || "").trim() || null,
     isManual: true,
   };
