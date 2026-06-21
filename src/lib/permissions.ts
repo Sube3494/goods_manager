@@ -14,6 +14,7 @@ export type Permission =
   | "brush:simulate"
   | "gallery:upload" | "gallery:download" | "gallery:share" | "gallery:copy"
   | "settlement:manage"
+  | "operating-costs:manage"
   | "logistics:manage"
   | "shelf_life:read" | "shelf_life:manage"
   | "roles:manage"
@@ -132,6 +133,7 @@ export const PERMISSION_TREE = [
     label: "财务结算",
     children: [
       { key: "settlement:manage", label: "结算管理" },
+      { key: "operating-costs:manage", label: "经营成本管理" },
     ]
   },
   {
@@ -299,6 +301,7 @@ const DEFAULT_ROUTE_RULES: RouteAccessRule[] = [
   { href: "/inbound", permission: "inbound:manage" },
   { href: "/outbound", permission: "outbound:manage" },
   { href: "/settlement", permission: "settlement:manage" },
+  { href: "/operating-costs", permission: "operating-costs:manage" },
   { href: "/shelf-life", permission: "shelf_life:read" },
   { href: "/gallery", permission: ["gallery:upload", "gallery:download", "gallery:share", "gallery:copy"] },
   { href: "/admin/members", adminCapability: ["members:manage", "members:status", "whitelist:manage"] },

@@ -23,6 +23,7 @@ import {
   Trash2,
   Truck,
   Warehouse,
+  WalletCards,
   X,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -57,6 +58,7 @@ const GROUP_ICONS = {
   gallery: ImageIcon,
   gallery_audit: ClipboardCheck,
   logistics: Truck,
+  settlement: WalletCards,
   system: Settings,
 } as const;
 

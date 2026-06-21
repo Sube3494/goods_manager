@@ -1577,21 +1577,25 @@ export async function GET(request: NextRequest) {
           const hasStrictMatchForAllSegments = normalizedSkuCandidates.length > 0
             && normalizedSkuCandidates.every((candidate) => Boolean(resolveStrictSkuMatch(candidate)));
           const matchedProduct = manualMatchedProduct || (hasStrictMatchForAllSegments ? (strictMatches[0] || null) : null);
-          const displayItems = manualMatchedProduct
-            ? (manualMatchedProduct.bundleItems && Array.isArray(manualMatchedProduct.bundleItems)
-              ? manualMatchedProduct.bundleItems.map((bItem: any) => ({
-                  name: bItem.name || item.productName || "未命名商品",
-                  sku: (
-                    isJDPlatform(order.platform)
-                      ? (bItem.jdSkuId || bItem.sku)
-                      : (bItem.sku || bItem.jdSkuId)
-                  ) || "-",
-                  image: bItem.image || null,
-                  quantity: item.quantity,
-                }))
-              : undefined)
-            : normalizedSkuCandidates.length > 1 && hasStrictMatchForAllSegments
-            ? normalizedSkuCandidates.map((candidate) => {
+          
+          const matchedSkuToSplit = manualMatchedProduct?.sku || item.productNo;
+          const segmentsFromSku = splitCompositeSkuSegments(matchedSkuToSplit);
+          const hasStrictMatchForAllSegmentsFromSku = segmentsFromSku.length > 1
+            && segmentsFromSku.every((candidate) => Boolean(resolveStrictSkuMatch(candidate)));
+
+          const displayItems = (manualMatchedProduct && manualMatchedProduct.bundleItems && Array.isArray(manualMatchedProduct.bundleItems))
+            ? manualMatchedProduct.bundleItems.map((bItem: any) => ({
+                name: bItem.name || item.productName || "未命名商品",
+                sku: (
+                  isJDPlatform(order.platform)
+                    ? (bItem.jdSkuId || bItem.sku)
+                    : (bItem.sku || bItem.jdSkuId)
+                ) || "-",
+                image: bItem.image || null,
+                quantity: item.quantity,
+              }))
+            : hasStrictMatchForAllSegmentsFromSku
+            ? segmentsFromSku.map((candidate) => {
                 const segmentMatchedProduct = resolveStrictSkuMatch(candidate);
                 return {
                   name: segmentMatchedProduct?.name || item.productName || "未命名商品",
