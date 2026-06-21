@@ -95,6 +95,56 @@ type OutboundCostLookupRow = {
   }>;
 };
 
+function resolveRefundAdjustedIncomeMetrics(options: {
+  expectedIncome: number | null | undefined;
+  platformCommission: number | null | undefined;
+  actualPaid: number | null | undefined;
+  refundAmount: number | null | undefined;
+}) {
+  const expectedIncome = Math.max(0, Number(options.expectedIncome || 0));
+  const platformCommission = Math.max(0, Number(options.platformCommission || 0));
+  const actualPaid = Math.max(0, Number(options.actualPaid || 0));
+  const refundAmount = Math.max(0, Number(options.refundAmount || 0));
+
+  if (refundAmount <= 0) {
+    return {
+      expectedIncome,
+      platformCommission,
+      refundedExpectedIncome: 0,
+      refundedCommission: 0,
+    };
+  }
+
+  const grossBase = Math.max(actualPaid, expectedIncome + platformCommission);
+  if (grossBase <= 0) {
+    return {
+      expectedIncome,
+      platformCommission,
+      refundedExpectedIncome: refundAmount,
+      refundedCommission: 0,
+    };
+  }
+
+  const commissionRatio = platformCommission > 0
+    ? Math.min(1, Math.max(0, platformCommission / grossBase))
+    : 0;
+  const refundedCommission = Math.min(
+    platformCommission,
+    Math.max(0, Math.round(refundAmount * commissionRatio))
+  );
+  const refundedExpectedIncome = Math.min(
+    expectedIncome,
+    Math.max(0, refundAmount - refundedCommission)
+  );
+
+  return {
+    expectedIncome: Math.max(0, expectedIncome - refundedExpectedIncome),
+    platformCommission: Math.max(0, platformCommission - refundedCommission),
+    refundedExpectedIncome,
+    refundedCommission,
+  };
+}
+
 export async function GET(request: NextRequest) {
   const perf = createRequestPerfTracker(request);
   try {
@@ -568,16 +618,23 @@ export async function GET(request: NextRequest) {
         const matchedShopName = resolveAutoPickMatchedShopName(order, user.permissions) || "";
         const isOffline = order.platform === "线下交易";
         const rate = isOffline ? 0 : (shopRateMap.get(matchedShopName) ?? 0.06);
-        const commissionYuan = isOffline ? 0 : (paidYuan * rate);
         const deliveryYuan = getDeliveryFee(order.delivery) / 100;
 
         const orderCostMeta = outboundMetaByOrderNo.get(String(order.orderNo || "").trim());
         const orderCostYuan = orderCostMeta?.productCost || 0;
         const refundAmountYuan = orderCostMeta?.refundAmount || 0;
+        const adjustedMetrics = resolveRefundAdjustedIncomeMetrics({
+          expectedIncome: Number(order.expectedIncome || 0) / 100,
+          platformCommission: isOffline ? 0 : (paidYuan * rate),
+          actualPaid: paidYuan,
+          refundAmount: refundAmountYuan,
+        });
+        const commissionYuan = adjustedMetrics.platformCommission;
+        const expectedIncomeYuan = adjustedMetrics.expectedIncome;
 
         const isBrush = readMainSystemSelfDeliveryFlag(order.rawPayload);
         if (!isBrush) {
-          userPaid = FinanceMath.add(userPaid, paidYuan - refundAmountYuan);
+          userPaid = FinanceMath.add(userPaid, expectedIncomeYuan);
           productCost = FinanceMath.add(productCost, orderCostYuan);
         } else {
           brushExpense = FinanceMath.add(brushExpense, defaultBrushCommission);
@@ -704,16 +761,23 @@ export async function GET(request: NextRequest) {
         const matchedShopName = resolveAutoPickMatchedShopName(order, user.permissions) || "";
         const isOffline = order.platform === "线下交易";
         const rate = isOffline ? 0 : (shopRateMap.get(matchedShopName) ?? 0.06);
-        const commissionYuan = isOffline ? 0 : (paidYuan * rate);
         const deliveryYuan = getDeliveryFee(order.delivery) / 100;
         const refundAmountYuan = outboundMetaByOrderNo.get(String(order.orderNo || "").trim())?.refundAmount || 0;
+        const adjustedMetrics = resolveRefundAdjustedIncomeMetrics({
+          expectedIncome: Number(order.expectedIncome || 0) / 100,
+          platformCommission: isOffline ? 0 : (paidYuan * rate),
+          actualPaid: paidYuan,
+          refundAmount: refundAmountYuan,
+        });
+        const commissionYuan = adjustedMetrics.platformCommission;
+        const expectedIncomeYuan = adjustedMetrics.expectedIncome;
 
         if (!isBrush) {
           if (point) {
-            point.userPaid = FinanceMath.add(point.userPaid, paidYuan - refundAmountYuan);
+            point.userPaid = FinanceMath.add(point.userPaid, expectedIncomeYuan);
           }
           if (platformPoint) {
-            platformPoint.userPaid = FinanceMath.add(platformPoint.userPaid, paidYuan - refundAmountYuan);
+            platformPoint.userPaid = FinanceMath.add(platformPoint.userPaid, expectedIncomeYuan);
           }
         }
         if (point) {
@@ -737,7 +801,6 @@ export async function GET(request: NextRequest) {
         } else {
           const orderCostMeta = outboundMetaByOrderNo.get(String(order.orderNo || "").trim());
           const orderCostYuan = orderCostMeta?.productCost || 0;
-          const refundAmountYuan = orderCostMeta?.refundAmount || 0;
 
           if (point) {
             point.productCost = FinanceMath.add(point.productCost, orderCostYuan);
@@ -746,7 +809,6 @@ export async function GET(request: NextRequest) {
             platformPoint.productCost = FinanceMath.add(platformPoint.productCost, orderCostYuan);
           }
 
-          const expectedIncomeYuan = Number(order.expectedIncome || 0) / 100;
           const matchedShopName = resolveAutoPickMatchedShopName(order, user.permissions) || "";
           const isOffline = order.platform === "线下交易";
           const rate = isOffline ? 0 : (shopRateMap.get(matchedShopName) ?? 0.06);
@@ -755,7 +817,7 @@ export async function GET(request: NextRequest) {
           if (hasReadyCost) {
             const pureProfit = FinanceMath.add(
               FinanceMath.multiply(expectedIncomeYuan, 1 - rate),
-              -deliveryYuan - orderCostYuan - refundAmountYuan
+              -deliveryYuan - orderCostYuan
             );
             if (point) {
               point.pureProfit = FinanceMath.add(point.pureProfit, pureProfit);

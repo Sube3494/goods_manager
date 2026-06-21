@@ -475,6 +475,56 @@ function resolveIncomeMetrics(
   };
 }
 
+function resolveRefundAdjustedIncomeMetrics(options: {
+  expectedIncome: number | null | undefined;
+  platformCommission: number | null | undefined;
+  actualPaid: number | null | undefined;
+  refundAmount: number | null | undefined;
+}) {
+  const expectedIncome = Math.max(0, Number(options.expectedIncome || 0));
+  const platformCommission = Math.max(0, Number(options.platformCommission || 0));
+  const actualPaid = Math.max(0, Number(options.actualPaid || 0));
+  const refundAmount = Math.max(0, Number(options.refundAmount || 0));
+
+  if (refundAmount <= 0) {
+    return {
+      expectedIncome,
+      platformCommission,
+      refundedExpectedIncome: 0,
+      refundedCommission: 0,
+    };
+  }
+
+  const grossBase = Math.max(actualPaid, expectedIncome + platformCommission);
+  if (grossBase <= 0) {
+    return {
+      expectedIncome,
+      platformCommission,
+      refundedExpectedIncome: refundAmount,
+      refundedCommission: 0,
+    };
+  }
+
+  const commissionRatio = platformCommission > 0
+    ? Math.min(1, Math.max(0, platformCommission / grossBase))
+    : 0;
+  const refundedCommission = Math.min(
+    platformCommission,
+    Math.max(0, Math.round(refundAmount * commissionRatio))
+  );
+  const refundedExpectedIncome = Math.min(
+    expectedIncome,
+    Math.max(0, refundAmount - refundedCommission)
+  );
+
+  return {
+    expectedIncome: Math.max(0, expectedIncome - refundedExpectedIncome),
+    platformCommission: Math.max(0, platformCommission - refundedCommission),
+    refundedExpectedIncome,
+    refundedCommission,
+  };
+}
+
 function readShopNameFromRawPayload(rawPayload: unknown) {
   if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
     return null;
@@ -1311,9 +1361,17 @@ export async function GET(request: NextRequest) {
           const cancelled = isAutoPickOrderCancelledStatus(order.status);
           const deleted = isAutoPickOrderDeletedStatus(order.status);
           if (!cancelled && !deleted) {
-            const expected = Math.max(0, Number(metrics.expectedIncome || 0));
+            const outboundMeta = outboundByOrderNo.get(order.orderNo) || null;
+            const refundAmount = outboundMeta?.refundAmount || 0;
+            const adjustedMetrics = resolveRefundAdjustedIncomeMetrics({
+              expectedIncome: metrics.expectedIncome,
+              platformCommission: metrics.platformCommission,
+              actualPaid: order.actualPaid,
+              refundAmount,
+            });
+            const expected = Math.max(0, Number(adjustedMetrics.expectedIncome || 0));
             acc.receivedAmount += expected;
-            acc.platformCommission += metrics.platformCommission;
+            acc.platformCommission += adjustedMetrics.platformCommission;
             acc.validOrderCount += 1;
 
             const platform = order.platform || "线下交易";
@@ -1341,12 +1399,10 @@ export async function GET(request: NextRequest) {
             const matchedShopName = String(
               String(lockedResolvedShop?.name || "").trim() || mappingDebug.localShopName || ""
             ).trim();
-            const outboundMeta = outboundByOrderNo.get(order.orderNo) || null;
             const hiddenDeletedOfflineIncome = deleted && order.platform === "线下交易";
             const safeExpectedIncome = hiddenDeletedOfflineIncome
               ? null
-              : (typeof metrics.expectedIncome === "number" ? metrics.expectedIncome : null);
-            const refundAmount = outboundMeta?.refundAmount || 0;
+              : (typeof adjustedMetrics.expectedIncome === "number" ? adjustedMetrics.expectedIncome : null);
             const serviceFeeRate = order.platform === "线下交易"
               ? 0
               : (shopRateMap.get(matchedShopName) ?? 0.06);
@@ -1362,12 +1418,11 @@ export async function GET(request: NextRequest) {
             const orderPureProfit = hiddenDeletedOfflineIncome
               ? null
               : isBrush
-              ? - (Math.abs(Number(order.platformCommission || 0)) + brushCommission)
+              ? - (Math.abs(Number(adjustedMetrics.platformCommission || 0)) + brushCommission)
               : (productCostStatus === "ready"
-                ? Math.round(Number(safeExpectedIncome || 0) * (1 - serviceFeeRate)) - deliveryFee - productCost - refundAmount
+                ? Math.round(Number(safeExpectedIncome || 0) * (1 - serviceFeeRate)) - deliveryFee - productCost
                 : null);
 
-            acc.receivedAmount -= refundAmount;
             const profitValue = typeof orderPureProfit === "number" && Number.isFinite(orderPureProfit) ? orderPureProfit : 0;
             acc.pureProfit += profitValue;
             if (!acc.platformProfit[platform]) {
@@ -1375,7 +1430,6 @@ export async function GET(request: NextRequest) {
             }
             acc.platformProfit[platform].amount += profitValue;
             acc.platformProfit[platform].count += 1;
-            acc.platformReceived[platform].amount -= refundAmount;
           }
           acc.itemCount += order.items.reduce((sum: number, item) => sum + item.quantity, 0);
           return acc;
@@ -1536,10 +1590,16 @@ export async function GET(request: NextRequest) {
       const autoOutboundMeta = readAutoOutboundMeta(order.rawPayload);
       const outboundMeta = outboundByOrderNo.get(order.orderNo) || null;
       const hiddenDeletedOfflineIncome = order.isDeleted && order.platform === "线下交易";
+      const refundAmount = outboundMeta?.refundAmount || 0;
+      const adjustedMetrics = resolveRefundAdjustedIncomeMetrics({
+        expectedIncome: order.expectedIncome,
+        platformCommission: order.platformCommission,
+        actualPaid: order.actualPaid,
+        refundAmount,
+      });
       const safeExpectedIncome = hiddenDeletedOfflineIncome
         ? null
-        : (typeof order.expectedIncome === "number" ? order.expectedIncome : null);
-      const refundAmount = outboundMeta?.refundAmount || 0;
+        : (typeof adjustedMetrics.expectedIncome === "number" ? adjustedMetrics.expectedIncome : null);
       const serviceFeeRate = order.platform === "线下交易"
         ? 0
         : (shopRateMap.get(matchedShopName) ?? 0.06);
@@ -1557,13 +1617,14 @@ export async function GET(request: NextRequest) {
         : order.isMainSystemSelfDelivery
         ? - (Math.abs(Number(order.platformCommission || 0)) + brushCommission)
         : (productCostStatus === "ready"
-          ? Math.round(Number(safeExpectedIncome || 0) * (1 - serviceFeeRate)) - deliveryFee - productCost - refundAmount
+          ? Math.round(Number(safeExpectedIncome || 0) * (1 - serviceFeeRate)) - deliveryFee - productCost
           : null);
 
       return {
         ...order,
         expectedIncome: safeExpectedIncome,
         refundAmount,
+        platformCommission: adjustedMetrics.platformCommission,
         matchedShopId,
         matchedShopName,
         autoOutboundStatus: autoOutboundMeta.status,
