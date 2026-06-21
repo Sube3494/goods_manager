@@ -249,6 +249,8 @@ model User {
   roleProfile        RoleProfile?        @relation(fields: [roleProfileId], references: [id])
   batches            ProductBatch[]
   dailyPromotionExpenses DailyPromotionExpense[]
+  operatingCostProfiles OperatingCostProfile[]
+  operatingCostMonthlyBills OperatingCostMonthlyBill[]
 }
 
 model UserDeviceSession {
@@ -768,3 +770,36 @@ model DailyPromotionExpense {
   @@unique([userId, date, shopName])
   @@index([userId, date])
 }
+
+model OperatingCostProfile {
+  id                String   @id @default(cuid())
+  userId            String
+  shopName          String
+  monthlyRent       Float    @default(0)
+  monthlyLabor      Float    @default(0)
+  allocationBaseDays Int     @default(30)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, shopName])
+  @@index([userId, shopName])
+}
+
+model OperatingCostMonthlyBill {
+  id                   String   @id @default(cuid())
+  userId               String
+  shopName             String
+  monthKey             String
+  waterAmount          Float    @default(0)
+  electricAmount       Float    @default(0)
+  sharedElectricAmount Float    @default(0)
+  propertyFeeAmount    Float    @default(0)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, shopName, monthKey])
+  @@index([userId, shopName, monthKey])
+}
+
