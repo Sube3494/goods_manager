@@ -4284,6 +4284,7 @@ type InsufficientAutoPickStockItem = {
   quantity: number;
   availableQuantity: number;
   missingQuantity: number;
+  mappedShopId: string | null;
   mappedShopName: string | null;
   systemStock?: number;
 };
@@ -4535,9 +4536,17 @@ async function resolveOutboundItemsForAutoPickOrder(
         || null
       )
     : (internalShop?.name || mappedShopName || null);
+  const resolvedShopId = resolvedItems.length > 0
+    ? (
+        shopProducts.find((candidate) => candidate.id === resolvedItems.find((item) => item.shopProductId)?.shopProductId)?.shop?.id
+        || internalShop?.id
+        || null
+      )
+    : (internalShop?.id || null);
 
   return {
     items: resolvedItems,
+    mappedShopId: resolvedShopId,
     mappedShopName: resolvedShopName,
     displayShopName: resolvedShopName,
   };
@@ -4646,7 +4655,7 @@ export async function createOutboundFromAutoPickOrder(
               stock: true,
               productImage: true,
               product: { select: { image: true } },
-              shop: { select: { name: true } },
+              shop: { select: { id: true, name: true } },
             },
           }),
         ]);
@@ -4661,6 +4670,7 @@ export async function createOutboundFromAutoPickOrder(
             quantity: item.quantity,
             availableQuantity: currentBatchStock,
             missingQuantity: item.quantity - currentBatchStock,
+            mappedShopId: shopProduct?.shop?.id || resolved.mappedShopId || null,
             mappedShopName: shopProduct?.shop?.name || resolved.mappedShopName || null,
             systemStock: currentSystemStock,
           });
@@ -4694,6 +4704,7 @@ export async function createOutboundFromAutoPickOrder(
             quantity: item.quantity,
             availableQuantity: currentBatchStock,
             missingQuantity: item.quantity - currentBatchStock,
+            mappedShopId: resolved.mappedShopId || null,
             mappedShopName: resolved.mappedShopName || null,
             systemStock: currentSystemStock,
           });

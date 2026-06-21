@@ -7,6 +7,7 @@ import { CustomSelect } from "@/components/ui/CustomSelect";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { AutoPickOrder, AutoPickOrderItem, PurchaseOrder, PurchaseStatus } from "@/lib/types";
 import { formatLocalDate } from "@/lib/dateUtils";
+import { isShopNameMatch } from "@/lib/shopIdentity";
 import { getBaseAutoPickStatusDisplay } from "@/lib/autoPickOrderStatus";
 import {
   OrderCard,
@@ -261,16 +262,19 @@ export function TodayOrdersView({
         if (response.status === 409 && data.reason === "insufficient-stock" && Array.isArray(data.insufficientItems)) {
           if (onOpenPurchaseDraft) {
             const today = new Date();
+            const draftShopId = data.insufficientItems[0]?.mappedShopId || "";
             const draftShopName = data.insufficientItems[0]?.mappedShopName || "";
-            const matchedShop = draftShopName
-              ? localShops.find((shop) => shop.name === draftShopName)
-              : undefined;
+            const matchedShop = draftShopId
+              ? localShops.find((shop) => shop.id === draftShopId)
+              : draftShopName
+                ? localShops.find((shop) => isShopNameMatch(shop.name, draftShopName))
+                : undefined;
             const draft = {
               id: `PO-${today.toISOString().slice(0, 10).replace(/-/g, "")}-${Math.floor(Math.random() * 1000).toString().padStart(3, "0")}`,
               status: "Confirmed" as PurchaseStatus,
               type: "Purchase",
               date: today.toLocaleString('sv-SE').slice(0, 16).replace('T', ' '),
-              items: data.insufficientItems.map((item: { productId?: string; shopProductId?: string; name?: string; image?: string | null; missingQuantity: number; mappedShopName?: string }) => ({
+              items: data.insufficientItems.map((item: { productId?: string; shopProductId?: string; name?: string; image?: string | null; missingQuantity: number; mappedShopId?: string; mappedShopName?: string }) => ({
                 productId: item.productId || null,
                 shopProductId: item.shopProductId || null,
                 product: {

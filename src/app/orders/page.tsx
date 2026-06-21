@@ -1651,7 +1651,7 @@ export default function OrdersPage() {
       itemName: item.productName || "未命名商品",
       shopName: resolvedShopName,
       shopId: resolvedShopId,
-      currentMatchedProductId: item.matchedProduct?.id || "",
+      currentMatchedProductId: item.matchedProduct?.shopProductId || item.matchedProduct?.id || "",
     });
     setIsMatchPickerOpen(true);
   }, [localShops]);
@@ -2232,9 +2232,10 @@ export default function OrdersPage() {
         onSelect={(products) => {
           const selectedProduct = products[0];
           const resolvedProductId = String(
-            selectedProduct?.sourceProductId
-            || selectedProduct?.productId
+            selectedProduct?.shopProductId
             || selectedProduct?.id
+            || selectedProduct?.sourceProductId
+            || selectedProduct?.productId
             || ""
           ).trim();
           if (!resolvedProductId) return;

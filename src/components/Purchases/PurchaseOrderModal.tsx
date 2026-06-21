@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { AUTO_INBOUND_TYPE } from "@/lib/purchaseOrderTypes";
 import { formatLocalDateTime } from "@/lib/dateUtils";
+import { isShopNameMatch } from "@/lib/shopIdentity";
 
 interface PurchaseOrderModalProps {
   isOpen: boolean;
@@ -668,7 +669,7 @@ export function PurchaseOrderModal({
       return;
     }
 
-    const matched = addressList.find((address) => address.label === formData.shopName);
+    const matched = addressList.find((address) => isShopNameMatch(address.label, formData.shopName));
     if (!matched?.address) {
       return;
     }

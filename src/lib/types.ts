@@ -154,6 +154,7 @@ export interface AutoPickOrderItem {
     sku?: string | null;
     image?: string | null;
     sourceType: "product" | "shopProduct";
+    shopProductId?: string | null;
     shopName?: string | null;
     isManual?: boolean;
   } | null;
@@ -167,6 +168,7 @@ export interface AutoPickMatchedProductRef {
   sku?: string | null;
   image?: string | null;
   sourceType: "product" | "shopProduct";
+  shopProductId?: string | null;
   shopName?: string | null;
   isManual?: boolean;
 }
