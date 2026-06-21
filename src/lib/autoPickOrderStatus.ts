@@ -1,3 +1,39 @@
+export const AUTO_PICK_EXTRA_STATUS_FILTERS = [
+  { value: "pending-outbound", label: "未出库" },
+  { value: "pending-backfill", label: "未回填" },
+] as const;
+
+export function isAutoPickExtraStatusFilter(status?: string | null) {
+  const value = String(status || "").trim();
+  return AUTO_PICK_EXTRA_STATUS_FILTERS.some((item) => item.value === value);
+}
+
+export function getAutoPickStatusFilterLabel(status?: string | null) {
+  const value = String(status || "").trim();
+  const matched = AUTO_PICK_EXTRA_STATUS_FILTERS.find((item) => item.value === value);
+  if (matched) {
+    return matched.label;
+  }
+  return getBaseAutoPickStatusDisplay(status);
+}
+
+export function matchesAutoPickStatusFilter(
+  order: { status?: string | null; productCostStatus?: "ready" | "pending-outbound" | "pending-backfill" | null },
+  filter?: string | null
+) {
+  const value = String(filter || "").trim();
+  if (!value || value === "all") {
+    return true;
+  }
+  if (value === "pending-outbound") {
+    return order.productCostStatus === "pending-outbound";
+  }
+  if (value === "pending-backfill") {
+    return order.productCostStatus === "pending-backfill";
+  }
+  return getBaseAutoPickStatusDisplay(order.status) === getBaseAutoPickStatusDisplay(value);
+}
+
 export function getBaseAutoPickStatusDisplay(status?: string | null) {
   const text = String(status || "").trim();
   const normalized = text.toLowerCase();

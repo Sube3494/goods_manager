@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { AutoPickOrder, AutoPickOrderItem, PurchaseOrder, PurchaseStatus } from "@/lib/types";
 import { formatLocalDate } from "@/lib/dateUtils";
 import { isShopNameMatch } from "@/lib/shopIdentity";
+import { AUTO_PICK_EXTRA_STATUS_FILTERS, getBaseAutoPickStatusDisplay, getAutoPickStatusFilterLabel, isAutoPickExtraStatusFilter, matchesAutoPickStatusFilter } from "@/lib/autoPickOrderStatus";
 import {
   OrderCard,
   OrderCardErrorBoundary,
@@ -144,7 +145,7 @@ export function AllOrdersView({
 
       if (query.trim()) params.set("query", query.trim());
       if (platform !== "all") params.set("platform", platform);
-      if (status !== "all") params.set("status", status);
+      if (status !== "all" && !isAutoPickExtraStatusFilter(status)) params.set("status", status);
       if (startDate) params.set("startDate", startDate);
       if (endDate) params.set("endDate", endDate);
       if (shop !== "all") params.set("shop", shop);
@@ -394,16 +395,38 @@ export function AllOrdersView({
   );
 
   const statusOptions = useMemo(() => {
-    return [{ value: "all", label: "全部状态" }, ...statuses.map((item) => ({ value: item, label: item }))];
-  }, [statuses]);
+    const dynamicExtraOptions = AUTO_PICK_EXTRA_STATUS_FILTERS.filter((option) => (
+      orders.some((order) => matchesAutoPickStatusFilter(order, option.value))
+    ));
+    const baseStatusOptions = Array.from(
+      new Map(
+        statuses.map((item) => {
+          const label = getAutoPickStatusFilterLabel(item);
+          return [label, { value: label, label }] as const;
+        })
+      ).values()
+    );
+    return [
+      { value: "all", label: "全部状态" },
+      ...dynamicExtraOptions,
+      ...baseStatusOptions,
+    ];
+  }, [orders, statuses]);
+
+  useEffect(() => {
+    if (status === "all") return;
+    if (statusOptions.some((option) => option.value === status)) return;
+    setStatus("all");
+  }, [status, statusOptions]);
 
   // 前端过滤（针对店铺筛选项）
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {
       if (shop !== "all" && order.matchedShopName !== shop) return false;
+      if (!matchesAutoPickStatusFilter(order, status)) return false;
       return true;
     });
-  }, [orders, shop]);
+  }, [orders, shop, status]);
 
   const orderOverviewCounts = useMemo(() => {
     if (shop === "all") {
