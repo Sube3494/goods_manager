@@ -2254,19 +2254,15 @@ export default function OrdersPage() {
         isOpen={isMatchPickerOpen}
         onClose={closeMatchEditor}
         onSelect={(products) => {
-          const selectedProduct = products[0];
-          const resolvedProductId = String(
-            selectedProduct?.shopProductId
-            || selectedProduct?.id
-            || selectedProduct?.sourceProductId
-            || selectedProduct?.productId
-            || ""
-          ).trim();
-          if (!resolvedProductId) return;
-          void saveManualMatch(resolvedProductId);
+          const resolvedIds = products
+            .map((p) => String(p.shopProductId || p.id || p.sourceProductId || p.productId || "").trim())
+            .filter(Boolean);
+          if (resolvedIds.length === 0) return;
+          void saveManualMatch(resolvedIds.join("+"));
         }}
-        selectedIds={matchEditorTarget?.currentMatchedProductId ? [matchEditorTarget.currentMatchedProductId] : []}
+        selectedIds={matchEditorTarget?.currentMatchedProductId ? matchEditorTarget.currentMatchedProductId.split("+").filter(Boolean) : []}
         singleSelect
+        allowMultipleToggle={true}
         loadAllOnOpen
         showPlatformSelector={false}
         showCategoryFilter

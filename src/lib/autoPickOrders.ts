@@ -4212,21 +4212,50 @@ async function resolveBrushOrderItemsForAutoPickOrder(
   for (const item of order.items) {
     const manualMatchedProduct = readManualMatchedProductFromOrderItemRawPayload(item.rawPayload);
     if (manualMatchedProduct?.shopProductId) {
-      const matchedShopProduct = shopProducts.find((product) => product.id === manualMatchedProduct.shopProductId);
+      const productIds = manualMatchedProduct.shopProductId.split(/[+＋]/).map(id => id.trim()).filter(Boolean);
+      if (productIds.length > 1) {
+        let hasUnresolved = false;
+        const subResolvedItems: Array<{ productId: string; quantity: number }> = [];
 
-      if (matchedShopProduct) {
-        const resolvedProductId = String(
-          matchedShopProduct.productId
-          || matchedShopProduct.sourceProductId
-          || ""
-        ).trim();
+        for (const subShopProductId of productIds) {
+          const matchedShopProduct = shopProducts.find((product) => product.id === subShopProductId);
+          const resolvedProductId = String(
+            matchedShopProduct?.productId
+            || matchedShopProduct?.sourceProductId
+            || ""
+          ).trim();
 
-        if (resolvedProductId) {
-          resolvedItems.push({
-            productId: resolvedProductId,
-            quantity: Math.max(1, Number(item.quantity || 1) || 1),
-          });
+          if (resolvedProductId) {
+            subResolvedItems.push({
+              productId: resolvedProductId,
+              quantity: Math.max(1, Number(item.quantity || 1) || 1),
+            });
+          } else {
+            hasUnresolved = true;
+          }
+        }
+
+        if (!hasUnresolved && subResolvedItems.length > 0) {
+          resolvedItems.push(...subResolvedItems);
           continue;
+        }
+      } else {
+        const matchedShopProduct = shopProducts.find((product) => product.id === manualMatchedProduct.shopProductId);
+
+        if (matchedShopProduct) {
+          const resolvedProductId = String(
+            matchedShopProduct.productId
+            || matchedShopProduct.sourceProductId
+            || ""
+          ).trim();
+
+          if (resolvedProductId) {
+            resolvedItems.push({
+              productId: resolvedProductId,
+              quantity: Math.max(1, Number(item.quantity || 1) || 1),
+            });
+            continue;
+          }
         }
       }
 
@@ -4438,6 +4467,38 @@ async function resolveOutboundItemsForAutoPickOrder(
 
     for (const normalizedSku of skuParts) {
       if (manualMatchedProduct?.id) {
+        if ((manualMatchedProduct as any).bundleItems && Array.isArray((manualMatchedProduct as any).bundleItems)) {
+          const bundleItems = (manualMatchedProduct as any).bundleItems;
+          for (const bundleItem of bundleItems) {
+            const matchedShopProduct = await tx.shopProduct.findFirst({
+              where: {
+                id: bundleItem.shopProductId || bundleItem.id,
+                shop: { userId },
+              },
+              select: {
+                id: true,
+                productId: true,
+                sourceProductId: true,
+              },
+            });
+
+            const resolvedSubProductId = String(
+              matchedShopProduct?.productId
+              || matchedShopProduct?.sourceProductId
+              || bundleItem.id
+              || ""
+            ).trim() || null;
+
+            resolvedItems.push({
+              productId: resolvedSubProductId,
+              shopProductId: bundleItem.shopProductId || bundleItem.id,
+              quantity: Math.max(1, Number(item.quantity || 1) || 1),
+              price: FinanceMath.divide(perResolvedPrice, bundleItems.length),
+            });
+          }
+          continue;
+        }
+
         const storedManualShopProductId = String(manualMatchedProduct.shopProductId || "").trim() || null;
         let manualShopProductId: string | null = storedManualShopProductId;
         let manualResolvedProductId: string | null =

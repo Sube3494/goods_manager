@@ -73,6 +73,7 @@ interface ProductSelectionModalProps {
   title?: string;
   showPlatformSelector?: boolean;
   imageOnly?: boolean;
+  allowMultipleToggle?: boolean; // 是否允许切换多选开关
   minimalView?: boolean;
   showCategoryFilter?: boolean;
   query?: Record<string, string>;
@@ -120,7 +121,9 @@ export function ProductSelectionModal({
   externalLoading = false,
   loadAllOnOpen = false,
   respectPublicVisibility = true,
+  allowMultipleToggle = false,
 }: ProductSelectionModalProps) {
+  const [localSingleSelect, setLocalSingleSelect] = useState(Boolean(singleSelect));
   const queryRef = useRef(query);
   queryRef.current = query;
   const [searchQuery, setSearchQuery] = useState("");
@@ -170,6 +173,7 @@ export function ProductSelectionModal({
   // 初始化重置逻辑
   useEffect(() => {
     if (isOpen) {
+      setLocalSingleSelect(Boolean(singleSelect));
       setTempSelectedIds([]);
       setSelectedProducts([]);
       setProducts([]);
@@ -397,18 +401,18 @@ export function ProductSelectionModal({
 
   const allFilteredSelected = useMemo(() => {
     return (
-      !singleSelect &&
+      !localSingleSelect &&
       selectableProducts.length > 0 &&
       selectableProducts.every((product: Product) => tempSelectedIds.includes(getSelectionKey(product)))
     );
-  }, [singleSelect, selectableProducts, tempSelectedIds, getSelectionKey]);
+  }, [localSingleSelect, selectableProducts, tempSelectedIds, getSelectionKey]);
 
   const displayedProducts = useMemo(() => {
     return filteredProducts.slice(0, localVisibleCount);
   }, [filteredProducts, localVisibleCount]);
 
   const handleToggleSelectAll = async () => {
-    if (singleSelect || selectableProducts.length === 0) {
+    if (localSingleSelect || selectableProducts.length === 0) {
       return;
     }
 
@@ -455,7 +459,7 @@ export function ProductSelectionModal({
     if (selectedIds.includes(id)) {
       return;
     }
-    if (singleSelect) {
+    if (localSingleSelect) {
         setTempSelectedIds([id]);
         setSelectedProducts([product]);
     } else {
@@ -471,7 +475,7 @@ export function ProductSelectionModal({
             return [...prev, product];
         });
     }
-  }, [getSelectionKey, selectedIds, singleSelect]);
+  }, [getSelectionKey, selectedIds, localSingleSelect]);
 
   const handleConfirm = () => {
     onSelect(selectedProducts, targetPlatform);
@@ -534,6 +538,42 @@ export function ProductSelectionModal({
                   </div>
                 )}
               </div>
+              
+              {allowMultipleToggle && (
+                <div className="flex items-center justify-between gap-4 rounded-2xl border border-black/6 bg-black/2 px-4 py-3 dark:border-white/8 dark:bg-white/3 transition-all hover:bg-black/3 dark:hover:bg-white/5 shrink-0 mt-0.5 mb-1.5">
+                  <div className="flex flex-col gap-0.5 text-left">
+                    <span className="text-xs font-bold text-foreground transition-colors">组合商品匹配</span>
+                    <span className="text-[10px] font-medium text-muted-foreground leading-normal">开启后支持同时勾选多件商品进行合并绑定 (适用于套装礼盒等)</span>
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0">
+                    {!localSingleSelect && (
+                      <span className="hidden sm:inline-block text-[10px] text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full font-bold border border-emerald-500/15 animate-pulse">
+                        多选模式已启用
+                      </span>
+                    )}
+                    <label className="relative inline-flex cursor-pointer items-center select-none shrink-0">
+                      <input
+                        type="checkbox"
+                        checked={!localSingleSelect}
+                        onChange={(e) => {
+                          const isMultiple = e.target.checked;
+                          setLocalSingleSelect(!isMultiple);
+                          setTempSelectedIds([]);
+                          setSelectedProducts([]);
+                          setShowUnselectedOnly(!isMultiple ? false : true);
+                        }}
+                        className="peer sr-only"
+                      />
+                      <div className="peer relative h-6 w-11 rounded-full bg-zinc-200 dark:bg-zinc-700 transition-all peer-checked:bg-emerald-500 dark:peer-checked:bg-emerald-600 peer-focus:outline-none flex items-center px-[2px]">
+                        <div className={cn(
+                          "h-5 w-5 rounded-full bg-white shadow-sm transition-all transform duration-200",
+                          !localSingleSelect ? "translate-x-5" : "translate-x-0"
+                        )} />
+                      </div>
+                    </label>
+                  </div>
+                </div>
+              )}
 
               <div className={cn("relative flex-1 overflow-y-auto no-scrollbar min-h-[220px]", imageOnly ? "" : "space-y-2")}>
                  {(showInitialSkeleton && products.length === 0) ? (
@@ -719,7 +759,7 @@ export function ProductSelectionModal({
                   >
                     取消
                   </button>
-                  {!singleSelect && (
+                  {!localSingleSelect && (
                     <button
                       type="button"
                       onClick={handleToggleSelectAll}

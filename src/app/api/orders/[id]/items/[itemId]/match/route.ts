@@ -32,6 +32,7 @@ function normalizeMatchedProductCandidate(input: unknown) {
     sourceType,
     shopProductId,
     shopName: String(record.shopName || "").trim() || null,
+    bundleItems: Array.isArray(record.bundleItems) ? record.bundleItems : undefined,
   };
 }
 
@@ -106,6 +107,64 @@ export async function PATCH(
     }
 
     const storage = await getStorageStrategy();
+    const productIds = productId.split(/[+＋]/).map(item => item.trim()).filter(Boolean);
+
+    if (productIds.length > 1) {
+      const shopProducts = await prisma.shopProduct.findMany({
+        where: {
+          id: { in: productIds },
+          shop: { userId: user.id },
+        },
+        select: {
+          id: true,
+          productName: true,
+          sku: true,
+          productImage: true,
+          shop: {
+            select: {
+              name: true,
+            },
+          },
+        },
+      });
+
+      if (shopProducts.length === 0) {
+        return NextResponse.json({ error: "未找到对应的店铺商品" }, { status: 404 });
+      }
+
+      const matchedProduct = {
+        id: shopProducts.map((p) => p.id).join("+"),
+        name: shopProducts.map((p) => p.productName || "未命名商品").join(" + "),
+        sku: shopProducts.map((p) => p.sku || "").join(" + "),
+        image: shopProducts[0]?.productImage ? storage.resolveUrl(shopProducts[0].productImage) : null,
+        sourceType: "shopProduct" as const,
+        shopProductId: shopProducts.map((p) => p.id).join("+"),
+        shopName: shopProducts[0]?.shop?.name || null,
+        isManual: true,
+        bundleItems: shopProducts.map((p) => ({
+          id: p.id,
+          name: p.productName || "未命名商品",
+          sku: p.sku || null,
+          image: p.productImage ? storage.resolveUrl(p.productImage) : null,
+          sourceType: "shopProduct" as const,
+          shopProductId: p.id,
+          shopName: p.shop?.name || null,
+        })),
+      };
+
+      await prisma.autoPickOrderItem.update({
+        where: { id: orderItem.id },
+        data: {
+          rawPayload: {
+            ...restPayload,
+            manualMatchedProduct: matchedProduct,
+          } as Prisma.InputJsonValue,
+        },
+      });
+
+      return NextResponse.json({ ok: true, matchedProduct });
+    }
+
     const shopProduct = await prisma.shopProduct.findFirst({
       where: {
         id: productId,

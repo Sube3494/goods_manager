@@ -139,6 +139,7 @@ type MatchedCatalogProduct = {
   shopId?: string | null;
   shopName?: string | null;
   isManual?: boolean;
+  bundleItems?: any[];
 };
 
 type UserPermissionsPayload = {
@@ -311,6 +312,7 @@ function readManualMatchedProduct(rawPayload: unknown): MatchedCatalogProduct | 
     shopProductId,
     shopName: String(record.shopName || "").trim() || null,
     isManual: true,
+    bundleItems: Array.isArray(record.bundleItems) ? record.bundleItems : undefined,
   };
 }
 
@@ -1576,7 +1578,18 @@ export async function GET(request: NextRequest) {
             && normalizedSkuCandidates.every((candidate) => Boolean(resolveStrictSkuMatch(candidate)));
           const matchedProduct = manualMatchedProduct || (hasStrictMatchForAllSegments ? (strictMatches[0] || null) : null);
           const displayItems = manualMatchedProduct
-            ? undefined
+            ? (manualMatchedProduct.bundleItems && Array.isArray(manualMatchedProduct.bundleItems)
+              ? manualMatchedProduct.bundleItems.map((bItem: any) => ({
+                  name: bItem.name || item.productName || "未命名商品",
+                  sku: (
+                    isJDPlatform(order.platform)
+                      ? (bItem.jdSkuId || bItem.sku)
+                      : (bItem.sku || bItem.jdSkuId)
+                  ) || "-",
+                  image: bItem.image || null,
+                  quantity: item.quantity,
+                }))
+              : undefined)
             : normalizedSkuCandidates.length > 1 && hasStrictMatchForAllSegments
             ? normalizedSkuCandidates.map((candidate) => {
                 const segmentMatchedProduct = resolveStrictSkuMatch(candidate);
