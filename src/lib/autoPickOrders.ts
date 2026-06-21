@@ -9,6 +9,7 @@ import { emitAutoPickOrderEvent } from "@/lib/autoPickOrderEvents";
 import { FinanceMath } from "@/lib/math";
 import { buildShopDedupeKey, findMatchingShopRecord, normalizeExternalId, normalizeShopAddress, normalizeShopAddressKey, normalizeShopNameKey, isShopNameMatch } from "@/lib/shopIdentity";
 import { getOutboundOrderItemSchemaErrorMessage } from "@/lib/prismaSchemaCompat";
+import { getStorageStrategy } from "@/lib/storage";
 
 export type AutoPickInboundItem = {
   productName?: string;
@@ -4644,6 +4645,7 @@ export async function createOutboundFromAutoPickOrder(
   options?: { requireCompleted?: boolean; preferredMappedShopName?: string | null }
 ) {
   const requireCompleted = options?.requireCompleted === true;
+  const storage = await getStorageStrategy();
 
   const order = await prisma.autoPickOrder.findFirst({
     where: {
@@ -4750,7 +4752,11 @@ export async function createOutboundFromAutoPickOrder(
             productId: item.productId,
             shopProductId: item.shopProductId,
             name: String(shopProduct?.productName || "未命名商品").trim() || "未命名商品",
-            image: shopProduct?.productImage || shopProduct?.product?.image || null,
+            image: shopProduct?.productImage
+              ? storage.resolveUrl(shopProduct.productImage)
+              : shopProduct?.product?.image
+                ? storage.resolveUrl(shopProduct.product.image)
+                : null,
             quantity: item.quantity,
             availableQuantity: currentBatchStock,
             missingQuantity: item.quantity - currentBatchStock,
@@ -4784,7 +4790,7 @@ export async function createOutboundFromAutoPickOrder(
             productId: item.productId,
             shopProductId: null,
             name: String(product?.name || "未命名商品").trim() || "未命名商品",
-            image: product?.image || null,
+            image: product?.image ? storage.resolveUrl(product.image) : null,
             quantity: item.quantity,
             availableQuantity: currentBatchStock,
             missingQuantity: item.quantity - currentBatchStock,

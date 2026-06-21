@@ -76,12 +76,38 @@ export async function PATCH(
       select: {
         id: true,
         rawPayload: true,
+        order: {
+          select: {
+            orderNo: true,
+          },
+        },
       },
     });
 
     if (!orderItem) {
       return NextResponse.json({ error: "订单商品不存在" }, { status: 404 });
     }
+
+    const deleteLegacyOutbound = async (tx: any, orderNo: string) => {
+      const existingOutbounds = await tx.outboundOrder.findMany({
+        where: {
+          userId: user.id,
+          note: {
+            contains: `平台单号: ${orderNo}`,
+            mode: "insensitive",
+          },
+        },
+        select: { id: true },
+      });
+
+      if (existingOutbounds.length > 0) {
+        await tx.outboundOrder.deleteMany({
+          where: {
+            id: { in: existingOutbounds.map((o: any) => o.id) },
+          },
+        });
+      }
+    };
 
     const basePayload = readRawPayloadRecord(orderItem.rawPayload);
     const { manualMatchedProduct: _removedManualMatchedProduct, ...restPayload } = basePayload;
@@ -90,11 +116,14 @@ export async function PATCH(
     const autoMatchedProduct = previousAutoMatchedProduct || requestedAutoMatchedProduct;
 
     if (shouldClear) {
-      await prisma.autoPickOrderItem.update({
-        where: { id: orderItem.id },
-        data: {
-          rawPayload: (Object.keys(restPayload).length > 0 ? restPayload : Prisma.JsonNull) as Prisma.InputJsonValue,
-        },
+      await prisma.$transaction(async (tx) => {
+        await tx.autoPickOrderItem.update({
+          where: { id: orderItem.id },
+          data: {
+            rawPayload: (Object.keys(restPayload).length > 0 ? restPayload : Prisma.JsonNull) as Prisma.InputJsonValue,
+          },
+        });
+        await deleteLegacyOutbound(tx, orderItem.order.orderNo);
       });
 
       return NextResponse.json({
@@ -152,14 +181,17 @@ export async function PATCH(
         })),
       };
 
-      await prisma.autoPickOrderItem.update({
-        where: { id: orderItem.id },
-        data: {
-          rawPayload: {
-            ...restPayload,
-            manualMatchedProduct: matchedProduct,
-          } as Prisma.InputJsonValue,
-        },
+      await prisma.$transaction(async (tx) => {
+        await tx.autoPickOrderItem.update({
+          where: { id: orderItem.id },
+          data: {
+            rawPayload: {
+              ...restPayload,
+              manualMatchedProduct: matchedProduct,
+            } as Prisma.InputJsonValue,
+          },
+        });
+        await deleteLegacyOutbound(tx, orderItem.order.orderNo);
       });
 
       return NextResponse.json({ ok: true, matchedProduct });
@@ -199,11 +231,14 @@ export async function PATCH(
     };
 
     if (autoMatchedProduct?.shopProductId && autoMatchedProduct.shopProductId === matchedProduct.shopProductId) {
-      await prisma.autoPickOrderItem.update({
-        where: { id: orderItem.id },
-        data: {
-          rawPayload: (Object.keys(restPayload).length > 0 ? restPayload : Prisma.JsonNull) as Prisma.InputJsonValue,
-        },
+      await prisma.$transaction(async (tx) => {
+        await tx.autoPickOrderItem.update({
+          where: { id: orderItem.id },
+          data: {
+            rawPayload: (Object.keys(restPayload).length > 0 ? restPayload : Prisma.JsonNull) as Prisma.InputJsonValue,
+          },
+        });
+        await deleteLegacyOutbound(tx, orderItem.order.orderNo);
       });
 
       return NextResponse.json({
@@ -215,23 +250,26 @@ export async function PATCH(
       });
     }
 
-    await prisma.autoPickOrderItem.update({
-      where: { id: orderItem.id },
-      data: {
-        rawPayload: {
-          ...restPayload,
-          manualMatchedProduct: {
-            id: matchedProduct.id,
-            name: matchedProduct.name,
-            sku: matchedProduct.sku,
-            image: matchedProduct.image,
-            sourceType: matchedProduct.sourceType,
-            shopProductId: matchedProduct.shopProductId,
-            shopName: matchedProduct.shopName,
-            ...(autoMatchedProduct ? { autoMatchedProduct } : {}),
-          },
-        } as Prisma.InputJsonValue,
-      },
+    await prisma.$transaction(async (tx) => {
+      await tx.autoPickOrderItem.update({
+        where: { id: orderItem.id },
+        data: {
+          rawPayload: {
+            ...restPayload,
+            manualMatchedProduct: {
+              id: matchedProduct.id,
+              name: matchedProduct.name,
+              sku: matchedProduct.sku,
+              image: matchedProduct.image,
+              sourceType: matchedProduct.sourceType,
+              shopProductId: matchedProduct.shopProductId,
+              shopName: matchedProduct.shopName,
+              ...(autoMatchedProduct ? { autoMatchedProduct } : {}),
+            },
+          } as Prisma.InputJsonValue,
+        },
+      });
+      await deleteLegacyOutbound(tx, orderItem.order.orderNo);
     });
 
     return NextResponse.json({ ok: true, matchedProduct });

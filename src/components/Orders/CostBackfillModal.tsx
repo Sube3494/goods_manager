@@ -383,6 +383,7 @@ export default function CostBackfillModal({
                             fill
                             sizes="56px"
                             className="object-cover"
+                            unoptimized
                           />
                         ) : (
                           <div className="flex h-full w-full items-center justify-center text-[11px] font-semibold text-muted-foreground">
