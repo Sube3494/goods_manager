@@ -130,6 +130,7 @@ type AutoPickManualMatchedProductMeta = {
   sourceType?: "product" | "shopProduct";
   shopProductId?: string | null;
   shopName?: string | null;
+  bundleItems?: any[];
 };
 
 const MAIYATIAN_BASE_URL = "https://saas.maiyatian.com";
@@ -3172,6 +3173,7 @@ function readManualMatchedProductFromOrderItemRawPayload(rawPayload: unknown) {
     sourceType,
     shopProductId,
     shopName: String(manual.shopName || "").trim() || null,
+    bundleItems: Array.isArray(manual.bundleItems) ? manual.bundleItems : undefined,
   };
 }
 
