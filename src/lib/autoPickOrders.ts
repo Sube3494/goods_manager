@@ -4149,6 +4149,7 @@ async function resolveBrushOrderItemsForAutoPickOrder(
   };
 
   const shopProductNameMap = new Map<string, Array<{
+    id: string;
     productId: string | null;
     sourceProductId: string | null;
     sku: string | null;
@@ -4157,6 +4158,7 @@ async function resolveBrushOrderItemsForAutoPickOrder(
     shopName: string | null;
   }>>();
   const shopProductSkuMap = new Map<string, Array<{
+    id: string;
     productId: string | null;
     sourceProductId: string | null;
     sku: string | null;
@@ -4165,6 +4167,7 @@ async function resolveBrushOrderItemsForAutoPickOrder(
     shopName: string | null;
   }>>();
   const normalizedShopProductEntries: Array<{
+    id: string;
     normalizedProductName: string;
     productId: string | null;
     sourceProductId: string | null;
@@ -4175,6 +4178,7 @@ async function resolveBrushOrderItemsForAutoPickOrder(
   }> = [];
   for (const item of shopProducts) {
     const entry = {
+      id: item.id,
       productId: item.productId || null,
       sourceProductId: item.sourceProductId || null,
       sku: item.sku || null,
@@ -4208,16 +4212,7 @@ async function resolveBrushOrderItemsForAutoPickOrder(
   for (const item of order.items) {
     const manualMatchedProduct = readManualMatchedProductFromOrderItemRawPayload(item.rawPayload);
     if (manualMatchedProduct?.shopProductId) {
-      const matchedShopProduct = await tx.shopProduct.findFirst({
-        where: {
-          id: manualMatchedProduct.shopProductId,
-          shop: { userId },
-        },
-        select: {
-          productId: true,
-          sourceProductId: true,
-        },
-      });
+      const matchedShopProduct = shopProducts.find((product) => product.id === manualMatchedProduct.shopProductId);
 
       if (matchedShopProduct) {
         const resolvedProductId = String(
