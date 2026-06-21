@@ -166,7 +166,9 @@ export function summarizeOrders(orders: AutoPickOrder[]) {
   return orders.reduce((acc, order) => {
     if (!isCancelledStatus(order.status) && !isDeletedStatus(order.status)) {
       const expectedIncome = Math.max(0, getExpectedIncome(order.expectedIncome, order.actualPaid, order.platformCommission));
+      const refundAmount = Math.max(0, Number(order.refundAmount || 0));
       acc.receivedAmount += expectedIncome;
+      acc.receivedAmount -= refundAmount;
       acc.platformCommission += Math.max(0, Number(order.platformCommission || 0));
       acc.validOrderCount += 1;
       const deliveryFee = getDeliveryFee(order.delivery);
@@ -176,7 +178,7 @@ export function summarizeOrders(orders: AutoPickOrder[]) {
       if (!acc.platformReceived[platform]) {
         acc.platformReceived[platform] = { amount: 0, count: 0 };
       }
-      acc.platformReceived[platform].amount += expectedIncome;
+      acc.platformReceived[platform].amount += expectedIncome - refundAmount;
       acc.platformReceived[platform].count += 1;
 
       const orderPureProfit = typeof order.pureProfit === "number" && Number.isFinite(order.pureProfit) ? order.pureProfit : 0;
@@ -1251,6 +1253,8 @@ export function OrderCard({
   const hasPureProfit = typeof order.pureProfit === "number" && Number.isFinite(order.pureProfit);
   const pureProfit = hasPureProfit ? Number(order.pureProfit) : 0;
   const productCostStatusText = getProductCostStatusText(order);
+  const refundAmount = Math.max(0, Number(order.refundAmount || 0));
+  const hasRefundAmount = refundAmount > 0;
   const expectedIncomeDisplay = hideDeletedOfflineIncome ? "-" : toCurrency(expectedIncome);
   const pureProfitDisplay = hideDeletedOfflineIncome
     ? "-"
@@ -1259,6 +1263,7 @@ export function OrderCard({
   const deliveryFee = getDeliveryFee(order.delivery);
   const productCost = Number(order.productCost || 0);
   const productCostBreakdown = Array.isArray(order.productCostBreakdown) ? order.productCostBreakdown : [];
+  const outboundReturnDetails = Array.isArray(order.outboundReturnDetails) ? order.outboundReturnDetails : [];
   const canEditProductCost = order.productCostStatus === "pending-backfill" || productCostBreakdown.length > 0;
   const settlementAfterRate = Math.round(expectedIncome * (1 - serviceFeeRate));
   const isJdOrder = String(order.platform || "").includes("京东");
@@ -1268,18 +1273,20 @@ export function OrderCard({
           { label: "扣平台佣金", value: toCurrency(order.platformCommission) },
           { label: "扣刷单佣金", value: toCurrency(- (Math.abs(pureProfit) - Math.abs(Number(order.platformCommission || 0)))) },
         ]
-      : [
-          { label: "预计到手", value: toCurrency(expectedIncome) },
-          { label: `扣抽出 ${formatPercent(serviceFeeRate)} 后`, value: toCurrency(settlementAfterRate) },
-          { label: "减配送费", value: toCurrency(deliveryFee) },
-          { label: "减货品成本", value: toCurrency(productCost), editable: canEditProductCost },
-        ])
+        : [
+            { label: "预计到手", value: toCurrency(expectedIncome) },
+            { label: `扣抽出 ${formatPercent(serviceFeeRate)} 后`, value: toCurrency(settlementAfterRate) },
+            { label: "减配送费", value: toCurrency(deliveryFee) },
+            { label: "减货品成本", value: toCurrency(productCost), editable: canEditProductCost },
+            ...(hasRefundAmount ? [{ label: "减退款金额", value: toCurrency(refundAmount) }] : []),
+          ])
     : productCostStatusText
       ? [
           { label: "预计到手", value: toCurrency(expectedIncome) },
           { label: "抽出率", value: formatPercent(serviceFeeRate) },
           { label: "配送费", value: toCurrency(deliveryFee) },
           { label: "货品成本", value: productCostStatusText, editable: canEditProductCost },
+          ...(hasRefundAmount ? [{ label: "退款金额", value: toCurrency(refundAmount) }] : []),
         ]
       : [];
   const sourceLabel = getOrderSourceLabel(order);
@@ -1365,6 +1372,11 @@ export function OrderCard({
                   {showBrushMarker ? (
                     <span className="inline-flex h-7 items-center rounded-full border border-rose-500/15 bg-rose-500/10 px-1.5 text-[11px] font-medium leading-none text-rose-700 dark:text-rose-400 sm:h-8 sm:px-2.5 sm:text-[13px]">
                       刷单
+                    </span>
+                  ) : null}
+                  {hasRefundAmount ? (
+                    <span className="inline-flex h-7 items-center rounded-full border border-amber-500/15 bg-amber-500/10 px-1.5 text-[11px] font-medium leading-none text-amber-700 dark:text-amber-300 sm:h-8 sm:px-2.5 sm:text-[13px]">
+                      已退款 {toCurrency(refundAmount)}
                     </span>
                   ) : null}
                   {autoOutboundFailed ? (
@@ -1970,6 +1982,9 @@ export function OrderCard({
                   <DetailStat label={isJdOrder ? "京东到手" : "预计到手"} value={expectedIncomeDisplay} />
                   <DetailStat label="货品成本" value={order.productCostStatus === "ready" ? toCurrency(order.productCost) : (productCostStatusText || "-")} />
                   <DetailStat label="纯利润" value={pureProfitDisplay} />
+                  {hasRefundAmount ? (
+                    <DetailStat label="退款金额" value={toCurrency(refundAmount)} />
+                  ) : null}
                   <div className="col-span-2">
                     <DetailStat label={commissionDisplay.label} value={commissionDisplay.value} />
                   </div>
@@ -1995,6 +2010,46 @@ export function OrderCard({
                   <DetailBlock label="轨迹" value={order.delivery?.track || "暂无轨迹"} />
                 </div>
               </section>
+
+              {outboundReturnDetails.length > 0 ? (
+                <section className="rounded-[20px] border border-amber-500/12 bg-amber-500/[0.04] p-3.5 dark:border-amber-400/12 dark:bg-amber-400/[0.05] sm:rounded-3xl sm:p-4">
+                  <h3 className="mb-3 text-[11px] font-medium uppercase tracking-[0.16em] text-amber-700 dark:text-amber-300 sm:mb-3">退货记录</h3>
+                  <div className="space-y-2.5">
+                    {outboundReturnDetails.map((entry, index) => (
+                      <div
+                        key={entry.id || `${entry.createdAt}-${index}`}
+                        className="rounded-2xl border border-amber-500/10 bg-white/70 px-3 py-3 dark:border-white/8 dark:bg-white/[0.04]"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="text-[13px] font-semibold text-foreground">
+                            第 {index + 1} 次退货
+                          </div>
+                          <div className="text-[11px] text-muted-foreground">
+                            {removeYear(entry.createdAt)}
+                          </div>
+                        </div>
+                        <div className="mt-2 grid grid-cols-2 gap-2 sm:gap-2.5">
+                          <DetailStat label="退款金额" value={toCurrency(entry.refundAmount)} />
+                          <DetailStat label="冲回成本" value={toCurrency(entry.returnedCost)} />
+                        </div>
+                        <div className="mt-2">
+                          <DetailBlock label="退货原因" value={entry.reason || "-"} />
+                        </div>
+                        <div className="mt-2.5 flex flex-wrap gap-2">
+                          {entry.items.map((item, itemIndex) => (
+                            <span
+                              key={`${entry.id}-${item.outboundOrderItemId}-${itemIndex}`}
+                              className="inline-flex items-center rounded-full border border-amber-500/12 bg-amber-500/[0.06] px-2.5 py-1 text-[11px] font-medium text-amber-800 dark:text-amber-200"
+                            >
+                              {(item.name || "未命名商品")} x{item.quantity}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
 
             </div>
           </div>

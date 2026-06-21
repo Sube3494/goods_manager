@@ -8,6 +8,7 @@ import { createRequestPerfTracker } from "@/lib/perf";
 import { getStorageStrategy } from "@/lib/storage";
 import { formatLocalDate, parseAsShanghaiTime } from "@/lib/dateUtils";
 import { isPrismaMissingColumnError } from "@/lib/prismaSchemaCompat";
+import { getOutboundReturnTotals, parseOutboundReturnMeta } from "@/lib/outboundReturnMeta";
 
 const SHANGHAI_DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -518,11 +519,17 @@ export async function GET(request: NextRequest) {
         }));
       }
     }
-    const outboundMetaByOrderNo = new Map<string, { productCost: number; missingCostItemCount: number }>();
+    const outboundMetaByOrderNo = new Map<string, {
+      productCost: number;
+      missingCostItemCount: number;
+      refundAmount: number;
+      returnedCost: number;
+    }>();
     outboundOrdersForCost.forEach((outbound) => {
       const orderNo = extractOrderNoFromNote(outbound.note);
       if (!orderNo) return;
       let missingCostItemCount = 0;
+      const returnTotals = getOutboundReturnTotals(parseOutboundReturnMeta(outbound.note).returns);
       const outboundCost = outbound.items.reduce((sum, item) => {
         const snapshot = parseOutboundCostSnapshot(item.costSnapshot);
         const unitCost = snapshot
@@ -537,8 +544,13 @@ export async function GET(request: NextRequest) {
       }, 0);
       const current = outboundMetaByOrderNo.get(orderNo);
       outboundMetaByOrderNo.set(orderNo, {
-        productCost: FinanceMath.add(current?.productCost || 0, outboundCost),
+        productCost: FinanceMath.add(
+          current?.productCost || 0,
+          FinanceMath.add(outboundCost, -returnTotals.returnedCost)
+        ),
         missingCostItemCount: (current?.missingCostItemCount || 0) + missingCostItemCount,
+        refundAmount: FinanceMath.add(current?.refundAmount || 0, returnTotals.refundAmount),
+        returnedCost: FinanceMath.add(current?.returnedCost || 0, returnTotals.returnedCost),
       });
     });
 
@@ -561,10 +573,11 @@ export async function GET(request: NextRequest) {
 
         const orderCostMeta = outboundMetaByOrderNo.get(String(order.orderNo || "").trim());
         const orderCostYuan = orderCostMeta?.productCost || 0;
+        const refundAmountYuan = orderCostMeta?.refundAmount || 0;
 
         const isBrush = readMainSystemSelfDeliveryFlag(order.rawPayload);
         if (!isBrush) {
-          userPaid = FinanceMath.add(userPaid, paidYuan);
+          userPaid = FinanceMath.add(userPaid, paidYuan - refundAmountYuan);
           productCost = FinanceMath.add(productCost, orderCostYuan);
         } else {
           brushExpense = FinanceMath.add(brushExpense, defaultBrushCommission);
@@ -693,13 +706,14 @@ export async function GET(request: NextRequest) {
         const rate = isOffline ? 0 : (shopRateMap.get(matchedShopName) ?? 0.06);
         const commissionYuan = isOffline ? 0 : (paidYuan * rate);
         const deliveryYuan = getDeliveryFee(order.delivery) / 100;
+        const refundAmountYuan = outboundMetaByOrderNo.get(String(order.orderNo || "").trim())?.refundAmount || 0;
 
         if (!isBrush) {
           if (point) {
-            point.userPaid = FinanceMath.add(point.userPaid, paidYuan);
+            point.userPaid = FinanceMath.add(point.userPaid, paidYuan - refundAmountYuan);
           }
           if (platformPoint) {
-            platformPoint.userPaid = FinanceMath.add(platformPoint.userPaid, paidYuan);
+            platformPoint.userPaid = FinanceMath.add(platformPoint.userPaid, paidYuan - refundAmountYuan);
           }
         }
         if (point) {
@@ -723,6 +737,7 @@ export async function GET(request: NextRequest) {
         } else {
           const orderCostMeta = outboundMetaByOrderNo.get(String(order.orderNo || "").trim());
           const orderCostYuan = orderCostMeta?.productCost || 0;
+          const refundAmountYuan = orderCostMeta?.refundAmount || 0;
 
           if (point) {
             point.productCost = FinanceMath.add(point.productCost, orderCostYuan);
@@ -740,7 +755,7 @@ export async function GET(request: NextRequest) {
           if (hasReadyCost) {
             const pureProfit = FinanceMath.add(
               FinanceMath.multiply(expectedIncomeYuan, 1 - rate),
-              -deliveryYuan - orderCostYuan
+              -deliveryYuan - orderCostYuan - refundAmountYuan
             );
             if (point) {
               point.pureProfit = FinanceMath.add(point.pureProfit, pureProfit);

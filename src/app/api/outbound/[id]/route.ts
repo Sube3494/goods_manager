@@ -22,9 +22,9 @@ export async function POST(
       return NextResponse.json({ error: "Permission denied" }, { status: 403 });
     }
 
-    const { reason } = await request.json().catch(() => ({ reason: "退货入库" }));
+    const body = await request.json().catch(() => ({ reason: "退货入库" }));
 
-    const result = await returnOutboundOrderById(session.id, id, reason);
+    const result = await returnOutboundOrderById(session.id, id, body);
 
     return NextResponse.json({ success: true, order: result });
   } catch (error) {

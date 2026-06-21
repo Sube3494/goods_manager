@@ -6,6 +6,7 @@ import { Plus, Search, Package, History, RotateCcw, AlertCircle, Store, Eye, Fil
 import { useToast } from "@/components/ui/Toast";
 import { OutboundModal } from "@/components/Outbound/OutboundModal";
 import { OutboundDetailModal } from "@/components/Outbound/OutboundDetailModal";
+import { PartialReturnModal } from "@/components/Outbound/PartialReturnModal";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import Image from "next/image";
 import { format, isWithinInterval, startOfDay, endOfDay, parseISO } from "date-fns";
@@ -15,7 +16,6 @@ import { DatePicker } from "@/components/ui/DatePicker";
 import { useUser } from "@/hooks/useUser";
 import { hasPermission } from "@/lib/permissions";
 import { SessionUser } from "@/lib/permissions";
-import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { cn, parseOutboundNote, getPlatformMeta } from "@/lib/utils";
 import { Pagination } from "@/components/ui/Pagination";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -26,6 +26,7 @@ export default function OutboundPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [selectedDetailOrder, setSelectedDetailOrder] = useState<OutboundOrder | null>(null);
+  const [returningOrder, setReturningOrder] = useState<OutboundOrder | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -35,18 +36,6 @@ export default function OutboundPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [isFiltersExpanded, setIsFiltersExpanded] = useState(false);
-  const [confirmConfig, setConfirmConfig] = useState<{
-    isOpen: boolean;
-    title: string;
-    message: string;
-    onConfirm: () => void;
-  }>({
-    isOpen: false,
-    title: "",
-    message: "",
-    onConfirm: () => {},
-  });
-  
   const { showToast } = useToast();
   const { user } = useUser();
   const canCreate = hasPermission(user as SessionUser | null, "outbound:manage");
@@ -90,30 +79,8 @@ export default function OutboundPage() {
     }
   };
 
-  const handleReturn = async (id: string) => {
-    setConfirmConfig({
-      isOpen: true,
-      title: "出库退货入库",
-      message: "此操作将该笔出库记录标记为“已退回”，并自动将相关商品及其对应的批次库存退回到库房。此举符合财务对冲规范，不会物理删除历史痕迹。确定继续吗？",
-      onConfirm: async () => {
-        try {
-          const res = await fetch(`/api/outbound/${id}`, { 
-            method: "POST",
-            body: JSON.stringify({ reason: "异常退回" }) 
-          });
-          if (res.ok) {
-            showToast("对冲操作成功，库存已恢复", "success");
-            fetchOrders();
-          } else {
-            const data = await res.json();
-            showToast(data.error || "操作失败", "error");
-          }
-        } catch (error) {
-          console.error("Return outbound failed:", error);
-          showToast("网络错误", "error");
-        }
-      }
-    });
+  const handleReturn = (order: OutboundOrder) => {
+    setReturningOrder(order);
   };
 
   // 从 note 中提取店铺名的辅助函数
@@ -391,6 +358,7 @@ export default function OutboundPage() {
                     const isReturned = order.status === 'Returned';
                     const parsed = parseOutboundNote(order.note);
                     
+                    const isPartialReturned = order.status === 'PartialReturned';
                     const shopName = parsed.shopName || resolveOrderShopName(order);
                     const platformName = extractPlatform(order.note);
                     const platformMeta = getPlatformMeta(platformName);
@@ -431,6 +399,12 @@ export default function OutboundPage() {
                               <span className="flex items-center gap-1 text-[10px] font-bold text-destructive bg-destructive/5 px-2 py-0.5 rounded-md border border-destructive/10">
                                 <RotateCcw size={10} />
                                 已对冲
+                              </span>
+                            )}
+                            {isPartialReturned && (
+                              <span className="flex items-center gap-1 text-[10px] font-bold text-amber-500 bg-amber-500/5 px-2 py-0.5 rounded-md border border-amber-500/10">
+                                <RotateCcw size={10} />
+                                部分退回
                               </span>
                             )}
                           </div>
@@ -509,9 +483,9 @@ export default function OutboundPage() {
                             </button>
                             {!isReturned ? (
                               <button 
-                                onClick={() => handleReturn(order.id)}
+                                onClick={() => handleReturn(order)}
                                 className="p-2.5 rounded-2xl text-muted-foreground hover:bg-orange-500/10 hover:text-orange-600 hover:shadow-lg hover:shadow-orange-500/5 transition-all duration-300 active:scale-90"
-                                title="退货入库 (执行对冲)"
+                                title={isPartialReturned ? "继续退货入库" : "退货入库"}
                               >
                                 <RotateCcw size={18} />
                               </button>
@@ -550,6 +524,7 @@ export default function OutboundPage() {
             ) : paginatedOrders.length > 0 ? (
               paginatedOrders.map((order) => {
                 const isReturned = order.status === 'Returned';
+                const isPartialReturned = order.status === 'PartialReturned';
                 const parsed = parseOutboundNote(order.note);
                 
                 const shopName = parsed.shopName || resolveOrderShopName(order);
@@ -619,6 +594,9 @@ export default function OutboundPage() {
                         {isReturned && (
                           <span className="inline-flex h-7 items-center text-[10px] font-bold text-destructive px-2.5 py-0.5 bg-destructive/5 rounded-full border border-destructive/10 whitespace-nowrap">已对冲</span>
                         )}
+                        {isPartialReturned && (
+                          <span className="inline-flex h-7 items-center text-[10px] font-bold text-amber-500 px-2.5 py-0.5 bg-amber-500/5 rounded-full border border-amber-500/10 whitespace-nowrap">部分退回</span>
+                        )}
                       </div>
 
                       {/* 右侧操作按钮 */}
@@ -635,9 +613,9 @@ export default function OutboundPage() {
                         </button>
                         {!isReturned && (
                           <button 
-                              onClick={() => handleReturn(order.id)}
+                              onClick={() => handleReturn(order)}
                               className="p-2 text-orange-600 bg-orange-500/5 rounded-2xl border border-orange-500/10 active:scale-90 transition-transform"
-                              title="对冲退回"
+                              title={isPartialReturned ? "继续退货入库" : "对冲退回"}
                           >
                               <RotateCcw size={14} />
                           </button>
@@ -736,12 +714,14 @@ export default function OutboundPage() {
         order={selectedDetailOrder}
       />
 
-      <ConfirmModal
-        isOpen={confirmConfig.isOpen}
-        title={confirmConfig.title}
-        message={confirmConfig.message}
-        onConfirm={confirmConfig.onConfirm}
-        onClose={() => setConfirmConfig({ ...confirmConfig, isOpen: false })}
+      <PartialReturnModal
+        isOpen={Boolean(returningOrder)}
+        order={returningOrder}
+        onClose={() => setReturningOrder(null)}
+        onSuccess={() => {
+          setReturningOrder(null);
+          fetchOrders();
+        }}
       />
     </div>
   );

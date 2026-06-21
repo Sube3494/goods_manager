@@ -221,6 +221,19 @@ export interface AutoPickOrder {
   outboundOrderId?: string | null;
   serviceFeeRate?: number | null;
   productCost?: number | null;
+  refundAmount?: number | null;
+  outboundReturnDetails?: Array<{
+    id: string;
+    createdAt: string;
+    reason: string;
+    refundAmount: number;
+    returnedCost: number;
+    items: Array<{
+      outboundOrderItemId: string;
+      quantity: number;
+      name?: string | null;
+    }>;
+  }> | null;
   productCostBreakdown?: Array<{
     outboundOrderItemId?: string | null;
     productId?: string | null;

@@ -7,6 +7,7 @@
  */
 import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
+import { stripOutboundReturnMeta } from "./outboundReturnMeta";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -111,6 +112,8 @@ export function parseOutboundNote(note: string | undefined | null): ParsedNote {
   };
   
   if (!note) return result;
+
+  note = stripOutboundReturnMeta(note);
   
   // 提取对冲退回前的原始备注
   const noteParts = note.match(/^(.*)\s*\(已退回:\s*(.*)\)$/);

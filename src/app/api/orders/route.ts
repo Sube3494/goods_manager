@@ -9,6 +9,11 @@ import { getStorageStrategy } from "@/lib/storage";
 import { Prisma } from "../../../../prisma/generated-client";
 import { buildShopDedupeKey, normalizeExternalId, normalizeShopNameKey, isShopNameMatch } from "@/lib/shopIdentity";
 import { isPrismaMissingColumnError } from "@/lib/prismaSchemaCompat";
+import {
+  getOutboundReturnTotals,
+  getOutboundReturnedQuantityMap,
+  parseOutboundReturnMeta,
+} from "@/lib/outboundReturnMeta";
 
 export const dynamic = "force-dynamic";
 
@@ -1051,6 +1056,20 @@ export async function GET(request: NextRequest) {
     const outboundByOrderNo = new Map<string, {
       id: string;
       productCost: number;
+      refundAmount: number;
+      returnedCost: number;
+      returnDetails: Array<{
+        id: string;
+        createdAt: string;
+        reason: string;
+        refundAmount: number;
+        returnedCost: number;
+        items: Array<{
+          outboundOrderItemId: string;
+          quantity: number;
+          name?: string | null;
+        }>;
+      }>;
       missingCostItemCount: number;
       firstMissingCostShopProductId: string | null;
       firstMissingCostPurchaseOrderId: string | null;
@@ -1172,6 +1191,21 @@ export async function GET(request: NextRequest) {
       const match = note.match(/平台单号:\s*([^\s|]+)/);
       const orderNo = String(match?.[1] || "").trim();
       if (orderNo && !outboundByOrderNo.has(orderNo)) {
+        const returnMeta = parseOutboundReturnMeta(outbound.note);
+        const returnTotals = getOutboundReturnTotals(returnMeta.returns);
+        const returnedQuantityMap = getOutboundReturnedQuantityMap(returnMeta.returns);
+        const returnDetails = returnMeta.returns.map((entry) => ({
+          id: entry.id,
+          createdAt: entry.createdAt,
+          reason: entry.reason,
+          refundAmount: Math.round(Number(entry.refundAmount || 0) * 100),
+          returnedCost: Math.round(Number(entry.returnedCost || 0) * 100),
+          items: (entry.items || []).map((item) => ({
+            outboundOrderItemId: item.outboundOrderItemId,
+            quantity: item.quantity,
+            name: item.name || null,
+          })),
+        }));
         let missingCostItemCount = 0;
         let firstMissingCostShopProductId: string | null = null;
         let firstMissingCostPurchaseOrderId: string | null = null;
@@ -1219,7 +1253,7 @@ export async function GET(request: NextRequest) {
           return {
             outboundOrderItemId: item.id,
             name: String(item.shopProduct?.productName || item.product?.name || "未命名商品").trim() || "未命名商品",
-            quantity,
+            quantity: Math.max(0, quantity - (returnedQuantityMap.get(item.id) || 0)),
             unitCost: roundCurrency(unitCost),
             totalCost: roundCurrency(totalCost),
             shopProductId,
@@ -1250,7 +1284,10 @@ export async function GET(request: NextRequest) {
           : rawBreakdown;
         outboundByOrderNo.set(orderNo, {
           id: outbound.id,
-          productCost,
+          productCost: Math.max(0, productCost - Math.round(returnTotals.returnedCost * 100)),
+          refundAmount: Math.round(returnTotals.refundAmount * 100),
+          returnedCost: Math.round(returnTotals.returnedCost * 100),
+          returnDetails,
           missingCostItemCount,
           firstMissingCostShopProductId,
           firstMissingCostPurchaseOrderId,
@@ -1309,6 +1346,7 @@ export async function GET(request: NextRequest) {
             const safeExpectedIncome = hiddenDeletedOfflineIncome
               ? null
               : (typeof metrics.expectedIncome === "number" ? metrics.expectedIncome : null);
+            const refundAmount = outboundMeta?.refundAmount || 0;
             const serviceFeeRate = order.platform === "线下交易"
               ? 0
               : (shopRateMap.get(matchedShopName) ?? 0.06);
@@ -1326,9 +1364,10 @@ export async function GET(request: NextRequest) {
               : isBrush
               ? - (Math.abs(Number(order.platformCommission || 0)) + brushCommission)
               : (productCostStatus === "ready"
-                ? Math.round(Number(safeExpectedIncome || 0) * (1 - serviceFeeRate)) - deliveryFee - productCost
+                ? Math.round(Number(safeExpectedIncome || 0) * (1 - serviceFeeRate)) - deliveryFee - productCost - refundAmount
                 : null);
 
+            acc.receivedAmount -= refundAmount;
             const profitValue = typeof orderPureProfit === "number" && Number.isFinite(orderPureProfit) ? orderPureProfit : 0;
             acc.pureProfit += profitValue;
             if (!acc.platformProfit[platform]) {
@@ -1336,6 +1375,7 @@ export async function GET(request: NextRequest) {
             }
             acc.platformProfit[platform].amount += profitValue;
             acc.platformProfit[platform].count += 1;
+            acc.platformReceived[platform].amount -= refundAmount;
           }
           acc.itemCount += order.items.reduce((sum: number, item) => sum + item.quantity, 0);
           return acc;
@@ -1499,6 +1539,7 @@ export async function GET(request: NextRequest) {
       const safeExpectedIncome = hiddenDeletedOfflineIncome
         ? null
         : (typeof order.expectedIncome === "number" ? order.expectedIncome : null);
+      const refundAmount = outboundMeta?.refundAmount || 0;
       const serviceFeeRate = order.platform === "线下交易"
         ? 0
         : (shopRateMap.get(matchedShopName) ?? 0.06);
@@ -1516,12 +1557,13 @@ export async function GET(request: NextRequest) {
         : order.isMainSystemSelfDelivery
         ? - (Math.abs(Number(order.platformCommission || 0)) + brushCommission)
         : (productCostStatus === "ready"
-          ? Math.round(Number(safeExpectedIncome || 0) * (1 - serviceFeeRate)) - deliveryFee - productCost
+          ? Math.round(Number(safeExpectedIncome || 0) * (1 - serviceFeeRate)) - deliveryFee - productCost - refundAmount
           : null);
 
       return {
         ...order,
         expectedIncome: safeExpectedIncome,
+        refundAmount,
         matchedShopId,
         matchedShopName,
         autoOutboundStatus: autoOutboundMeta.status,
@@ -1532,6 +1574,7 @@ export async function GET(request: NextRequest) {
         outboundOrderId: outboundMeta?.id || null,
         serviceFeeRate,
         productCost: hasOutbound ? productCost : null,
+        outboundReturnDetails: outboundMeta?.returnDetails || [],
         productCostBreakdown: outboundMeta?.breakdown || [],
         pureProfit,
         productCostStatus,

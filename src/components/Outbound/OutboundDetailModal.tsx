@@ -2,6 +2,7 @@ import { useState } from "react";
 import { X, Copy, Check, Store, Clock, FileText, MapPin, Tag, ShoppingBag, AlertCircle, ArrowLeftRight } from "lucide-react";
 import { OutboundOrder, OutboundOrderItem } from "@/lib/types";
 import { parseOutboundNote, copyToClipboard, getPlatformMeta, cn } from "@/lib/utils";
+import { getOutboundLatestReturnReason, parseOutboundReturnMeta } from "@/lib/outboundReturnMeta";
 import { useToast } from "@/components/ui/Toast";
 import { format } from "date-fns";
 import { zhCN } from "date-fns/locale/zh-CN";
@@ -22,10 +23,8 @@ export function OutboundDetailModal({ isOpen, onClose, order }: OutboundDetailMo
   const parsed = parseOutboundNote(order.note);
   const platformMeta = getPlatformMeta(parsed.platform);
   const isReturned = order.status === "Returned";
-  
-  // 提取对冲理由
-  const noteParts = order.note?.match(/^(.*)\s*\(已退回:\s*(.*)\)$/);
-  const returnReason = noteParts ? noteParts[2] : (isReturned ? "常规退回" : null);
+  const isPartialReturned = order.status === "PartialReturned";
+  const returnReason = getOutboundLatestReturnReason(parseOutboundReturnMeta(order.note).returns);
 
   const handleCopy = async (text: string, field: string) => {
     const success = await copyToClipboard(text);
@@ -53,10 +52,10 @@ export function OutboundDetailModal({ isOpen, onClose, order }: OutboundDetailMo
         <div className="flex items-center justify-between px-5 sm:px-8 py-4 sm:py-5 border-b border-black/[0.05] dark:border-white/5 bg-transparent">
           <div className="flex items-center gap-3">
             <h2 className="text-base sm:text-lg font-black bg-gradient-to-r from-slate-900 via-slate-800 to-slate-600 dark:from-white dark:via-slate-100 dark:to-slate-400 bg-clip-text text-transparent">出库单详情</h2>
-            {isReturned && (
+            {(isReturned || isPartialReturned) && (
               <span className="flex items-center gap-1 text-[10px] font-black tracking-wide text-rose-600 dark:text-rose-400 bg-rose-500/10 px-2.5 py-0.5 rounded-full border border-rose-500/20 shadow-[0_0_12px_rgba(244,63,94,0.1)] animate-pulse">
                 <AlertCircle size={10} />
-                已对冲
+                {isReturned ? "已对冲" : "部分退回"}
               </span>
             )}
           </div>
@@ -208,7 +207,7 @@ export function OutboundDetailModal({ isOpen, onClose, order }: OutboundDetailMo
           </div>
 
           {/* User Custom Note & Return Status */}
-          {(parsed.userNote || isReturned) && (
+          {(parsed.userNote || isReturned || isPartialReturned) && (
             <div className="space-y-4">
               {parsed.userNote && (
                 <div className="p-4 rounded-2xl border border-blue-500/20 bg-blue-500/5 backdrop-blur-md shadow-[0_0_15px_rgba(59,130,246,0.03)] flex gap-3">
@@ -223,7 +222,7 @@ export function OutboundDetailModal({ isOpen, onClose, order }: OutboundDetailMo
                   </div>
                 </div>
               )}
-              {isReturned && (
+              {(isReturned || isPartialReturned) && (
                 <div className="p-4 rounded-2xl border border-rose-500/20 bg-rose-500/5 backdrop-blur-md shadow-[0_0_15px_rgba(244,63,94,0.03)] flex gap-3">
                   <div className="p-2 h-fit rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 shrink-0">
                     <ArrowLeftRight size={14} />
@@ -231,7 +230,7 @@ export function OutboundDetailModal({ isOpen, onClose, order }: OutboundDetailMo
                   <div className="flex-1 min-w-0">
                     <h4 className="text-[10px] font-black text-rose-500 dark:text-rose-400 uppercase tracking-widest mb-0.5">退回对冲详情</h4>
                     <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed break-words">
-                      该笔交易已进行财务对冲并恢复库存。
+                      {isReturned ? "该笔交易已全部退回并完成财务对冲。" : "该笔交易已有部分商品退回，仍可继续退剩余数量。"}
                       {returnReason && (
                         <span className="block mt-1.5 font-black text-rose-600 dark:text-rose-400 bg-rose-500/10 border border-rose-500/20 px-2 py-0.5 rounded w-fit text-[10px] break-all">
                           退回原因: {returnReason}
