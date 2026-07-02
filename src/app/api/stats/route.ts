@@ -108,6 +108,7 @@ function resolveRefundAdjustedIncomeMetrics(options: {
 
   if (refundAmount <= 0) {
     return {
+      actualPaid,
       expectedIncome,
       platformCommission,
       refundedExpectedIncome: 0,
@@ -116,8 +117,10 @@ function resolveRefundAdjustedIncomeMetrics(options: {
   }
 
   const grossBase = Math.max(actualPaid, expectedIncome + platformCommission);
+  const adjustedActualPaid = Math.max(0, actualPaid - refundAmount);
   if (grossBase <= 0) {
     return {
+      actualPaid: adjustedActualPaid,
       expectedIncome,
       platformCommission,
       refundedExpectedIncome: refundAmount,
@@ -137,11 +140,61 @@ function resolveRefundAdjustedIncomeMetrics(options: {
     Math.max(0, refundAmount - refundedCommission)
   );
 
+  const adjustedPlatformCommission = Math.max(0, platformCommission - refundedCommission);
+  const adjustedExpectedIncome = Math.max(
+    0,
+    Math.min(
+      Math.max(0, expectedIncome - refundedExpectedIncome),
+      adjustedActualPaid - adjustedPlatformCommission
+    )
+  );
+
   return {
-    expectedIncome: Math.max(0, expectedIncome - refundedExpectedIncome),
-    platformCommission: Math.max(0, platformCommission - refundedCommission),
+    actualPaid: adjustedActualPaid,
+    expectedIncome: adjustedExpectedIncome,
+    platformCommission: adjustedPlatformCommission,
     refundedExpectedIncome,
     refundedCommission,
+  };
+}
+
+function isJDPlatform(platform: string | null | undefined) {
+  const normalized = String(platform || "").trim().toLowerCase();
+  return normalized === "jd" || normalized.includes("jingdong") || normalized.includes("jddj") || normalized.includes("京东");
+}
+
+function resolveDashboardIncomeMetrics(
+  platform: string | null | undefined,
+  expectedIncome: number | null | undefined,
+  actualPaid: number | null | undefined,
+  fallbackCommission: number | null | undefined
+) {
+  const paid = Math.max(0, Number(actualPaid || 0));
+  const explicitExpectedIncome = Number(expectedIncome);
+  const explicitCommission = Math.max(0, Math.abs(Number(fallbackCommission || 0)));
+
+  if (Number.isFinite(explicitExpectedIncome)) {
+    const resolvedExpectedIncome = Math.max(0, explicitExpectedIncome);
+    const derivedCommission = Math.max(0, paid - resolvedExpectedIncome);
+    return {
+      expectedIncome: resolvedExpectedIncome,
+      platformCommission: Math.max(derivedCommission, explicitCommission),
+    };
+  }
+
+  if (isJDPlatform(platform)) {
+    const settledBase = Math.max(0, paid - 1);
+    const platformCommission = Math.max(0, FinanceMath.multiply(settledBase, 0.06));
+    const resolvedExpectedIncome = Math.max(0, FinanceMath.add(settledBase, -platformCommission));
+    return {
+      expectedIncome: resolvedExpectedIncome,
+      platformCommission,
+    };
+  }
+
+  return {
+    expectedIncome: Math.max(0, FinanceMath.add(paid, -explicitCommission)),
+    platformCommission: explicitCommission,
   };
 }
 
@@ -615,26 +668,31 @@ export async function GET(request: NextRequest) {
         || isVoidedOfflineOrder(order);
       if (!isCancelled) {
         const paidYuan = (order.actualPaid || 0) / 100;
-        const matchedShopName = resolveAutoPickMatchedShopName(order, user.permissions) || "";
         const isOffline = order.platform === "线下交易";
-        const rate = isOffline ? 0 : (shopRateMap.get(matchedShopName) ?? 0.06);
         const deliveryYuan = getDeliveryFee(order.delivery) / 100;
+        const metrics = resolveDashboardIncomeMetrics(
+          order.platform,
+          typeof order.expectedIncome === "number" ? (order.expectedIncome / 100) : null,
+          paidYuan,
+          Number(order.platformCommission || 0) / 100
+        );
 
         const orderCostMeta = outboundMetaByOrderNo.get(String(order.orderNo || "").trim());
         const orderCostYuan = orderCostMeta?.productCost || 0;
         const refundAmountYuan = orderCostMeta?.refundAmount || 0;
         const adjustedMetrics = resolveRefundAdjustedIncomeMetrics({
-          expectedIncome: Number(order.expectedIncome || 0) / 100,
-          platformCommission: isOffline ? 0 : (paidYuan * rate),
+          expectedIncome: metrics.expectedIncome,
+          platformCommission: isOffline ? 0 : metrics.platformCommission,
           actualPaid: paidYuan,
           refundAmount: refundAmountYuan,
         });
+        const adjustedPaidYuan = adjustedMetrics.actualPaid;
         const commissionYuan = adjustedMetrics.platformCommission;
         const expectedIncomeYuan = adjustedMetrics.expectedIncome;
 
         const isBrush = readMainSystemSelfDeliveryFlag(order.rawPayload);
         if (!isBrush) {
-          userPaid = FinanceMath.add(userPaid, expectedIncomeYuan);
+          userPaid = FinanceMath.add(userPaid, adjustedPaidYuan);
           productCost = FinanceMath.add(productCost, orderCostYuan);
         } else {
           brushExpense = FinanceMath.add(brushExpense, defaultBrushCommission);
@@ -758,26 +816,31 @@ export async function GET(request: NextRequest) {
 
       if (!isOther) {
         const paidYuan = (order.actualPaid || 0) / 100;
-        const matchedShopName = resolveAutoPickMatchedShopName(order, user.permissions) || "";
         const isOffline = order.platform === "线下交易";
-        const rate = isOffline ? 0 : (shopRateMap.get(matchedShopName) ?? 0.06);
         const deliveryYuan = getDeliveryFee(order.delivery) / 100;
+        const metrics = resolveDashboardIncomeMetrics(
+          order.platform,
+          typeof order.expectedIncome === "number" ? (order.expectedIncome / 100) : null,
+          paidYuan,
+          Number(order.platformCommission || 0) / 100
+        );
         const refundAmountYuan = outboundMetaByOrderNo.get(String(order.orderNo || "").trim())?.refundAmount || 0;
         const adjustedMetrics = resolveRefundAdjustedIncomeMetrics({
-          expectedIncome: Number(order.expectedIncome || 0) / 100,
-          platformCommission: isOffline ? 0 : (paidYuan * rate),
+          expectedIncome: metrics.expectedIncome,
+          platformCommission: isOffline ? 0 : metrics.platformCommission,
           actualPaid: paidYuan,
           refundAmount: refundAmountYuan,
         });
+        const adjustedPaidYuan = adjustedMetrics.actualPaid;
         const commissionYuan = adjustedMetrics.platformCommission;
         const expectedIncomeYuan = adjustedMetrics.expectedIncome;
 
         if (!isBrush) {
           if (point) {
-            point.userPaid = FinanceMath.add(point.userPaid, expectedIncomeYuan);
+            point.userPaid = FinanceMath.add(point.userPaid, adjustedPaidYuan);
           }
           if (platformPoint) {
-            platformPoint.userPaid = FinanceMath.add(platformPoint.userPaid, expectedIncomeYuan);
+            platformPoint.userPaid = FinanceMath.add(platformPoint.userPaid, adjustedPaidYuan);
           }
         }
         if (point) {
@@ -791,11 +854,11 @@ export async function GET(request: NextRequest) {
 
         if (isBrush) {
           if (point) {
-            point.brushPaid = FinanceMath.add(point.brushPaid, paidYuan);
+            point.brushPaid = FinanceMath.add(point.brushPaid, adjustedPaidYuan);
             point.pureProfit = FinanceMath.add(point.pureProfit, -commissionYuan - deliveryYuan - defaultBrushCommission);
           }
           if (platformPoint) {
-            platformPoint.brushPaid = FinanceMath.add(platformPoint.brushPaid, paidYuan);
+            platformPoint.brushPaid = FinanceMath.add(platformPoint.brushPaid, adjustedPaidYuan);
             platformPoint.pureProfit = FinanceMath.add(platformPoint.pureProfit, -commissionYuan - deliveryYuan - defaultBrushCommission);
           }
         } else {

@@ -486,6 +486,23 @@ function mergeAutoPickSystemMeta(
   };
 }
 
+function getAutoPickOrderRecencyTimestamp(candidate: {
+  lastSyncedAt?: Date | string | null;
+  createdAt?: Date | string | null;
+}) {
+  const lastSyncedAt = candidate.lastSyncedAt ? new Date(candidate.lastSyncedAt).getTime() : Number.NaN;
+  if (Number.isFinite(lastSyncedAt)) {
+    return lastSyncedAt;
+  }
+
+  const createdAt = candidate.createdAt ? new Date(candidate.createdAt).getTime() : Number.NaN;
+  if (Number.isFinite(createdAt)) {
+    return createdAt;
+  }
+
+  return 0;
+}
+
 function hashAutoPickApiKey(value: string) {
   return createHash("sha256").update(value).digest("hex");
 }
@@ -2526,6 +2543,8 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
         deliveryTimeRange: true,
         delivery: true,
         customerRemark: true,
+        createdAt: true,
+        lastSyncedAt: true,
         rawPayload: true,
         items: {
           select: {
@@ -2539,9 +2558,13 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
       },
     });
 
-    const existing = existingCandidates[0] || null;
+    const existingCandidatesSorted = [...existingCandidates].sort((left, right) => (
+      getAutoPickOrderRecencyTimestamp(right) - getAutoPickOrderRecencyTimestamp(left)
+    ));
+
+    const existing = existingCandidatesSorted[0] || null;
     previousStatus = existing?.status || null;
-    const duplicateIds = existingCandidates
+    const duplicateIds = existingCandidatesSorted
       .slice(1)
       .map((item) => item.id)
       .filter(Boolean);

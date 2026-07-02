@@ -37,7 +37,7 @@ export async function POST(request: Request) {
 
     const data = JSON.parse(decryptedData);
 
-    // 2. 执行数据库事务：全量恢复
+    // 2. 超管全量恢复
     await BackupService.restoreFromData(data);
 
     return NextResponse.json({ success: true, message: "系统数据已全量恢复" });

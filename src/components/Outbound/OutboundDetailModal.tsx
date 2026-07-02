@@ -2,7 +2,7 @@ import { useState } from "react";
 import { X, Copy, Check, Store, Clock, FileText, MapPin, Tag, ShoppingBag, AlertCircle, ArrowLeftRight } from "lucide-react";
 import { OutboundOrder, OutboundOrderItem } from "@/lib/types";
 import { parseOutboundNote, copyToClipboard, getPlatformMeta, cn } from "@/lib/utils";
-import { getOutboundLatestReturnReason, parseOutboundReturnMeta } from "@/lib/outboundReturnMeta";
+import { getOutboundLatestReturnReason, getOutboundReturnedQuantityMap, parseOutboundReturnMeta } from "@/lib/outboundReturnMeta";
 import { useToast } from "@/components/ui/Toast";
 import { format } from "date-fns";
 import { zhCN } from "date-fns/locale/zh-CN";
@@ -24,7 +24,9 @@ export function OutboundDetailModal({ isOpen, onClose, order }: OutboundDetailMo
   const platformMeta = getPlatformMeta(parsed.platform);
   const isReturned = order.status === "Returned";
   const isPartialReturned = order.status === "PartialReturned";
-  const returnReason = getOutboundLatestReturnReason(parseOutboundReturnMeta(order.note).returns);
+  const returnMeta = parseOutboundReturnMeta(order.note);
+  const returnReason = getOutboundLatestReturnReason(returnMeta.returns);
+  const returnedQuantityMap = getOutboundReturnedQuantityMap(returnMeta.returns);
 
   const handleCopy = async (text: string, field: string) => {
     const success = await copyToClipboard(text);
@@ -256,14 +258,23 @@ export function OutboundDetailModal({ isOpen, onClose, order }: OutboundDetailMo
             {/* Products Card List */}
             <div className="space-y-2.5">
               {order.items.map((item: OutboundOrderItem) => {
+                const itemId = String(item.id || "");
                 const name = item.shopProduct?.name || item.product?.name || '未知商品';
                 const img = item.shopProduct?.image || item.product?.image;
                 const sku = item.shopProduct?.sku || item.product?.sku || '-';
+                const returnedQuantity = itemId ? Math.max(0, returnedQuantityMap.get(itemId) || 0) : 0;
+                const remainingQuantity = Math.max(0, item.quantity - returnedQuantity);
+                const isItemReturned = returnedQuantity > 0;
                 
                 return (
                   <div 
                     key={item.id} 
-                    className="flex items-center justify-between gap-3 p-3.5 sm:p-4 rounded-2xl bg-slate-50 dark:bg-white/[0.03] border border-black/[0.05] dark:border-white/10 hover:border-black/[0.1] dark:hover:border-white/20 hover:bg-slate-100 dark:hover:bg-white/[0.06] transition-all duration-300 hover:-translate-y-0.5 group shadow-xs dark:shadow-none"
+                    className={cn(
+                      "flex items-center justify-between gap-3 p-3.5 sm:p-4 rounded-2xl border transition-all duration-300 hover:-translate-y-0.5 group shadow-xs dark:shadow-none",
+                      isItemReturned
+                        ? "bg-rose-50/70 border-rose-200 dark:bg-rose-500/[0.05] dark:border-rose-500/20 hover:border-rose-300 dark:hover:border-rose-500/30"
+                        : "bg-slate-50 border-black/[0.05] dark:bg-white/[0.03] dark:border-white/10 hover:border-black/[0.1] dark:hover:border-white/20 hover:bg-slate-100 dark:hover:bg-white/[0.06]"
+                    )}
                   >
                     {/* Left: Product Info */}
                     <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
@@ -288,14 +299,35 @@ export function OutboundDetailModal({ isOpen, onClose, order }: OutboundDetailMo
                           <span className="font-mono text-[9px] text-slate-500 dark:text-slate-400 bg-slate-200/50 dark:bg-white/5 px-2 py-0.5 rounded border border-black/[0.04] dark:border-white/5">
                             SKU: {sku}
                           </span>
+                          {isItemReturned ? (
+                            <>
+                              <span className="inline-flex px-1.5 py-0.2 rounded text-[9px] font-black bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
+                                已退 {returnedQuantity} 件
+                              </span>
+                              <span className="inline-flex px-1.5 py-0.2 rounded text-[9px] font-black bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                                剩余 {remainingQuantity} 件
+                              </span>
+                            </>
+                          ) : null}
                         </div>
                       </div>
                     </div>
 
                     {/* Right: Quantity Badge */}
-                    <div className="shrink-0 flex items-center pl-2">
-                      <div className="font-mono text-xs sm:text-sm font-black text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 px-3 py-1.2 rounded-full shadow-sm dark:shadow-[0_0_15px_rgba(16,185,129,0.05)]">
-                        x{item.quantity}
+                    <div className="shrink-0 flex items-center gap-2 pl-2">
+                      {isItemReturned ? (
+                        <div className="hidden sm:flex flex-col items-end text-[10px] font-semibold leading-4">
+                          <span className="text-rose-600 dark:text-rose-400">退回 x{returnedQuantity}</span>
+                          <span className="text-slate-500 dark:text-slate-400">原始 x{item.quantity}</span>
+                        </div>
+                      ) : null}
+                      <div className={cn(
+                        "font-mono text-xs sm:text-sm font-black px-3 py-1.2 rounded-full shadow-sm",
+                        isItemReturned
+                          ? "text-rose-700 bg-rose-100 border border-rose-200 dark:text-rose-300 dark:bg-rose-500/10 dark:border-rose-500/20"
+                          : "text-emerald-700 bg-emerald-50 border border-emerald-200 dark:text-emerald-400 dark:bg-emerald-500/10 dark:border-emerald-500/20 dark:shadow-[0_0_15px_rgba(16,185,129,0.05)]"
+                      )}>
+                        {isItemReturned ? `剩 x${remainingQuantity}` : `x${item.quantity}`}
                       </div>
                     </div>
                   </div>

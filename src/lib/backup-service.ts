@@ -24,6 +24,8 @@ interface BackupPayload {
   version?: string;
   timestamp?: string;
   userId?: string;
+  userProfile?: Record<string, unknown> | null;
+  userSystemSettings?: Record<string, unknown>[];
   roleProfiles?: Record<string, unknown>[];
   systemSettings?: Record<string, unknown>[];
   whitelists?: Record<string, unknown>[];
@@ -36,6 +38,9 @@ interface BackupPayload {
   suppliers?: Record<string, unknown>[];
   products?: Record<string, unknown>[];
   shops?: Record<string, unknown>[];
+  shopProducts?: Record<string, unknown>[];
+  productJdSkus?: Record<string, unknown>[];
+  productBatches?: Record<string, unknown>[];
   brushProducts?: Record<string, unknown>[];
   brushOrderPlans?: BackupOrderWithItems[];
   settlements?: BackupOrderWithItems[];
@@ -44,10 +49,24 @@ interface BackupPayload {
   outboundOrders?: BackupOrderWithItems[];
   brushOrders?: BackupOrderWithItems[];
   galleryItems?: Record<string, unknown>[];
+  galleryFaqs?: Record<string, unknown>[];
+  autoPickApiKeys?: Record<string, unknown>[];
+  autoPickOrders?: BackupOrderWithItems[];
+  autoPickAutoCompleteJobs?: Record<string, unknown>[];
+  dailyPromotionExpenses?: Record<string, unknown>[];
+  operatingCostProfiles?: Record<string, unknown>[];
+  operatingCostMonthlyBills?: Record<string, unknown>[];
 }
 
 function castMany<T>(value: unknown): T[] {
   return Array.isArray(value) ? (value as T[]) : [];
+}
+
+function withTargetUserId<T extends Record<string, unknown>>(value: T, userId: string): T {
+  return {
+    ...value,
+    userId,
+  };
 }
 
 export class BackupService {
@@ -86,13 +105,27 @@ export class BackupService {
 
   static async collectBackupData(userId?: string): Promise<BackupPayload> {
     const scopedWhere = this.buildUserScopedWhere(userId);
+    const userProfile = userId
+      ? await prisma.user.findUnique({
+          where: { id: userId },
+          select: {
+            name: true,
+            permissions: true,
+            shippingAddresses: true,
+            brushShops: true,
+            brushCommissionBoostEnabled: true,
+          },
+        })
+      : null;
 
     return {
-      version: "2.0",
+      version: "2.1",
       timestamp: new Date().toISOString(),
       userId,
+      userProfile: userProfile as Record<string, unknown> | null,
       categories: await prisma.category.findMany({ where: scopedWhere }),
       products: await prisma.product.findMany({ where: scopedWhere }),
+      productJdSkus: await prisma.productJdSku.findMany({ where: scopedWhere }),
       suppliers: await prisma.supplier.findMany({ where: scopedWhere }),
       purchaseOrders: await prisma.purchaseOrder.findMany({ where: scopedWhere, include: { items: true } }),
       outboundOrders: await prisma.outboundOrder.findMany({ where: scopedWhere, include: { items: true } }),
@@ -102,7 +135,17 @@ export class BackupService {
       settlements: await prisma.settlement.findMany({ where: scopedWhere, include: { items: true } }),
       storeOpeningBatches: await prisma.storeOpeningBatch.findMany({ where: scopedWhere, include: { items: true } }),
       shops: await prisma.shop.findMany({ where: scopedWhere }),
+      shopProducts: await prisma.shopProduct.findMany({ where: userId ? { shop: { userId } } : undefined }),
+      productBatches: await prisma.productBatch.findMany({ where: scopedWhere }),
       galleryItems: await prisma.galleryItem.findMany({ where: scopedWhere }),
+      galleryFaqs: await prisma.galleryFaq.findMany({ where: scopedWhere }),
+      autoPickApiKeys: await prisma.autoPickApiKey.findMany({ where: userId ? { userId } : undefined }),
+      autoPickOrders: await prisma.autoPickOrder.findMany({ where: userId ? { userId } : undefined, include: { items: true } }),
+      autoPickAutoCompleteJobs: await prisma.autoPickAutoCompleteJob.findMany({ where: userId ? { userId } : undefined }),
+      dailyPromotionExpenses: await prisma.dailyPromotionExpense.findMany({ where: userId ? { userId } : undefined }),
+      operatingCostProfiles: await prisma.operatingCostProfile.findMany({ where: userId ? { userId } : undefined }),
+      operatingCostMonthlyBills: await prisma.operatingCostMonthlyBill.findMany({ where: userId ? { userId } : undefined }),
+      userSystemSettings: userId ? await prisma.systemSetting.findMany({ where: { userId } }) : [],
       systemSettings: userId ? [] : await prisma.systemSetting.findMany(),
       users: userId ? [] : await prisma.user.findMany(),
       roleProfiles: userId ? [] : await prisma.roleProfile.findMany(),
@@ -408,6 +451,153 @@ export class BackupService {
       if (data.galleryItems) await tx.galleryItem.createMany({ data: castMany<Prisma.GalleryItemCreateManyInput>(data.galleryItems) });
     }, {
       timeout: 30000 // 恢复操作可能较重，增加超时时间
+    });
+  }
+
+  static async restoreUserScopedData(targetUserId: string, data: BackupPayload) {
+    await prisma.$transaction(async (tx) => {
+      await tx.autoPickAutoCompleteJob.deleteMany({ where: { userId: targetUserId } });
+      await tx.autoPickOrder.deleteMany({ where: { userId: targetUserId } });
+      await tx.autoPickApiKey.deleteMany({ where: { userId: targetUserId } });
+      await tx.dailyPromotionExpense.deleteMany({ where: { userId: targetUserId } });
+      await tx.operatingCostMonthlyBill.deleteMany({ where: { userId: targetUserId } });
+      await tx.operatingCostProfile.deleteMany({ where: { userId: targetUserId } });
+      await tx.productBatch.deleteMany({ where: { userId: targetUserId } });
+      await tx.brushOrderPlan.deleteMany({ where: { userId: targetUserId } });
+      await tx.brushProduct.deleteMany({ where: { userId: targetUserId } });
+      await tx.brushOrder.deleteMany({ where: { userId: targetUserId } });
+      await tx.settlement.deleteMany({ where: { userId: targetUserId } });
+      await tx.storeOpeningBatch.deleteMany({ where: { userId: targetUserId } });
+      await tx.outboundOrder.deleteMany({ where: { userId: targetUserId } });
+      await tx.purchaseOrder.deleteMany({ where: { userId: targetUserId } });
+      await tx.galleryFaq.deleteMany({ where: { userId: targetUserId } });
+      await tx.galleryItem.deleteMany({ where: { userId: targetUserId } });
+      await tx.systemSetting.deleteMany({ where: { userId: targetUserId } });
+      await tx.productJdSku.deleteMany({ where: { userId: targetUserId } });
+      await tx.shop.deleteMany({ where: { userId: targetUserId } });
+      await tx.product.deleteMany({ where: { userId: targetUserId } });
+      await tx.supplier.deleteMany({ where: { userId: targetUserId } });
+      await tx.category.deleteMany({ where: { userId: targetUserId } });
+
+      const userProfile = data.userProfile && typeof data.userProfile === "object" && !Array.isArray(data.userProfile)
+        ? data.userProfile
+        : null;
+
+      if (userProfile) {
+        const updateUserData: Prisma.UserUncheckedUpdateInput = {};
+        if ("name" in userProfile) updateUserData.name = typeof userProfile.name === "string" ? userProfile.name : null;
+        if ("permissions" in userProfile) updateUserData.permissions = (userProfile.permissions ?? Prisma.JsonNull) as Prisma.InputJsonValue;
+        if ("shippingAddresses" in userProfile) updateUserData.shippingAddresses = (userProfile.shippingAddresses ?? Prisma.JsonNull) as Prisma.InputJsonValue;
+        if ("brushShops" in userProfile) updateUserData.brushShops = (userProfile.brushShops ?? Prisma.JsonNull) as Prisma.InputJsonValue;
+        if ("brushCommissionBoostEnabled" in userProfile) {
+          updateUserData.brushCommissionBoostEnabled = Boolean(userProfile.brushCommissionBoostEnabled);
+        }
+        await tx.user.update({
+          where: { id: targetUserId },
+          data: updateUserData,
+        });
+      }
+
+      if (data.categories?.length) {
+        await tx.category.createMany({ data: castMany<Prisma.CategoryCreateManyInput>(data.categories.map((item) => withTargetUserId(item, targetUserId))) });
+      }
+      if (data.suppliers?.length) {
+        await tx.supplier.createMany({ data: castMany<Prisma.SupplierCreateManyInput>(data.suppliers.map((item) => withTargetUserId(item, targetUserId))) });
+      }
+      if (data.products?.length) {
+        await tx.product.createMany({ data: castMany<Prisma.ProductCreateManyInput>(data.products.map((item) => withTargetUserId(item, targetUserId))) });
+      }
+      if (data.productJdSkus?.length) {
+        await tx.productJdSku.createMany({ data: castMany<Prisma.ProductJdSkuCreateManyInput>(data.productJdSkus.map((item) => withTargetUserId(item, targetUserId))) });
+      }
+      if (data.shops?.length) {
+        await tx.shop.createMany({ data: castMany<Prisma.ShopCreateManyInput>(data.shops.map((item) => withTargetUserId(item, targetUserId))) });
+      }
+      if (data.shopProducts?.length) {
+        await tx.shopProduct.createMany({ data: castMany<Prisma.ShopProductCreateManyInput>(data.shopProducts) });
+      }
+      if (data.brushProducts?.length) {
+        await tx.brushProduct.createMany({ data: castMany<Prisma.BrushProductCreateManyInput>(data.brushProducts.map((item) => withTargetUserId(item, targetUserId))) });
+      }
+      if (data.userSystemSettings?.length) {
+        await tx.systemSetting.createMany({ data: castMany<Prisma.SystemSettingCreateManyInput>(data.userSystemSettings.map((item) => withTargetUserId(item, targetUserId))) });
+      }
+      if (data.galleryItems?.length) {
+        await tx.galleryItem.createMany({ data: castMany<Prisma.GalleryItemCreateManyInput>(data.galleryItems.map((item) => withTargetUserId(item, targetUserId))) });
+      }
+      if (data.galleryFaqs?.length) {
+        await tx.galleryFaq.createMany({ data: castMany<Prisma.GalleryFaqCreateManyInput>(data.galleryFaqs.map((item) => withTargetUserId(item, targetUserId))) });
+      }
+      if (data.autoPickApiKeys?.length) {
+        await tx.autoPickApiKey.createMany({ data: castMany<Prisma.AutoPickApiKeyCreateManyInput>(data.autoPickApiKeys.map((item) => withTargetUserId(item, targetUserId))) });
+      }
+
+      if (data.purchaseOrders) {
+        for (const order of data.purchaseOrders) {
+          const { items, ...orderData } = order;
+          await tx.purchaseOrder.create({ data: withTargetUserId(orderData as Prisma.PurchaseOrderCreateInput & Record<string, unknown>, targetUserId) as Prisma.PurchaseOrderCreateInput });
+          if (items?.length) await tx.purchaseOrderItem.createMany({ data: castMany<Prisma.PurchaseOrderItemCreateManyInput>(items) });
+        }
+      }
+      if (data.outboundOrders) {
+        for (const order of data.outboundOrders) {
+          const { items, ...orderData } = order;
+          await tx.outboundOrder.create({ data: withTargetUserId(orderData as Prisma.OutboundOrderCreateInput & Record<string, unknown>, targetUserId) as Prisma.OutboundOrderCreateInput });
+          if (items?.length) await tx.outboundOrderItem.createMany({ data: castMany<Prisma.OutboundOrderItemCreateManyInput>(items) });
+        }
+      }
+      if (data.brushOrders) {
+        for (const order of data.brushOrders) {
+          const { items, ...orderData } = order;
+          await tx.brushOrder.create({ data: withTargetUserId(orderData as Prisma.BrushOrderCreateInput & Record<string, unknown>, targetUserId) as Prisma.BrushOrderCreateInput });
+          if (items?.length) await tx.brushOrderItem.createMany({ data: castMany<Prisma.BrushOrderItemCreateManyInput>(items) });
+        }
+      }
+      if (data.brushOrderPlans) {
+        for (const plan of data.brushOrderPlans) {
+          const { items, ...planData } = plan;
+          await tx.brushOrderPlan.create({ data: withTargetUserId(planData as Prisma.BrushOrderPlanCreateInput & Record<string, unknown>, targetUserId) as Prisma.BrushOrderPlanCreateInput });
+          if (items?.length) await tx.brushOrderPlanItem.createMany({ data: castMany<Prisma.BrushOrderPlanItemCreateManyInput>(items) });
+        }
+      }
+      if (data.settlements) {
+        for (const settlement of data.settlements) {
+          const { items, ...settlementData } = settlement;
+          await tx.settlement.create({ data: withTargetUserId(settlementData as Prisma.SettlementCreateInput & Record<string, unknown>, targetUserId) as Prisma.SettlementCreateInput });
+          if (items?.length) await tx.settlementItem.createMany({ data: castMany<Prisma.SettlementItemCreateManyInput>(items) });
+        }
+      }
+      if (data.storeOpeningBatches) {
+        for (const batch of data.storeOpeningBatches) {
+          const { items, ...batchData } = batch;
+          await tx.storeOpeningBatch.create({ data: withTargetUserId(batchData as Prisma.StoreOpeningBatchCreateInput & Record<string, unknown>, targetUserId) as Prisma.StoreOpeningBatchCreateInput });
+          if (items?.length) await tx.storeOpeningItem.createMany({ data: castMany<Prisma.StoreOpeningItemCreateManyInput>(items) });
+        }
+      }
+      if (data.autoPickOrders) {
+        for (const order of data.autoPickOrders) {
+          const { items, ...orderData } = order;
+          await tx.autoPickOrder.create({ data: withTargetUserId(orderData as Prisma.AutoPickOrderCreateInput & Record<string, unknown>, targetUserId) as Prisma.AutoPickOrderCreateInput });
+          if (items?.length) await tx.autoPickOrderItem.createMany({ data: castMany<Prisma.AutoPickOrderItemCreateManyInput>(items) });
+        }
+      }
+      if (data.autoPickAutoCompleteJobs?.length) {
+        await tx.autoPickAutoCompleteJob.createMany({ data: castMany<Prisma.AutoPickAutoCompleteJobCreateManyInput>(data.autoPickAutoCompleteJobs.map((item) => withTargetUserId(item, targetUserId))) });
+      }
+      if (data.productBatches?.length) {
+        await tx.productBatch.createMany({ data: castMany<Prisma.ProductBatchCreateManyInput>(data.productBatches.map((item) => withTargetUserId(item, targetUserId))) });
+      }
+      if (data.dailyPromotionExpenses?.length) {
+        await tx.dailyPromotionExpense.createMany({ data: castMany<Prisma.DailyPromotionExpenseCreateManyInput>(data.dailyPromotionExpenses.map((item) => withTargetUserId(item, targetUserId))) });
+      }
+      if (data.operatingCostProfiles?.length) {
+        await tx.operatingCostProfile.createMany({ data: castMany<Prisma.OperatingCostProfileCreateManyInput>(data.operatingCostProfiles.map((item) => withTargetUserId(item, targetUserId))) });
+      }
+      if (data.operatingCostMonthlyBills?.length) {
+        await tx.operatingCostMonthlyBill.createMany({ data: castMany<Prisma.OperatingCostMonthlyBillCreateManyInput>(data.operatingCostMonthlyBills.map((item) => withTargetUserId(item, targetUserId))) });
+      }
+    }, {
+      timeout: 30000,
     });
   }
 

@@ -488,6 +488,7 @@ function resolveRefundAdjustedIncomeMetrics(options: {
 
   if (refundAmount <= 0) {
     return {
+      actualPaid,
       expectedIncome,
       platformCommission,
       refundedExpectedIncome: 0,
@@ -496,8 +497,10 @@ function resolveRefundAdjustedIncomeMetrics(options: {
   }
 
   const grossBase = Math.max(actualPaid, expectedIncome + platformCommission);
+  const adjustedActualPaid = Math.max(0, actualPaid - refundAmount);
   if (grossBase <= 0) {
     return {
+      actualPaid: adjustedActualPaid,
       expectedIncome,
       platformCommission,
       refundedExpectedIncome: refundAmount,
@@ -517,9 +520,19 @@ function resolveRefundAdjustedIncomeMetrics(options: {
     Math.max(0, refundAmount - refundedCommission)
   );
 
+  const adjustedPlatformCommission = Math.max(0, platformCommission - refundedCommission);
+  const adjustedExpectedIncome = Math.max(
+    0,
+    Math.min(
+      Math.max(0, expectedIncome - refundedExpectedIncome),
+      adjustedActualPaid - adjustedPlatformCommission
+    )
+  );
+
   return {
-    expectedIncome: Math.max(0, expectedIncome - refundedExpectedIncome),
-    platformCommission: Math.max(0, platformCommission - refundedCommission),
+    actualPaid: adjustedActualPaid,
+    expectedIncome: adjustedExpectedIncome,
+    platformCommission: adjustedPlatformCommission,
     refundedExpectedIncome,
     refundedCommission,
   };
@@ -1622,6 +1635,7 @@ export async function GET(request: NextRequest) {
 
       return {
         ...order,
+        actualPaid: adjustedMetrics.actualPaid,
         expectedIncome: safeExpectedIncome,
         refundAmount,
         platformCommission: adjustedMetrics.platformCommission,

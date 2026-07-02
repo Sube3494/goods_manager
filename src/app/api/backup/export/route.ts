@@ -20,7 +20,7 @@ export async function POST(request: Request) {
     }
 
     const { password } = await request.json();
-    const encryptedBuffer = await BackupService.createExportBuffer(session.id, password);
+    const encryptedBuffer = await BackupService.createExportBuffer(undefined, password);
 
     // 3. 先返回备份文件，异步更新最后备份时间（不阻塞响应）
     const response = new Response(Buffer.from(encryptedBuffer), {
