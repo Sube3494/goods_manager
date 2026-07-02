@@ -132,6 +132,7 @@ export interface AutoPickDelivery {
   pickupTime?: string;
   track?: string;
   riderName?: string;
+  riderPhone?: string;
   completedTime?: string;
 }
 
@@ -207,6 +208,10 @@ export interface AutoPickOrder {
   expectedIncome?: number | null;
   platformCommission: number;
   delivery?: AutoPickDelivery | null;
+  customerName?: string | null;
+  customerPhone?: string | null;
+  customerMaskedPhone?: string | null;
+  customerPhoneExtension?: string | null;
   items: AutoPickOrderItem[];
   autoCompleteAt?: string | null;
   completedAt?: string | null;
