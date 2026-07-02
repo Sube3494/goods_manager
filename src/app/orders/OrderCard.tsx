@@ -991,12 +991,25 @@ export function ProductStripItem({
     createdAt: string;
     reason: string;
     quantity: number;
+    refundAmount?: number;
+    extraExpense?: number;
   }>;
 }) {
   const returnedTooltip = returnedDetails.length > 0
-    ? returnedDetails.map((detail) => (
-        `${removeYear(detail.createdAt)} · ${detail.reason || "退货"} · x${detail.quantity}`
-      )).join("\n")
+    ? returnedDetails.map((detail) => {
+        const parts = [`${removeYear(detail.createdAt)} · ${detail.reason || "退货"}${detail.quantity > 1 ? ` · x${detail.quantity}` : ""}`];
+        const info = [];
+        if (detail.refundAmount && detail.refundAmount > 0) {
+          info.push(`退款 ¥${(detail.refundAmount / 100).toFixed(2)}`);
+        }
+        if (detail.extraExpense && detail.extraExpense > 0) {
+          info.push(`支出 ¥${(detail.extraExpense / 100).toFixed(2)}`);
+        }
+        if (info.length > 0) {
+          parts.push(`(${info.join(", ")})`);
+        }
+        return parts.join(" ");
+      }).join("\n")
     : "";
   return (
     <div className="flex items-center gap-2.5 rounded-2xl border border-black/6 bg-white/70 px-2.5 py-2 dark:border-white/8 dark:bg-white/4 sm:gap-3 sm:rounded-[18px] sm:px-3 sm:py-2.5">
@@ -1314,11 +1327,13 @@ export function OrderCard({
         createdAt: String(entry.createdAt || ""),
         reason: String(entry.reason || "").trim() || "退货",
         quantity: Math.max(0, Number(item.quantity || 0)),
+        refundAmount: Number(entry.refundAmount || 0),
+        extraExpense: Number(entry.extraExpense || 0),
       });
       acc.set(key, list);
     }
     return acc;
-  }, new Map<string, Array<{ createdAt: string; reason: string; quantity: number }>>());
+  }, new Map<string, Array<{ createdAt: string; reason: string; quantity: number; refundAmount?: number; extraExpense?: number }>>());
   const canEditProductCost = order.productCostStatus === "pending-backfill" || productCostBreakdown.length > 0;
   const settlementAfterRate = Math.round(expectedIncome * (1 - serviceFeeRate));
   const isJdOrder = String(order.platform || "").includes("京东");
@@ -1333,7 +1348,6 @@ export function OrderCard({
             { label: `扣抽出 ${formatPercent(serviceFeeRate)} 后`, value: toCurrency(settlementAfterRate) },
             { label: "减配送费", value: toCurrency(deliveryFee) },
             { label: "减货品成本", value: toCurrency(productCost), editable: canEditProductCost },
-            ...(hasRefundAmount ? [{ label: "减退款金额", value: toCurrency(refundAmount) }] : []),
             ...(hasReturnExtraExpense ? [{ label: "减退货支出", value: toCurrency(returnExtraExpense) }] : []),
           ])
     : productCostStatusText
@@ -1342,7 +1356,6 @@ export function OrderCard({
           { label: "抽出率", value: formatPercent(serviceFeeRate) },
           { label: "配送费", value: toCurrency(deliveryFee) },
           { label: "货品成本", value: productCostStatusText, editable: canEditProductCost },
-          ...(hasRefundAmount ? [{ label: "退款金额", value: toCurrency(refundAmount) }] : []),
           ...(hasReturnExtraExpense ? [{ label: "退货支出", value: toCurrency(returnExtraExpense) }] : []),
         ]
       : [];
