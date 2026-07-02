@@ -3184,26 +3184,63 @@ export async function syncAutoPickOrdersFromPlugin(userId: string, options: { st
         continue;
       }
 
-      if (cookie) {
-        const existing = await prisma.autoPickOrder.findFirst({
-          where: {
-            userId,
-            platform: current.platform || "",
-            orderNo: current.orderNo || "",
-          },
-          select: {
-            id: true,
-            customerRemark: true,
-          },
-        });
-
-        // 如果数据库没有此订单，或者有此订单但没有备注，则主动调用麦芽田详情接口获取详细备注
-        if (!existing || !existing.customerRemark) {
-          await enrichMaiyatianOrderByCookie(cookie, current).catch((e) => {
-            console.warn(`Failed to enrich order ${current.orderNo} during sync:`, e);
+        if (cookie) {
+          const existing = await prisma.autoPickOrder.findFirst({
+            where: {
+              userId,
+              platform: current.platform || "",
+              orderNo: current.orderNo || "",
+            },
+            select: {
+              id: true,
+              customerRemark: true,
+              rawPayload: true,
+              delivery: true,
+            },
           });
+
+          const hasCustomerName = Boolean(
+            current.customerName
+            || readCustomerNameFromRawPayload(current)
+            || readCustomerNameFromRawPayload(existing?.rawPayload)
+          );
+          const hasEncryptedCustomerPhone = Boolean(
+            current.customerPhone
+            || readCustomerPhoneFromRawPayload(current)
+            || readCustomerPhoneFromRawPayload(existing?.rawPayload)
+          );
+          const hasMaskedCustomerPhone = Boolean(
+            current.customerMaskedPhone
+            || readCustomerMaskedPhoneFromRawPayload(current)
+            || readCustomerMaskedPhoneFromRawPayload(existing?.rawPayload)
+          );
+          const hasCustomerPhoneExtension = Boolean(
+            current.customerPhoneExtension
+            || readCustomerPhoneExtensionFromRawPayload(current)
+            || readCustomerPhoneExtensionFromRawPayload(existing?.rawPayload)
+          );
+          const hasRiderPhone = Boolean(
+            readRiderPhoneFromDelivery(current.delivery)
+            || readRiderPhoneFromRawPayload(current)
+            || readRiderPhoneFromDelivery(existing?.delivery)
+            || readRiderPhoneFromRawPayload(existing?.rawPayload)
+          );
+          const shouldEnrichOrderDetail =
+            !existing
+            || !existing.customerRemark
+            || !hasCustomerName
+            || !hasEncryptedCustomerPhone
+            || !hasMaskedCustomerPhone
+            || !hasCustomerPhoneExtension
+            || !hasRiderPhone;
+
+          // 列表同步默认只有简版字段；缺少备注或联系信息时，主动补一次详情，保证一键同步也能刷新详情面板。
+          if (shouldEnrichOrderDetail) {
+            await enrichMaiyatianOrderByCookie(cookie, current).catch((e) => {
+              console.warn(`Failed to enrich order ${current.orderNo} during sync:`, e);
+            });
+          }
         }
-      }
 
       results.push(await upsertAutoPickOrder(userId, current));
     } catch (error) {
