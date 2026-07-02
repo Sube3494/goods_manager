@@ -21,6 +21,7 @@ interface PartialReturnModalProps {
 export function PartialReturnModal({ isOpen, order, onClose, onSuccess }: PartialReturnModalProps) {
   const { showToast } = useToast();
   const [refundAmount, setRefundAmount] = useState("");
+  const [extraExpense, setExtraExpense] = useState("");
   const [reason, setReason] = useState("售后退货");
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -55,6 +56,7 @@ export function PartialReturnModal({ isOpen, order, onClose, onSuccess }: Partia
     });
     setQuantities(next);
     setRefundAmount("");
+    setExtraExpense("");
     setReason("售后退货");
   }, [isOpen, order, returnState.rows]);
 
@@ -64,7 +66,6 @@ export function PartialReturnModal({ isOpen, order, onClose, onSuccess }: Partia
 
   const selectedCount = Object.values(quantities).reduce((sum, qty) => sum + Math.max(0, Number(qty || 0)), 0);
   const selectedSkuCount = returnState.rows.filter((row) => Number(quantities[row.itemId] || 0) > 0).length;
-  const refundAmountNumber = Math.max(0, Number(refundAmount || 0));
 
   const updateQuantity = (itemId: string, nextValue: number, max: number) => {
     const safeValue = Math.max(0, Math.min(max, Number.isFinite(nextValue) ? nextValue : 0));
@@ -92,6 +93,7 @@ export function PartialReturnModal({ isOpen, order, onClose, onSuccess }: Partia
         body: JSON.stringify({
           reason: reason.trim() || "售后退货",
           refundAmount: Number(refundAmount || 0),
+          extraExpense: Number(extraExpense || 0),
           items,
         }),
       });
@@ -102,7 +104,7 @@ export function PartialReturnModal({ isOpen, order, onClose, onSuccess }: Partia
         return;
       }
 
-      showToast("退货已回库，利润会按退款和退货成本一起对冲", "success");
+      showToast("退货已回库，利润会按退款、退货成本和额外支出一起对冲", "success");
       onSuccess();
       onClose();
     } catch (error) {
@@ -122,7 +124,7 @@ export function PartialReturnModal({ isOpen, order, onClose, onSuccess }: Partia
           <div className="min-w-0">
             <h2 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">部分退货入库</h2>
             <p className="mt-1.5 text-sm text-muted-foreground">
-              选择本单要退回的商品数量，库存会自动回补，利润会按退款金额和退回成本一起冲回。
+              选择本单要退回的商品数量，库存会自动回补，利润会按退款金额、退回成本和额外支出一起冲回。
             </p>
           </div>
           <button
@@ -158,17 +160,13 @@ export function PartialReturnModal({ isOpen, order, onClose, onSuccess }: Partia
           </div>
 
           <div className="rounded-2xl border border-black/6 bg-black/2 p-4 dark:border-white/8 dark:bg-white/3 sm:p-5">
-            <div className="mb-4 flex items-center justify-between gap-3">
+            <div className="mb-4">
               <div>
                 <div className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                   <ClipboardList size={13} />
                   退货商品选择
                 </div>
                 <p className="mt-1 text-sm text-muted-foreground">优先选择需要退回的件数，右侧输入框只保留本次退货数量。</p>
-              </div>
-              <div className="hidden rounded-xl border border-black/6 bg-white/70 px-3 py-2 text-right dark:border-white/8 dark:bg-white/4 md:block">
-                <div className="text-[11px] text-muted-foreground">可操作商品</div>
-                <div className="text-lg font-bold text-foreground">{returnState.rows.length} 种</div>
               </div>
             </div>
 
@@ -210,11 +208,6 @@ export function PartialReturnModal({ isOpen, order, onClose, onSuccess }: Partia
                           <div className="truncate text-sm font-semibold leading-5 text-foreground">{row.name}</div>
                         </div>
                       </div>
-                      {isSelected ? (
-                        <span className="shrink-0 rounded-full border border-primary/20 bg-primary/8 px-2.5 py-1 text-[11px] font-semibold text-primary">
-                          已选中
-                        </span>
-                      ) : null}
                     </div>
                   </div>
 
@@ -272,64 +265,58 @@ export function PartialReturnModal({ isOpen, order, onClose, onSuccess }: Partia
           </div>
 
           <div className="rounded-2xl border border-black/6 bg-black/2 p-4 dark:border-white/8 dark:bg-white/3">
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-col gap-1">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                  退货说明与汇总
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                  <div>
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                      退货说明与汇总
+                    </div>
+                  <p className="mt-1 text-sm text-muted-foreground">填写退货原因、退款金额和额外支出，提交后系统会按本次退货数量回补库存并冲回利润。</p>
+                  </div>
                 </div>
-                <p className="text-sm text-muted-foreground">填写原因和退款金额的同时，右侧会同步显示本次退货汇总。</p>
-              </div>
 
-              <div className="grid gap-3 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
-                <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_220px]">
-                  <label className="space-y-2">
-                    <span className="text-sm font-semibold text-foreground">退货原因</span>
-                    <input
-                      value={reason}
-                      onChange={(e) => setReason(e.target.value)}
-                      placeholder="例如：客户退单、少件退回"
-                      className="h-11 w-full rounded-xl border border-black/8 bg-white/70 px-4 text-foreground outline-none transition focus:border-primary/30 focus:ring-2 focus:ring-primary/10 dark:border-white/10 dark:bg-white/5"
-                    />
+              <div className="grid items-end gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)_minmax(0,1.1fr)]">
+                <label className="space-y-2">
+                  <span className="text-sm font-semibold text-foreground">退货原因</span>
+                  <input
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                    placeholder="例如：客户退单、少件退回"
+                    className="h-11 w-full rounded-xl border border-black/8 bg-white/70 px-4 text-foreground outline-none transition focus:border-primary/30 focus:ring-2 focus:ring-primary/10 dark:border-white/10 dark:bg-white/5"
+                  />
                   </label>
 
-                  <label className="space-y-2">
-                    <span className="text-sm font-semibold text-foreground">退款金额</span>
-                    <div className="relative">
-                      <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground">¥</span>
-                      <input
-                        type="number"
-                        min={0}
-                        step="0.01"
-                        value={refundAmount}
-                        onChange={(e) => setRefundAmount(e.target.value)}
-                        placeholder="0.00"
-                        className="h-11 w-full rounded-xl border border-black/8 bg-white/70 pl-8 pr-4 text-foreground outline-none transition focus:border-primary/30 focus:ring-2 focus:ring-primary/10 dark:border-white/10 dark:bg-white/5"
+                <label className="space-y-2">
+                  <span className="text-sm font-semibold text-foreground">退款金额</span>
+                  <div className="relative">
+                    <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground">¥</span>
+                    <input
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={refundAmount}
+                      onChange={(e) => setRefundAmount(e.target.value)}
+                      placeholder="0.00"
+                      className="h-11 w-full rounded-xl border border-black/8 bg-white/70 pl-8 pr-4 text-foreground outline-none transition focus:border-primary/30 focus:ring-2 focus:ring-primary/10 dark:border-white/10 dark:bg-white/5"
                       />
                     </div>
                   </label>
-                </div>
 
-                <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-[repeat(2,minmax(0,1fr))_minmax(0,1.1fr)]">
-                  <div className="rounded-xl border border-black/6 bg-white/70 px-3 py-2.5 dark:border-white/8 dark:bg-white/4">
-                    <div className="text-[11px] text-muted-foreground">退货商品种类</div>
-                    <div className="mt-1 text-xl font-bold text-foreground">{selectedSkuCount}</div>
-                    <div className="text-[11px] text-muted-foreground">种</div>
+                <label className="space-y-2">
+                  <span className="text-sm font-semibold text-foreground">额外退货支出</span>
+                  <div className="relative">
+                    <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground">¥</span>
+                    <input
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={extraExpense}
+                      onChange={(e) => setExtraExpense(e.target.value)}
+                      placeholder="0.00"
+                      className="h-11 w-full rounded-xl border border-black/8 bg-white/70 pl-8 pr-4 text-foreground outline-none transition focus:border-primary/30 focus:ring-2 focus:ring-primary/10 dark:border-white/10 dark:bg-white/5"
+                    />
                   </div>
-                  <div className="rounded-xl border border-black/6 bg-white/70 px-3 py-2.5 dark:border-white/8 dark:bg-white/4">
-                    <div className="text-[11px] text-muted-foreground">退货总件数</div>
-                    <div className="mt-1 text-xl font-bold text-foreground">{selectedCount}</div>
-                    <div className="text-[11px] text-muted-foreground">件</div>
-                  </div>
-                  <div className="rounded-xl border border-black/6 bg-white/70 px-3 py-2.5 dark:border-white/8 dark:bg-white/4">
-                    <div className="text-[11px] text-muted-foreground">本次退款金额</div>
-                    <div className="mt-1 text-xl font-bold text-foreground">¥{refundAmountNumber.toFixed(2)}</div>
-                    <div className="text-[11px] text-muted-foreground">实时汇总</div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-xl border border-amber-500/15 bg-amber-500/8 px-3 py-2.5 text-[12px] leading-5 text-muted-foreground dark:text-slate-300">
-                提交后会自动回补库存，并把这次退款金额与退回成本一起冲回利润。
+                </label>
               </div>
             </div>
           </div>

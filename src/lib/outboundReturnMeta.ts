@@ -18,6 +18,7 @@ export interface OutboundReturnMetaEntry {
   createdAt: string;
   reason: string;
   refundAmount: number;
+  extraExpense: number;
   returnedCost: number;
   inboundOrderId?: string | null;
   items: OutboundReturnMetaItem[];
@@ -43,14 +44,15 @@ function safeParseReturnMeta(jsonText: string): OutboundReturnMetaEntry[] {
       }
       const record = entry as Record<string, unknown>;
       const items = Array.isArray(record.items) ? record.items : [];
-      return [{
-        id: String(record.id || "").trim(),
-        createdAt: String(record.createdAt || "").trim(),
-        reason: String(record.reason || "").trim() || "退货入库",
-        refundAmount: Number(record.refundAmount || 0) || 0,
-        returnedCost: Number(record.returnedCost || 0) || 0,
-        inboundOrderId: String(record.inboundOrderId || "").trim() || null,
-        items: items.flatMap((item) => {
+        return [{
+          id: String(record.id || "").trim(),
+          createdAt: String(record.createdAt || "").trim(),
+          reason: String(record.reason || "").trim() || "退货入库",
+          refundAmount: Number(record.refundAmount || 0) || 0,
+          extraExpense: Number(record.extraExpense || 0) || 0,
+          returnedCost: Number(record.returnedCost || 0) || 0,
+          inboundOrderId: String(record.inboundOrderId || "").trim() || null,
+          items: items.flatMap((item) => {
           if (!item || typeof item !== "object" || Array.isArray(item)) {
             return [];
           }
@@ -170,9 +172,11 @@ export function getOutboundReturnedBatchQuantityMap(entries: OutboundReturnMetaE
 export function getOutboundReturnTotals(entries: OutboundReturnMetaEntry[]) {
   return entries.reduce((acc, entry) => ({
     refundAmount: FinanceMath.add(acc.refundAmount, Number(entry.refundAmount || 0)),
+    extraExpense: FinanceMath.add(acc.extraExpense, Number(entry.extraExpense || 0)),
     returnedCost: FinanceMath.add(acc.returnedCost, Number(entry.returnedCost || 0)),
   }), {
     refundAmount: 0,
+    extraExpense: 0,
     returnedCost: 0,
   });
 }

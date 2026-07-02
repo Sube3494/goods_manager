@@ -491,6 +491,13 @@ export function getExpandedOrderItemDisplays(item: AutoPickOrderItem) {
   return [getOrderItemDisplay(item)];
 }
 
+export function normalizeReturnedItemKey(value: string | null | undefined) {
+  return String(value || "")
+    .trim()
+    .replace(/\s+/g, "")
+    .toLowerCase();
+}
+
 export function getOrderSourceLabel(order: AutoPickOrder) {
   return order.matchedShopName || "";
 }
@@ -971,12 +978,14 @@ export function ProductStripItem({
   showEditMatch = false,
   matchedProduct,
   showMatchStatus = false,
+  returnedQuantity = 0,
 }: {
   display: { name: string; sku: string; image: string | null; quantity: number };
   onEditMatch?: () => void;
   showEditMatch?: boolean;
   matchedProduct?: AutoPickOrderItem['matchedProduct'];
   showMatchStatus?: boolean;
+  returnedQuantity?: number;
 }) {
   return (
     <div className="flex items-center gap-2.5 rounded-2xl border border-black/6 bg-white/70 px-2.5 py-2 dark:border-white/8 dark:bg-white/4 sm:gap-3 sm:rounded-[18px] sm:px-3 sm:py-2.5">
@@ -1011,6 +1020,11 @@ export function ProductStripItem({
                 : "bg-rose-500/10 text-rose-700 dark:text-rose-400"
             )}>
               {matchedProduct ? (matchedProduct.isManual ? "手动" : "自动") : "未匹配"}
+            </span>
+          ) : null}
+          {returnedQuantity > 0 ? (
+            <span className="inline-flex items-center rounded-full border border-amber-500/15 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-bold leading-none text-amber-700 dark:text-amber-300">
+              已退 x{returnedQuantity}
             </span>
           ) : null}
         </div>
@@ -1122,8 +1136,6 @@ export function OrderCard({
 }) {
   const [isProfitTooltipOpen, setIsProfitTooltipOpen] = useState(false);
   const [isProfitTooltipHovering, setIsProfitTooltipHovering] = useState(false);
-  const [isRefundTooltipOpen, setIsRefundTooltipOpen] = useState(false);
-  const [isRefundTooltipHovering, setIsRefundTooltipHovering] = useState(false);
   const [isUpdatingBrush, setIsUpdatingBrush] = useState(false);
   const [isAmountEditorOpen, setIsAmountEditorOpen] = useState(false);
   const [isSavingAmount, setIsSavingAmount] = useState(false);
@@ -1131,7 +1143,6 @@ export function OrderCard({
   const [isDeletingOffline, setIsDeletingOffline] = useState(false);
   const { showToast } = useToast();
   const profitTooltipHoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const refundTooltipHoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const clearProfitTooltipHoverTimeout = useCallback(() => {
     if (profitTooltipHoverTimeoutRef.current) {
@@ -1152,26 +1163,6 @@ export function OrderCard({
       profitTooltipHoverTimeoutRef.current = null;
     }, 180);
   }, [clearProfitTooltipHoverTimeout]);
-
-  const clearRefundTooltipHoverTimeout = useCallback(() => {
-    if (refundTooltipHoverTimeoutRef.current) {
-      clearTimeout(refundTooltipHoverTimeoutRef.current);
-      refundTooltipHoverTimeoutRef.current = null;
-    }
-  }, []);
-
-  const openRefundTooltipHover = useCallback(() => {
-    clearRefundTooltipHoverTimeout();
-    setIsRefundTooltipHovering(true);
-  }, [clearRefundTooltipHoverTimeout]);
-
-  const closeRefundTooltipHover = useCallback(() => {
-    clearRefundTooltipHoverTimeout();
-    refundTooltipHoverTimeoutRef.current = setTimeout(() => {
-      setIsRefundTooltipHovering(false);
-      refundTooltipHoverTimeoutRef.current = null;
-    }, 180);
-  }, [clearRefundTooltipHoverTimeout]);
 
   const handleUpdateBrush = useCallback(async (val: boolean) => {
     if (val === order.isMainSystemSelfDelivery) return;
@@ -1256,7 +1247,6 @@ export function OrderCard({
   }, [order.id, showToast, onRefresh]);
 
   const profitTooltipRef = useRef<HTMLDivElement | null>(null);
-  const refundTooltipRef = useRef<HTMLDivElement | null>(null);
   const itemCount = getItemCount(order.items);
   const completed = isCompletedStatus(order.status);
   const cancelled = isCancelledStatus(order.status);
@@ -1277,6 +1267,8 @@ export function OrderCard({
   const productCostStatusText = getProductCostStatusText(order);
   const refundAmount = Math.max(0, Number(order.refundAmount || 0));
   const hasRefundAmount = refundAmount > 0;
+  const returnExtraExpense = Math.max(0, Number(order.returnExtraExpense || 0));
+  const hasReturnExtraExpense = returnExtraExpense > 0;
   const expectedIncomeDisplay = hideDeletedOfflineIncome ? "-" : toCurrency(expectedIncome);
   const pureProfitDisplay = hideDeletedOfflineIncome
     ? "-"
@@ -1286,6 +1278,14 @@ export function OrderCard({
   const productCost = Number(order.productCost || 0);
   const productCostBreakdown = Array.isArray(order.productCostBreakdown) ? order.productCostBreakdown : [];
   const outboundReturnDetails = Array.isArray(order.outboundReturnDetails) ? order.outboundReturnDetails : [];
+  const returnedItemQuantityMap = outboundReturnDetails.reduce((acc, entry) => {
+    for (const item of entry.items || []) {
+      const key = normalizeReturnedItemKey(item.name);
+      if (!key) continue;
+      acc.set(key, (acc.get(key) || 0) + Math.max(0, Number(item.quantity || 0)));
+    }
+    return acc;
+  }, new Map<string, number>());
   const canEditProductCost = order.productCostStatus === "pending-backfill" || productCostBreakdown.length > 0;
   const settlementAfterRate = Math.round(expectedIncome * (1 - serviceFeeRate));
   const isJdOrder = String(order.platform || "").includes("京东");
@@ -1301,6 +1301,7 @@ export function OrderCard({
             { label: "减配送费", value: toCurrency(deliveryFee) },
             { label: "减货品成本", value: toCurrency(productCost), editable: canEditProductCost },
             ...(hasRefundAmount ? [{ label: "减退款金额", value: toCurrency(refundAmount) }] : []),
+            ...(hasReturnExtraExpense ? [{ label: "减退货支出", value: toCurrency(returnExtraExpense) }] : []),
           ])
     : productCostStatusText
       ? [
@@ -1309,6 +1310,7 @@ export function OrderCard({
           { label: "配送费", value: toCurrency(deliveryFee) },
           { label: "货品成本", value: productCostStatusText, editable: canEditProductCost },
           ...(hasRefundAmount ? [{ label: "退款金额", value: toCurrency(refundAmount) }] : []),
+          ...(hasReturnExtraExpense ? [{ label: "退货支出", value: toCurrency(returnExtraExpense) }] : []),
         ]
       : [];
   const sourceLabel = getOrderSourceLabel(order);
@@ -1319,18 +1321,11 @@ export function OrderCard({
   const compactAutoCompleteAt = formatCompactDateTime(order.autoCompleteAt);
   const compactDeadlineDisplay = formatCompactDateTime(deadlineDisplay);
   const isProfitTooltipVisible = isProfitTooltipOpen || isProfitTooltipHovering;
-  const isRefundTooltipVisible = isRefundTooltipOpen || isRefundTooltipHovering;
   const closeProfitTooltip = useCallback(() => {
     clearProfitTooltipHoverTimeout();
     setIsProfitTooltipHovering(false);
     setIsProfitTooltipOpen(false);
   }, [clearProfitTooltipHoverTimeout]);
-
-  const closeRefundTooltip = useCallback(() => {
-    clearRefundTooltipHoverTimeout();
-    setIsRefundTooltipHovering(false);
-    setIsRefundTooltipOpen(false);
-  }, [clearRefundTooltipHoverTimeout]);
 
   const handleProfitTooltipTriggerClick = useCallback(() => {
     clearProfitTooltipHoverTimeout();
@@ -1341,16 +1336,6 @@ export function OrderCard({
       return !current;
     });
   }, [clearProfitTooltipHoverTimeout]);
-
-  const handleRefundTooltipTriggerClick = useCallback(() => {
-    clearRefundTooltipHoverTimeout();
-    setIsRefundTooltipOpen((current) => {
-      if (current) {
-        setIsRefundTooltipHovering(false);
-      }
-      return !current;
-    });
-  }, [clearRefundTooltipHoverTimeout]);
 
   useEffect(() => {
     if (!isProfitTooltipOpen) return;
@@ -1366,24 +1351,10 @@ export function OrderCard({
   }, [closeProfitTooltip, isProfitTooltipOpen]);
 
   useEffect(() => {
-    if (!isRefundTooltipOpen) return;
-
-    const handlePointerDown = (event: PointerEvent) => {
-      if (!refundTooltipRef.current?.contains(event.target as Node)) {
-        closeRefundTooltip();
-      }
-    };
-
-    document.addEventListener("pointerdown", handlePointerDown);
-    return () => document.removeEventListener("pointerdown", handlePointerDown);
-  }, [closeRefundTooltip, isRefundTooltipOpen]);
-
-  useEffect(() => {
     return () => {
       clearProfitTooltipHoverTimeout();
-      clearRefundTooltipHoverTimeout();
     };
-  }, [clearProfitTooltipHoverTimeout, clearRefundTooltipHoverTimeout]);
+  }, [clearProfitTooltipHoverTimeout]);
 
   return (
     <>
@@ -1769,100 +1740,6 @@ export function OrderCard({
                   {order.items.length > 1 ? "商品列表" : "商品"}
                 </div>
                 <div className="flex flex-wrap items-center justify-end gap-2">
-                  {hasRefundAmount ? (
-                    <div
-                      ref={refundTooltipRef}
-                      className="group/refund relative"
-                      onMouseEnter={openRefundTooltipHover}
-                      onMouseLeave={closeRefundTooltipHover}
-                    >
-                      <button
-                        type="button"
-                        onClick={handleRefundTooltipTriggerClick}
-                        aria-expanded={isRefundTooltipVisible}
-                        className="inline-flex items-center rounded-full border border-amber-500/15 bg-amber-500/10 px-2.5 py-1 text-[11px] font-medium text-amber-700 transition-all hover:border-amber-500/30 hover:bg-amber-500/14 dark:text-amber-300"
-                      >
-                        已退款 {toCurrency(refundAmount)}
-                      </button>
-                      {isRefundTooltipOpen ? (
-                        <div
-                          className="fixed inset-0 z-40 bg-slate-950/42 sm:hidden"
-                          onPointerDown={(event) => {
-                            event.preventDefault();
-                            closeRefundTooltip();
-                          }}
-                          onClick={closeRefundTooltip}
-                        />
-                      ) : null}
-                      {isRefundTooltipVisible ? (
-                        <div className={cn(
-                          "fixed left-1/2 top-1/2 z-50 w-[min(340px,calc(100vw-2rem))] max-h-[calc(100vh-2rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border border-amber-500/18 bg-[#171b22]/98 p-3 text-left shadow-[0_24px_60px_rgba(0,0,0,0.45)] sm:absolute sm:left-1/2 sm:top-full sm:z-30 sm:mt-3 sm:w-80 sm:max-h-none sm:-translate-x-1/2 sm:translate-y-0 sm:overflow-visible"
-                        )}>
-                          <div className="hidden absolute left-1/2 top-0 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rotate-45 border-l border-t border-amber-500/18 bg-[#171b22]/98 sm:block" />
-                          <button
-                            type="button"
-                            onPointerDown={(event) => {
-                              event.preventDefault();
-                              event.stopPropagation();
-                              closeRefundTooltip();
-                            }}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              closeRefundTooltip();
-                            }}
-                            className="absolute right-3 top-3 inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/6 text-white/55 transition-colors hover:text-white sm:hidden"
-                            aria-label="关闭退款明细"
-                          >
-                            <X size={14} />
-                          </button>
-                          <div className="border-b border-white/8 pb-2 pr-10 sm:pr-0">
-                            <div className="text-[11px] font-semibold tracking-[0.12em] text-amber-300/80">
-                              退款明细
-                            </div>
-                            <div className="mt-0.5 text-[14px] font-semibold text-white">
-                              共退款 {toCurrency(refundAmount)}
-                            </div>
-                          </div>
-                          <div className="mt-3 space-y-2">
-                            {outboundReturnDetails.map((entry, index) => (
-                              <div
-                                key={entry.id || `${entry.createdAt}-${index}`}
-                                className="rounded-xl border border-white/8 bg-white/[0.04] px-3 py-2.5"
-                              >
-                                <div className="flex items-center justify-between gap-3">
-                                  <div className="text-[12px] font-semibold text-white">第 {index + 1} 次退货</div>
-                                  <div className="text-[10px] text-white/45">{removeYear(entry.createdAt)}</div>
-                                </div>
-                                <div className="mt-2 grid grid-cols-2 gap-2 text-[12px]">
-                                  <div className="rounded-lg bg-white/[0.04] px-2.5 py-2">
-                                    <div className="text-[10px] text-white/45">退款金额</div>
-                                    <div className="mt-1 font-semibold text-amber-200">{toCurrency(entry.refundAmount)}</div>
-                                  </div>
-                                  <div className="rounded-lg bg-white/[0.04] px-2.5 py-2">
-                                    <div className="text-[10px] text-white/45">冲回成本</div>
-                                    <div className="mt-1 font-semibold text-white">{toCurrency(entry.returnedCost)}</div>
-                                  </div>
-                                </div>
-                                <div className="mt-2 text-[11px] text-white/70">
-                                  原因：{entry.reason || "-"}
-                                </div>
-                                <div className="mt-2 flex flex-wrap gap-1.5">
-                                  {entry.items.map((item, itemIndex) => (
-                                    <span
-                                      key={`${entry.id}-${item.outboundOrderItemId}-${itemIndex}`}
-                                      className="inline-flex items-center rounded-full border border-amber-500/12 bg-amber-500/[0.08] px-2 py-0.5 text-[10px] font-medium text-amber-200"
-                                    >
-                                      {(item.name || "未命名商品")} x{item.quantity}
-                                    </span>
-                                  ))}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      ) : null}
-                    </div>
-                  ) : null}
                   <div className="text-xs font-medium text-muted-foreground">共 {itemCount} 件商品</div>
                 </div>
               </div>
@@ -1877,6 +1754,7 @@ export function OrderCard({
                     onEditMatch={() => onOpenMatchEditor(order, item)}
                     matchedProduct={item.matchedProduct}
                     showMatchStatus={displayIndex === 0}
+                    returnedQuantity={returnedItemQuantityMap.get(normalizeReturnedItemKey(display.name)) || 0}
                   />
                 ))
               )}
@@ -2129,7 +2007,10 @@ export function OrderCard({
                   {hasRefundAmount ? (
                     <DetailStat label="退款金额" value={toCurrency(refundAmount)} />
                   ) : null}
-                  <div className={hasRefundAmount ? "" : "col-span-2"}>
+                  {hasReturnExtraExpense ? (
+                    <DetailStat label="退货支出" value={toCurrency(returnExtraExpense)} />
+                  ) : null}
+                  <div className={hasRefundAmount || hasReturnExtraExpense ? "" : "col-span-2"}>
                     <DetailStat label={commissionDisplay.label} value={commissionDisplay.value} />
                   </div>
                 </div>

@@ -121,7 +121,7 @@ export async function PATCH(
     const actualPaid = order.actualPaid;
     const expectedIncome = hasExpectedIncome ? Math.round(nextExpectedIncome) : order.expectedIncome;
     const platformCommission = hasAmountEdit
-      ? Math.round(Number(expectedIncome || 0) - Number(actualPaid || 0))
+      ? Math.max(0, Math.round(Number(actualPaid || 0) - Number(expectedIncome || 0)))
       : order.platformCommission;
 
     await prisma.autoPickOrder.update({

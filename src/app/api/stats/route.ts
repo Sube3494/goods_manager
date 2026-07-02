@@ -117,10 +117,9 @@ function resolveRefundAdjustedIncomeMetrics(options: {
   }
 
   const grossBase = Math.max(actualPaid, expectedIncome + platformCommission);
-  const adjustedActualPaid = Math.max(0, actualPaid - refundAmount);
   if (grossBase <= 0) {
     return {
-      actualPaid: adjustedActualPaid,
+      actualPaid,
       expectedIncome,
       platformCommission,
       refundedExpectedIncome: refundAmount,
@@ -141,16 +140,10 @@ function resolveRefundAdjustedIncomeMetrics(options: {
   );
 
   const adjustedPlatformCommission = Math.max(0, platformCommission - refundedCommission);
-  const adjustedExpectedIncome = Math.max(
-    0,
-    Math.min(
-      Math.max(0, expectedIncome - refundedExpectedIncome),
-      adjustedActualPaid - adjustedPlatformCommission
-    )
-  );
+  const adjustedExpectedIncome = Math.max(0, expectedIncome - refundedExpectedIncome);
 
   return {
-    actualPaid: adjustedActualPaid,
+    actualPaid,
     expectedIncome: adjustedExpectedIncome,
     platformCommission: adjustedPlatformCommission,
     refundedExpectedIncome,
@@ -626,6 +619,7 @@ export async function GET(request: NextRequest) {
       productCost: number;
       missingCostItemCount: number;
       refundAmount: number;
+      extraExpense: number;
       returnedCost: number;
     }>();
     outboundOrdersForCost.forEach((outbound) => {
@@ -653,6 +647,7 @@ export async function GET(request: NextRequest) {
         ),
         missingCostItemCount: (current?.missingCostItemCount || 0) + missingCostItemCount,
         refundAmount: FinanceMath.add(current?.refundAmount || 0, returnTotals.refundAmount),
+        extraExpense: FinanceMath.add(current?.extraExpense || 0, returnTotals.extraExpense),
         returnedCost: FinanceMath.add(current?.returnedCost || 0, returnTotals.returnedCost),
       });
     });
@@ -661,6 +656,7 @@ export async function GET(request: NextRequest) {
     let platformCommission = 0;
     let deliveryExpense = 0;
     let productCost = 0;
+    let returnExtraExpense = 0;
 
     filteredAutoPickOrdersInRange.forEach((order) => {
       const isCancelled = isAutoPickOrderCancelledStatus(order.status)
@@ -679,6 +675,7 @@ export async function GET(request: NextRequest) {
 
         const orderCostMeta = outboundMetaByOrderNo.get(String(order.orderNo || "").trim());
         const orderCostYuan = orderCostMeta?.productCost || 0;
+        const returnExtraExpenseYuan = orderCostMeta?.extraExpense || 0;
         const refundAmountYuan = orderCostMeta?.refundAmount || 0;
         const adjustedMetrics = resolveRefundAdjustedIncomeMetrics({
           expectedIncome: metrics.expectedIncome,
@@ -686,7 +683,7 @@ export async function GET(request: NextRequest) {
           actualPaid: paidYuan,
           refundAmount: refundAmountYuan,
         });
-        const adjustedPaidYuan = adjustedMetrics.actualPaid;
+        const adjustedPaidYuan = paidYuan;
         const commissionYuan = adjustedMetrics.platformCommission;
         const expectedIncomeYuan = adjustedMetrics.expectedIncome;
 
@@ -694,8 +691,10 @@ export async function GET(request: NextRequest) {
         if (!isBrush) {
           userPaid = FinanceMath.add(userPaid, adjustedPaidYuan);
           productCost = FinanceMath.add(productCost, orderCostYuan);
+          returnExtraExpense = FinanceMath.add(returnExtraExpense, returnExtraExpenseYuan);
         } else {
           brushExpense = FinanceMath.add(brushExpense, defaultBrushCommission);
+          returnExtraExpense = FinanceMath.add(returnExtraExpense, returnExtraExpenseYuan);
         }
         platformCommission = FinanceMath.add(platformCommission, commissionYuan);
         deliveryExpense = FinanceMath.add(deliveryExpense, deliveryYuan);
@@ -723,7 +722,7 @@ export async function GET(request: NextRequest) {
 
     const netProfit = FinanceMath.add(
       userPaid,
-      -platformCommission - deliveryExpense - productCost - promotionExpense - brushExpense - otherExpense
+      -platformCommission - deliveryExpense - productCost - returnExtraExpense - promotionExpense - brushExpense - otherExpense
     );
 
     const dateSeries = buildDateSeries(startDate, endDate);
@@ -824,14 +823,16 @@ export async function GET(request: NextRequest) {
           paidYuan,
           Number(order.platformCommission || 0) / 100
         );
-        const refundAmountYuan = outboundMetaByOrderNo.get(String(order.orderNo || "").trim())?.refundAmount || 0;
+        const orderCostMeta = outboundMetaByOrderNo.get(String(order.orderNo || "").trim());
+        const refundAmountYuan = orderCostMeta?.refundAmount || 0;
+        const returnExtraExpenseYuan = orderCostMeta?.extraExpense || 0;
         const adjustedMetrics = resolveRefundAdjustedIncomeMetrics({
           expectedIncome: metrics.expectedIncome,
           platformCommission: isOffline ? 0 : metrics.platformCommission,
           actualPaid: paidYuan,
           refundAmount: refundAmountYuan,
         });
-        const adjustedPaidYuan = adjustedMetrics.actualPaid;
+        const adjustedPaidYuan = paidYuan;
         const commissionYuan = adjustedMetrics.platformCommission;
         const expectedIncomeYuan = adjustedMetrics.expectedIncome;
 
@@ -855,15 +856,15 @@ export async function GET(request: NextRequest) {
         if (isBrush) {
           if (point) {
             point.brushPaid = FinanceMath.add(point.brushPaid, adjustedPaidYuan);
-            point.pureProfit = FinanceMath.add(point.pureProfit, -commissionYuan - deliveryYuan - defaultBrushCommission);
+            point.pureProfit = FinanceMath.add(point.pureProfit, -commissionYuan - deliveryYuan - defaultBrushCommission - returnExtraExpenseYuan);
           }
           if (platformPoint) {
             platformPoint.brushPaid = FinanceMath.add(platformPoint.brushPaid, adjustedPaidYuan);
-            platformPoint.pureProfit = FinanceMath.add(platformPoint.pureProfit, -commissionYuan - deliveryYuan - defaultBrushCommission);
+            platformPoint.pureProfit = FinanceMath.add(platformPoint.pureProfit, -commissionYuan - deliveryYuan - defaultBrushCommission - returnExtraExpenseYuan);
           }
         } else {
-          const orderCostMeta = outboundMetaByOrderNo.get(String(order.orderNo || "").trim());
           const orderCostYuan = orderCostMeta?.productCost || 0;
+          const returnExtraExpenseYuan = orderCostMeta?.extraExpense || 0;
 
           if (point) {
             point.productCost = FinanceMath.add(point.productCost, orderCostYuan);
@@ -878,10 +879,10 @@ export async function GET(request: NextRequest) {
           const deliveryYuan = getDeliveryFee(order.delivery) / 100;
           const hasReadyCost = Boolean(orderCostMeta) && (orderCostMeta?.missingCostItemCount || 0) <= 0;
           if (hasReadyCost) {
-            const pureProfit = FinanceMath.add(
-              FinanceMath.multiply(expectedIncomeYuan, 1 - rate),
-              -deliveryYuan - orderCostYuan
-            );
+              const pureProfit = FinanceMath.add(
+                FinanceMath.multiply(expectedIncomeYuan, 1 - rate),
+                -deliveryYuan - orderCostYuan - returnExtraExpenseYuan
+              );
             if (point) {
               point.pureProfit = FinanceMath.add(point.pureProfit, pureProfit);
             }

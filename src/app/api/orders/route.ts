@@ -443,11 +443,12 @@ function resolveIncomeMetrics(
   fallbackCommission: number,
   options?: { preferExplicitExpectedIncome?: boolean }
 ) {
-  if (options?.preferExplicitExpectedIncome && Number.isFinite(Number(expectedIncome))) {
+  if (Number.isFinite(Number(expectedIncome))) {
     const resolvedExpectedIncome = Math.round(Number(expectedIncome));
+    const derivedCommission = Math.max(0, Math.round(Number(actualPaid || 0) - resolvedExpectedIncome));
     return {
       expectedIncome: resolvedExpectedIncome,
-      platformCommission: Math.round(resolvedExpectedIncome - Number(actualPaid || 0)),
+      platformCommission: Math.max(derivedCommission, Math.max(0, Math.round(Number(fallbackCommission || 0)))),
     };
   }
 
@@ -461,17 +462,9 @@ function resolveIncomeMetrics(
     };
   }
 
-  if (Number.isFinite(Number(expectedIncome))) {
-    const resolvedExpectedIncome = Math.round(Number(expectedIncome));
-    return {
-      expectedIncome: resolvedExpectedIncome,
-      platformCommission: Math.round(resolvedExpectedIncome - Number(actualPaid || 0)),
-    };
-  }
-
   return {
     expectedIncome: null,
-    platformCommission: Math.round(Number(fallbackCommission || 0)),
+    platformCommission: Math.max(0, Math.round(Number(fallbackCommission || 0))),
   };
 }
 
@@ -497,10 +490,9 @@ function resolveRefundAdjustedIncomeMetrics(options: {
   }
 
   const grossBase = Math.max(actualPaid, expectedIncome + platformCommission);
-  const adjustedActualPaid = Math.max(0, actualPaid - refundAmount);
   if (grossBase <= 0) {
     return {
-      actualPaid: adjustedActualPaid,
+      actualPaid,
       expectedIncome,
       platformCommission,
       refundedExpectedIncome: refundAmount,
@@ -521,16 +513,10 @@ function resolveRefundAdjustedIncomeMetrics(options: {
   );
 
   const adjustedPlatformCommission = Math.max(0, platformCommission - refundedCommission);
-  const adjustedExpectedIncome = Math.max(
-    0,
-    Math.min(
-      Math.max(0, expectedIncome - refundedExpectedIncome),
-      adjustedActualPaid - adjustedPlatformCommission
-    )
-  );
+  const adjustedExpectedIncome = Math.max(0, expectedIncome - refundedExpectedIncome);
 
   return {
-    actualPaid: adjustedActualPaid,
+    actualPaid,
     expectedIncome: adjustedExpectedIncome,
     platformCommission: adjustedPlatformCommission,
     refundedExpectedIncome,
@@ -1120,12 +1106,14 @@ export async function GET(request: NextRequest) {
       id: string;
       productCost: number;
       refundAmount: number;
+      extraExpense: number;
       returnedCost: number;
       returnDetails: Array<{
         id: string;
         createdAt: string;
         reason: string;
         refundAmount: number;
+        extraExpense: number;
         returnedCost: number;
         items: Array<{
           outboundOrderItemId: string;
@@ -1262,6 +1250,7 @@ export async function GET(request: NextRequest) {
           createdAt: entry.createdAt,
           reason: entry.reason,
           refundAmount: Math.round(Number(entry.refundAmount || 0) * 100),
+          extraExpense: Math.round(Number(entry.extraExpense || 0) * 100),
           returnedCost: Math.round(Number(entry.returnedCost || 0) * 100),
           items: (entry.items || []).map((item) => ({
             outboundOrderItemId: item.outboundOrderItemId,
@@ -1349,6 +1338,7 @@ export async function GET(request: NextRequest) {
           id: outbound.id,
           productCost: Math.max(0, productCost - Math.round(returnTotals.returnedCost * 100)),
           refundAmount: Math.round(returnTotals.refundAmount * 100),
+          extraExpense: Math.round(returnTotals.extraExpense * 100),
           returnedCost: Math.round(returnTotals.returnedCost * 100),
           returnDetails,
           missingCostItemCount,
@@ -1420,6 +1410,7 @@ export async function GET(request: NextRequest) {
               ? 0
               : (shopRateMap.get(matchedShopName) ?? 0.06);
             const productCost = outboundMeta?.productCost || 0;
+            const returnExtraExpense = outboundMeta?.extraExpense || 0;
             const missingCostItemCount = outboundMeta?.missingCostItemCount || 0;
             const hasOutbound = Boolean(outboundMeta);
             const productCostStatus = !hasOutbound
@@ -1431,9 +1422,9 @@ export async function GET(request: NextRequest) {
             const orderPureProfit = hiddenDeletedOfflineIncome
               ? null
               : isBrush
-              ? - (Math.abs(Number(adjustedMetrics.platformCommission || 0)) + brushCommission)
+              ? - (Math.abs(Number(adjustedMetrics.platformCommission || 0)) + brushCommission + returnExtraExpense)
               : (productCostStatus === "ready"
-                ? Math.round(Number(safeExpectedIncome || 0) * (1 - serviceFeeRate)) - deliveryFee - productCost
+                ? Math.round(Number(safeExpectedIncome || 0) * (1 - serviceFeeRate)) - deliveryFee - productCost - returnExtraExpense
                 : null);
 
             const profitValue = typeof orderPureProfit === "number" && Number.isFinite(orderPureProfit) ? orderPureProfit : 0;
@@ -1604,6 +1595,7 @@ export async function GET(request: NextRequest) {
       const outboundMeta = outboundByOrderNo.get(order.orderNo) || null;
       const hiddenDeletedOfflineIncome = order.isDeleted && order.platform === "线下交易";
       const refundAmount = outboundMeta?.refundAmount || 0;
+      const returnExtraExpense = outboundMeta?.extraExpense || 0;
       const adjustedMetrics = resolveRefundAdjustedIncomeMetrics({
         expectedIncome: order.expectedIncome,
         platformCommission: order.platformCommission,
@@ -1628,16 +1620,17 @@ export async function GET(request: NextRequest) {
       const pureProfit = hiddenDeletedOfflineIncome
         ? null
         : order.isMainSystemSelfDelivery
-        ? - (Math.abs(Number(order.platformCommission || 0)) + brushCommission)
+        ? - (Math.abs(Number(order.platformCommission || 0)) + brushCommission + returnExtraExpense)
         : (productCostStatus === "ready"
-          ? Math.round(Number(safeExpectedIncome || 0) * (1 - serviceFeeRate)) - deliveryFee - productCost
+          ? Math.round(Number(safeExpectedIncome || 0) * (1 - serviceFeeRate)) - deliveryFee - productCost - returnExtraExpense
           : null);
 
       return {
         ...order,
-        actualPaid: adjustedMetrics.actualPaid,
+        actualPaid: order.actualPaid,
         expectedIncome: safeExpectedIncome,
         refundAmount,
+        returnExtraExpense,
         platformCommission: adjustedMetrics.platformCommission,
         matchedShopId,
         matchedShopName,

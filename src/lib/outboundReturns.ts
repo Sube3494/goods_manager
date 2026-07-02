@@ -18,6 +18,7 @@ interface ReturnOutboundItemInput {
 interface ReturnOutboundOrderInput {
   reason?: string;
   refundAmount?: number;
+  extraExpense?: number;
   items?: ReturnOutboundItemInput[];
 }
 
@@ -286,6 +287,7 @@ export async function returnOutboundOrderById(
       createdAt: new Date().toISOString(),
       reason,
       refundAmount: Math.max(0, Number(payload.refundAmount || 0)),
+      extraExpense: Math.max(0, Number(payload.extraExpense || 0)),
       returnedCost: inboundTotalAmount,
       inboundOrderId: inboundOrder.id,
       items: returnMetaItems,
