@@ -1328,12 +1328,18 @@ export async function GET(request: NextRequest) {
         const shouldScaleBreakdown = rawBreakdownTotal > 0
           && Math.abs(productCost - rawBreakdownTotal * 100) < 0.01;
         const breakdown = shouldScaleBreakdown
-          ? rawBreakdown.map((item) => ({
+          ? rawBreakdown.map((item) => {
+              const scaledUnitCost = roundCurrency(item.unitCost * 100);
+              return {
+                ...item,
+                unitCost: scaledUnitCost,
+                totalCost: scaledUnitCost * item.quantity,
+              };
+            })
+          : rawBreakdown.map((item) => ({
               ...item,
-              unitCost: roundCurrency(item.unitCost * 100),
-              totalCost: roundCurrency(item.totalCost * 100),
-            }))
-          : rawBreakdown;
+              totalCost: item.unitCost * item.quantity,
+            }));
         outboundByOrderNo.set(orderNo, {
           id: outbound.id,
           productCost: Math.max(0, productCost - Math.round(returnTotals.returnedCost * 100)),
