@@ -1035,10 +1035,15 @@ export function ProductStripItem({
           ) : null}
           {returnedQuantity > 0 ? (
             <span
-              title={returnedTooltip || undefined}
-              className="inline-flex cursor-help items-center rounded-full border border-amber-500/15 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-bold leading-none text-amber-700 dark:text-amber-300"
+              className="relative group inline-flex cursor-help items-center rounded-full border border-amber-500/15 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-bold leading-none text-amber-700 dark:text-amber-300"
             >
-              已退 x{returnedQuantity}
+              已退{returnedQuantity > 1 ? ` x${returnedQuantity}` : ""}
+              {returnedTooltip && (
+                <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-max max-w-[240px] -translate-x-1/2 rounded-lg bg-slate-900 px-2.5 py-1.5 text-[10px] font-medium text-white opacity-0 invisible transition-all duration-200 group-hover:opacity-100 group-hover:visible dark:bg-zinc-800 dark:text-zinc-200 shadow-lg border border-white/10 whitespace-pre-line line-clamp-none">
+                  {returnedTooltip}
+                  <span className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-slate-900 dark:border-t-zinc-800" />
+                </span>
+              )}
             </span>
           ) : null}
         </div>

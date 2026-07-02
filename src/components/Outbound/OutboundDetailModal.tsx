@@ -295,19 +295,13 @@ export function OutboundDetailModal({ isOpen, onClose, order }: OutboundDetailMo
                           </span>
                           {isItemReturned ? (
                             <>
-                              <span className="inline-flex px-1.5 py-0.2 rounded text-[9px] font-black bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
-                                已退 {returnedQuantity} 件
-                              </span>
-                              <span className="inline-flex px-1.5 py-0.2 rounded text-[9px] font-black bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                                剩余 {remainingQuantity} 件
-                              </span>
                               {returnedDetails.map((detail, detailIndex) => (
                                 <span
                                   key={`${itemId}-return-${detailIndex}`}
                                   className="inline-flex max-w-full items-center rounded text-[9px] font-black bg-rose-500/8 px-1.5 py-0.2 text-rose-600 dark:text-rose-300 border border-rose-500/15"
                                   title={`${format(new Date(detail.createdAt), 'yyyy-MM-dd HH:mm', { locale: zhCN })} · ${detail.reason} · x${detail.quantity}`}
                                 >
-                                  {detail.reason} x{detail.quantity}
+                                  {detail.reason}{detail.quantity > 1 ? ` x${detail.quantity}` : ""}
                                 </span>
                               ))}
                             </>
