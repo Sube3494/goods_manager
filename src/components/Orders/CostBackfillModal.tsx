@@ -43,6 +43,7 @@ interface CostBackfillModalProps {
         id: string;
         name: string;
         image?: string | null;
+        shopProductId?: string | null;
       } | null;
       displayItems?: Array<{
         name: string;
@@ -118,6 +119,10 @@ export default function CostBackfillModal({
 
     const matchedOrderItem = orderItems.find((orderItem) => {
       if (item.productId && orderItem.matchedProduct?.id === item.productId) {
+        return true;
+      }
+
+      if (item.shopProductId && orderItem.matchedProduct?.shopProductId === item.shopProductId) {
         return true;
       }
 

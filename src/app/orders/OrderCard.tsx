@@ -124,6 +124,11 @@ export function toCurrency(value: number | null | undefined) {
   return `¥${amount.toFixed(2)}`;
 }
 
+function getDisplayText(value: string | null | undefined) {
+  const text = String(value || "").trim();
+  return text || "-";
+}
+
 export function formatPercent(value: number | null | undefined) {
   const rate = Number(value || 0);
   return `${(rate * 100).toFixed(1)}%`;
@@ -1316,6 +1321,16 @@ export function OrderCard({
   const hasRefundAmount = refundAmount > 0;
   const returnExtraExpense = Math.max(0, Number(order.returnExtraExpense || 0));
   const hasReturnExtraExpense = returnExtraExpense > 0;
+  const customerName = getDisplayText(order.customerName);
+  const customerPhone = getDisplayText(order.customerPhone);
+  const customerMaskedPhone = getDisplayText(order.customerMaskedPhone);
+  const customerPhoneExtension = getDisplayText(order.customerPhoneExtension);
+  const customerPrivacyPhone = customerPhoneExtension !== "-"
+    ? `${customerPhone}${customerPhone !== "-" ? "_" : ""}${customerPhoneExtension}`
+    : customerPhone;
+  const logisticPlatform = getDisplayText(order.delivery?.logisticName || "第三方平台");
+  const riderName = getDisplayText(order.delivery?.riderName);
+  const riderPhone = getDisplayText(order.delivery?.riderPhone);
   const expectedIncomeDisplay = hideDeletedOfflineIncome ? "-" : toCurrency(expectedIncome);
   const pureProfitDisplay = hideDeletedOfflineIncome
     ? "-"
@@ -2033,13 +2048,23 @@ export function OrderCard({
                     className="sm:col-span-2"
                   />
                   <DetailStat
-                    label="订单编号"
-                    value={order.orderNo}
+                    label="顾客昵称"
+                    value={customerName}
                     valueClassName="break-all text-[13px] sm:text-sm"
                   />
                   <DetailStat
-                    label="原始 ID"
-                    value={order.sourceId || "-"}
+                    label="顾客电话"
+                    value={customerMaskedPhone}
+                    valueClassName="break-all text-[13px] sm:text-sm"
+                  />
+                  <DetailStat
+                    label="隐私号"
+                    value={customerPrivacyPhone}
+                    valueClassName="break-all text-[13px] sm:text-sm"
+                  />
+                  <DetailStat
+                    label="订单编号"
+                    value={order.orderNo}
                     valueClassName="break-all text-[13px] sm:text-sm"
                   />
                 </div>
@@ -2078,10 +2103,15 @@ export function OrderCard({
                 </div>
               </section>
               <section className="rounded-[20px] border border-black/6 bg-white/80 p-3.5 dark:border-white/8 dark:bg-white/4 sm:rounded-3xl sm:p-4">
-                <h3 className="mb-3 text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground sm:mb-3">物流信息</h3>
+                <div className="mb-3 flex items-center justify-between gap-2 sm:mb-3">
+                  <h3 className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">物流信息</h3>
+                  <span className="inline-flex max-w-[60%] items-center rounded-full border border-emerald-400/20 bg-emerald-500/10 px-2.5 py-1 text-[10px] font-medium leading-none text-emerald-700 dark:text-emerald-300">
+                    <span className="truncate">{logisticPlatform}</span>
+                  </span>
+                </div>
                 <div className="grid grid-cols-2 gap-2 sm:gap-2.5">
-                  <DetailStat label="物流平台" value={order.delivery?.logisticName || "第三方平台"} />
-                  <DetailStat label="配送人" value={order.delivery?.riderName || "-"} />
+                  <DetailStat label="配送人" value={riderName} />
+                  <DetailStat label="骑手电话" value={riderPhone} valueClassName="break-all text-[13px] sm:text-sm" />
                   <DetailStat label="取餐时间" value={removeYear(order.delivery?.pickupTime)} />
                   <DetailStat
                     label={isAutoPickOrderCompletedStatus(order.status) ? "送达时间" : "最晚送达"}

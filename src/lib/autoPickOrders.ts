@@ -50,6 +50,7 @@ export type AutoPickInboundOrder = {
     pickupTime?: string;
     track?: string;
     riderName?: string;
+    riderPhone?: string;
     completedTime?: string;
   };
   items?: AutoPickInboundItem[];
@@ -58,6 +59,8 @@ export type AutoPickInboundOrder = {
   unencryptedAddress?: string;
   customerName?: string;
   customerPhone?: string;
+  customerMaskedPhone?: string;
+  customerPhoneExtension?: string;
   customerRemark?: string;
   [key: string]: unknown;
 };
@@ -446,6 +449,258 @@ export function readCustomerRemarkFromRawPayload(rawPayload: unknown): string | 
       continue;
     }
     const nestedValue = readRemarkFromRecord(candidate as Record<string, unknown>);
+    if (nestedValue) {
+      return nestedValue;
+    }
+  }
+
+  return null;
+}
+
+function readTrimmedCandidateValue(candidates: unknown[]) {
+  for (const candidate of candidates) {
+    const value = String(candidate || "").trim();
+    if (value) return value;
+  }
+  return null;
+}
+
+function splitPrivacyPhoneValue(value: unknown) {
+  const text = String(value || "").trim();
+  if (!text) {
+    return { phone: null, extension: null };
+  }
+
+  const normalized = text.replace(/\s+/g, "");
+  const match = normalized.match(/^(.+?)[_#-](\d{2,})$/);
+  if (!match) {
+    return { phone: normalized, extension: null };
+  }
+
+  return {
+    phone: String(match[1] || "").trim() || null,
+    extension: String(match[2] || "").trim() || null,
+  };
+}
+
+export function readCustomerNameFromRawPayload(rawPayload: unknown): string | null {
+  if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
+    return null;
+  }
+
+  const root = rawPayload as Record<string, unknown>;
+  const userInfo = root.userInfo && typeof root.userInfo === "object" && !Array.isArray(root.userInfo)
+    ? root.userInfo as Record<string, unknown>
+    : null;
+  const nestedCandidates = [root.data, root.extend, root.order, root.orderInfo, root.order_info, root.extra, root.payload];
+
+  const directValue = readTrimmedCandidateValue([
+    root.customerName,
+    root.real_name,
+    root.realName,
+    root.nick_name,
+    root.nickName,
+    root.buyer_name,
+    root.buyerName,
+    userInfo?.real_name,
+    userInfo?.realName,
+    userInfo?.nick_name,
+    userInfo?.nickName,
+  ]);
+  if (directValue) {
+    return directValue;
+  }
+
+  for (const candidate of nestedCandidates) {
+    if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
+      continue;
+    }
+    const nested = candidate as Record<string, unknown>;
+    const nestedValue = readTrimmedCandidateValue([
+      nested.customerName,
+      nested.real_name,
+      nested.realName,
+      nested.nick_name,
+      nested.nickName,
+      nested.buyer_name,
+      nested.buyerName,
+    ]);
+    if (nestedValue) {
+      return nestedValue;
+    }
+  }
+
+  return null;
+}
+
+export function readCustomerPhoneFromRawPayload(rawPayload: unknown): string | null {
+  if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
+    return null;
+  }
+
+  const root = rawPayload as Record<string, unknown>;
+  const userInfo = root.userInfo && typeof root.userInfo === "object" && !Array.isArray(root.userInfo)
+    ? root.userInfo as Record<string, unknown>
+    : null;
+  const nestedCandidates = [root.data, root.extend, root.order, root.orderInfo, root.order_info, root.extra, root.payload];
+
+  const directValue = readTrimmedCandidateValue([
+    splitPrivacyPhoneValue(root.customerPhone).phone,
+    root.unencryptedPhone,
+    root.unencrypted_phone,
+    splitPrivacyPhoneValue(root.phone).phone,
+    root.secret_phone,
+    userInfo?.unencrypted_phone,
+    userInfo?.unencryptedPhone,
+    splitPrivacyPhoneValue(userInfo?.customerPhone).phone,
+    splitPrivacyPhoneValue(userInfo?.phone).phone,
+    userInfo?.secret_phone,
+  ]);
+  if (directValue) {
+    return directValue;
+  }
+
+  for (const candidate of nestedCandidates) {
+    if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
+      continue;
+    }
+    const nested = candidate as Record<string, unknown>;
+    const nestedValue = readTrimmedCandidateValue([
+      splitPrivacyPhoneValue(nested.customerPhone).phone,
+      nested.unencryptedPhone,
+      nested.unencrypted_phone,
+      splitPrivacyPhoneValue(nested.phone).phone,
+      nested.secret_phone,
+    ]);
+    if (nestedValue) {
+      return nestedValue;
+    }
+  }
+
+  return null;
+}
+
+export function readCustomerMaskedPhoneFromRawPayload(rawPayload: unknown): string | null {
+  if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
+    return null;
+  }
+
+  const root = rawPayload as Record<string, unknown>;
+  const userInfo = root.userInfo && typeof root.userInfo === "object" && !Array.isArray(root.userInfo)
+    ? root.userInfo as Record<string, unknown>
+    : null;
+  const nestedCandidates = [root.data, root.extend, root.order, root.orderInfo, root.order_info, root.extra, root.payload];
+
+  const directValue = readTrimmedCandidateValue([
+    root.customerMaskedPhone,
+    root.secret_phone,
+    userInfo?.secret_phone,
+  ]);
+  if (directValue) {
+    return directValue;
+  }
+
+  for (const candidate of nestedCandidates) {
+    if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
+      continue;
+    }
+    const nested = candidate as Record<string, unknown>;
+    const nestedValue = readTrimmedCandidateValue([
+      nested.customerMaskedPhone,
+      nested.secret_phone,
+    ]);
+    if (nestedValue) {
+      return nestedValue;
+    }
+  }
+
+  return null;
+}
+
+export function readCustomerPhoneExtensionFromRawPayload(rawPayload: unknown): string | null {
+  if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
+    return null;
+  }
+
+  const root = rawPayload as Record<string, unknown>;
+  const userInfo = root.userInfo && typeof root.userInfo === "object" && !Array.isArray(root.userInfo)
+    ? root.userInfo as Record<string, unknown>
+    : null;
+  const nestedCandidates = [root.data, root.extend, root.order, root.orderInfo, root.order_info, root.extra, root.payload];
+
+  const directValue = readTrimmedCandidateValue([
+    root.customerPhoneExtension,
+    root.phone_extend,
+    splitPrivacyPhoneValue(root.customerPhone).extension,
+    splitPrivacyPhoneValue(root.phone).extension,
+    userInfo?.phone_extend,
+    splitPrivacyPhoneValue(userInfo?.customerPhone).extension,
+    splitPrivacyPhoneValue(userInfo?.phone).extension,
+  ]);
+  if (directValue) {
+    return directValue;
+  }
+
+  for (const candidate of nestedCandidates) {
+    if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
+      continue;
+    }
+    const nested = candidate as Record<string, unknown>;
+    const nestedValue = readTrimmedCandidateValue([
+      nested.customerPhoneExtension,
+      nested.phone_extend,
+      splitPrivacyPhoneValue(nested.customerPhone).extension,
+      splitPrivacyPhoneValue(nested.phone).extension,
+    ]);
+    if (nestedValue) {
+      return nestedValue;
+    }
+  }
+
+  return null;
+}
+
+export function readRiderPhoneFromDelivery(delivery: unknown): string | null {
+  if (!delivery || typeof delivery !== "object" || Array.isArray(delivery)) {
+    return null;
+  }
+
+  const record = delivery as Record<string, unknown>;
+  return readTrimmedCandidateValue([
+    record.riderPhone,
+    record.delivery_phone,
+    record.deliveryPhone,
+    record.phone,
+    record.mobile,
+    record.tel,
+    record.telephone,
+  ]);
+}
+
+export function readRiderPhoneFromRawPayload(rawPayload: unknown): string | null {
+  if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
+    return null;
+  }
+
+  const root = rawPayload as Record<string, unknown>;
+  const rootValue = readRiderPhoneFromDelivery(root.delivery);
+  if (rootValue) {
+    return rootValue;
+  }
+
+  const nestedCandidates = [root.data, root.extend, root.order, root.orderInfo, root.order_info, root.extra, root.payload];
+  for (const candidate of nestedCandidates) {
+    if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
+      continue;
+    }
+    const nested = candidate as Record<string, unknown>;
+    const nestedValue = readRiderPhoneFromDelivery(nested.delivery) || readTrimmedCandidateValue([
+      nested.riderPhone,
+      nested.delivery_phone,
+      nested.deliveryPhone,
+      nested.phone,
+      nested.mobile,
+    ]);
     if (nestedValue) {
       return nestedValue;
     }
@@ -1176,6 +1431,7 @@ function parseDeliveryInfoFromDetail(detail: MaiyatianOrderDetailResponse["data"
         : undefined);
   const track = String(deliveryRecord?.track || "").trim();
   const riderName = String(deliveryRecord?.delivery_name || deliveryRecord?.riderName || "").trim() || undefined;
+  const riderPhone = readRiderPhoneFromDelivery(deliveryRecord);
 
   const rawFinishedTime = deliveryRecord?.finished_time
     ?? deliveryRecord?.finishedTime
@@ -1187,7 +1443,7 @@ function parseDeliveryInfoFromDetail(detail: MaiyatianOrderDetailResponse["data"
         ? parseUnixTimestampToOrderTime(rawFinishedTime)
         : undefined);
 
-  if (!logisticName && sendFee <= 0 && !pickupTime && !track && !riderName && !completedTime) {
+  if (!logisticName && sendFee <= 0 && !pickupTime && !track && !riderName && !riderPhone && !completedTime) {
     return undefined;
   }
 
@@ -1197,6 +1453,7 @@ function parseDeliveryInfoFromDetail(detail: MaiyatianOrderDetailResponse["data"
     pickupTime,
     track,
     riderName,
+    riderPhone: riderPhone || undefined,
     completedTime,
   };
 }
@@ -1407,15 +1664,59 @@ async function enrichMaiyatianOrderByCookie(cookie: string, order: AutoPickInbou
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const orderObj = order as any;
 
-  const unencryptedPhone = userInfoObj && String(userInfoObj.unencrypted_phone || "").trim();
+  const unencryptedPhone = String(
+    userInfoObj?.unencrypted_phone
+    || userInfoObj?.unencryptedPhone
+    || detailDataObj?.unencrypted_phone
+    || detailDataObj?.unencryptedPhone
+    || ""
+  ).trim();
+  const splitUserPhone = splitPrivacyPhoneValue(userInfoObj?.phone);
+  const splitDetailPhone = splitPrivacyPhoneValue(detailDataObj?.phone);
+  const maskedPhone = String(
+    userInfoObj?.secret_phone
+    || userInfoObj?.secretPhone
+    || detailDataObj?.secret_phone
+    || detailDataObj?.secretPhone
+    || splitUserPhone.phone
+    || splitDetailPhone.phone
+    || ""
+  ).trim();
+  const phoneExtension = String(
+    userInfoObj?.phone_extend
+    || detailDataObj?.phone_extend
+    || splitUserPhone.extension
+    || splitDetailPhone.extension
+    || ""
+  ).trim();
   const unencryptedMapAddress = userInfoObj && String(userInfoObj.unencrypted_map_address || "").trim();
   const unencryptedAddress = userInfoObj && String(userInfoObj.unencrypted_address || "").trim();
-  const realName = userInfoObj && String(userInfoObj.real_name || "").trim();
-  const nickName = userInfoObj && String(userInfoObj.nick_name || "").trim();
+  const realName = String(
+    userInfoObj?.real_name
+    || userInfoObj?.realName
+    || detailDataObj?.real_name
+    || detailDataObj?.realName
+    || ""
+  ).trim();
+  const nickName = String(
+    userInfoObj?.nick_name
+    || userInfoObj?.nickName
+    || detailDataObj?.nick_name
+    || detailDataObj?.nickName
+    || ""
+  ).trim();
 
   if (unencryptedPhone) {
     orderObj.unencryptedPhone = unencryptedPhone;
     orderObj.customerPhone = unencryptedPhone;
+  } else if (maskedPhone) {
+    orderObj.customerPhone = maskedPhone;
+  }
+  if (maskedPhone) {
+    orderObj.customerMaskedPhone = maskedPhone;
+  }
+  if (phoneExtension) {
+    orderObj.customerPhoneExtension = phoneExtension;
   }
   if (realName || nickName) {
     orderObj.customerName = realName || nickName;
@@ -2225,12 +2526,35 @@ export function normalizeAutoPickOrderPayload(payload: unknown): AutoPickInbound
     ? input.extend as Record<string, unknown>
     : null;
   const items = Array.isArray(input.items) ? input.items : [];
+  const userInfo = input.userInfo && typeof input.userInfo === "object" && !Array.isArray(input.userInfo)
+    ? input.userInfo as Record<string, unknown>
+    : (input.user_info && typeof input.user_info === "object" && !Array.isArray(input.user_info)
+        ? input.user_info as Record<string, unknown>
+        : null);
 
-  const unencryptedPhone = String(input.unencryptedPhone || input.unencrypted_phone || "").trim();
+  const unencryptedPhone = String(input.unencryptedPhone || input.unencrypted_phone || userInfo?.unencryptedPhone || userInfo?.unencrypted_phone || "").trim();
   const unencryptedMapAddress = String(input.unencryptedMapAddress || input.unencrypted_map_address || "").trim();
   const unencryptedAddress = String(input.unencryptedAddress || input.unencrypted_address || "").trim();
-  const realName = String(input.customerName || input.real_name || "").trim();
-  const nickName = String(input.nick_name || "").trim();
+  const splitInputPhone = splitPrivacyPhoneValue(input.phone);
+  const splitUserPhone = splitPrivacyPhoneValue(userInfo?.phone);
+  const maskedPhone = readTrimmedCandidateValue([
+    input.secret_phone,
+    input.secretPhone,
+    userInfo?.secret_phone,
+    userInfo?.secretPhone,
+    input.customerMaskedPhone,
+    splitInputPhone.phone,
+    splitUserPhone.phone,
+  ]) || "";
+  const phoneExtension = readTrimmedCandidateValue([
+    input.customerPhoneExtension,
+    input.phone_extend,
+    userInfo?.phone_extend,
+    splitInputPhone.extension,
+    splitUserPhone.extension,
+  ]) || "";
+  const realName = String(input.customerName || input.real_name || userInfo?.real_name || userInfo?.realName || "").trim();
+  const nickName = String(input.nick_name || userInfo?.nick_name || userInfo?.nickName || "").trim();
 
   const platform = String(input.platform || "").trim();
   const channelTag = String(input.channelTag || input.channel_tag || "").trim();
@@ -2399,9 +2723,10 @@ export function normalizeAutoPickOrderPayload(payload: unknown): AutoPickInbound
               : undefined),
         track: String(deliveryRecord?.track || "").trim() || undefined,
         riderName: String(deliveryRecord?.riderName || deliveryRecord?.delivery_name || "").trim() || undefined,
+        riderPhone: readRiderPhoneFromDelivery(deliveryRecord) || undefined,
         completedTime,
       };
-      if (!normalizedDelivery.logisticName && normalizedDelivery.sendFee == null && !normalizedDelivery.pickupTime && !normalizedDelivery.track && !normalizedDelivery.riderName && !normalizedDelivery.completedTime) {
+      if (!normalizedDelivery.logisticName && normalizedDelivery.sendFee == null && !normalizedDelivery.pickupTime && !normalizedDelivery.track && !normalizedDelivery.riderName && !normalizedDelivery.riderPhone && !normalizedDelivery.completedTime) {
         return undefined;
       }
       return normalizedDelivery;
@@ -2419,7 +2744,9 @@ export function normalizeAutoPickOrderPayload(payload: unknown): AutoPickInbound
     unencryptedMapAddress: unencryptedMapAddress || undefined,
     unencryptedAddress: unencryptedAddress || undefined,
     customerName: realName || nickName || undefined,
-    customerPhone: unencryptedPhone || String(input.customerPhone || input.phone || "").trim() || undefined,
+    customerPhone: unencryptedPhone || maskedPhone || splitInputPhone.phone || splitUserPhone.phone || undefined,
+    customerMaskedPhone: maskedPhone || undefined,
+    customerPhoneExtension: phoneExtension || undefined,
   };
 
   normalized.status = resolveAutoPickBusinessStatus(

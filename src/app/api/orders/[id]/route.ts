@@ -3,7 +3,15 @@ import prisma from "@/lib/prisma";
 import { getAuthorizedUser, getAuthorizedUserAny } from "@/lib/auth";
 import { Prisma } from "../../../../../prisma/generated-client";
 import { returnOutboundOrderById } from "@/lib/outboundReturns";
-import { readCustomerRemarkFromRawPayload } from "@/lib/autoPickOrders";
+import {
+  readCustomerMaskedPhoneFromRawPayload,
+  readCustomerNameFromRawPayload,
+  readCustomerPhoneFromRawPayload,
+  readCustomerPhoneExtensionFromRawPayload,
+  readCustomerRemarkFromRawPayload,
+  readRiderPhoneFromDelivery,
+  readRiderPhoneFromRawPayload,
+} from "@/lib/autoPickOrders";
 
 export async function GET(
   _request: NextRequest,
@@ -42,7 +50,16 @@ export async function GET(
         sourceId: order.sourceId,
         longitude: order.longitude,
         latitude: order.latitude,
-        delivery: order.delivery,
+        delivery: order.delivery && typeof order.delivery === "object"
+          ? {
+              ...(order.delivery as Record<string, unknown>),
+              riderPhone: readRiderPhoneFromDelivery(order.delivery) || readRiderPhoneFromRawPayload(order.rawPayload) || undefined,
+            }
+          : order.delivery,
+        customerName: readCustomerNameFromRawPayload(order.rawPayload),
+        customerPhone: readCustomerPhoneFromRawPayload(order.rawPayload),
+        customerMaskedPhone: readCustomerMaskedPhoneFromRawPayload(order.rawPayload),
+        customerPhoneExtension: readCustomerPhoneExtensionFromRawPayload(order.rawPayload),
         customerRemark: order.customerRemark || readCustomerRemarkFromRawPayload(order.rawPayload),
         detailLoaded: true,
         detailLoading: false,

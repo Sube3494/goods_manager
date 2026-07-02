@@ -1,7 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
-import { normalizeAutoPickIntegrationConfig, readCustomerRemarkFromRawPayload } from "@/lib/autoPickOrders";
+import {
+  normalizeAutoPickIntegrationConfig,
+  readCustomerMaskedPhoneFromRawPayload,
+  readCustomerNameFromRawPayload,
+  readCustomerPhoneFromRawPayload,
+  readCustomerPhoneExtensionFromRawPayload,
+  readCustomerRemarkFromRawPayload,
+  readRiderPhoneFromDelivery,
+  readRiderPhoneFromRawPayload,
+} from "@/lib/autoPickOrders";
 import { parseAsShanghaiTime } from "@/lib/dateUtils";
 import { doesAutoPickOrderRequirePickConfirmation, isAutoPickOrderCancelledStatus, isAutoPickOrderDeletedStatus, isAutoPickOtherPickupOrder, isAutoPickPickCompleted, isAutoPickPickupOrder, resolveAutoPickBusinessStatus } from "@/lib/autoPickOrderStatus";
 import { createRequestPerfTracker } from "@/lib/perf";
@@ -1583,7 +1592,17 @@ export async function GET(request: NextRequest) {
         autoCompleteJobStatus: order.autoCompleteJob?.status || null,
         autoCompleteJobError: order.autoCompleteJob?.lastError || null,
         autoCompleteJobAttempts: order.autoCompleteJob?.attempts ?? null,
+        customerName: readCustomerNameFromRawPayload(order.rawPayload),
+        customerPhone: readCustomerPhoneFromRawPayload(order.rawPayload),
+        customerMaskedPhone: readCustomerMaskedPhoneFromRawPayload(order.rawPayload),
+        customerPhoneExtension: readCustomerPhoneExtensionFromRawPayload(order.rawPayload),
         customerRemark: order.customerRemark || readCustomerRemarkFromRawPayload(order.rawPayload),
+        delivery: order.delivery && typeof order.delivery === "object"
+          ? {
+              ...(order.delivery as Record<string, unknown>),
+              riderPhone: readRiderPhoneFromDelivery(order.delivery) || readRiderPhoneFromRawPayload(order.rawPayload) || undefined,
+            }
+          : order.delivery,
       };
     }).map((order) => {
       const lockedResolvedShop = readResolvedAutoPickShop(order.rawPayload);
