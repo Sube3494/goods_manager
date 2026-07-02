@@ -222,11 +222,13 @@ export interface AutoPickOrder {
   serviceFeeRate?: number | null;
   productCost?: number | null;
   refundAmount?: number | null;
+  returnExtraExpense?: number | null;
   outboundReturnDetails?: Array<{
     id: string;
     createdAt: string;
     reason: string;
     refundAmount: number;
+    extraExpense: number;
     returnedCost: number;
     items: Array<{
       outboundOrderItemId: string;
