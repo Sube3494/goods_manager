@@ -317,7 +317,11 @@ export function TodayOrdersView({
       } else {
         showToast("操作成功", "success");
         if (data.order) {
-          patchOrder(orderId, () => data.order);
+          patchOrder(orderId, (order) => ({
+            ...order,
+            ...data.order,
+            delivery: data.order.delivery ?? order.delivery,
+          }));
         } else {
           void fetchOrders({ silent: true });
         }

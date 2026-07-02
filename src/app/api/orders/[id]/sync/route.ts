@@ -1,7 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
-import { backfillPersistedAutoPickOrderFields, clearAutoPickOrderMainSystemSelfDelivery, normalizeAutoPickOrderPayload, refreshAutoPickOrderFromPlugin, syncAutoOutboundFromCompletedAutoPickOrder, syncBrushOrderFromCompletedAutoPickOrder } from "@/lib/autoPickOrders";
+import {
+  backfillPersistedAutoPickOrderFields,
+  clearAutoPickOrderMainSystemSelfDelivery,
+  normalizeAutoPickOrderPayload,
+  readCustomerMaskedPhoneFromRawPayload,
+  readCustomerNameFromRawPayload,
+  readCustomerPhoneExtensionFromRawPayload,
+  readCustomerPhoneFromRawPayload,
+  readRiderPhoneFromDelivery,
+  readRiderPhoneFromRawPayload,
+  refreshAutoPickOrderFromPlugin,
+  syncAutoOutboundFromCompletedAutoPickOrder,
+  syncBrushOrderFromCompletedAutoPickOrder,
+} from "@/lib/autoPickOrders";
 import { cancelAutoCompleteJob } from "@/lib/autoPickAutoComplete";
 import { isAutoPickOrderAbnormalStatus, isAutoPickOrderCancelledStatus, isAutoPickOrderCompletedStatus, isAutoPickOrderDeliveringStatus } from "@/lib/autoPickOrderStatus";
 
@@ -83,6 +96,20 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
     });
 
     const normalized = normalizeAutoPickOrderPayload(refreshedOrder.rawPayload);
+    const syncedOrder = {
+      ...refreshedOrder,
+      completedAt: normalized?.completedAt || null,
+      customerName: readCustomerNameFromRawPayload(refreshedOrder.rawPayload),
+      customerPhone: readCustomerPhoneFromRawPayload(refreshedOrder.rawPayload),
+      customerMaskedPhone: readCustomerMaskedPhoneFromRawPayload(refreshedOrder.rawPayload),
+      customerPhoneExtension: readCustomerPhoneExtensionFromRawPayload(refreshedOrder.rawPayload),
+      delivery: refreshedOrder.delivery && typeof refreshedOrder.delivery === "object"
+        ? {
+            ...(refreshedOrder.delivery as Record<string, unknown>),
+            riderPhone: readRiderPhoneFromDelivery(refreshedOrder.delivery) || readRiderPhoneFromRawPayload(refreshedOrder.rawPayload) || undefined,
+          }
+        : refreshedOrder.delivery,
+    };
 
     return NextResponse.json({
       ok: true,
@@ -93,6 +120,7 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
       completedAt: normalized?.completedAt || null,
       lastSyncedAt: refreshedOrder.lastSyncedAt,
       backfilled: backfill.count,
+      order: syncedOrder,
     });
   } catch (error) {
     console.error("Failed to sync auto-pick order:", error);
