@@ -65,6 +65,8 @@ function SettingsContent() {
   const canTransferData = hasPermission(sessionUser, "data:transfer");
   const canAccessSettingsPage = isSuperAdmin || canManageSettings || canManageBackups || canTransferData;
   const [lowStockThreshold, setLowStockThreshold] = useState<number | "">(10);
+  const [ttlockClientId, setTtlockClientId] = useState("");
+  const [ttlockClientSecret, setTtlockClientSecret] = useState("");
   const [maxLoginDevices, setMaxLoginDevices] = useState<number | "">(2);
   const [allowGalleryUpload, setAllowGalleryUpload] = useState<boolean>(true);
   const [requireLoginForLightbox, setRequireLoginForLightbox] = useState<boolean>(false);
@@ -217,6 +219,8 @@ function SettingsContent() {
             if (settingsRes.ok) {
                 const data = await settingsRes.json();
                 setLowStockThreshold(data.lowStockThreshold);
+                setTtlockClientId(data.ttlockClientId || "");
+                setTtlockClientSecret(data.ttlockClientSecret || "");
                 setMaxLoginDevices(data.maxLoginDevices ?? 2);
                 setAllowGalleryUpload(data.allowGalleryUpload ?? true);
                 setRequireLoginForLightbox(data.requireLoginForLightbox ?? false);
@@ -260,6 +264,9 @@ function SettingsContent() {
     
     const payload = {
         lowStockThreshold,
+        ttlockRegion: "cn",
+        ttlockClientId,
+        ttlockClientSecret,
         maxLoginDevices,
         allowGalleryUpload,
         requireLoginForLightbox,
@@ -300,6 +307,8 @@ function SettingsContent() {
     }
   }, [
     lowStockThreshold, 
+    ttlockClientId,
+    ttlockClientSecret,
     maxLoginDevices,
     allowGalleryUpload, 
     requireLoginForLightbox,
@@ -575,6 +584,10 @@ function SettingsContent() {
             setTheme={setTheme}
             lowStockThreshold={lowStockThreshold}
             setLowStockThreshold={setLowStockThreshold}
+            ttlockClientId={ttlockClientId}
+            setTtlockClientId={setTtlockClientId}
+            ttlockClientSecret={ttlockClientSecret}
+            setTtlockClientSecret={setTtlockClientSecret}
             saveSettings={saveSettings}
           />
         )}

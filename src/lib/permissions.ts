@@ -302,6 +302,7 @@ const DEFAULT_ROUTE_RULES: RouteAccessRule[] = [
   { href: "/outbound", permission: "outbound:manage" },
   { href: "/settlement", permission: "settlement:manage" },
   { href: "/operating-costs", permission: "operating-costs:manage" },
+  { href: "/door-locks", permission: "settings:manage" },
   { href: "/shelf-life", permission: "shelf_life:read" },
   { href: "/gallery", permission: ["gallery:upload", "gallery:download", "gallery:share", "gallery:copy"] },
   { href: "/admin/members", adminCapability: ["members:manage", "members:status", "whitelist:manage"] },

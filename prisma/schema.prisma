@@ -388,6 +388,9 @@ model SystemSetting {
   webdavUser             String?
   webdavPassword         String?
   webdavPath             String?
+  ttlockRegion           String    @default("cn")
+  ttlockClientId         String?
+  ttlockClientSecret     String?
   lastBackup             DateTime?
   updatedAt              DateTime  @updatedAt
   userId                 String?

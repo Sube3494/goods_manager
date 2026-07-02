@@ -1,0 +1,4 @@
+ALTER TABLE "SystemSetting"
+ADD COLUMN IF NOT EXISTS "ttlockRegion" TEXT NOT NULL DEFAULT 'cn',
+ADD COLUMN IF NOT EXISTS "ttlockClientId" TEXT,
+ADD COLUMN IF NOT EXISTS "ttlockClientSecret" TEXT;

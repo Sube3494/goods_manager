@@ -322,6 +322,73 @@ export interface AutoPickMaiyatianShopMapping {
   cityName?: string | null;
 }
 
+export type TTLockRegion = "cn" | "global";
+
+export interface TTLockIntegrationConfig {
+  region: TTLockRegion;
+  clientId: string;
+  clientSecret: string;
+  username: string;
+  passwordMd5: string;
+  accessToken: string;
+  refreshToken: string;
+  accessTokenExpiresAt?: string | null;
+  refreshTokenExpiresAt?: string | null;
+  ttlockUserId?: number | null;
+  defaultLockId?: number | null;
+  lastAuthorizedAt?: string | null;
+  lastTokenError?: string | null;
+}
+
+export interface TTLockIntegrationConfigPublic {
+  region: TTLockRegion;
+  clientId: string;
+  clientSecret: string;
+  usesSystemCredentials?: boolean;
+  username: string;
+  hasPassword: boolean;
+  linked: boolean;
+  accessTokenExpiresAt?: string | null;
+  refreshTokenExpiresAt?: string | null;
+  ttlockUserId?: number | null;
+  defaultLockId?: number | null;
+  lastAuthorizedAt?: string | null;
+  lastTokenError?: string | null;
+}
+
+export interface TTLockLockSummary {
+  lockId: number;
+  lockName: string;
+  lockAlias?: string | null;
+  lockMac?: string | null;
+  electricQuantity?: number | null;
+  hasGateway?: boolean | null;
+  groupId?: number | null;
+  groupName?: string | null;
+  featureValue?: string | null;
+  date?: number | null;
+  scanUnlockToken?: string;
+}
+
+export interface TTLockLockDetail extends TTLockLockSummary {
+  noKeyPwd?: string | null;
+  timezoneRawOffset?: number | null;
+  modelNum?: string | null;
+  hardwareRevision?: string | null;
+  firmwareRevision?: string | null;
+  autoLockTime?: number | null;
+  lockSound?: number | null;
+  soundVolume?: number | null;
+  privacyLock?: number | null;
+  passageMode?: number | null;
+  passageModeAutoUnlock?: number | null;
+  tamperAlert?: number | null;
+  resetButton?: number | null;
+  openDirection?: number | null;
+  keyboardPwdVersion?: number | null;
+  specialValue?: number | null;
+}
+
 export interface BrushProduct {
   id: string;
   userId?: string;

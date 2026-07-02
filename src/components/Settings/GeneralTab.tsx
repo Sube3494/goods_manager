@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, Monitor, Moon, Sun } from "lucide-react";
+import { AlertTriangle, KeyRound, Monitor, Moon, Save, Sun } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface GeneralTabProps {
@@ -8,10 +8,24 @@ interface GeneralTabProps {
   setTheme: (theme: string) => void;
   lowStockThreshold: number | "";
   setLowStockThreshold: (val: number | "") => void;
+  ttlockClientId: string;
+  setTtlockClientId: (value: string) => void;
+  ttlockClientSecret: string;
+  setTtlockClientSecret: (value: string) => void;
   saveSettings: (newSettings: Record<string, unknown>, options?: { silent?: boolean }) => Promise<void>;
 }
 
-export function GeneralTab({ theme, setTheme, lowStockThreshold, setLowStockThreshold, saveSettings }: GeneralTabProps) {
+export function GeneralTab({
+  theme,
+  setTheme,
+  lowStockThreshold,
+  setLowStockThreshold,
+  ttlockClientId,
+  setTtlockClientId,
+  ttlockClientSecret,
+  setTtlockClientSecret,
+  saveSettings,
+}: GeneralTabProps) {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
@@ -82,6 +96,73 @@ export function GeneralTab({ theme, setTheme, lowStockThreshold, setLowStockThre
                 </div>
               </button>
             ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="overflow-hidden rounded-[26px] border border-border/60 bg-white/75 shadow-sm dark:bg-white/5">
+        <div className="border-b border-border/50 bg-white/50 px-4 py-4 md:px-5 dark:bg-white/[0.03]">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-600 ring-1 ring-emerald-500/25">
+                <KeyRound size={17} />
+              </div>
+              <div>
+                <h3 className="text-base font-black text-foreground">TTLock 应用凭据</h3>
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">全局保存一次后，门锁页就只需要输入 TTLock App 账号密码，不用再反复填应用 ID 和密钥。</p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                void saveSettings({
+                  ttlockRegion: "cn",
+                  ttlockClientId,
+                  ttlockClientSecret,
+                });
+              }}
+              aria-label="保存 TTLock 凭据"
+              title="保存 TTLock 凭据"
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-border/60 bg-background/80 text-foreground transition hover:bg-black/[0.04] dark:bg-white/[0.04] dark:hover:bg-white/[0.08]"
+            >
+              <Save size={16} />
+            </button>
+          </div>
+        </div>
+        <div className="space-y-4 p-4 md:p-5">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <label className="space-y-1.5">
+              <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground/80">应用 ID</div>
+              <input
+                type="text"
+                value={ttlockClientId}
+                onChange={(e) => {
+                  setTtlockClientId(e.target.value);
+                  void saveSettings({ ttlockClientId: e.target.value }, { silent: true });
+                }}
+                placeholder="TTLock clientId"
+                className="h-11 w-full rounded-2xl border border-border bg-white px-4 text-sm outline-none transition-all focus:ring-2 focus:ring-primary/20 dark:border-white/10 dark:bg-white/5"
+              />
+            </label>
+
+            <label className="space-y-1.5">
+              <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground/80">应用密钥</div>
+              <input
+                type="password"
+                value={ttlockClientSecret}
+                onChange={(e) => {
+                  setTtlockClientSecret(e.target.value);
+                  void saveSettings({ ttlockClientSecret: e.target.value }, { silent: true });
+                }}
+                placeholder="TTLock clientSecret"
+                className="h-11 w-full rounded-2xl border border-border bg-white px-4 text-sm outline-none transition-all focus:ring-2 focus:ring-primary/20 dark:border-white/10 dark:bg-white/5"
+              />
+            </label>
+          </div>
+
+          <div className="rounded-3xl border border-border/60 bg-white/72 px-5 py-4 text-xs leading-relaxed text-muted-foreground shadow-sm dark:bg-white/[0.04]">
+            这里保存的是 TTLock 开发者应用凭据，作用是帮“门锁管理”页换取 access token。真正登录门锁账号时，仍然要在门锁页填写 TTLock App 账号密码。
           </div>
         </div>
       </section>

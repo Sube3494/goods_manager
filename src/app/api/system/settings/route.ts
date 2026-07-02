@@ -33,6 +33,7 @@ export async function GET() {
         backupIntervalValue: 1,
         backupRetention: 10,
         webdavEnabled: false,
+        ttlockRegion: "cn",
       }
     });
     
@@ -78,6 +79,8 @@ export async function POST(request: Request) {
       webdavUser,
       webdavPassword,
       webdavPath,
+      ttlockClientId,
+      ttlockClientSecret,
     } = body;
 
     const updateData: Prisma.SystemSettingUpdateInput = {};
@@ -109,6 +112,9 @@ export async function POST(request: Request) {
     if (webdavUser !== undefined) updateData.webdavUser = webdavUser;
     if (webdavPassword !== undefined) updateData.webdavPassword = webdavPassword;
     if (webdavPath !== undefined) updateData.webdavPath = webdavPath;
+    updateData.ttlockRegion = "cn";
+    if (ttlockClientId !== undefined) updateData.ttlockClientId = String(ttlockClientId || "").trim() || null;
+    if (ttlockClientSecret !== undefined) updateData.ttlockClientSecret = String(ttlockClientSecret || "").trim() || null;
 
     const settings = await prisma.systemSetting.upsert({
       where: { id: "system" },
@@ -141,6 +147,9 @@ export async function POST(request: Request) {
         webdavUser: webdavUser || null,
         webdavPassword: webdavPassword || null,
         webdavPath: webdavPath || null,
+        ttlockRegion: "cn",
+        ttlockClientId: ttlockClientId || null,
+        ttlockClientSecret: ttlockClientSecret || null,
       }
     });
 
