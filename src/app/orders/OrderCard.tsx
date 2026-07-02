@@ -979,6 +979,7 @@ export function ProductStripItem({
   matchedProduct,
   showMatchStatus = false,
   returnedQuantity = 0,
+  returnedDetails = [],
 }: {
   display: { name: string; sku: string; image: string | null; quantity: number };
   onEditMatch?: () => void;
@@ -986,7 +987,17 @@ export function ProductStripItem({
   matchedProduct?: AutoPickOrderItem['matchedProduct'];
   showMatchStatus?: boolean;
   returnedQuantity?: number;
+  returnedDetails?: Array<{
+    createdAt: string;
+    reason: string;
+    quantity: number;
+  }>;
 }) {
+  const returnedTooltip = returnedDetails.length > 0
+    ? returnedDetails.map((detail) => (
+        `${removeYear(detail.createdAt)} · ${detail.reason || "退货"} · x${detail.quantity}`
+      )).join("\n")
+    : "";
   return (
     <div className="flex items-center gap-2.5 rounded-2xl border border-black/6 bg-white/70 px-2.5 py-2 dark:border-white/8 dark:bg-white/4 sm:gap-3 sm:rounded-[18px] sm:px-3 sm:py-2.5">
       <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-white dark:bg-white/6 sm:h-11 sm:w-11 sm:rounded-xl">
@@ -1023,7 +1034,10 @@ export function ProductStripItem({
             </span>
           ) : null}
           {returnedQuantity > 0 ? (
-            <span className="inline-flex items-center rounded-full border border-amber-500/15 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-bold leading-none text-amber-700 dark:text-amber-300">
+            <span
+              title={returnedTooltip || undefined}
+              className="inline-flex cursor-help items-center rounded-full border border-amber-500/15 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-bold leading-none text-amber-700 dark:text-amber-300"
+            >
               已退 x{returnedQuantity}
             </span>
           ) : null}
@@ -1286,6 +1300,20 @@ export function OrderCard({
     }
     return acc;
   }, new Map<string, number>());
+  const returnedItemDetailsMap = outboundReturnDetails.reduce((acc, entry) => {
+    for (const item of entry.items || []) {
+      const key = normalizeReturnedItemKey(item.name);
+      if (!key) continue;
+      const list = acc.get(key) || [];
+      list.push({
+        createdAt: String(entry.createdAt || ""),
+        reason: String(entry.reason || "").trim() || "退货",
+        quantity: Math.max(0, Number(item.quantity || 0)),
+      });
+      acc.set(key, list);
+    }
+    return acc;
+  }, new Map<string, Array<{ createdAt: string; reason: string; quantity: number }>>());
   const canEditProductCost = order.productCostStatus === "pending-backfill" || productCostBreakdown.length > 0;
   const settlementAfterRate = Math.round(expectedIncome * (1 - serviceFeeRate));
   const isJdOrder = String(order.platform || "").includes("京东");
@@ -1755,6 +1783,7 @@ export function OrderCard({
                     matchedProduct={item.matchedProduct}
                     showMatchStatus={displayIndex === 0}
                     returnedQuantity={returnedItemQuantityMap.get(normalizeReturnedItemKey(display.name)) || 0}
+                    returnedDetails={returnedItemDetailsMap.get(normalizeReturnedItemKey(display.name)) || []}
                   />
                 ))
               )}

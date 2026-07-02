@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { X, Copy, Check, Store, Clock, FileText, MapPin, Tag, ShoppingBag, AlertCircle, ArrowLeftRight } from "lucide-react";
+import { X, Copy, Check, Store, Clock, FileText, MapPin, Tag, ShoppingBag, AlertCircle } from "lucide-react";
 import { OutboundOrder, OutboundOrderItem } from "@/lib/types";
 import { parseOutboundNote, copyToClipboard, getPlatformMeta, cn } from "@/lib/utils";
-import { getOutboundLatestReturnReason, getOutboundReturnedQuantityMap, parseOutboundReturnMeta } from "@/lib/outboundReturnMeta";
+import { getOutboundReturnedQuantityMap, parseOutboundReturnMeta } from "@/lib/outboundReturnMeta";
 import { useToast } from "@/components/ui/Toast";
 import { format } from "date-fns";
 import { zhCN } from "date-fns/locale/zh-CN";
@@ -25,8 +25,21 @@ export function OutboundDetailModal({ isOpen, onClose, order }: OutboundDetailMo
   const isReturned = order.status === "Returned";
   const isPartialReturned = order.status === "PartialReturned";
   const returnMeta = parseOutboundReturnMeta(order.note);
-  const returnReason = getOutboundLatestReturnReason(returnMeta.returns);
   const returnedQuantityMap = getOutboundReturnedQuantityMap(returnMeta.returns);
+  const returnedItemDetailsMap = returnMeta.returns.reduce((acc, entry) => {
+    for (const item of entry.items || []) {
+      const key = String(item.outboundOrderItemId || "").trim();
+      if (!key) continue;
+      const list = acc.get(key) || [];
+      list.push({
+        createdAt: String(entry.createdAt || ""),
+        reason: String(entry.reason || "").trim() || "退货",
+        quantity: Math.max(0, Number(item.quantity || 0)),
+      });
+      acc.set(key, list);
+    }
+    return acc;
+  }, new Map<string, Array<{ createdAt: string; reason: string; quantity: number }>>());
 
   const handleCopy = async (text: string, field: string) => {
     const success = await copyToClipboard(text);
@@ -208,40 +221,20 @@ export function OutboundDetailModal({ isOpen, onClose, order }: OutboundDetailMo
             </div>
           </div>
 
-          {/* User Custom Note & Return Status */}
-          {(parsed.userNote || isReturned || isPartialReturned) && (
+          {/* User Custom Note */}
+          {parsed.userNote && (
             <div className="space-y-4">
-              {parsed.userNote && (
-                <div className="p-4 rounded-2xl border border-blue-500/20 bg-blue-500/5 backdrop-blur-md shadow-[0_0_15px_rgba(59,130,246,0.03)] flex gap-3">
-                  <div className="p-2 h-fit rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-500 shrink-0">
-                    <FileText size={14} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h4 className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1">用户备注</h4>
-                    <p className="text-xs font-bold text-slate-800 dark:text-slate-200 leading-relaxed break-words">
-                      {parsed.userNote}
-                    </p>
-                  </div>
+              <div className="p-4 rounded-2xl border border-blue-500/20 bg-blue-500/5 backdrop-blur-md shadow-[0_0_15px_rgba(59,130,246,0.03)] flex gap-3">
+                <div className="p-2 h-fit rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-500 shrink-0">
+                  <FileText size={14} />
                 </div>
-              )}
-              {(isReturned || isPartialReturned) && (
-                <div className="p-4 rounded-2xl border border-rose-500/20 bg-rose-500/5 backdrop-blur-md shadow-[0_0_15px_rgba(244,63,94,0.03)] flex gap-3">
-                  <div className="p-2 h-fit rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 shrink-0">
-                    <ArrowLeftRight size={14} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h4 className="text-[10px] font-black text-rose-500 dark:text-rose-400 uppercase tracking-widest mb-0.5">退回对冲详情</h4>
-                    <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed break-words">
-                      {isReturned ? "该笔交易已全部退回并完成财务对冲。" : "该笔交易已有部分商品退回，仍可继续退剩余数量。"}
-                      {returnReason && (
-                        <span className="block mt-1.5 font-black text-rose-600 dark:text-rose-400 bg-rose-500/10 border border-rose-500/20 px-2 py-0.5 rounded w-fit text-[10px] break-all">
-                          退回原因: {returnReason}
-                        </span>
-                      )}
-                    </p>
-                  </div>
+                <div className="flex-1 min-w-0">
+                  <h4 className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1">用户备注</h4>
+                  <p className="text-xs font-bold text-slate-800 dark:text-slate-200 leading-relaxed break-words">
+                    {parsed.userNote}
+                  </p>
                 </div>
-              )}
+              </div>
             </div>
           )}
 
@@ -263,6 +256,7 @@ export function OutboundDetailModal({ isOpen, onClose, order }: OutboundDetailMo
                 const img = item.shopProduct?.image || item.product?.image;
                 const sku = item.shopProduct?.sku || item.product?.sku || '-';
                 const returnedQuantity = itemId ? Math.max(0, returnedQuantityMap.get(itemId) || 0) : 0;
+                const returnedDetails = itemId ? (returnedItemDetailsMap.get(itemId) || []) : [];
                 const remainingQuantity = Math.max(0, item.quantity - returnedQuantity);
                 const isItemReturned = returnedQuantity > 0;
                 
@@ -307,6 +301,15 @@ export function OutboundDetailModal({ isOpen, onClose, order }: OutboundDetailMo
                               <span className="inline-flex px-1.5 py-0.2 rounded text-[9px] font-black bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                                 剩余 {remainingQuantity} 件
                               </span>
+                              {returnedDetails.map((detail, detailIndex) => (
+                                <span
+                                  key={`${itemId}-return-${detailIndex}`}
+                                  className="inline-flex max-w-full items-center rounded text-[9px] font-black bg-rose-500/8 px-1.5 py-0.2 text-rose-600 dark:text-rose-300 border border-rose-500/15"
+                                  title={`${format(new Date(detail.createdAt), 'yyyy-MM-dd HH:mm', { locale: zhCN })} · ${detail.reason} · x${detail.quantity}`}
+                                >
+                                  {detail.reason} x{detail.quantity}
+                                </span>
+                              ))}
                             </>
                           ) : null}
                         </div>
