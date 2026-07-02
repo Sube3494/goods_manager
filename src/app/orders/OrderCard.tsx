@@ -995,22 +995,6 @@ export function ProductStripItem({
     extraExpense?: number;
   }>;
 }) {
-  const returnedTooltip = returnedDetails.length > 0
-    ? returnedDetails.map((detail) => {
-        const parts = [`${removeYear(detail.createdAt)} · ${detail.reason || "退货"}${detail.quantity > 1 ? ` · x${detail.quantity}` : ""}`];
-        const info = [];
-        if (detail.refundAmount && detail.refundAmount > 0) {
-          info.push(`退款 ¥${(detail.refundAmount / 100).toFixed(2)}`);
-        }
-        if (detail.extraExpense && detail.extraExpense > 0) {
-          info.push(`支出 ¥${(detail.extraExpense / 100).toFixed(2)}`);
-        }
-        if (info.length > 0) {
-          parts.push(`(${info.join(", ")})`);
-        }
-        return parts.join(" ");
-      }).join("\n")
-    : "";
   return (
     <div className="flex items-center gap-2.5 rounded-2xl border border-black/6 bg-white/70 px-2.5 py-2 dark:border-white/8 dark:bg-white/4 sm:gap-3 sm:rounded-[18px] sm:px-3 sm:py-2.5">
       <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-white dark:bg-white/6 sm:h-11 sm:w-11 sm:rounded-xl">
@@ -1051,10 +1035,41 @@ export function ProductStripItem({
               className="relative group inline-flex cursor-help items-center rounded-full border border-amber-500/15 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-bold leading-none text-amber-700 dark:text-amber-300"
             >
               已退{returnedQuantity > 1 ? ` x${returnedQuantity}` : ""}
-              {returnedTooltip && (
-                <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-max max-w-[240px] -translate-x-1/2 rounded-lg bg-slate-900 px-2.5 py-1.5 text-[10px] font-medium text-white opacity-0 invisible transition-all duration-200 group-hover:opacity-100 group-hover:visible dark:bg-zinc-800 dark:text-zinc-200 shadow-lg border border-white/10 whitespace-pre-line line-clamp-none">
-                  {returnedTooltip}
-                  <span className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-slate-900 dark:border-t-zinc-800" />
+              {returnedDetails && returnedDetails.length > 0 && (
+                <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-max max-w-[320px] -translate-x-1/2 rounded-xl border border-black/8 bg-white/95 p-2 text-[10px] text-slate-800 opacity-0 invisible transition-all duration-200 group-hover:opacity-100 group-hover:visible dark:border-white/10 dark:bg-zinc-900/95 dark:text-zinc-100 shadow-xl backdrop-blur-sm space-y-1.5">
+                  {returnedDetails.map((detail, detailIndex) => (
+                    <div 
+                      key={detailIndex} 
+                      className={cn(
+                        "flex flex-col gap-1 text-left min-w-[160px] max-w-[280px]",
+                        detailIndex > 0 && "border-t border-black/[0.06] pt-1.5 dark:border-white/[0.06]"
+                      )}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="font-bold text-slate-900 dark:text-white">
+                          {detail.reason || "退货"}
+                        </span>
+                        <span className="font-mono text-[9px] text-slate-400 dark:text-zinc-500 whitespace-nowrap">
+                          {removeYear(detail.createdAt)}
+                        </span>
+                      </div>
+                      {(Number(detail.refundAmount) > 0 || Number(detail.extraExpense) > 0) && (
+                        <div className="flex flex-wrap gap-1 mt-0.5">
+                          {Number(detail.refundAmount) > 0 && (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-rose-500/10 text-[9px] font-semibold text-rose-600 dark:text-rose-400 whitespace-nowrap">
+                              退款 ¥{(Number(detail.refundAmount) / 100).toFixed(2)}
+                            </span>
+                          )}
+                          {Number(detail.extraExpense) > 0 && (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-amber-500/10 text-[9px] font-semibold text-amber-600 dark:text-amber-400 whitespace-nowrap">
+                              支出 ¥{(Number(detail.extraExpense) / 100).toFixed(2)}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  <span className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-white dark:border-t-zinc-900 filter drop-shadow-[0_1px_1px_rgba(0,0,0,0.08)]" />
                 </span>
               )}
             </span>
