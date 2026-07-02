@@ -227,14 +227,14 @@ export default function ShelfLifeDashboard() {
             </span>
           </div>
           <div className="mt-2.5 sm:mt-4 flex items-baseline gap-1 sm:gap-2">
-            <span className="text-2xl sm:text-4xl lg:text-5xl bg-linear-to-r from-red-500 to-red-400 bg-clip-text text-transparent tracking-tight font-sans leading-none">
+            <span className="text-2xl sm:text-4xl lg:text-5xl bg-linear-to-r from-red-500 to-red-400 bg-clip-text text-transparent tracking-tight font-sans font-bold leading-none">
               {isLoadingStats ? "..." : stats?.summary.expired.count || 0}
             </span>
             <span className="text-[10px] sm:text-xs text-muted-foreground/80">批次变质</span>
           </div>
           <div className="mt-2.5 sm:mt-4 text-[9.5px] sm:text-xs font-mono text-muted-foreground/60 flex items-center justify-between border-t border-black/5 dark:border-white/5 pt-2 sm:pt-3">
             <span>损失估值</span>
-            <span className="text-red-500 font-number">￥{isLoadingStats ? "0.00" : stats?.summary.expired.value.toFixed(1)}</span>
+            <span className="text-red-500 font-bold font-number">￥{isLoadingStats ? "0.00" : stats?.summary.expired.value.toFixed(1)}</span>
           </div>
         </div>
 
@@ -251,14 +251,14 @@ export default function ShelfLifeDashboard() {
             </span>
           </div>
           <div className="mt-2.5 sm:mt-4 flex items-baseline gap-1 sm:gap-2">
-            <span className="text-2xl sm:text-4xl lg:text-5xl bg-linear-to-r from-orange-500 to-orange-400 bg-clip-text text-transparent tracking-tight font-sans leading-none">
+            <span className="text-2xl sm:text-4xl lg:text-5xl bg-linear-to-r from-orange-500 to-orange-400 bg-clip-text text-transparent tracking-tight font-sans font-bold leading-none">
               {isLoadingStats ? "..." : stats?.summary.critical.count || 0}
             </span>
             <span className="text-[10px] sm:text-xs text-muted-foreground/80">批次处理</span>
           </div>
           <div className="mt-2.5 sm:mt-4 text-[9.5px] sm:text-xs font-mono text-muted-foreground/60 flex items-center justify-between border-t border-black/5 dark:border-white/5 pt-2 sm:pt-3">
             <span>过期风险</span>
-            <span className="text-orange-500 font-number">￥{isLoadingStats ? "0.00" : stats?.summary.critical.value.toFixed(1)}</span>
+            <span className="text-orange-500 font-bold font-number">￥{isLoadingStats ? "0.00" : stats?.summary.critical.value.toFixed(1)}</span>
           </div>
         </div>
 
@@ -275,14 +275,14 @@ export default function ShelfLifeDashboard() {
             </span>
           </div>
           <div className="mt-2.5 sm:mt-4 flex items-baseline gap-1 sm:gap-2">
-            <span className="text-2xl sm:text-4xl lg:text-5xl bg-linear-to-r from-amber-500 to-amber-400 bg-clip-text text-transparent tracking-tight font-sans leading-none">
+            <span className="text-2xl sm:text-4xl lg:text-5xl bg-linear-to-r from-amber-500 to-amber-400 bg-clip-text text-transparent tracking-tight font-sans font-bold leading-none">
               {isLoadingStats ? "..." : stats?.summary.warning.count || 0}
             </span>
             <span className="text-[10px] sm:text-xs text-muted-foreground/80">批次警报</span>
           </div>
           <div className="mt-2.5 sm:mt-4 text-[9.5px] sm:text-xs font-mono text-muted-foreground/60 flex items-center justify-between border-t border-black/5 dark:border-white/5 pt-2 sm:pt-3">
             <span>预警成本</span>
-            <span className="text-amber-500 font-number">￥{isLoadingStats ? "0.00" : stats?.summary.warning.value.toFixed(1)}</span>
+            <span className="text-amber-500 font-bold font-number">￥{isLoadingStats ? "0.00" : stats?.summary.warning.value.toFixed(1)}</span>
           </div>
         </div>
 
@@ -299,14 +299,14 @@ export default function ShelfLifeDashboard() {
             </span>
           </div>
           <div className="mt-2.5 sm:mt-4 flex items-baseline gap-1 sm:gap-2">
-            <span className="text-2xl sm:text-4xl lg:text-5xl bg-linear-to-r from-emerald-500 to-emerald-400 bg-clip-text text-transparent tracking-tight font-sans leading-none">
+            <span className="text-2xl sm:text-4xl lg:text-5xl bg-linear-to-r from-emerald-500 to-emerald-400 bg-clip-text text-transparent tracking-tight font-sans font-bold leading-none">
               {isLoadingStats ? "..." : stats?.summary.safe.count || 0}
             </span>
             <span className="text-[10px] sm:text-xs text-muted-foreground/80">在库安全</span>
           </div>
           <div className="mt-2.5 sm:mt-4 text-[9.5px] sm:text-xs font-mono text-muted-foreground/60 flex items-center justify-between border-t border-black/5 dark:border-white/5 pt-2 sm:pt-3">
             <span>总在库货值</span>
-            <span className="text-emerald-500 font-number">￥{isLoadingStats ? "0.00" : stats?.summary.safe.value.toFixed(1)}</span>
+            <span className="text-emerald-500 font-bold font-number">￥{isLoadingStats ? "0.00" : stats?.summary.safe.value.toFixed(1)}</span>
           </div>
         </div>
       </div>
