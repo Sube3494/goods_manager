@@ -85,6 +85,71 @@ function normalizeOptionalPositiveInt(value: unknown) {
   return Math.floor(numeric);
 }
 
+function toTTLockUserMessage(input: unknown) {
+  const rawMessage = String(input || "").trim();
+  const normalized = rawMessage.toLowerCase();
+
+  if (!rawMessage) {
+    return "TTLock 服务暂时不可用，请稍后重试";
+  }
+
+  if (
+    normalized.includes("clientid")
+    || normalized.includes("client id")
+    || normalized.includes("invalid client")
+  ) {
+    return "TTLock Client ID 配置有误，请到系统设置检查应用 ID";
+  }
+
+  if (
+    normalized.includes("clientsecret")
+    || normalized.includes("client secret")
+    || normalized.includes("secret invalid")
+  ) {
+    return "TTLock Client Secret 配置有误，请到系统设置检查应用密钥";
+  }
+
+  if (normalized.includes("username") || normalized.includes("account")) {
+    return "TTLock App 账号有误，请检查后重新登录";
+  }
+
+  if (normalized.includes("password")) {
+    return "TTLock App 密码有误，请检查后重新登录";
+  }
+
+  if (normalized.includes("refresh token")) {
+    return "TTLock 授权已失效，请重新登录并重新获取门锁";
+  }
+
+  if (normalized.includes("access token") || normalized.includes("token invalid")) {
+    return "TTLock 授权状态异常，请重新登录并重新获取门锁";
+  }
+
+  if (normalized.includes("grant_type")) {
+    return "TTLock 授权参数异常，请到系统设置检查 TTLock 配置";
+  }
+
+  if (
+    normalized.includes("fetch failed")
+    || normalized.includes("network")
+    || normalized.includes("econn")
+    || normalized.includes("timed out")
+    || normalized.includes("timeout")
+  ) {
+    return "TTLock 服务连接失败，请稍后重试";
+  }
+
+  if (normalized.includes("http 401") || normalized.includes("unauthorized")) {
+    return "TTLock 授权失败，请检查系统参数和账号密码后重试";
+  }
+
+  if (normalized.includes("http 5")) {
+    return "TTLock 服务器暂时异常，请稍后重试";
+  }
+
+  return rawMessage;
+}
+
 function md5LowerCase(value: string) {
   return createHash("md5").update(value).digest("hex").toLowerCase();
 }
@@ -278,7 +343,7 @@ export async function updateTTLockIntegrationConfigByUserId(userId: string, inpu
 function assertTTLockSuccess<T extends { errcode?: number; errmsg?: string }>(payload: T) {
   const errcode = Number(payload?.errcode ?? 0);
   if (Number.isFinite(errcode) && errcode !== 0) {
-    const message = String(payload?.errmsg || "TTLock request failed").trim();
+    const message = toTTLockUserMessage(payload?.errmsg || "TTLock request failed");
     throw new Error(`${message} (code: ${errcode})`);
   }
   return payload;
@@ -305,9 +370,9 @@ async function postTTLockForm<T>(config: TTLockIntegrationConfig, path: string, 
 
   if (!response.ok) {
     const message = typeof payload === "object" && payload && "errmsg" in payload
-      ? String((payload as { errmsg?: string }).errmsg || "").trim()
+      ? toTTLockUserMessage((payload as { errmsg?: string }).errmsg || "")
       : "";
-    throw new Error(message || `TTLock HTTP ${response.status}`);
+    throw new Error(message || toTTLockUserMessage(`TTLock HTTP ${response.status}`));
   }
 
   return payload;
@@ -332,9 +397,9 @@ async function getTTLockJson<T>(config: TTLockIntegrationConfig, path: string, p
 
   if (!response.ok) {
     const message = typeof payload === "object" && payload && "errmsg" in payload
-      ? String((payload as { errmsg?: string }).errmsg || "").trim()
+      ? toTTLockUserMessage((payload as { errmsg?: string }).errmsg || "")
       : "";
-    throw new Error(message || `TTLock HTTP ${response.status}`);
+    throw new Error(message || toTTLockUserMessage(`TTLock HTTP ${response.status}`));
   }
 
   return payload;
@@ -342,7 +407,7 @@ async function getTTLockJson<T>(config: TTLockIntegrationConfig, path: string, p
 
 function getRequiredTTLockCredentials(config: TTLockIntegrationConfig) {
   if (!config.clientId || !config.clientSecret) {
-    throw new Error("请先填写 TTLock 应用 ID 和应用密钥");
+    throw new Error("系统里的 TTLock Client ID 或 Client Secret 还没配置好，请先到系统设置检查");
   }
   if (!config.username || !config.passwordMd5) {
     throw new Error("请先填写 TTLock App 账号和密码");
@@ -378,7 +443,7 @@ export async function issueTTLockAccessTokenByUserId(userId: string) {
 export async function refreshTTLockAccessTokenByUserId(userId: string) {
   const config = await getTTLockIntegrationConfigByUserId(userId);
   if (!config.clientId || !config.clientSecret) {
-    throw new Error("请先填写 TTLock 应用 ID 和应用密钥");
+    throw new Error("系统里的 TTLock Client ID 或 Client Secret 还没配置好，请先到系统设置检查");
   }
   if (!config.refreshToken) {
     throw new Error("当前没有可用的 refresh token，请重新授权");
@@ -409,7 +474,7 @@ async function markTTLockTokenError(userId: string, message: string) {
   const config = await getTTLockIntegrationConfigByUserId(userId);
   return await saveTTLockIntegrationConfigByUserId(userId, {
     ...config,
-    lastTokenError: message.slice(0, 500),
+    lastTokenError: toTTLockUserMessage(message).slice(0, 500),
   });
 }
 
@@ -428,9 +493,9 @@ export async function ensureTTLockAccessTokenByUserId(userId: string) {
     }
     return await issueTTLockAccessTokenByUserId(userId);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "TTLock token unavailable";
+    const message = error instanceof Error ? toTTLockUserMessage(error.message) : "TTLock token unavailable";
     await markTTLockTokenError(userId, message).catch(() => null);
-    throw error;
+    throw new Error(message);
   }
 }
 

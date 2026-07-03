@@ -214,7 +214,7 @@ function ScanUnlockInner() {
             </p>
           ) : !hasValidVerificationCode ? (
             <p className="mt-6 rounded-xl border border-amber-500/15 bg-amber-50 px-4 py-3 text-sm font-semibold leading-6 text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
-              请输入 4 位校验码后再执行开锁。
+              请输入 4 位校验码后再执行开锁
             </p>
           ) : null}
         </div>

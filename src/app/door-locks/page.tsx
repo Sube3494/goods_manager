@@ -430,7 +430,7 @@ export default function DoorLocksPage() {
 
         {config?.lastTokenError ? (
           <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-100">
-            最近错误: {config.lastTokenError}
+            登录失败原因：{config.lastTokenError}
           </div>
         ) : null}
 

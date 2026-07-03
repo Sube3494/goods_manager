@@ -32,7 +32,7 @@ export async function proxy(request: NextRequest) {
 
   // Define public paths that don't require authentication
   // STRICT MODE: Only Login, Gallery, and share pages are public.
-  const publicPaths = ["/login", "/gallery", "/media", "/brush-plans/share"];
+  const publicPaths = ["/login", "/gallery", "/media", "/brush-plans/share", "/door-locks/scan-unlock"];
 
   // 1. Always allow public static files (images, favicon, etc) - handled by matcher
 
@@ -46,12 +46,22 @@ export async function proxy(request: NextRequest) {
   const isPublicPath = publicPaths.some(p => path === p || path.startsWith(p + "/"));
 
   // Check for public GET APIs
-  const publicApis = ["/api/gallery", "/api/categories", "/api/products", "/api/system/info", "/api/brush-plans/public", "/api/uploads", "/api/map-distance"];
+  const publicApis = [
+    "/api/gallery",
+    "/api/categories",
+    "/api/products",
+    "/api/system/info",
+    "/api/brush-plans/public",
+    "/api/uploads",
+    "/api/map-distance",
+  ];
   const isPublicGetApi = request.method === "GET" && publicApis.some(p => path === p || path.startsWith(p + "/"));
+  const isPublicScanUnlockDetailApi = request.method === "GET" && /^\/api\/ttlock\/locks\/[^/]+\/public-detail$/.test(path);
 
   // Check for public POST APIs
   const publicPostApis = ["/api/upload", "/api/map-distance"];
   const isPublicPostApi = request.method === "POST" && publicPostApis.some(p => path === p || path.startsWith(p + "/"));
+  const isPublicScanUnlockPostApi = request.method === "POST" && /^\/api\/ttlock\/locks\/[^/]+\/public-unlock$/.test(path);
 
   // Check for public PATCH APIs (Guest toggle status)
   const publicPatchApis = ["/api/brush-plans/public"];
@@ -62,7 +72,16 @@ export async function proxy(request: NextRequest) {
 
   // Protect private routes
   // If pass is NOT public AND NOT a public GET API AND NOT a public POST API AND NOT a public PATCH API AND no session
-  if (!isPublicPath && !isPublicGetApi && !isPublicPostApi && !isPublicPatchApi && !isPublicApiKeyWebhook && !session) {
+  if (
+    !isPublicPath
+    && !isPublicGetApi
+    && !isPublicScanUnlockDetailApi
+    && !isPublicPostApi
+    && !isPublicScanUnlockPostApi
+    && !isPublicPatchApi
+    && !isPublicApiKeyWebhook
+    && !session
+  ) {
     if (path.startsWith("/api/")) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
