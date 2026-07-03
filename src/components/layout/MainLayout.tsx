@@ -35,8 +35,9 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
     pathname?.startsWith("/media") ||
     pathname?.startsWith("/brush-plans/share") ||
     pathname?.startsWith("/brush-plans/preview");
+  const isScanUnlockPage = pathname?.startsWith("/door-locks/scan-unlock");
   const isWideCanvasPage = pathname?.startsWith("/distance-calc");
-  const isFullScreenPage = isLoginPage || isSharePage;
+  const isFullScreenPage = isLoginPage || isSharePage || isScanUnlockPage;
   
   // Sidebar is functional for guests too (login link, gallery), so we reserve space for it on desktop
   const visibleItems = getVisibleNavItems(user as SessionUser | null);

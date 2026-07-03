@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { unlockTTLockByUserId, findAuthorizedTTLockUserId } from "@/lib/ttlock";
+import { verifyScanUnlockCodeByOrders } from "@/lib/ttlockScanUnlock";
 import { createHash } from "crypto";
 
 export const dynamic = "force-dynamic";
@@ -17,6 +18,8 @@ export async function POST(
   const token = searchParams.get("token") || "";
 
   try {
+    const body = await request.json().catch(() => ({}));
+    const verificationCode = String((body as { verificationCode?: unknown })?.verificationCode || "").trim();
     const params = await context.params;
     const lockId = Number(params.lockId);
     if (!Number.isFinite(lockId) || lockId <= 0) {
@@ -32,6 +35,11 @@ export async function POST(
     const userId = await findAuthorizedTTLockUserId();
     if (!userId) {
       return NextResponse.json({ error: "No authorized TTLock configuration found" }, { status: 404 });
+    }
+
+    const verification = await verifyScanUnlockCodeByOrders(userId, verificationCode);
+    if (!verification.ok) {
+      return NextResponse.json({ error: verification.reason }, { status: 403 });
     }
 
     const result = await unlockTTLockByUserId(userId, lockId);

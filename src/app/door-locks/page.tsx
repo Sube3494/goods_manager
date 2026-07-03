@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { Battery, ChevronDown, Copy, Cpu, DoorOpen, Fingerprint, Layers, Loader2, LockKeyhole, QrCode, ShieldCheck, Timer, Wifi, WifiOff } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Battery, ChevronDown, Copy, Cpu, DoorOpen, Fingerprint, Layers, Loader2, LockKeyhole, ShieldCheck, Timer, Wifi, WifiOff } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { useUser } from "@/hooks/useUser";
 import { hasPermission, type SessionUser } from "@/lib/permissions";
@@ -127,6 +127,7 @@ export default function DoorLocksPage() {
   const { user, isLoading: userLoading } = useUser();
   const { showToast } = useToast();
   const canManage = hasPermission(user as SessionUser | null, "settings:manage");
+  const hasAutoLoadedLocksRef = useRef(false);
 
   const [config, setConfig] = useState<TTLockIntegrationConfigPublic | null>(null);
   const [form, setForm] = useState<ConfigForm>(getDefaultForm);
@@ -141,7 +142,7 @@ export default function DoorLocksPage() {
   const [isUnlocking, setIsUnlocking] = useState(false);
   const [isEditingPassword, setIsEditingPassword] = useState(false);
 
-  const syncConfig = (next: TTLockIntegrationConfigPublic) => {
+  const syncConfig = useCallback((next: TTLockIntegrationConfigPublic) => {
     setConfig(next);
     setForm((current) => ({
       ...current,
@@ -149,7 +150,7 @@ export default function DoorLocksPage() {
       password: "",
     }));
     setIsEditingPassword(false);
-  };
+  }, []);
 
   const loadConfig = useCallback(async () => {
     setIsLoadingConfig(true);
@@ -168,7 +169,7 @@ export default function DoorLocksPage() {
     }
   }, [showToast]);
 
-  const loadLockDetail = async (lockId: number) => {
+  const loadLockDetail = useCallback(async (lockId: number) => {
     setIsLoadingDetail(true);
     try {
       const response = await fetch(`/api/ttlock/locks/${lockId}`, { cache: "no-store" });
@@ -185,9 +186,9 @@ export default function DoorLocksPage() {
     } finally {
       setIsLoadingDetail(false);
     }
-  };
+  }, [showToast]);
 
-  const loadLocks = async (lockIdToKeep?: number | null) => {
+  const loadLocks = useCallback(async (lockIdToKeep?: number | null) => {
     setIsLoadingLocks(true);
     try {
       const query = lockAliasFilter.trim()
@@ -220,7 +221,7 @@ export default function DoorLocksPage() {
     } finally {
       setIsLoadingLocks(false);
     }
-  };
+  }, [loadLockDetail, lockAliasFilter, selectedLockId, showToast, syncConfig]);
 
   useEffect(() => {
     if (!canManage) {
@@ -229,6 +230,14 @@ export default function DoorLocksPage() {
     }
     void loadConfig();
   }, [canManage, loadConfig]);
+
+  useEffect(() => {
+    if (!canManage || isLoadingConfig || !config?.linked || hasAutoLoadedLocksRef.current) {
+      return;
+    }
+    hasAutoLoadedLocksRef.current = true;
+    void loadLocks(config.defaultLockId || null);
+  }, [canManage, config?.defaultLockId, config?.linked, isLoadingConfig, loadLocks]);
 
   const handleConnect = async () => {
     setIsConnecting(true);
@@ -358,7 +367,7 @@ export default function DoorLocksPage() {
             }`}
           >
             {isConnecting ? <Loader2 size={14} className="animate-spin" /> : null}
-            登录并获取门锁
+            {config?.linked ? "刷新授权并同步门锁" : "登录并获取门锁"}
           </button>
         </div>
 
@@ -465,7 +474,9 @@ export default function DoorLocksPage() {
         </div>
 
         <div className="mt-4 text-sm text-muted-foreground">
-          填好账号密码后，直接登录并获取门锁。密码会在服务端转成 MD5 保存。
+          {config?.linked
+            ? "当前 TTLock 已连接。这个按钮用于刷新授权状态，并重新同步门锁列表。"
+            : "填好账号密码后，直接登录并获取门锁。密码会在服务端转成 MD5 保存。"}
         </div>
 
         {config?.lastTokenError ? (
@@ -518,7 +529,7 @@ export default function DoorLocksPage() {
         </div>
 
         {/* 门锁单行列表展开区 */}
-        <div className="mt-5 border border-border/60 rounded-2xl overflow-hidden bg-background/35 divide-y divide-border/60">
+        <div className="mt-5 border border-border/60 rounded-2xl overflow-visible bg-background/35 divide-y divide-border/60">
           {locks.length > 0 ? (
             locks.map((lock) => {
               const isActive = selectedLockId === lock.lockId;
@@ -563,6 +574,34 @@ export default function DoorLocksPage() {
                         >
                           ID: {lock.lockId}
                           <Copy size={10} className="text-muted-foreground/60 hover:text-foreground transition-colors" />
+                        </span>
+                        <span
+                          onClick={(e) => e.stopPropagation()}
+                          className="relative group inline-flex items-center"
+                          title="扫码开锁"
+                        >
+                          <img
+                            src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(
+                              typeof window !== "undefined"
+                                ? `${window.location.origin}/door-locks/scan-unlock?lockId=${lock.lockId}&token=${lock.scanUnlockToken || ""}`
+                                : ""
+                            )}`}
+                            alt="QR Code"
+                            className="h-5 w-5 rounded border border-border bg-white p-0.5"
+                          />
+                          <div className="absolute left-full top-1/2 z-40 hidden h-12 w-3 -translate-y-1/2 group-hover:block" />
+                          <div className="absolute left-full top-1/2 z-50 hidden min-w-[160px] translate-x-3 -translate-y-1/2 flex-col items-center rounded-xl border border-border/60 bg-white p-2.5 shadow-xl group-hover:flex dark:bg-slate-900">
+                            <img
+                              src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(
+                                typeof window !== "undefined"
+                                  ? `${window.location.origin}/door-locks/scan-unlock?lockId=${lock.lockId}&token=${lock.scanUnlockToken || ""}`
+                                  : ""
+                              )}`}
+                              alt="Large QR Code"
+                              className="h-36 w-36 rounded bg-white p-1"
+                            />
+                            <div className="mt-1.5 text-center text-[9px] font-medium text-muted-foreground">扫码远程解锁门锁</div>
+                          </div>
                         </span>
                         <span className="text-muted-foreground/40">·</span>
                         <span className="font-medium text-foreground/80 bg-background/50 border border-border/40 px-1.5 py-0.5 rounded text-[10px] whitespace-nowrap">
@@ -680,42 +719,6 @@ export default function DoorLocksPage() {
                               </div>
                             </div>
 
-                            {/* 扫码开锁 */}
-                            <div className="col-span-2 sm:col-span-2 bg-black/[0.015] dark:bg-white/[0.02] border border-border/50 rounded-xl p-3 flex items-center justify-between min-h-[64px] gap-3">
-                              <div className="flex-1 min-w-0">
-                                <div className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider flex items-center gap-1.5">
-                                  <QrCode size={12} className="text-muted-foreground/70" />
-                                  扫码开锁
-                                </div>
-                                <div className="text-[11px] text-muted-foreground mt-1 leading-snug">
-                                  扫码直达快捷开锁页，或将二维码保存以供现场扫码使用。
-                                </div>
-                              </div>
-                              <div className="relative group shrink-0">
-                                <img
-                                  src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(
-                                    typeof window !== "undefined"
-                                      ? `${window.location.origin}/door-locks/scan-unlock?lockId=${lockDetail.lockId}&token=${lockDetail.scanUnlockToken || ""}`
-                                      : ""
-                                  )}`}
-                                  alt="QR Code"
-                                  className="w-12 h-12 rounded border border-border bg-white p-0.5 cursor-zoom-in"
-                                />
-                                {/* 悬浮放大二维码 */}
-                                <div className="absolute right-0 bottom-full mb-2 hidden group-hover:flex flex-col items-center z-50 bg-white dark:bg-slate-900 p-2.5 rounded-xl shadow-xl border border-border/60 min-w-[160px]">
-                                  <img
-                                    src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(
-                                      typeof window !== "undefined"
-                                        ? `${window.location.origin}/door-locks/scan-unlock?lockId=${lockDetail.lockId}&token=${lockDetail.scanUnlockToken || ""}`
-                                        : ""
-                                    )}`}
-                                    alt="Large QR Code"
-                                    className="w-36 h-36 bg-white p-1 rounded"
-                                  />
-                                  <div className="text-[9px] text-center text-muted-foreground mt-1.5 font-medium">扫码远程解锁门锁</div>
-                                </div>
-                              </div>
-                            </div>
                           </div>
 
                           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-2 w-full border-t border-border/20">

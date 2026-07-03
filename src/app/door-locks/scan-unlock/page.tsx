@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useRef, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { Battery, Loader2, LockKeyhole, LockKeyholeOpen, ShieldAlert, ShieldCheck, Wifi, WifiOff } from "lucide-react";
+import { Loader2, LockKeyhole, LockKeyholeOpen, ShieldAlert, ShieldCheck } from "lucide-react";
+import { useTheme } from "next-themes";
 import { useToast } from "@/components/ui/Toast";
 import type { TTLockLockDetail } from "@/lib/types";
 
@@ -10,6 +11,7 @@ function ScanUnlockInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { showToast } = useToast();
+  const { theme, setTheme } = useTheme();
   const lockIdParam = searchParams.get("lockId");
   const lockId = lockIdParam ? Number(lockIdParam) : null;
   const token = searchParams.get("token") || "";
@@ -19,6 +21,24 @@ function ScanUnlockInner() {
   const [isUnlocking, setIsUnlocking] = useState(false);
   const [unlockSuccess, setUnlockSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [verificationCode, setVerificationCode] = useState("");
+  const previousThemeRef = useRef<string | null>(null);
+  const hasForcedSystemThemeRef = useRef(false);
+
+  useEffect(() => {
+    if (hasForcedSystemThemeRef.current) {
+      return;
+    }
+    previousThemeRef.current = theme ?? null;
+    hasForcedSystemThemeRef.current = true;
+    setTheme("system");
+
+    return () => {
+      if (previousThemeRef.current) {
+        setTheme(previousThemeRef.current);
+      }
+    };
+  }, [setTheme, theme]);
 
   useEffect(() => {
     if (!lockId) {
@@ -53,10 +73,21 @@ function ScanUnlockInner() {
 
   const handleUnlock = async () => {
     if (!lockId || !token) return;
+    const normalizedCode = verificationCode.replace(/\D/g, "").slice(-4);
+    if (normalizedCode.length !== 4) {
+      showToast("请输入订单号后四位或顾客手机号后四位", "error");
+      return;
+    }
     setIsUnlocking(true);
     try {
       const response = await fetch(`/api/ttlock/locks/${lockId}/public-unlock?token=${encodeURIComponent(token)}`, {
         method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          verificationCode: normalizedCode,
+        }),
       });
       const data = await response.json() as { error?: string };
       if (!response.ok) {
@@ -76,7 +107,7 @@ function ScanUnlockInner() {
   if (isLoading) {
     return (
       <div className="flex h-[80dvh] flex-col items-center justify-center text-slate-100 p-6">
-        <Loader2 size={32} className="animate-spin text-rose-500" />
+        <Loader2 size={32} className="text-rose-500" />
         <span className="mt-4 text-sm text-slate-400">正在建立安全通道...</span>
       </div>
     );
@@ -102,86 +133,93 @@ function ScanUnlockInner() {
 
   // 3. Success/Normal View
   const isOnline = !!lock.hasGateway;
+  const normalizedVerificationCode = verificationCode.replace(/\D/g, "").slice(-4);
+  const hasValidVerificationCode = normalizedVerificationCode.length === 4;
 
   return (
-    <div className="flex min-h-[85dvh] flex-col justify-between text-slate-100 p-4 sm:p-6">
+    <div className="flex min-h-[85dvh] flex-col justify-between bg-white p-4 text-slate-900 dark:bg-[linear-gradient(180deg,#0f172a_0%,#111827_100%)] dark:text-slate-100 sm:p-6">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-slate-800/80 pb-4">
+      <div className="flex items-center justify-between border-b border-slate-200/80 pb-4 dark:border-slate-800/80">
         <div className="flex items-center gap-2">
           <ShieldCheck size={18} className="text-rose-500" />
-          <span className="text-xs font-bold uppercase tracking-wider text-slate-400">扫码远程快捷开锁</span>
+          <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">扫码远程快捷开锁</span>
         </div>
-        <span className="text-[10px] text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full font-semibold">
-          安全通道已建立
-        </span>
       </div>
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col items-center justify-center my-8 text-center max-w-sm mx-auto w-full">
-        <h1 className="text-2xl font-black tracking-tight text-foreground">{lock.lockAlias || lock.lockName}</h1>
-        <p className="text-xs text-slate-400 mt-1">ID: {lock.lockId}</p>
-
-        {/* Lock State Cards */}
-        <div className="grid grid-cols-2 gap-3 w-full mt-6">
-          <div className="bg-white/[0.02] dark:bg-white/[0.02] border border-border/50 rounded-xl p-3 flex flex-col items-center justify-center">
-            <span className="text-[10px] text-slate-500 font-medium">当前电量</span>
-            <div className="text-sm font-bold mt-1 flex items-center gap-1.5">
-              <Battery size={14} className="text-emerald-500" />
-              {lock.electricQuantity ? `${lock.electricQuantity}%` : "--"}
-            </div>
-          </div>
-          <div className="bg-white/[0.02] dark:bg-white/[0.02] border border-border/50 rounded-xl p-3 flex flex-col items-center justify-center">
-            <span className="text-[10px] text-slate-500 font-medium">设备状态</span>
-            <div className={`text-sm font-bold mt-1 flex items-center gap-1.5 ${isOnline ? "text-emerald-500" : "text-slate-400"}`}>
-              {isOnline ? <Wifi size={14} /> : <WifiOff size={14} />}
-              {isOnline ? "在线" : "离线"}
-            </div>
-          </div>
+        <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white">扫码开锁</h1>
+        <div className="mt-4 w-full rounded-2xl border border-rose-200/80 bg-rose-50 px-4 py-3 text-left shadow-sm dark:border-rose-500/20 dark:bg-rose-500/10">
+          <div className="text-[11px] font-black uppercase tracking-[0.16em] text-rose-700 dark:text-rose-300">开锁前验证</div>
+          <p className="mt-1.5 text-base font-black leading-7 text-rose-900 dark:text-rose-50 sm:text-lg">
+            请输入
+            <span className="rounded-md bg-amber-300 px-1.5 py-0.5 text-amber-950 dark:bg-amber-300 dark:text-amber-950">
+              订单号后四位
+            </span>
+            <span className="px-1 text-rose-500 dark:text-rose-300">或者</span>
+            <span className="rounded-md bg-yellow-300 px-1.5 py-0.5 text-yellow-950 dark:bg-yellow-300 dark:text-yellow-950">
+              顾客手机后四位
+            </span>
+          </p>
         </div>
 
-        {/* Big Pulsating Lock Button */}
+        <input
+          inputMode="numeric"
+          maxLength={4}
+          value={verificationCode}
+          onChange={(event) => {
+            setVerificationCode(event.target.value.replace(/\D/g, "").slice(0, 4));
+          }}
+          placeholder="请输入 4 位数字"
+          className="mt-6 h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-center text-lg font-black tracking-[0.35em] text-slate-900 shadow-sm outline-none transition focus:border-rose-500/40 focus:ring-2 focus:ring-rose-500/15 dark:border-white/10 dark:bg-slate-950/40 dark:text-white"
+        />
+
         <div className="mt-8 flex flex-col items-center justify-center w-full">
           <button
             type="button"
             onClick={handleUnlock}
-            disabled={isUnlocking || !isOnline}
+            disabled={isUnlocking || !isOnline || !hasValidVerificationCode}
             className={`w-36 h-36 rounded-full flex flex-col items-center justify-center transition-all duration-300 relative cursor-pointer ${
               unlockSuccess
-                ? "bg-emerald-600 text-white shadow-lg shadow-emerald-600/30 scale-105"
-                : !isOnline
-                ? "bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700/50"
+                ? "bg-emerald-600 text-white shadow-lg shadow-emerald-600/30"
+                : !isOnline || !hasValidVerificationCode
+                ? "cursor-not-allowed border border-slate-300 bg-slate-200 text-slate-500 dark:border-slate-700/50 dark:bg-slate-800 dark:text-slate-500"
                 : "bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-600/25 hover:shadow-rose-600/40 active:scale-95"
-            }`}
-          >
-            {isOnline && !unlockSuccess && !isUnlocking && (
-              <span className="absolute inset-0 rounded-full bg-rose-500/20 animate-ping" />
-            )}
-
+             }`}
+           >
             {isUnlocking ? (
-              <Loader2 size={36} className="animate-spin" />
+              <Loader2 size={36} />
             ) : unlockSuccess ? (
-              <LockKeyholeOpen size={36} className="animate-bounce" />
+              <LockKeyholeOpen size={36} />
             ) : (
               <LockKeyhole size={36} />
             )}
             
-            <span className="text-xs font-bold mt-2">
-              {isUnlocking ? "开锁中..." : unlockSuccess ? "已成功开锁" : !isOnline ? "设备已离线" : "点击开锁"}
+            <span className="mt-2 text-sm font-black">
+              {isUnlocking
+                ? "开锁中..."
+                : unlockSuccess
+                ? "已成功开锁"
+                : !isOnline
+                ? "设备已离线"
+                : !hasValidVerificationCode
+                ? "先输入后四位"
+                : "验证并开锁"}
             </span>
           </button>
           
-          {!isOnline && (
-            <p className="mt-6 text-[11px] text-red-500 bg-red-500/5 border border-red-500/10 px-4 py-2.5 rounded-xl">
+          {!isOnline ? (
+            <p className="mt-6 rounded-xl border border-red-500/15 bg-red-50 px-4 py-3 text-sm font-semibold leading-6 text-red-700 dark:bg-red-500/10 dark:text-red-300">
               警告：当前门锁已离线，无法通过云端远程开启。请前往门前使用本地蓝牙或物理钥匙。
             </p>
-          )}
+          ) : !hasValidVerificationCode ? (
+            <p className="mt-6 rounded-xl border border-amber-500/15 bg-amber-50 px-4 py-3 text-sm font-semibold leading-6 text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
+              请输入 4 位校验码后再执行开锁。
+            </p>
+          ) : null}
         </div>
       </div>
 
-      {/* Footer */}
-      <div className="text-[10px] text-center text-slate-600 border-t border-slate-800/80 pt-4">
-        门锁系统安全加密保护中 · TTLOCK API V3
-      </div>
     </div>
   );
 }
@@ -189,12 +227,12 @@ function ScanUnlockInner() {
 export default function ScanUnlockPage() {
   return (
     <Suspense
-      fallback={
-        <div className="flex h-[80dvh] flex-col items-center justify-center text-slate-100 p-6">
-          <Loader2 size={32} className="animate-spin text-rose-500" />
-          <span className="mt-4 text-sm text-slate-400">正在初始化页面...</span>
-        </div>
-      }
+        fallback={
+          <div className="flex h-[80dvh] flex-col items-center justify-center text-slate-100 p-6">
+            <Loader2 size={32} className="text-rose-500" />
+            <span className="mt-4 text-sm text-slate-400">正在初始化页面...</span>
+          </div>
+        }
     >
       <ScanUnlockInner />
     </Suspense>
