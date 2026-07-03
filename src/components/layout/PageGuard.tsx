@@ -25,7 +25,9 @@ export function PageGuard({ children }: { children: React.ReactNode }) {
       pathname === "/media" ||
       pathname.startsWith("/media/") ||
       pathname === "/brush-plans/share" ||
-      pathname.startsWith("/brush-plans/share/");
+      pathname.startsWith("/brush-plans/share/") ||
+      pathname === "/door-locks/scan-unlock" ||
+      pathname.startsWith("/door-locks/scan-unlock/");
     const isStaticFile = pathname.endsWith('.txt');
 
     if (isPublicPath || isStaticFile) {
