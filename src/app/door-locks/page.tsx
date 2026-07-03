@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Battery, ChevronDown, Copy, Cpu, DoorOpen, Fingerprint, Layers, Loader2, LockKeyhole, ShieldCheck, Timer, Wifi, WifiOff } from "lucide-react";
+import { Battery, ChevronDown, Copy, Cpu, DoorOpen, Fingerprint, Layers, Loader2, LockKeyhole, ShieldCheck, Timer, Wifi, WifiOff, X } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { useUser } from "@/hooks/useUser";
 import { hasPermission, type SessionUser } from "@/lib/permissions";
@@ -141,6 +141,12 @@ export default function DoorLocksPage() {
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
   const [isUnlocking, setIsUnlocking] = useState(false);
   const [isEditingPassword, setIsEditingPassword] = useState(false);
+  const [qrPreviewLock, setQrPreviewLock] = useState<TTLockLockSummary | null>(null);
+
+  const getScanUnlockUrl = useCallback((lock: Pick<TTLockLockSummary, "lockId" | "scanUnlockToken">) => {
+    if (typeof window === "undefined") return "";
+    return `${window.location.origin}/door-locks/scan-unlock?lockId=${lock.lockId}&token=${lock.scanUnlockToken || ""}`;
+  }, []);
 
   const syncConfig = useCallback((next: TTLockIntegrationConfigPublic) => {
     setConfig(next);
@@ -547,72 +553,61 @@ export default function DoorLocksPage() {
                         void loadLockDetail(lock.lockId);
                       }
                     }}
-                    className={`w-full px-4 sm:px-5 py-4 text-left transition hover:bg-black/[0.02] dark:hover:bg-white/[0.02] flex items-center justify-between gap-4 ${
+                    className={`w-full px-4 sm:px-5 py-4 text-left transition hover:bg-black/[0.02] dark:hover:bg-white/[0.02] flex items-start sm:items-center justify-between gap-3 sm:gap-4 ${
                       isActive ? "bg-primary/[0.04]" : "bg-transparent"
                     }`}
                   >
-                    <div className="min-w-0 flex-1 flex flex-col sm:flex-row sm:items-center sm:gap-6">
-                      <div className="flex flex-wrap items-center gap-2 shrink-0">
-                        <div className="font-semibold text-foreground text-sm sm:w-48 shrink-0 truncate">
+                    <div className="min-w-0 flex-1 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-6">
+                      <div className="flex flex-wrap items-center gap-2 shrink-0 pr-2">
+                        <div className="min-w-0 font-semibold text-foreground text-base sm:text-sm sm:w-48 shrink-0 truncate">
                           {lock.lockAlias || lock.lockName}
                         </div>
                         {/* 移动端展示的在线状态胶囊 */}
-                        <span className={`text-[10px] sm:hidden px-1.5 py-0.5 rounded border inline-flex items-center gap-1 font-medium whitespace-nowrap bg-background/50 border-border/40 ${status.colorClass}`}>
+                        <span className={`text-[10px] sm:hidden px-2 py-1 rounded-full border inline-flex items-center gap-1 font-medium whitespace-nowrap bg-background/80 border-border/50 ${status.colorClass}`}>
                           {status.online ? <Wifi size={10} /> : <WifiOff size={10} />}
                           {status.label}
                         </span>
                       </div>
-                      <div className="text-xs text-muted-foreground mt-1.5 sm:mt-0 flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <div className="text-xs text-muted-foreground flex flex-wrap items-center gap-2 sm:mt-0">
                         <span
                           onClick={(e) => {
                             e.stopPropagation();
                             void navigator.clipboard.writeText(String(lock.lockId));
                             showToast("门锁 ID 已复制", "success");
                           }}
-                          className="inline-flex items-center gap-1 cursor-pointer hover:text-foreground hover:bg-black/5 dark:hover:bg-white/10 px-1 py-0.5 rounded transition whitespace-nowrap"
+                          className="inline-flex items-center gap-1 cursor-pointer rounded-lg border border-border/40 bg-background/60 px-2 py-1 transition whitespace-nowrap hover:text-foreground hover:bg-black/5 dark:hover:bg-white/10"
                           title="点击复制门锁 ID"
                         >
                           ID: {lock.lockId}
                           <Copy size={10} className="text-muted-foreground/60 hover:text-foreground transition-colors" />
                         </span>
-                        <span
-                          onClick={(e) => e.stopPropagation()}
-                          className="relative group inline-flex items-center"
-                          title="扫码开锁"
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setQrPreviewLock(lock);
+                          }}
+                          className="inline-flex items-center rounded-lg border border-border/40 bg-background/60 p-1"
+                          title="点击查看扫码开锁二维码"
                         >
                           <img
-                            src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(
-                              typeof window !== "undefined"
-                                ? `${window.location.origin}/door-locks/scan-unlock?lockId=${lock.lockId}&token=${lock.scanUnlockToken || ""}`
-                                : ""
-                            )}`}
+                            src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(getScanUnlockUrl(lock))}`}
                             alt="QR Code"
                             className="h-5 w-5 rounded border border-border bg-white p-0.5"
                           />
-                          <div className="absolute left-full top-1/2 z-40 hidden h-12 w-3 -translate-y-1/2 group-hover:block" />
-                          <div className="absolute left-full top-1/2 z-50 hidden min-w-[160px] translate-x-3 -translate-y-1/2 flex-col items-center rounded-xl border border-border/60 bg-white p-2.5 shadow-xl group-hover:flex dark:bg-slate-900">
-                            <img
-                              src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(
-                                typeof window !== "undefined"
-                                  ? `${window.location.origin}/door-locks/scan-unlock?lockId=${lock.lockId}&token=${lock.scanUnlockToken || ""}`
-                                  : ""
-                              )}`}
-                              alt="Large QR Code"
-                              className="h-36 w-36 rounded bg-white p-1"
-                            />
-                            <div className="mt-1.5 text-center text-[9px] font-medium text-muted-foreground">扫码远程解锁门锁</div>
-                          </div>
-                        </span>
-                        <span className="text-muted-foreground/40">·</span>
-                        <span className="font-medium text-foreground/80 bg-background/50 border border-border/40 px-1.5 py-0.5 rounded text-[10px] whitespace-nowrap">
+                        </button>
+                        <span className="hidden sm:inline text-muted-foreground/40">·</span>
+                        <span className="font-medium text-foreground/80 bg-background/50 border border-border/40 px-2 py-1 rounded-full text-[10px] whitespace-nowrap">
                           {status.type}
                         </span>
-                        <span className="text-muted-foreground/40">·</span>
-                        <span className="whitespace-nowrap">电量: {formatBattery(lock.electricQuantity)}</span>
+                        <span className="hidden sm:inline text-muted-foreground/40">·</span>
+                        <span className="rounded-full border border-border/40 bg-background/50 px-2 py-1 whitespace-nowrap text-[10px] sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:text-xs">
+                          电量: {formatBattery(lock.electricQuantity)}
+                        </span>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-3 shrink-0">
+                    <div className="flex items-start sm:items-center gap-2 sm:gap-3 shrink-0 pt-0.5 sm:pt-0">
                       {/* 桌面端展示的在线状态 */}
                       <span className={`text-xs hidden sm:flex items-center gap-1 ${status.colorClass}`}>
                         {status.online ? <Wifi size={12} /> : <WifiOff size={12} />}
@@ -764,6 +759,47 @@ export default function DoorLocksPage() {
           )}
         </div>
       </section>
+
+      {qrPreviewLock ? (
+        <div
+          className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+          onClick={() => setQrPreviewLock(null)}
+        >
+          <div
+            className="w-full max-w-[320px] rounded-[28px] border border-border/60 bg-white p-4 shadow-2xl dark:bg-slate-950"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="truncate text-base font-black text-foreground">
+                  {qrPreviewLock.lockAlias || qrPreviewLock.lockName}
+                </div>
+                <div className="mt-1 text-xs text-muted-foreground">扫码开锁</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setQrPreviewLock(null)}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border/60 text-muted-foreground transition hover:bg-black/5 dark:hover:bg-white/10"
+                title="关闭"
+              >
+                <X size={14} />
+              </button>
+            </div>
+
+            <div className="mt-4 rounded-2xl border border-border/60 bg-white p-3">
+              <img
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=320x320&data=${encodeURIComponent(getScanUnlockUrl(qrPreviewLock))}`}
+                alt="Scan Unlock QR Code"
+                className="w-full rounded-xl bg-white"
+              />
+            </div>
+
+            <div className="mt-3 text-center text-xs text-muted-foreground">
+              点击外部空白区域也可以关闭
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
