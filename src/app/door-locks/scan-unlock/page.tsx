@@ -218,6 +218,10 @@ function ScanUnlockInner() {
             </p>
           ) : null}
         </div>
+
+        <p className="mt-10 text-center text-xs font-medium leading-5 text-slate-500 dark:text-slate-400">
+          如果还是打不开，请直接联系商家处理
+        </p>
       </div>
 
     </div>

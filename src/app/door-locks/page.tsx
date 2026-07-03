@@ -141,6 +141,7 @@ export default function DoorLocksPage() {
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
   const [isUnlocking, setIsUnlocking] = useState(false);
   const [isEditingPassword, setIsEditingPassword] = useState(false);
+  const hasSystemCredentials = Boolean(config?.usesSystemCredentials);
   const [qrPreviewLock, setQrPreviewLock] = useState<TTLockLockSummary | null>(null);
 
   const getScanUnlockUrl = useCallback((lock: Pick<TTLockLockSummary, "lockId" | "scanUnlockToken">) => {
@@ -365,15 +366,19 @@ export default function DoorLocksPage() {
           <button
             type="button"
             onClick={() => {
-              if (isConnecting) return;
+              if (isConnecting || !hasSystemCredentials) return;
               void handleConnect();
             }}
             className={`inline-flex h-9 items-center justify-center gap-2 rounded-2xl bg-white px-4 text-sm font-bold text-slate-950 transition hover:opacity-92 dark:bg-white dark:text-slate-950 shadow-sm border border-border/10 w-full sm:w-auto ${
-              isConnecting ? "opacity-50 cursor-not-allowed" : ""
+              isConnecting || !hasSystemCredentials ? "opacity-50 cursor-not-allowed" : ""
             }`}
           >
             {isConnecting ? <Loader2 size={14} className="animate-spin" /> : null}
-            {config?.linked ? "刷新授权并同步门锁" : "登录并获取门锁"}
+            {!hasSystemCredentials
+              ? "请先配置系统 TTLock 参数"
+              : config?.linked
+              ? "刷新授权并同步门锁"
+              : "登录并获取门锁"}
           </button>
         </div>
 
@@ -386,101 +391,39 @@ export default function DoorLocksPage() {
               className="h-11 w-full rounded-xl border border-border bg-white px-3 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-primary/20 dark:border-white/10 dark:bg-white/5"
             />
           </Field>
-
-          {!config?.usesSystemCredentials ? (
-            <Field label="接口区域">
-              <select
-                value={form.region}
-                onChange={(event) => setForm((current) => ({ ...current, region: event.target.value as TTLockRegion }))}
-                className="h-11 w-full rounded-xl border border-border bg-white px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/20 dark:border-white/10 dark:bg-white/5"
-              >
-                <option value="cn">中国区</option>
-                <option value="global">Global</option>
-              </select>
-            </Field>
-          ) : (
-            <Field label="TTLock App 密码">
-              <input
-                type={isEditingPassword || !config?.hasPassword ? "password" : "text"}
-                value={passwordDisplayValue}
-                onFocus={() => {
-                  if (!isEditingPassword) {
-                    setIsEditingPassword(true);
-                    if (!form.password) {
-                      setForm((current) => ({ ...current, password: "" }));
-                    }
+          <Field label="TTLock App 密码">
+            <input
+              type={isEditingPassword || !config?.hasPassword ? "password" : "text"}
+              value={passwordDisplayValue}
+              onFocus={() => {
+                if (!isEditingPassword) {
+                  setIsEditingPassword(true);
+                  if (!form.password) {
+                    setForm((current) => ({ ...current, password: "" }));
                   }
-                }}
-                onBlur={() => {
-                  if (!form.password && config?.hasPassword) {
-                    setIsEditingPassword(false);
-                  }
-                }}
-                onChange={(event) => {
-                  if (!isEditingPassword) {
-                    setIsEditingPassword(true);
-                  }
-                  setForm((current) => ({ ...current, password: event.target.value }));
-                }}
-                placeholder={config?.hasPassword ? "" : "请输入密码"}
-                className="h-11 w-full rounded-xl border border-border bg-white px-3 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-primary/20 dark:border-white/10 dark:bg-white/5"
-              />
-            </Field>
-          )}
-
-          {!config?.usesSystemCredentials ? (
-            <>
-              <Field label="应用 ID">
-                <input
-                  value={form.clientId}
-                  onChange={(event) => setForm((current) => ({ ...current, clientId: event.target.value }))}
-                  placeholder="clientId"
-                  className="h-11 w-full rounded-xl border border-border bg-white px-3 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-primary/20 dark:border-white/10 dark:bg-white/5"
-                />
-              </Field>
-
-              <Field label="应用密钥">
-                <input
-                  value={form.clientSecret}
-                  onChange={(event) => setForm((current) => ({ ...current, clientSecret: event.target.value }))}
-                  placeholder="clientSecret"
-                  className="h-11 w-full rounded-xl border border-border bg-white px-3 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-primary/20 dark:border-white/10 dark:bg-white/5"
-                />
-              </Field>
-
-              <Field label="TTLock App 密码">
-                <input
-                  type={isEditingPassword || !config?.hasPassword ? "password" : "text"}
-                  value={passwordDisplayValue}
-                  onFocus={() => {
-                    if (!isEditingPassword) {
-                      setIsEditingPassword(true);
-                      if (!form.password) {
-                        setForm((current) => ({ ...current, password: "" }));
-                      }
-                    }
-                  }}
-                  onBlur={() => {
-                    if (!form.password && config?.hasPassword) {
-                      setIsEditingPassword(false);
-                    }
-                  }}
-                  onChange={(event) => {
-                    if (!isEditingPassword) {
-                      setIsEditingPassword(true);
-                    }
-                    setForm((current) => ({ ...current, password: event.target.value }));
-                  }}
-                  placeholder={config?.hasPassword ? "" : "请输入密码"}
-                  className="h-11 w-full rounded-xl border border-border bg-white px-3 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-primary/20 dark:border-white/10 dark:bg-white/5"
-                />
-              </Field>
-            </>
-          ) : null}
+                }
+              }}
+              onBlur={() => {
+                if (!form.password && config?.hasPassword) {
+                  setIsEditingPassword(false);
+                }
+              }}
+              onChange={(event) => {
+                if (!isEditingPassword) {
+                  setIsEditingPassword(true);
+                }
+                setForm((current) => ({ ...current, password: event.target.value }));
+              }}
+              placeholder={config?.hasPassword ? "" : "请输入密码"}
+              className="h-11 w-full rounded-xl border border-border bg-white px-3 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-primary/20 dark:border-white/10 dark:bg-white/5"
+            />
+          </Field>
         </div>
 
         <div className="mt-4 text-sm text-muted-foreground">
-          {config?.linked
+          {!hasSystemCredentials
+            ? "TTLock 的接口区域、应用 ID 和应用密钥已改为系统固定参数。请先到系统设置中完成配置，然后再回到这里填写账号密码登录。"
+            : config?.linked
             ? "当前 TTLock 已连接。这个按钮用于刷新授权状态，并重新同步门锁列表。"
             : "填好账号密码后，直接登录并获取门锁。密码会在服务端转成 MD5 保存。"}
         </div>
