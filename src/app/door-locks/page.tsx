@@ -662,13 +662,9 @@ export default function DoorLocksPage() {
                           </div>
 
                           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-2 w-full border-t border-border/20">
-                            {!status.online ? (
+                            {!status.online && (
                               <span className="text-[11px] text-red-600 dark:text-red-400 bg-red-500/5 border border-red-500/10 px-3 py-1.5 rounded-xl block flex-1">
                                 警告：当前门锁处于离线状态，无法接收远程指令。请检查网络或网关。
-                              </span>
-                            ) : (
-                              <span className="text-[11px] text-amber-600 dark:text-amber-400 bg-amber-500/5 border border-amber-500/10 px-3 py-1.5 rounded-xl block flex-1">
-                                远程开锁前请确认门锁在线，并确认当前操作环境安全。
                               </span>
                             )}
                             <button
