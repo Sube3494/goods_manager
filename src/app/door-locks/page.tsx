@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Battery, ChevronDown, Copy, Cpu, DoorOpen, Fingerprint, KeyRound, Layers, Loader2, LockKeyhole, ShieldCheck, Timer, Wifi, WifiOff, X } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { DatePicker } from "@/components/ui/DatePicker";
+import { TimePicker } from "@/components/ui/TimePicker";
 import { format } from "date-fns";
 import { useUser } from "@/hooks/useUser";
 import { hasPermission, type SessionUser } from "@/lib/permissions";
@@ -1122,14 +1123,13 @@ export default function DoorLocksPage() {
                                             }}
                                             triggerClassName="h-7 text-[10px] py-1 px-2.5 min-w-[100px]"
                                           />
-                                          <input
-                                            type="time"
+                                          <TimePicker
                                             value={pwdCustomStartTime}
-                                            onChange={(e) => {
-                                              setPwdCustomStartTime(e.target.value);
+                                            onChange={(val) => {
+                                              setPwdCustomStartTime(val);
                                               setGeneratedPwd("");
                                             }}
-                                            className="h-7 rounded-lg border border-border bg-white px-2 text-[10px] outline-none dark:border-white/10 dark:bg-white/5 text-foreground w-[60px]"
+                                            triggerClassName="h-7 text-[10px] py-1 px-2.5 min-w-[66px]"
                                           />
                                         </div>
                                       </div>
@@ -1144,14 +1144,13 @@ export default function DoorLocksPage() {
                                             }}
                                             triggerClassName="h-7 text-[10px] py-1 px-2.5 min-w-[100px]"
                                           />
-                                          <input
-                                            type="time"
+                                          <TimePicker
                                             value={pwdCustomEndTime}
-                                            onChange={(e) => {
-                                              setPwdCustomEndTime(e.target.value);
+                                            onChange={(val) => {
+                                              setPwdCustomEndTime(val);
                                               setGeneratedPwd("");
                                             }}
-                                            className="h-7 rounded-lg border border-border bg-white px-2 text-[10px] outline-none dark:border-white/10 dark:bg-white/5 text-foreground w-[60px]"
+                                            triggerClassName="h-7 text-[10px] py-1 px-2.5 min-w-[66px]"
                                           />
                                         </div>
                                       </div>
@@ -1279,11 +1278,10 @@ export default function DoorLocksPage() {
                                               onChange={(val) => setCustomPwdStartDate(val)}
                                               triggerClassName="h-7 text-[10px] py-1 px-2.5 min-w-[100px]"
                                             />
-                                            <input
-                                              type="time"
+                                            <TimePicker
                                               value={customPwdStartTime}
-                                              onChange={(e) => setCustomPwdStartTime(e.target.value)}
-                                              className="h-7 rounded-lg border border-border bg-white px-2 text-[10px] outline-none dark:border-white/10 dark:bg-white/5 text-foreground w-[60px]"
+                                              onChange={(val) => setCustomPwdStartTime(val)}
+                                              triggerClassName="h-7 text-[10px] py-1 px-2.5 min-w-[66px]"
                                             />
                                           </div>
                                         </div>
@@ -1295,11 +1293,10 @@ export default function DoorLocksPage() {
                                               onChange={(val) => setCustomPwdEndDate(val)}
                                               triggerClassName="h-7 text-[10px] py-1 px-2.5 min-w-[100px]"
                                             />
-                                            <input
-                                              type="time"
+                                            <TimePicker
                                               value={customPwdEndTime}
-                                              onChange={(e) => setCustomPwdEndTime(e.target.value)}
-                                              className="h-7 rounded-lg border border-border bg-white px-2 text-[10px] outline-none dark:border-white/10 dark:bg-white/5 text-foreground w-[60px]"
+                                              onChange={(val) => setCustomPwdEndTime(val)}
+                                              triggerClassName="h-7 text-[10px] py-1 px-2.5 min-w-[66px]"
                                             />
                                           </div>
                                         </div>
