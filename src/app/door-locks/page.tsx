@@ -643,18 +643,18 @@ export default function DoorLocksPage() {
           </div>
         ) : null}
 
-        <div className="mt-5 grid gap-3 grid-cols-1 sm:grid-cols-3">
+        <div className="mt-5 grid gap-2 grid-cols-2 sm:grid-cols-3">
           <div className="rounded-2xl border border-border/60 bg-background/70 px-4 py-3 text-sm">
-            <div className="text-muted-foreground">TTLock 用户 ID</div>
-            <div className="mt-1 font-bold text-foreground">{config?.ttlockUserId || "未获取"}</div>
+            <div className="text-muted-foreground text-[11px]">TTLock 用户 ID</div>
+            <div className="mt-1 font-bold text-foreground text-xs truncate">{config?.ttlockUserId || "未获取"}</div>
           </div>
           <div className="rounded-2xl border border-border/60 bg-background/70 px-4 py-3 text-sm">
-            <div className="text-muted-foreground">访问令牌到期</div>
-            <div className="mt-1 font-bold text-foreground">{formatTime(config?.accessTokenExpiresAt)}</div>
+            <div className="text-muted-foreground text-[11px]">令牌到期</div>
+            <div className="mt-1 font-bold text-foreground text-xs truncate">{formatTime(config?.accessTokenExpiresAt)}</div>
           </div>
-          <div className="rounded-2xl border border-border/60 bg-background/70 px-4 py-3 text-sm">
-            <div className="text-muted-foreground">最近授权时间</div>
-            <div className="mt-1 font-bold text-foreground">{formatTime(config?.lastAuthorizedAt)}</div>
+          <div className="rounded-2xl border border-border/60 bg-background/70 px-4 py-3 text-sm col-span-2 sm:col-span-1">
+            <div className="text-muted-foreground text-[11px]">最近授权时间</div>
+            <div className="mt-1 font-bold text-foreground text-xs truncate">{formatTime(config?.lastAuthorizedAt)}</div>
           </div>
         </div>
       </section>
@@ -720,14 +720,14 @@ export default function DoorLocksPage() {
                           {status.label}
                         </span>
                       </div>
-                      <div className="text-xs text-muted-foreground flex flex-wrap items-center gap-2 sm:mt-0">
+                      <div className="text-xs text-muted-foreground flex flex-wrap items-center gap-1.5 sm:mt-0">
                         <span
                           onClick={(e) => {
                             e.stopPropagation();
                             void navigator.clipboard.writeText(String(lock.lockId));
                             showToast("门锁 ID 已复制", "success");
                           }}
-                          className="inline-flex items-center gap-1 cursor-pointer rounded-lg border border-border/40 bg-background/60 px-2 py-1 transition whitespace-nowrap hover:text-foreground hover:bg-black/5 dark:hover:bg-white/10"
+                          className="inline-flex items-center gap-1 cursor-pointer rounded-lg border border-border/40 bg-background/60 px-2 py-0.5 transition whitespace-nowrap hover:text-foreground hover:bg-black/5 dark:hover:bg-white/10"
                           title="点击复制门锁 ID"
                         >
                           ID: {lock.lockId}
@@ -739,21 +739,21 @@ export default function DoorLocksPage() {
                             e.stopPropagation();
                             setQrPreviewLock(lock);
                           }}
-                          className="inline-flex items-center rounded-lg border border-border/40 bg-background/60 p-1"
+                          className="inline-flex items-center rounded-lg border border-border/40 bg-background/60 p-0.5"
                           title="点击查看扫码开锁二维码"
                         >
                           <img
                             src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(getScanUnlockUrl(lock))}`}
                             alt="QR Code"
-                            className="h-5 w-5 rounded border border-border bg-white p-0.5"
+                            className="h-4 w-4 rounded border border-border bg-white p-0.5"
                           />
                         </button>
                         <span className="hidden sm:inline text-muted-foreground/40">·</span>
-                        <span className="font-medium text-foreground/80 bg-background/50 border border-border/40 px-2 py-1 rounded-full text-[10px] whitespace-nowrap">
+                        <span className="font-medium text-foreground/80 bg-background/50 border border-border/40 px-2 py-0.5 rounded-full text-[10px] whitespace-nowrap">
                           {status.type}
                         </span>
                         <span className="hidden sm:inline text-muted-foreground/40">·</span>
-                        <span className="rounded-full border border-border/40 bg-background/50 px-2 py-1 whitespace-nowrap text-[10px] sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:text-xs">
+                        <span className="rounded-full border border-border/40 bg-background/50 px-2 py-0.5 whitespace-nowrap text-[10px] sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:text-xs">
                           电量: {formatBattery(lock.electricQuantity)}
                         </span>
                       </div>
