@@ -77,7 +77,7 @@ function testBitFromHex(hexStr: string | null | undefined, bitIndex: number): bo
   }
 }
 
-function getLockConnectionStatus(lock?: { featureValue?: string | null; hasGateway?: boolean | null; wifiState?: number | null } | null) {
+function getLockConnectionStatus(lock?: { featureValue?: string | null; hasGateway?: boolean | null; isOnline?: boolean | null } | null) {
   if (!lock) {
     return {
       type: "未知",
@@ -88,7 +88,7 @@ function getLockConnectionStatus(lock?: { featureValue?: string | null; hasGatew
   }
   const isWifiSupported = testBitFromHex(lock.featureValue, 56);
   if (isWifiSupported) {
-    const isOnline = !!lock.hasGateway || lock.wifiState === 1;
+    const isOnline = !!lock.hasGateway || lock.isOnline === true;
     return {
       type: "WiFi锁",
       online: isOnline,
@@ -98,7 +98,7 @@ function getLockConnectionStatus(lock?: { featureValue?: string | null; hasGatew
         : "text-muted-foreground"
     };
   } else {
-    const isOnline = !!lock.hasGateway;
+    const isOnline = !!lock.hasGateway || lock.isOnline === true;
     return {
       type: lock.hasGateway ? "网关锁" : "蓝牙锁",
       online: isOnline,
