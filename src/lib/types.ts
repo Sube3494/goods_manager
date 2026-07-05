@@ -363,6 +363,7 @@ export interface TTLockLockSummary {
   lockMac?: string | null;
   electricQuantity?: number | null;
   hasGateway?: boolean | null;
+  wifiState?: number | null;
   groupId?: number | null;
   groupName?: string | null;
   featureValue?: string | null;

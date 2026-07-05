@@ -77,7 +77,7 @@ function testBitFromHex(hexStr: string | null | undefined, bitIndex: number): bo
   }
 }
 
-function getLockConnectionStatus(lock?: { featureValue?: string | null; hasGateway?: boolean | null } | null) {
+function getLockConnectionStatus(lock?: { featureValue?: string | null; hasGateway?: boolean | null; wifiState?: number | null } | null) {
   if (!lock) {
     return {
       type: "未知",
@@ -88,18 +88,20 @@ function getLockConnectionStatus(lock?: { featureValue?: string | null; hasGatew
   }
   const isWifiSupported = testBitFromHex(lock.featureValue, 56);
   if (isWifiSupported) {
+    const isOnline = !!lock.hasGateway || lock.wifiState === 1;
     return {
       type: "WiFi锁",
-      online: !!lock.hasGateway,
-      label: lock.hasGateway ? "WiFi在线" : "WiFi离线",
-      colorClass: lock.hasGateway 
+      online: isOnline,
+      label: isOnline ? "WiFi在线" : "WiFi离线",
+      colorClass: isOnline 
         ? "text-emerald-600 dark:text-emerald-400 font-medium" 
         : "text-muted-foreground"
     };
   } else {
+    const isOnline = !!lock.hasGateway;
     return {
       type: lock.hasGateway ? "网关锁" : "蓝牙锁",
-      online: !!lock.hasGateway,
+      online: isOnline,
       label: lock.hasGateway ? "网关在线" : "蓝牙",
       colorClass: lock.hasGateway 
         ? "text-emerald-600 dark:text-emerald-400 font-medium" 

@@ -132,7 +132,7 @@ function ScanUnlockInner() {
   }
 
   // 3. Success/Normal View
-  const isOnline = !!lock.hasGateway;
+  const isOnline = !!lock.hasGateway || lock.wifiState === 1;
   const normalizedVerificationCode = verificationCode.replace(/\D/g, "").slice(-4);
   const hasValidVerificationCode = normalizedVerificationCode.length === 4;
 

@@ -521,6 +521,7 @@ function mapTTLockLockSummary(item: unknown): TTLockLockSummary | null {
       : Number.isFinite(Number(record.hasGateway))
         ? Number(record.hasGateway) === 1
         : null,
+    wifiState: Number.isFinite(Number(record.wifiState)) ? Number(record.wifiState) : null,
     groupId: normalizeOptionalPositiveInt(record.groupId),
     groupName: String(record.groupName || "").trim() || null,
     featureValue: String(record.featureValue || "").trim() || null,
