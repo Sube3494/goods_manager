@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Battery, ChevronDown, Copy, Cpu, DoorOpen, Fingerprint, KeyRound, Layers, Loader2, LockKeyhole, ShieldCheck, Timer, Wifi, WifiOff, X } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
+import { DatePicker } from "@/components/ui/DatePicker";
+import { format } from "date-fns";
 import { useUser } from "@/hooks/useUser";
 import { hasPermission, type SessionUser } from "@/lib/permissions";
 import type {
@@ -151,14 +153,18 @@ export default function DoorLocksPage() {
   const [isGeneratingPwd, setIsGeneratingPwd] = useState(false);
   const [generatedPwd, setGeneratedPwd] = useState("");
   const [pwdDurationType, setPwdDurationType] = useState<"1h" | "24h" | "3d" | "custom">("1h");
-  const [pwdCustomStart, setPwdCustomStart] = useState("");
-  const [pwdCustomEnd, setPwdCustomEnd] = useState("");
+  const [pwdCustomStartDate, setPwdCustomStartDate] = useState(() => format(new Date(), "yyyy-MM-dd"));
+  const [pwdCustomStartTime, setPwdCustomStartTime] = useState("14:00");
+  const [pwdCustomEndDate, setPwdCustomEndDate] = useState(() => format(new Date(Date.now() + 24 * 60 * 60 * 1000), "yyyy-MM-dd"));
+  const [pwdCustomEndTime, setPwdCustomEndTime] = useState("12:00");
   const [pwdMode, setPwdMode] = useState<"offline" | "custom">("offline");
   const [customPwdVal, setCustomPwdVal] = useState("");
   const [customPwdName, setCustomPwdName] = useState("");
   const [customPwdIsPermanent, setCustomPwdIsPermanent] = useState(true);
-  const [customPwdStart, setCustomPwdStart] = useState("");
-  const [customPwdEnd, setCustomPwdEnd] = useState("");
+  const [customPwdStartDate, setCustomPwdStartDate] = useState(() => format(new Date(), "yyyy-MM-dd"));
+  const [customPwdStartTime, setCustomPwdStartTime] = useState("14:00");
+  const [customPwdEndDate, setCustomPwdEndDate] = useState(() => format(new Date(Date.now() + 24 * 60 * 60 * 1000), "yyyy-MM-dd"));
+  const [customPwdEndTime, setCustomPwdEndTime] = useState("12:00");
   const [isAddingCustomPwd, setIsAddingCustomPwd] = useState(false);
   const [isEditingPassword, setIsEditingPassword] = useState(false);
   const hasSystemCredentials = Boolean(config?.usesSystemCredentials);
@@ -417,8 +423,8 @@ export default function DoorLocksPage() {
     } else if (pwdDurationType === "3d") {
       endDate = startDate + 3 * 24 * 60 * 60 * 1000;
     } else {
-      const startMs = pwdCustomStart ? new Date(pwdCustomStart).getTime() : 0;
-      const endMs = pwdCustomEnd ? new Date(pwdCustomEnd).getTime() : 0;
+      const startMs = pwdCustomStartDate && pwdCustomStartTime ? new Date(`${pwdCustomStartDate}T${pwdCustomStartTime}:00`).getTime() : 0;
+      const endMs = pwdCustomEndDate && pwdCustomEndTime ? new Date(`${pwdCustomEndDate}T${pwdCustomEndTime}:00`).getTime() : 0;
       if (!startMs || !endMs || startMs >= endMs) {
         showToast("自定义起止时间无效", "error");
         setIsGeneratingPwd(false);
@@ -470,8 +476,8 @@ export default function DoorLocksPage() {
     let endDate = startDate;
 
     if (!customPwdIsPermanent) {
-      const startMs = customPwdStart ? new Date(customPwdStart).getTime() : 0;
-      const endMs = customPwdEnd ? new Date(customPwdEnd).getTime() : 0;
+      const startMs = customPwdStartDate && customPwdStartTime ? new Date(`${customPwdStartDate}T${customPwdStartTime}:00`).getTime() : 0;
+      const endMs = customPwdEndDate && customPwdEndTime ? new Date(`${customPwdEndDate}T${customPwdEndTime}:00`).getTime() : 0;
       if (!startMs || !endMs || startMs >= endMs) {
         showToast("自定义起止时间无效", "error");
         setIsAddingCustomPwd(false);
@@ -1104,30 +1110,50 @@ export default function DoorLocksPage() {
 
                                   {/* 自定义起止时间选择器 */}
                                   {pwdDurationType === "custom" && (
-                                    <div className="grid grid-cols-2 gap-2 w-full sm:w-auto shrink-0">
+                                    <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto shrink-0">
                                       <div className="space-y-1">
-                                        <span className="text-[9px] text-muted-foreground block">开始时间</span>
-                                        <input
-                                          type="datetime-local"
-                                          value={pwdCustomStart}
-                                          onChange={(e) => {
-                                            setPwdCustomStart(e.target.value);
-                                            setGeneratedPwd("");
-                                          }}
-                                          className="h-7 rounded-lg border border-border bg-white px-2 text-[10px] outline-none dark:border-white/10 dark:bg-white/5 text-foreground w-full"
-                                        />
+                                        <span className="text-[9px] text-muted-foreground block font-medium">开始时间</span>
+                                        <div className="flex items-center gap-1.5">
+                                          <DatePicker
+                                            value={pwdCustomStartDate}
+                                            onChange={(val) => {
+                                              setPwdCustomStartDate(val);
+                                              setGeneratedPwd("");
+                                            }}
+                                            triggerClassName="h-7 text-[10px] py-1 px-2.5 min-w-[100px]"
+                                          />
+                                          <input
+                                            type="time"
+                                            value={pwdCustomStartTime}
+                                            onChange={(e) => {
+                                              setPwdCustomStartTime(e.target.value);
+                                              setGeneratedPwd("");
+                                            }}
+                                            className="h-7 rounded-lg border border-border bg-white px-2 text-[10px] outline-none dark:border-white/10 dark:bg-white/5 text-foreground w-[60px]"
+                                          />
+                                        </div>
                                       </div>
                                       <div className="space-y-1">
-                                        <span className="text-[9px] text-muted-foreground block">结束时间</span>
-                                        <input
-                                          type="datetime-local"
-                                          value={pwdCustomEnd}
-                                          onChange={(e) => {
-                                            setPwdCustomEnd(e.target.value);
-                                            setGeneratedPwd("");
-                                          }}
-                                          className="h-7 rounded-lg border border-border bg-white px-2 text-[10px] outline-none dark:border-white/10 dark:bg-white/5 text-foreground w-full"
-                                        />
+                                        <span className="text-[9px] text-muted-foreground block font-medium">结束时间</span>
+                                        <div className="flex items-center gap-1.5">
+                                          <DatePicker
+                                            value={pwdCustomEndDate}
+                                            onChange={(val) => {
+                                              setPwdCustomEndDate(val);
+                                              setGeneratedPwd("");
+                                            }}
+                                            triggerClassName="h-7 text-[10px] py-1 px-2.5 min-w-[100px]"
+                                          />
+                                          <input
+                                            type="time"
+                                            value={pwdCustomEndTime}
+                                            onChange={(e) => {
+                                              setPwdCustomEndTime(e.target.value);
+                                              setGeneratedPwd("");
+                                            }}
+                                            className="h-7 rounded-lg border border-border bg-white px-2 text-[10px] outline-none dark:border-white/10 dark:bg-white/5 text-foreground w-[60px]"
+                                          />
+                                        </div>
                                       </div>
                                     </div>
                                   )}
@@ -1244,24 +1270,38 @@ export default function DoorLocksPage() {
                                     </div>
 
                                     {!customPwdIsPermanent && (
-                                      <div className="grid grid-cols-2 gap-2 w-full sm:w-auto shrink-0 animate-fadeIn">
+                                      <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto shrink-0 animate-fadeIn">
                                         <div className="space-y-1">
-                                          <span className="text-[9px] text-muted-foreground block">生效时间</span>
-                                          <input
-                                            type="datetime-local"
-                                            value={customPwdStart}
-                                            onChange={(e) => setCustomPwdStart(e.target.value)}
-                                            className="h-7 rounded-lg border border-border bg-white px-2 text-[10px] outline-none dark:border-white/10 dark:bg-white/5 text-foreground w-full"
-                                          />
+                                          <span className="text-[9px] text-muted-foreground block font-medium">生效时间</span>
+                                          <div className="flex items-center gap-1.5">
+                                            <DatePicker
+                                              value={customPwdStartDate}
+                                              onChange={(val) => setCustomPwdStartDate(val)}
+                                              triggerClassName="h-7 text-[10px] py-1 px-2.5 min-w-[100px]"
+                                            />
+                                            <input
+                                              type="time"
+                                              value={customPwdStartTime}
+                                              onChange={(e) => setCustomPwdStartTime(e.target.value)}
+                                              className="h-7 rounded-lg border border-border bg-white px-2 text-[10px] outline-none dark:border-white/10 dark:bg-white/5 text-foreground w-[60px]"
+                                            />
+                                          </div>
                                         </div>
                                         <div className="space-y-1">
-                                          <span className="text-[9px] text-muted-foreground block">失效时间</span>
-                                          <input
-                                            type="datetime-local"
-                                            value={customPwdEnd}
-                                            onChange={(e) => setCustomPwdEnd(e.target.value)}
-                                            className="h-7 rounded-lg border border-border bg-white px-2 text-[10px] outline-none dark:border-white/10 dark:bg-white/5 text-foreground w-full"
-                                          />
+                                          <span className="text-[9px] text-muted-foreground block font-medium">失效时间</span>
+                                          <div className="flex items-center gap-1.5">
+                                            <DatePicker
+                                              value={customPwdEndDate}
+                                              onChange={(val) => setCustomPwdEndDate(val)}
+                                              triggerClassName="h-7 text-[10px] py-1 px-2.5 min-w-[100px]"
+                                            />
+                                            <input
+                                              type="time"
+                                              value={customPwdEndTime}
+                                              onChange={(e) => setCustomPwdEndTime(e.target.value)}
+                                              className="h-7 rounded-lg border border-border bg-white px-2 text-[10px] outline-none dark:border-white/10 dark:bg-white/5 text-foreground w-[60px]"
+                                            />
+                                          </div>
                                         </div>
                                       </div>
                                     )}
