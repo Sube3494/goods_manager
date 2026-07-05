@@ -649,7 +649,7 @@ export default function DoorLocksPage() {
                             </div>
 
                             {/* 产品型号 */}
-                            <div className="col-span-2 sm:col-span-2 bg-black/[0.015] dark:bg-white/[0.02] border border-border/50 rounded-xl p-3 flex flex-col justify-between min-h-[64px]">
+                            <div className="col-span-1 sm:col-span-1 bg-black/[0.015] dark:bg-white/[0.02] border border-border/50 rounded-xl p-3 flex flex-col justify-between min-h-[64px]">
                               <div className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider flex items-center gap-1.5">
                                 <Fingerprint size={12} className="text-muted-foreground/70" />
                                 产品型号
@@ -659,28 +659,34 @@ export default function DoorLocksPage() {
                               </div>
                             </div>
 
+                            {/* 远程操作（开锁） */}
+                            <div className="col-span-1 sm:col-span-1 bg-rose-500/5 dark:bg-rose-500/10 border border-rose-500/20 rounded-xl p-3 flex flex-col justify-between min-h-[64px] transition-all hover:bg-rose-500/10 dark:hover:bg-rose-500/20">
+                              <div className="text-[10px] text-rose-500 dark:text-rose-400 font-medium uppercase tracking-wider flex items-center gap-1.5">
+                                <LockKeyhole size={12} className="text-rose-500 dark:text-rose-400" />
+                                远程操作
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => void handleUnlock(lockDetail.lockId)}
+                                disabled={isUnlocking || !status.online}
+                                className={`w-full inline-flex h-7 items-center justify-center gap-1.5 rounded-lg text-[11px] font-semibold text-white transition shrink-0 ${
+                                  !status.online
+                                    ? "bg-slate-400 dark:bg-slate-700 cursor-not-allowed opacity-60"
+                                    : "bg-rose-600 hover:bg-rose-500 disabled:opacity-50 shadow-sm shadow-rose-600/20"
+                                }`}
+                              >
+                                {isUnlocking ? <Loader2 size={10} className="animate-spin" /> : null}
+                                {!status.online ? "设备离线" : "远程开锁"}
+                              </button>
+                            </div>
+
                           </div>
 
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-2 w-full border-t border-border/20">
-                            {!status.online && (
-                              <span className="text-[11px] text-red-600 dark:text-red-400 bg-red-500/5 border border-red-500/10 px-3 py-1.5 rounded-xl block flex-1">
-                                警告：当前门锁处于离线状态，无法接收远程指令。请检查网络或网关。
-                              </span>
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => void handleUnlock(lockDetail.lockId)}
-                              disabled={isUnlocking || !status.online}
-                              className={`inline-flex h-9 items-center justify-center gap-2 rounded-xl px-6 text-xs font-semibold text-white transition shrink-0 w-full sm:w-auto ${
-                                !status.online
-                                  ? "bg-slate-400 dark:bg-slate-700 cursor-not-allowed opacity-60"
-                                  : "bg-rose-600 hover:bg-rose-500 disabled:opacity-50"
-                              }`}
-                            >
-                              {isUnlocking ? <Loader2 size={12} className="animate-spin" /> : <LockKeyhole size={12} />}
-                              {!status.online ? "设备离线，无法开锁" : "远程开锁"}
-                            </button>
-                          </div>
+                          {!status.online && (
+                            <div className="text-[11px] text-red-600 dark:text-red-400 bg-red-500/5 border border-red-500/10 px-3 py-2 rounded-xl block w-full mt-3">
+                              警告：当前门锁处于离线状态，无法接收远程指令。请检查网络或网关。
+                            </div>
+                          )}
                         </div>
                       ) : (
                         <div className="text-xs text-muted-foreground py-2">
