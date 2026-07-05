@@ -674,6 +674,36 @@ export async function setTTLockAutoLockTimeByUserId(userId: string, lockId: numb
   return { success: true };
 }
 
+export async function getTTLockKeyboardPwdByUserId(
+  userId: string,
+  lockId: number,
+  options: {
+    keyboardPwdVersion: number;
+    keyboardPwdType: number;
+    startDate: number;
+    endDate: number;
+  }
+) {
+  const config = await ensureTTLockAccessTokenByUserId(userId);
+  const response = await postTTLockForm<{ keyboardPwd: string; errcode?: number; errmsg?: string }>(
+    config,
+    "/v3/keyboardPwd/get",
+    {
+      clientId: config.clientId,
+      accessToken: config.accessToken,
+      lockId,
+      keyboardPwdVersion: options.keyboardPwdVersion,
+      keyboardPwdType: options.keyboardPwdType,
+      startDate: options.startDate,
+      endDate: options.endDate,
+      date: nowMs(),
+    }
+  );
+
+  const payload = assertTTLockSuccess(response);
+  return { success: true, keyboardPwd: payload.keyboardPwd };
+}
+
 export async function findAuthorizedTTLockUserId(): Promise<string | null> {
   const users = await prisma.user.findMany({
     select: { id: true, permissions: true }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthorizedUser } from "@/lib/auth";
-import { getTTLockDetailByUserId, configTTLockPassageModeByUserId, syncTTLockBatteryByUserId, setTTLockAutoLockTimeByUserId } from "@/lib/ttlock";
+import { getTTLockDetailByUserId, configTTLockPassageModeByUserId, syncTTLockBatteryByUserId, setTTLockAutoLockTimeByUserId, getTTLockKeyboardPwdByUserId } from "@/lib/ttlock";
 import { createHash } from "crypto";
 
 export const dynamic = "force-dynamic";
@@ -73,6 +73,26 @@ export async function POST(
         return NextResponse.json({ error: "Invalid seconds parameter" }, { status: 400 });
       }
       const result = await setTTLockAutoLockTimeByUserId(session.id, lockId, seconds);
+      return NextResponse.json(result);
+    }
+
+    // 获取键盘临时密码逻辑分发
+    if (body.action === "getKeyboardPwd") {
+      const keyboardPwdVersion = Number(body.keyboardPwdVersion) || 4;
+      const keyboardPwdType = Number(body.keyboardPwdType) || 3;
+      const startDate = Number(body.startDate);
+      const endDate = Number(body.endDate);
+
+      if (!Number.isFinite(startDate) || !Number.isFinite(endDate) || startDate >= endDate) {
+        return NextResponse.json({ error: "Invalid time parameters" }, { status: 400 });
+      }
+
+      const result = await getTTLockKeyboardPwdByUserId(session.id, lockId, {
+        keyboardPwdVersion,
+        keyboardPwdType,
+        startDate,
+        endDate,
+      });
       return NextResponse.json(result);
     }
 

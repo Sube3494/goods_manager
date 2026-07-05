@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Battery, ChevronDown, Copy, Cpu, DoorOpen, Fingerprint, Layers, Loader2, LockKeyhole, ShieldCheck, Timer, Wifi, WifiOff, X } from "lucide-react";
+import { Battery, ChevronDown, Copy, Cpu, DoorOpen, Fingerprint, KeyRound, Layers, Loader2, LockKeyhole, ShieldCheck, Timer, Wifi, WifiOff, X } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { useUser } from "@/hooks/useUser";
 import { hasPermission, type SessionUser } from "@/lib/permissions";
@@ -148,6 +148,11 @@ export default function DoorLocksPage() {
   const [showAutoLockSelector, setShowAutoLockSelector] = useState(false);
   const [isCustomAutoLock, setIsCustomAutoLock] = useState(false);
   const [customAutoLockSec, setCustomAutoLockSec] = useState("");
+  const [isGeneratingPwd, setIsGeneratingPwd] = useState(false);
+  const [generatedPwd, setGeneratedPwd] = useState("");
+  const [pwdDurationType, setPwdDurationType] = useState<"1h" | "24h" | "3d" | "custom">("1h");
+  const [pwdCustomStart, setPwdCustomStart] = useState("");
+  const [pwdCustomEnd, setPwdCustomEnd] = useState("");
   const [isEditingPassword, setIsEditingPassword] = useState(false);
   const hasSystemCredentials = Boolean(config?.usesSystemCredentials);
   const [qrPreviewLock, setQrPreviewLock] = useState<TTLockLockSummary | null>(null);
@@ -388,6 +393,61 @@ export default function DoorLocksPage() {
       showToast(error instanceof Error ? error.message : "设置自动锁门时间失败", "error");
     } finally {
       setIsSettingAutoLock(false);
+    }
+  };
+
+  const handleGeneratePwd = async (lockId: number, keyboardPwdVersion: number) => {
+    setIsGeneratingPwd(true);
+    setGeneratedPwd("");
+
+    let startDate = Date.now();
+    let endDate = startDate;
+
+    if (pwdDurationType === "1h") {
+      endDate = startDate + 60 * 60 * 1000;
+    } else if (pwdDurationType === "24h") {
+      endDate = startDate + 24 * 60 * 60 * 1000;
+    } else if (pwdDurationType === "3d") {
+      endDate = startDate + 3 * 24 * 60 * 60 * 1000;
+    } else {
+      const startMs = pwdCustomStart ? new Date(pwdCustomStart).getTime() : 0;
+      const endMs = pwdCustomEnd ? new Date(pwdCustomEnd).getTime() : 0;
+      if (!startMs || !endMs || startMs >= endMs) {
+        showToast("自定义起止时间无效", "error");
+        setIsGeneratingPwd(false);
+        return;
+      }
+      startDate = startMs;
+      endDate = endMs;
+    }
+
+    try {
+      const response = await fetch(`/api/ttlock/locks/${lockId}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "getKeyboardPwd",
+          keyboardPwdVersion,
+          keyboardPwdType: 3,
+          startDate,
+          endDate,
+        }),
+      });
+      const data = await response.json() as { error?: string; keyboardPwd?: string };
+      if (!response.ok) {
+        throw new Error(data?.error || "生成临时密码失败");
+      }
+      if (data.keyboardPwd) {
+        setGeneratedPwd(data.keyboardPwd);
+        showToast("临时开锁密码生成成功", "success");
+      }
+    } catch (error) {
+      console.error("Failed to generate keyboard pwd:", error);
+      showToast(error instanceof Error ? error.message : "生成临时密码失败", "error");
+    } finally {
+      setIsGeneratingPwd(false);
     }
   };
 
@@ -910,6 +970,113 @@ export default function DoorLocksPage() {
                             </button>
 
                           </div>
+
+                          {/* 离线临时密码生成区 */}
+                          <div className="border border-border/50 rounded-xl bg-black/[0.005] dark:bg-white/[0.005] p-3 sm:p-4 mt-4 space-y-3">
+                            <div>
+                              <h3 className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                                <KeyRound size={13} className="text-muted-foreground" />
+                                生成离线限时密码 (键盘密码)
+                              </h3>
+                              <p className="text-[10px] text-muted-foreground mt-0.5">
+                                通过内置算法离线计算限时密码。即使门锁离线（无网络/无网关），在锁键盘输入此密码亦可开门。
+                              </p>
+                            </div>
+
+                            <div className="flex flex-col sm:flex-row sm:items-end gap-3 pt-1">
+                              {/* 密码有效期限选择 */}
+                              <div className="flex-1 space-y-1.5">
+                                <label className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider block">密码有效期限</label>
+                                <div className="flex flex-wrap gap-1">
+                                  {(["1h", "24h", "3d", "custom"] as const).map((type) => (
+                                    <button
+                                      key={type}
+                                      type="button"
+                                      onClick={() => {
+                                        setPwdDurationType(type);
+                                        setGeneratedPwd("");
+                                      }}
+                                      className={`h-6 px-3 rounded-lg text-[10px] font-semibold transition cursor-pointer ${
+                                        pwdDurationType === type
+                                          ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20"
+                                          : "bg-black/5 hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10 text-muted-foreground border border-transparent"
+                                      }`}
+                                    >
+                                      {type === "1h" ? "1 小时" : type === "24h" ? "24 小时" : type === "3d" ? "3 天" : "自定义"}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+
+                              {/* 自定义起止时间选择器 */}
+                              {pwdDurationType === "custom" && (
+                                <div className="grid grid-cols-2 gap-2 w-full sm:w-auto shrink-0">
+                                  <div className="space-y-1">
+                                    <span className="text-[9px] text-muted-foreground block">开始时间</span>
+                                    <input
+                                      type="datetime-local"
+                                      value={pwdCustomStart}
+                                      onChange={(e) => {
+                                        setPwdCustomStart(e.target.value);
+                                        setGeneratedPwd("");
+                                      }}
+                                      className="h-7 rounded-lg border border-border bg-white px-2 text-[10px] outline-none dark:border-white/10 dark:bg-white/5 text-foreground w-full"
+                                    />
+                                  </div>
+                                  <div className="space-y-1">
+                                    <span className="text-[9px] text-muted-foreground block">结束时间</span>
+                                    <input
+                                      type="datetime-local"
+                                      value={pwdCustomEnd}
+                                      onChange={(e) => {
+                                        setPwdCustomEnd(e.target.value);
+                                        setGeneratedPwd("");
+                                      }}
+                                      className="h-7 rounded-lg border border-border bg-white px-2 text-[10px] outline-none dark:border-white/10 dark:bg-white/5 text-foreground w-full"
+                                    />
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* 生成按钮 */}
+                              <button
+                                type="button"
+                                onClick={() => void handleGeneratePwd(lockDetail.lockId, lockDetail.keyboardPwdVersion || 4)}
+                                disabled={isGeneratingPwd}
+                                className="inline-flex h-7 items-center justify-center gap-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-[10px] font-semibold text-white px-4 shrink-0 cursor-pointer w-full sm:w-auto shadow-sm shadow-rose-600/10 transition"
+                              >
+                                {isGeneratingPwd ? <Loader2 size={10} className="animate-spin" /> : null}
+                                生成密码
+                              </button>
+                            </div>
+
+                            {/* 生成密码显示 */}
+                            {generatedPwd && (
+                              <div className="mt-2 bg-emerald-500/5 border border-emerald-500/10 rounded-xl p-3 flex items-center justify-between gap-3 animate-fadeIn">
+                                <div className="space-y-1 min-w-0">
+                                  <div className="text-[9px] text-emerald-600 dark:text-emerald-400 font-semibold tracking-wider uppercase">已生成的临时开锁密码</div>
+                                  <div className="text-xl font-bold tracking-widest text-emerald-600 dark:text-emerald-400 font-mono">
+                                    {generatedPwd}
+                                  </div>
+                                  <p className="text-[9px] text-muted-foreground">
+                                    提示：请引导客人在门锁键盘上输入此密码，并以 **“#”** 键结尾即可开锁。
+                                  </p>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    void navigator.clipboard.writeText(generatedPwd);
+                                    showToast("开锁密码已复制", "success");
+                                  }}
+                                  className="inline-flex h-7 items-center justify-center gap-1 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 transition shrink-0 cursor-pointer"
+                                >
+                                  <Copy size={10} />
+                                  复制密码
+                                </button>
+                              </div>
+                            )}
+                          </div>
+
                         </div>
                       ) : (
                         <div className="text-xs text-muted-foreground py-2">
