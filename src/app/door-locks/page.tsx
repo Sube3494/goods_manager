@@ -144,6 +144,8 @@ export default function DoorLocksPage() {
   const [isUnlocking, setIsUnlocking] = useState(false);
   const [isConfiguringPassageMode, setIsConfiguringPassageMode] = useState(false);
   const [isSyncingBattery, setIsSyncingBattery] = useState(false);
+  const [isSettingAutoLock, setIsSettingAutoLock] = useState(false);
+  const [showAutoLockSelector, setShowAutoLockSelector] = useState(false);
   const [isEditingPassword, setIsEditingPassword] = useState(false);
   const hasSystemCredentials = Boolean(config?.usesSystemCredentials);
   const [qrPreviewLock, setQrPreviewLock] = useState<TTLockLockSummary | null>(null);
@@ -359,6 +361,31 @@ export default function DoorLocksPage() {
       showToast(error instanceof Error ? error.message : "同步电量失败", "error");
     } finally {
       setIsSyncingBattery(false);
+    }
+  };
+
+  const handleSetAutoLockTime = async (lockId: number, seconds: number) => {
+    setIsSettingAutoLock(true);
+    try {
+      const response = await fetch(`/api/ttlock/locks/${lockId}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ action: "setAutoLockTime", seconds }),
+      });
+      const data = await response.json() as { error?: string };
+      if (!response.ok) {
+        throw new Error(data?.error || "设置自动锁门时间失败");
+      }
+      showToast(seconds === 0 ? "已成功禁用自动锁门" : `自动锁门时间已设为 ${seconds} 秒`, "success");
+      setShowAutoLockSelector(false);
+      await loadLockDetail(lockId);
+    } catch (error) {
+      console.error("Failed to set TTLock auto lock time:", error);
+      showToast(error instanceof Error ? error.message : "设置自动锁门时间失败", "error");
+    } finally {
+      setIsSettingAutoLock(false);
     }
   };
 
@@ -687,14 +714,60 @@ export default function DoorLocksPage() {
                             </button>
 
                             {/* 自动锁门 */}
-                            <div className="bg-black/[0.015] dark:bg-white/[0.02] border border-border/50 rounded-xl p-3 flex flex-col justify-between min-h-[64px]">
-                              <div className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider flex items-center gap-1.5">
-                                <Timer size={12} className="text-muted-foreground/70" />
-                                自动锁门
+                            <div
+                              className={`col-span-1 sm:col-span-1 border rounded-xl p-3 flex flex-col justify-between min-h-[64px] text-left transition-all ${
+                                !status.online
+                                  ? "bg-slate-400/5 dark:bg-slate-700/5 border-border/40 cursor-not-allowed opacity-50"
+                                  : "bg-black/[0.015] dark:bg-white/[0.02] border-border/50"
+                              }`}
+                            >
+                              <div className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider flex items-center gap-1.5 w-full justify-between">
+                                <span className="flex items-center gap-1.5">
+                                  {isSettingAutoLock ? (
+                                    <Loader2 size={12} className="animate-spin text-primary" />
+                                  ) : (
+                                    <Timer size={12} className="text-muted-foreground/70" />
+                                  )}
+                                  自动锁门
+                                </span>
+                                {status.online && !isSettingAutoLock && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowAutoLockSelector(!showAutoLockSelector)}
+                                    className="text-[10px] text-rose-500 dark:text-rose-400 hover:underline font-medium cursor-pointer"
+                                  >
+                                    {showAutoLockSelector ? "取消" : "设置"}
+                                  </button>
+                                )}
                               </div>
-                              <div className="text-[13px] font-semibold text-foreground mt-1 truncate">
-                                {Number(lockDetail.autoLockTime) > 0 ? `${lockDetail.autoLockTime} 秒` : "已禁用"}
-                              </div>
+                              
+                              {showAutoLockSelector && status.online && !isSettingAutoLock ? (
+                                <div className="grid grid-cols-5 gap-1 mt-1.5">
+                                  {[0, 5, 10, 30, 60].map((sec) => (
+                                    <button
+                                      key={sec}
+                                      type="button"
+                                      onClick={() => void handleSetAutoLockTime(lockDetail.lockId, sec)}
+                                      className="h-5 rounded bg-black/5 hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10 text-[9px] font-medium text-foreground flex items-center justify-center transition cursor-pointer"
+                                      title={sec === 0 ? "禁用自动锁门" : `设置自动锁门时间为 ${sec} 秒`}
+                                    >
+                                      {sec === 0 ? "禁用" : `${sec}s`}
+                                    </button>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className={`text-[13px] font-semibold mt-1 truncate ${
+                                  !status.online ? "text-muted-foreground" : "text-foreground"
+                                }`}>
+                                  {!status.online
+                                    ? "设备离线"
+                                    : isSettingAutoLock
+                                      ? "设置中..."
+                                      : Number(lockDetail.autoLockTime) > 0
+                                        ? `${lockDetail.autoLockTime} 秒`
+                                        : "已禁用"}
+                                </div>
+                              )}
                             </div>
 
                             {/* 固件版本 */}

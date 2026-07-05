@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthorizedUser } from "@/lib/auth";
-import { getTTLockDetailByUserId, configTTLockPassageModeByUserId, syncTTLockBatteryByUserId } from "@/lib/ttlock";
+import { getTTLockDetailByUserId, configTTLockPassageModeByUserId, syncTTLockBatteryByUserId, setTTLockAutoLockTimeByUserId } from "@/lib/ttlock";
 import { createHash } from "crypto";
 
 export const dynamic = "force-dynamic";
@@ -63,6 +63,16 @@ export async function POST(
     // 电量同步逻辑分发
     if (body.action === "syncBattery") {
       const result = await syncTTLockBatteryByUserId(session.id, lockId);
+      return NextResponse.json(result);
+    }
+
+    // 自动锁门时间配置逻辑分发
+    if (body.action === "setAutoLockTime") {
+      const seconds = Number(body.seconds);
+      if (!Number.isFinite(seconds) || seconds < 0) {
+        return NextResponse.json({ error: "Invalid seconds parameter" }, { status: 400 });
+      }
+      const result = await setTTLockAutoLockTimeByUserId(session.id, lockId, seconds);
       return NextResponse.json(result);
     }
 
