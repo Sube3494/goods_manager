@@ -555,7 +555,7 @@ export default function DoorLocksPage() {
             <h1 className="mt-3 text-4xl font-black tracking-tight text-foreground">门锁管理</h1>
           </div>
 
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className="grid gap-3 grid-cols-2">
             <div className="rounded-2xl border border-border/60 bg-background/75 px-4 py-4 text-sm">
               <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">授权状态</div>
               <div className="mt-2 text-2xl font-black text-foreground">{config?.linked ? "已连接" : "未连接"}</div>
