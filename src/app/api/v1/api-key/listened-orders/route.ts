@@ -7,6 +7,7 @@ import {
   normalizeAutoPickOrderPayload,
   resolveAutoPickTargetUserId,
   upsertAutoPickOrder,
+  enrichAutoPickInboundOrderIfNeeded,
 } from "@/lib/autoPickOrders";
 
 export const dynamic = "force-dynamic";
@@ -48,6 +49,7 @@ export async function POST(request: NextRequest) {
       }, { status: 500 });
     }
 
+    await enrichAutoPickInboundOrderIfNeeded(targetUserId, normalized);
     const order = await upsertAutoPickOrder(targetUserId, normalized);
     await markAutoPickApiKeyUsed(requestApiKey);
     return NextResponse.json({

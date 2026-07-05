@@ -3129,6 +3129,79 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
   return order;
 }
 
+export async function enrichAutoPickInboundOrderIfNeeded(
+  userId: string,
+  current: AutoPickInboundOrder,
+  cookie?: string | null,
+  options?: { force?: boolean }
+) {
+  try {
+    const activeCookie = cookie || await getMaiyatianCookieForUser(userId).catch(() => null);
+    if (!activeCookie) {
+      return current;
+    }
+
+    const currentStatusDisplay = getBaseAutoPickStatusDisplay(current.status);
+    const canEnrich =
+      options?.force || (
+        currentStatusDisplay !== "待处理" &&
+        currentStatusDisplay !== "已取消" &&
+        currentStatusDisplay !== "已删除" &&
+        currentStatusDisplay !== "同步中"
+      );
+
+    if (!canEnrich) {
+      return current;
+    }
+
+    const existing = await prisma.autoPickOrder.findFirst({
+      where: {
+        userId,
+        platform: current.platform || "",
+        orderNo: current.orderNo || "",
+      },
+      select: {
+        id: true,
+        customerRemark: true,
+        rawPayload: true,
+      },
+    });
+
+    const hasCustomerName = Boolean(
+      current.customerName
+      || readCustomerNameFromRawPayload(current)
+      || readCustomerNameFromRawPayload(existing?.rawPayload)
+    );
+    const hasEncryptedCustomerPhone = Boolean(
+      current.customerPhone
+      || readCustomerPhoneFromRawPayload(current)
+      || readCustomerPhoneFromRawPayload(existing?.rawPayload)
+    );
+    const hasMaskedCustomerPhone = Boolean(
+      current.customerMaskedPhone
+      || readCustomerMaskedPhoneFromRawPayload(current)
+      || readCustomerMaskedPhoneFromRawPayload(existing?.rawPayload)
+    );
+
+    const shouldEnrichOrderDetail =
+      !existing
+      || !existing.customerRemark
+      || !hasCustomerName
+      || !hasEncryptedCustomerPhone
+      || !hasMaskedCustomerPhone;
+
+    if (shouldEnrichOrderDetail) {
+      console.log(`[AutoEnrich] Synchronously enriching order ${current.orderNo} (status: ${current.status})`);
+      await enrichMaiyatianOrderByCookie(activeCookie, current).catch((e) => {
+        console.warn(`[AutoEnrich] Failed to enrich order ${current.orderNo} synchronously:`, e);
+      });
+    }
+  } catch (error) {
+    console.error("[AutoEnrich] Error during synchronous order enrichment:", error);
+  }
+  return current;
+}
+
 export async function syncAutoPickOrdersFromPlugin(userId: string, options: { status?: AutoPickSyncStatus; date?: string }) {
   const pluginResult = options.date
     ? await fetchAutoPickPluginJson<AutoPickInboundOrder[]>(userId, `/all-orders/${encodeURIComponent(options.date)}`)
@@ -3184,63 +3257,7 @@ export async function syncAutoPickOrdersFromPlugin(userId: string, options: { st
         continue;
       }
 
-        if (cookie) {
-          const existing = await prisma.autoPickOrder.findFirst({
-            where: {
-              userId,
-              platform: current.platform || "",
-              orderNo: current.orderNo || "",
-            },
-            select: {
-              id: true,
-              customerRemark: true,
-              rawPayload: true,
-              delivery: true,
-            },
-          });
-
-          const hasCustomerName = Boolean(
-            current.customerName
-            || readCustomerNameFromRawPayload(current)
-            || readCustomerNameFromRawPayload(existing?.rawPayload)
-          );
-          const hasEncryptedCustomerPhone = Boolean(
-            current.customerPhone
-            || readCustomerPhoneFromRawPayload(current)
-            || readCustomerPhoneFromRawPayload(existing?.rawPayload)
-          );
-          const hasMaskedCustomerPhone = Boolean(
-            current.customerMaskedPhone
-            || readCustomerMaskedPhoneFromRawPayload(current)
-            || readCustomerMaskedPhoneFromRawPayload(existing?.rawPayload)
-          );
-          const hasCustomerPhoneExtension = Boolean(
-            current.customerPhoneExtension
-            || readCustomerPhoneExtensionFromRawPayload(current)
-            || readCustomerPhoneExtensionFromRawPayload(existing?.rawPayload)
-          );
-          const hasRiderPhone = Boolean(
-            readRiderPhoneFromDelivery(current.delivery)
-            || readRiderPhoneFromRawPayload(current)
-            || readRiderPhoneFromDelivery(existing?.delivery)
-            || readRiderPhoneFromRawPayload(existing?.rawPayload)
-          );
-          const shouldEnrichOrderDetail =
-            !existing
-            || !existing.customerRemark
-            || !hasCustomerName
-            || !hasEncryptedCustomerPhone
-            || !hasMaskedCustomerPhone
-            || !hasCustomerPhoneExtension
-            || !hasRiderPhone;
-
-          // 列表同步默认只有简版字段；缺少备注或联系信息时，主动补一次详情，保证一键同步也能刷新详情面板。
-          if (shouldEnrichOrderDetail) {
-            await enrichMaiyatianOrderByCookie(cookie, current).catch((e) => {
-              console.warn(`Failed to enrich order ${current.orderNo} during sync:`, e);
-            });
-          }
-        }
+        await enrichAutoPickInboundOrderIfNeeded(userId, current, cookie, { force: true });
 
       results.push(await upsertAutoPickOrder(userId, current));
     } catch (error) {
@@ -3286,6 +3303,7 @@ async function syncAutoPickConfirmOrdersByCookieListener(userId: string, cookie:
       continue;
     }
 
+    await enrichAutoPickInboundOrderIfNeeded(userId, normalized, cookie);
     await upsertAutoPickOrder(userId, normalized).catch((error) => {
       console.error("Auto-pick confirm listener upsert failed:", {
         userId,
@@ -3323,6 +3341,7 @@ async function syncAutoPickChangedOrdersByCookieListener(userId: string, cookie:
       continue;
     }
 
+    await enrichAutoPickInboundOrderIfNeeded(userId, normalized, cookie);
     await upsertAutoPickOrder(userId, normalized).catch((error) => {
       console.error("Auto-pick changed-state listener upsert failed:", {
         userId,
