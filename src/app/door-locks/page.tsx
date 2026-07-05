@@ -480,7 +480,7 @@ export default function DoorLocksPage() {
         </div>
 
         {/* 门锁单行列表展开区 */}
-        <div className="mt-5 border border-border/60 rounded-2xl overflow-visible bg-background/35 divide-y divide-border/60">
+        <div className="mt-5 border border-border/60 rounded-2xl overflow-hidden bg-background/35 divide-y divide-border/60">
           {locks.length > 0 ? (
             locks.map((lock) => {
               const isActive = selectedLockId === lock.lockId;
