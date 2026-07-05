@@ -704,6 +704,32 @@ export async function getTTLockKeyboardPwdByUserId(
   return { success: true, keyboardPwd: payload.keyboardPwd };
 }
 
+export async function addTTLockCustomKeyboardPwdByUserId(
+  userId: string,
+  lockId: number,
+  options: {
+    keyboardPwd: string;
+    keyboardPwdName?: string;
+    startDate: number;
+    endDate: number;
+  }
+) {
+  const config = await ensureTTLockAccessTokenByUserId(userId);
+  await postTTLockForm(config, "/v3/keyboardPwd/add", {
+    clientId: config.clientId,
+    accessToken: config.accessToken,
+    lockId,
+    keyboardPwd: options.keyboardPwd,
+    keyboardPwdName: options.keyboardPwdName || "自定义下发密码",
+    startDate: options.startDate,
+    endDate: options.endDate,
+    addType: 2, // 2-网关远程下发
+    date: nowMs(),
+  });
+
+  return { success: true };
+}
+
 export async function findAuthorizedTTLockUserId(): Promise<string | null> {
   const users = await prisma.user.findMany({
     select: { id: true, permissions: true }

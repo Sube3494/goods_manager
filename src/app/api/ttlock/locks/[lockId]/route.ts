@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthorizedUser } from "@/lib/auth";
-import { getTTLockDetailByUserId, configTTLockPassageModeByUserId, syncTTLockBatteryByUserId, setTTLockAutoLockTimeByUserId, getTTLockKeyboardPwdByUserId } from "@/lib/ttlock";
+import { getTTLockDetailByUserId, configTTLockPassageModeByUserId, syncTTLockBatteryByUserId, setTTLockAutoLockTimeByUserId, getTTLockKeyboardPwdByUserId, addTTLockCustomKeyboardPwdByUserId } from "@/lib/ttlock";
 import { createHash } from "crypto";
 
 export const dynamic = "force-dynamic";
@@ -92,6 +92,40 @@ export async function POST(
         keyboardPwdType,
         startDate,
         endDate,
+      });
+      return NextResponse.json(result);
+    }
+
+    // 添加并远程下发自定义密码逻辑分发
+    if (body.action === "addCustomKeyboardPwd") {
+      const keyboardPwd = String(body.keyboardPwd || "").trim();
+      const keyboardPwdName = String(body.keyboardPwdName || "").trim();
+      const isPermanent = Boolean(body.isPermanent);
+      const startDate = Number(body.startDate);
+      const endDate = Number(body.endDate);
+
+      if (!/^\d{4,9}$/.test(keyboardPwd)) {
+        return NextResponse.json({ error: "自定义密码必须为 4 到 9 位纯数字" }, { status: 400 });
+      }
+
+      let startMs = startDate;
+      let endMs = endDate;
+
+      if (isPermanent) {
+        startMs = Date.now();
+        // 100 年后失效，等同于永久
+        endMs = startMs + 100 * 365 * 24 * 60 * 60 * 1000;
+      } else {
+        if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || startMs >= endMs) {
+          return NextResponse.json({ error: "无效的密码生效时间范围" }, { status: 400 });
+        }
+      }
+
+      const result = await addTTLockCustomKeyboardPwdByUserId(session.id, lockId, {
+        keyboardPwd,
+        keyboardPwdName,
+        startDate: startMs,
+        endDate: endMs,
       });
       return NextResponse.json(result);
     }
