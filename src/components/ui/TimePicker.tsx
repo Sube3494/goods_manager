@@ -36,8 +36,9 @@ export function TimePicker({
   const [dropdownPosition, setDropdownPosition] = useState<{
     top: number;
     left: number;
+    maxHeight: number;
     showAbove?: boolean;
-  }>({ top: 0, left: 0 });
+  }>({ top: 0, left: 0, maxHeight: 400 });
 
   // 解析当前时和分
   const [hour, minute] = useMemo(() => {
@@ -59,12 +60,15 @@ export function TimePicker({
       const rect = containerRef.current.getBoundingClientRect();
       const windowHeight = window.innerHeight;
       const dropdownHeight = 220;
-      const spaceBelow = windowHeight - rect.bottom;
-      const showAbove = spaceBelow < dropdownHeight && rect.top > dropdownHeight;
+      const spaceBelow = windowHeight - rect.bottom - 16;
+      const spaceAbove = rect.top - 16;
+      const showAbove = spaceBelow < dropdownHeight && spaceAbove > spaceBelow;
+      const maxHeight = Math.max(showAbove ? spaceAbove : spaceBelow, 160);
 
       setDropdownPosition({
         top: showAbove ? rect.top - 8 : rect.bottom + 8,
         left: rect.left,
+        maxHeight,
         showAbove,
       });
     }
@@ -160,11 +164,14 @@ export function TimePicker({
                 transition={{ duration: 0.15 }}
                 style={{
                   position: "fixed",
-                  top: `${dropdownPosition.top}px`,
+                  top: dropdownPosition.showAbove ? "auto" : `${dropdownPosition.top}px`,
+                  bottom: dropdownPosition.showAbove ? `${window.innerHeight - dropdownPosition.top}px` : "auto",
                   left: `${dropdownPosition.left}px`,
+                  maxHeight: `${dropdownPosition.maxHeight}px`,
+                  overflowY: "auto",
                   pointerEvents: "auto",
                 }}
-                className="z-[1000001] w-[148px] rounded-2xl bg-white/95 dark:bg-[#0c1222]/95 backdrop-blur-2xl border border-black/8 dark:border-white/10 shadow-2xl dark:shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] overflow-hidden"
+                className="z-[1000001] w-[148px] rounded-2xl bg-white/95 dark:bg-[#0c1222]/95 backdrop-blur-2xl border border-black/8 dark:border-white/10 shadow-2xl dark:shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)]"
               >
                 {/* 标题栏 */}
                 <div className="flex items-center justify-between px-3 py-2 border-b border-border/40 dark:border-white/5">
