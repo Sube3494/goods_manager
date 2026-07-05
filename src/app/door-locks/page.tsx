@@ -757,7 +757,7 @@ export default function DoorLocksPage() {
                                         void handleSetAutoLockTime(lockDetail.lockId, sec);
                                       }
                                     }}
-                                    className="flex items-center gap-1 mt-1.5 w-full"
+                                    className="flex flex-wrap items-center gap-1 mt-1.5 w-full"
                                   >
                                     <input
                                       type="number"
@@ -785,13 +785,13 @@ export default function DoorLocksPage() {
                                     </button>
                                   </form>
                                 ) : (
-                                  <div className="grid grid-cols-5 gap-1 mt-1.5">
+                                  <div className="flex flex-wrap gap-1 mt-1.5 w-full">
                                     {[0, 5, 10, 30].map((sec) => (
                                       <button
                                         key={sec}
                                         type="button"
                                         onClick={() => void handleSetAutoLockTime(lockDetail.lockId, sec)}
-                                        className="h-5 rounded bg-black/5 hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10 text-[9px] font-medium text-foreground flex items-center justify-center transition cursor-pointer"
+                                        className="h-5 px-1 rounded bg-black/5 hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10 text-[9px] font-medium text-foreground flex items-center justify-center transition cursor-pointer flex-1 min-w-[28px]"
                                         title={sec === 0 ? "禁用自动锁门" : `设置自动锁门时间为 ${sec} 秒`}
                                       >
                                         {sec === 0 ? "禁用" : `${sec}s`}
@@ -800,7 +800,7 @@ export default function DoorLocksPage() {
                                     <button
                                       type="button"
                                       onClick={() => setIsCustomAutoLock(true)}
-                                      className="h-5 rounded bg-black/5 hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10 text-[9px] font-medium text-foreground flex items-center justify-center transition cursor-pointer"
+                                      className="h-5 px-2 rounded bg-black/5 hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10 text-[9px] font-medium text-foreground flex items-center justify-center transition cursor-pointer flex-initial"
                                       title="自定义时间"
                                     >
                                       自定义
