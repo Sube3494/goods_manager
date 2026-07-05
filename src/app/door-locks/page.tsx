@@ -622,7 +622,7 @@ export default function DoorLocksPage() {
                                 自动锁门
                               </div>
                               <div className="text-[13px] font-semibold text-foreground mt-1 truncate">
-                                {lockDetail.autoLockTime ? `${lockDetail.autoLockTime} 秒` : "已禁用"}
+                                {Number(lockDetail.autoLockTime) > 0 ? `${lockDetail.autoLockTime} 秒` : "已禁用"}
                               </div>
                             </div>
 
