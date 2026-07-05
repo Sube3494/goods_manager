@@ -143,6 +143,7 @@ export default function DoorLocksPage() {
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
   const [isUnlocking, setIsUnlocking] = useState(false);
   const [isConfiguringPassageMode, setIsConfiguringPassageMode] = useState(false);
+  const [isSyncingBattery, setIsSyncingBattery] = useState(false);
   const [isEditingPassword, setIsEditingPassword] = useState(false);
   const hasSystemCredentials = Boolean(config?.usesSystemCredentials);
   const [qrPreviewLock, setQrPreviewLock] = useState<TTLockLockSummary | null>(null);
@@ -334,6 +335,30 @@ export default function DoorLocksPage() {
       showToast(error instanceof Error ? error.message : "配置常开模式失败", "error");
     } finally {
       setIsConfiguringPassageMode(false);
+    }
+  };
+
+  const handleSyncBattery = async (lockId: number) => {
+    setIsSyncingBattery(true);
+    try {
+      const response = await fetch(`/api/ttlock/locks/${lockId}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ action: "syncBattery" }),
+      });
+      const data = await response.json() as { error?: string };
+      if (!response.ok) {
+        throw new Error(data?.error || "同步电量失败");
+      }
+      showToast("门锁电量已校准并同步", "success");
+      await loadLockDetail(lockId);
+    } catch (error) {
+      console.error("Failed to sync TTLock battery:", error);
+      showToast(error instanceof Error ? error.message : "同步电量失败", "error");
+    } finally {
+      setIsSyncingBattery(false);
     }
   };
 
@@ -630,16 +655,36 @@ export default function DoorLocksPage() {
                               </div>
                             </div>
 
-                            {/* 当前电量 */}
-                            <div className="bg-black/[0.015] dark:bg-white/[0.02] border border-border/50 rounded-xl p-3 flex flex-col justify-between min-h-[64px]">
+                            {/* 当前电量（磁贴动作卡片） */}
+                            <button
+                              type="button"
+                              onClick={() => void handleSyncBattery(lockDetail.lockId)}
+                              disabled={isSyncingBattery || !status.online}
+                              className={`col-span-1 sm:col-span-1 border rounded-xl p-3 flex flex-col justify-between min-h-[64px] text-left transition-all ${
+                                !status.online
+                                  ? "bg-slate-400/5 dark:bg-slate-700/5 border-border/40 cursor-not-allowed opacity-50"
+                                  : "bg-black/[0.015] dark:bg-white/[0.02] border-border/50 hover:bg-black/[0.03] dark:hover:bg-white/[0.04] active:scale-[0.98] cursor-pointer"
+                              }`}
+                              title={!status.online ? "设备离线，无法校准" : "点击强制校准并同步最新电量"}
+                            >
                               <div className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider flex items-center gap-1.5">
-                                <Battery size={12} className="text-emerald-500" />
+                                {isSyncingBattery ? (
+                                  <Loader2 size={12} className="animate-spin text-primary" />
+                                ) : (
+                                  <Battery size={12} className="text-emerald-500" />
+                                )}
                                 当前电量
                               </div>
-                              <div className="text-[13px] font-semibold text-foreground mt-1 truncate">
-                                {formatBattery(lockDetail.electricQuantity)}
+                              <div className={`text-[13px] font-semibold mt-1 truncate ${
+                                !status.online ? "text-muted-foreground" : "text-foreground"
+                              }`}>
+                                {!status.online
+                                  ? "设备离线"
+                                  : isSyncingBattery
+                                    ? "同步中..."
+                                    : `${formatBattery(lockDetail.electricQuantity)}`}
                               </div>
-                            </div>
+                            </button>
 
                             {/* 自动锁门 */}
                             <div className="bg-black/[0.015] dark:bg-white/[0.02] border border-border/50 rounded-xl p-3 flex flex-col justify-between min-h-[64px]">

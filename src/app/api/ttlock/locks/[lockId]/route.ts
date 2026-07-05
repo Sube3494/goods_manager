@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthorizedUser } from "@/lib/auth";
-import { getTTLockDetailByUserId, configTTLockPassageModeByUserId } from "@/lib/ttlock";
+import { getTTLockDetailByUserId, configTTLockPassageModeByUserId, syncTTLockBatteryByUserId } from "@/lib/ttlock";
 import { createHash } from "crypto";
 
 export const dynamic = "force-dynamic";
@@ -59,10 +59,17 @@ export async function POST(
     }
 
     const body = await request.json().catch(() => ({}));
-    const passageMode = Number(body.passageMode);
 
+    // 电量同步逻辑分发
+    if (body.action === "syncBattery") {
+      const result = await syncTTLockBatteryByUserId(session.id, lockId);
+      return NextResponse.json(result);
+    }
+
+    // 通道模式配置逻辑分发
+    const passageMode = Number(body.passageMode);
     if (passageMode !== 1 && passageMode !== 2) {
-      return NextResponse.json({ error: "Invalid passageMode parameter" }, { status: 400 });
+      return NextResponse.json({ error: "Invalid parameters" }, { status: 400 });
     }
 
     const result = await configTTLockPassageModeByUserId(session.id, lockId, {
@@ -73,9 +80,9 @@ export async function POST(
 
     return NextResponse.json(result);
   } catch (error) {
-    console.error("Failed to config TTLock passage mode:", error);
+    console.error("Failed to update TTLock setting:", error);
     return NextResponse.json({
-      error: error instanceof Error ? error.message : "Failed to config TTLock passage mode",
+      error: error instanceof Error ? error.message : "Failed to update TTLock setting",
     }, { status: 500 });
   }
 }

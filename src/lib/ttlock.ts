@@ -648,6 +648,19 @@ export async function configTTLockPassageModeByUserId(
   return { success: true };
 }
 
+export async function syncTTLockBatteryByUserId(userId: string, lockId: number) {
+  const config = await ensureTTLockAccessTokenByUserId(userId);
+  const payload = assertTTLockSuccess(await postTTLockForm<{ electricQuantity: number; errcode?: number; errmsg?: string }>(config, "/v3/lock/queryElectricQuantity", {
+    clientId: config.clientId,
+    accessToken: config.accessToken,
+    lockId,
+    date: nowMs(),
+  }));
+
+  const electricQuantity = Number(payload.electricQuantity);
+  return { success: true, electricQuantity };
+}
+
 export async function findAuthorizedTTLockUserId(): Promise<string | null> {
   const users = await prisma.user.findMany({
     select: { id: true, permissions: true }
