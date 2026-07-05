@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { Clock } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { createPortal } from "react-dom";
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -25,9 +27,17 @@ export function TimePicker({
   placeholder = "选择时间",
 }: TimePickerProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const pickerRef = useRef<HTMLDivElement>(null);
   const hourListRef = useRef<HTMLDivElement>(null);
   const minuteListRef = useRef<HTMLDivElement>(null);
+
+  const [dropdownPosition, setDropdownPosition] = useState<{
+    top: number;
+    left: number;
+    showAbove?: boolean;
+  }>({ top: 0, left: 0 });
 
   // 解析当前时和分
   const [hour, minute] = useMemo(() => {
@@ -39,34 +49,72 @@ export function TimePicker({
   const hours = useMemo(() => Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0")), []);
   const minutes = useMemo(() => Array.from({ length: 60 }, (_, i) => String(i).padStart(2, "0")), []);
 
-  // 点击外部收起
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    const handle = requestAnimationFrame(() => setMounted(true));
+    return () => cancelAnimationFrame(handle);
   }, []);
+
+  const updatePosition = useCallback(() => {
+    if (isOpen && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const windowHeight = window.innerHeight;
+      const dropdownHeight = 220;
+      const spaceBelow = windowHeight - rect.bottom;
+      const showAbove = spaceBelow < dropdownHeight && rect.top > dropdownHeight;
+
+      setDropdownPosition({
+        top: showAbove ? rect.top - 8 : rect.bottom + 8,
+        left: rect.left,
+        showAbove,
+      });
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen) {
+      updatePosition();
+      window.addEventListener("scroll", updatePosition, true);
+      window.addEventListener("resize", updatePosition);
+
+      const originalStyle = window.getComputedStyle(document.body).overflow;
+      if (originalStyle !== "hidden") {
+        document.body.style.overflow = "hidden";
+      }
+
+      const handleClickOutside = (event: MouseEvent) => {
+        const target = event.target as Node;
+        const isClickInsideTrigger = containerRef.current?.contains(target);
+        const isClickInsidePicker = pickerRef.current?.contains(target);
+        if (!isClickInsideTrigger && !isClickInsidePicker) {
+          setIsOpen(false);
+        }
+      };
+      document.addEventListener("mousedown", handleClickOutside);
+
+      return () => {
+        window.removeEventListener("scroll", updatePosition, true);
+        window.removeEventListener("resize", updatePosition);
+        document.removeEventListener("mousedown", handleClickOutside);
+        if (originalStyle !== "hidden") {
+          document.body.style.overflow = originalStyle;
+        }
+      };
+    }
+  }, [isOpen, updatePosition]);
 
   // 展开时自动滚动到当前选中的值
   useEffect(() => {
     if (isOpen) {
       setTimeout(() => {
         if (hourListRef.current) {
-          const selectedHourEl = hourListRef.current.querySelector("[data-selected='true']");
-          if (selectedHourEl) {
-            hourListRef.current.scrollTop = (selectedHourEl as HTMLElement).offsetTop - 70;
-          }
+          const el = hourListRef.current.querySelector("[data-selected='true']") as HTMLElement | null;
+          if (el) hourListRef.current.scrollTop = el.offsetTop - 80;
         }
         if (minuteListRef.current) {
-          const selectedMinEl = minuteListRef.current.querySelector("[data-selected='true']");
-          if (selectedMinEl) {
-            minuteListRef.current.scrollTop = (selectedMinEl as HTMLElement).offsetTop - 70;
-          }
+          const el = minuteListRef.current.querySelector("[data-selected='true']") as HTMLElement | null;
+          if (el) minuteListRef.current.scrollTop = el.offsetTop - 80;
         }
-      }, 50);
+      }, 80);
     }
   }, [isOpen]);
 
@@ -79,76 +127,145 @@ export function TimePicker({
   };
 
   return (
-    <div ref={containerRef} className={cn("relative inline-block text-left", className)}>
+    <div ref={containerRef} className={cn("relative w-full", className)}>
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
-          "inline-flex h-8 items-center justify-between gap-1.5 rounded-lg border border-border bg-white px-2.5 py-1.5 text-xs text-foreground outline-none transition-all hover:bg-black/[0.02] dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/[0.08] active:scale-[0.98] cursor-pointer min-w-[76px]",
+          "flex w-full h-full items-center justify-between rounded-2xl bg-white dark:bg-white/5 border border-border dark:border-white/10 px-4 text-sm transition-all outline-none",
+          isOpen
+            ? "ring-2 ring-primary/20 border-primary/20 shadow-lg"
+            : "hover:bg-muted/50 dark:hover:bg-white/10",
+          !value && "text-muted-foreground",
           triggerClassName
         )}
       >
-        <span className="font-medium font-mono">{value || placeholder}</span>
-        <Clock size={12} className="text-muted-foreground/75 shrink-0" />
+        <div className="flex items-center justify-center gap-2 min-w-0 flex-1">
+          <span className={cn("truncate font-mono", value ? "text-foreground font-medium" : "text-muted-foreground")}>
+            {value || placeholder}
+          </span>
+        </div>
+        <Clock size={14} className={cn("shrink-0", value ? "text-primary" : "text-muted-foreground")} />
       </button>
 
-      {isOpen && (
-        <div className="absolute left-0 mt-1 z-[110] w-[130px] h-[180px] bg-white dark:bg-slate-900 border border-border/80 dark:border-white/10 rounded-xl shadow-xl flex overflow-hidden animate-in fade-in slide-in-from-top-1 duration-100">
-          {/* 小时列 */}
-          <div
-            ref={hourListRef}
-            className="flex-1 overflow-y-auto border-r border-border/40 dark:border-white/5 scrollbar-none py-1 scroll-smooth"
-            style={{ msOverflowStyle: "none", scrollbarWidth: "none" }}
-          >
-            {hours.map((h) => {
-              const isSelected = h === hour;
-              return (
-                <button
-                  key={h}
-                  type="button"
-                  data-selected={isSelected}
-                  onClick={() => handleSelectHour(h)}
-                  className={cn(
-                    "w-full h-7 text-[11px] font-mono font-medium flex items-center justify-center transition-colors cursor-pointer",
-                    isSelected
-                      ? "bg-rose-500 text-white font-semibold"
-                      : "text-foreground hover:bg-black/5 dark:hover:bg-white/5"
-                  )}
-                >
-                  {h}
-                </button>
-              );
-            })}
-          </div>
+      {mounted &&
+        createPortal(
+          <AnimatePresence>
+            {isOpen && (
+              <motion.div
+                ref={pickerRef}
+                initial={{ opacity: 0, scale: 0.95, y: dropdownPosition.showAbove ? 10 : -10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: dropdownPosition.showAbove ? 10 : -10 }}
+                transition={{ duration: 0.15 }}
+                style={{
+                  position: "fixed",
+                  top: `${dropdownPosition.top}px`,
+                  left: `${dropdownPosition.left}px`,
+                  pointerEvents: "auto",
+                }}
+                className="z-[1000001] w-[148px] rounded-2xl bg-white/95 dark:bg-[#0c1222]/95 backdrop-blur-2xl border border-black/8 dark:border-white/10 shadow-2xl dark:shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] overflow-hidden"
+              >
+                {/* 标题栏 */}
+                <div className="flex items-center justify-between px-3 py-2 border-b border-border/40 dark:border-white/5">
+                  <span className="text-[11px] font-bold text-foreground">选择时间</span>
+                  <div className="flex items-center gap-1 text-[10px] text-muted-foreground font-mono font-medium">
+                    <span className="text-primary">{hour}</span>
+                    <span>:</span>
+                    <span className="text-primary">{minute}</span>
+                  </div>
+                </div>
 
-          {/* 分钟列 */}
-          <div
-            ref={minuteListRef}
-            className="flex-1 overflow-y-auto scrollbar-none py-1 scroll-smooth"
-            style={{ msOverflowStyle: "none", scrollbarWidth: "none" }}
-          >
-            {minutes.map((m) => {
-              const isSelected = m === minute;
-              return (
-                <button
-                  key={m}
-                  type="button"
-                  data-selected={isSelected}
-                  onClick={() => handleSelectMinute(m)}
-                  className={cn(
-                    "w-full h-7 text-[11px] font-mono font-medium flex items-center justify-center transition-colors cursor-pointer",
-                    isSelected
-                      ? "bg-rose-500 text-white font-semibold"
-                      : "text-foreground hover:bg-black/5 dark:hover:bg-white/5"
-                  )}
-                >
-                  {m}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
+                {/* 时分双列 */}
+                <div className="flex h-[160px]">
+                  {/* 小时列 */}
+                  <div className="flex flex-col flex-1 border-r border-border/30 dark:border-white/5">
+                    <div className="text-[9px] font-bold text-muted-foreground text-center py-1 bg-black/[0.02] dark:bg-white/[0.02]">时</div>
+                    <div
+                      ref={hourListRef}
+                      className="flex-1 overflow-y-auto"
+                      style={{ scrollbarWidth: "none", msOverflowStyle: "none" } as React.CSSProperties}
+                    >
+                      {hours.map((h) => {
+                        const isSelected = h === hour;
+                        return (
+                          <button
+                            key={h}
+                            type="button"
+                            data-selected={isSelected}
+                            onClick={() => handleSelectHour(h)}
+                            className={cn(
+                              "w-full h-7 text-[11px] font-mono flex items-center justify-center transition-all duration-150 cursor-pointer",
+                              isSelected
+                                ? "bg-primary text-primary-foreground font-bold shadow-sm"
+                                : "text-foreground hover:bg-primary/10 hover:text-primary"
+                            )}
+                          >
+                            {h}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* 分钟列 */}
+                  <div className="flex flex-col flex-1">
+                    <div className="text-[9px] font-bold text-muted-foreground text-center py-1 bg-black/[0.02] dark:bg-white/[0.02]">分</div>
+                    <div
+                      ref={minuteListRef}
+                      className="flex-1 overflow-y-auto"
+                      style={{ scrollbarWidth: "none", msOverflowStyle: "none" } as React.CSSProperties}
+                    >
+                      {minutes.map((m) => {
+                        const isSelected = m === minute;
+                        return (
+                          <button
+                            key={m}
+                            type="button"
+                            data-selected={isSelected}
+                            onClick={() => handleSelectMinute(m)}
+                            className={cn(
+                              "w-full h-7 text-[11px] font-mono flex items-center justify-center transition-all duration-150 cursor-pointer",
+                              isSelected
+                                ? "bg-primary text-primary-foreground font-bold shadow-sm"
+                                : "text-foreground hover:bg-primary/10 hover:text-primary"
+                            )}
+                          >
+                            {m}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 底部操作栏 */}
+                <div className="flex items-center justify-between border-t border-border/50 dark:border-white/5 px-3 py-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const now = new Date();
+                      const h = String(now.getHours()).padStart(2, "0");
+                      const m = String(now.getMinutes()).padStart(2, "0");
+                      onChange(`${h}:${m}`);
+                    }}
+                    className="text-[10px] font-bold text-primary hover:underline px-1 py-0.5"
+                  >
+                    此刻
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsOpen(false)}
+                    className="text-[10px] font-bold text-muted-foreground hover:text-foreground px-1 py-0.5"
+                  >
+                    关闭
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>,
+          document.body
+        )}
     </div>
   );
 }
