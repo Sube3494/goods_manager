@@ -633,7 +633,7 @@ export default function DoorLocksPage() {
                                 通道模式
                               </div>
                               <div className="text-[13px] font-semibold text-foreground mt-1 truncate">
-                                {lockDetail.passageMode ?? "--"}
+                                {lockDetail.passageMode === 1 ? "已启用" : lockDetail.passageMode === 2 ? "已禁用" : "--"}
                               </div>
                             </div>
 
