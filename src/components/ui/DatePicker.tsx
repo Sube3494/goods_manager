@@ -54,8 +54,9 @@ export function DatePicker({
     top: number;
     left: number;
     width: number;
+    maxHeight: number;
     showAbove?: boolean;
-  }>({ top: 0, left: 0, width: 0 });
+  }>({ top: 0, left: 0, width: 0, maxHeight: 600 });
 
   const selectedDate = useMemo(() => {
     if (!value) return null;
@@ -86,10 +87,14 @@ export function DatePicker({
       const rect = containerRef.current.getBoundingClientRect();
       const windowHeight = window.innerHeight;
       const windowWidth = window.innerWidth;
-      const dropdownHeight = 350; 
+      const dropdownHeight = 350;
       const dropdownMinWidth = 280;
-      const spaceBelow = windowHeight - rect.bottom;
-      const showAbove = spaceBelow < dropdownHeight && rect.top > dropdownHeight;
+      const spaceBelow = windowHeight - rect.bottom - 16;
+      const spaceAbove = rect.top - 16;
+      const showAbove = spaceBelow < dropdownHeight && spaceAbove > spaceBelow;
+
+      // 可用高度：取上方或下方的较大可用空间，最小 200px
+      const maxHeight = Math.max(showAbove ? spaceAbove : spaceBelow, 200);
 
       // 始终优先左对齐，但在右侧空间不足时左移以防止溢出
       let left = rect.left;
@@ -106,6 +111,7 @@ export function DatePicker({
         top: showAbove ? rect.top - 8 : rect.bottom + 8,
         left: left,
         width: rect.width,
+        maxHeight,
         showAbove
       });
     }
@@ -219,11 +225,14 @@ export function DatePicker({
             transition={{ duration: 0.15 }}
             style={{
               position: 'fixed',
-              top: `${dropdownPosition.top}px`,
+              top: dropdownPosition.showAbove ? 'auto' : `${dropdownPosition.top}px`,
+              bottom: dropdownPosition.showAbove ? `${window.innerHeight - dropdownPosition.top}px` : 'auto',
               left: `${dropdownPosition.left}px`,
               width: `${dropdownPosition.width}px`,
               minWidth: '280px',
               maxWidth: 'calc(100vw - 2rem)',
+              maxHeight: `${dropdownPosition.maxHeight}px`,
+              overflowY: 'auto',
               pointerEvents: 'auto'
             }}
             className="z-1000001 rounded-2xl bg-white/95 dark:bg-[#0c1222]/95 backdrop-blur-2xl p-3.5 border border-black/8 dark:border-white/10 shadow-2xl dark:shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)]"
