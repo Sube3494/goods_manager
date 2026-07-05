@@ -649,7 +649,7 @@ export default function DoorLocksPage() {
                             </div>
 
                             {/* 产品型号 */}
-                            <div className="col-span-2 sm:col-span-2 bg-black/[0.015] dark:bg-white/[0.02] border border-border/50 rounded-xl p-3 flex flex-col justify-between min-h-[64px]">
+                            <div className="col-span-1 sm:col-span-1 bg-black/[0.015] dark:bg-white/[0.02] border border-border/50 rounded-xl p-3 flex flex-col justify-between min-h-[64px]">
                               <div className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider flex items-center gap-1.5">
                                 <Fingerprint size={12} className="text-muted-foreground/70" />
                                 产品型号
@@ -659,35 +659,32 @@ export default function DoorLocksPage() {
                               </div>
                             </div>
 
-                          </div>
-
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-3 mt-4 border-t border-border/30 bg-black/[0.015] dark:bg-white/[0.005] -mx-4 sm:-mx-5 -mb-4 sm:-mb-4 px-4 sm:px-5 py-3 rounded-b-2xl">
-                            <div className="flex items-center gap-2">
-                              {status.online ? (
-                                <span className="inline-flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 font-medium">
-                                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                  设备连接就绪，您可以执行远程管理
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1.5 text-xs text-rose-600 dark:text-rose-400 font-medium">
-                                  <span className="h-1.5 w-1.5 rounded-full bg-rose-500 animate-pulse" />
-                                  设备已离线，无法接收远程控制指令
-                                </span>
-                              )}
-                            </div>
+                            {/* 远程操作（磁贴动作卡片） */}
                             <button
                               type="button"
                               onClick={() => void handleUnlock(lockDetail.lockId)}
                               disabled={isUnlocking || !status.online}
-                              className={`inline-flex h-8 items-center justify-center gap-2 rounded-xl px-5 text-xs font-semibold text-white transition shrink-0 w-full sm:w-auto ${
+                              className={`col-span-1 sm:col-span-1 border rounded-xl p-3 flex flex-col justify-between min-h-[64px] text-left transition-all ${
                                 !status.online
-                                  ? "bg-slate-400 dark:bg-slate-700 cursor-not-allowed opacity-60"
-                                  : "bg-rose-600 hover:bg-rose-500 disabled:opacity-50 shadow-sm shadow-rose-600/20"
+                                  ? "bg-slate-400/5 dark:bg-slate-700/5 border-border/40 cursor-not-allowed opacity-50"
+                                  : "bg-rose-500/10 dark:bg-rose-500/10 border-rose-500/20 hover:bg-rose-500/20 active:scale-[0.98] cursor-pointer"
                               }`}
                             >
-                              {isUnlocking ? <Loader2 size={12} className="animate-spin" /> : <LockKeyhole size={12} />}
-                              {!status.online ? "设备离线" : "远程开锁"}
+                              <div className="text-[10px] text-rose-500 dark:text-rose-400 font-medium uppercase tracking-wider flex items-center gap-1.5">
+                                {isUnlocking ? (
+                                  <Loader2 size={12} className="animate-spin text-rose-500" />
+                                ) : (
+                                  <LockKeyhole size={12} className="text-rose-500 dark:text-rose-400" />
+                                )}
+                                远程操作
+                              </div>
+                              <div className={`text-[13px] font-semibold mt-1 truncate ${
+                                !status.online ? "text-muted-foreground" : "text-rose-600 dark:text-rose-400"
+                              }`}>
+                                {!status.online ? "设备离线" : isUnlocking ? "正在开锁..." : "点击远程开锁"}
+                              </div>
                             </button>
+
                           </div>
                         </div>
                       ) : (
