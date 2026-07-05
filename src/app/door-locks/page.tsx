@@ -626,17 +626,6 @@ export default function DoorLocksPage() {
                               </div>
                             </div>
 
-                            {/* 通道模式 */}
-                            <div className="bg-black/[0.015] dark:bg-white/[0.02] border border-border/50 rounded-xl p-3 flex flex-col justify-between min-h-[64px]">
-                              <div className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider flex items-center gap-1.5">
-                                <DoorOpen size={12} className="text-muted-foreground/70" />
-                                通道模式
-                              </div>
-                              <div className="text-[13px] font-semibold text-foreground mt-1 truncate">
-                                {lockDetail.passageMode === 1 ? "已启用" : lockDetail.passageMode === 2 ? "已禁用" : "--"}
-                              </div>
-                            </div>
-
                             {/* 固件版本 */}
                             <div className="bg-black/[0.015] dark:bg-white/[0.02] border border-border/50 rounded-xl p-3 flex flex-col justify-between min-h-[64px]">
                               <div className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider flex items-center gap-1.5">
@@ -649,7 +638,7 @@ export default function DoorLocksPage() {
                             </div>
 
                             {/* 产品型号 */}
-                            <div className="col-span-1 sm:col-span-1 bg-black/[0.015] dark:bg-white/[0.02] border border-border/50 rounded-xl p-3 flex flex-col justify-between min-h-[64px]">
+                            <div className="col-span-2 sm:col-span-2 bg-black/[0.015] dark:bg-white/[0.02] border border-border/50 rounded-xl p-3 flex flex-col justify-between min-h-[64px]">
                               <div className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider flex items-center gap-1.5">
                                 <Fingerprint size={12} className="text-muted-foreground/70" />
                                 产品型号
