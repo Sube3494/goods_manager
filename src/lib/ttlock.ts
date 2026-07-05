@@ -619,6 +619,35 @@ export async function unlockTTLockByUserId(userId: string, lockId: number) {
   };
 }
 
+export async function configTTLockPassageModeByUserId(
+  userId: string,
+  lockId: number,
+  options: {
+    passageMode: number;
+    startDate?: number;
+    endDate?: number;
+    isAllDay?: number;
+    weekDays?: number[];
+  }
+) {
+  const config = await ensureTTLockAccessTokenByUserId(userId);
+  const weekDaysJson = JSON.stringify(options.weekDays || [1, 2, 3, 4, 5, 6, 7]);
+
+  await postTTLockForm(config, "/v3/lock/configPassageMode", {
+    clientId: config.clientId,
+    accessToken: config.accessToken,
+    lockId,
+    passageMode: options.passageMode,
+    isAllDay: options.isAllDay ?? 1,
+    weekDays: weekDaysJson,
+    ...(options.startDate !== undefined ? { startDate: options.startDate } : {}),
+    ...(options.endDate !== undefined ? { endDate: options.endDate } : {}),
+    date: nowMs(),
+  });
+
+  return { success: true };
+}
+
 export async function findAuthorizedTTLockUserId(): Promise<string | null> {
   const users = await prisma.user.findMany({
     select: { id: true, permissions: true }

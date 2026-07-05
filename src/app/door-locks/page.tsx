@@ -142,6 +142,7 @@ export default function DoorLocksPage() {
   const [lockDetail, setLockDetail] = useState<TTLockLockDetail | null>(null);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
   const [isUnlocking, setIsUnlocking] = useState(false);
+  const [isConfiguringPassageMode, setIsConfiguringPassageMode] = useState(false);
   const [isEditingPassword, setIsEditingPassword] = useState(false);
   const hasSystemCredentials = Boolean(config?.usesSystemCredentials);
   const [qrPreviewLock, setQrPreviewLock] = useState<TTLockLockSummary | null>(null);
@@ -308,6 +309,31 @@ export default function DoorLocksPage() {
       showToast(error instanceof Error ? error.message : "远程开锁失败", "error");
     } finally {
       setIsUnlocking(false);
+    }
+  };
+
+  const handleTogglePassageMode = async (lockId: number, currentMode: number | null | undefined) => {
+    setIsConfiguringPassageMode(true);
+    const nextMode = currentMode === 1 ? 2 : 1;
+    try {
+      const response = await fetch(`/api/ttlock/locks/${lockId}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ passageMode: nextMode }),
+      });
+      const data = await response.json() as { error?: string };
+      if (!response.ok) {
+        throw new Error(data?.error || "配置常开模式失败");
+      }
+      showToast(nextMode === 1 ? "常开模式已开启（全天生效）" : "常开模式已关闭（已恢复自动关锁）", "success");
+      await loadLockDetail(lockId);
+    } catch (error) {
+      console.error("Failed to config TTLock passage mode:", error);
+      showToast(error instanceof Error ? error.message : "配置常开模式失败", "error");
+    } finally {
+      setIsConfiguringPassageMode(false);
     }
   };
 
@@ -638,7 +664,7 @@ export default function DoorLocksPage() {
                             </div>
 
                             {/* 产品型号 */}
-                            <div className="col-span-2 sm:col-span-2 bg-black/[0.015] dark:bg-white/[0.02] border border-border/50 rounded-xl p-3 flex flex-col justify-between min-h-[64px]">
+                            <div className="col-span-1 sm:col-span-1 bg-black/[0.015] dark:bg-white/[0.02] border border-border/50 rounded-xl p-3 flex flex-col justify-between min-h-[64px]">
                               <div className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider flex items-center gap-1.5">
                                 <Fingerprint size={12} className="text-muted-foreground/70" />
                                 产品型号
@@ -647,6 +673,45 @@ export default function DoorLocksPage() {
                                 {lockDetail.modelNum || "--"}
                               </div>
                             </div>
+
+                            {/* 常开模式（磁贴动作卡片） */}
+                            <button
+                              type="button"
+                              onClick={() => void handleTogglePassageMode(lockDetail.lockId, lockDetail.passageMode)}
+                              disabled={isConfiguringPassageMode || !status.online}
+                              className={`col-span-1 sm:col-span-1 border rounded-xl p-3 flex flex-col justify-between min-h-[64px] text-left transition-all ${
+                                !status.online
+                                  ? "bg-slate-400/5 dark:bg-slate-700/5 border-border/40 cursor-not-allowed opacity-50"
+                                  : lockDetail.passageMode === 1
+                                    ? "bg-emerald-500/10 dark:bg-emerald-500/10 border-emerald-500/20 hover:bg-emerald-500/20 active:scale-[0.98] cursor-pointer"
+                                    : "bg-black/[0.015] dark:bg-white/[0.02] border-border/50 hover:bg-black/[0.03] dark:hover:bg-white/[0.04] active:scale-[0.98] cursor-pointer"
+                              }`}
+                              title={!status.online ? "设备离线，无法配置" : lockDetail.passageMode === 1 ? "点击关闭常开模式" : "点击开启常开模式"}
+                            >
+                              <div className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider flex items-center gap-1.5">
+                                {isConfiguringPassageMode ? (
+                                  <Loader2 size={12} className="animate-spin text-primary" />
+                                ) : (
+                                  <DoorOpen size={12} className={lockDetail.passageMode === 1 ? "text-emerald-500" : "text-muted-foreground/70"} />
+                                )}
+                                常开模式
+                              </div>
+                              <div className={`text-[13px] font-semibold mt-1 truncate ${
+                                !status.online
+                                  ? "text-muted-foreground"
+                                  : lockDetail.passageMode === 1
+                                    ? "text-emerald-600 dark:text-emerald-400"
+                                    : "text-foreground/80"
+                              }`}>
+                                {!status.online
+                                  ? "设备离线"
+                                  : isConfiguringPassageMode
+                                    ? "正在配置..."
+                                    : lockDetail.passageMode === 1
+                                      ? "已开启 (点击关闭)"
+                                      : "已关闭 (点击开启)"}
+                              </div>
+                            </button>
 
                             {/* 远程操作（磁贴动作卡片） */}
                             <button
