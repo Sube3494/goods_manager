@@ -146,6 +146,8 @@ export default function DoorLocksPage() {
   const [isSyncingBattery, setIsSyncingBattery] = useState(false);
   const [isSettingAutoLock, setIsSettingAutoLock] = useState(false);
   const [showAutoLockSelector, setShowAutoLockSelector] = useState(false);
+  const [isCustomAutoLock, setIsCustomAutoLock] = useState(false);
+  const [customAutoLockSec, setCustomAutoLockSec] = useState("");
   const [isEditingPassword, setIsEditingPassword] = useState(false);
   const hasSystemCredentials = Boolean(config?.usesSystemCredentials);
   const [qrPreviewLock, setQrPreviewLock] = useState<TTLockLockSummary | null>(null);
@@ -733,7 +735,11 @@ export default function DoorLocksPage() {
                                 {status.online && !isSettingAutoLock && (
                                   <button
                                     type="button"
-                                    onClick={() => setShowAutoLockSelector(!showAutoLockSelector)}
+                                    onClick={() => {
+                                      setShowAutoLockSelector(!showAutoLockSelector);
+                                      setIsCustomAutoLock(false);
+                                      setCustomAutoLockSec("");
+                                    }}
                                     className="text-[10px] text-rose-500 dark:text-rose-400 hover:underline font-medium cursor-pointer"
                                   >
                                     {showAutoLockSelector ? "取消" : "设置"}
@@ -742,19 +748,65 @@ export default function DoorLocksPage() {
                               </div>
                               
                               {showAutoLockSelector && status.online && !isSettingAutoLock ? (
-                                <div className="grid grid-cols-5 gap-1 mt-1.5">
-                                  {[0, 5, 10, 30, 60].map((sec) => (
+                                isCustomAutoLock ? (
+                                  <form
+                                    onSubmit={(e) => {
+                                      e.preventDefault();
+                                      const sec = parseInt(customAutoLockSec, 10);
+                                      if (!isNaN(sec) && sec >= 0) {
+                                        void handleSetAutoLockTime(lockDetail.lockId, sec);
+                                      }
+                                    }}
+                                    className="flex items-center gap-1 mt-1.5 w-full"
+                                  >
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      max="900"
+                                      value={customAutoLockSec}
+                                      onChange={(e) => setCustomAutoLockSec(e.target.value)}
+                                      placeholder="秒"
+                                      className="h-5 rounded bg-black/5 dark:bg-white/5 border border-border/40 px-1 text-[10px] w-12 text-foreground focus:outline-none focus:ring-1 focus:ring-rose-500"
+                                      autoFocus
+                                    />
                                     <button
-                                      key={sec}
-                                      type="button"
-                                      onClick={() => void handleSetAutoLockTime(lockDetail.lockId, sec)}
-                                      className="h-5 rounded bg-black/5 hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10 text-[9px] font-medium text-foreground flex items-center justify-center transition cursor-pointer"
-                                      title={sec === 0 ? "禁用自动锁门" : `设置自动锁门时间为 ${sec} 秒`}
+                                      type="submit"
+                                      disabled={!customAutoLockSec}
+                                      className="h-5 px-1.5 rounded bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-[9px] font-medium text-white flex items-center justify-center transition cursor-pointer"
                                     >
-                                      {sec === 0 ? "禁用" : `${sec}s`}
+                                      确定
                                     </button>
-                                  ))}
-                                </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => setIsCustomAutoLock(false)}
+                                      className="h-5 px-1.5 rounded bg-black/5 hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10 text-[9px] font-medium text-foreground flex items-center justify-center transition cursor-pointer"
+                                    >
+                                      返回
+                                    </button>
+                                  </form>
+                                ) : (
+                                  <div className="grid grid-cols-5 gap-1 mt-1.5">
+                                    {[0, 5, 10, 30].map((sec) => (
+                                      <button
+                                        key={sec}
+                                        type="button"
+                                        onClick={() => void handleSetAutoLockTime(lockDetail.lockId, sec)}
+                                        className="h-5 rounded bg-black/5 hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10 text-[9px] font-medium text-foreground flex items-center justify-center transition cursor-pointer"
+                                        title={sec === 0 ? "禁用自动锁门" : `设置自动锁门时间为 ${sec} 秒`}
+                                      >
+                                        {sec === 0 ? "禁用" : `${sec}s`}
+                                      </button>
+                                    ))}
+                                    <button
+                                      type="button"
+                                      onClick={() => setIsCustomAutoLock(true)}
+                                      className="h-5 rounded bg-black/5 hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10 text-[9px] font-medium text-foreground flex items-center justify-center transition cursor-pointer"
+                                      title="自定义时间"
+                                    >
+                                      自定义
+                                    </button>
+                                  </div>
+                                )
                               ) : (
                                 <div className={`text-[13px] font-semibold mt-1 truncate ${
                                   !status.online ? "text-muted-foreground" : "text-foreground"
