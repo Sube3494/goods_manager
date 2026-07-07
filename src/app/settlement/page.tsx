@@ -178,6 +178,7 @@ export default function SettlementPage() {
   }, [shops, activeShop, editId]);
 
   useEffect(() => {
+    if (editId) return; // 编辑模式下不使用自动获取的数据覆盖
     if (!businessMonth || shops.length === 0) return;
 
     let cancelled = false;
@@ -220,7 +221,7 @@ export default function SettlementPage() {
     return () => {
       cancelled = true;
     };
-  }, [businessMonth, shops, showToast]);
+  }, [businessMonth, shops, showToast, editId]);
 
   // 结算计算引擎
   const groups = useMemo<ShopGroup[]>(() => {
@@ -306,7 +307,7 @@ export default function SettlementPage() {
 
   const activeGroup = groups.find((g) => g.shopName === activeShop);
 
-  const handleInputChange = (id: string, field: "received" | "receivedToCard", value: string) => {
+  const handleInputChange = (id: string, field: "received" | "receivedToCard" | "brushing", value: string) => {
     const numeric = Number.parseFloat(value) || 0;
     setEntries((prev) => prev.map((entry) => (entry.id === id ? { ...entry, [field]: numeric } : entry)));
   };
@@ -367,7 +368,7 @@ export default function SettlementPage() {
         router.push("/settlement/history");
       } else {
         router.refresh();
-        setEntries((prev) => prev.map((entry) => (entry.shopName === activeShop ? { ...entry, received: 0, receivedToCard: 0 } : entry)));
+        setEntries((prev) => prev.map((entry) => (entry.shopName === activeShop ? { ...entry, received: 0, receivedToCard: 0, brushing: 0 } : entry)));
         setNote("");
       }
     } catch (error) {
@@ -551,7 +552,7 @@ export default function SettlementPage() {
                     setIsConfirmResetOpen(false);
                     setEntries((prev) => prev.map((entry) => 
                       entry.shopName === activeShop 
-                        ? { ...entry, received: 0, receivedToCard: 0 } 
+                        ? { ...entry, received: 0, receivedToCard: 0, brushing: 0 } 
                         : entry
                     ));
                     setNote("");
@@ -671,11 +672,11 @@ export default function SettlementPage() {
                           <input type="number" step="0.01" value={entry.received || ""} onChange={(e) => handleInputChange(entry.id, "received", e.target.value)} placeholder="0.00" className="h-9 md:h-11 w-full rounded-xl bg-transparent dark:bg-transparent pl-8 pr-3 text-right text-base font-bold text-foreground transition-colors hover:bg-muted/30 dark:hover:bg-white/5 focus:bg-white dark:focus:bg-white/5 focus:ring-2 focus:ring-primary/20" />
                         </div>
                       </div>
-                      <div className="px-4 py-2.5 md:p-4 flex items-center justify-between md:block relative transition-colors hover:bg-muted/30 dark:hover:bg-white/2">
-                        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/70 md:mb-2 block shrink-0">刷单到手(自动)</label>
+                      <div className="px-4 py-2.5 md:p-4 flex items-center justify-between md:block relative group transition-colors hover:bg-muted/30 dark:hover:bg-white/2">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/70 md:mb-2 block shrink-0">刷单到手</label>
                         <div className="relative w-full">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-rose-500/70 font-medium">¥</span>
-                          <input type="number" step="0.01" value={entry.brushing || ""} readOnly placeholder="0.00" className="h-9 md:h-11 w-full rounded-xl border border-rose-500/10 bg-rose-500/[0.06] pl-8 pr-3 text-right text-base font-bold text-foreground outline-none" />
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-rose-500/70 font-medium group-focus-within:text-rose-500 transition-colors">¥</span>
+                          <input type="number" step="0.01" value={entry.brushing || ""} onChange={(e) => handleInputChange(entry.id, "brushing", e.target.value)} placeholder="0.00" className="h-9 md:h-11 w-full rounded-xl bg-transparent dark:bg-transparent pl-8 pr-3 text-right text-base font-bold text-foreground transition-colors hover:bg-muted/30 dark:hover:bg-white/5 focus:bg-white dark:focus:bg-white/5 focus:ring-2 focus:ring-rose-500/20 outline-none" />
                         </div>
                       </div>
                       <div className="px-4 py-2.5 md:p-4 flex items-center justify-between md:block relative group transition-colors hover:bg-muted/30 dark:hover:bg-white/2">
