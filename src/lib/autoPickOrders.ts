@@ -3144,7 +3144,6 @@ export async function enrichAutoPickInboundOrderIfNeeded(
     const currentStatusDisplay = getBaseAutoPickStatusDisplay(current.status);
     const canEnrich =
       options?.force || (
-        currentStatusDisplay !== "待处理" &&
         currentStatusDisplay !== "已取消" &&
         currentStatusDisplay !== "已删除" &&
         currentStatusDisplay !== "同步中"
@@ -3164,6 +3163,7 @@ export async function enrichAutoPickInboundOrderIfNeeded(
         id: true,
         customerRemark: true,
         rawPayload: true,
+        delivery: true,
       },
     });
 
@@ -3182,13 +3182,22 @@ export async function enrichAutoPickInboundOrderIfNeeded(
       || readCustomerMaskedPhoneFromRawPayload(current)
       || readCustomerMaskedPhoneFromRawPayload(existing?.rawPayload)
     );
+    const hasRiderPhone = Boolean(
+      readRiderPhoneFromDelivery(current.delivery)
+      || readRiderPhoneFromRawPayload(current)
+      || readRiderPhoneFromDelivery(existing?.delivery)
+      || readRiderPhoneFromRawPayload(existing?.rawPayload)
+    );
+
+    const isAccepted = currentStatusDisplay === "待配送" || currentStatusDisplay === "配送中";
 
     const shouldEnrichOrderDetail =
       !existing
       || !existing.customerRemark
       || !hasCustomerName
       || !hasEncryptedCustomerPhone
-      || !hasMaskedCustomerPhone;
+      || !hasMaskedCustomerPhone
+      || (isAccepted && !hasRiderPhone);
 
     if (shouldEnrichOrderDetail) {
       console.log(`[AutoEnrich] Synchronously enriching order ${current.orderNo} (status: ${current.status})`);
