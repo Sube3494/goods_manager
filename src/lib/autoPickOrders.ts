@@ -2479,6 +2479,7 @@ export async function deleteAutoPickOrderByIdentity(
         id: true,
         platform: true,
         orderNo: true,
+        status: true,
       },
     })
     : await prisma.autoPickOrder.findUnique({
@@ -2493,6 +2494,7 @@ export async function deleteAutoPickOrderByIdentity(
         id: true,
         platform: true,
         orderNo: true,
+        status: true,
       },
     });
 
@@ -2500,8 +2502,15 @@ export async function deleteAutoPickOrderByIdentity(
     return { deleted: false, notFound: true };
   }
 
-  await prisma.autoPickOrder.delete({
+  // 如果订单已是终态（如已完成、已取消、已删除），则跳过修改和删除，直接保留
+  if (isAutoPickOrderTerminalStatus(existing.status)) {
+    return { deleted: false, id: existing.id, terminalSkipped: true };
+  }
+
+  // 将进行中订单的状态更新为“已取消”，防止物理删除造成数据丢失
+  await prisma.autoPickOrder.update({
     where: { id: existing.id },
+    data: { status: "已取消" },
   });
 
   emitAutoPickOrderEvent({
