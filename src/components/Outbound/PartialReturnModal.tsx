@@ -25,6 +25,7 @@ export function PartialReturnModal({ isOpen, order, onClose, onSuccess }: Partia
   const [reason, setReason] = useState("售后退货");
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isRefundAmountManual, setIsRefundAmountManual] = useState(false);
 
   const returnState = useMemo(() => {
     const meta = parseOutboundReturnMeta(order?.note);
@@ -40,6 +41,7 @@ export function PartialReturnModal({ isOpen, order, onClose, onSuccess }: Partia
         originalQuantity,
         alreadyReturned,
         remainingQuantity,
+        price: Number(item.price || 0),
       };
     });
     return {
@@ -47,6 +49,13 @@ export function PartialReturnModal({ isOpen, order, onClose, onSuccess }: Partia
       latestReason: getOutboundLatestReturnReason(meta.returns),
     };
   }, [order]);
+
+  const suggestedAmount = useMemo(() => {
+    return returnState.rows.reduce((sum, row) => {
+      const qty = quantities[row.itemId] || 0;
+      return sum + qty * row.price;
+    }, 0);
+  }, [quantities, returnState.rows]);
 
   useEffect(() => {
     if (!isOpen || !order) return;
@@ -58,7 +67,17 @@ export function PartialReturnModal({ isOpen, order, onClose, onSuccess }: Partia
     setRefundAmount("");
     setExtraExpense("");
     setReason("售后退货");
+    setIsRefundAmountManual(false);
   }, [isOpen, order, returnState.rows]);
+
+  useEffect(() => {
+    if (!isOpen || isRefundAmountManual) return;
+    if (suggestedAmount > 0) {
+      setRefundAmount(suggestedAmount.toFixed(2));
+    } else {
+      setRefundAmount("");
+    }
+  }, [isOpen, suggestedAmount, isRefundAmountManual]);
 
   if (!isOpen || !order) {
     return null;
@@ -116,7 +135,7 @@ export function PartialReturnModal({ isOpen, order, onClose, onSuccess }: Partia
   };
 
   return (
-    <div className="fixed inset-0 z-60 flex items-start justify-center overflow-y-auto p-3 sm:p-4 lg:pl-(--sidebar-width)">
+    <div className="fixed inset-0 z-60 flex items-center justify-center overflow-y-auto p-3 sm:p-4 lg:pl-(--sidebar-width)">
       <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" onClick={onClose} />
       <div className="relative my-3 flex max-h-[calc(100vh-1.5rem)] w-full max-w-3xl flex-col overflow-hidden rounded-[24px] border border-black/8 bg-white/96 shadow-[0_24px_64px_rgba(15,23,42,0.20)] dark:border-white/10 dark:bg-[#0d1420]/98 sm:my-4 sm:max-h-[calc(100vh-2rem)] sm:rounded-[28px]">
         <div className="shrink-0 border-b border-black/6 px-4 py-4 dark:border-white/8 sm:px-6 sm:py-5">
@@ -286,8 +305,22 @@ export function PartialReturnModal({ isOpen, order, onClose, onSuccess }: Partia
                   />
                   </label>
 
-                <label className="space-y-2">
-                  <span className="text-sm font-semibold text-foreground">退款金额</span>
+                <label className="space-y-2 flex-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold text-foreground">退款金额</span>
+                    {suggestedAmount > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRefundAmount(suggestedAmount.toFixed(2));
+                          setIsRefundAmountManual(true);
+                        }}
+                        className="text-xs text-sky-500 hover:text-sky-600 dark:text-sky-400 dark:hover:text-sky-300 font-medium transition cursor-pointer"
+                      >
+                        对应到手金额 ¥{suggestedAmount.toFixed(2)}
+                      </button>
+                    )}
+                  </div>
                   <div className="relative">
                     <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground">¥</span>
                     <input
@@ -295,12 +328,15 @@ export function PartialReturnModal({ isOpen, order, onClose, onSuccess }: Partia
                       min={0}
                       step="0.01"
                       value={refundAmount}
-                      onChange={(e) => setRefundAmount(e.target.value)}
+                      onChange={(e) => {
+                        setRefundAmount(e.target.value);
+                        setIsRefundAmountManual(true);
+                      }}
                       placeholder="0.00"
                       className="h-11 w-full rounded-xl border border-black/8 bg-white/70 pl-8 pr-4 text-foreground outline-none transition focus:border-primary/30 focus:ring-2 focus:ring-primary/10 dark:border-white/10 dark:bg-white/5"
-                      />
-                    </div>
-                  </label>
+                    />
+                  </div>
+                </label>
 
                 <label className="space-y-2">
                   <span className="text-sm font-semibold text-foreground">额外退货支出</span>
