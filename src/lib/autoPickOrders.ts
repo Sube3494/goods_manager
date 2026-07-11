@@ -10,6 +10,7 @@ import { FinanceMath } from "@/lib/math";
 import { buildShopDedupeKey, findMatchingShopRecord, normalizeExternalId, normalizeShopAddress, normalizeShopAddressKey, normalizeShopNameKey, isShopNameMatch } from "@/lib/shopIdentity";
 import { getOutboundOrderItemSchemaErrorMessage } from "@/lib/prismaSchemaCompat";
 import { getStorageStrategy } from "@/lib/storage";
+import { returnOutboundOrderById } from "@/lib/outboundReturns";
 
 export type AutoPickInboundItem = {
   productName?: string;
@@ -3132,6 +3133,38 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
         platform: order.platform,
         at: new Date().toISOString(),
       });
+    }
+  }
+
+  const isCancelledOrDeleted = isAutoPickOrderCancelledStatus(order.status) || isAutoPickOrderDeletedStatus(order.status);
+  const wasCancelledOrDeleted = isAutoPickOrderCancelledStatus(previousStatus) || isAutoPickOrderDeletedStatus(previousStatus);
+  const becameCancelledOrDeleted = isCancelledOrDeleted && !wasCancelledOrDeleted;
+
+  if (becameCancelledOrDeleted) {
+    try {
+      const relatedOutboundOrders = await prisma.outboundOrder.findMany({
+        where: {
+          status: {
+            not: "Returned",
+          },
+          note: {
+            contains: `平台单号: ${order.orderNo}`,
+            mode: "insensitive",
+          },
+        },
+        select: {
+          id: true,
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+      });
+
+      for (const outbound of relatedOutboundOrders) {
+        await returnOutboundOrderById(userId, outbound.id, `平台订单取消/退货自动回滚：${order.status || "已取消"}`);
+      }
+    } catch (cancelError) {
+      console.error("Failed to automatically return outbound order for cancelled auto-pick order:", cancelError);
     }
   }
 
