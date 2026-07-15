@@ -31,6 +31,23 @@ export default function ShopGoodsPage() {
   const [shops, setShops] = useState<Shop[]>([]);
   const [needsAddress, setNeedsAddress] = useState(false);
   const [selectedShopId, setSelectedShopId] = useState("");
+  
+  const [libraries, setLibraries] = useState<any[]>([]);
+  const [activeLibraryId, setActiveLibraryId] = useState<string>("all");
+
+  useEffect(() => {
+    fetch("/api/product-libraries")
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setLibraries(data);
+          if (data.length > 0) {
+            setActiveLibraryId(data[0].id);
+          }
+        }
+      })
+      .catch(() => {});
+  }, []);
   const [items, setItems] = useState<ShopCatalogItem[]>([]);
   const itemsRef = useRef<ShopCatalogItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -185,10 +202,11 @@ export default function ShopGoodsPage() {
       supplierId: selectedSupplier,
       sortBy,
       ...(selectedShopId ? { shopId: selectedShopId } : {}),
+      ...(activeLibraryId && activeLibraryId !== "all" ? { libraryId: activeLibraryId } : {}),
       ...extra,
     });
     return queryParams;
-  }, [debouncedSearch, selectedCategory, selectedShopId, selectedSupplier, sortBy]);
+  }, [debouncedSearch, selectedCategory, selectedShopId, selectedSupplier, sortBy, activeLibraryId]);
 
   const fetchShopProducts = useCallback(async (isFirstPage = true) => {
     if (!selectedShopId) {
@@ -263,7 +281,7 @@ export default function ShopGoodsPage() {
     setItems([]);
     setSelectedIds([]);
     void fetchShopProducts(true);
-  }, [fetchShopProducts]);
+  }, [fetchShopProducts, activeLibraryId]);
 
   useEffect(() => {
     const fetchAssignedTemplateIds = async () => {
@@ -781,6 +799,25 @@ export default function ShopGoodsPage() {
           </div>
         )}
       </div>
+
+      {libraries.length > 1 && (
+        <div className="flex flex-wrap gap-2 border-b border-border/50 pb-3">
+          {libraries.map((lib) => (
+            <button
+              key={lib.id}
+              onClick={() => setActiveLibraryId(lib.id)}
+              className={cn(
+                "px-4 py-2 text-sm font-bold rounded-xl transition-all duration-200",
+                activeLibraryId === lib.id
+                  ? "bg-primary text-primary-foreground shadow-md shadow-primary/10"
+                  : "text-muted-foreground hover:bg-muted/10 hover:text-foreground"
+              )}
+            >
+              {lib.name}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="flex flex-col xl:flex-row items-stretch xl:items-center gap-2">
         <div className="flex items-center gap-2 flex-1">

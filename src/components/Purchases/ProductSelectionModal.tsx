@@ -144,6 +144,25 @@ export function ProductSelectionModal({
   const [categories, setCategories] = useState<Category[]>([]);
   const observerTarget = useRef<HTMLDivElement>(null);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [libraries, setLibraries] = useState<any[]>([]);
+  const [activeLibraryId, setActiveLibraryId] = useState<string>("all");
+
+  useEffect(() => {
+    if (isOpen) {
+      fetch("/api/product-libraries")
+        .then((res) => (res.ok ? res.json() : []))
+        .then((data) => {
+          if (Array.isArray(data)) {
+            setLibraries(data);
+            if (data.length > 0) {
+              setActiveLibraryId(data[0].id);
+            }
+          }
+        })
+        .catch(() => {});
+    }
+  }, [isOpen]);
+
   const [showUnselectedOnly, setShowUnselectedOnly] = useState(true);
   const [localVisibleCount, setLocalVisibleCount] = useState(50);
   const { showToast } = useToast();
@@ -163,6 +182,7 @@ export function ProductSelectionModal({
     query: query || {},
     selectedCategoryName: remoteCategoryName,
     debouncedSearch: remoteSearch,
+    activeLibraryId,
   });
 
   const getSelectionKey = useCallback((product: Product) => {
@@ -249,6 +269,7 @@ export function ProductSelectionModal({
         ...(loadAllOnOpen ? { all: "true" } : { pageSize: "20" }),
         ...(remoteSearch ? { search: remoteSearch } : {}),
         ...(queryRef.current || {}),
+        ...(activeLibraryId && activeLibraryId !== "all" ? { libraryId: activeLibraryId } : {}),
         ...(remoteCategoryName !== "all" ? { category: remoteCategoryName, categoryName: remoteCategoryName } : {}),
       });
 
@@ -508,6 +529,24 @@ export function ProductSelectionModal({
             </div>
 
             <div className="flex-1 overflow-hidden flex flex-col p-5 sm:p-8 space-y-4">
+              {libraries.length > 1 && (
+                <div className="flex flex-wrap gap-2 border-b border-border/50 pb-3 shrink-0">
+                  {libraries.map((lib) => (
+                    <button
+                      key={lib.id}
+                      onClick={() => setActiveLibraryId(lib.id)}
+                      className={cn(
+                        "px-4 py-1.5 text-xs font-bold rounded-xl transition-all duration-200",
+                        activeLibraryId === lib.id
+                          ? "bg-primary text-primary-foreground shadow-md shadow-primary/10"
+                          : "text-muted-foreground hover:bg-muted/10 hover:text-foreground"
+                      )}
+                    >
+                      {lib.name}
+                    </button>
+                  ))}
+                </div>
+              )}
               <div className="flex items-center gap-3 shrink-0">
                  <div className="relative flex-1 group">
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" size={18} />

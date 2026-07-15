@@ -198,6 +198,32 @@ function GalleryContent() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [selectedImage, setSelectedImage] = useState<GalleryItem | null>(null);
+
+  // 新增：商品库相关状态
+  const [libraries, setLibraries] = useState<any[]>([]);
+  const [activeLibraryId, setActiveLibraryId] = useState<string>("");
+
+  useEffect(() => {
+    fetch("/api/product-libraries")
+      .then(r => r.ok ? r.json() : [])
+      .then(data => {
+        if (Array.isArray(data)) {
+          setLibraries(data);
+          if (data.length > 0) {
+            setActiveLibraryId(data[0].id);
+          }
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleLibraryChange = (libId: string) => {
+    setActiveLibraryId(libId);
+    setGroups([]);
+    setProducts([]);
+    currentPageRef.current = 1;
+    setHasMore(true);
+  };
   const [mounted, setMounted] = useState(false);
   const [groups, setGroups] = useState<GalleryGroupSummary[]>([]);
   const [productMediaMap, setProductMediaMap] = useState<Record<string, GalleryItem[]>>({});
@@ -515,6 +541,10 @@ function GalleryContent() {
         ...(selectedCategory !== "All" ? { category: selectedCategory } : {})
       });
 
+      if (activeLibraryId) {
+        params.append("libraryId", activeLibraryId);
+      }
+
       const galleryUrl = `/api/gallery?${params.toString()}`;
       
       const galleryRes = await fetch(galleryUrl);
@@ -555,12 +585,12 @@ function GalleryContent() {
       setIsLoading(false);
       setIsNextPageLoading(false);
     }
-  }, [debouncedSearchQuery, selectedCategory]);
+  }, [debouncedSearchQuery, selectedCategory, activeLibraryId]);
 
   useEffect(() => {
     setMounted(true);
     fetchData(true);
-  }, [debouncedSearchQuery, selectedCategory, fetchData]);
+  }, [debouncedSearchQuery, selectedCategory, fetchData, activeLibraryId]);
 
   // Infinite Scroll Observer (Main Page)
   useEffect(() => {
@@ -1224,6 +1254,28 @@ function GalleryContent() {
             )}
           </div>
         </div>
+
+        {/* Tab 切换商品库 */}
+        {libraries.length > 1 && (
+          <div className="border-b border-border dark:border-white/10 mb-6">
+            <div className="flex gap-6">
+              {libraries.map(lib => (
+                <button
+                  key={lib.id}
+                  onClick={() => handleLibraryChange(lib.id)}
+                  className={cn(
+                    "pb-3 text-sm font-medium border-b-2 transition-all relative",
+                    activeLibraryId === lib.id
+                      ? "border-primary text-primary font-semibold"
+                      : "border-transparent text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {lib.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="flex flex-row gap-2 items-center w-full transition-all mb-6 md:mb-10">
               <div className="h-10 sm:h-11 px-3 sm:px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-2 sm:gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 flex-1 relative">

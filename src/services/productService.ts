@@ -37,6 +37,7 @@ export class ProductService {
     shopId?: string;
     shopFilterMode?: "assigned" | "unassigned";
     includeShopOnly?: boolean;
+    libraryId?: string;
   }) {
     const {
       userId,
@@ -57,9 +58,67 @@ export class ProductService {
       shopId,
       shopFilterMode = "assigned",
       includeShopOnly = false,
+      libraryId,
     } = params;
 
     const andConditions: Prisma.ProductWhereInput[] = [];
+
+    // 判断是否有库的权限
+    const isSuperAdmin = role === "SUPER_ADMIN";
+
+    const checkLibraryAccess = async (libId: string): Promise<boolean> => {
+      if (isSuperAdmin) return true;
+      if (!userId) return false;
+      
+      const lib = await prisma.productLibrary.findUnique({
+        where: { id: libId },
+        select: { 
+          isPublic: true,
+          authorizedUsers: {
+            where: { id: userId },
+            select: { id: true }
+          }
+        }
+      });
+      if (!lib) return false;
+      return lib.isPublic || lib.authorizedUsers.length > 0;
+    };
+
+    // 针对不同商品库进行权限判定与数据过滤
+    if (libraryId) {
+      const hasAccess = await checkLibraryAccess(libraryId);
+      if (!hasAccess) {
+        return {
+          items: [],
+          total: 0,
+          page,
+          pageSize,
+          hasMore: false,
+        };
+      }
+      andConditions.push({ libraryId });
+    } else {
+      // 若未显式传入 libraryId，过滤出用户有权查看的库
+      if (!isSuperAdmin) {
+        if (userId) {
+          andConditions.push({
+            OR: [
+              { libraryId: null },
+              { library: { isPublic: true } },
+              { library: { authorizedUsers: { some: { id: userId } } } }
+            ]
+          });
+        } else {
+          // 未登录：只能看到公开库或无库商品
+          andConditions.push({
+            OR: [
+              { libraryId: null },
+              { library: { isPublic: true } }
+            ]
+          });
+        }
+      }
+    }
     
     // Visibility and permission filtering logic
     if (publicOnly) {

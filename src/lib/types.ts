@@ -320,6 +320,8 @@ export interface AutoPickMaiyatianShopMapping {
   localShopName: string;
   cityCode?: string | null;
   cityName?: string | null;
+  libraryId?: string | null;
+  libraryName?: string | null;
 }
 
 export type TTLockRegion = "cn" | "global";

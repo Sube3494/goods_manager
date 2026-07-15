@@ -36,6 +36,12 @@ export async function GET() {
             lastActiveAt: true,
             permissions: true,
             roleProfile: true,
+            accessibleLibraries: {
+              select: {
+                id: true,
+                name: true
+              }
+            },
             deviceSessions: {
               where: {
                 endedAt: null,

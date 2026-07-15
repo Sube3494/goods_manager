@@ -40,6 +40,16 @@ export function CustomSelect({
 }: CustomSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
   
   const handleOpenChange = useCallback((open: boolean) => {
     setIsOpen(open);
@@ -84,13 +94,21 @@ export function CustomSelect({
   }, [isOpen, onOpenChange]);
 
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.parentElement?.contains(event.target as Node)) {
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
+      const target = event.target as HTMLElement;
+      if (target.closest(".select-dropdown-container")) {
+        return;
+      }
+      if (containerRef.current && !containerRef.current.parentElement?.contains(target)) {
         handleOpenChange(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("touchstart", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
+    };
   }, [handleOpenChange]);
 
   const updatePosition = useCallback(() => {
@@ -124,6 +142,36 @@ export function CustomSelect({
       window.removeEventListener("resize", updatePosition);
     };
   }, [isOpen, updatePosition]);
+
+  if (isMobile && !searchable && !onAddNew) {
+    return (
+      <div className={cn("relative", className)}>
+        <select
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className={cn(
+            "flex w-full h-full items-center justify-between bg-white dark:bg-white/5 border border-border dark:border-white/10 px-2.5 text-left text-xs transition-all outline-none ring-offset-background appearance-none",
+            !triggerClassName?.includes("rounded-") && "rounded-lg",
+            triggerClassName
+          )}
+          style={{
+            backgroundImage: `url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E")`,
+            backgroundPosition: 'right 0.75rem center',
+            backgroundSize: '1em 1em',
+            backgroundRepeat: 'no-repeat',
+            paddingRight: '2rem'
+          }}
+        >
+          {!value && <option value="" disabled>{placeholder}</option>}
+          {options.map((opt) => (
+            <option key={opt.value} value={opt.value} className="text-foreground bg-white dark:bg-zinc-900">
+              {opt.label}
+            </option>
+          ))}
+        </select>
+      </div>
+    );
+  }
 
   return (
     <div className={cn("relative", className)}>
@@ -185,7 +233,7 @@ export function CustomSelect({
                 translateY: dropdownPosition.showAbove ? '-100%' : '0%',
                 willChange: 'transform, opacity'
               } as React.CSSProperties}
-              className="rounded-2xl bg-white/95 dark:bg-[#0c1222]/95 backdrop-blur-2xl border border-black/8 dark:border-white/10 shadow-2xl dark:shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] focus:outline-none overflow-hidden"
+              className="select-dropdown-container rounded-2xl bg-white/95 dark:bg-[#0c1222]/95 backdrop-blur-2xl border border-black/8 dark:border-white/10 shadow-2xl dark:shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] focus:outline-none overflow-hidden"
             >
               <div className="max-h-60 overflow-auto p-1.5 py-2">
                 {filteredOptions.length > 0 ? (

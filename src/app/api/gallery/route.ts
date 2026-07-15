@@ -13,6 +13,7 @@ export async function GET(request: Request) {
     const productId = searchParams.get("productId");
     const page = parseInt(searchParams.get("page") || "1");
     const pageSize = parseInt(searchParams.get("pageSize") || "20");
+    const libraryId = searchParams.get("libraryId");
 
     const session = await getFreshSession() as SessionUser | null;
 
@@ -24,17 +25,32 @@ export async function GET(request: Request) {
     
     // 1. Build product-level filters
     const andConditions: Array<Record<string, unknown>> = [];
-    
+
     // Visibility and permission filtering logic
     if (!session || !session.id) {
-      // Unauthenticated: only see public products
-      andConditions.push({ isPublic: true });
+      // Unauthenticated: only see public products in public libraries
+      andConditions.push({ 
+        isPublic: true,
+        OR: [
+          { libraryId: null },
+          { library: { isPublic: true } }
+        ]
+      });
     } else if (session.role !== "SUPER_ADMIN") {
-      // Regular user: see own products OR public ones
+      // Authenticated non-superadmin: see own products OR public ones, 
+      // but MUST be in public libraries or libraries explicitly authorized to this user
       andConditions.push({
         OR: [
           { userId: session.id },
           { isPublic: true }
+        ]
+      });
+
+      andConditions.push({
+        OR: [
+          { libraryId: null },
+          { library: { isPublic: true } },
+          { library: { authorizedUsers: { some: { id: session.id } } } }
         ]
       });
     }
@@ -43,6 +59,7 @@ export async function GET(request: Request) {
     const productWhere = {
       AND: andConditions,
       id: productId || undefined,
+      libraryId: libraryId || undefined,
       ...(categoryName && categoryName !== "All" ? { category: { name: categoryName } } : {}),
       ...(query ? {
         AND: [

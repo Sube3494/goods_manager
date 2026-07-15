@@ -26,6 +26,9 @@ export async function GET(
       include: {
         category: true,
         supplier: true,
+        library: {
+          select: { isPublic: true }
+        },
         jdSkuMappings: {
           select: { jdSkuId: true },
           orderBy: { createdAt: "asc" }
@@ -46,6 +49,27 @@ export async function GET(
 
     if (!product) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
+    }
+
+    // 校验商品所属库的权限
+    if (product.library && !product.library.isPublic) {
+      const isSuperAdmin = session?.role === "SUPER_ADMIN";
+      if (!isSuperAdmin) {
+        if (!session?.id) {
+          return NextResponse.json({ error: "Permission denied" }, { status: 403 });
+        }
+        const hasAccess = await prisma.productLibrary.findFirst({
+          where: {
+            id: product.libraryId!,
+            authorizedUsers: {
+              some: { id: session.id }
+            }
+          }
+        });
+        if (!hasAccess) {
+          return NextResponse.json({ error: "Permission denied" }, { status: 403 });
+        }
+      }
     }
 
     // Visibility check

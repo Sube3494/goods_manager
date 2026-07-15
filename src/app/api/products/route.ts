@@ -85,6 +85,7 @@ export async function GET(request: Request) {
     const includeShopOnly = searchParams.get("includeShopOnly") === "true";
     const shopFilterModeParam = searchParams.get("shopFilterMode");
     const shopFilterMode = shopFilterModeParam === "unassigned" ? "unassigned" : "assigned";
+    const libraryId = searchParams.get("libraryId") || undefined;
 
     const [field, order] = sortByParam.split("-") as [string, "asc" | "desc"];
 
@@ -107,6 +108,7 @@ export async function GET(request: Request) {
       shopId,
       shopFilterMode,
       includeShopOnly,
+      libraryId,
     });
 
     if (idsOnly && 'ids' in result.items) {
@@ -129,7 +131,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { name, sku, jdSkuId, jdSkuIds, costPrice, categoryId, supplierId, image, isPublic, isDiscontinued, specs, remark, shopId, isShopOnly } = body;
+    const { name, sku, jdSkuId, jdSkuIds, costPrice, categoryId, supplierId, image, isPublic, isDiscontinued, specs, remark, shopId, isShopOnly, libraryId } = body;
     const isShelfLife = Boolean(body?.isShelfLife ?? false);
     const shelfLifeDays = body?.shelfLifeDays !== undefined && body.shelfLifeDays !== null ? Number(body.shelfLifeDays) : null;
     const normalizedSku = normalizeSku(sku);
@@ -278,6 +280,7 @@ export async function POST(request: Request) {
           name,
           sku: normalizedSku,
           jdSkuId: normalizedJdSkuId,
+          libraryId: libraryId || undefined,
           costPrice: Number(costPrice) || 0,
           stock: 0,
           categoryId: categoryId || undefined,
@@ -358,7 +361,7 @@ export async function PUT(request: Request) {
     }
 
     const body = await request.json();
-    const { id, name, sku, jdSkuId, jdSkuIds, costPrice, categoryId, supplierId, image, isPublic, isDiscontinued, specs, remark } = body;
+    const { id, name, sku, jdSkuId, jdSkuIds, costPrice, categoryId, supplierId, image, isPublic, isDiscontinued, specs, remark, libraryId } = body;
     const isShelfLife = body?.isShelfLife !== undefined ? Boolean(body.isShelfLife) : undefined;
     const shelfLifeDays = body?.shelfLifeDays !== undefined ? (body.shelfLifeDays !== null ? Number(body.shelfLifeDays) : null) : undefined;
     const normalizedSku = normalizeSku(sku);
@@ -404,6 +407,7 @@ export async function PUT(request: Request) {
           name,
           sku: normalizedSku,
           jdSkuId: normalizedJdSkuId,
+          libraryId: libraryId !== undefined ? (libraryId || null) : undefined,
           costPrice: costPrice !== undefined ? Math.max(0, Number(costPrice) || 0) : undefined,
           categoryId: categoryId || undefined,
           supplierId: supplierId || null,

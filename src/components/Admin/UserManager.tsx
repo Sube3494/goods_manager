@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Shield, Settings2, Loader2, User as UserIcon, Mail, Plus, Trash2, AlertCircle, NotebookPen, Search, Check, UserCheck, Ban, MonitorSmartphone, Smartphone } from "lucide-react";
+import { Shield, Settings2, Loader2, User as UserIcon, Mail, Plus, Trash2, AlertCircle, NotebookPen, Search, Check, UserCheck, Ban, MonitorSmartphone, Smartphone, FolderLock } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { Switch } from "@/components/ui/Switch";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
@@ -47,6 +47,8 @@ interface WhitelistEntry {
     }>;
     roleProfileId: string | null;
     roleProfile?: RoleProfile;
+    isInternal?: boolean;
+    accessibleLibraries?: Array<{ id: string; name: string }>;
   };
 }
 
@@ -314,6 +316,24 @@ export function UserManager() {
   const [isBatchRunning, setIsBatchRunning] = useState(false);
   const [isBatchRoleOpen, setIsBatchRoleOpen] = useState(false);
 
+  // 新增：商品库授权状态
+  const [authLibraryUserId, setAuthLibraryUserId] = useState<string | null>(null);
+  const [selectedLibraryIds, setSelectedLibraryIds] = useState<string[]>([]);
+  const [allLibraries, setAllLibraries] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (authLibraryUserId) {
+      fetch("/api/product-libraries")
+        .then(r => r.ok ? r.json() : [])
+        .then(data => {
+          if (Array.isArray(data)) {
+            setAllLibraries(data);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [authLibraryUserId]);
+
   const filteredEntries = useMemo(() => {
     const keyword = searchQuery.trim();
     if (!keyword) return entries;
@@ -467,6 +487,48 @@ export function UserManager() {
       if (res.ok) {
         showToast("角色已更新", "success");
         setEditingUserId(null);
+        fetchData();
+      } else {
+        showToast("更新失败", "error");
+      }
+    } catch {
+      showToast("网络错误", "error");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleInternalToggle = async (userId: string, isInternal: boolean) => {
+    if (!canManageMembers) return;
+    try {
+      const res = await fetch(`/api/admin/users/${userId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isInternal }),
+      });
+      if (res.ok) {
+        showToast("用户内部身份已更新", "success");
+        fetchData();
+      } else {
+        showToast("操作失败", "error");
+      }
+    } catch {
+      showToast("网络请求失败", "error");
+    }
+  };
+
+  const handleSaveUserLibraries = async () => {
+    if (!authLibraryUserId) return;
+    setIsSaving(true);
+    try {
+      const res = await fetch(`/api/admin/users/${authLibraryUserId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ libraryIds: selectedLibraryIds }),
+      });
+      if (res.ok) {
+        showToast("商品库授权已更新", "success");
+        setAuthLibraryUserId(null);
         fetchData();
       } else {
         showToast("更新失败", "error");
@@ -779,17 +841,29 @@ export function UserManager() {
                          <div className="flex justify-center gap-2">
                             <div className="flex items-center gap-1">
                                {isRegistered && canManageMembers ? (
-                                 <button
-                                   onClick={() => {
-                                     setEditingUserId(entry.user!.id);
-                                     setCurrentRoleId(entry.user!.roleProfileId);
-                                   }}
-                                   className="p-2.5 rounded-xl text-muted-foreground hover:bg-primary/5 hover:text-primary transition-all"
-                                   title="角色分配"
-                                 >
-                                   <Settings2 size={18} />
-                                 </button>
-                               ) : null}
+                                  <button
+                                    onClick={() => {
+                                      setEditingUserId(entry.user!.id);
+                                      setCurrentRoleId(entry.user!.roleProfileId);
+                                    }}
+                                    className="p-2.5 rounded-xl text-muted-foreground hover:bg-primary/5 hover:text-primary transition-all"
+                                    title="角色分配"
+                                  >
+                                    <Settings2 size={18} />
+                                  </button>
+                                ) : null}
+                                {isRegistered && canManageMembers ? (
+                                  <button
+                                    onClick={() => {
+                                      setAuthLibraryUserId(entry.user!.id);
+                                      setSelectedLibraryIds(entry.user!.accessibleLibraries?.map(l => l.id) || []);
+                                    }}
+                                    className="p-2.5 rounded-xl text-muted-foreground hover:bg-indigo-500/10 hover:text-indigo-600 transition-all"
+                                    title="商品库授权"
+                                  >
+                                    <FolderLock size={18} />
+                                  </button>
+                                ) : null}
                                {canManageWhitelist && (
                                  <button
                                    onClick={() => setEditingRemarkEntry(entry)}
@@ -888,7 +962,9 @@ export function UserManager() {
                       {canManageWhitelist && (
                         <button
                           onClick={() => setEditingRemarkEntry(entry)}
-                          className="h-9 rounded-xl bg-amber-500/5 text-amber-700 dark:text-amber-300 text-xs font-bold transition-all hover:bg-amber-500/10 flex items-center justify-center gap-2"
+                          className={`h-9 rounded-xl bg-amber-500/5 text-amber-700 dark:text-amber-300 text-xs font-bold transition-all hover:bg-amber-500/10 flex items-center justify-center gap-2 ${
+                            isRegistered ? "" : "col-span-2"
+                          }`}
                         >
                           <NotebookPen size={14} />
                           备注
@@ -904,6 +980,18 @@ export function UserManager() {
                         >
                           <Settings2 size={14} />
                           角色分配
+                        </button>
+                      )}
+                      {isRegistered && canManageMembers && (
+                        <button
+                          onClick={() => {
+                            setAuthLibraryUserId(entry.user!.id);
+                            setSelectedLibraryIds(entry.user!.accessibleLibraries?.map(l => l.id) || []);
+                          }}
+                          className="col-span-2 h-9 rounded-xl bg-indigo-500/5 text-indigo-700 dark:text-indigo-300 text-xs font-bold transition-all hover:bg-indigo-500/10 flex items-center justify-center gap-2"
+                        >
+                          <FolderLock size={14} />
+                          商品库授权
                         </button>
                       )}
                       {canManageWhitelist && (
@@ -994,6 +1082,65 @@ export function UserManager() {
            variant="danger"
          />
        )}
+
+       {/* 商品库授权 Modal */}
+      {authLibraryUserId && (
+        <ConfirmModal
+          isOpen={!!authLibraryUserId}
+          onClose={() => setAuthLibraryUserId(null)}
+          onConfirm={handleSaveUserLibraries}
+          title="商品库访问授权"
+          confirmLabel="保存授权"
+          variant="primary"
+          message={
+            <div className="space-y-4 py-2">
+              <p className="text-xs text-muted-foreground">
+                请选择并授权该成员可以访问的商品模板库。默认普通商品库所有人均可访问。
+              </p>
+              <div className="space-y-2.5 max-h-[300px] overflow-y-auto pr-1">
+                {allLibraries.map((lib) => {
+                  const isDefault = lib.code === "public";
+                  const isChecked = isDefault || selectedLibraryIds.includes(lib.id);
+                  
+                  return (
+                    <div
+                      key={lib.id}
+                      onClick={() => {
+                        if (isDefault) return;
+                        if (isChecked) {
+                          setSelectedLibraryIds(prev => prev.filter(id => id !== lib.id));
+                        } else {
+                          setSelectedLibraryIds(prev => [...prev, lib.id]);
+                        }
+                      }}
+                      className={`flex items-center justify-between p-3 rounded-xl border text-sm transition-all cursor-pointer select-none ${
+                        isChecked
+                          ? "border-primary/20 bg-primary/5 text-foreground"
+                          : "border-border hover:bg-muted/10 text-muted-foreground"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="pointer-events-none">
+                          <SelectionCircleButton
+                            checked={isChecked}
+                            onClick={() => {}}
+                          />
+                        </div>
+                        <span className="font-semibold">{lib.name}</span>
+                      </div>
+                      {isDefault && (
+                        <span className="text-[10px] px-2 py-0.5 rounded-md font-bold border bg-emerald-500/5 text-emerald-600 border-emerald-500/10">
+                          默认全员可见
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          }
+        />
+      )}
 
        <ActionBar
          selectedCount={shouldHideActionBar ? 0 : selectedEntries.length}

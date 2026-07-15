@@ -38,27 +38,51 @@ export async function GET(request: NextRequest) {
 
     const canViewAllShops = user.role === "SUPER_ADMIN" && scope === "all";
 
-    const where = {
+    const where: any = {
       ...(canViewAllShops ? {} : { shop: { userId: user.id } }),
       ...(explicitIds.length > 0 ? { id: { in: explicitIds } } : {}),
       ...(shopId !== "all" ? { shopId } : {}),
       ...(categoryName !== "all" ? { categoryName } : {}),
       ...(supplierId === "unknown" ? { supplierId: null } : supplierId !== "all" ? { supplierId } : {}),
-      ...(search
-        ? {
-            OR: [
-              { sku: { contains: search, mode: "insensitive" as const } },
-              { jdSkuId: { contains: search, mode: "insensitive" as const } },
-              { productName: { contains: search, mode: "insensitive" as const } },
-              { pinyin: { contains: search.toLowerCase(), mode: "insensitive" as const } },
-              { categoryName: { contains: search, mode: "insensitive" as const } },
-              { shop: { name: { contains: search, mode: "insensitive" as const } } },
-              { product: { name: { contains: search, mode: "insensitive" as const } } },
-              { product: { pinyin: { contains: search.toLowerCase(), mode: "insensitive" as const } } },
-            ],
-          }
-        : {}),
     };
+
+    const libraryId = request.nextUrl.searchParams.get("libraryId") || "all";
+    const andConditions: any[] = [];
+
+    if (search) {
+      andConditions.push({
+        OR: [
+          { sku: { contains: search, mode: "insensitive" as const } },
+          { jdSkuId: { contains: search, mode: "insensitive" as const } },
+          { productName: { contains: search, mode: "insensitive" as const } },
+          { pinyin: { contains: search.toLowerCase(), mode: "insensitive" as const } },
+          { categoryName: { contains: search, mode: "insensitive" as const } },
+          { shop: { name: { contains: search, mode: "insensitive" as const } } },
+          { product: { name: { contains: search, mode: "insensitive" as const } } },
+          { product: { pinyin: { contains: search.toLowerCase(), mode: "insensitive" as const } } },
+        ],
+      });
+    }
+
+    if (libraryId !== "all") {
+      andConditions.push({
+        product: { libraryId }
+      });
+    }
+
+    if (user.role !== "SUPER_ADMIN") {
+      andConditions.push({
+        OR: [
+          { productId: null },
+          { product: { library: { code: "public" } } },
+          { product: { library: { authorizedUsers: { some: { id: user.id } } } } }
+        ]
+      });
+    }
+
+    if (andConditions.length > 0) {
+      where.AND = andConditions;
+    }
 
     const naturalSortBySku = async () => {
       const allItems = await prisma.shopProduct.findMany({

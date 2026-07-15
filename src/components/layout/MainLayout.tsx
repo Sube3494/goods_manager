@@ -40,8 +40,10 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
   const isFullScreenPage = isLoginPage || isSharePage || isScanUnlockPage;
   
   // Sidebar is functional for guests too (login link, gallery), so we reserve space for it on desktop
+  // If user is a guest ("基础访客"), we don't display the sidebar
   const visibleItems = getVisibleNavItems(user as SessionUser | null);
-  const showSidebar = !isFullScreenPage && !!user && visibleItems.length > 0;
+  const isGuest = user?.roleProfile?.name === "基础访客";
+  const showSidebar = !isFullScreenPage && !!user && visibleItems.length > 0 && !isGuest;
 
   // Track initialization to prevent initial mount transition
   useEffect(() => {

@@ -241,6 +241,7 @@ function IntegrationModal({
   onFetchMaiyatianShops,
   onTestPlugin,
   onTestCookie,
+  libraries,
 }: {
   integrationConfig: AutoPickIntegrationConfig;
   maiyatianShops: AutoPickMaiyatianShop[];
@@ -254,6 +255,7 @@ function IntegrationModal({
   onFetchMaiyatianShops: () => void;
   onTestPlugin: () => void;
   onTestCookie: () => void;
+  libraries: any[];
 }) {
   const hasCookie = Boolean(integrationConfig.maiyatianCookie.trim());
   const [isEditingCookie, setIsEditingCookie] = useState(!hasCookie);
@@ -424,7 +426,6 @@ function IntegrationModal({
               </div>
             </div>
 
-
             <div className="rounded-[20px] border border-black/8 bg-black/2 p-3.5 dark:border-white/10 dark:bg-white/3 sm:p-4 lg:col-start-2 lg:row-start-2">
               <div className="flex items-start justify-between gap-3">
                 <div>
@@ -454,51 +455,52 @@ function IntegrationModal({
                 </div>
               ) : null}
 
-              <div className="mt-3 space-y-2.5">
+              <div className="mt-3 space-y-2">
+                {maiyatianShops.length > 0 && (
+                  <div className="hidden md:grid md:grid-cols-[1fr_140px_140px] gap-3 px-3 py-1.5 text-[10px] uppercase tracking-[0.16em] text-muted-foreground font-bold border-b border-black/5 dark:border-white/5 pb-2 select-none">
+                    <div>麦芽田发货门店</div>
+                    <div className="text-center">绑定系统门店</div>
+                    <div className="text-center">对应商品库</div>
+                  </div>
+                )}
+
                 {maiyatianShops.length > 0 ? maiyatianShops.map((shop) => {
                   const mapped = integrationConfig.maiyatianShopMappings.find((item) => item.maiyatianShopId === shop.id);
                   const isMappingInvalid = mapped && !localShops.some(s => s.name === mapped.localShopName);
                   return (
-                    <div key={shop.id} className="rounded-2xl border border-black/8 bg-white/80 p-3 dark:border-white/10 dark:bg-white/4">
-                      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_260px] lg:items-start">
-                        <div className="min-w-0">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <div className="text-sm leading-5 text-foreground">{shop.name}</div>
-                              <div className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
-                                {shop.address}
-                              </div>
-                              <div className="mt-1.5 text-[11px] text-muted-foreground">
-                                {shop.cityName ? `${shop.cityName} · ` : ""}ID {shop.id}
-                              </div>
-                            </div>
-                            <span className={cn(
-                              "inline-flex shrink-0 items-center rounded-full px-2.5 py-1 text-[10px] uppercase tracking-[0.14em]",
-                              isMappingInvalid
-                                ? "border border-rose-500/20 bg-rose-500/12 text-rose-600 dark:text-rose-400 animate-pulse"
-                                : mapped
-                                ? "border border-emerald-500/20 bg-emerald-500/12 text-emerald-600 dark:text-emerald-400"
-                                : "border border-black/8 bg-black/3 text-muted-foreground dark:border-white/10 dark:bg-white/4"
-                            )}>
-                              {isMappingInvalid ? "映射已失效" : mapped ? "已映射" : "待映射"}
-                            </span>
-                          </div>
-                          {isMappingInvalid ? (
-                            <div className="mt-2.5 text-[11px] text-rose-500">⚠️ 原绑定的系统门店 “{mapped.localShopName}” 已在管理中被删除或重命名！</div>
-                          ) : !mapped?.localShopName ? (
-                            <div className="mt-2.5 text-[11px] text-muted-foreground">还没绑定系统门店。</div>
-                          ) : null}
+                    <div key={shop.id} className="group rounded-2xl border border-black/8 bg-white/80 p-3 transition-all hover:bg-white dark:hover:bg-white/8 dark:border-white/10 dark:bg-white/4 md:grid md:grid-cols-[1fr_140px_140px] md:items-center gap-3">
+                      {/* 第一列：麦芽田门店信息 + 状态 */}
+                      <div className="min-w-0 flex flex-col gap-1 text-left">
+                        <div className="text-sm font-bold text-foreground truncate" title={shop.name}>{shop.name}</div>
+                        <div className="text-xs text-muted-foreground truncate leading-normal" title={shop.address || undefined}>
+                          {shop.address}
                         </div>
+                        <div className="flex items-center gap-2 text-[10px] text-muted-foreground/60 leading-none">
+                          <span>{shop.cityName ? `${shop.cityName} · ` : ""}ID {shop.id}</span>
+                          <span className={cn(
+                            "inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.12em]",
+                            isMappingInvalid
+                              ? "bg-rose-500/10 border border-rose-500/20 text-rose-500 animate-pulse"
+                              : mapped
+                              ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-500"
+                              : "bg-black/5 border border-black/8 text-muted-foreground dark:bg-white/5 dark:border-white/10"
+                          )}>
+                            {isMappingInvalid ? "已失效" : mapped ? "已映射" : "待映射"}
+                          </span>
+                        </div>
+                      </div>
 
-                        <div className="rounded-2xl border border-black/8 bg-black/2 p-2.5 dark:border-white/10 dark:bg-white/3">
-                          <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">系统门店</div>
+                      {/* 第二列：系统门店 */}
+                      <div className="mt-3 md:mt-0 flex md:justify-center min-w-0 w-full">
+                        <div className="w-full md:w-[140px] text-left">
+                          <div className="md:hidden text-[10px] uppercase tracking-[0.16em] text-muted-foreground mb-1">系统门店</div>
                           {(() => {
                             const finalOptions = [{ value: "", label: "暂不映射" }, ...localShopOptions];
                             if (mapped?.localShopName && !localShopOptions.some(opt => opt.value === mapped.localShopName)) {
                               finalOptions.push({
                                 value: mapped.localShopName,
-                                label: `已失效 (无此门店: ${mapped.localShopName})`,
-                                hint: "原绑定的门店在系统门店管理中已不存在，请在此处重新选择一个有效门店。"
+                                label: `已失效 (${mapped.localShopName})`,
+                                hint: "原绑定的系统门店在管理中已被删除或重命名。"
                               });
                             }
                             return (
@@ -508,6 +510,7 @@ function IntegrationModal({
                                 onChange={(localShopName) => {
                                   const nextMappings = integrationConfig.maiyatianShopMappings.filter((item) => item.maiyatianShopId !== shop.id);
                                   if (localShopName) {
+                                    const defaultLib = libraries[0] || null;
                                     nextMappings.push({
                                       maiyatianShopId: shop.id,
                                       maiyatianShopName: shop.name,
@@ -515,6 +518,8 @@ function IntegrationModal({
                                       localShopName,
                                       cityCode: shop.cityCode || undefined,
                                       cityName: shop.cityName || undefined,
+                                      libraryId: defaultLib ? defaultLib.id : undefined,
+                                      libraryName: defaultLib ? defaultLib.name : undefined,
                                     });
                                   }
                                   onChange({
@@ -525,11 +530,48 @@ function IntegrationModal({
                               />
                             );
                           })()}
-                          {isMappingInvalid ? (
-                            <div className="mt-2 text-[11px] text-rose-500">请在此处重新选择一个有效的系统门店并保存。</div>
-                          ) : !mapped?.localShopName ? (
-                            <div className="mt-2 text-[11px] text-muted-foreground">选择后会固定这条映射。</div>
-                          ) : null}
+                          {isMappingInvalid && (
+                            <div className="mt-1 text-[10px] text-rose-500">⚠️ 系统门店已被删除，请重新绑定</div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* 第三列：绑定商品库 */}
+                      <div className="mt-3 md:mt-0 flex md:justify-center min-w-0 w-full">
+                        <div className="w-full md:w-[140px] text-left">
+                          <div className="md:hidden text-[10px] uppercase tracking-[0.16em] text-muted-foreground mb-1">绑定商品库</div>
+                          {mapped?.localShopName && !isMappingInvalid ? (
+                            (() => {
+                              const currentLibId = mapped.libraryId || libraries[0]?.id || "";
+                              return (
+                                <MappingSelect
+                                  value={currentLibId}
+                                  options={libraries.map(lib => ({ value: lib.id, label: lib.name }))}
+                                  onChange={(libraryId) => {
+                                    const nextMappings = integrationConfig.maiyatianShopMappings.map((item) => {
+                                      if (item.maiyatianShopId === shop.id) {
+                                        const selectedLib = libraries.find(l => l.id === libraryId);
+                                        return {
+                                          ...item,
+                                          libraryId: libraryId,
+                                          libraryName: selectedLib ? selectedLib.name : null,
+                                        };
+                                      }
+                                      return item;
+                                    });
+                                    onChange({
+                                      ...integrationConfig,
+                                      maiyatianShopMappings: nextMappings,
+                                    });
+                                  }}
+                                />
+                              );
+                            })()
+                          ) : (
+                            <div className="h-10 rounded-xl border border-dashed border-black/5 dark:border-white/5 flex items-center justify-center text-xs text-muted-foreground/30 bg-black/1 dark:bg-white/1 select-none">
+                              请先绑定门店
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -1201,6 +1243,17 @@ export default function OrdersPage() {
   const [isTestingCookie, setIsTestingCookie] = useState(false);
   const [isFetchingMaiyatianShops, setIsFetchingMaiyatianShops] = useState(false);
   
+  const [libraries, setLibraries] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetch("/api/product-libraries")
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data) => {
+        if (Array.isArray(data)) setLibraries(data);
+      })
+      .catch(() => {});
+  }, []);
+
   const [isCreateOfflineOpen, setIsCreateOfflineOpen] = useState(false);
   const [backfillTarget, setBackfillTarget] = useState<AutoPickOrder | null>(null);
   const [purchaseDraft, setPurchaseDraft] = useState<PurchaseDraftPayload | null>(null);
@@ -2204,6 +2257,7 @@ export default function OrdersPage() {
                 onFetchMaiyatianShops={fetchMaiyatianShops}
                 onTestPlugin={() => void testIntegrationConfig("plugin")}
                 onTestCookie={() => void testIntegrationConfig("cookie")}
+                libraries={libraries}
               />,
             document.body
           )

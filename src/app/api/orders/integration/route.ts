@@ -60,6 +60,26 @@ export async function POST(request: NextRequest) {
 
     const saved = await updateAutoPickIntegrationConfigByUserId(session.id, config);
 
+    // 同步把麦芽田绑定的系统门店的商品库 ID 写入真正的 Shop 物理表中
+    try {
+      const mappings = config?.maiyatianShopMappings || [];
+      for (const mapping of mappings) {
+        if (mapping.localShopName) {
+          await prisma.shop.updateMany({
+            where: {
+              name: mapping.localShopName,
+              userId: session.id,
+            },
+            data: {
+              libraryId: mapping.libraryId || null,
+            },
+          });
+        }
+      }
+    } catch (err) {
+      console.error("Failed to sync libraryId to physical Shop records:", err);
+    }
+
     // 保存配置后，自动进行历史订单店铺绑定匹配修正
     try {
       await fixHistoryShopOrdersForUser(session.id);

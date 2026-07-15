@@ -29,7 +29,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
     }
 
-    const { products } = await request.json();
+    const { products, libraryId } = await request.json();
 
     // Check system setting for data import
     const settings = await prisma.systemSetting.findUnique({
@@ -302,7 +302,8 @@ export async function POST(request: Request) {
                         remark: remarkText || undefined,
                         specs: Object.keys(specs).length > 0 ? specs : undefined,
                         isShelfLife,
-                        shelfLifeDays: isShelfLife && Number.isFinite(shelfLifeDays) ? shelfLifeDays : null
+                        shelfLifeDays: isShelfLife && Number.isFinite(shelfLifeDays) ? shelfLifeDays : null,
+                        libraryId: libraryId || undefined
                     }
                 });
 

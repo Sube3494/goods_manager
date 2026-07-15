@@ -23,7 +23,7 @@ export async function PATCH(
 
   try {
     const { id } = await params;
-    const { role, permissions, roleProfileId } = await request.json();
+    const { role, permissions, roleProfileId, isInternal, libraryIds } = await request.json();
     const currentUser = await prisma.user.findUnique({
       where: { id },
       select: { permissions: true },
@@ -48,7 +48,11 @@ export async function PATCH(
       data: {
         role: role !== undefined ? role : undefined,
         roleProfileId: roleProfileId !== undefined ? roleProfileId : undefined,
+        isInternal: isInternal !== undefined ? isInternal : undefined,
         permissions: mergedPermissions !== undefined ? asPrismaJsonValue(mergedPermissions) : undefined,
+        accessibleLibraries: libraryIds !== undefined && Array.isArray(libraryIds)
+          ? { set: libraryIds.map((libId: string) => ({ id: libId })) }
+          : undefined,
       },
     });
 

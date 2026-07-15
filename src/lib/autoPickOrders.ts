@@ -853,6 +853,9 @@ function normalizeMaiyatianShopMapping(input: unknown): AutoPickMaiyatianShopMap
   const cityCode = String(record.cityCode || "").trim();
   const cityName = String(record.cityName || "").trim();
 
+  const libraryId = record.libraryId ? String(record.libraryId).trim() : null;
+  const libraryName = record.libraryName ? String(record.libraryName).trim() : null;
+
   if (!maiyatianShopId || !maiyatianShopName || !maiyatianShopAddress || !localShopName) {
     return null;
   }
@@ -864,6 +867,8 @@ function normalizeMaiyatianShopMapping(input: unknown): AutoPickMaiyatianShopMap
     localShopName,
     cityCode: cityCode || undefined,
     cityName: cityName || undefined,
+    libraryId: libraryId || undefined,
+    libraryName: libraryName || undefined,
   };
 }
 

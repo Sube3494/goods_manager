@@ -45,6 +45,7 @@ model Product {
   remark          String?
   userId          String?
   sourceProductId String?
+  libraryId       String?
   brushProducts   BrushProduct[]
   brushOrderItems     BrushOrderItem[]
   brushOrderPlanItems BrushOrderPlanItem[]
@@ -58,12 +59,14 @@ model Product {
   storeOpeningItems StoreOpeningItem[]
   jdSkuMappings   ProductJdSku[]
   batches         ProductBatch[]
+  library         ProductLibrary?     @relation(fields: [libraryId], references: [id])
 
   @@index([categoryId])
   @@index([supplierId])
   @@index([sourceProductId])
   @@index([userId, pinyin])
   @@index([userId, createdAt])
+  @@index([libraryId])
   @@unique([userId, sourceProductId])
 }
 
@@ -228,6 +231,8 @@ model User {
   brushShops         Json?               @default("[]")
   brushCommissionBoostEnabled Boolean     @default(false)
   roleProfileId      String?
+  isInternal         Boolean             @default(false)
+  accessibleLibraries ProductLibrary[]    @relation("UserLibraries")
   brushOrders        BrushOrder[]
   brushOrderPlans    BrushOrderPlan[]
   brushProducts      BrushProduct[]
@@ -579,12 +584,15 @@ model Shop {
   user        User?    @relation(fields: [userId], references: [id])
   brushProducts BrushProduct[]
   shopProducts ShopProduct[]
+  libraryId   String?
+  library     ProductLibrary?     @relation(fields: [libraryId], references: [id])
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   @@index([userId])
   @@index([province, city])
   @@index([addressBookId])
+  @@index([libraryId])
   @@unique([userId, externalId])
   @@unique([userId, dedupeKey])
 }
@@ -805,4 +813,17 @@ model OperatingCostMonthlyBill {
   @@unique([userId, shopName, monthKey])
   @@index([userId, shopName, monthKey])
 }
+
+model ProductLibrary {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  code      String    @unique // e.g., "public", "secret"
+  isPublic  Boolean   @default(true)
+  products  Product[]
+  shops     Shop[]
+  authorizedUsers User[]    @relation("UserLibraries")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
 

@@ -5,8 +5,9 @@ import { GoodsCard } from "@/components/Goods/GoodsCard";
 import { GoodsCardSkeleton } from "@/components/Goods/GoodsCardSkeleton";
 import { ImportModal } from "@/components/Goods/ImportModal";
 import { ProductFormModal } from "@/components/Goods/ProductFormModal";
-import { Search, Plus, Download, ArrowUp, X, RotateCcw } from "lucide-react";
+import { Search, Plus, Download, ArrowUp, X, RotateCcw, Settings } from "lucide-react";
 import { Product, Category, Supplier, GalleryItem } from "@/lib/types";
+import { ManageLibrariesModal } from "@/components/Goods/ManageLibrariesModal";
 import { BatchEditModal } from "@/components/Goods/BatchEditModal";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { useToast } from "@/components/ui/Toast";
@@ -28,6 +29,11 @@ export default function GoodsPage() {
   const [isPending, startTransition] = useTransition();
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+
+  // 新增：商品库相关状态
+  const [libraries, setLibraries] = useState<any[]>([]);
+  const [activeLibraryId, setActiveLibraryId] = useState<string>("");
+  const [isManageLibrariesOpen, setIsManageLibrariesOpen] = useState(false);
   const observerTarget = useRef<HTMLDivElement>(null);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isNewProductOpen, setIsNewProductOpen] = useState(false);
@@ -104,6 +110,37 @@ export default function GoodsPage() {
     itemsRef.current = items;
   }, [items]);
 
+  // 新增：拉取有权访问的商品库的方法
+  const fetchLibraries = useCallback(() => {
+    fetch("/api/product-libraries")
+      .then(r => r.ok ? r.json() : [])
+      .then(data => {
+        if (Array.isArray(data)) {
+          setLibraries(data);
+          if (data.length > 0) {
+            setActiveLibraryId(prev => {
+              const stillExists = data.some(lib => lib.id === prev);
+              return stillExists ? prev : data[0].id;
+            });
+          }
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // 新增：挂载时拉取有权访问的商品库，并初始化默认选中第一个
+  useEffect(() => {
+    fetchLibraries();
+  }, [fetchLibraries]);
+
+  const handleLibraryChange = (libId: string) => {
+    setActiveLibraryId(libId);
+    setItems([]);
+    setPage(1);
+    currentPageRef.current = 1;
+    setHasMore(true);
+  };
+
   const fetchGoods = useCallback(async (isFirstPage = true) => {
     if (isFetchingRef.current) {
       return;
@@ -132,6 +169,10 @@ export default function GoodsPage() {
         sortBy: sortBy,
         includeShopOnly: "true",
       });
+
+      if (activeLibraryId) {
+        queryParams.append("libraryId", activeLibraryId);
+      }
 
       const res = await fetch(`/api/products?${queryParams.toString()}`);
       if (!res.ok) throw new Error("Fetch failed");
@@ -167,7 +208,7 @@ export default function GoodsPage() {
       setIsLoading(false);
       setIsNextPageLoading(false);
     }
-  }, [debouncedSearch, selectedCategory, selectedStatus, selectedSupplier, sortBy]);
+  }, [debouncedSearch, selectedCategory, selectedStatus, selectedSupplier, sortBy, activeLibraryId]);
 
   // Fetch metadata once on mount
   useEffect(() => {
@@ -403,7 +444,9 @@ export default function GoodsPage() {
       const method = editingProduct ? "PUT" : "POST";
       const url = "/api/products";
       
-      const normalizedData = { ...data, stock: 0 };
+      const normalizedData = editingProduct 
+        ? { ...data, stock: 0 } 
+        : { ...data, stock: 0, libraryId: activeLibraryId };
       const body = editingProduct ? { ...normalizedData, id: editingProduct.id } : normalizedData;
 
       const res = await fetch(url, {
@@ -557,7 +600,7 @@ export default function GoodsPage() {
       const res = await fetch("/api/products/import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ products: data }),
+        body: JSON.stringify({ products: data, libraryId: activeLibraryId }),
       });
 
       if (res.ok) {
@@ -677,6 +720,38 @@ export default function GoodsPage() {
            )}
         </div>
       </div>
+
+      {/* Tab 切换商品库 */}
+      {(libraries.length > 1 || isSuperAdmin) && (
+        <div className="border-b border-border dark:border-white/10 mb-6 flex justify-between items-center">
+          <div className="flex gap-6">
+            {libraries.map(lib => (
+              <button
+                key={lib.id}
+                onClick={() => handleLibraryChange(lib.id)}
+                className={cn(
+                  "pb-3 text-sm font-medium border-b-2 transition-all relative",
+                  activeLibraryId === lib.id
+                    ? "border-primary text-primary font-semibold"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {lib.name}
+              </button>
+            ))}
+          </div>
+          {isSuperAdmin && (
+            <button
+              onClick={() => setIsManageLibrariesOpen(true)}
+              className="pb-3 text-xs font-bold text-primary hover:opacity-90 flex items-center gap-1.5 transition-all"
+            >
+              <Settings size={14} />
+              管理商品库
+            </button>
+          )}
+        </div>
+      )}
+
       {/* 搜索框与筛选器行 - 在 PC 端 (xl) 合并为一行 */}
       <div className="flex flex-col xl:flex-row items-stretch xl:items-center gap-2 mb-6 md:mb-8 transition-all">
           {/* 搜索框 + 重置按钮 */}
@@ -914,6 +989,13 @@ export default function GoodsPage() {
         label="个商品"
         onDelete={handleBatchDelete}
         onEdit={() => setIsBatchEditOpen(true)}
+      />
+
+      <ManageLibrariesModal
+        isOpen={isManageLibrariesOpen}
+        onClose={() => setIsManageLibrariesOpen(false)}
+        libraries={libraries}
+        onUpdate={fetchLibraries}
       />
 
       {/* Back to Top Button */}
