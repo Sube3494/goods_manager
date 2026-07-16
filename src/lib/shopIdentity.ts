@@ -125,13 +125,16 @@ export function findMatchingShopRecord<T extends ShopIdentityRecord>(
   }
 
   // 智能 Fallback 匹配：如果简称已变，但“详细地址”完全一致且唯一，则判定为改名后的同一家店铺
-  const addressKey = normalizeShopAddressKey(target.address);
-  if (addressKey) {
-    const matchedByAddress = shops.filter(
-      (shop) => normalizeShopAddressKey(shop.address) === addressKey
-    );
-    if (matchedByAddress.length === 1) {
-      return matchedByAddress[0];
+  // 注意：只有当 target 确实没有 addressBookId 时，才允许进行地址 Fallback，防止地址库中不同别名但使用相同地址的两个独立门店被强行合并
+  if (!target.addressBookId) {
+    const addressKey = normalizeShopAddressKey(target.address);
+    if (addressKey) {
+      const matchedByAddress = shops.filter(
+        (shop) => normalizeShopAddressKey(shop.address) === addressKey
+      );
+      if (matchedByAddress.length === 1) {
+        return matchedByAddress[0];
+      }
     }
   }
 

@@ -248,14 +248,6 @@ export async function GET(request: NextRequest) {
       source: "shipping-addresses",
       needsAddress: false,
       syncedCount: createdShops.length,
-      debug: {
-        rawShippingAddressesCount: shippingAddresses.length,
-        normalizedAddressesCount: normalizedAddresses.length,
-        normalizedAddresses,
-        existingShopsCount: existingShops.length,
-        existingShops: existingShops.map((s) => ({ id: s.id, name: s.name, addressBookId: s.addressBookId, libraryId: s.libraryId })),
-        touchedShopIds: Array.from(touchedShopIds),
-      }
     });
   } catch (error) {
     console.error("Failed to fetch shops:", error);
