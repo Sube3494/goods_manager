@@ -34,6 +34,11 @@ export function simplifyShopName(name: string) {
   const normalized = normalizeDisplayText(name);
   if (!normalized) return "";
 
+  // 如果店名原本就已经是简短的简称（例如小于等于 10 个字符），则不作切割剥离，直接完整保留
+  if (normalized.length <= 10) {
+    return normalized;
+  }
+
   const match = normalized.match(/[\(（](.*)[\)）]$/);
   if (match?.[1]) return normalizeDisplayText(match[1]);
 
