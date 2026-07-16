@@ -40,19 +40,12 @@ export default function CategoriesPage() {
     onConfirm: () => {},
   });
 
-  const [libraries, setLibraries] = useState<any[]>([]);
-  const [activeLibraryId, setActiveLibraryId] = useState<string>("all");
-
   const { showToast } = useToast();
 
-  const fetchCategories = useCallback(async (libId?: string) => {
+  const fetchCategories = useCallback(async () => {
     try {
       setIsLoading(true);
-      const currentLibId = libId !== undefined ? libId : activeLibraryId;
-      const url = currentLibId && currentLibId !== "all" 
-        ? `/api/categories?libraryId=${currentLibId}` 
-        : "/api/categories";
-      const res = await fetch(url);
+      const res = await fetch("/api/categories");
       if (res.ok) {
         const data = await res.json();
         setCategories(data);
@@ -62,26 +55,11 @@ export default function CategoriesPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [activeLibraryId]);
-
-  useEffect(() => {
-    fetch("/api/product-libraries")
-      .then((res) => (res.ok ? res.json() : []))
-      .then((data) => {
-        const libs = Array.isArray(data) ? data : (data.libraries || []);
-        setLibraries(libs);
-        if (libs.length > 0) {
-          setActiveLibraryId(libs[0].id);
-        }
-      })
-      .catch((err) => console.error("Failed to load libraries:", err));
   }, []);
 
   useEffect(() => {
-    if (activeLibraryId) {
-      void fetchCategories(activeLibraryId);
-    }
-  }, [activeLibraryId, fetchCategories]);
+    fetchCategories();
+  }, [fetchCategories]);
 
   const handleOpenCreate = () => {
     setEditingCategory(undefined);
@@ -123,9 +101,7 @@ export default function CategoriesPage() {
       const method = editingCategory ? "PUT" : "POST";
       const url = editingCategory ? `/api/categories/${editingCategory.id}` : "/api/categories";
       
-      const body = editingCategory 
-        ? { ...data, id: editingCategory.id } 
-        : { ...data, libraryId: activeLibraryId !== "all" ? activeLibraryId : undefined };
+      const body = editingCategory ? { ...data, id: editingCategory.id } : data;
 
       const res = await fetch(url, {
         method,
@@ -174,25 +150,6 @@ export default function CategoriesPage() {
             </button>
         )}
       </div>
-
-      {libraries.length > 1 && (
-        <div className="flex flex-wrap gap-2 border-b border-border/50 pb-3 mb-6 md:mb-8">
-          {libraries.map((lib) => (
-            <button
-              key={lib.id}
-              onClick={() => setActiveLibraryId(lib.id)}
-              className={cn(
-                "px-4 py-2 text-sm font-bold rounded-xl transition-all duration-200",
-                activeLibraryId === lib.id
-                  ? "bg-primary text-primary-foreground shadow-md shadow-primary/10"
-                  : "text-muted-foreground hover:bg-muted/10 hover:text-foreground"
-              )}
-            >
-              {lib.name}
-            </button>
-          ))}
-        </div>
-      )}
 
       <div className="h-11 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 w-full mb-6 md:mb-8">
           <Search size={18} className="text-muted-foreground shrink-0" />

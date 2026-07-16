@@ -30,7 +30,6 @@ export async function PUT(
       data: {
         name: body.name,
         description: body.description,
-        libraryId: body.libraryId !== undefined ? (body.libraryId || null) : existingCategory.libraryId,
       },
     });
     return NextResponse.json(category);

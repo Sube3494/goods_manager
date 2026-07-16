@@ -18,12 +18,9 @@ model Category {
   userId      String?
   user        User?     @relation(fields: [userId], references: [id])
   products    Product[]
-  libraryId   String?
-  library     ProductLibrary?     @relation(fields: [libraryId], references: [id])
 
-  @@unique([name, userId, libraryId])
+  @@unique([name, userId])
   @@index([userId])
-  @@index([libraryId])
 }
 
 model Product {
@@ -118,12 +115,9 @@ model Supplier {
   products           Product[]
   purchaseOrderItems PurchaseOrderItem[]
   user               User?               @relation(fields: [userId], references: [id])
-  libraryId          String?
-  library            ProductLibrary?     @relation(fields: [libraryId], references: [id])
 
-  @@unique([code, userId, libraryId])
+  @@unique([code, userId])
   @@index([userId])
-  @@index([libraryId])
 }
 
 model PurchaseOrder {
@@ -828,8 +822,6 @@ model ProductLibrary {
   products  Product[]
   shops     Shop[]
   authorizedUsers User[]    @relation("UserLibraries")
-  categories Category[]
-  suppliers  Supplier[]
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 }
