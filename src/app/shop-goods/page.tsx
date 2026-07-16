@@ -182,7 +182,8 @@ export default function ShopGoodsPage() {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const res = await fetch("/api/categories");
+        const url = selectedShopId ? `/api/categories?shopId=${selectedShopId}` : "/api/categories";
+        const res = await fetch(url);
         const data = await res.json().catch(() => []);
         if (res.ok && Array.isArray(data)) setCategories(data);
       } catch (error) {
@@ -191,7 +192,8 @@ export default function ShopGoodsPage() {
     };
     const fetchSuppliers = async () => {
       try {
-        const res = await fetch("/api/suppliers");
+        const url = selectedShopId ? `/api/suppliers?shopId=${selectedShopId}` : "/api/suppliers";
+        const res = await fetch(url);
         const data = await res.json().catch(() => []);
         if (res.ok && Array.isArray(data)) setSuppliers(data);
       } catch (error) {
@@ -200,7 +202,7 @@ export default function ShopGoodsPage() {
     };
     void fetchCategories();
     void fetchSuppliers();
-  }, []);
+  }, [selectedShopId]);
 
   useEffect(() => {
     const handleScroll = () => {
