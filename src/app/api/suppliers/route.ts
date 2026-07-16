@@ -3,10 +3,8 @@ import prisma from "@/lib/prisma";
 import { getFreshSession } from "@/lib/auth";
 import { hasPermission, SessionUser } from "@/lib/permissions";
 
-export async function GET(request: Request) {
+export async function GET() {
   const session = await getFreshSession() as SessionUser | null;
-  const { searchParams } = new URL(request.url);
-  const shopId = searchParams.get("shopId");
 
   if (!session || !session.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -17,22 +15,9 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Permission denied" }, { status: 403 });
     }
 
-    let filterSupplierIds: string[] | undefined = undefined;
-    if (shopId) {
-      const used = await prisma.shopProduct.findMany({
-        where: { shopId },
-        select: { supplierId: true },
-        distinct: ["supplierId"],
-      });
-      filterSupplierIds = used
-        .map((u) => u.supplierId)
-        .filter((id): id is string => typeof id === "string" && id !== "");
-    }
-
     const suppliers = await prisma.supplier.findMany({
       where: {
-        userId: session.id,
-        ...(filterSupplierIds ? { id: { in: filterSupplierIds } } : {}),
+        userId: session.id
       },
       orderBy: { code: 'asc' },
       include: {
