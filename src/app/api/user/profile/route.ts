@@ -13,6 +13,7 @@ type ShippingAddressInput = {
   contactPhone?: string;
   isDefault?: boolean;
   serviceFeeRate?: number;
+  libraryId?: string;
 };
 
 export async function PATCH(req: Request) {

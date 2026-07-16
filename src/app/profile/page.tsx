@@ -34,6 +34,34 @@ export default function ProfilePage() {
   const canUseBrushSimulation = hasPermission(user as SessionUser | null, "brush:simulate");
   const [name, setName] = useState("");
   const [addressList, setAddressList] = useState<AddressItem[]>([]);
+  const [libraries, setLibraries] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetch("/api/product-libraries")
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data) => {
+        const libs = data.libraries || [];
+        setLibraries(libs);
+      })
+      .catch((err) => console.error("Failed to load libraries:", err));
+  }, []);
+
+  useEffect(() => {
+    if (libraries.length > 0 && addressList.length > 0) {
+      let changed = false;
+      const newList = addressList.map((item) => {
+        if (!item.libraryId) {
+          changed = true;
+          return { ...item, libraryId: libraries[0].id };
+        }
+        return item;
+      });
+      if (changed) {
+        setAddressList(newList);
+      }
+    }
+  }, [libraries]);
+
   const [brushCommissionBoostEnabled, setBrushCommissionBoostEnabled] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [verificationCode, setVerificationCode] = useState("");
@@ -595,7 +623,7 @@ export default function ProfilePage() {
                 </button>
                 <button
                   onClick={() => {
-                    const newAddress = { id: Math.random().toString(36).slice(2, 11), label: "", address: "", detailAddress: "", contactName: "", contactPhone: "", isDefault: false };
+                    const newAddress = { id: Math.random().toString(36).slice(2, 11), label: "", address: "", detailAddress: "", contactName: "", contactPhone: "", isDefault: false, libraryId: libraries[0]?.id || "" };
                     setAddressList([newAddress, ...addressList]);
                     setExpandedAddressId(newAddress.id);
                   }}
@@ -710,6 +738,35 @@ export default function ProfilePage() {
                         rows={3}
                         className="w-full rounded-2xl border border-border bg-white px-4 py-3 text-sm leading-7 outline-none transition-all focus:ring-2 focus:ring-primary/20 dark:bg-white/5 dark:border-white/10"
                       />
+
+                      {libraries.length > 0 && (
+                        <div className="space-y-2">
+                          <div className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">绑定商品库</div>
+                          <div className="relative">
+                            <select
+                              required
+                              value={item.libraryId || libraries[0]?.id || ""}
+                              onChange={(e) => {
+                                const newList = [...addressList];
+                                newList[index] = { ...newList[index], libraryId: e.target.value };
+                                setAddressList(newList);
+                              }}
+                              className="h-11 w-full appearance-none rounded-2xl border border-border bg-white px-4 pr-10 text-sm text-foreground outline-none transition-all focus:ring-2 focus:ring-primary/20 dark:bg-white/5 dark:border-white/10 cursor-pointer"
+                            >
+                              {libraries.map((lib) => (
+                                <option key={lib.id} value={lib.id} className="dark:bg-[#131926] dark:text-white">
+                                  {lib.name}
+                                </option>
+                              ))}
+                            </select>
+                            <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-slate-400 dark:text-slate-500">
+                              <svg className="h-4 w-4 fill-current" viewBox="0 0 20 20">
+                                <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
+                              </svg>
+                            </div>
+                          </div>
+                        </div>
+                      )}
 
                     </div>
                     ) : null}

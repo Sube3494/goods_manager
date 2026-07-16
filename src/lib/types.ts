@@ -30,6 +30,7 @@ export interface AddressItem {
   serviceFeeRate?: number;
   longitude?: number;
   latitude?: number;
+  libraryId?: string;
 }
 
 export interface BrushShopItem {

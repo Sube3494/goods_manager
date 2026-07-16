@@ -19,6 +19,7 @@ type ShippingAddress = {
   externalId?: string;
   longitude?: number;
   latitude?: number;
+  libraryId?: string;
 };
 
 // GET: 获取店铺列表，默认仅返回当前用户自己的数据
@@ -76,6 +77,7 @@ export async function GET(request: NextRequest) {
         externalId: normalizeExternalId(item?.externalId),
         longitude: Number.isFinite(Number(item?.longitude)) ? Number(item?.longitude) : null,
         latitude: Number.isFinite(Number(item?.latitude)) ? Number(item?.latitude) : null,
+        libraryId: item?.libraryId || null,
       }))
       .filter((item) => item.name && item.address);
 
@@ -165,7 +167,8 @@ export async function GET(request: NextRequest) {
           String(existing.externalId || "").trim() !== String(addr.externalId || "").trim() ||
           existing.addressBookId !== addr.addressBookId ||
           !sameNullableNumber(existing.longitude, addr.longitude) ||
-          !sameNullableNumber(existing.latitude, addr.latitude);
+          !sameNullableNumber(existing.latitude, addr.latitude) ||
+          existing.libraryId !== addr.libraryId;
 
         if (shouldUpdate) {
           const updated = await prisma.shop.update({
@@ -179,6 +182,7 @@ export async function GET(request: NextRequest) {
               addressBookId: addr.addressBookId,
               longitude: addr.longitude,
               latitude: addr.latitude,
+              libraryId: addr.libraryId || null,
             },
           });
           const index = existingShops.findIndex((shop) => shop.id === updated.id);
@@ -203,6 +207,7 @@ export async function GET(request: NextRequest) {
           latitude: addr.latitude,
           isSource: true,
           remark: "自动从店铺地址同步",
+          libraryId: addr.libraryId || null,
         },
       });
 
