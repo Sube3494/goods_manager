@@ -35,6 +35,24 @@ export default function ShopGoodsPage() {
   const [libraries, setLibraries] = useState<any[]>([]);
   const [activeLibraryId, setActiveLibraryId] = useState<string>("all");
 
+  const filteredShops = useMemo(() => {
+    return shops.filter(
+      (shop) => !activeLibraryId || activeLibraryId === "all" || shop.libraryId === activeLibraryId
+    );
+  }, [shops, activeLibraryId]);
+
+  // 当切换商品库导致店铺列表发生变化时，自动联动更新选中的店铺，防止出现跨库店铺被保留选中的情况
+  useEffect(() => {
+    if (filteredShops.length > 0) {
+      const isCurrentShopValid = filteredShops.some((shop) => shop.id === selectedShopId);
+      if (!isCurrentShopValid) {
+        setSelectedShopId(filteredShops[0].id);
+      }
+    } else {
+      setSelectedShopId("");
+    }
+  }, [filteredShops, selectedShopId]);
+
   useEffect(() => {
     fetch("/api/product-libraries")
       .then((res) => (res.ok ? res.json() : []))
@@ -87,7 +105,7 @@ export default function ShopGoodsPage() {
     () => shops.find((shop) => shop.id === selectedShopId) || null,
     [selectedShopId, shops]
   );
-  const hasMultipleShops = shops.length > 1;
+  const hasMultipleShops = filteredShops.length > 1;
 
   const templateCatalogQuery = useMemo(
     () => {
@@ -790,7 +808,7 @@ export default function ShopGoodsPage() {
             {hasMultipleShops ? "当前页面固定按单店铺查看，切换店铺只更新筛选结果。" : "当前仅有 1 家店铺，页面已自动按该店铺展示。"}
           </p>
         </div>
-        {shops.length > 0 && (
+        {filteredShops.length > 0 && (
           <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
             <button onClick={() => selectedShop ? setIsImportOpen(true) : showToast("先选择一个目标店铺再导入", "error")} className={cn("flex min-w-0 items-center justify-center gap-2 rounded-full border border-border/60 px-3 h-10 sm:h-11 text-sm font-bold transition-all", selectedShop ? "bg-white dark:bg-white/5 text-foreground hover:bg-white/80 dark:hover:bg-white/10" : "bg-muted/60 text-muted-foreground cursor-not-allowed")}><span className="truncate">导入</span></button>
             <button onClick={handleExport} className="flex min-w-0 items-center justify-center gap-2 rounded-full border border-border/60 bg-white dark:bg-white/5 px-3 h-10 sm:h-11 text-sm font-bold text-foreground hover:bg-white/80 dark:hover:bg-white/10 transition-all"><span className="truncate">导出</span></button>
@@ -831,7 +849,7 @@ export default function ShopGoodsPage() {
         <div className="grid grid-cols-2 xl:flex gap-2 sm:gap-3 w-full xl:w-auto shrink-0">
           {hasMultipleShops && (
             <div className="xl:w-52 h-10 sm:h-11">
-              <CustomSelect value={selectedShopId} onChange={setSelectedShopId} options={shops.map((shop) => ({ value: shop.id, label: shop.name }))} placeholder="选择店铺" className="h-full" triggerClassName={cn("h-full rounded-full border text-xs sm:text-sm py-0 px-2 sm:px-5 transition-all truncate", selectedShop ? "bg-primary/10 border-primary/20 text-primary dark:bg-primary/20 dark:border-primary/30 dark:text-primary font-medium" : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5")} />
+              <CustomSelect value={selectedShopId} onChange={setSelectedShopId} options={filteredShops.map((shop) => ({ value: shop.id, label: shop.name }))} placeholder="选择店铺" className="h-full" triggerClassName={cn("h-full rounded-full border text-xs sm:text-sm py-0 px-2 sm:px-5 transition-all truncate", selectedShop ? "bg-primary/10 border-primary/20 text-primary dark:bg-primary/20 dark:border-primary/30 dark:text-primary font-medium" : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5")} />
             </div>
           )}
           <div className="xl:w-44 h-10 sm:h-11">
