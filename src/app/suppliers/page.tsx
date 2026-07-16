@@ -10,7 +10,6 @@ import { useUser } from "@/hooks/useUser";
 import { hasPermission } from "@/lib/permissions";
 import { Supplier } from "@/lib/types";
 import { SessionUser } from "@/lib/permissions";
-import { cn } from "@/lib/utils";
 
 export default function SuppliersPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -93,7 +92,7 @@ export default function SuppliersPage() {
     setConfirmConfig({
       isOpen: true,
       title: "删除供应商",
-      message: `确定要删除供应商 "${name}" 吗？此操作不可逆，将影响已关联磁的商品数据。`,
+      message: `确定要删除供应商 "${name}" 吗？此操作不可逆，将影响已关联的商品数据。`,
       variant: "danger",
       onConfirm: async () => {
         try {
