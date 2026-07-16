@@ -660,8 +660,20 @@ export default function ProfilePage() {
                             onClick={() => setExpandedAddressId(expandedAddressId === item.id ? null : item.id)}
                             className="min-w-0 flex-1 text-left"
                           >
-                            <div className="truncate text-sm font-black text-foreground">
-                              {String(item.label || "").trim() || "未命名门店"}
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="truncate text-sm font-black text-foreground">
+                                {String(item.label || "").trim() || "未命名门店"}
+                              </span>
+                              {(() => {
+                                const matchedLib = libraries.find((lib) => lib.id === item.libraryId);
+                                if (!matchedLib) return null;
+                                return (
+                                  <span className="inline-flex items-center gap-1 rounded-md bg-purple-500/10 dark:bg-purple-500/15 border border-purple-500/20 px-2 py-0.5 text-[10px] font-bold text-purple-600 dark:text-purple-400">
+                                    <span className="h-1 w-1 rounded-full bg-purple-500" />
+                                    {matchedLib.name}
+                                  </span>
+                                );
+                              })()}
                             </div>
                             <div className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
                               {item.detailAddress || "请补全详细地址"}
