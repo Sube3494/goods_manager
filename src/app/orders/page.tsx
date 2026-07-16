@@ -1684,9 +1684,8 @@ export default function OrdersPage() {
 
   useEffect(() => {
     if (!isIntegrationOpen) return;
-    if (localShops.length > 0) return;
     void fetchLocalShops();
-  }, [fetchLocalShops, isIntegrationOpen, localShops.length]);
+  }, [fetchLocalShops, isIntegrationOpen]);
 
   useEffect(() => {
     if (!isIntegrationOpen) return;

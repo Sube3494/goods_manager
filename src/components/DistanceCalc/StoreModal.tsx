@@ -51,7 +51,7 @@ export function StoreModal({
       void fetch("/api/product-libraries")
         .then((res) => res.json())
         .then((data) => {
-          const libs = data.libraries || [];
+          const libs = Array.isArray(data) ? data : (data.libraries || []);
           setLibraries(libs);
           
           if (libs.length > 0) {

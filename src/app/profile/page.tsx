@@ -664,7 +664,7 @@ export default function ProfilePage() {
                               <span className="truncate text-sm font-black text-foreground">
                                 {String(item.label || "").trim() || "未命名门店"}
                               </span>
-                              {(() => {
+                              {libraries.length > 1 && (() => {
                                 const matchedLib = libraries.find((lib) => lib.id === item.libraryId);
                                 if (!matchedLib) return null;
                                 return (
@@ -752,7 +752,7 @@ export default function ProfilePage() {
                         className="w-full rounded-2xl border border-border bg-white px-4 py-3 text-sm leading-7 outline-none transition-all focus:ring-2 focus:ring-primary/20 dark:bg-white/5 dark:border-white/10"
                       />
 
-                      {libraries.length > 0 && (
+                      {libraries.length > 1 && (
                         <div className="space-y-2">
                           <div className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">绑定商品库</div>
                           <CustomSelect
