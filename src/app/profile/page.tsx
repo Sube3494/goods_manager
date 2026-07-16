@@ -26,6 +26,7 @@ import Image from "next/image";
 import md5 from "blueimp-md5";
 import { User as UserType, AddressItem } from "@/lib/types";
 import { hasPermission, SessionUser } from "@/lib/permissions";
+import { CustomSelect } from "@/components/ui/CustomSelect";
 
 export default function ProfilePage() {
   const { user, isLoading: isUserLoading } = useUser();
@@ -742,29 +743,16 @@ export default function ProfilePage() {
                       {libraries.length > 0 && (
                         <div className="space-y-2">
                           <div className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">绑定商品库</div>
-                          <div className="relative">
-                            <select
-                              required
-                              value={item.libraryId || libraries[0]?.id || ""}
-                              onChange={(e) => {
-                                const newList = [...addressList];
-                                newList[index] = { ...newList[index], libraryId: e.target.value };
-                                setAddressList(newList);
-                              }}
-                              className="h-11 w-full appearance-none rounded-2xl border border-border bg-white px-4 pr-10 text-sm text-foreground outline-none transition-all focus:ring-2 focus:ring-primary/20 dark:bg-white/5 dark:border-white/10 cursor-pointer"
-                            >
-                              {libraries.map((lib) => (
-                                <option key={lib.id} value={lib.id} className="dark:bg-[#131926] dark:text-white">
-                                  {lib.name}
-                                </option>
-                              ))}
-                            </select>
-                            <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-slate-400 dark:text-slate-500">
-                              <svg className="h-4 w-4 fill-current" viewBox="0 0 20 20">
-                                <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
-                              </svg>
-                            </div>
-                          </div>
+                          <CustomSelect
+                            options={libraries.map((lib) => ({ value: lib.id, label: lib.name }))}
+                            value={item.libraryId || libraries[0]?.id || ""}
+                            onChange={(val) => {
+                              const newList = [...addressList];
+                              newList[index] = { ...newList[index], libraryId: val };
+                              setAddressList(newList);
+                            }}
+                            triggerClassName="h-11 w-full rounded-2xl border border-border bg-white dark:bg-white/5 dark:border-white/10 text-sm font-bold text-foreground px-4"
+                          />
                         </div>
                       )}
 
