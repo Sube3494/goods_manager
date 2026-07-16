@@ -238,6 +238,12 @@ export default function ShopGoodsPage() {
       return;
     }
 
+    // 防抢跑卫语句：如果当前选中的店铺已不属于当前选中的库，暂不发送请求，等联动重置完成后再发送
+    const isCurrentShopValid = filteredShops.some((shop) => shop.id === selectedShopId);
+    if (!isCurrentShopValid) {
+      return;
+    }
+
     if (isFetchingRef.current) {
       return;
     }
@@ -293,7 +299,7 @@ export default function ShopGoodsPage() {
       }
       isFetchingRef.current = false;
     }
-  }, [buildAggregateQuery, selectedShopId, showToast]);
+  }, [buildAggregateQuery, selectedShopId, showToast, filteredShops]);
 
   useEffect(() => {
     setItems([]);
