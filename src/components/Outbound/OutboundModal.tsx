@@ -100,8 +100,10 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
 
   useEffect(() => {
     if (isOpen) {
+      document.body.style.overflow = 'hidden';
       fetchProducts('initial');
     } else {
+      document.body.style.overflow = '';
       setSelectedItems([]);
       setShops([]);
       setSelectedShopId("");
@@ -110,6 +112,9 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
       setType("Sale");
       setMobileView("selection");
     }
+    return () => {
+      document.body.style.overflow = '';
+    };
   }, [isOpen, fetchProducts]);
 
   useEffect(() => {

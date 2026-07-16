@@ -143,35 +143,7 @@ export function CustomSelect({
     };
   }, [isOpen, updatePosition]);
 
-  if (isMobile && !searchable && !onAddNew) {
-    return (
-      <div className={cn("relative", className)}>
-        <select
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className={cn(
-            "flex w-full h-full items-center justify-between bg-white dark:bg-white/5 border border-border dark:border-white/10 px-2.5 text-left text-xs transition-all outline-none ring-offset-background appearance-none",
-            !triggerClassName?.includes("rounded-") && "rounded-lg",
-            triggerClassName
-          )}
-          style={{
-            backgroundImage: `url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E")`,
-            backgroundPosition: 'right 0.75rem center',
-            backgroundSize: '1em 1em',
-            backgroundRepeat: 'no-repeat',
-            paddingRight: '2rem'
-          }}
-        >
-          {!value && <option value="" disabled>{placeholder}</option>}
-          {options.map((opt) => (
-            <option key={opt.value} value={opt.value} className="text-foreground bg-white dark:bg-zinc-900">
-              {opt.label}
-            </option>
-          ))}
-        </select>
-      </div>
-    );
-  }
+  // Always use custom styled select dropdown even on mobile to maintain visual aesthetics
 
   return (
     <div className={cn("relative", className)}>
