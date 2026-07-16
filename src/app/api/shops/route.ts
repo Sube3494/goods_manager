@@ -185,6 +185,23 @@ export async function GET(request: NextRequest) {
               libraryId: addr.libraryId || null,
             },
           });
+
+          if (addr.libraryId !== existing.libraryId) {
+            const shopProducts = await prisma.shopProduct.findMany({
+              where: { shopId: existing.id },
+              select: { productId: true },
+            });
+            const productIds = shopProducts
+              .map((sp) => sp.productId)
+              .filter((pId): pId is string => typeof pId === "string" && pId !== "");
+            if (productIds.length > 0) {
+              await prisma.product.updateMany({
+                where: { id: { in: productIds } },
+                data: { libraryId: addr.libraryId || null },
+              });
+            }
+          }
+
           const index = existingShops.findIndex((shop) => shop.id === updated.id);
           if (index >= 0) {
             existingShops[index] = updated;

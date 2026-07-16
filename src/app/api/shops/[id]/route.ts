@@ -72,6 +72,22 @@ export async function PUT(request: Request, context: { params: { id: string } })
       },
     });
 
+    if (libraryId !== existingShop.libraryId) {
+      const shopProducts = await prisma.shopProduct.findMany({
+        where: { shopId: id },
+        select: { productId: true },
+      });
+      const productIds = shopProducts
+        .map((sp) => sp.productId)
+        .filter((pId): pId is string => typeof pId === "string" && pId !== "");
+      if (productIds.length > 0) {
+        await prisma.product.updateMany({
+          where: { id: { in: productIds } },
+          data: { libraryId: libraryId || null },
+        });
+      }
+    }
+
     return NextResponse.json({ shop: updatedShop });
   } catch (error) {
     console.error("Failed to update shop:", error);
