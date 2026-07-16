@@ -847,7 +847,7 @@ export default function ShopGoodsPage() {
         </div>
 
         <div className="grid grid-cols-2 xl:flex gap-2 sm:gap-3 w-full xl:w-auto shrink-0">
-          {hasMultipleShops && (
+          {filteredShops.length > 0 && (
             <div className="xl:w-52 h-10 sm:h-11">
               <CustomSelect value={selectedShopId} onChange={setSelectedShopId} options={filteredShops.map((shop) => ({ value: shop.id, label: shop.name }))} placeholder="选择店铺" className="h-full" triggerClassName={cn("h-full rounded-full border text-xs sm:text-sm py-0 px-2 sm:px-5 transition-all truncate", selectedShop ? "bg-primary/10 border-primary/20 text-primary dark:bg-primary/20 dark:border-primary/30 dark:text-primary font-medium" : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5")} />
             </div>
