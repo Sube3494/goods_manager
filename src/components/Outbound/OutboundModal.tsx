@@ -307,7 +307,21 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
           <div className="flex-1 overflow-hidden flex flex-col md:flex-row">
             {/* Left/Selection: Product Selection */}
             <div className={`w-full md:w-80 border-r border-border dark:border-white/5 flex flex-col justify-between bg-muted/10 ${mobileView === "review" ? "hidden md:flex" : "flex"}`}>
-              <div className="p-4 sm:p-5">
+              <div className="p-4 sm:p-5 space-y-3">
+                <div className="space-y-1.5 md:hidden">
+                    <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground px-1">出库门店</label>
+                    <CustomSelect
+                        value={selectedShopId}
+                        onChange={setSelectedShopId}
+                        options={shops.map((shop) => ({
+                          value: shop.id,
+                          label: shop.name,
+                        }))}
+                        placeholder="选择门店"
+                        triggerClassName="bg-white dark:bg-white/5 border border-border dark:border-white/10 rounded-xl px-4 py-2 h-[38px] text-sm"
+                    />
+                </div>
+
                 <div className="space-y-1.5">
                     <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground px-1">快速查找</label>
                     <div className="relative">
