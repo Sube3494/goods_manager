@@ -10,6 +10,7 @@ interface Shop {
   externalId?: string | null;
   address?: string | null;
   isSource: boolean;
+  libraryId?: string | null;
 }
 
 interface StoreModalProps {
@@ -28,12 +29,14 @@ export function StoreModal({
   title = "店铺信息",
 }: StoreModalProps) {
   const [mounted, setMounted] = useState(false);
+  const [libraries, setLibraries] = useState<any[]>([]);
   const [formData, setFormData] = useState<Partial<Shop>>({
     id: undefined,
     name: "",
     externalId: "",
     address: "",
     isSource: true,
+    libraryId: null,
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -44,6 +47,29 @@ export function StoreModal({
 
   useEffect(() => {
     if (isOpen) {
+      // 预先拉取当前用户有权限的商品库列表
+      void fetch("/api/product-libraries")
+        .then((res) => res.json())
+        .then((data) => {
+          const libs = data.libraries || [];
+          setLibraries(libs);
+          
+          if (libs.length > 0) {
+            setFormData((prev) => {
+              const hasValidLib = prev.libraryId && libs.some((l: any) => l.id === prev.libraryId);
+              if (!hasValidLib) {
+                return { ...prev, libraryId: libs[0].id };
+              }
+              return prev;
+            });
+          }
+        })
+        .catch((err) => console.error("Failed to load libraries:", err));
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen) {
       if (initialData) {
         setFormData({
           id: initialData.id,
@@ -51,6 +77,7 @@ export function StoreModal({
           externalId: initialData.externalId || "",
           address: initialData.address || "",
           isSource: initialData.isSource ?? true,
+          libraryId: initialData.libraryId || null,
         });
       } else {
         setFormData({
@@ -59,6 +86,7 @@ export function StoreModal({
           externalId: "",
           address: "",
           isSource: true,
+          libraryId: null,
         });
       }
     }
@@ -69,6 +97,7 @@ export function StoreModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name || !formData.externalId || !formData.address) return;
+    if (libraries.length > 0 && !formData.libraryId) return;
 
     setIsSubmitting(true);
     try {
@@ -150,10 +179,37 @@ export function StoreModal({
                   className="w-full resize-none rounded-2xl border border-black/10 dark:border-white/[0.05] bg-black/[0.01] dark:bg-[#131926] px-4.5 py-3.5 text-xs sm:text-sm text-slate-900 dark:text-white outline-none transition-all placeholder:text-slate-400 dark:placeholder:text-slate-500/80 focus:border-blue-500/30 focus:bg-white dark:focus:bg-[#161d2d] focus:ring-4 focus:ring-blue-500/10 dark:focus:ring-blue-500/5"
                 />
               </div>
+
+              {libraries.length > 0 && (
+                <div className="space-y-2">
+                  <label className="text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-300">
+                    绑定商品库 <span className="text-rose-500 font-bold">*</span>
+                  </label>
+                  <div className="relative">
+                    <select
+                      required
+                      value={formData.libraryId || ""}
+                      onChange={(e) => setFormData({ ...formData, libraryId: e.target.value })}
+                      className="h-12 w-full appearance-none rounded-2xl border border-black/10 dark:border-white/[0.05] bg-black/[0.01] dark:bg-[#131926] px-4.5 text-xs sm:text-sm text-slate-900 dark:text-white outline-none transition-all focus:border-blue-500/30 focus:bg-white dark:focus:bg-[#161d2d] focus:ring-4 focus:ring-blue-500/10 dark:focus:ring-blue-500/5 cursor-pointer"
+                    >
+                      {libraries.map((lib) => (
+                        <option key={lib.id} value={lib.id} className="dark:bg-[#131926] dark:text-white">
+                          {lib.name}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-slate-400 dark:text-slate-500">
+                      <svg className="h-4 w-4 fill-current" viewBox="0 0 20 20">
+                        <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="rounded-2xl border border-black/[0.03] dark:border-white/[0.02] bg-slate-50/60 dark:bg-[#131926]/40 px-4 py-3.5 text-xs text-slate-500 dark:text-slate-400/80 font-medium leading-relaxed">
-              三项均为必填，用于门店去重、定位和路线测算。
+              {libraries.length > 0 ? "四项均为必填，用于门店去重、定位、商品库隔离和路线测算。" : "三项均为必填，用于门店去重、定位和路线测算。"}
             </div>
           </div>
 
@@ -165,18 +221,23 @@ export function StoreModal({
             >
               取消
             </button>
-            <button
-              type="submit"
-              disabled={isSubmitting || !formData.name || !formData.externalId || !formData.address}
-              className={`h-11 flex items-center justify-center gap-1.5 rounded-full px-6 text-xs sm:text-sm font-bold transition-all active:scale-95 cursor-pointer sm:min-w-[140px] ${
-                !formData.name || !formData.externalId || !formData.address
-                  ? "bg-slate-200/80 text-slate-400 dark:bg-[#202737] dark:text-[#555d70] cursor-not-allowed border-transparent shadow-none"
-                  : "bg-slate-900 text-white hover:bg-slate-800 dark:bg-white dark:text-[#0c101d] dark:hover:bg-slate-100 shadow-lg dark:shadow-[0_4px_20px_rgba(255,255,255,0.12)]"
-              }`}
-            >
-              {isSubmitting && <Loader2 size={14} className="animate-spin" />}
-              {initialData?.id ? "保存修改" : "确认新增"}
-            </button>
+            {(() => {
+              const isFormInvalid = !formData.name || !formData.externalId || !formData.address || (libraries.length > 0 && !formData.libraryId);
+              return (
+                <button
+                  type="submit"
+                  disabled={isSubmitting || isFormInvalid}
+                  className={`h-11 flex items-center justify-center gap-1.5 rounded-full px-6 text-xs sm:text-sm font-bold transition-all active:scale-95 cursor-pointer sm:min-w-[140px] ${
+                    isFormInvalid
+                      ? "bg-slate-200/80 text-slate-400 dark:bg-[#202737] dark:text-[#555d70] cursor-not-allowed border-transparent shadow-none"
+                      : "bg-slate-900 text-white hover:bg-slate-800 dark:bg-white dark:text-[#0c101d] dark:hover:bg-slate-100 shadow-lg dark:shadow-[0_4px_20px_rgba(255,255,255,0.12)]"
+                  }`}
+                >
+                  {isSubmitting && <Loader2 size={14} className="animate-spin" />}
+                  {initialData?.id ? "保存修改" : "确认新增"}
+                </button>
+              );
+            })()}
           </div>
         </form>
       </div>

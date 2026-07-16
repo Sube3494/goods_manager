@@ -36,6 +36,7 @@ export async function GET(request: NextRequest) {
 
     if (canViewAllShops) {
       const shops = await prisma.shop.findMany({
+        include: { library: { select: { id: true, name: true } } },
         orderBy: { createdAt: "desc" },
       });
 
@@ -49,6 +50,7 @@ export async function GET(request: NextRequest) {
 
     const existingShops = await prisma.shop.findMany({
       where: { userId: user.id },
+      include: { library: { select: { id: true, name: true } } },
       orderBy: { createdAt: "desc" },
     });
 
@@ -168,6 +170,7 @@ export async function GET(request: NextRequest) {
         if (shouldUpdate) {
           const updated = await prisma.shop.update({
             where: { id: existing.id },
+            include: { library: { select: { id: true, name: true } } },
             data: {
               name: addr.name,
               address: addr.address,
@@ -188,6 +191,7 @@ export async function GET(request: NextRequest) {
       }
 
       const created = await prisma.shop.create({
+        include: { library: { select: { id: true, name: true } } },
         data: {
           userId: user.id,
           name: addr.name,
@@ -213,6 +217,7 @@ export async function GET(request: NextRequest) {
           .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
       : await prisma.shop.findMany({
           where: { userId: user.id },
+          include: { library: { select: { id: true, name: true } } },
           orderBy: { createdAt: "desc" },
         });
 
@@ -237,7 +242,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { name, externalId, address, province, city, latitude, longitude, isSource, contactName, contactPhone, remark } = body;
+    const { name, externalId, address, province, city, latitude, longitude, isSource, contactName, contactPhone, remark, libraryId } = body;
     const normalizedExternalId = normalizeExternalId(externalId);
     const normalizedName = normalizeShopName(name);
     const normalizedAddress = normalizeShopAddress(address);
@@ -278,6 +283,7 @@ export async function POST(request: Request) {
         contactPhone,
         remark,
         userId: user.id,
+        libraryId: libraryId || null,
       },
     });
 

@@ -37,6 +37,11 @@ type Shop = {
   contactName?: string | null;
   contactPhone: string | null;
   remark?: string | null;
+  libraryId?: string | null;
+  library?: {
+    id: string;
+    name: string;
+  } | null;
 };
 
 type EditableShop = Partial<Shop>;
@@ -2618,11 +2623,21 @@ export function StoreDispatchMap({
                                       {hasResolvedLocation ? "定位正常" : "待定位"}
                                     </span>
                                   </div>
-                                  {shop.externalId && (
-                                    <div className="mt-2.5 inline-flex rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 px-2.5 py-0.5 text-[10px] font-black tracking-wide">
-                                      POI_ID: {shop.externalId}
-                                    </div>
-                                  )}
+                                  <div className="flex flex-wrap gap-2 mt-2.5">
+                                    {shop.externalId && (
+                                      <div className="inline-flex rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 px-2.5 py-0.5 text-[10px] font-black tracking-wide">
+                                        POI_ID: {shop.externalId}
+                                      </div>
+                                    )}
+                                    {shop.library && (
+                                      <div className="inline-flex rounded-md bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 px-2.5 py-0.5 text-[10px] font-black tracking-wide gap-1.5 items-center">
+                                        <span className="relative flex h-1.5 w-1.5">
+                                          <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-purple-500" />
+                                        </span>
+                                        商品库: {shop.library.name}
+                                      </div>
+                                    )}
+                                  </div>
                                   {shop.address && (
                                     <p className="mt-3.5 min-h-[36px] text-xs leading-relaxed text-slate-500 dark:text-slate-400 line-clamp-2 select-all" title={shop.address}>
                                       {shop.address}

@@ -12,7 +12,7 @@ export async function PUT(request: Request, context: { params: { id: string } })
 
     const { id } = await context.params;
     const body = await request.json();
-    const { name, externalId, address, province, city, latitude, longitude, isSource, contactName, contactPhone, remark } = body;
+    const { name, externalId, address, province, city, latitude, longitude, isSource, contactName, contactPhone, remark, libraryId } = body;
     const normalizedExternalId = normalizeExternalId(externalId);
     const normalizedName = normalizeShopName(name);
     const normalizedAddress = normalizeShopAddress(address);
@@ -68,6 +68,7 @@ export async function PUT(request: Request, context: { params: { id: string } })
         contactName,
         contactPhone,
         remark,
+        libraryId: libraryId || null,
       },
     });
 

@@ -480,6 +480,11 @@ export function PurchaseOrderModal({
     () => shops.find((shop) => shop.name === formData.shopName)?.id || "",
     [shops, formData.shopName]
   );
+  const lockedLibraryIdForPurchase = useMemo(() => {
+    if (!formData.shopName || !shops.length) return undefined;
+    const currentShop = shops.find((shop) => shop.name === formData.shopName);
+    return currentShop?.libraryId || undefined;
+  }, [shops, formData.shopName]);
   const purchaseCatalogQuery = useMemo<Record<string, string> | undefined>(() => {
     if (selectedPurchaseShopId) {
       const nextQuery: Record<string, string> = { shopId: selectedPurchaseShopId };
@@ -1461,6 +1466,7 @@ export function PurchaseOrderModal({
             showPlatformSelector={false}
             query={purchaseCatalogQuery}
             loadAllOnOpen
+            lockLibraryId={lockedLibraryIdForPurchase}
           />
 
           {/* Image Gallery Preview */}

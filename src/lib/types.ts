@@ -95,6 +95,11 @@ export interface Shop {
   city?: string | null;
   externalId?: string | null;
   isSource?: boolean;
+  libraryId?: string | null;
+  library?: {
+    id: string;
+    name: string;
+  } | null;
   createdAt?: string;
   updatedAt?: string;
 }

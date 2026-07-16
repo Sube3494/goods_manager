@@ -82,6 +82,7 @@ interface ProductSelectionModalProps {
   externalLoading?: boolean;
   loadAllOnOpen?: boolean;
   respectPublicVisibility?: boolean;
+  lockLibraryId?: string;
 }
 
 function ProductSkeleton({ imageOnly = false }: { imageOnly?: boolean }) {
@@ -122,6 +123,7 @@ export function ProductSelectionModal({
   loadAllOnOpen = false,
   respectPublicVisibility = true,
   allowMultipleToggle = false,
+  lockLibraryId,
 }: ProductSelectionModalProps) {
   const [localSingleSelect, setLocalSingleSelect] = useState(Boolean(singleSelect));
   const queryRef = useRef(query);
@@ -145,7 +147,13 @@ export function ProductSelectionModal({
   const observerTarget = useRef<HTMLDivElement>(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const [libraries, setLibraries] = useState<any[]>([]);
-  const [activeLibraryId, setActiveLibraryId] = useState<string>("all");
+  const [activeLibraryId, setActiveLibraryId] = useState<string>(lockLibraryId || "all");
+
+  useEffect(() => {
+    if (isOpen) {
+      setActiveLibraryId(lockLibraryId || "all");
+    }
+  }, [isOpen, lockLibraryId]);
 
   useEffect(() => {
     if (isOpen) {
@@ -529,7 +537,7 @@ export function ProductSelectionModal({
             </div>
 
             <div className="flex-1 overflow-hidden flex flex-col p-5 sm:p-8 space-y-4">
-              {libraries.length > 1 && (
+              {libraries.length > 1 && !lockLibraryId && (
                 <div className="flex flex-wrap gap-2 border-b border-border/50 pb-3 shrink-0">
                   {libraries.map((lib) => (
                     <button
