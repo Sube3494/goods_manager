@@ -752,6 +752,8 @@ export default function ProfilePage() {
                               setAddressList(newList);
                             }}
                             triggerClassName="h-11 w-full rounded-2xl border border-border bg-white dark:bg-white/5 dark:border-white/10 text-sm font-bold text-foreground px-4"
+                            searchable={true}
+                            searchPlaceholder="选择或搜索商品库..."
                           />
                         </div>
                       )}
