@@ -40,7 +40,7 @@ export default function ProfilePage() {
     fetch("/api/product-libraries")
       .then((res) => (res.ok ? res.json() : []))
       .then((data) => {
-        const libs = data.libraries || [];
+        const libs = Array.isArray(data) ? data : (data.libraries || []);
         setLibraries(libs);
       })
       .catch((err) => console.error("Failed to load libraries:", err));
