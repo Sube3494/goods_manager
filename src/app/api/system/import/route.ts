@@ -33,11 +33,14 @@ export async function POST(request: Request) {
         for (const cat of categories) {
           const name = cat["分类名称"];
           if (name) {
-            await tx.category.upsert({
-              where: { name_userId: { name, userId } },
-              update: {},
-              create: { name, userId }
+            const existing = await tx.category.findFirst({
+              where: { name, userId, libraryId: null }
             });
+            if (!existing) {
+              await tx.category.create({
+                data: { name, userId, libraryId: null }
+              });
+            }
           }
         }
       }
@@ -50,11 +53,19 @@ export async function POST(request: Request) {
           if (name) {
             // Upsert by name if code is missing, otherwise by code
             if (code) {
-              await tx.supplier.upsert({
-                where: { code_userId: { code, userId } },
-                update: { name, contact: sup["联系人"] || null, phone: sup["电话"] || null, address: sup["地址"] || null },
-                create: { code, name, contact: sup["联系人"] || null, phone: sup["电话"] || null, address: sup["地址"] || null, userId }
+              const existing = await tx.supplier.findFirst({
+                where: { code, userId, libraryId: null }
               });
+              if (existing) {
+                await tx.supplier.update({
+                  where: { id: existing.id },
+                  data: { name, contact: sup["联系人"] || null, phone: sup["电话"] || null, address: sup["地址"] || null }
+                });
+              } else {
+                await tx.supplier.create({
+                  data: { code, name, contact: sup["联系人"] || null, phone: sup["电话"] || null, address: sup["地址"] || null, userId, libraryId: null }
+                });
+              }
             } else {
               // Fallback to name-based logic (simplified for this context)
               const existingS = await tx.supplier.findFirst({ 
@@ -93,8 +104,8 @@ export async function POST(request: Request) {
             // Find or create category
             let categoryId = "";
             if (catName) {
-              const cat = await tx.category.findUnique({ 
-                  where: { name_userId: { name: catName, userId } } 
+              const cat = await tx.category.findFirst({ 
+                  where: { name: catName, userId, libraryId: null } 
               });
               if (cat) {
                 categoryId = cat.id;
@@ -106,11 +117,14 @@ export async function POST(request: Request) {
               }
             } else {
                 // Find or create 'Mixed' category
-                const cat = await tx.category.upsert({
-                    where: { name_userId: { name: "未分类", userId } },
-                    update: {},
-                    create: { name: "未分类", userId }
+                let cat = await tx.category.findFirst({
+                    where: { name: "未分类", userId, libraryId: null }
                 });
+                if (!cat) {
+                  cat = await tx.category.create({
+                    data: { name: "未分类", userId, libraryId: null }
+                  });
+                }
                 categoryId = cat.id;
             }
 

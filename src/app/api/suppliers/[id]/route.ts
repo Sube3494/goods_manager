@@ -54,7 +54,10 @@ export async function PUT(
 
     const supplier = await prisma.supplier.update({
       where: { id: existingSupplier.id },
-      data: body
+      data: {
+        ...body,
+        libraryId: body.libraryId !== undefined ? (body.libraryId || null) : undefined,
+      }
     });
     return NextResponse.json(supplier);
   } catch {

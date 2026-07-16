@@ -7,6 +7,7 @@ export async function GET(request: Request) {
   const session = await getFreshSession() as SessionUser | null;
   const { searchParams } = new URL(request.url);
   const shopId = searchParams.get("shopId");
+  const libraryId = searchParams.get("libraryId");
 
   if (!session || !session.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -32,6 +33,7 @@ export async function GET(request: Request) {
     const suppliers = await prisma.supplier.findMany({
       where: {
         userId: session.id,
+        ...(libraryId ? { libraryId } : {}),
         ...(filterSupplierIds ? { id: { in: filterSupplierIds } } : {}),
       },
       orderBy: { code: 'asc' },
@@ -86,7 +88,8 @@ export async function POST(request: Request) {
     const supplier = await prisma.supplier.create({
       data: {
           ...body,
-          userId: session.id
+          userId: session.id,
+          libraryId: body.libraryId || null,
       }
     });
     return NextResponse.json(supplier);

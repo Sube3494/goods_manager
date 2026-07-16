@@ -10,6 +10,7 @@ import { useUser } from "@/hooks/useUser";
 import { hasPermission } from "@/lib/permissions";
 import { Supplier } from "@/lib/types";
 import { SessionUser } from "@/lib/permissions";
+import { cn } from "@/lib/utils";
 
 export default function SuppliersPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -29,15 +30,22 @@ export default function SuppliersPage() {
     onConfirm: () => {},
     message: "",
   });
+
+  const [libraries, setLibraries] = useState<any[]>([]);
+  const [activeLibraryId, setActiveLibraryId] = useState<string>("all");
   
   const { showToast } = useToast();
   const { user } = useUser();
   const canManage = hasPermission(user as SessionUser | null, "supplier:manage");
 
-  const fetchSuppliers = useCallback(async () => {
+  const fetchSuppliers = useCallback(async (libId?: string) => {
     try {
       setIsLoading(true);
-      const res = await fetch("/api/suppliers");
+      const currentLibId = libId !== undefined ? libId : activeLibraryId;
+      const url = currentLibId && currentLibId !== "all" 
+        ? `/api/suppliers?libraryId=${currentLibId}` 
+        : "/api/suppliers";
+      const res = await fetch(url);
       if (res.ok) {
         setSuppliers(await res.json());
       }
@@ -47,11 +55,26 @@ export default function SuppliersPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [showToast]);
+  }, [activeLibraryId, showToast]);
 
   useEffect(() => {
-    fetchSuppliers();
-  }, [fetchSuppliers]);
+    fetch("/api/product-libraries")
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data) => {
+        const libs = Array.isArray(data) ? data : (data.libraries || []);
+        setLibraries(libs);
+        if (libs.length > 0) {
+          setActiveLibraryId(libs[0].id);
+        }
+      })
+      .catch((err) => console.error("Failed to load libraries:", err));
+  }, []);
+
+  useEffect(() => {
+    if (activeLibraryId) {
+      void fetchSuppliers(activeLibraryId);
+    }
+  }, [activeLibraryId, fetchSuppliers]);
 
   const handleOpenCreate = () => {
     setEditingSupplier(null);
@@ -69,10 +92,14 @@ export default function SuppliersPage() {
       const url = isEdit ? `/api/suppliers/${editingSupplier.id}` : "/api/suppliers";
       const method = isEdit ? "PUT" : "POST";
 
+      const payload = isEdit 
+        ? data 
+        : { ...data, libraryId: activeLibraryId !== "all" ? activeLibraryId : undefined };
+
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify(payload),
       });
 
       if (res.ok) {
@@ -123,8 +150,8 @@ export default function SuppliersPage() {
 
   const filteredSuppliers = suppliers.filter(s => 
     s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    s.contact.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    s.code?.toLowerCase().includes(searchQuery.toLowerCase())
+    (s.contact && s.contact.toLowerCase().includes(searchQuery.toLowerCase())) ||
+    (s.code && s.code.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   return (
@@ -148,6 +175,25 @@ export default function SuppliersPage() {
           </button>
         )}
       </div>
+
+      {libraries.length > 1 && (
+        <div className="flex flex-wrap gap-2 border-b border-border/50 pb-3 mb-6 md:mb-8">
+          {libraries.map((lib) => (
+            <button
+              key={lib.id}
+              onClick={() => setActiveLibraryId(lib.id)}
+              className={cn(
+                "px-4 py-2 text-sm font-bold rounded-xl transition-all duration-200",
+                activeLibraryId === lib.id
+                  ? "bg-primary text-primary-foreground shadow-md shadow-primary/10"
+                  : "text-muted-foreground hover:bg-muted/10 hover:text-foreground"
+              )}
+            >
+              {lib.name}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Search Box */}
       <div className="h-10 sm:h-11 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 mb-6 md:mb-8">

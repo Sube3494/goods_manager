@@ -8,12 +8,14 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const scope = searchParams.get("scope") || "all";
   const shopId = searchParams.get("shopId");
+  const libraryId = searchParams.get("libraryId");
   const mainProductsOnly = scope === "main-products";
 
   try {
     const categories = await prisma.category.findMany({
       where: session ? {
         userId: session.id,
+        ...(libraryId ? { libraryId } : {}),
       } : {},
       select: {
         id: true,
@@ -111,6 +113,7 @@ export async function POST(request: Request) {
         name: body.name,
         description: body.description,
         userId: session.id,
+        libraryId: body.libraryId || null,
       }
     });
     return NextResponse.json(category);
