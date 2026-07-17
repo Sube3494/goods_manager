@@ -244,7 +244,9 @@ export default function ShopGoodsPage() {
       return;
     }
 
-    if (isFetchingRef.current) {
+    // 只有在加载下一页时才拦截重复请求
+    // 重新加载第一页数据（如切换筛选条件、切换店铺或初始化）时，应该允许发起请求，并通过版本号（requestVersion）机制处理并发
+    if (isFetchingRef.current && !isFirstPage) {
       return;
     }
 
@@ -296,8 +298,8 @@ export default function ShopGoodsPage() {
       if (requestVersion === requestVersionRef.current) {
         setIsLoading(false);
         setIsNextPageLoading(false);
+        isFetchingRef.current = false;
       }
-      isFetchingRef.current = false;
     }
   }, [buildAggregateQuery, selectedShopId, showToast, filteredShops]);
 

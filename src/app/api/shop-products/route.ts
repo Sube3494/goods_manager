@@ -66,7 +66,15 @@ export async function GET(request: NextRequest) {
 
     if (libraryId !== "all") {
       andConditions.push({
-        product: { libraryId }
+        OR: [
+          { product: { libraryId } },
+          {
+            AND: [
+              { productId: null },
+              { shop: { libraryId } }
+            ]
+          }
+        ]
       });
     }
 
