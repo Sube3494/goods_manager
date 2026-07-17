@@ -131,13 +131,17 @@ export default function ShopGoodsPage() {
 
   const displayedItems = useMemo(
     () =>
-      items.map((item) => ({
-        ...item,
-        displayId: item.id,
-        linkedIds: [item.id],
-        shopNames: item.shopName ? [item.shopName] : [],
-      })),
-    [items]
+      items.map((item) => {
+        const matchedSupplier = suppliers.find((s) => s.id === item.supplierId);
+        return {
+          ...item,
+          displayId: item.id,
+          linkedIds: [item.id],
+          shopNames: item.shopName ? [item.shopName] : [],
+          supplier: matchedSupplier ? { id: matchedSupplier.id, name: matchedSupplier.name } : undefined,
+        };
+      }),
+    [items, suppliers]
   );
 
   useEffect(() => {
