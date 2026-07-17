@@ -19,6 +19,7 @@ type OutboundBreakdownItem = {
   unitCost: number;
   totalCost: number;
   shopProductId?: string | null;
+  hasBackfilled?: boolean;
   batches?: OutboundBatch[];
   availableBatches?: Array<{
     purchaseOrderItemId: string;
@@ -157,14 +158,16 @@ export default function CostBackfillModal({
     const initialInputs: Record<string, string> = {};
     order.productCostBreakdown.forEach((item) => {
       const displayBatches = resolveDisplayBatches(item);
+      const hasBackfilled = item.hasBackfilled;
       if (displayBatches.length > 0) {
         displayBatches.forEach((batch) => {
-          // 只使用采购批次本身已记录的单价（元），若<=0则直接为空，强制用户输入，绝不读取商品默认进价做兜底
-          initialInputs[batch.purchaseOrderItemId] = batch.unitCost <= 0 ? "" : String(batch.unitCost);
+          // 如果已回填过（包括填 0），或者批次本身的单价大于 0，则使用当前值作为初始值
+          const hasValue = hasBackfilled || batch.unitCost > 0;
+          initialInputs[batch.purchaseOrderItemId] = hasValue ? String(batch.unitCost) : "";
         });
       } else if (item.outboundOrderItemId) {
-        // 兜底纯手动回填同样保持空白，不读取商品的默认进价做初始值
-        initialInputs[item.outboundOrderItemId] = "";
+        const hasValue = hasBackfilled || item.unitCost > 0;
+        initialInputs[item.outboundOrderItemId] = hasValue ? String(item.unitCost) : "";
       }
     });
     setCostInputs(initialInputs);
@@ -403,7 +406,7 @@ export default function CostBackfillModal({
                       <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
                         <span>数量: x{item.quantity}</span>
                         <span className="hidden sm:inline">·</span>
-                        {item.unitCost > 0 ? (
+                        {item.hasBackfilled || item.unitCost > 0 ? (
                           <span className="font-medium text-emerald-600 dark:text-emerald-400">当前成本: ¥{(item.unitCost / 100).toFixed(2)}</span>
                         ) : (
                           <span className="inline-flex items-center gap-1 rounded-md bg-orange-500/10 px-1.5 py-0.25 font-semibold text-orange-600 dark:text-orange-400">

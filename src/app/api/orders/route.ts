@@ -1296,7 +1296,9 @@ export async function GET(request: NextRequest) {
             || (productId ? availableBatchesByProduct.get(productId) : null)
             || [];
 
-          if (unitCost <= 0) {
+          const hasCostSnapshot = item.costSnapshot !== null && item.costSnapshot !== undefined;
+          const isMissing = hasCostSnapshot ? false : unitCost <= 0;
+          if (isMissing) {
             missingCostItemCount += 1;
             if (!firstMissingCostShopProductId) {
               firstMissingCostShopProductId = shopProductId;
@@ -1321,6 +1323,7 @@ export async function GET(request: NextRequest) {
             productId,
             batches,
             availableBatches,
+            hasBackfilled: snapshot !== null,
           };
         });
         const productCost = outbound.items.reduce((sum, item) => {
