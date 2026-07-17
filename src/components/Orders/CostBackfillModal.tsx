@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { X, Loader2, Check, AlertTriangle, Coins, RefreshCw } from "lucide-react";
 import Image from "next/image";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 
 type OutboundBatch = {
   purchaseOrderItemId: string;
@@ -20,6 +21,7 @@ type OutboundBreakdownItem = {
   totalCost: number;
   shopProductId?: string | null;
   hasBackfilled?: boolean;
+  image?: string | null;
   batches?: OutboundBatch[];
   availableBatches?: Array<{
     purchaseOrderItemId: string;
@@ -71,6 +73,8 @@ export default function CostBackfillModal({
 }: CostBackfillModalProps) {
   const [isMounted, setIsMounted] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const pendingSubmitItemsRef = useRef<any[] | null>(null);
   
   // 记录每个批次输入框的修改值: { purchaseOrderItemId_or_outboundOrderItemId: string_value }
   const [costInputs, setCostInputs] = useState<Record<string, string>>({});
@@ -116,6 +120,13 @@ export default function CostBackfillModal({
   };
 
   const resolveBreakdownDisplay = (item: OutboundBreakdownItem) => {
+    if (item.image) {
+      return {
+        name: item.name,
+        image: item.image,
+      };
+    }
+
     const orderItems = Array.isArray(order.items) ? order.items : [];
 
     const matchedOrderItem = orderItems.find((orderItem) => {
@@ -250,6 +261,36 @@ export default function CostBackfillModal({
     setCostInputs((prev) => ({ ...prev, [purchaseOrderItemId]: String(price) }));
   };
 
+  const executeSave = async (itemsToSubmit: any[]) => {
+    setIsSaving(true);
+    try {
+      const res = await fetch("/api/purchases/backfill-cost", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ items: itemsToSubmit }),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData?.error || "成本保存失败");
+      }
+
+      onSuccess();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "成本保存发生错误");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleConfirmSave = () => {
+    if (pendingSubmitItemsRef.current) {
+      void executeSave(pendingSubmitItemsRef.current);
+    }
+  };
+
   const handleSave = async () => {
     if (isSaving) return;
     
@@ -299,31 +340,12 @@ export default function CostBackfillModal({
     }
 
     if (hasEmptyOrZero) {
-      const confirmSave = window.confirm("部分商品的成本未填写或填写为 0，这会导致利润计算不准。确定要直接保存吗？");
-      if (!confirmSave) return;
+      pendingSubmitItemsRef.current = submitItems;
+      setIsConfirmOpen(true);
+      return;
     }
 
-    setIsSaving(true);
-    try {
-      const res = await fetch("/api/purchases/backfill-cost", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ items: submitItems }),
-      });
-
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData?.error || "成本保存失败");
-      }
-
-      onSuccess();
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "成本保存发生错误");
-    } finally {
-      setIsSaving(false);
-    }
+    void executeSave(submitItems);
   };
 
   if (!isMounted) return null;
@@ -601,5 +623,19 @@ export default function CostBackfillModal({
     </div>
   );
 
-  return createPortal(modalContent, document.body);
+  return (
+    <>
+      {createPortal(modalContent, document.body)}
+      <ConfirmModal
+        isOpen={isConfirmOpen}
+        onClose={() => setIsConfirmOpen(false)}
+        onConfirm={handleConfirmSave}
+        title="成本确认提示"
+        message="部分商品的成本未填写或填写为 0，这会导致利润计算不准。确定要直接保存吗？"
+        confirmLabel="确定保存"
+        cancelLabel="返回修改"
+        variant="warning"
+      />
+    </>
+  );
 }

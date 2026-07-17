@@ -39,10 +39,12 @@ type OutboundLookupRow = {
     shopProduct: {
       productName: string | null;
       costPrice: number;
+      productImage: string | null;
     } | null;
     product: {
       name: string;
       costPrice: number;
+      image: string | null;
     } | null;
   }>;
 };
@@ -1062,12 +1064,14 @@ export async function GET(request: NextRequest) {
                   select: {
                     productName: true,
                     costPrice: true,
+                    productImage: true,
                   },
                 },
                 product: {
                   select: {
                     name: true,
                     costPrice: true,
+                    image: true,
                   },
                 },
               },
@@ -1282,6 +1286,8 @@ export async function GET(request: NextRequest) {
             : (Math.round(unitCost * 100) * quantity) / 100;
           const shopProductId = String(item.shopProductId || "").trim() || null;
           const productId = String(item.productId || "").trim() || null;
+          const rawImage = item.shopProduct?.productImage || item.product?.image || null;
+          const image = rawImage ? storage.resolveUrl(rawImage) : null;
 
           const batches = (snapshot?.batches || []).map((batch) => {
             const purchaseOrderItemId = batch.purchaseOrderItemId;
@@ -1324,6 +1330,7 @@ export async function GET(request: NextRequest) {
             batches,
             availableBatches,
             hasBackfilled: snapshot !== null,
+            image,
           };
         });
         const productCost = outbound.items.reduce((sum, item) => {
