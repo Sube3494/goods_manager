@@ -92,6 +92,10 @@ export async function POST(
     if (!shop) {
       return NextResponse.json({ error: "Shop not found" }, { status: 404 });
     }
+    const shopData = await prisma.shop.findUnique({
+      where: { id: shopId },
+      select: { libraryId: true }
+    });
 
     const body = await request.json();
     const rows = Array.isArray(body)
@@ -182,28 +186,67 @@ export async function POST(
         },
       });
 
-      if (!sourceProduct) {
-        results.failed += 1;
-        results.errors.push(`第 ${rowNumber} 行：找不到可加入店铺的公开商品${sku ? `（${sku}）` : `（${name}）`}`);
-        continue;
+      let finalSourceProduct = sourceProduct;
+      if (!finalSourceProduct) {
+        // 如果主库中没有匹配的商品，则自动先在主库中创建这个公开商品
+        let newSku = sku || null;
+        if (!newSku) {
+          newSku = `AUTO-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+        } else {
+          const isSkuDup = await prisma.product.findUnique({
+            where: { sku: newSku }
+          });
+          if (isSkuDup) {
+            newSku = `${newSku}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+          }
+        }
+
+        let finalCategoryId = category?.id;
+        if (!finalCategoryId) {
+          const backupCategory = await ensureCategory(shop.userId || user.id, "未分类");
+          finalCategoryId = backupCategory?.id || '';
+        }
+
+        finalSourceProduct = await prisma.product.create({
+          data: {
+            sku: newSku,
+            name: name,
+            pinyin: generatePinyinSearchText(name),
+            categoryId: finalCategoryId,
+            supplierId: supplier?.id || null,
+            image: normalizedImage,
+            costPrice: Number.isFinite(costPrice) ? costPrice : 0,
+            isPublic: true,
+            isDiscontinued: false,
+            userId: shop.userId || user.id,
+            libraryId: shopData?.libraryId || null,
+          },
+          select: {
+            id: true,
+            name: true,
+            image: true,
+            isPublic: true,
+            isDiscontinued: true,
+          }
+        });
       }
 
       await prisma.shopProduct.create({
         data: {
           shopId,
-          productId: sourceProduct.id,
-          sourceProductId: sourceProduct.id,
+          productId: finalSourceProduct.id,
+          sourceProductId: finalSourceProduct.id,
           sku: sku || null,
-          productName: name || sourceProduct.name,
-          pinyin: generatePinyinSearchText(name || sourceProduct.name),
-          productImage: normalizedImage || sourceProduct.image,
+          productName: name || finalSourceProduct.name,
+          pinyin: generatePinyinSearchText(name || finalSourceProduct.name),
+          productImage: normalizedImage || finalSourceProduct.image,
           categoryId: category?.id || null,
           categoryName: category?.name || "未分类",
           supplierId: supplier?.id || null,
           costPrice: Number.isFinite(costPrice) ? costPrice : 0,
           stock: 0, // 新建店铺商品库存初始为 0，需通过采购入库批次
-          isPublic: sourceProduct.isPublic,
-          isDiscontinued: sourceProduct.isDiscontinued,
+          isPublic: finalSourceProduct.isPublic,
+          isDiscontinued: finalSourceProduct.isDiscontinued,
           remark: remark || null,
           specs: Prisma.JsonNull,
         },
