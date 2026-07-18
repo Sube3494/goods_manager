@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, Suspense, useMemo, useTransition, type ReactNode } from "react";
-import { Plus, ShoppingBag, Calendar, Trash2, Eye, Store, Package, Wallet, Archive, ReceiptText, Check, ArrowUp } from "lucide-react";
+import { Plus, ShoppingBag, Calendar, Trash2, Eye, Store, Package, Wallet, Archive, ReceiptText, Check, ArrowUp, X } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { PurchaseOrderModal } from "@/components/Purchases/PurchaseOrderModal";
 import { PurchaseOverviewModal } from "@/components/Purchases/PurchaseOverviewModal";
@@ -113,6 +113,11 @@ function PurchasesContent() {
   const pathname = usePathname();
   const [purchases, setPurchases] = useState<PurchaseOrder[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [exportTargetPO, setExportTargetPO] = useState<PurchaseOrder | undefined>(undefined);
+  const [exportColumns, setExportColumns] = useState<string[]>([
+    "shippingAddress", "shopName", "index", "image", "name", "sku", "price", "quantity", "subtotal"
+  ]);
   const [overviewPurchases, setOverviewPurchases] = useState<PurchaseOrder[]>([]);
   const [editingPurchase, setEditingPurchase] = useState<PurchaseOrder | null>(null);
 
@@ -574,11 +579,27 @@ function PurchasesContent() {
     });
   }, [fetchData, selectedPurchases, showToast]);
 
-  const handleExport = useCallback(async (specificPO?: PurchaseOrder) => {
+  const handleExport = useCallback(async (specificPO?: PurchaseOrder, columnsToInclude: string[] = exportColumns) => {
+    // 过滤得到需要的表格列
+    const tableColumns = [
+      { key: "index", header: "序号", width: 8, align: "center" as const },
+      { key: "image", header: "商品图片", width: 18, align: "center" as const },
+      { key: "name", header: "商品名称", width: 35, align: "left" as const },
+      { key: "sku", header: "货品编码", width: 18, align: "center" as const },
+      { key: "price", header: "单价", width: 12, align: "center" as const },
+      { key: "quantity", header: "数量", width: 12, align: "center" as const },
+      { key: "subtotal", header: "小计", width: 15, align: "center" as const },
+    ].filter(col => columnsToInclude.includes(col.key));
+
     const targets = specificPO ? [specificPO] : filteredPurchases;
 
     if (targets.length === 0) {
       showToast("没有可导出的采购记录", "error");
+      return;
+    }
+
+    if (tableColumns.length === 0) {
+      showToast("请至少选择一个表格列属性导出", "warning");
       return;
     }
 
@@ -602,47 +623,70 @@ function PurchasesContent() {
       const dateStr = `${now.toLocaleDateString("zh-CN")} ${now.toLocaleTimeString("zh-CN", { hour12: false })}`;
       const title = specificPO ? `采购单明细` : `进货汇总`;
       
+      // 动态计算列总数和字母索引
+      const totalCols = tableColumns.length;
+      const lastColLetter = String.fromCharCode(65 + Math.max(0, totalCols - 1));
+
       // 添加标题行
       worksheet.addRow([`${title} — ${dateStr}`]);
-      worksheet.mergeCells('A1:G1'); // 扩展到 G 列 (小计)
+      worksheet.mergeCells(`A1:${lastColLetter}1`);
       worksheet.getCell('A1').font = { size: 14, bold: true };
-      worksheet.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' }; // 居中及垂直居中
+      worksheet.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' };
       
       // 添加收货地址
       let displayAddress = "";
-      if (specificPO) {
-        displayAddress = specificPO.shippingAddress || "";
-      } else if (targets.length > 0) {
-        const defaultAddr = (typedUser?.shippingAddresses || []).find(a => a.isDefault)?.address;
-        displayAddress = targets[0].shippingAddress || defaultAddr || "";
+      if (columnsToInclude.includes("shippingAddress")) {
+        if (specificPO) {
+          displayAddress = specificPO.shippingAddress || "";
+        } else if (targets.length > 0) {
+          const defaultAddr = (typedUser?.shippingAddresses || []).find(a => a.isDefault)?.address;
+          displayAddress = targets[0].shippingAddress || defaultAddr || "";
+        }
       }
 
       if (displayAddress) {
         worksheet.addRow([`收货地址：${displayAddress}`]);
         const addrRowIdx = worksheet.rowCount;
-        worksheet.mergeCells(`A${addrRowIdx}:M${addrRowIdx}`); // 扩展到 M 列，确保一行能放下
+        worksheet.mergeCells(`A${addrRowIdx}:${lastColLetter}${addrRowIdx}`);
         const addressCell = worksheet.getCell(`A${addrRowIdx}`);
         addressCell.font = { size: 14, bold: true, color: { argb: 'FFFF0000' } }; 
-        addressCell.alignment = { horizontal: 'left', vertical: 'middle', wrapText: false }; // 关闭换行
-        worksheet.getRow(addrRowIdx).height = 25; // 稍微调小行高，让间距更自然
+        addressCell.alignment = { horizontal: 'left', vertical: 'middle', wrapText: false };
+        worksheet.getRow(addrRowIdx).height = 25;
       }
       
+      // 添加店铺名称
+      let displayShopName = "";
+      if (columnsToInclude.includes("shopName")) {
+        if (specificPO) {
+          displayShopName = specificPO.shopName || "";
+        } else if (targets.length > 0) {
+          displayShopName = targets.map(t => t.shopName).filter(Boolean).join(", ") || "";
+        }
+      }
+
+      if (displayShopName) {
+        worksheet.addRow([`收货店铺：${displayShopName}`]);
+        const shopRowIdx = worksheet.rowCount;
+        worksheet.mergeCells(`A${shopRowIdx}:${lastColLetter}${shopRowIdx}`);
+        const shopCell = worksheet.getCell(`A${shopRowIdx}`);
+        shopCell.font = { size: 12, bold: true, color: { argb: 'FF0000FF' } }; 
+        shopCell.alignment = { horizontal: 'left', vertical: 'middle', wrapText: false };
+        worksheet.getRow(shopRowIdx).height = 22;
+      }
+
       // 添加空行
       worksheet.addRow([]);
       
       // 添加表头
-      const headerRow = worksheet.addRow(["序号", "商品图片", "商品名称", "货品编码", "单价", "数量", "小计"]);
+      const headers = tableColumns.map(col => col.header);
+      const headerRow = worksheet.addRow(headers);
       headerRow.font = { bold: true };
       headerRow.alignment = { horizontal: 'center', vertical: 'middle' };
       
       // 设置列宽
-      worksheet.getColumn(1).width = 8;
-      worksheet.getColumn(2).width = 18;
-      worksheet.getColumn(3).width = 35;
-      worksheet.getColumn(4).width = 18;
-      worksheet.getColumn(5).width = 12;
-      worksheet.getColumn(6).width = 12;
-      worksheet.getColumn(7).width = 15;
+      tableColumns.forEach((col, idx) => {
+        worksheet.getColumn(idx + 1).width = col.width;
+      });
       
       let globalIndex = 1;
       let currentRowIndex = worksheet.rowCount + 1; // 动态计算下一个数据行的起始索引
@@ -657,22 +701,21 @@ function PurchasesContent() {
         );
         for (const item of sortedItems) {
           const qty = item.quantity || 0;
-          // 兼容性读取单价：尝试多个可能的属性名
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const price = (item as any).price || item.costPrice || item.shopProduct?.costPrice || item.product?.costPrice || 0;
           const subtotal = qty * price;
-          const subtotalFormula = { formula: `E${currentRowIndex}*F${currentRowIndex}`, result: subtotal };
 
           totalQty += qty;
           totalAmount += subtotal;
 
           // ── 第一步：预取图片并计算尺寸，用于动态行高 ──
+          const hasImageColumn = columnsToInclude.includes("image");
           const imageUrl = item.shopProduct?.image || item.image;
           let imageBuffer: ArrayBuffer | null = null;
           let imgW = 0;
           let imgH = 0;
 
-          if (imageUrl) {
+          if (hasImageColumn && imageUrl) {
             try {
               const response = await fetch(imageUrl);
               if (response.ok) {
@@ -693,82 +736,89 @@ function PurchasesContent() {
             }
           }
 
-          // ── 第二步：根据图片宽高比计算行高 ──
-          // 图片列宽 18 ≈ 135px；图片宽度上限留 10px 边距 = 125px
           const COL_WIDTH_PX = 135;
           const IMG_MAX_W = 125;
-          const MIN_ROW_H = 80;   // 最小行高（Excel points）
-          const MAX_ROW_H = 200;  // 最大行高，防止过高
-          const PADDING_PX = 12;  // 上下各留 6px
+          const MIN_ROW_H = hasImageColumn ? 80 : 30; // 如果没有图片，行高为较扁平紧凑的 30 磅
+          const MAX_ROW_H = 200;
+          const PADDING_PX = 12;
 
           let rowHeightPts = MIN_ROW_H;
           let finalW = IMG_MAX_W;
           let finalH = IMG_MAX_W;
 
-          if (imgW > 0 && imgH > 0) {
-            // 按宽度缩放，算出对应的图片高度（px）
+          if (hasImageColumn && imgW > 0 && imgH > 0) {
             const scale = IMG_MAX_W / imgW;
-            finalW = imgW * scale;         // ≈ IMG_MAX_W
+            finalW = imgW * scale;
             finalH = imgH * scale;
-            // Excel row height (pts) ≈ px * 0.75；加上上下边距后换算
             rowHeightPts = Math.round((finalH + PADDING_PX) * 0.75);
             rowHeightPts = Math.max(MIN_ROW_H, Math.min(MAX_ROW_H, rowHeightPts));
           }
 
-          // ── 第三步：用正确行高创建行 ──
-          const row = worksheet.addRow([
-            globalIndex++,
-            "", // Placeholder for image
-            item.shopProduct?.name || item.product?.name || "未知商品",
-            item.shopProductId ? (item.shopProduct?.sku || "") : (item.product?.sku || ""),
-            price,
-            qty,
-            subtotalFormula,
-          ]);
+          // ── 第二步：组装数据项 ──
+          const rowData = tableColumns.map(col => {
+            if (col.key === "index") return globalIndex;
+            if (col.key === "image") return ""; // 占位符
+            if (col.key === "name") return item.shopProduct?.name || item.product?.name || "未知商品";
+            if (col.key === "sku") return item.shopProductId ? (item.shopProduct?.sku || "") : (item.product?.sku || "");
+            if (col.key === "price") return price;
+            if (col.key === "quantity") return qty;
+            if (col.key === "subtotal") {
+              const priceIdx = tableColumns.findIndex(c => c.key === "price");
+              const qtyIdx = tableColumns.findIndex(c => c.key === "quantity");
+              if (priceIdx !== -1 && qtyIdx !== -1) {
+                const priceColLetter = String.fromCharCode(65 + priceIdx);
+                const qtyColLetter = String.fromCharCode(65 + qtyIdx);
+                return { formula: `${priceColLetter}${currentRowIndex}*${qtyColLetter}${currentRowIndex}`, result: subtotal };
+              }
+              return subtotal;
+            }
+            return "";
+          });
 
+          globalIndex++;
+
+          const row = worksheet.addRow(rowData);
           row.height = rowHeightPts;
           row.alignment = { vertical: 'middle', wrapText: true };
 
-          // 对齐设置 (A-G)
-          worksheet.getCell(`A${currentRowIndex}`).alignment = { horizontal: 'center', vertical: 'middle' };
-          worksheet.getCell(`B${currentRowIndex}`).alignment = { horizontal: 'center', vertical: 'middle' };
-          worksheet.getCell(`C${currentRowIndex}`).alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
-          worksheet.getCell(`D${currentRowIndex}`).alignment = { horizontal: 'center', vertical: 'middle' };
-          worksheet.getCell(`E${currentRowIndex}`).alignment = { horizontal: 'center', vertical: 'middle' };
-          worksheet.getCell(`F${currentRowIndex}`).alignment = { horizontal: 'center', vertical: 'middle' };
-          worksheet.getCell(`G${currentRowIndex}`).alignment = { horizontal: 'center', vertical: 'middle' };
+          // 设置对齐方式与格式化
+          tableColumns.forEach((col, idx) => {
+            const cell = worksheet.getCell(`${String.fromCharCode(65 + idx)}${currentRowIndex}`);
+            cell.alignment = { 
+              horizontal: col.align, 
+              vertical: 'middle',
+              wrapText: col.key === "name" 
+            };
+            
+            if (col.key === "price" || col.key === "subtotal") {
+              cell.numFmt = '¥#,##0.00';
+            }
+          });
 
-          // 格式化金额
-          worksheet.getCell(`E${currentRowIndex}`).numFmt = '¥#,##0.00';
-          worksheet.getCell(`G${currentRowIndex}`).numFmt = '¥#,##0.00';
+          // ── 第三步：将图片插入对应列 ──
+          if (hasImageColumn && imageBuffer) {
+            const imageIdx = tableColumns.findIndex(c => c.key === "image");
+            if (imageIdx !== -1) {
+              try {
+                const imageId = workbook.addImage({
+                  buffer: imageBuffer,
+                  extension: imageUrl!.split('.').pop()?.toLowerCase() === 'png' ? 'png' : 'jpeg',
+                });
 
-          // ── 第四步：将图片插入对应行，居中对齐 ──
-          if (imageBuffer) {
-            try {
-              const ext = imageUrl!.split('.').pop()?.toLowerCase();
-              const extType = ext === 'png' ? 'png' : 'jpeg';
+                const cellHeightPx = rowHeightPts / 0.75;
+                const colOffset = ((COL_WIDTH_PX - finalW) / 2) / COL_WIDTH_PX;
+                const rowOffset = ((cellHeightPx - finalH) / 2) / cellHeightPx;
 
-              const imageId = workbook.addImage({
-                buffer: imageBuffer,
-                extension: extType as 'png' | 'jpeg',
-              });
-
-              // 单元格实际像素高度 = rowHeightPts / 0.75
-              const cellHeightPx = rowHeightPts / 0.75;
-
-              // 图片居中偏移（比例值）
-              const colOffset = ((COL_WIDTH_PX - finalW) / 2) / COL_WIDTH_PX;
-              const rowOffset = ((cellHeightPx - finalH) / 2) / cellHeightPx;
-
-              worksheet.addImage(imageId, {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                tl: { col: 1 + colOffset, row: currentRowIndex - 1 + rowOffset } as any,
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                ext: { width: finalW, height: finalH } as any,
-                editAs: 'oneCell',
-              });
-            } catch (err) {
-              console.error("Failed to insert image into worksheet", err);
+                worksheet.addImage(imageId, {
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  tl: { col: imageIdx + colOffset, row: currentRowIndex - 1 + rowOffset } as any,
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  ext: { width: finalW, height: finalH } as any,
+                  editAs: 'oneCell',
+                });
+              } catch (imgErr) {
+                console.error("Failed to insert image into worksheet", imgErr);
+              }
             }
           }
 
@@ -777,21 +827,40 @@ function PurchasesContent() {
       }
       
       const lastDataRow = currentRowIndex - 1;
-      const totalQtyFormula = lastDataRow >= 4 ? { formula: `SUM(F4:F${lastDataRow})`, result: totalQty } : totalQty;
-      const totalAmountFormula = lastDataRow >= 4 ? { formula: `SUM(G4:G${lastDataRow})`, result: totalAmount } : totalAmount;
 
-      // Add total row
-      const totalRow = worksheet.addRow(["", "", "总计", "", "", totalQtyFormula, totalAmountFormula]);
-      totalRow.font = { bold: true };
-      totalRow.height = 35; // 稍微增加总计行高度
+      // ── 第四步：添加总计行 ──
+      if (totalCols > 0) {
+        const totalRowData = tableColumns.map((col, idx) => {
+          if (col.key === "name") return "总计";
+          if (col.key === "quantity") {
+            const colLetter = String.fromCharCode(65 + idx);
+            return lastDataRow >= 4 ? { formula: `SUM(${colLetter}4:${colLetter}${lastDataRow})`, result: totalQty } : totalQty;
+          }
+          if (col.key === "subtotal") {
+            const colLetter = String.fromCharCode(65 + idx);
+            return lastDataRow >= 4 ? { formula: `SUM(${colLetter}4:${colLetter}${lastDataRow})`, result: totalAmount } : totalAmount;
+          }
+          return "";
+        });
+
+        if (!tableColumns.some(c => c.key === "name")) {
+          totalRowData[0] = "总计";
+        }
+
+        const totalRow = worksheet.addRow(totalRowData);
+        totalRow.font = { bold: true };
+        totalRow.height = 35;
+        
+        tableColumns.forEach((col, idx) => {
+          const cell = worksheet.getCell(`${String.fromCharCode(65 + idx)}${currentRowIndex}`);
+          cell.alignment = { horizontal: 'center', vertical: 'middle' };
+          if (col.key === "subtotal") {
+            cell.numFmt = '¥#,##0.00';
+          }
+        });
+      }
       
-      // 合并总计标签对应的单元格 A-E 没必要全部居中，让"总计"在C列
-      worksheet.getCell(`C${currentRowIndex}`).alignment = { horizontal: 'center', vertical: 'middle' };
-      worksheet.getCell(`F${currentRowIndex}`).alignment = { horizontal: 'center', vertical: 'middle' }; // 总数量居中
-      worksheet.getCell(`G${currentRowIndex}`).alignment = { horizontal: 'center', vertical: 'middle' }; // 总金额居中
-      worksheet.getCell(`G${currentRowIndex}`).numFmt = '¥#,##0.00';
-      
-      // Add borders everywhere
+      // 样式边框应用
       worksheet.eachRow((row, rowNumber) => {
         row.eachCell((cell) => {
           cell.font = { ...cell.font, name: '微软雅黑' };
@@ -806,7 +875,7 @@ function PurchasesContent() {
         });
       });
       
-      // Generate and save file
+      // 保存
       const buffer = await workbook.xlsx.writeBuffer();
       const filename = specificPO 
           ? `采购单_${specificPO.id}_${formatLocalDate(new Date())}.xlsx`
@@ -819,7 +888,12 @@ function PurchasesContent() {
       console.error("Export failed:", error);
       showToast("导出失败，请重试", "error");
     }
-  }, [filteredPurchases, showToast, typedUser?.shippingAddresses]);
+  }, [filteredPurchases, showToast, typedUser?.shippingAddresses, exportColumns]);
+
+  const handleExportClick = useCallback((specificPO?: PurchaseOrder) => {
+    setExportTargetPO(specificPO);
+    setIsExportModalOpen(true);
+  }, []);
 
   const scrollToTop = useCallback(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -1263,7 +1337,7 @@ function PurchasesContent() {
           setCostBackfillItemId(null);
         }}
         onSubmit={handleSave}
-        onExport={handleExport}
+        onExport={handleExportClick}
         onOverview={(po) => setOverviewPurchases([po])}
         initialData={editingPurchase || undefined}
         readOnly={detailReadOnly}
@@ -1285,6 +1359,22 @@ function PurchasesContent() {
         isOpen={overviewPurchases.length > 0}
         onClose={() => setOverviewPurchases([])}
         purchases={overviewPurchases}
+      />
+
+      {/* Export Settings Modal */}
+      <ExportSettingsModal
+        isOpen={isExportModalOpen}
+        onClose={() => {
+          setIsExportModalOpen(false);
+          setExportTargetPO(undefined);
+        }}
+        selectedColumns={exportColumns}
+        onChange={setExportColumns}
+        onConfirm={(cols) => {
+          setIsExportModalOpen(false);
+          void handleExport(exportTargetPO, cols);
+          setExportTargetPO(undefined);
+        }}
       />
 
       <ActionBar
@@ -1339,5 +1429,129 @@ export default function PurchasesPage() {
     }>
       <PurchasesContent />
     </Suspense>
+  );
+}
+
+interface ExportSettingsModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: (selectedColumns: string[]) => void;
+  selectedColumns: string[];
+  onChange: (columns: string[]) => void;
+}
+
+function ExportSettingsModal({ isOpen, onClose, onConfirm, selectedColumns, onChange }: ExportSettingsModalProps) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    return () => setMounted(false);
+  }, []);
+
+  const allColumns = [
+    { key: "shippingAddress", label: "收货地址 (外部信息)", desc: "在表格上方以红色特大字体展示采购收货详细地址" },
+    { key: "shopName", label: "店铺名称 (外部信息)", desc: "在表格上方以蓝色字体展示收货的店铺名称" },
+    { key: "index", label: "序号", desc: "表格列：显示商品排列序号 (1, 2, 3...)" },
+    { key: "image", label: "商品图片", desc: "表格列：在导出中嵌入商品实物缩略图" },
+    { key: "name", label: "商品名称", desc: "表格列：商品详细标题" },
+    { key: "sku", label: "货品编码", desc: "表格列：店内识别码/SKU，可为空" },
+    { key: "price", label: "单价", desc: "表格列：商品进货单价，自动保留两位小数" },
+    { key: "quantity", label: "数量", desc: "表格列：本单采购数量" },
+    { key: "subtotal", label: "小计", desc: "表格列：单价*数量的计算，若单价和数量都勾选，会自动写入 Excel 公式" },
+  ];
+
+  const handleToggle = (key: string) => {
+    if (selectedColumns.includes(key)) {
+      onChange(selectedColumns.filter(c => c !== key));
+    } else {
+      onChange([...selectedColumns, key]);
+    }
+  };
+
+  const handleSelectAll = () => {
+    onChange(allColumns.map(c => c.key));
+  };
+
+  const handleSelectNone = () => {
+    onChange([]);
+  };
+
+  if (!mounted || !isOpen) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-60000 flex items-center justify-center p-4">
+      {/* Background overlay */}
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      
+      {/* Modal Content */}
+      <div className="relative w-full max-w-lg overflow-hidden rounded-3xl bg-white dark:bg-gray-900 shadow-2xl border border-border/50 flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-200">
+        {/* Header */}
+        <div className="border-b border-border p-6 flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-bold text-foreground">自定义导出属性</h3>
+            <p className="text-xs text-muted-foreground mt-1">请选择需要在采购 Excel 明细表中包含的信息</p>
+          </div>
+          <button onClick={onClose} className="rounded-full p-1.5 text-muted-foreground hover:bg-muted transition-colors">
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* List of attributes */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+          <div className="flex gap-2 justify-end mb-2">
+            <button type="button" onClick={handleSelectAll} className="text-xs font-medium text-primary hover:underline">全选</button>
+            <span className="text-muted-foreground/30 text-xs">|</span>
+            <button type="button" onClick={handleSelectNone} className="text-xs font-medium text-muted-foreground hover:underline">清空</button>
+          </div>
+          <div className="space-y-2">
+            {allColumns.map(col => {
+              const isChecked = selectedColumns.includes(col.key);
+              return (
+                <div 
+                  key={col.key}
+                  onClick={() => handleToggle(col.key)}
+                  className={`flex items-start gap-3 p-3.5 rounded-2xl border cursor-pointer transition-all ${
+                    isChecked 
+                      ? "border-primary bg-primary/5 dark:bg-primary/10" 
+                      : "border-border hover:bg-muted/40"
+                  }`}
+                >
+                  <div className={`mt-0.5 relative flex h-4 w-4 shrink-0 items-center justify-center rounded-md border-2 transition-all ${
+                    isChecked 
+                      ? "border-primary bg-primary text-primary-foreground" 
+                      : "border-gray-300 dark:border-white/20"
+                  }`}>
+                    {isChecked && <Check size={10} strokeWidth={4} />}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className={`text-sm font-bold leading-tight ${isChecked ? "text-primary" : "text-foreground/90"}`}>{col.label}</p>
+                    <p className="text-xs text-muted-foreground/80 mt-1 leading-normal">{col.desc}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="border-t border-border p-6 flex justify-end gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="h-10 px-5 rounded-full text-sm font-medium text-muted-foreground hover:bg-muted transition-colors"
+          >
+            取消
+          </button>
+          <button
+            type="button"
+            onClick={() => onConfirm(selectedColumns)}
+            className="h-10 px-6 rounded-full text-sm font-medium bg-primary text-primary-foreground shadow-lg shadow-primary/20 hover:opacity-90 active:scale-95 transition-all"
+          >
+            确认导出
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
   );
 }
