@@ -9,7 +9,7 @@ import * as XLSX from "xlsx";
 interface ImportModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onImport: (data: Record<string, unknown>[] | Record<string, unknown[]>) => void;
+  onImport: (data: Record<string, unknown>[] | Record<string, unknown[]>) => Promise<void> | void;
   title?: string;
   description?: string;
   dropzoneText?: string;
@@ -34,6 +34,8 @@ export function ImportModal({
   const [previewData, setPreviewData] = useState<Record<string, unknown>[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [progress, setProgress] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleDownloadTemplate = () => {
@@ -97,27 +99,57 @@ export function ImportModal({
   const handleConfirm = () => {
      if (file) {
         const reader = new FileReader();
-        reader.onload = (e) => {
+        reader.onload = async (e) => {
             const data = e.target?.result;
             const workbook = XLSX.read(data, { type: "binary" });
             
-              if (multiSheet) {
-                const result: Record<string, unknown[]> = {};
-                workbook.SheetNames.forEach(name => {
-                    const sheet = workbook.Sheets[name];
-                    result[name] = XLSX.utils.sheet_to_json(sheet);
-                });
-                onImport(result);
-              } else {
-                const sheetName = workbook.SheetNames[0];
-                const sheet = workbook.Sheets[sheetName];
-                const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet).map((row) => ({
-                  ...row,
-                  __sheetName: sheetName,
-                }));
-                onImport(json);
-              }
-            onClose();
+            let importData: any = null;
+            if (multiSheet) {
+              const result: Record<string, unknown[]> = {};
+              workbook.SheetNames.forEach(name => {
+                  const sheet = workbook.Sheets[name];
+                  result[name] = XLSX.utils.sheet_to_json(sheet);
+              });
+              importData = result;
+            } else {
+              const sheetName = workbook.SheetNames[0];
+              const sheet = workbook.Sheets[sheetName];
+              importData = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet).map((row) => ({
+                ...row,
+                __sheetName: sheetName,
+              }));
+            }
+
+            setIsImporting(true);
+            setProgress(0);
+
+            // 模拟进度条平滑爬升
+            const progressTimer = setInterval(() => {
+              setProgress((prev) => {
+                if (prev >= 95) {
+                  clearInterval(progressTimer);
+                  return 95;
+                }
+                const step = Math.max(1, Math.floor((98 - prev) * 0.15));
+                return prev + step;
+              });
+            }, 100);
+
+            try {
+              await onImport(importData);
+              clearInterval(progressTimer);
+              setProgress(100);
+              setTimeout(() => {
+                setIsImporting(false);
+                setPreviewData([]);
+                setFile(null);
+                onClose();
+              }, 300);
+            } catch (err) {
+              clearInterval(progressTimer);
+              setIsImporting(false);
+              setError(err instanceof Error ? err.message : "导入失败");
+            }
         };
         reader.readAsBinaryString(file);
      }
@@ -154,7 +186,11 @@ export function ImportModal({
             <div className="flex flex-col border-b border-border/50 p-6 md:p-8 shrink-0">
               <div className="flex items-center justify-between">
                 <h2 className="text-xl md:text-2xl font-bold text-foreground">{title}</h2>
-                <button onClick={onClose} className="rounded-full p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors">
+                <button 
+                  disabled={isImporting}
+                  onClick={onClose} 
+                  className="rounded-full p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                >
                   <X size={20} className="md:size-6" />
                 </button>
               </div>
@@ -166,8 +202,53 @@ export function ImportModal({
             </div>
 
             <div className="flex-1 overflow-y-auto p-6 md:p-8 min-h-0">
-              {/* Drop Zone */}
-              {!previewData.length ? (
+              {/* Drop Zone / Progress / Preview */}
+              {isImporting ? (
+                <div className="flex flex-col items-center justify-center py-12 px-6 space-y-6 animate-in fade-in-50 duration-300">
+                  <div className="relative flex items-center justify-center">
+                    <div className="absolute inset-0 bg-primary/20 blur-3xl rounded-full scale-150 animate-pulse" />
+                    
+                    <div className="relative w-28 h-28 flex items-center justify-center bg-white dark:bg-white/5 rounded-full shadow-lg border border-border/50">
+                      <svg className="w-24 h-24 transform -rotate-90">
+                        <circle
+                          cx="48"
+                          cy="48"
+                          r="40"
+                          stroke="currentColor"
+                          strokeWidth="6"
+                          fill="transparent"
+                          className="text-muted/20"
+                        />
+                        <circle
+                          cx="48"
+                          cy="48"
+                          r="40"
+                          stroke="currentColor"
+                          strokeWidth="6"
+                          fill="transparent"
+                          strokeDasharray={251.2}
+                          strokeDashoffset={251.2 - (251.2 * progress) / 100}
+                          className="text-primary transition-all duration-300 ease-out"
+                          strokeLinecap="round"
+                        />
+                      </svg>
+                      <span className="absolute text-2xl font-bold text-foreground font-number">{progress}%</span>
+                    </div>
+                  </div>
+                  
+                  <div className="text-center space-y-2">
+                    <p className="text-lg font-bold text-foreground">正在安全导入商品数据...</p>
+                    <p className="text-sm text-muted-foreground">正在写入库并生成关联关系，请勿关闭窗口</p>
+                  </div>
+                  
+                  <div className="w-full max-w-md h-2 bg-muted dark:bg-white/5 rounded-full overflow-hidden border border-border/30">
+                    <div 
+                      className="h-full bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 rounded-full transition-all duration-300 ease-out"
+                      style={{ width: `${progress}%` }}
+                    />
+                  </div>
+                </div>
+              ) : !previewData.length ? (
                 <div
                   className={`group relative flex h-72 cursor-pointer flex-col items-center justify-center rounded-3xl border-2 border-dashed transition-all duration-500 ${
                     dragActive
@@ -276,19 +357,29 @@ export function ImportModal({
             <div className="flex justify-end gap-3 border-t border-border/50 p-6 md:p-8 shrink-0">
               <button
                 type="button"
+                disabled={isImporting}
                 onClick={onClose}
-                className="h-11 px-6 rounded-full text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-all active:scale-95"
+                className="h-11 px-6 rounded-full text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 取消
               </button>
               <button
                 type="button"
-                disabled={!file}
+                disabled={!file || isImporting}
                 onClick={handleConfirm}
-                className="flex items-center gap-2 h-11 px-8 rounded-full bg-primary text-sm font-medium text-primary-foreground shadow-xl shadow-primary/20 transition-all hover:opacity-90 active:scale-95 disabled:opacity-50 disabled:grayscale shrink-0"
+                className="flex items-center gap-2 h-11 px-8 rounded-full bg-primary text-sm font-medium text-primary-foreground shadow-xl shadow-primary/20 transition-all hover:opacity-90 active:scale-95 disabled:opacity-50 disabled:grayscale shrink-0 disabled:cursor-not-allowed"
               >
-                <CheckCircle size={18} />
-                确认导入
+                {isImporting ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                    正在导入...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle size={18} />
+                    确认导入
+                  </>
+                )}
               </button>
             </div>
           </motion.div>

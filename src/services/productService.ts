@@ -200,7 +200,7 @@ export class ProductService {
     if (field === "sku") {
         const totalCount = await prisma.product.count({ where });
         
-        if (totalCount < 500) {
+        if (totalCount < 100000) {
             const allItems = await prisma.product.findMany({
               where,
               select: { id: true, sku: true },
