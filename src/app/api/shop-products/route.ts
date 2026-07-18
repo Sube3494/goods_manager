@@ -68,12 +68,7 @@ export async function GET(request: NextRequest) {
       andConditions.push({
         OR: [
           { product: { libraryId } },
-          {
-            AND: [
-              { productId: null },
-              { shop: { libraryId } }
-            ]
-          }
+          { shop: { libraryId } }
         ]
       });
     }
