@@ -163,13 +163,18 @@ export function ProductSelectionModal({
           if (Array.isArray(data)) {
             setLibraries(data);
             if (data.length > 0) {
-              setActiveLibraryId(data[0].id);
+              const hasLocked = data.some(lib => lib.id === lockLibraryId);
+              if (lockLibraryId && hasLocked) {
+                setActiveLibraryId(lockLibraryId);
+              } else {
+                setActiveLibraryId(data[0].id);
+              }
             }
           }
         })
         .catch(() => {});
     }
-  }, [isOpen]);
+  }, [isOpen, lockLibraryId]);
 
   const [showUnselectedOnly, setShowUnselectedOnly] = useState(true);
   const [localVisibleCount, setLocalVisibleCount] = useState(50);
@@ -537,7 +542,7 @@ export function ProductSelectionModal({
             </div>
 
             <div className="flex-1 overflow-hidden flex flex-col p-5 sm:p-8 space-y-4">
-              {libraries.length > 1 && !lockLibraryId && (
+              {libraries.length > 1 && (
                 <div className="flex flex-wrap gap-2 border-b border-border/50 pb-3 shrink-0">
                   {libraries.map((lib) => (
                     <button
