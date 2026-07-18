@@ -254,7 +254,7 @@ export function OutboundDetailModal({ isOpen, onClose, order }: OutboundDetailMo
                 const itemId = String(item.id || "");
                 const name = item.shopProduct?.name || item.product?.name || '未知商品';
                 const img = item.shopProduct?.image || item.product?.image;
-                const sku = item.shopProduct?.sku || item.product?.sku || '-';
+                const sku = item.shopProductId ? (item.shopProduct?.sku || '-') : (item.product?.sku || '-');
                 const returnedQuantity = itemId ? Math.max(0, returnedQuantityMap.get(itemId) || 0) : 0;
                 const returnedDetails = itemId ? (returnedItemDetailsMap.get(itemId) || []) : [];
                 const remainingQuantity = Math.max(0, item.quantity - returnedQuantity);

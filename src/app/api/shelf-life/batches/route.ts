@@ -158,7 +158,7 @@ export async function GET(request: NextRequest) {
         purchaseOrderDate: batch.purchaseOrderItem?.purchaseOrder?.createdAt || null,
         productName: batch.shopProduct?.productName || batch.product?.name || "未命名商品",
         productImage,
-        sku: batch.shopProduct?.sku || batch.product?.sku || null,
+        sku: batch.shopProductId ? (batch.shopProduct?.sku || null) : (batch.product?.sku || null),
         shopName: batch.shopProduct?.shop?.name || "未知店铺",
         shelfLifeDays: batch.shopProduct?.shelfLifeDays || null,
         remainingDays: diffDays,

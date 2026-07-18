@@ -94,7 +94,11 @@ export async function GET() {
     ]);
     const resolveBrushProductKey = (item: (typeof brushProducts)[number]) => {
       const resolvedShopId = String(item.shopProduct?.shopId || item.shop?.id || item.shopId || "").trim();
-      const resolvedSku = String(item.shopProduct?.sku || item.product?.sku || "").trim().toLowerCase();
+      const resolvedSku = String(
+        item.shopProductId || item.shopProduct?.id
+          ? (item.shopProduct?.sku || "")
+          : (item.product?.sku || "")
+      ).trim().toLowerCase();
       const resolvedProductId = String(
         item.shopProduct?.sourceProductId ||
         item.shopProduct?.productId ||

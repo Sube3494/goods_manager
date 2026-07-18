@@ -652,7 +652,7 @@ function PurchasesContent() {
       for (const po of targets) {
         const sortedItems = sortPurchaseItems(
             po.items,
-            item => item.shopProduct?.sku || item.product?.sku,
+            item => item.shopProductId ? (item.shopProduct?.sku || "") : (item.product?.sku || ""),
             item => item.shopProduct?.name || item.product?.name
         );
         for (const item of sortedItems) {
@@ -720,7 +720,7 @@ function PurchasesContent() {
             globalIndex++,
             "", // Placeholder for image
             item.shopProduct?.name || item.product?.name || "未知商品",
-            item.shopProduct?.sku || item.product?.sku || "",
+            item.shopProductId ? (item.shopProduct?.sku || "") : (item.product?.sku || ""),
             price,
             qty,
             subtotalFormula,

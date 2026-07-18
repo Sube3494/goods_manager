@@ -67,7 +67,7 @@ const PurchaseItemRow = memo(({
         return {
             imageUrl: item.shopProduct?.image || item.image || item.product?.image || p?.image,
             productName: item.shopProduct?.productName || item.shopProduct?.name || item.product?.name || p?.name || "加载中...",
-            productSku: item.shopProduct?.sku || item.product?.sku || p?.sku,
+            productSku: item.shopProductId ? (item.shopProduct?.sku || "") : (item.product?.sku || p?.sku || ""),
             supplierName: suppliers.find(s => s.id === supplierId)?.name,
             remark: item.shopProduct?.remark || item.product?.remark || p?.remark
         };
