@@ -949,7 +949,7 @@ export default function GoodsPage() {
             "*商品名称": "示例商品1",
             "*分类": "默认分类",
             "*进货单价": 99.00,
-            "SKU": "EXAMPLE-001",
+            "*SKU/店内码": "EXAMPLE-001",
             "供应商": "默认供应商",
             "商品图片": "https://example.com/main.jpg",
             "图库图片": "https://example.com/p1.jpg\nhttps://example.com/p2.jpg",

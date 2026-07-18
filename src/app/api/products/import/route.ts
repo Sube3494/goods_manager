@@ -18,6 +18,24 @@ function isInvalidSupplier(name: string): boolean {
 }
 
 
+function extractRowValue(row: Record<string, any>, keys: string[]) {
+  const rowKeys = Object.keys(row);
+  for (const key of keys) {
+    const target = key.toLowerCase();
+    const matchedKey = rowKeys.find(rk => {
+      const normalizedRowKey = rk.trim().replace(/^\*/, '').toLowerCase();
+      return normalizedRowKey === target;
+    });
+    if (matchedKey) {
+      const value = row[matchedKey];
+      if (value !== undefined && value !== null && String(value).trim() !== "") {
+        return value;
+      }
+    }
+  }
+  return "";
+}
+
 export async function POST(request: Request) {
   try {
     const session = await getAuthorizedUser() as SessionUser | null;
@@ -49,24 +67,24 @@ export async function POST(request: Request) {
     for (const item of products) {
         try {
             // Map keys for SKU and Quantity (Supporting both internal formats and exported headers)
-            const sku = String(item.sku || item['SKU/店内码'] || item['SKU'] || item['编码'] || item['*SKU'] || "");
-            const costPrice = Number(item['进货单价'] || item['*进货单价'] || item['成本价'] || item['*成本价'] || item['成本价格'] || item.costPrice || item['Cost Price'] || 0);
+            const sku = String(extractRowValue(item, ["sku", "SKU/店内码", "SKU", "编码"]) || "");
+            const costPrice = Number(extractRowValue(item, ["进货单价", "成本价", "成本价格", "costPrice", "Cost Price"]) || 0);
             // 1. 基础数据解析
-            const name = String(item['商品名称'] || item.name || "");
-            const image = String(item['商品图片'] || item.image || item['图片'] || "");
-            const categoryName = String(item['分类'] || item.category || "");
-            const supplierName = String(item['供应商'] || item['supplier'] || "");
-            const isPublicText = String(item['公开状态'] || item.isPublic || "");
+            const name = String(extractRowValue(item, ["商品名称", "name", "名称"]) || "");
+            const image = String(extractRowValue(item, ["商品图片", "image", "图片", "主图"]) || "");
+            const categoryName = String(extractRowValue(item, ["分类", "category", "categoryName", "类目"]) || "");
+            const supplierName = String(extractRowValue(item, ["供应商", "supplier"]) || "");
+            const isPublicText = String(extractRowValue(item, ["公开状态", "isPublic"]) || "");
             const isPublic = isPublicText === "私有" || isPublicText === "否" || isPublicText === "false" ? false : true;
 
-            const isDiscontinuedText = String(item['生产状态'] || item.isDiscontinued || "");
+            const isDiscontinuedText = String(extractRowValue(item, ["生产状态", "isDiscontinued"]) || "");
             const isDiscontinued = isDiscontinuedText === "已停产" || isDiscontinuedText === "是" || isDiscontinuedText === "true" ? true : false;
             
-            const remarkText = String(item['备注'] || item.remark || "");
+            const remarkText = String(extractRowValue(item, ["备注", "remark"]) || "");
 
-            const isShelfLifeText = String(item['是否管理保质期'] || item['是否保质期管理'] || item['保质期管理'] || item.isShelfLife || "");
+            const isShelfLifeText = String(extractRowValue(item, ["是否管理保质期", "是否保质期管理", "保质期管理", "isShelfLife"]) || "");
             const isShelfLife = isShelfLifeText === "是" || isShelfLifeText === "true" || isShelfLifeText === "1" ? true : false;
-            const shelfLifeDays = item['保质期天数'] || item['保质期'] || item.shelfLifeDays ? Number(item['保质期天数'] || item['保质期'] || item.shelfLifeDays) : null;
+            const shelfLifeDays = extractRowValue(item, ["保质期天数", "保质期", "shelfLifeDays"]) ? Number(extractRowValue(item, ["保质期天数", "保质期", "shelfLifeDays"])) : null;
 
             // 2. 解析规格参数 (specs)
             const specs: Record<string, string> = {};

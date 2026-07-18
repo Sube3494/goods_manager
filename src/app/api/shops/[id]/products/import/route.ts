@@ -17,10 +17,18 @@ function normalizeText(value: unknown) {
 }
 
 function extractRowValue(row: Record<string, unknown>, keys: string[]) {
+  const rowKeys = Object.keys(row);
   for (const key of keys) {
-    const value = row[key];
-    if (normalizeText(value) !== "") {
-      return value;
+    const target = key.toLowerCase();
+    const matchedKey = rowKeys.find(rk => {
+      const normalizedRowKey = rk.trim().replace(/^\*/, '').toLowerCase();
+      return normalizedRowKey === target;
+    });
+    if (matchedKey) {
+      const value = row[matchedKey];
+      if (normalizeText(value) !== "") {
+        return value;
+      }
     }
   }
   return "";
