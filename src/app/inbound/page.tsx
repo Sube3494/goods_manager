@@ -9,8 +9,6 @@ import { formatLocalDateTime } from "@/lib/dateUtils";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { startOfDay, endOfDay, parseISO, isWithinInterval } from "date-fns";
-import Image from "next/image";
-
 import { cn } from "@/lib/utils";
 import { Pagination } from "@/components/ui/Pagination";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -152,7 +150,7 @@ function InboundContent() {
     // Search query filter
     const matchesSearch = !query || 
            p.id.toLowerCase().includes(query) || 
-           p.items.some(item => item.product?.name?.toLowerCase().includes(query));
+           p.items.some(item => (item.shopProduct?.name || item.product?.name || item.shopProduct?.productName || "").toLowerCase().includes(query));
     
     // Shop filter
     const matchesShop = selectedShop === "全部" || p.shopName === selectedShop;
@@ -369,17 +367,17 @@ function InboundContent() {
                           <div 
                             key={idx} 
                             className="flex items-center gap-2 p-0.5 pr-2.5 rounded-full bg-secondary/30 dark:bg-white/5 border border-border/50 max-w-[180px] shadow-sm hover:border-primary/30 transition-all cursor-default"
-                            title={item.product?.name}
+                            title={item.shopProduct?.name || item.product?.name || item.shopProduct?.productName || ""}
                           >
-                            <div className="relative w-6 h-6 shrink-0 rounded-full overflow-hidden bg-white dark:bg-black flex items-center justify-center">
-                              {item.product?.image ? (
-                                <Image src={item.product.image} className="object-cover" alt="" fill sizes="24px" />
+                            <div className="w-6 h-6 shrink-0 rounded-full overflow-hidden bg-white dark:bg-black flex items-center justify-center">
+                              {(item.shopProduct?.image || item.product?.image) ? (
+                                <img src={item.shopProduct?.image || item.product?.image || ""} className="w-full h-full object-cover" alt="" loading="lazy" />
                               ) : (
                                 <Package size={12} className="text-muted-foreground/50" />
                               )}
                             </div>
                             <span className="text-[10px] font-medium truncate text-foreground/80 leading-none">
-                              {item.product?.name || '未知商品'}
+                              {item.shopProduct?.name || item.product?.name || item.shopProduct?.productName || '未知商品'}
                             </span>
                             <span className="text-[10px] font-black text-primary shrink-0 leading-none">
                               x{item.quantity}
@@ -484,17 +482,17 @@ function InboundContent() {
                       <div 
                         key={idx} 
                         className="flex items-center gap-2 p-0.5 pr-2.5 rounded-full bg-secondary/30 dark:bg-white/5 border border-border/50 max-w-[160px] shadow-sm"
-                        title={item.product?.name}
+                        title={item.shopProduct?.name || item.product?.name || item.shopProduct?.productName || ""}
                       >
-                        <div className="relative w-5 h-5 shrink-0 rounded-full overflow-hidden bg-white dark:bg-black flex items-center justify-center">
-                          {item.product?.image ? (
-                            <Image src={item.product.image} className="object-cover" alt="" fill sizes="20px" />
+                        <div className="w-5 h-5 shrink-0 rounded-full overflow-hidden bg-white dark:bg-black flex items-center justify-center">
+                          {(item.shopProduct?.image || item.product?.image) ? (
+                            <img src={item.shopProduct?.image || item.product?.image || ""} className="w-full h-full object-cover" alt="" loading="lazy" />
                           ) : (
                             <Package size={10} className="text-muted-foreground/50" />
                           )}
                         </div>
                         <span className="text-[10px] font-medium truncate text-foreground/80 leading-none">
-                          {item.product?.name || '未知商品'}
+                          {item.shopProduct?.name || item.product?.name || item.shopProduct?.productName || '未知商品'}
                         </span>
                         <span className="text-[10px] font-black text-primary shrink-0 leading-none">
                           x{item.quantity}
