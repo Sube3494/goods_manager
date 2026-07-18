@@ -51,7 +51,7 @@ async function findConflictingShopProductByJdSkuId(shopId: string, jdSkuId: stri
 async function getOwnedShop(shopId: string, userId: string, isAdmin: boolean) {
   return prisma.shop.findFirst({
     where: isAdmin ? { id: shopId } : { id: shopId, userId },
-    select: { id: true, name: true, userId: true },
+    select: { id: true, name: true, userId: true, libraryId: true },
   });
 }
 
@@ -571,6 +571,7 @@ export async function POST(
         shelfLifeDays: true,
         remark: true,
         specs: true,
+        libraryId: true,
         category: { select: { name: true } },
         supplier: { select: { name: true } },
       },
@@ -643,11 +644,23 @@ export async function POST(
         return [];
       }
 
-      const normalizedProductSku = normalizeSku(product.sku);
-      let nextSku = normalizedProductSku;
-      if (normalizedProductSku && existingSkuSet.has(normalizedProductSku)) {
-        nextSku = null;
-        copiedWithoutSkuCount += 1;
+      // 判定是否是跨库复制：当主商品的库 ID 不等于店铺所属的库 ID 时，判定为跨库复制
+      const isCrossLibrary = product.libraryId !== shop.libraryId;
+
+      let nextSku = null;
+      if (!isCrossLibrary) {
+        const normalizedProductSku = normalizeSku(product.sku);
+        if (normalizedProductSku && existingSkuSet.has(normalizedProductSku)) {
+          nextSku = null;
+          copiedWithoutSkuCount += 1;
+        } else {
+          nextSku = normalizedProductSku;
+        }
+      } else {
+        // 跨库复制时，直接抹除 SKU 编号（强制为 null），并在此记录一下抹除编号的数量以做提醒
+        if (normalizeSku(product.sku)) {
+          copiedWithoutSkuCount += 1;
+        }
       }
 
       if (nextSku) {
@@ -665,7 +678,7 @@ export async function POST(
         shopId,
         productId: product.id,
         sourceProductId: product.id,
-        sku: normalizeSku(product.sku),
+        sku: product.sku,
         productName: product.name,
         pinyin: generatePinyinSearchText(product.name),
         productImage: product.image,
