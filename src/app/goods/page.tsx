@@ -522,6 +522,7 @@ export default function GoodsPage() {
         supplierId: selectedSupplier,
         sortBy: sortBy,
         includeShopOnly: "true",
+        ...(activeLibraryId ? { libraryId: activeLibraryId } : {}),
       });
 
       const res = await fetch(`/api/products?${queryParams.toString()}`);
@@ -594,7 +595,7 @@ export default function GoodsPage() {
       console.error("Export failed:", error);
       showToast("导出失败，请重试", "error");
     }
-  }, [debouncedSearch, selectedCategory, selectedStatus, selectedSupplier, sortBy, showToast]);
+  }, [debouncedSearch, selectedCategory, selectedStatus, selectedSupplier, sortBy, activeLibraryId, showToast]);
 
 
   const handleImport = async (data: Record<string, unknown>[] | Record<string, unknown[]>) => {
