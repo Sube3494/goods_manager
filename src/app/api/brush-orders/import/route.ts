@@ -671,13 +671,14 @@ export async function POST(req: NextRequest) {
             },
           });
 
-          existingOutbound = await prisma.outboundOrder.findFirst({
+          const candidateOutbounds = await prisma.outboundOrder.findMany({
             where: {
               userId,
               note: { contains: `平台单号: ${strOrderId}` },
             },
             select: {
               id: true,
+              note: true,
               items: {
                 select: {
                   productId: true,
@@ -686,6 +687,12 @@ export async function POST(req: NextRequest) {
               },
             },
           });
+
+          existingOutbound = candidateOutbounds.find((outbound) => {
+            const match = outbound.note?.match(/平台单号:\s*([^\s|]+)/);
+            if (!match) return false;
+            return match[1].toLowerCase() === strOrderId.toLowerCase();
+          }) || null;
         }
 
         // 4. 执行业务逻辑分支

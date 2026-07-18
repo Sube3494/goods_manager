@@ -246,13 +246,20 @@ export async function DELETE(
       },
       select: {
         id: true,
+        note: true,
       },
       orderBy: {
         createdAt: "desc",
       },
     });
 
-    for (const outbound of relatedOutboundOrders) {
+    const filteredOutboundOrders = relatedOutboundOrders.filter((outbound) => {
+      const match = outbound.note?.match(/平台单号:\s*([^\s|]+)/);
+      if (!match) return false;
+      return match[1].toLowerCase() === order.orderNo.toLowerCase();
+    });
+
+    for (const outbound of filteredOutboundOrders) {
       await returnOutboundOrderById(user.id, outbound.id, `线下订单作废：${reason}`);
     }
 

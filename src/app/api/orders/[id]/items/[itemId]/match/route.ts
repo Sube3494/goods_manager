@@ -97,13 +97,19 @@ export async function PATCH(
             mode: "insensitive",
           },
         },
-        select: { id: true },
+        select: { id: true, note: true },
       });
 
-      if (existingOutbounds.length > 0) {
+      const filteredOutbounds = existingOutbounds.filter((outbound: any) => {
+        const match = outbound.note?.match(/平台单号:\s*([^\s|]+)/);
+        if (!match) return false;
+        return match[1].toLowerCase() === orderNo.toLowerCase();
+      });
+
+      if (filteredOutbounds.length > 0) {
         await tx.outboundOrder.deleteMany({
           where: {
-            id: { in: existingOutbounds.map((o: any) => o.id) },
+            id: { in: filteredOutbounds.map((o: any) => o.id) },
           },
         });
       }

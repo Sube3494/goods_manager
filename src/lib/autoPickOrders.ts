@@ -3159,13 +3159,20 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
         },
         select: {
           id: true,
+          note: true,
         },
         orderBy: {
           createdAt: "desc",
         },
       });
 
-      for (const outbound of relatedOutboundOrders) {
+      const filteredOutboundOrders = relatedOutboundOrders.filter((outbound) => {
+        const match = outbound.note?.match(/平台单号:\s*([^\s|]+)/);
+        if (!match) return false;
+        return match[1].toLowerCase() === order.orderNo.toLowerCase();
+      });
+
+      for (const outbound of filteredOutboundOrders) {
         await returnOutboundOrderById(userId, outbound.id, `平台订单取消/退货自动回滚：${order.status || "已取消"}`);
       }
     } catch (cancelError) {
