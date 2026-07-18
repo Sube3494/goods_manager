@@ -405,6 +405,7 @@ export async function PUT(
             id: true,
             isShopOnly: true,
             userId: true,
+            image: true,
           },
         },
       },
@@ -452,6 +453,11 @@ export async function PUT(
     const storage = await getStorageStrategy();
     const normalizedProductImage = storage.stripUrl(productImage) || null;
 
+    let finalProductImage = normalizedProductImage;
+    if (existing.product && normalizedProductImage === existing.product.image) {
+      finalProductImage = null;
+    }
+
     const updated = await prisma.shopProduct.update({
       where: { id: existing.id },
       data: {
@@ -463,7 +469,7 @@ export async function PUT(
         jdSkuId: normalizedJdSkuId,
         categoryId: categoryId || null,
         categoryName: categoryName || "未分类",
-        productImage: normalizedProductImage,
+        productImage: finalProductImage,
         supplierId: supplierId || null,
         costPrice: Number.isFinite(costPrice) ? costPrice : 0,
         isPublic,
@@ -681,7 +687,7 @@ export async function POST(
         sku: product.sku,
         productName: product.name,
         pinyin: generatePinyinSearchText(product.name),
-        productImage: product.image,
+        productImage: null,
         categoryId: categoryMap.get(product.category?.name || "") || null,
         categoryName: product.category?.name || null,
         supplierId: product.supplier?.name ? (supplierMap.get(product.supplier.name) || null) : null,
