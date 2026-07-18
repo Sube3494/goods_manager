@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { Search, Plus, Store, X, ArrowUp, Trash2 } from "lucide-react";
+import { Search, Plus, Store, X, ArrowUp, Trash2, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { ImportModal } from "@/components/Goods/ImportModal";
 import { GoodsCard } from "@/components/Goods/GoodsCard";
@@ -34,6 +34,7 @@ export default function ShopGoodsPage() {
   
   const [libraries, setLibraries] = useState<any[]>([]);
   const [activeLibraryId, setActiveLibraryId] = useState<string>("all");
+  const [importErrors, setImportErrors] = useState<string[]>([]);
 
   const filteredShops = useMemo(() => {
     return shops.filter(
@@ -800,6 +801,11 @@ export default function ShopGoodsPage() {
         return;
       }
       await fetchShopProducts(true);
+
+      if (Array.isArray(data?.errors) && data.errors.length > 0) {
+        setImportErrors(data.errors);
+      }
+
       const summary = [data?.success ? `新增 ${data.success} 条` : "", data?.updated ? `更新 ${data.updated} 条` : "", data?.failed ? `失败 ${data.failed} 条` : ""].filter(Boolean).join("，");
       showToast(summary || "导入完成", data?.failed ? "info" : "success");
     } catch (error) {
@@ -909,7 +915,75 @@ export default function ShopGoodsPage() {
       <ProductFormModal isOpen={isEditOpen} onClose={closeEditModal} onSubmit={async (data) => { await handleSaveEdit(data); }} initialData={editingProduct} title="编辑店铺商品" hideVisibilityControl={true} hideProductionControl={true} hideGallerySection={true} hideSpecsSection={true} showCoverSection={true} showJdSkuField={true} mainImageUploadEndpoint={editingShopId ? `/api/shops/${editingShopId}/products/cover-upload` : undefined} />
       <BatchEditModal isOpen={isBatchEditOpen} onClose={() => setIsBatchEditOpen(false)} onConfirm={handleBatchUpdate} categories={categories} suppliers={suppliers} selectedCount={selectedIds.length} hideProductionStatus={true} />
 
-      {typeof document !== "undefined" && createPortal(<AnimatePresence>{showScrollTop && <motion.button initial={{ opacity: 0, scale: 0.5, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.5, y: 20 }} onClick={scrollToTop} className="fixed bottom-24 sm:bottom-12 right-6 sm:right-12 z-9999 p-3 sm:p-4 rounded-full bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.3)] backdrop-blur-xl text-foreground hover:scale-110 active:scale-95 transition-all group"><ArrowUp size={24} className="group-hover:-translate-y-1 transition-transform" /></motion.button>}</AnimatePresence>, document.body)}
+      {typeof document !== "undefined" && createPortal(
+        <AnimatePresence>
+          {showScrollTop && (
+            <motion.button initial={{ opacity: 0, scale: 0.5, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.5, y: 20 }} onClick={scrollToTop} className="fixed bottom-24 sm:bottom-12 right-6 sm:right-12 z-9999 p-3 sm:p-4 rounded-full bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.3)] backdrop-blur-xl text-foreground hover:scale-110 active:scale-95 transition-all group">
+              <ArrowUp size={24} className="group-hover:-translate-y-1 transition-transform" />
+            </motion.button>
+          )}
+          {importErrors.length > 0 && (
+            <div className="fixed inset-0 z-60000 flex items-center justify-center p-4">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-black/60 backdrop-blur-sm"
+                onClick={() => setImportErrors([])}
+              />
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                className="relative w-full max-w-xl max-h-[80vh] overflow-hidden rounded-3xl bg-white dark:bg-gray-900/90 backdrop-blur-xl border border-border/50 shadow-2xl p-6 md:p-8 flex flex-col z-60000 animate-in fade-in-50 duration-200"
+              >
+                <div className="flex items-center justify-between border-b border-border pb-4 mb-4">
+                  <div className="flex items-center gap-2.5 text-destructive">
+                    <AlertCircle size={24} />
+                    <h3 className="text-lg md:text-xl font-bold">导入失败日志明细</h3>
+                  </div>
+                  <button
+                    onClick={() => setImportErrors([])}
+                    className="rounded-full p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-all"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+                
+                <div className="flex-1 overflow-y-auto min-h-0 space-y-2 pr-2 scrollbar-none">
+                  {importErrors.map((err, idx) => (
+                    <div key={idx} className="flex gap-2.5 items-start p-3.5 rounded-2xl bg-destructive/5 border border-destructive/10 text-destructive text-sm font-medium">
+                      <span className="shrink-0 flex items-center justify-center w-5 h-5 rounded-full bg-destructive/15 text-[11px] font-black">{idx + 1}</span>
+                      <span className="leading-relaxed">{err}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex justify-end gap-3 border-t border-border pt-4 mt-6">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(importErrors.join('\n'));
+                      showToast("日志复制成功", "success");
+                    }}
+                    className="h-11 px-5 rounded-full text-sm font-medium border border-border text-foreground hover:bg-secondary transition-all active:scale-95"
+                  >
+                    复制全部日志
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setImportErrors([])}
+                    className="h-11 px-6 rounded-full text-sm font-medium bg-destructive text-destructive-foreground hover:opacity-90 transition-all active:scale-95"
+                  >
+                    关闭
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </div>
   );
 }

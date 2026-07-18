@@ -5,7 +5,7 @@ import { GoodsCard } from "@/components/Goods/GoodsCard";
 import { GoodsCardSkeleton } from "@/components/Goods/GoodsCardSkeleton";
 import { ImportModal } from "@/components/Goods/ImportModal";
 import { ProductFormModal } from "@/components/Goods/ProductFormModal";
-import { Search, Plus, Download, ArrowUp, X, RotateCcw, Settings } from "lucide-react";
+import { Search, Plus, Download, ArrowUp, X, RotateCcw, Settings, AlertCircle } from "lucide-react";
 import { Product, Category, Supplier, GalleryItem } from "@/lib/types";
 import { ManageLibrariesModal } from "@/components/Goods/ManageLibrariesModal";
 import { BatchEditModal } from "@/components/Goods/BatchEditModal";
@@ -34,6 +34,7 @@ export default function GoodsPage() {
   const [libraries, setLibraries] = useState<any[]>([]);
   const [activeLibraryId, setActiveLibraryId] = useState<string>("");
   const [isManageLibrariesOpen, setIsManageLibrariesOpen] = useState(false);
+  const [importErrors, setImportErrors] = useState<string[]>([]);
   const observerTarget = useRef<HTMLDivElement>(null);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isNewProductOpen, setIsNewProductOpen] = useState(false);
@@ -603,12 +604,20 @@ export default function GoodsPage() {
         body: JSON.stringify({ products: data, libraryId: activeLibraryId }),
       });
 
+      const resData = await res.json().catch(() => ({}));
       if (res.ok) {
-        showToast("导入成功", "success");
+        if (Array.isArray(resData?.errors) && resData.errors.length > 0) {
+          setImportErrors(resData.errors.map((e: any) => `${e.sku ? `SKU ${e.sku}: ` : ''}${e.reason}`));
+        }
+        const summary = [
+          resData?.successCount ? `新增/更新 ${resData.successCount} 条` : "",
+          resData?.failCount ? `失败 ${resData.failCount} 条` : ""
+        ].filter(Boolean).join("，");
+        showToast(summary || "导入成功", resData?.failCount ? "info" : "success");
         setIsImportOpen(false);
         fetchGoods(true);
       } else {
-        showToast("导入失败", "error");
+        showToast(resData?.error || "导入失败", "error");
       }
     } catch {
       showToast("导入请求失败", "error");
@@ -1011,6 +1020,65 @@ export default function GoodsPage() {
             >
               <ArrowUp size={24} className="group-hover:-translate-y-1 transition-transform" />
             </motion.button>
+          )}
+          {importErrors.length > 0 && (
+            <div className="fixed inset-0 z-60000 flex items-center justify-center p-4">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-black/60 backdrop-blur-sm"
+                onClick={() => setImportErrors([])}
+              />
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                className="relative w-full max-w-xl max-h-[80vh] overflow-hidden rounded-3xl bg-white dark:bg-gray-900/90 backdrop-blur-xl border border-border/50 shadow-2xl p-6 md:p-8 flex flex-col z-60000 animate-in fade-in-50 duration-200"
+              >
+                <div className="flex items-center justify-between border-b border-border pb-4 mb-4">
+                  <div className="flex items-center gap-2.5 text-destructive">
+                    <AlertCircle size={24} />
+                    <h3 className="text-lg md:text-xl font-bold">导入失败日志明细</h3>
+                  </div>
+                  <button
+                    onClick={() => setImportErrors([])}
+                    className="rounded-full p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-all"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+                
+                <div className="flex-1 overflow-y-auto min-h-0 space-y-2 pr-2 scrollbar-none">
+                  {importErrors.map((err, idx) => (
+                    <div key={idx} className="flex gap-2.5 items-start p-3.5 rounded-2xl bg-destructive/5 border border-destructive/10 text-destructive text-sm font-medium">
+                      <span className="shrink-0 flex items-center justify-center w-5 h-5 rounded-full bg-destructive/15 text-[11px] font-black">{idx + 1}</span>
+                      <span className="leading-relaxed">{err}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex justify-end gap-3 border-t border-border pt-4 mt-6">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(importErrors.join('\n'));
+                      showToast("日志复制成功", "success");
+                    }}
+                    className="h-11 px-5 rounded-full text-sm font-medium border border-border text-foreground hover:bg-secondary transition-all active:scale-95"
+                  >
+                    复制全部日志
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setImportErrors([])}
+                    className="h-11 px-6 rounded-full text-sm font-medium bg-destructive text-destructive-foreground hover:opacity-90 transition-all active:scale-95"
+                  >
+                    关闭
+                  </button>
+                </div>
+              </motion.div>
+            </div>
           )}
         </AnimatePresence>,
         document.body
