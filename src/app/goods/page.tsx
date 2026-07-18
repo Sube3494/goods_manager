@@ -739,13 +739,23 @@ export default function GoodsPage() {
                 key={lib.id}
                 onClick={() => handleLibraryChange(lib.id)}
                 className={cn(
-                  "pb-3 text-sm font-medium border-b-2 transition-all relative",
+                  "pb-3 text-sm font-medium border-b-2 transition-all relative flex items-center gap-1.5",
                   activeLibraryId === lib.id
                     ? "border-primary text-primary font-semibold"
                     : "border-transparent text-muted-foreground hover:text-foreground"
                 )}
               >
-                {lib.name}
+                <span>{lib.name}</span>
+                {lib._count?.products !== undefined && (
+                  <span className={cn(
+                    "text-[10px] px-1.5 py-0.5 rounded-full font-bold font-number",
+                    activeLibraryId === lib.id
+                      ? "bg-primary/10 text-primary"
+                      : "bg-muted text-muted-foreground"
+                  )}>
+                    {lib._count.products}
+                  </span>
+                )}
               </button>
             ))}
           </div>

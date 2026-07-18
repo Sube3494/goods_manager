@@ -54,6 +54,11 @@ export async function GET() {
     if (!session || !session.id) {
       const publicLibs = await prisma.productLibrary.findMany({
         where: { isPublic: true },
+        include: {
+          _count: {
+            select: { products: true }
+          }
+        },
         orderBy: { createdAt: "asc" },
       });
       return NextResponse.json(publicLibs);
@@ -62,6 +67,11 @@ export async function GET() {
     // 如果是超级管理员，可以直接获取所有库
     if (session.role === "SUPER_ADMIN") {
       const allLibs = await prisma.productLibrary.findMany({
+        include: {
+          _count: {
+            select: { products: true }
+          }
+        },
         orderBy: { createdAt: "asc" },
       });
       return NextResponse.json(allLibs);
@@ -78,6 +88,11 @@ export async function GET() {
             }
           }
         ]
+      },
+      include: {
+        _count: {
+          select: { products: true }
+        }
       },
       orderBy: { createdAt: "asc" },
     });
