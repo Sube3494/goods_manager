@@ -25,7 +25,6 @@ import { formatLocalDateTime, formatLocalDate } from "@/lib/dateUtils";
 import { sortPurchaseItems } from "@/lib/pinyin";
 import { filterPurchases, isPurchaseStatusFilter, PurchaseStatusFilter } from "@/lib/purchases";
 import { isAutoInboundOrderLike, isOrderShortagePurchaseLike } from "@/lib/purchaseOrderTypes";
-import NextImage from "next/image";
 
 function sortPurchasesByRecency(items: PurchaseOrder[]) {
   return [...items].sort((a, b) => {
@@ -182,24 +181,23 @@ function PurchasesContent() {
     }
   }, [showToast]);
 
-  // 1. Initial Data Fetch & Mounted Status
+  // 1. Initial Data Fetch (Run only once on mount)
   useEffect(() => {
-    const handle = requestAnimationFrame(() => {
-        fetchData(true);
-        
-        // Sync filter from URL on mount
-        const statusParam = searchParams.get('status');
-        if (!statusParam) {
-          setStatusFilter("Confirmed");
-        } else {
-          const normalizedStatus = statusParam === "Ordered" ? "Confirmed" : statusParam;
-          if (isPurchaseStatusFilter(normalizedStatus)) {
-            setStatusFilter(normalizedStatus);
-          }
-        }
-    });
-    return () => cancelAnimationFrame(handle);
-  }, [searchParams, fetchData]); 
+    fetchData(true);
+  }, [fetchData]);
+
+  // 2. Sync filter from URL on searchParams change
+  useEffect(() => {
+    const statusParam = searchParams.get('status');
+    if (!statusParam) {
+      setStatusFilter("Confirmed");
+    } else {
+      const normalizedStatus = statusParam === "Ordered" ? "Confirmed" : statusParam;
+      if (isPurchaseStatusFilter(normalizedStatus)) {
+        setStatusFilter(normalizedStatus);
+      }
+    }
+  }, [searchParams]); 
 
   // 2. Auto-open detail if orderId in URL (Depends on purchases being loaded)
   useEffect(() => {
@@ -1015,9 +1013,9 @@ function PurchasesContent() {
                                 className="flex min-w-0 max-w-[105px] items-center gap-1.5 rounded-full border border-border/50 bg-secondary/30 p-0.5 pr-2 shadow-sm transition-all hover:border-primary/30 dark:bg-white/5"
                                 title={item.name}
                               >
-                                <div className="relative flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white dark:bg-black">
+                                <div className="flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white dark:bg-black">
                                   {item.image ? (
-                                    <NextImage src={item.image} className="object-cover" alt="" fill sizes="24px" />
+                                    <img src={item.image} className="h-full w-full object-cover" alt="" loading="lazy" />
                                   ) : (
                                     <Package size={12} className="text-muted-foreground/50" />
                                   )}
@@ -1173,9 +1171,9 @@ function PurchasesContent() {
                                   className="flex min-w-0 items-center gap-1.5 rounded-full border border-border/50 bg-white/70 p-0.5 pr-2 shadow-sm dark:border-white/8 dark:bg-white/[0.06]"
                                   title={item.name}
                                 >
-                                  <div className="relative flex h-5 w-5 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white dark:bg-black">
+                                  <div className="flex h-5 w-5 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white dark:bg-black">
                                     {item.image ? (
-                                      <NextImage src={item.image} className="object-cover" alt="" fill sizes="20px" />
+                                      <img src={item.image} className="h-full w-full object-cover" alt="" loading="lazy" />
                                     ) : (
                                       <Package size={10} className="text-muted-foreground/50" />
                                     )}

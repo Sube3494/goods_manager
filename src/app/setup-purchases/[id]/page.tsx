@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback, Suspense, useMemo } from "react";
 import { Plus, Upload, AlertCircle, ArrowLeft, RefreshCcw, Trash2, Search, Package, Check, Filter, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
-import NextImage from "next/image";
 import { ProductSelectionModal } from "@/components/Purchases/ProductSelectionModal";
 import { Product } from "@/lib/types";
 import { useToast } from "@/components/ui/Toast";
@@ -641,11 +640,11 @@ function SetupPurchaseDetailContent() {
                                  <td className="px-3 py-3 whitespace-nowrap">
                                      <div className="flex items-center gap-3">
                                          <div className="w-10 h-10 rounded-lg overflow-hidden bg-muted border border-border/50 flex items-center justify-center shrink-0">
-                                             {item.product?.image ? (
-                                                 <NextImage src={item.product.image} alt={item.productName || ""} width={40} height={40} className="w-full h-full object-cover" unoptimized />
-                                             ) : (
-                                                 <Package size={18} className="text-muted-foreground/40" />
-                                             )}
+                                              {item.product?.image ? (
+                                                  <img src={item.product.image} alt={item.productName || ""} className="w-full h-full object-cover" loading="lazy" />
+                                              ) : (
+                                                  <Package size={18} className="text-muted-foreground/40" />
+                                              )}
                                          </div>
                                          <div className="min-w-0">
                                              {item.productCode ? (
