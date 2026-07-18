@@ -137,6 +137,7 @@ export default function GoodsPage() {
   const handleLibraryChange = (libId: string) => {
     setActiveLibraryId(libId);
     setItems([]);
+    setSelectedIds([]);
     setPage(1);
     currentPageRef.current = 1;
     setHasMore(true);
@@ -335,6 +336,7 @@ export default function GoodsPage() {
         sortBy: sortBy,
         idsOnly: "true",
         includeShopOnly: "true",
+        ...(activeLibraryId ? { libraryId: activeLibraryId } : {}),
       });
 
 
