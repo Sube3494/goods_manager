@@ -12,7 +12,7 @@ import { InventoryService } from "@/services/inventoryService";
 import { allocateShippingToPurchaseItems, calculatePurchaseOrderTotalAmount } from "@/lib/purchaseCosting";
 import { parseAsShanghaiTime } from "@/lib/dateUtils";
 
-async function resolvePurchaseOrderResponse<T extends {
+export async function resolvePurchaseOrderResponse<T extends {
   status?: string;
   paymentVouchers?: unknown;
   trackingData?: unknown;
@@ -51,7 +51,11 @@ async function resolvePurchaseOrderResponse<T extends {
         ? {
             ...item.shopProduct,
             name: item.shopProduct.productName || "未命名商品",
-            image: item.shopProduct.productImage ? storage.resolveUrl(item.shopProduct.productImage) : null,
+            image: item.shopProduct.productImage
+              ? storage.resolveUrl(item.shopProduct.productImage)
+              : item.product?.image
+              ? storage.resolveUrl(item.product.image)
+              : null,
           }
         : null,
       product: item.product

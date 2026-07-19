@@ -203,6 +203,7 @@ export async function GET(request: Request) {
       },
       include: {
         shop: { select: { id: true, name: true } },
+        product: { select: { image: true } },
       },
       orderBy: [{ updatedAt: "desc" }],
     });
@@ -221,7 +222,11 @@ export async function GET(request: Request) {
       category: item.categoryName ? { id: item.categoryId || "", name: item.categoryName, count: 0 } : undefined,
       costPrice: item.costPrice,
       stock: item.stock,
-      image: item.productImage ? storage.resolveUrl(item.productImage) : null,
+      image: item.productImage
+        ? storage.resolveUrl(item.productImage)
+        : item.product?.image
+        ? storage.resolveUrl(item.product.image)
+        : null,
       isPublic: item.isPublic,
       isDiscontinued: item.isDiscontinued,
       isShopOnly: true,

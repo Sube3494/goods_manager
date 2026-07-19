@@ -7,6 +7,7 @@ import { InventoryService } from "@/services/inventoryService";
 import { Prisma } from "../../../../../prisma/generated-client";
 import { allocateShippingToPurchaseItems, calculatePurchaseOrderTotalAmount } from "@/lib/purchaseCosting";
 import { parseAsShanghaiTime } from "@/lib/dateUtils";
+import { resolvePurchaseOrderResponse } from "../route";
 
 function calculateRevertedCostPrice(currentStock: number, currentCost: number, revertQty: number, revertCost: number) {
   const nextStock = currentStock - revertQty;
@@ -527,7 +528,7 @@ export async function PUT(
       return p;
     });
 
-    return NextResponse.json(purchase);
+    return NextResponse.json(await resolvePurchaseOrderResponse(purchase as any));
   } catch (error) {
     console.error("Failed to update purchase order:", error);
     return NextResponse.json(
