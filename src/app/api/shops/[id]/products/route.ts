@@ -394,6 +394,7 @@ export async function PUT(
         id: true,
         productId: true,
         sourceProductId: true,
+        productImage: true,
         shopId: true,
         shop: {
           select: {
@@ -453,9 +454,10 @@ export async function PUT(
     const storage = await getStorageStrategy();
     const normalizedProductImage = storage.stripUrl(productImage) || null;
 
+    // 当提供了图片时直接保存；如果未提供但已关联主商品，保持当前图片或主商品图片
     let finalProductImage = normalizedProductImage;
-    if (existing.product && normalizedProductImage === existing.product.image) {
-      finalProductImage = null;
+    if (!finalProductImage && existing.productImage) {
+      finalProductImage = existing.productImage;
     }
 
     const updated = await prisma.shopProduct.update({
@@ -503,6 +505,12 @@ export async function PUT(
       },
     });
 
+    const resolvedImage = updated.productImage
+      ? storage.resolveUrl(updated.productImage)
+      : existing.product?.image
+      ? storage.resolveUrl(existing.product.image)
+      : null;
+
     return NextResponse.json({
       id: updated.id,
       productId: updated.productId || null,
@@ -510,7 +518,7 @@ export async function PUT(
       sku: updated.sku || null,
       jdSkuId: updated.jdSkuId || null,
       name: updated.productName || "未命名商品",
-      image: updated.productImage ? storage.resolveUrl(updated.productImage) : null,
+      image: resolvedImage,
       categoryId: updated.categoryId || null,
       categoryName: updated.categoryName || "未分类",
       supplierId: updated.supplierId || null,
@@ -687,7 +695,7 @@ export async function POST(
         sku: product.sku,
         productName: product.name,
         pinyin: generatePinyinSearchText(product.name),
-        productImage: null,
+        productImage: product.image || null,
         categoryId: categoryMap.get(product.category?.name || "") || null,
         categoryName: product.category?.name || null,
         supplierId: product.supplier?.name ? (supplierMap.get(product.supplier.name) || null) : null,
