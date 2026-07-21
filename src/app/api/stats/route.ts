@@ -625,6 +625,8 @@ export async function GET(request: NextRequest) {
     outboundOrdersForCost.forEach((outbound) => {
       const orderNo = extractOrderNoFromNote(outbound.note);
       if (!orderNo) return;
+      // 同一平台订单号只取第一笔出库单的成本，跳过重复录入的出库单，避免成本被累加多次
+      if (outboundMetaByOrderNo.has(orderNo)) return;
       let missingCostItemCount = 0;
       const returnTotals = getOutboundReturnTotals(parseOutboundReturnMeta(outbound.note).returns);
       const outboundCost = outbound.items.reduce((sum, item) => {
@@ -639,16 +641,12 @@ export async function GET(request: NextRequest) {
           ? FinanceMath.add(sum, Number(snapshot.totalCost || 0))
           : FinanceMath.add(sum, FinanceMath.multiply(unitCost, item.quantity || 0));
       }, 0);
-      const current = outboundMetaByOrderNo.get(orderNo);
       outboundMetaByOrderNo.set(orderNo, {
-        productCost: FinanceMath.add(
-          current?.productCost || 0,
-          FinanceMath.add(outboundCost, -returnTotals.returnedCost)
-        ),
-        missingCostItemCount: (current?.missingCostItemCount || 0) + missingCostItemCount,
-        refundAmount: FinanceMath.add(current?.refundAmount || 0, returnTotals.refundAmount),
-        extraExpense: FinanceMath.add(current?.extraExpense || 0, returnTotals.extraExpense),
-        returnedCost: FinanceMath.add(current?.returnedCost || 0, returnTotals.returnedCost),
+        productCost: FinanceMath.add(outboundCost, -returnTotals.returnedCost),
+        missingCostItemCount,
+        refundAmount: returnTotals.refundAmount,
+        extraExpense: returnTotals.extraExpense,
+        returnedCost: returnTotals.returnedCost,
       });
     });
 
