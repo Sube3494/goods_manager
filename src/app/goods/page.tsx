@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useTransition } from "react";
 import { GoodsCard } from "@/components/Goods/GoodsCard";
 import { GoodsCardSkeleton } from "@/components/Goods/GoodsCardSkeleton";
+import { QuickEditTable } from "@/components/Goods/QuickEditTable";
 import { ImportModal } from "@/components/Goods/ImportModal";
 import { ProductFormModal } from "@/components/Goods/ProductFormModal";
 import { Search, Plus, Download, ArrowUp, X, RotateCcw, Settings, AlertCircle } from "lucide-react";
@@ -76,8 +77,65 @@ export default function GoodsPage() {
   const [selectedSupplier, setSelectedSupplier] = useState("all");
   const [isBatchEditOpen, setIsBatchEditOpen] = useState(false);
   const [sortBy, setSortBy] = useState<string>("sku-desc");
+  const [viewMode, setViewMode] = useState<"card" | "quickEdit">("card");
 
   const debouncedSearch = useDebounce(searchQuery, 500);
+
+  const { showToast } = useToast();
+
+  const handleQuickSaveItem = useCallback(
+    async (id: string, updates: { sku: string; costPrice: number }) => {
+      try {
+        const res = await fetch(`/api/products/${id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(updates),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => null);
+          showToast(data?.error || "保存失败", "error");
+          return false;
+        }
+        setItems((prev) =>
+          prev.map((item) => (item.id === id ? { ...item, sku: updates.sku, costPrice: updates.costPrice } : item))
+        );
+        return true;
+      } catch {
+        showToast("保存异常", "error");
+        return false;
+      }
+    },
+    [showToast]
+  );
+
+  const handleQuickBatchSave = useCallback(
+    async (updates: Array<{ id: string; sku: string; costPrice: number }>) => {
+      try {
+        const res = await fetch("/api/products/batch", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ updates }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => null);
+          showToast(data?.error || "批量保存失败", "error");
+          return false;
+        }
+        const updateMap = new Map(updates.map((u) => [u.id, u]));
+        setItems((prev) =>
+          prev.map((item) => {
+            const u = updateMap.get(item.id);
+            return u ? { ...item, sku: u.sku, costPrice: u.costPrice } : item;
+          })
+        );
+        return true;
+      } catch {
+        showToast("批量保存异常", "error");
+        return false;
+      }
+    },
+    [showToast]
+  );
 
   const hasActiveFilters = 
     searchQuery.trim() !== "" || 
@@ -94,7 +152,6 @@ export default function GoodsPage() {
     setSortBy("sku-desc");
   }, []);
 
-  const { showToast } = useToast();
   const canCreate = hasPermission(user as SessionUser | null, "product:create");
   const canUpdate = hasPermission(user as SessionUser | null, "product:update");
   const canDelete = hasPermission(user as SessionUser | null, "product:delete");
@@ -888,8 +945,55 @@ export default function GoodsPage() {
       </div>
 
 
-      {/* Grid */}
-      {isLoading && items.length === 0 ? (
+      {/* 视图切换按钮与总计 */}
+      <div className="flex items-center justify-between gap-3 my-4">
+        <p className="text-xs sm:text-sm font-medium text-muted-foreground">
+          共 <strong className="text-foreground font-bold">{totalResults || items.length}</strong> 件商品
+        </p>
+        <div className="flex items-center gap-1.5 p-1 bg-muted/60 dark:bg-white/5 rounded-2xl border border-border/50 shrink-0">
+          <button
+            type="button"
+            onClick={() => setViewMode("card")}
+            className={cn(
+              "px-3 py-1.5 rounded-xl text-xs font-bold transition-all",
+              viewMode === "card"
+                ? "bg-white dark:bg-gray-800 text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            卡片视图
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode("quickEdit")}
+            className={cn(
+              "px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1",
+              viewMode === "quickEdit"
+                ? "bg-amber-500 text-white shadow-md shadow-amber-500/20"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <span>⚡ 快速编辑模式</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Grid or QuickEditTable */}
+      {viewMode === "quickEdit" ? (
+        <QuickEditTable
+          items={items.map((item) => ({
+            id: item.id,
+            name: item.name,
+            sku: item.sku,
+            costPrice: item.costPrice,
+            image: item.image,
+            categoryName: item.category?.name,
+          }))}
+          onSaveItem={handleQuickSaveItem}
+          onBatchSave={handleQuickBatchSave}
+          isLoading={isLoading}
+        />
+      ) : isLoading && items.length === 0 ? (
         <div className="grid gap-3 sm:gap-6 grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(i => (
              <GoodsCardSkeleton key={i} />

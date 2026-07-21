@@ -10,11 +10,19 @@ function normalizeSku(sku: unknown) {
   return trimmed.length > 0 ? trimmed : null;
 }
 
-export async function PUT(request: Request) {
+export async function PUT(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
     const user = await getAuthorizedUser("product:update");
     if (!user) {
       return NextResponse.json({ error: "Unauthorized or insufficient permissions" }, { status: 401 });
+    }
+
+    const { id: shopId } = await params;
+    if (!shopId) {
+      return NextResponse.json({ error: "Missing shop ID" }, { status: 400 });
     }
 
     const body = await request.json();
@@ -24,27 +32,26 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: "No update items provided" }, { status: 400 });
     }
 
-    // 检查是否有重复的有效 SKU
+    // 校验店铺内部 SKU 重复
     const skuMap = new Map<string, string>();
     for (const update of updates) {
       const normalized = normalizeSku(update.sku);
       if (normalized) {
         if (skuMap.has(normalized)) {
           return NextResponse.json({
-            error: `批量修改提交的 SKU 编码 "${normalized}" 重复，请检查修改内容`
+            error: `店铺内提交的 SKU 编码 "${normalized}" 重复，请检查`
           }, { status: 400 });
         }
         skuMap.set(normalized, update.id);
       }
     }
 
-    // 在事务中对每个商品执行高效更新
     const updatePromises = updates.map(async (item: { id: string; sku: string; costPrice: number }) => {
       const normalizedSku = normalizeSku(item.sku);
       const numPrice = Number(item.costPrice);
       const costPrice = Number.isFinite(numPrice) && numPrice >= 0 ? numPrice : 0;
 
-      return prisma.product.update({
+      return prisma.shopProduct.update({
         where: { id: item.id },
         data: {
           sku: normalizedSku,
@@ -66,7 +73,7 @@ export async function PUT(request: Request) {
       items: results,
     });
   } catch (error) {
-    console.error("Failed to batch update products:", error);
-    return NextResponse.json({ error: "Failed to batch update products" }, { status: 500 });
+    console.error("Failed to batch update shop products:", error);
+    return NextResponse.json({ error: "Failed to batch update shop products" }, { status: 500 });
   }
 }
