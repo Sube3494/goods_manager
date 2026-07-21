@@ -864,10 +864,10 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
                     ${
                       showIndex
                         ? `
-                          <div style="width: 28px; height: 28px; border-radius: 50%; background-color: #f1f5f9; border: 1.5px solid #94a3b8; display: flex; align-items: center; justify-content: center; margin-bottom: 2px;">
-                            <svg width="28" height="28" viewBox="0 0 28 28">
-                              <circle cx="14" cy="14" r="12.5" fill="#f1f5f9" stroke="#94a3b8" stroke-width="1.5" />
-                              <text x="14" y="14.5" text-anchor="middle" dominant-baseline="central" fill="#0f172a" font-size="12" font-weight="800" font-family="system-ui, -apple-system, sans-serif">
+                          <div style="width: 28px; height: 28px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; margin-bottom: 2px;">
+                            <svg width="28" height="28" viewBox="0 0 28 28" style="display: block;">
+                              <circle cx="14" cy="14" r="12.5" fill="#f1f5f9" stroke="#64748b" stroke-width="1.2" />
+                              <text x="14" y="14.5" text-anchor="middle" dominant-baseline="central" fill="#0f172a" font-size="12" font-weight="700" font-family="system-ui, -apple-system, sans-serif">
                                 ${rowItem.globalIndex}
                               </text>
                             </svg>
@@ -906,8 +906,8 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
                       ? `
                         <div style="width: 32px; height: 32px; min-width: 32px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
                           <svg width="32" height="32" viewBox="0 0 32 32" style="display: block;">
-                            <circle cx="16" cy="16" r="14.5" fill="#f1f5f9" stroke="#94a3b8" stroke-width="1.5" />
-                            <text x="16" y="16.5" text-anchor="middle" dominant-baseline="central" fill="#0f172a" font-size="13" font-weight="800" font-family="system-ui, -apple-system, sans-serif">
+                            <circle cx="16" cy="16" r="14.5" fill="#f1f5f9" stroke="#64748b" stroke-width="1.2" />
+                            <text x="16" y="16.5" text-anchor="middle" dominant-baseline="central" fill="#0f172a" font-size="13" font-weight="700" font-family="system-ui, -apple-system, sans-serif">
                               ${rowItem.globalIndex}
                             </text>
                           </svg>
