@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, Suspense, useMemo, useTransition, type ReactNode } from "react";
-import { Plus, ShoppingBag, Calendar, Trash2, Eye, Store, Package, Wallet, Archive, ReceiptText, Check, ArrowUp, X } from "lucide-react";
+import { Plus, ShoppingBag, Calendar, Trash2, Eye, Store, Package, Wallet, Archive, ReceiptText, Check, ArrowUp, X, FileSpreadsheet, FileText } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { PurchaseOrderModal } from "@/components/Purchases/PurchaseOrderModal";
 import { PurchaseOverviewModal } from "@/components/Purchases/PurchaseOverviewModal";
@@ -659,7 +659,220 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
   }
 }
 
-  const handleExport = useCallback(async (specificPO?: PurchaseOrder, columnsToInclude: string[] = exportColumns) => {
+  const handleExportPdf = useCallback(
+    async (
+      specificPO?: PurchaseOrder,
+      targets: PurchaseOrder[] = [],
+      tableColumns: { key: string; header: string; width: number; align: "center" | "left" }[] = [],
+      columnsToInclude: string[] = []
+    ) => {
+      showToast("正在准备高保真 PDF 导出数据，请稍候...", "info");
+
+      try {
+        const html2canvas = (await import("html2canvas")).default;
+        const { jsPDF } = await import("jspdf");
+
+        const now = new Date();
+        const dateStr = `${now.toLocaleDateString("zh-CN")} ${now.toLocaleTimeString("zh-CN", { hour12: false })}`;
+        const title = specificPO ? `采购单明细` : `进货汇总`;
+
+        let displayAddress = "";
+        if (columnsToInclude.includes("shippingAddress")) {
+          if (specificPO) {
+            displayAddress = specificPO.shippingAddress || "";
+          } else if (targets.length > 0) {
+            const defaultAddr = (typedUser?.shippingAddresses || []).find((a) => a.isDefault)?.address;
+            displayAddress = targets[0].shippingAddress || defaultAddr || "";
+          }
+        }
+
+        let displayShopName = "";
+        if (columnsToInclude.includes("shopName")) {
+          if (specificPO) {
+            displayShopName = specificPO.shopName || "";
+          } else if (targets.length > 0) {
+            displayShopName = targets.map((t) => t.shopName).filter(Boolean).join(", ") || "";
+          }
+        }
+
+        const container = document.createElement("div");
+        container.style.position = "absolute";
+        container.style.left = "-9999px";
+        container.style.top = "-9999px";
+        container.style.width = "820px";
+        container.style.backgroundColor = "#ffffff";
+        container.style.padding = "32px";
+        container.style.color = "#111827";
+        container.style.fontFamily = "system-ui, -apple-system, sans-serif";
+
+        let html = `
+          <div style="text-align: center; margin-bottom: 20px;">
+            <h1 style="font-size: 22px; font-weight: 800; margin: 0 0 6px 0; color: #111827;">${title}</h1>
+            <p style="font-size: 12px; color: #6b7280; margin: 0;">生成时间：${dateStr}</p>
+          </div>
+        `;
+
+        if (displayAddress) {
+          html += `
+            <div style="background-color: #fef2f2; border: 1px solid #fecaca; border-radius: 12px; padding: 12px 16px; margin-bottom: 12px;">
+              <p style="font-size: 16px; font-weight: 800; color: #dc2626; margin: 0;">收货地址：${displayAddress}</p>
+            </div>
+          `;
+        }
+
+        if (displayShopName) {
+          html += `
+            <div style="background-color: #eff6ff; border: 1px solid #bfdbfe; border-radius: 12px; padding: 10px 16px; margin-bottom: 16px;">
+              <p style="font-size: 14px; font-weight: 800; color: #2563eb; margin: 0;">收货店铺：${displayShopName}</p>
+            </div>
+          `;
+        }
+
+        html += `
+          <table style="width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px;">
+            <thead>
+              <tr style="background-color: #f3f4f6;">
+        `;
+
+        tableColumns.forEach((col) => {
+          html += `<th style="border: 1px solid #d1d5db; padding: 10px 8px; text-align: ${col.align}; font-weight: 800; color: #374151;">${col.header}</th>`;
+        });
+
+        html += `
+              </tr>
+            </thead>
+            <tbody>
+        `;
+
+        let globalIndex = 1;
+        let totalQty = 0;
+        let totalAmount = 0;
+
+        for (const po of targets) {
+          const sortedItems = sortPurchaseItems(
+            po.items,
+            (item) => (item.shopProductId ? item.shopProduct?.sku || "" : item.product?.sku || ""),
+            (item) => item.shopProduct?.name || item.product?.name
+          );
+
+          for (const item of sortedItems) {
+            const qty = item.quantity || 0;
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const price = (item as any).price || item.costPrice || item.shopProduct?.costPrice || item.product?.costPrice || 0;
+            const subtotal = qty * price;
+            totalQty += qty;
+            totalAmount += subtotal;
+
+            const imageUrl = item.shopProduct?.image || item.image;
+            const productName = item.shopProduct?.name || item.product?.name || "未知商品";
+            const sku = item.shopProductId ? item.shopProduct?.sku || "" : item.product?.sku || "";
+
+            html += `<tr style="border-bottom: 1px solid #e5e7eb;">`;
+
+            tableColumns.forEach((col) => {
+              if (col.key === "index") {
+                html += `<td style="border: 1px solid #d1d5db; padding: 8px; text-align: center;">${globalIndex}</td>`;
+              } else if (col.key === "image") {
+                html += `
+                  <td style="border: 1px solid #d1d5db; padding: 6px; text-align: center; width: 75px;">
+                    ${
+                      imageUrl
+                        ? `<img src="${imageUrl}" style="width: 60px; height: 60px; object-fit: cover; border-radius: 8px; border: 1px solid #e5e7eb; display: block; margin: 0 auto;" />`
+                        : `<span style="color: #9ca3af; font-size: 11px;">无图片</span>`
+                    }
+                  </td>
+                `;
+              } else if (col.key === "name") {
+                html += `<td style="border: 1px solid #d1d5db; padding: 8px; text-align: left; font-weight: 500; word-break: break-all;">${productName}</td>`;
+              } else if (col.key === "sku") {
+                html += `<td style="border: 1px solid #d1d5db; padding: 8px; text-align: center; color: #4b5563; font-family: monospace;">${sku}</td>`;
+              } else if (col.key === "price") {
+                html += `<td style="border: 1px solid #d1d5db; padding: 8px; text-align: center;">¥${price.toFixed(2)}</td>`;
+              } else if (col.key === "quantity") {
+                html += `<td style="border: 1px solid #d1d5db; padding: 8px; text-align: center; font-weight: bold; color: #111827;">${qty}</td>`;
+              } else if (col.key === "subtotal") {
+                html += `<td style="border: 1px solid #d1d5db; padding: 8px; text-align: center; font-weight: bold; color: #059669;">¥${subtotal.toFixed(2)}</td>`;
+              }
+            });
+
+            html += `</tr>`;
+            globalIndex++;
+          }
+        }
+
+        const showQtyCol = tableColumns.some((c) => c.key === "quantity");
+        const showSubtotalCol = tableColumns.some((c) => c.key === "subtotal");
+
+        if (showQtyCol || showSubtotalCol) {
+          html += `
+            <tr style="background-color: #f9fafb; font-weight: bold;">
+              <td colspan="${Math.max(1, tableColumns.length - (showQtyCol ? (showSubtotalCol ? 2 : 1) : 1))}" style="border: 1px solid #d1d5db; padding: 10px; text-align: right;">合计：</td>
+              ${showQtyCol ? `<td style="border: 1px solid #d1d5db; padding: 10px; text-align: center; color: #111827;">${totalQty}</td>` : ""}
+              ${showSubtotalCol ? `<td style="border: 1px solid #d1d5db; padding: 10px; text-align: center; color: #059669;">¥${totalAmount.toFixed(2)}</td>` : ""}
+            </tr>
+          `;
+        }
+
+        html += `
+            </tbody>
+          </table>
+        `;
+
+        container.innerHTML = html;
+        document.body.appendChild(container);
+
+        const images = Array.from(container.querySelectorAll("img"));
+        await Promise.all(
+          images.map((img) => {
+            if (img.complete) return Promise.resolve();
+            return new Promise((resolve) => {
+              img.onload = resolve;
+              img.onerror = resolve;
+            });
+          })
+        );
+
+        const canvas = await html2canvas(container, {
+          scale: 2,
+          useCORS: true,
+          logging: false,
+          backgroundColor: "#ffffff",
+        });
+
+        document.body.removeChild(container);
+
+        const imgData = canvas.toDataURL("image/jpeg", 0.95);
+        const pdf = new jsPDF("p", "mm", "a4");
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const pdfHeight = pdf.internal.pageSize.getHeight();
+        const imgWidth = pdfWidth;
+        const imgHeight = (canvas.height * pdfWidth) / canvas.width;
+
+        let heightLeft = imgHeight;
+        let position = 0;
+
+        pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight);
+        heightLeft -= pdfHeight;
+
+        while (heightLeft > 0) {
+          position = heightLeft - imgHeight;
+          pdf.addPage();
+          pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight);
+          heightLeft -= pdfHeight;
+        }
+
+        const filename = `${title}_${now.toISOString().slice(0, 10)}.pdf`;
+        pdf.save(filename);
+        showToast(specificPO ? `已导出 PDF 单据` : `已成功导出 ${targets.length} 张 PDF 采购单`, "success");
+      } catch (error) {
+        console.error("PDF export failed:", error);
+        showToast("生成 PDF 失败，请稍后重试", "error");
+      }
+    },
+    [typedUser?.shippingAddresses, showToast]
+  );
+
+  const handleExport = useCallback(async (specificPO?: PurchaseOrder, columnsToInclude: string[] = exportColumns, format: "excel" | "pdf" = "excel") => {
     // 过滤得到需要的表格列
     const tableColumns = [
       { key: "index", header: "序号", width: 8, align: "center" as const },
@@ -680,6 +893,11 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
 
     if (tableColumns.length === 0) {
       showToast("请至少选择一个表格列属性导出", "warning");
+      return;
+    }
+
+    if (format === "pdf") {
+      await handleExportPdf(specificPO, targets, tableColumns, columnsToInclude);
       return;
     }
 
@@ -1440,9 +1658,9 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
         }}
         selectedColumns={exportColumns}
         onChange={setExportColumns}
-        onConfirm={(cols) => {
+        onConfirm={(cols, format) => {
           setIsExportModalOpen(false);
-          void handleExport(exportTargetPO, cols);
+          void handleExport(exportTargetPO, cols, format);
           setExportTargetPO(undefined);
         }}
       />
@@ -1505,13 +1723,14 @@ export default function PurchasesPage() {
 interface ExportSettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (selectedColumns: string[]) => void;
+  onConfirm: (selectedColumns: string[], format: "excel" | "pdf") => void;
   selectedColumns: string[];
   onChange: (columns: string[]) => void;
 }
 
 function ExportSettingsModal({ isOpen, onClose, onConfirm, selectedColumns, onChange }: ExportSettingsModalProps) {
   const [mounted, setMounted] = useState(false);
+  const [exportFormat, setExportFormat] = useState<"excel" | "pdf">("excel");
 
   useEffect(() => {
     setMounted(true);
@@ -1519,15 +1738,15 @@ function ExportSettingsModal({ isOpen, onClose, onConfirm, selectedColumns, onCh
   }, []);
 
   const allColumns = [
-    { key: "shippingAddress", label: "收货地址 (外部信息)", desc: "在表格上方以红色特大字体展示采购收货详细地址" },
-    { key: "shopName", label: "店铺名称 (外部信息)", desc: "在表格上方以蓝色字体展示收货的店铺名称" },
-    { key: "index", label: "序号", desc: "表格列：显示商品排列序号 (1, 2, 3...)" },
-    { key: "image", label: "商品图片", desc: "表格列：在导出中嵌入商品实物缩略图" },
-    { key: "name", label: "商品名称", desc: "表格列：商品详细标题" },
-    { key: "sku", label: "货品编码", desc: "表格列：店内识别码/SKU，可为空" },
-    { key: "price", label: "单价", desc: "表格列：商品进货单价，自动保留两位小数" },
-    { key: "quantity", label: "数量", desc: "表格列：本单采购数量" },
-    { key: "subtotal", label: "小计", desc: "表格列：单价*数量的计算，若单价和数量都勾选，会自动写入 Excel 公式" },
+    { key: "shippingAddress", label: "收货地址 (外部信息)", desc: "在表格/文档上方以红色特大字体展示采购收货详细地址" },
+    { key: "shopName", label: "店铺名称 (外部信息)", desc: "在表格/文档上方以蓝色字体展示收货的店铺名称" },
+    { key: "index", label: "序号", desc: "明细列：显示商品排列序号 (1, 2, 3...)" },
+    { key: "image", label: "商品图片", desc: "明细列：在导出中嵌入商品实物缩略图" },
+    { key: "name", label: "商品名称", desc: "明细列：商品详细标题" },
+    { key: "sku", label: "货品编码", desc: "明细列：店内识别码/SKU，可为空" },
+    { key: "price", label: "单价", desc: "明细列：商品进货单价，自动保留两位小数" },
+    { key: "quantity", label: "数量", desc: "明细列：本单采购数量" },
+    { key: "subtotal", label: "小计", desc: "明细列：单价*数量的计算，若单价和数量都勾选，会自动计算小计" },
   ];
 
   const handleToggle = (key: string) => {
@@ -1549,29 +1768,60 @@ function ExportSettingsModal({ isOpen, onClose, onConfirm, selectedColumns, onCh
   if (!mounted || !isOpen) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-60000 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-60000 flex items-center sm:items-center justify-center p-3 sm:p-4">
       {/* Background overlay */}
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       
       {/* Modal Content */}
-      <div className="relative w-full max-w-lg overflow-hidden rounded-3xl bg-white dark:bg-gray-900 shadow-2xl border border-border/50 flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-200">
+      <div className="relative w-full max-w-lg overflow-hidden rounded-3xl bg-white dark:bg-gray-900 shadow-2xl border border-border/50 flex flex-col max-h-[90vh] sm:max-h-[85vh] animate-in zoom-in-95 duration-200">
         {/* Header */}
-        <div className="border-b border-border p-6 flex items-center justify-between">
+        <div className="border-b border-border p-4 sm:p-6 flex items-center justify-between shrink-0">
           <div>
-            <h3 className="text-lg font-bold text-foreground">自定义导出属性</h3>
-            <p className="text-xs text-muted-foreground mt-1">请选择需要在采购 Excel 明细表中包含的信息</p>
+            <h3 className="text-base sm:text-lg font-bold text-foreground">自定义导出设置</h3>
+            <p className="text-[11px] sm:text-xs text-muted-foreground mt-0.5 sm:mt-1">请选择导出格式以及采购文档中包含的信息</p>
           </div>
-          <button onClick={onClose} className="rounded-full p-1.5 text-muted-foreground hover:bg-muted transition-colors">
+          <button onClick={onClose} className="rounded-full p-2 text-muted-foreground hover:bg-muted active:scale-90 transition-all touch-manipulation">
             <X size={18} />
           </button>
         </div>
 
+        {/* Format Selector */}
+        <div className="px-4 sm:px-6 pt-3.5 pb-3 border-b border-border/50 bg-muted/20 shrink-0">
+          <p className="text-[11px] sm:text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">选择导出文件格式</p>
+          <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+            <button
+              type="button"
+              onClick={() => setExportFormat("excel")}
+              className={`flex items-center justify-center gap-2 sm:gap-2.5 p-2.5 sm:p-3 rounded-2xl border font-bold text-xs sm:text-sm active:scale-[0.98] transition-all touch-manipulation ${
+                exportFormat === "excel"
+                  ? "border-emerald-500 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 shadow-sm ring-1 ring-emerald-500/30"
+                  : "border-border hover:bg-muted text-muted-foreground"
+              }`}
+            >
+              <FileSpreadsheet size={16} className="sm:w-[18px] sm:h-[18px]" />
+              <span>Excel 表格 (.xlsx)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setExportFormat("pdf")}
+              className={`flex items-center justify-center gap-2 sm:gap-2.5 p-2.5 sm:p-3 rounded-2xl border font-bold text-xs sm:text-sm active:scale-[0.98] transition-all touch-manipulation ${
+                exportFormat === "pdf"
+                  ? "border-red-500 bg-red-500/10 text-red-600 dark:text-red-400 shadow-sm ring-1 ring-red-500/30"
+                  : "border-border hover:bg-muted text-muted-foreground"
+              }`}
+            >
+              <FileText size={16} className="sm:w-[18px] sm:h-[18px]" />
+              <span>PDF 文档 (.pdf)</span>
+            </button>
+          </div>
+        </div>
+
         {/* List of attributes */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-4">
-          <div className="flex gap-2 justify-end mb-2">
-            <button type="button" onClick={handleSelectAll} className="text-xs font-medium text-primary hover:underline">全选</button>
-            <span className="text-muted-foreground/30 text-xs">|</span>
-            <button type="button" onClick={handleSelectNone} className="text-xs font-medium text-muted-foreground hover:underline">清空</button>
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-3.5">
+          <div className="flex gap-2 justify-end mb-1">
+            <button type="button" onClick={handleSelectAll} className="text-xs font-medium text-primary hover:underline p-1 touch-manipulation">全选</button>
+            <span className="text-muted-foreground/30 text-xs self-center">|</span>
+            <button type="button" onClick={handleSelectNone} className="text-xs font-medium text-muted-foreground hover:underline p-1 touch-manipulation">清空</button>
           </div>
           <div className="space-y-2">
             {allColumns.map(col => {
@@ -1580,7 +1830,7 @@ function ExportSettingsModal({ isOpen, onClose, onConfirm, selectedColumns, onCh
                 <div 
                   key={col.key}
                   onClick={() => handleToggle(col.key)}
-                  className={`flex items-start gap-3 p-3.5 rounded-2xl border cursor-pointer transition-all ${
+                  className={`flex items-start gap-3 p-3 sm:p-3.5 rounded-2xl border cursor-pointer active:scale-[0.99] transition-all touch-manipulation ${
                     isChecked 
                       ? "border-primary bg-primary/5 dark:bg-primary/10" 
                       : "border-border hover:bg-muted/40"
@@ -1594,8 +1844,8 @@ function ExportSettingsModal({ isOpen, onClose, onConfirm, selectedColumns, onCh
                     {isChecked && <Check size={10} strokeWidth={4} />}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className={`text-sm font-bold leading-tight ${isChecked ? "text-primary" : "text-foreground/90"}`}>{col.label}</p>
-                    <p className="text-xs text-muted-foreground/80 mt-1 leading-normal">{col.desc}</p>
+                    <p className={`text-xs sm:text-sm font-bold leading-tight ${isChecked ? "text-primary" : "text-foreground/90"}`}>{col.label}</p>
+                    <p className="text-[11px] sm:text-xs text-muted-foreground/80 mt-1 leading-normal">{col.desc}</p>
                   </div>
                 </div>
               );
@@ -1604,20 +1854,20 @@ function ExportSettingsModal({ isOpen, onClose, onConfirm, selectedColumns, onCh
         </div>
 
         {/* Footer */}
-        <div className="border-t border-border p-6 flex justify-end gap-3">
+        <div className="border-t border-border p-4 sm:p-6 flex items-center justify-end gap-2.5 sm:gap-3 shrink-0 pb-safe">
           <button
             type="button"
             onClick={onClose}
-            className="h-10 px-5 rounded-full text-sm font-medium text-muted-foreground hover:bg-muted transition-colors"
+            className="h-11 sm:h-10 px-4 sm:px-5 rounded-full text-xs sm:text-sm font-medium text-muted-foreground hover:bg-muted active:scale-95 transition-all touch-manipulation"
           >
             取消
           </button>
           <button
             type="button"
-            onClick={() => onConfirm(selectedColumns)}
-            className="h-10 px-6 rounded-full text-sm font-medium bg-primary text-primary-foreground shadow-lg shadow-primary/20 hover:opacity-90 active:scale-95 transition-all"
+            onClick={() => onConfirm(selectedColumns, exportFormat)}
+            className="h-11 sm:h-10 px-5 sm:px-6 rounded-full text-xs sm:text-sm font-medium bg-primary text-primary-foreground shadow-lg shadow-primary/20 hover:opacity-90 active:scale-95 transition-all touch-manipulation"
           >
-            确认导出
+            确认导出 ({exportFormat === "excel" ? "Excel" : "PDF"})
           </button>
         </div>
       </div>
