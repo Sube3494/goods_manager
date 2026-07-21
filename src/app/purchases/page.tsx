@@ -748,10 +748,26 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
           }
         }
 
-        // 3. 计算物理分页（卡片式大图排版，首页放 4-5 个商品卡片，续页放 5 个）
-        const hasHeaderBanner = Boolean(displayAddress || displayShopName);
-        const FIRST_PAGE_LIMIT = hasHeaderBanner ? 4 : 5;
-        const OTHER_PAGE_LIMIT = 5;
+        // 3. 智能判断排版模式：
+        // 模式 A：网格大图画册模式 (当包含图片且勾选属性 <= 3 时，如只选了序号 + 图片 + 名称)
+        // 模式 B：详细采购卡片模式 (当包含图片且勾选较多属性，如包含单价、数量、小计等)
+        // 模式 C：纯文本表格模式 (当未勾选图片时)
+        const isGridCatalogMode = showImage && tableColumns.length <= 3;
+        const hasHeaderBanner = Boolean(displayAddress);
+
+        let FIRST_PAGE_LIMIT = 5;
+        let OTHER_PAGE_LIMIT = 5;
+
+        if (isGridCatalogMode) {
+          FIRST_PAGE_LIMIT = hasHeaderBanner ? 6 : 9; // 3 列网格 (2 行 = 6, 3 行 = 9)
+          OTHER_PAGE_LIMIT = 9;
+        } else if (!showImage) {
+          FIRST_PAGE_LIMIT = hasHeaderBanner ? 12 : 15;
+          OTHER_PAGE_LIMIT = 15;
+        } else {
+          FIRST_PAGE_LIMIT = hasHeaderBanner ? 4 : 5;
+          OTHER_PAGE_LIMIT = 5;
+        }
 
         const pagesData: FlatItem[][] = [];
         let remaining = [...flatItems];
@@ -811,16 +827,8 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
 
             if (displayAddress) {
               html += `
-                <div style="background-color: #fef2f2; border: 1.5px solid #fecaca; border-radius: 12px; padding: 12px 16px; margin-bottom: 12px;">
+                <div style="background-color: #fef2f2; border: 1.5px solid #fecaca; border-radius: 12px; padding: 12px 16px; margin-bottom: 16px;">
                   <p style="font-size: 15px; font-weight: 800; color: #dc2626; margin: 0; word-break: break-all;">收货地址：${displayAddress}</p>
-                </div>
-              `;
-            }
-
-            if (displayShopName) {
-              html += `
-                <div style="background-color: #eff6ff; border: 1.5px solid #bfdbfe; border-radius: 12px; padding: 10px 16px; margin-bottom: 16px;">
-                  <p style="font-size: 13px; font-weight: 800; color: #2563eb; margin: 0;">收货店铺：${displayShopName}</p>
                 </div>
               `;
             }
@@ -833,81 +841,140 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
             `;
           }
 
-          // 采购卡片列表：高对比度、极其规整的固定序列 + 图文详情布局
-          html += `<div style="flex: 1; display: flex; flex-direction: column; gap: 14px; overflow: hidden;">`;
-
-          for (const rowItem of pageItems) {
+          // ── 模式 1：网格大图画册模式 (一排 3 个，编号与信息在图片下方) ──
+          if (isGridCatalogMode) {
             html += `
-              <div style="border: 1.5px solid #cbd5e1; border-radius: 14px; padding: 14px 16px; background-color: #ffffff; display: flex; gap: 16px; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.04);">
-                <!-- 1. 最左侧：绝对固定、极为规整的序号圆形徽章（受 showIndex 控制） -->
-                ${
-                  showIndex
-                    ? `
-                      <div style="width: 32px; height: 32px; min-width: 32px; border-radius: 50%; background-color: #f1f5f9; border: 1.5px solid #94a3b8; text-align: center; line-height: 29px; font-size: 13px; font-weight: 800; color: #0f172a; flex-shrink: 0; box-sizing: border-box;">
-                        ${rowItem.globalIndex}
-                      </div>
-                    `
-                    : ""
-                }
-
-                <!-- 2. 中间：100px x 100px 超清主图（受 showImage 控制） -->
-                ${
-                  showImage
-                    ? `
-                      <div style="width: 104px; height: 104px; min-width: 104px; border-radius: 10px; overflow: hidden; border: 1.5px solid #cbd5e1; background-color: #f8fafc; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-                        ${
-                          rowItem.imageUrl
-                            ? `<img src="${rowItem.imageUrl}" style="width: 100%; height: 100%; object-fit: cover;" />`
-                            : `<span style="color: #64748b; font-size: 11px; font-weight: 700;">无主图</span>`
-                        }
-                      </div>
-                    `
-                    : ""
-                }
-                
-                <!-- 3. 右侧详情区（仅当勾选了名称、SKU、单价、数量或小计时渲染） -->
-                ${
-                  showName || showSku || showPrice || showQty || showSubtotal
-                    ? `
-                      <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px;">
-                        ${
-                          showName
-                            ? `
-                              <h3 style="font-size: 16px; font-weight: 800; color: #09090b; margin: 0; line-height: 1.35; word-break: break-all;">
-                                ${rowItem.productName}
-                              </h3>
-                            `
-                            : ""
-                        }
-
-                        ${
-                          showSku && rowItem.sku
-                            ? `<div style="font-size: 12px; color: #334155; font-family: monospace; font-weight: 600;">SKU / 编码: <strong style="color: #0f172a; background-color: #f1f5f9; border: 1px solid #cbd5e1; padding: 2px 8px; border-radius: 4px; font-weight: 800;">${rowItem.sku}</strong></div>`
-                            : ""
-                        }
-
-                        ${
-                          showPrice || showQty || showSubtotal
-                            ? `
-                              <div style="display: flex; gap: 24px; align-items: center; margin-top: 2px; padding-top: 8px; border-top: 1.5px dashed #cbd5e1;">
-                                ${showPrice ? `<div style="font-size: 13px; color: #334155; font-weight: 600;">进货单价: <strong style="color: #0f172a; font-size: 14px; font-weight: 800;">¥${rowItem.price.toFixed(2)}</strong></div>` : ""}
-                                ${showQty ? `<div style="font-size: 13px; color: #334155; font-weight: 600;">采购数量: <strong style="font-size: 17px; color: #1d4ed8; font-weight: 800;">${rowItem.quantity}</strong></div>` : ""}
-                                ${showSubtotal ? `<div style="font-size: 13px; color: #047857; font-weight: 600; margin-left: auto;">小计: <strong style="font-size: 18px; font-weight: 800;">¥${rowItem.subtotal.toFixed(2)}</strong></div>` : ""}
-                              </div>
-                            `
-                            : ""
-                        }
-                      </div>
-                    `
-                    : ""
-                }
-              </div>
+              <div style="flex: 1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px 16px; align-content: start;">
             `;
+
+            for (const rowItem of pageItems) {
+              html += `
+                <div style="border: 1.5px solid #cbd5e1; border-radius: 16px; padding: 14px; background-color: #ffffff; display: flex; flex-direction: column; align-items: center; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.03);">
+                  <!-- 200px 超大图展示区 -->
+                  <div style="width: 200px; height: 200px; border-radius: 12px; overflow: hidden; border: 1.5px solid #cbd5e1; background-color: #f8fafc; margin-bottom: 10px; display: flex; align-items: center; justify-content: center; shrink-0;">
+                    ${
+                      rowItem.imageUrl
+                        ? `<img src="${rowItem.imageUrl}" style="width: 100%; height: 100%; object-fit: cover;" />`
+                        : `<span style="color: #64748b; font-size: 12px; font-weight: 700;">无主图</span>`
+                    }
+                  </div>
+
+                  <!-- 图片下方：编号 + 名称 + SKU -->
+                  <div style="display: flex; flex-direction: column; align-items: center; gap: 4px; width: 100%;">
+                    ${
+                      showIndex
+                        ? `
+                          <div style="width: 28px; height: 28px; border-radius: 50%; background-color: #f1f5f9; border: 1.5px solid #94a3b8; display: flex; align-items: center; justify-content: center; margin-bottom: 2px;">
+                            <svg width="28" height="28" viewBox="0 0 28 28">
+                              <circle cx="14" cy="14" r="12.5" fill="#f1f5f9" stroke="#94a3b8" stroke-width="1.5" />
+                              <text x="14" y="14.5" text-anchor="middle" dominant-baseline="central" fill="#0f172a" font-size="12" font-weight="800" font-family="system-ui, -apple-system, sans-serif">
+                                ${rowItem.globalIndex}
+                              </text>
+                            </svg>
+                          </div>
+                        `
+                        : ""
+                    }
+
+                    ${
+                      showName
+                        ? `<div style="font-size: 14px; font-weight: 700; color: #09090b; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; word-break: break-all;">${rowItem.productName}</div>`
+                        : ""
+                    }
+
+                    ${
+                      showSku && rowItem.sku
+                        ? `<div style="font-size: 11px; color: #334155; font-family: monospace; font-weight: 600; background-color: #f1f5f9; border: 1px solid #cbd5e1; padding: 1px 6px; border-radius: 4px; margin-top: 2px;">${rowItem.sku}</div>`
+                        : ""
+                    }
+                  </div>
+                </div>
+              `;
+            }
+
+            html += `</div>`;
+          } else {
+            // ── 模式 2：详细采购卡片列表 / 模式 3：标准文本列表 ──
+            html += `<div style="flex: 1; display: flex; flex-direction: column; gap: 14px; overflow: hidden;">`;
+
+            for (const rowItem of pageItems) {
+              html += `
+                <div style="border: 1.5px solid #cbd5e1; border-radius: 14px; padding: 14px 16px; background-color: #ffffff; display: flex; gap: 16px; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.04);">
+                  <!-- 最左侧：序号圆形徽章 -->
+                  ${
+                    showIndex
+                      ? `
+                        <div style="width: 32px; height: 32px; min-width: 32px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+                          <svg width="32" height="32" viewBox="0 0 32 32" style="display: block;">
+                            <circle cx="16" cy="16" r="14.5" fill="#f1f5f9" stroke="#94a3b8" stroke-width="1.5" />
+                            <text x="16" y="16.5" text-anchor="middle" dominant-baseline="central" fill="#0f172a" font-size="13" font-weight="800" font-family="system-ui, -apple-system, sans-serif">
+                              ${rowItem.globalIndex}
+                            </text>
+                          </svg>
+                        </div>
+                      `
+                      : ""
+                  }
+
+                  <!-- 中间：图片 -->
+                  ${
+                    showImage
+                      ? `
+                        <div style="width: 104px; height: 104px; min-width: 104px; border-radius: 10px; overflow: hidden; border: 1.5px solid #cbd5e1; background-color: #f8fafc; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                          ${
+                            rowItem.imageUrl
+                              ? `<img src="${rowItem.imageUrl}" style="width: 100%; height: 100%; object-fit: cover;" />`
+                              : `<span style="color: #64748b; font-size: 11px; font-weight: 700;">无主图</span>`
+                          }
+                        </div>
+                      `
+                      : ""
+                  }
+                  
+                  <!-- 右侧详情区 -->
+                  ${
+                    showName || showSku || showPrice || showQty || showSubtotal
+                      ? `
+                        <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px;">
+                          ${
+                            showName
+                              ? `
+                                <h3 style="font-size: 16px; font-weight: 800; color: #09090b; margin: 0; line-height: 1.35; word-break: break-all;">
+                                  ${rowItem.productName}
+                                </h3>
+                              `
+                              : ""
+                          }
+
+                          ${
+                            showSku && rowItem.sku
+                              ? `<div style="font-size: 12px; color: #334155; font-family: monospace; font-weight: 600;">SKU / 编码: <strong style="color: #0f172a; background-color: #f1f5f9; border: 1px solid #cbd5e1; padding: 2px 8px; border-radius: 4px; font-weight: 800;">${rowItem.sku}</strong></div>`
+                              : ""
+                          }
+
+                          ${
+                            showPrice || showQty || showSubtotal
+                              ? `
+                                <div style="display: flex; gap: 24px; align-items: center; margin-top: 2px; padding-top: 8px; border-top: 1.5px dashed #cbd5e1;">
+                                  ${showPrice ? `<div style="font-size: 13px; color: #334155; font-weight: 600;">进货单价: <strong style="color: #0f172a; font-size: 14px; font-weight: 800;">¥${rowItem.price.toFixed(2)}</strong></div>` : ""}
+                                  ${showQty ? `<div style="font-size: 13px; color: #334155; font-weight: 600;">采购数量: <strong style="font-size: 17px; color: #1d4ed8; font-weight: 800;">${rowItem.quantity}</strong></div>` : ""}
+                                  ${showSubtotal ? `<div style="font-size: 13px; color: #047857; font-weight: 600; margin-left: auto;">小计: <strong style="font-size: 18px; font-weight: 800;">¥${rowItem.subtotal.toFixed(2)}</strong></div>` : ""}
+                                </div>
+                              `
+                              : ""
+                          }
+                        </div>
+                      `
+                      : ""
+                  }
+                </div>
+              `;
+            }
+
+            html += `</div>`;
           }
 
-          html += `</div>`;
-
-          // 如果是最后一页，追加底部总计卡片（受 showQty / showSubtotal 控制，强化对比度）
+          // 如果是最后一页，追加底部总计卡片
           if (isLastPage && (showQty || showSubtotal)) {
             html += `
               <div style="margin-top: 12px; background-color: #f8fafc; border: 2px solid #94a3b8; border-radius: 12px; padding: 12px 18px; display: flex; justify-content: space-between; align-items: center;">
