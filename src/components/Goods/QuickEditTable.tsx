@@ -163,8 +163,131 @@ export function QuickEditTable({
         </div>
       )}
 
-      {/* 高效表格 */}
-      <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+      {/* 移动端专属自适应卡片编辑列表 (md:hidden) */}
+      <div className="md:hidden space-y-3">
+        {items.map((item, idx) => {
+          const orig = getInitialValues(item);
+          const currentDraft = drafts[item.id] || orig;
+          const rowChanged = isChanged(item);
+          const isRowSaving = savingIds[item.id];
+
+          return (
+            <div
+              key={item.id}
+              className={cn(
+                "p-3.5 rounded-2xl border transition-all space-y-3 bg-card shadow-sm",
+                rowChanged ? "border-amber-500/50 bg-amber-500/5 dark:bg-amber-500/10" : "border-border"
+              )}
+            >
+              {/* 卡片头部：序号 + 封面 + 名称 + 单条保存按钮 */}
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-medium text-muted-foreground w-5 text-center shrink-0">
+                  {idx + 1}
+                </span>
+                <div className="h-11 w-11 rounded-xl overflow-hidden border border-border bg-muted/50 shrink-0 flex items-center justify-center">
+                  {item.image ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={item.image} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <ImageIcon size={16} className="text-muted-foreground/40" />
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm text-foreground truncate">{item.name}</p>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    {item.categoryName && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-muted text-muted-foreground font-medium">
+                        {item.categoryName}
+                      </span>
+                    )}
+                    {item.shopName && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-400 font-medium">
+                        {item.shopName}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                {rowChanged ? (
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => handleResetRow(item)}
+                      disabled={isRowSaving}
+                      className="p-2 rounded-xl text-muted-foreground hover:bg-muted active:scale-95 transition-all"
+                      title="撤销"
+                    >
+                      <RotateCcw size={15} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { void handleSaveRow(item); }}
+                      disabled={isRowSaving}
+                      className="px-2.5 py-1.5 rounded-xl bg-emerald-500 text-white font-medium text-xs flex items-center gap-1 shadow-sm active:scale-95 transition-all"
+                    >
+                      <Check size={15} strokeWidth={2.5} />
+                      <span>保存</span>
+                    </button>
+                  </div>
+                ) : (
+                  <span className="text-[11px] text-muted-foreground/40 shrink-0">未变动</span>
+                )}
+              </div>
+
+              {/* 卡片下部：全宽并排 SKU 与 进货单价 输入框 */}
+              <div className="grid grid-cols-2 gap-2.5 pt-2 border-t border-border/50">
+                <div>
+                  <label className="text-[11px] font-medium text-muted-foreground mb-1 block">
+                    货品编码 (SKU)
+                  </label>
+                  <input
+                    type="text"
+                    value={currentDraft.sku}
+                    onChange={(e) => handleFieldChange(item.id, "sku", e.target.value, item)}
+                    placeholder="暂无编号"
+                    className={cn(
+                      "w-full h-9 px-2.5 rounded-xl border text-xs font-mono font-normal transition-all outline-none bg-background/80 dark:bg-white/5 placeholder:text-muted-foreground/40",
+                      currentDraft.sku !== orig.sku
+                        ? "border-amber-500 bg-amber-500/10 dark:bg-amber-500/20 font-medium text-amber-600 dark:text-amber-400 ring-1 ring-amber-500/20"
+                        : "border-border/80 text-foreground"
+                    )}
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-medium text-muted-foreground mb-1 block">
+                    进货单价 (元)
+                  </label>
+                  <div className="relative flex items-center">
+                    <span className="absolute left-2.5 text-xs text-muted-foreground font-medium">¥</span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={currentDraft.costPrice}
+                      onChange={(e) => handleFieldChange(item.id, "costPrice", e.target.value, item)}
+                      className={cn(
+                        "w-full h-9 pl-6 pr-2 rounded-xl border text-xs font-normal transition-all outline-none bg-background/80 dark:bg-white/5",
+                        currentDraft.costPrice !== orig.costPrice
+                          ? "border-amber-500 bg-amber-500/10 dark:bg-amber-500/20 font-medium text-amber-600 dark:text-amber-400 ring-1 ring-amber-500/20"
+                          : "border-border/80 text-foreground"
+                      )}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+
+        {items.length === 0 && !isLoading && (
+          <div className="py-12 text-center text-muted-foreground text-xs bg-card rounded-2xl border border-border">
+            暂无相关商品数据
+          </div>
+        )}
+      </div>
+
+      {/* 桌面端多列连续编辑表格 (hidden md:block) */}
+      <div className="hidden md:block overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs sm:text-sm border-collapse">
             <thead>
