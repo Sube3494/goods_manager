@@ -59,8 +59,19 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
         orderNo: order.orderNo,
         platform: order.platform,
         preserved: true,
-        error: "Order was not found in the current sync query, local record preserved",
+        error: "在第三方平台未查询到该订单，已保护性保留本地记录",
       }, { status: 409 });
+    }
+
+    if ((refreshedOrder as any).isDeleted) {
+      return NextResponse.json({
+        ok: true,
+        id: order.id,
+        orderNo: order.orderNo,
+        platform: order.platform,
+        deleted: true,
+        message: "平台该订单已删除，已同步清理本地记录",
+      });
     }
 
     if (

@@ -579,6 +579,86 @@ function PurchasesContent() {
     });
   }, [fetchData, selectedPurchases, showToast]);
 
+async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: ArrayBuffer; width: number; height: number; extension: "jpeg" | "png" } | null> {
+  if (!imageUrl) return null;
+
+  try {
+    let rawBuffer: ArrayBuffer | null = null;
+    try {
+      const response = await fetch(imageUrl);
+      if (response.ok) {
+        rawBuffer = await response.arrayBuffer();
+      }
+    } catch {
+      rawBuffer = null;
+    }
+
+    let blobUrl = "";
+    if (rawBuffer) {
+      const blob = new Blob([rawBuffer]);
+      blobUrl = URL.createObjectURL(blob);
+    } else {
+      blobUrl = imageUrl;
+    }
+
+    return await new Promise((resolve) => {
+      const img = typeof window !== "undefined" ? new window.Image() : ({} as HTMLImageElement);
+      if (!rawBuffer) {
+        img.crossOrigin = "anonymous";
+      }
+      img.onload = () => {
+        try {
+          const canvas = document.createElement("canvas");
+          const width = img.width || 100;
+          const height = img.height || 100;
+          canvas.width = width;
+          canvas.height = height;
+
+          const ctx = canvas.getContext("2d");
+          if (!ctx) {
+            if (blobUrl && rawBuffer) URL.revokeObjectURL(blobUrl);
+            resolve(rawBuffer ? { buffer: rawBuffer, width, height, extension: "jpeg" } : null);
+            return;
+          }
+
+          ctx.fillStyle = "#FFFFFF";
+          ctx.fillRect(0, 0, width, height);
+          ctx.drawImage(img, 0, 0);
+
+          const dataUrl = canvas.toDataURL("image/jpeg", 0.9);
+          if (blobUrl && rawBuffer) URL.revokeObjectURL(blobUrl);
+
+          const base64Data = dataUrl.split(",")[1];
+          const binaryString = atob(base64Data);
+          const bytes = new Uint8Array(binaryString.length);
+          for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+          }
+
+          resolve({
+            buffer: bytes.buffer,
+            width,
+            height,
+            extension: "jpeg",
+          });
+        } catch {
+          if (blobUrl && rawBuffer) URL.revokeObjectURL(blobUrl);
+          resolve(rawBuffer ? { buffer: rawBuffer, width: img.width || 100, height: img.height || 100, extension: "jpeg" } : null);
+        }
+      };
+
+      img.onerror = () => {
+        if (blobUrl && rawBuffer) URL.revokeObjectURL(blobUrl);
+        resolve(rawBuffer ? { buffer: rawBuffer, width: 100, height: 100, extension: "jpeg" } : null);
+      };
+
+      img.src = blobUrl;
+    });
+  } catch {
+    return null;
+  }
+}
+
   const handleExport = useCallback(async (specificPO?: PurchaseOrder, columnsToInclude: string[] = exportColumns) => {
     // 过滤得到需要的表格列
     const tableColumns = [
@@ -708,31 +788,21 @@ function PurchasesContent() {
           totalQty += qty;
           totalAmount += subtotal;
 
-          // ── 第一步：预取图片并计算尺寸，用于动态行高 ──
+          // ── 第一步：预取图片并转码为标准 JPEG/PNG，用于动态行高与兼容 Excel 显示 ──
           const hasImageColumn = columnsToInclude.includes("image");
           const imageUrl = item.shopProduct?.image || item.image;
           let imageBuffer: ArrayBuffer | null = null;
+          let imageExtension: "jpeg" | "png" = "jpeg";
           let imgW = 0;
           let imgH = 0;
 
           if (hasImageColumn && imageUrl) {
-            try {
-              const response = await fetch(imageUrl);
-              if (response.ok) {
-                imageBuffer = await response.arrayBuffer();
-                const blob = new Blob([imageBuffer]);
-                const blobUrl = URL.createObjectURL(blob);
-                const dims = await new Promise<{ width: number; height: number }>((resolve) => {
-                  const img = new Image();
-                  img.onload = () => { URL.revokeObjectURL(blobUrl); resolve({ width: img.width, height: img.height }); };
-                  img.onerror = () => { URL.revokeObjectURL(blobUrl); resolve({ width: 100, height: 100 }); };
-                  img.src = blobUrl;
-                });
-                imgW = dims.width || 100;
-                imgH = dims.height || 100;
-              }
-            } catch (err) {
-              console.error("Failed to pre-fetch image for export", err);
+            const converted = await loadAndConvertImageForExcel(imageUrl);
+            if (converted) {
+              imageBuffer = converted.buffer;
+              imageExtension = converted.extension;
+              imgW = converted.width;
+              imgH = converted.height;
             }
           }
 
@@ -802,7 +872,7 @@ function PurchasesContent() {
               try {
                 const imageId = workbook.addImage({
                   buffer: imageBuffer,
-                  extension: imageUrl!.split('.').pop()?.toLowerCase() === 'png' ? 'png' : 'jpeg',
+                  extension: imageExtension,
                 });
 
                 const cellHeightPx = rowHeightPts / 0.75;

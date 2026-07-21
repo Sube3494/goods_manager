@@ -278,6 +278,86 @@ function SetupPurchaseDetailContent() {
     return items.map(item => item.productId).filter((id): id is string => id !== null);
   }, [items]);
 
+async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: ArrayBuffer; width: number; height: number; extension: "jpeg" | "png" } | null> {
+  if (!imageUrl) return null;
+
+  try {
+    let rawBuffer: ArrayBuffer | null = null;
+    try {
+      const response = await fetch(imageUrl);
+      if (response.ok) {
+        rawBuffer = await response.arrayBuffer();
+      }
+    } catch {
+      rawBuffer = null;
+    }
+
+    let blobUrl = "";
+    if (rawBuffer) {
+      const blob = new Blob([rawBuffer]);
+      blobUrl = URL.createObjectURL(blob);
+    } else {
+      blobUrl = imageUrl;
+    }
+
+    return await new Promise((resolve) => {
+      const img = typeof window !== "undefined" ? new window.Image() : ({} as HTMLImageElement);
+      if (!rawBuffer) {
+        img.crossOrigin = "anonymous";
+      }
+      img.onload = () => {
+        try {
+          const canvas = document.createElement("canvas");
+          const width = img.width || 100;
+          const height = img.height || 100;
+          canvas.width = width;
+          canvas.height = height;
+
+          const ctx = canvas.getContext("2d");
+          if (!ctx) {
+            if (blobUrl && rawBuffer) URL.revokeObjectURL(blobUrl);
+            resolve(rawBuffer ? { buffer: rawBuffer, width, height, extension: "jpeg" } : null);
+            return;
+          }
+
+          ctx.fillStyle = "#FFFFFF";
+          ctx.fillRect(0, 0, width, height);
+          ctx.drawImage(img, 0, 0);
+
+          const dataUrl = canvas.toDataURL("image/jpeg", 0.9);
+          if (blobUrl && rawBuffer) URL.revokeObjectURL(blobUrl);
+
+          const base64Data = dataUrl.split(",")[1];
+          const binaryString = atob(base64Data);
+          const bytes = new Uint8Array(binaryString.length);
+          for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+          }
+
+          resolve({
+            buffer: bytes.buffer,
+            width,
+            height,
+            extension: "jpeg",
+          });
+        } catch {
+          if (blobUrl && rawBuffer) URL.revokeObjectURL(blobUrl);
+          resolve(rawBuffer ? { buffer: rawBuffer, width: img.width || 100, height: img.height || 100, extension: "jpeg" } : null);
+        }
+      };
+
+      img.onerror = () => {
+        if (blobUrl && rawBuffer) URL.revokeObjectURL(blobUrl);
+        resolve(rawBuffer ? { buffer: rawBuffer, width: 100, height: 100, extension: "jpeg" } : null);
+      };
+
+      img.src = blobUrl;
+    });
+  } catch {
+    return null;
+  }
+}
+
   const handleExport = useCallback(async () => {
     if (filteredItems.length === 0) {
       showToast("没有可导出的记录", "error");
@@ -378,41 +458,16 @@ function SetupPurchaseDetailContent() {
           try {
             console.log(`Fetching image ${globalIndex-1}/${filteredItems.length}: ${imageUrl}`);
             
-            // 添加超时处理
-            const fetchPromise = fetch(imageUrl);
-            const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 8000));
+            const converted = await loadAndConvertImageForExcel(imageUrl);
             
-            const response = (await Promise.race([fetchPromise, timeoutPromise])) as Response;
-            
-            if (response.ok) {
-              const buffer = await response.arrayBuffer();
-              const ext = imageUrl.split('.').pop()?.split('?')[0].toLowerCase();
-              const extType = (ext === 'png' || ext === 'gif') ? ext : 'jpeg';
-              
+            if (converted) {
               const imageId = workbook.addImage({
-                buffer: buffer,
-                extension: extType as 'png' | 'jpeg' | 'gif',
+                buffer: converted.buffer,
+                extension: converted.extension,
               });
               
-              // 获取尺寸以居中
-              const blob = new Blob([buffer]);
-              const blobUrl = URL.createObjectURL(blob);
-              const dims = await new Promise<{width: number, height: number}>((resolve) => {
-                const img = new Image();
-                img.onload = () => {
-                  URL.revokeObjectURL(blobUrl);
-                  resolve({ width: img.width, height: img.height });
-                };
-                img.onerror = () => {
-                  URL.revokeObjectURL(blobUrl);
-                  resolve({ width: 100, height: 100 });
-                };
-                img.src = blobUrl;
-              });
-              
-              // 兜底尺寸，防止加载异常导致 Infinity/NaN
-              const imgW = dims.width || 100;
-              const imgH = dims.height || 100;
+              const imgW = converted.width || 100;
+              const imgH = converted.height || 100;
 
               // Excel width 18 (getColumn.width) is approx 135px in many viewers
               // Row height 80 (row.height) is approx 106px (80 * 1.33)

@@ -29,24 +29,72 @@ async function blobToDataUrl(blob: Blob) {
   });
 }
 
-async function getExcelImageSource(imageUrl?: string | null) {
+async function getExcelImageSource(imageUrl?: string | null): Promise<{ base64: string; extension: "jpeg" | "png" } | null> {
   if (!imageUrl) return null;
 
   try {
-    const response = await fetch(imageUrl);
-    if (!response.ok) return null;
+    let rawBuffer: ArrayBuffer | null = null;
+    try {
+      const response = await fetch(imageUrl);
+      if (response.ok) {
+        rawBuffer = await response.arrayBuffer();
+      }
+    } catch {
+      rawBuffer = null;
+    }
 
-    const blob = await response.blob();
-    const mimeType = blob.type.toLowerCase();
-    const extension =
-      mimeType.includes("png") ? "png" :
-      mimeType.includes("jpeg") || mimeType.includes("jpg") ? "jpeg" :
-      null;
+    let blobUrl = "";
+    if (rawBuffer) {
+      const blob = new Blob([rawBuffer]);
+      blobUrl = URL.createObjectURL(blob);
+    } else {
+      blobUrl = imageUrl;
+    }
 
-    if (!extension) return null;
+    return await new Promise((resolve) => {
+      const img = typeof window !== "undefined" ? new window.Image() : ({} as HTMLImageElement);
+      if (!rawBuffer) {
+        img.crossOrigin = "anonymous";
+      }
+      img.onload = () => {
+        try {
+          const canvas = document.createElement("canvas");
+          const width = img.width || 100;
+          const height = img.height || 100;
+          canvas.width = width;
+          canvas.height = height;
 
-    const base64 = await blobToDataUrl(blob);
-    return { base64, extension: extension as "png" | "jpeg" };
+          const ctx = canvas.getContext("2d");
+          if (!ctx) {
+            if (blobUrl && rawBuffer) URL.revokeObjectURL(blobUrl);
+            resolve(null);
+            return;
+          }
+
+          ctx.fillStyle = "#FFFFFF";
+          ctx.fillRect(0, 0, width, height);
+          ctx.drawImage(img, 0, 0);
+
+          const dataUrl = canvas.toDataURL("image/jpeg", 0.9);
+          if (blobUrl && rawBuffer) URL.revokeObjectURL(blobUrl);
+
+          resolve({
+            base64: dataUrl,
+            extension: "jpeg",
+          });
+        } catch {
+          if (blobUrl && rawBuffer) URL.revokeObjectURL(blobUrl);
+          resolve(null);
+        }
+      };
+
+      img.onerror = () => {
+        if (blobUrl && rawBuffer) URL.revokeObjectURL(blobUrl);
+        resolve(null);
+      };
+
+      img.src = blobUrl;
+    });
   } catch (error) {
     console.error("Failed to prepare export image:", imageUrl, error);
     return null;

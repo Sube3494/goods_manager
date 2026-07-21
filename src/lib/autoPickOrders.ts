@@ -1116,6 +1116,12 @@ function parseMaiyatianStatusValue(rawValue: unknown) {
 }
 
 function resolveMaiyatianOrderStatus(rawOrder: Record<string, unknown>) {
+  const isCancelled = rawOrder.is_cancel === true || rawOrder.is_cancel === 1 || rawOrder.is_cancel === "1"
+    || (String(rawOrder.cancel_status || "").trim() !== "" && String(rawOrder.cancel_status) !== "0");
+  if (isCancelled) {
+    return "已取消";
+  }
+
   const tipStatus = parseDeliveryDeadline(String(rawOrder.tips || "").trim());
   if (tipStatus) {
     return tipStatus;
@@ -4131,7 +4137,13 @@ export async function refreshAutoPickOrderFromPlugin(
             platform: normalizedDetailOrder.platform || fallbackPlatform,
             orderNo: normalizedDetailOrder.orderNo || fallbackOrderNo,
           });
-          return null;
+          return {
+            id: lookup.id || "",
+            orderNo: normalizedDetailOrder.orderNo || fallbackOrderNo,
+            platform: normalizedDetailOrder.platform || fallbackPlatform,
+            status: "已删除",
+            isDeleted: true,
+          } as unknown as Awaited<ReturnType<typeof upsertAutoPickOrder>>;
         }
         return await upsertAutoPickOrder(userId, normalizedDetailOrder);
       }
@@ -4170,7 +4182,13 @@ export async function refreshAutoPickOrderFromPlugin(
         platform: normalizedFallbackMatched.platform || String(lookup.platform || ""),
         orderNo: normalizedFallbackMatched.orderNo || String(lookup.orderNo || ""),
       });
-      return null;
+      return {
+        id: lookup.id || "",
+        orderNo: normalizedFallbackMatched.orderNo || String(lookup.orderNo || ""),
+        platform: normalizedFallbackMatched.platform || String(lookup.platform || ""),
+        status: "已删除",
+        isDeleted: true,
+      } as unknown as Awaited<ReturnType<typeof upsertAutoPickOrder>>;
     }
 
     return await upsertAutoPickOrder(userId, normalizedFallbackMatched);
@@ -4181,7 +4199,13 @@ export async function refreshAutoPickOrderFromPlugin(
       platform: matched.platform || String(lookup.platform || ""),
       orderNo: matched.orderNo || String(lookup.orderNo || ""),
     });
-    return null;
+    return {
+      id: lookup.id || "",
+      orderNo: matched.orderNo || String(lookup.orderNo || ""),
+      platform: matched.platform || String(lookup.platform || ""),
+      status: "已删除",
+      isDeleted: true,
+    } as unknown as Awaited<ReturnType<typeof upsertAutoPickOrder>>;
   }
 
   return await upsertAutoPickOrder(userId, matched);
@@ -4194,7 +4218,7 @@ async function findAutoPickOrderFromActiveStatusLists(
   const fallbackPlatform = String(lookup.platform || "").trim();
   const fallbackOrderNo = String(lookup.orderNo || "").trim();
   const canTrustLookupPlatform = Boolean(fallbackPlatform && fallbackPlatform !== "未知");
-  const activeStatuses: AutoPickSyncStatus[] = [
+  const activeStatuses = [
     "confirm",
     "subscribe",
     "delivery",
@@ -4203,7 +4227,9 @@ async function findAutoPickOrderFromActiveStatusLists(
     "expect",
     "remind",
     "meal",
-  ];
+    "cancel",
+    "refund",
+  ] as AutoPickSyncStatus[];
 
   for (const status of activeStatuses) {
     const orders = await fetchSimplifiedMaiyatianOrderListByCookie(cookie, status).catch(() => []);
