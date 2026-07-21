@@ -168,7 +168,7 @@ export function QuickEditTable({
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs sm:text-sm border-collapse">
             <thead>
-              <tr className="border-b border-border bg-muted/40 text-muted-foreground font-bold text-[11px] sm:text-xs">
+              <tr className="border-b border-border bg-muted/40 text-muted-foreground font-medium text-[11px] sm:text-xs">
                 <th className="py-3 px-3 w-12 text-center">#</th>
                 <th className="py-3 px-3 w-14 text-center">封面</th>
                 <th className="py-3 px-3 min-w-[140px]">商品名称 / 分类</th>
@@ -210,7 +210,7 @@ export function QuickEditTable({
 
                     {/* 商品名称 */}
                     <td className="py-2.5 px-3">
-                      <p className="font-bold text-foreground line-clamp-1 leading-snug">{item.name}</p>
+                      <p className="font-medium text-foreground line-clamp-1 leading-snug">{item.name}</p>
                       <div className="flex items-center gap-2 mt-0.5">
                         {item.categoryName && (
                           <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-muted text-muted-foreground font-medium">
@@ -233,10 +233,10 @@ export function QuickEditTable({
                         onChange={(e) => handleFieldChange(item.id, "sku", e.target.value, item)}
                         placeholder="暂无编号"
                         className={cn(
-                          "w-full h-9 px-3 rounded-xl border text-xs sm:text-sm font-mono transition-all outline-none bg-background",
+                          "w-full h-9 px-3 rounded-xl border text-xs sm:text-sm font-mono font-normal transition-all outline-none bg-background/80 dark:bg-white/5 placeholder:text-muted-foreground/40",
                           currentDraft.sku !== orig.sku
-                            ? "border-amber-500 ring-2 ring-amber-500/20 font-bold text-amber-600 dark:text-amber-400"
-                            : "border-border/80 focus:border-primary focus:ring-2 focus:ring-primary/20"
+                            ? "border-amber-500 bg-amber-500/10 dark:bg-amber-500/20 font-medium text-amber-600 dark:text-amber-400 ring-2 ring-amber-500/20"
+                            : "border-border/80 hover:border-border focus:border-primary focus:ring-2 focus:ring-primary/20 text-foreground"
                         )}
                       />
                     </td>
@@ -252,10 +252,10 @@ export function QuickEditTable({
                           value={currentDraft.costPrice}
                           onChange={(e) => handleFieldChange(item.id, "costPrice", e.target.value, item)}
                           className={cn(
-                            "w-full h-9 pl-6 pr-2.5 rounded-xl border text-xs sm:text-sm font-bold transition-all outline-none bg-background",
+                            "w-full h-9 pl-6 pr-2.5 rounded-xl border text-xs sm:text-sm font-normal transition-all outline-none bg-background/80 dark:bg-white/5",
                             currentDraft.costPrice !== orig.costPrice
-                              ? "border-amber-500 ring-2 ring-amber-500/20 text-amber-600 dark:text-amber-400"
-                              : "border-border/80 focus:border-primary focus:ring-2 focus:ring-primary/20"
+                              ? "border-amber-500 bg-amber-500/10 dark:bg-amber-500/20 font-medium text-amber-600 dark:text-amber-400 ring-2 ring-amber-500/20"
+                              : "border-border/80 hover:border-border focus:border-primary focus:ring-2 focus:ring-primary/20 text-foreground"
                           )}
                         />
                       </div>
