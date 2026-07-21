@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, Suspense, useMemo, useTransition, type ReactNode } from "react";
-import { Plus, ShoppingBag, Calendar, Trash2, Eye, Store, Package, Wallet, Archive, ReceiptText, Check, ArrowUp, X, FileSpreadsheet, FileText } from "lucide-react";
+import { Plus, ShoppingBag, Calendar, Trash2, Eye, Store, Package, Wallet, Archive, ReceiptText, Check, ArrowUp, X, FileSpreadsheet, FileText, Download, Loader2, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { PurchaseOrderModal } from "@/components/Purchases/PurchaseOrderModal";
 import { PurchaseOverviewModal } from "@/components/Purchases/PurchaseOverviewModal";
@@ -142,6 +142,17 @@ function PurchasesContent() {
     onConfirm: () => {},
     message: "",
   });
+  const [exportProgress, setExportProgress] = useState<{
+    isOpen: boolean;
+    title: string;
+    percentage: number;
+    currentStepText: string;
+  }>({
+    isOpen: false,
+    title: "",
+    percentage: 0,
+    currentStepText: "",
+  });
   const hasActiveFilters = searchQuery.trim() !== "" || statusFilter !== "Confirmed" || shopFilter !== "All";
 
   const resetFilters = useCallback(() => {
@@ -154,6 +165,13 @@ function PurchasesContent() {
     params.delete('status');
     replaceCurrentSearch(pathname, params);
   }, [searchParams, pathname]);
+
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    return () => setMounted(false);
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -666,7 +684,12 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
       tableColumns: { key: string; header: string; width: number; align: "center" | "left" }[] = [],
       columnsToInclude: string[] = []
     ) => {
-      showToast("正在准备高保真 A4 规范 PDF 导出数据，请稍候...", "info");
+      setExportProgress({
+        isOpen: true,
+        title: "正在准备 A4 高清 PDF...",
+        percentage: 10,
+        currentStepText: "正在初始化 PDF 渲染引擎...",
+      });
 
       try {
         const html2canvas = (await import("html2canvas")).default;
@@ -675,6 +698,13 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
         const now = new Date();
         const dateStr = `${now.toLocaleDateString("zh-CN")} ${now.toLocaleTimeString("zh-CN", { hour12: false })}`;
         const title = specificPO ? `采购单明细` : `进货汇总`;
+
+        setExportProgress({
+          isOpen: true,
+          title: "正在计算排版与布局...",
+          percentage: 20,
+          currentStepText: "动态计算 A4 尺寸与分页...",
+        });
 
         let displayAddress = "";
         if (columnsToInclude.includes("shippingAddress")) {
@@ -748,26 +778,24 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
           }
         }
 
-        // 3. 智能判断排版模式：
-        // 模式 A：网格大图画册模式 (只有勾选了图片 + 序号，且无任何其他属性时)
-        // 模式 B：列表/详细卡片模式 (只要勾选了名称、SKU、单价、数量或小计等任何其他属性，直接回归列表)
-        // 模式 C：纯文本表格模式 (未勾选图片时)
+        // 3. 智能计算极致紧凑的 A4 分页充实配额：
         const hasExtraAttributes = showName || showSku || showPrice || showQty || showSubtotal;
         const isGridCatalogMode = showImage && !hasExtraAttributes;
         const hasHeaderBanner = Boolean(displayAddress);
 
         let FIRST_PAGE_LIMIT = 5;
-        let OTHER_PAGE_LIMIT = 5;
+        let OTHER_PAGE_LIMIT = 6;
 
         if (isGridCatalogMode) {
-          FIRST_PAGE_LIMIT = hasHeaderBanner ? 6 : 9; // 3 列网格 (2 行 = 6, 3 行 = 9)
+          FIRST_PAGE_LIMIT = hasHeaderBanner ? 6 : 9;
           OTHER_PAGE_LIMIT = 9;
         } else if (!showImage) {
-          FIRST_PAGE_LIMIT = hasHeaderBanner ? 12 : 15;
-          OTHER_PAGE_LIMIT = 15;
+          FIRST_PAGE_LIMIT = hasHeaderBanner ? 13 : 16;
+          OTHER_PAGE_LIMIT = 17;
         } else {
-          FIRST_PAGE_LIMIT = hasHeaderBanner ? 4 : 5;
-          OTHER_PAGE_LIMIT = 5;
+          // 带主图的详细卡片模式 (高度 130px)
+          FIRST_PAGE_LIMIT = hasHeaderBanner ? 5 : 6;
+          OTHER_PAGE_LIMIT = 6; // 续页最大装载 6 个，充实度达到 92%，消除底部大面积留白
         }
 
         const pagesData: FlatItem[][] = [];
@@ -785,6 +813,13 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
         }
 
         const totalPages = pagesData.length;
+
+        setExportProgress({
+          isOpen: true,
+          title: "正在预抓取商品图片...",
+          percentage: 35,
+          currentStepText: `共 ${flatItems.length} 项数据，准备抓取主图...`,
+        });
 
         // 4. 创建离屏总容器
         const container = document.createElement("div");
@@ -1031,6 +1066,13 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
 
         document.body.appendChild(container);
 
+        setExportProgress({
+          isOpen: true,
+          title: "正在处理网页实物图片...",
+          percentage: 50,
+          currentStepText: "等待跨域与离屏图片加裁完成...",
+        });
+
         // 等待所有页面上的图片全部加载完成
         const images = Array.from(container.querySelectorAll("img"));
         await Promise.all(
@@ -1047,6 +1089,14 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
         const pdf = new jsPDF("p", "mm", "a4");
 
         for (let i = 0; i < pageNodes.length; i++) {
+          const pagePercent = 60 + Math.round(((i + 1) / pageNodes.length) * 35);
+          setExportProgress({
+            isOpen: true,
+            title: "正在生成 2X 4K 高清离屏页面...",
+            percentage: pagePercent,
+            currentStepText: `正在渲染 Canvas 第 ${i + 1}/${pageNodes.length} 页...`,
+          });
+
           const canvas = await html2canvas(pageNodes[i], {
             scale: 2,
             useCORS: true,
@@ -1058,17 +1108,30 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
           if (i > 0) {
             pdf.addPage();
           }
-          pdf.addImage(imgData, "JPEG", 0, 0, 210, 297); // 完整精准铺满 A4 (210mm x 297mm)
+          pdf.addImage(imgData, "JPEG", 0, 0, 210, 297);
         }
 
         document.body.removeChild(container);
 
+        setExportProgress({
+          isOpen: true,
+          title: "PDF 打包成功！",
+          percentage: 100,
+          currentStepText: "准备就绪，即将开始下载文件...",
+        });
+
         const timestamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}_${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}${String(now.getSeconds()).padStart(2, "0")}`;
         const filename = `${title}_${timestamp}.pdf`;
         pdf.save(filename);
+
+        setTimeout(() => {
+          setExportProgress((prev) => ({ ...prev, isOpen: false }));
+        }, 800);
+
         showToast(specificPO ? `已导出标准 A4 PDF 单据` : `已成功导出 ${targets.length} 张 A4 PDF 采购单`, "success");
       } catch (error) {
         console.error("PDF export failed:", error);
+        setExportProgress((prev) => ({ ...prev, isOpen: false }));
         showToast("生成 PDF 失败，请稍后重试", "error");
       }
     },
@@ -1104,7 +1167,12 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
       return;
     }
 
-    showToast("正在准备带有图片的导出数据，请稍候...", "info");
+    setExportProgress({
+      isOpen: true,
+      title: "正在构建 Excel 工作表...",
+      percentage: 15,
+      currentStepText: "正在初始化 ExcelJS 绘图引擎...",
+    });
 
     try {
       const ExcelJS = (await import("exceljs")).default;
@@ -1173,6 +1241,9 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
       let currentRowIndex = worksheet.rowCount + 1; // 动态计算下一个数据行的起始索引
       let totalQty = 0;
       let totalAmount = 0;
+
+      const totalItemsCount = targets.reduce((sum, t) => sum + t.items.length, 0);
+      let processedItemCount = 0;
       
       for (const po of targets) {
         const sortedItems = sortPurchaseItems(
@@ -1181,6 +1252,15 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
             item => item.shopProduct?.name || item.product?.name
         );
         for (const item of sortedItems) {
+          processedItemCount++;
+          const percent = 20 + Math.round((processedItemCount / totalItemsCount) * 65);
+          setExportProgress({
+            isOpen: true,
+            title: "正在转换导出数据...",
+            percentage: percent,
+            currentStepText: `正在转码图片与表格单元格 (${processedItemCount}/${totalItemsCount})...`,
+          });
+
           const qty = item.quantity || 0;
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const price = (item as any).price || item.costPrice || item.shopProduct?.costPrice || item.product?.costPrice || 0;
@@ -1346,6 +1426,13 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
         });
       });
       
+      setExportProgress({
+        isOpen: true,
+        title: "Excel 打包成功！",
+        percentage: 100,
+        currentStepText: "文件构建完毕，准备开始下载...",
+      });
+
       // 保存
       const buffer = await workbook.xlsx.writeBuffer();
       const filename = specificPO 
@@ -1353,13 +1440,19 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
           : `进货汇总_${formatLocalDate(new Date())}.xlsx`;
           
       saveAs(new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), filename);
+      
+      setTimeout(() => {
+        setExportProgress((prev) => ({ ...prev, isOpen: false }));
+      }, 800);
+
       showToast(specificPO ? `已导出单据` : `已导出 ${targets.length} 张单据`, "success");
       
     } catch (error) {
       console.error("Export failed:", error);
+      setExportProgress((prev) => ({ ...prev, isOpen: false }));
       showToast("导出失败，请重试", "error");
     }
-  }, [filteredPurchases, showToast, typedUser?.shippingAddresses, exportColumns]);
+  }, [filteredPurchases, showToast, typedUser?.shippingAddresses, exportColumns, handleExportPdf]);
 
   const handleExportClick = useCallback((specificPO?: PurchaseOrder) => {
     setExportTargetPO(specificPO);
@@ -1883,6 +1976,50 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
             </motion.button>
           )}
         </AnimatePresence>,
+        document.body
+      )}
+
+      {/* 实时导出进度通知 Modal */}
+      {mounted && exportProgress.isOpen && createPortal(
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-sm rounded-3xl bg-card border border-border/80 p-6 shadow-2xl space-y-5 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center gap-3.5">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                {exportProgress.percentage >= 100 ? (
+                  <CheckCircle2 className="h-6 w-6 text-emerald-500" />
+                ) : (
+                  <Loader2 className="h-6 w-6 animate-spin text-amber-500" />
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <h3 className="font-bold text-base text-foreground leading-tight truncate">
+                  {exportProgress.title}
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {exportProgress.percentage >= 100 ? "准备工作已就绪" : "正在后台处理中，请稍候..."}
+                </p>
+              </div>
+            </div>
+
+            {/* 实时百分比与进度条 */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs font-semibold">
+                <span className="text-muted-foreground truncate max-w-[210px]">
+                  {exportProgress.currentStepText}
+                </span>
+                <span className="text-amber-600 dark:text-amber-400 font-mono text-sm font-bold">
+                  {Math.min(100, Math.round(exportProgress.percentage))}%
+                </span>
+              </div>
+              <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted">
+                <div
+                  className="h-full bg-gradient-to-r from-amber-500 via-amber-400 to-emerald-500 transition-all duration-300 ease-out"
+                  style={{ width: `${Math.min(100, Math.max(3, exportProgress.percentage))}%` }}
+                />
+              </div>
+            </div>
+          </div>
+        </div>,
         document.body
       )}
 
