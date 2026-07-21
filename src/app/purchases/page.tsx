@@ -1435,9 +1435,8 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
 
       // 保存
       const buffer = await workbook.xlsx.writeBuffer();
-      const filename = specificPO 
-          ? `采购单_${specificPO.id}_${formatLocalDate(new Date())}.xlsx`
-          : `进货汇总_${formatLocalDate(new Date())}.xlsx`;
+      const timestamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}_${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}${String(now.getSeconds()).padStart(2, "0")}`;
+      const filename = `${title}_${timestamp}.xlsx`;
           
       saveAs(new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), filename);
       
