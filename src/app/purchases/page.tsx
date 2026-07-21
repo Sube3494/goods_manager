@@ -757,9 +757,10 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
           }
         }
 
-        // 3. 计算物理分页（首页受收货地址与店铺影响，能容纳 6 条；续页能容纳 8 条）
-        const FIRST_PAGE_LIMIT = displayAddress || displayShopName ? 5 : 6;
-        const OTHER_PAGE_LIMIT = 7;
+        // 3. 计算物理分页（卡片式大图排版，首页放 4-5 个商品卡片，续页放 5 个）
+        const hasHeaderBanner = Boolean(displayAddress || displayShopName);
+        const FIRST_PAGE_LIMIT = hasHeaderBanner ? 4 : 5;
+        const OTHER_PAGE_LIMIT = 5;
 
         const pagesData: FlatItem[][] = [];
         let remaining = [...flatItems];
@@ -785,7 +786,7 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
         container.style.display = "flex";
         container.style.flexDirection = "column";
         container.style.gap = "40px";
-        container.style.backgroundColor = "#e5e7eb"; // 灰底便于切页边界隔断
+        container.style.backgroundColor = "#e5e7eb";
 
         const pageNodes: HTMLElement[] = [];
 
@@ -812,14 +813,14 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
           if (isFirstPage) {
             html += `
               <div style="text-align: center; margin-bottom: 16px;">
-                <h1 style="font-size: 22px; font-weight: 800; margin: 0 0 4px 0; color: #111827;">${title}</h1>
+                <h1 style="font-size: 24px; font-weight: 800; margin: 0 0 4px 0; color: #111827; letter-spacing: -0.5px;">${title}</h1>
                 <p style="font-size: 11px; color: #6b7280; margin: 0;">生成时间：${dateStr}</p>
               </div>
             `;
 
             if (displayAddress) {
               html += `
-                <div style="background-color: #fef2f2; border: 1.5px solid #fecaca; border-radius: 10px; padding: 10px 14px; margin-bottom: 10px;">
+                <div style="background-color: #fef2f2; border: 1.5px solid #fecaca; border-radius: 12px; padding: 12px 16px; margin-bottom: 12px;">
                   <p style="font-size: 15px; font-weight: 800; color: #dc2626; margin: 0; word-break: break-all;">收货地址：${displayAddress}</p>
                 </div>
               `;
@@ -827,98 +828,79 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
 
             if (displayShopName) {
               html += `
-                <div style="background-color: #eff6ff; border: 1.5px solid #bfdbfe; border-radius: 10px; padding: 8px 14px; margin-bottom: 14px;">
+                <div style="background-color: #eff6ff; border: 1.5px solid #bfdbfe; border-radius: 12px; padding: 10px 16px; margin-bottom: 16px;">
                   <p style="font-size: 13px; font-weight: 800; color: #2563eb; margin: 0;">收货店铺：${displayShopName}</p>
                 </div>
               `;
             }
           } else {
             html += `
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; border-b: 2px solid #111827; padding-bottom: 6px;">
-                <h2 style="font-size: 14px; font-weight: 800; margin: 0; color: #111827;">${title} (续页)</h2>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 2px solid #111827; padding-bottom: 8px;">
+                <h2 style="font-size: 15px; font-weight: 800; margin: 0; color: #111827;">${title} (续页)</h2>
                 <span style="font-size: 11px; color: #6b7280;">${dateStr}</span>
               </div>
             `;
           }
 
-          // 表格区域 (使用 table-layout: fixed 和精确 col width)
-          html += `
-            <div style="flex: 1; overflow: hidden;">
-              <table style="width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 12px; margin-top: 4px;">
-                <colgroup>
-                  ${normalizedCols.map((c) => `<col style="width: ${c.widthPct};" />`).join("")}
-                </colgroup>
-                <thead>
-                  <tr style="background-color: #f3f4f6;">
-                    ${normalizedCols
-                      .map(
-                        (col) =>
-                          `<th style="border: 1px solid #d1d5db; padding: 8px 6px; text-align: ${col.align}; font-weight: 800; color: #374151; font-size: 11px;">${col.header}</th>`
-                      )
-                      .join("")}
-                  </tr>
-                </thead>
-                <tbody>
-          `;
+          // 放弃死板的固定多表格，采用清晰图文采购卡片列表！
+          html += `<div style="flex: 1; display: flex; flex-direction: column; gap: 14px; overflow: hidden;">`;
 
           for (const rowItem of pageItems) {
-            html += `<tr style="border-bottom: 1px solid #e5e7eb;">`;
+            html += `
+              <div style="border: 1px solid #e5e7eb; border-radius: 14px; padding: 14px 16px; background-color: #ffffff; display: flex; gap: 18px; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
+                <!-- 左侧：100px x 100px 超清大图 -->
+                <div style="width: 100px; height: 100px; min-width: 100px; border-radius: 10px; overflow: hidden; border: 1px solid #f3f4f6; background-color: #f9fafb; display: flex; align-items: center; justify-content: center;">
+                  ${
+                    rowItem.imageUrl
+                      ? `<img src="${rowItem.imageUrl}" style="width: 100%; height: 100%; object-fit: cover;" />`
+                      : `<span style="color: #9ca3af; font-size: 11px;">无主图</span>`
+                  }
+                </div>
+                
+                <!-- 右侧：商品详情与采购属性区 -->
+                <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px;">
+                  <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;">
+                    <h3 style="font-size: 15px; font-weight: 800; color: #111827; margin: 0; line-height: 1.35; word-break: break-all;">
+                      <span style="display: inline-block; background-color: #f3f4f6; color: #4b5563; padding: 2px 8px; border-radius: 6px; font-size: 12px; font-weight: 800; margin-right: 8px;"># ${rowItem.globalIndex}</span>
+                      ${rowItem.productName}
+                    </h3>
+                  </div>
 
-            tableColumns.forEach((col) => {
-              if (col.key === "index") {
-                html += `<td style="border: 1px solid #d1d5db; padding: 6px 4px; text-align: center; font-size: 11px;">${rowItem.globalIndex}</td>`;
-              } else if (col.key === "image") {
-                html += `
-                  <td style="border: 1px solid #d1d5db; padding: 4px; text-align: center;">
-                    ${
-                      rowItem.imageUrl
-                        ? `<img src="${rowItem.imageUrl}" style="width: 54px; height: 54px; object-fit: cover; border-radius: 6px; border: 1px solid #e5e7eb; display: block; margin: 0 auto;" />`
-                        : `<span style="color: #9ca3af; font-size: 10px;">无图</span>`
-                    }
-                  </td>
-                `;
-              } else if (col.key === "name") {
-                html += `<td style="border: 1px solid #d1d5db; padding: 6px 8px; text-align: left; font-weight: 500; font-size: 11px; line-height: 1.3; word-break: break-all;">${rowItem.productName}</td>`;
-              } else if (col.key === "sku") {
-                html += `<td style="border: 1px solid #d1d5db; padding: 6px; text-align: center; color: #4b5563; font-family: monospace; font-size: 10px; word-break: break-all;">${rowItem.sku}</td>`;
-              } else if (col.key === "price") {
-                html += `<td style="border: 1px solid #d1d5db; padding: 6px 4px; text-align: center; font-size: 11px;">¥${rowItem.price.toFixed(2)}</td>`;
-              } else if (col.key === "quantity") {
-                html += `<td style="border: 1px solid #d1d5db; padding: 6px 4px; text-align: center; font-weight: bold; color: #111827; font-size: 11px;">${rowItem.quantity}</td>`;
-              } else if (col.key === "subtotal") {
-                html += `<td style="border: 1px solid #d1d5db; padding: 6px 4px; text-align: center; font-weight: bold; color: #059669; font-size: 11px;">¥${rowItem.subtotal.toFixed(2)}</td>`;
-              }
-            });
+                  ${
+                    rowItem.sku
+                      ? `<div style="font-size: 12px; color: #4b5563; font-family: monospace;">SKU / 编码: <strong style="color: #111827; background-color: #f3f4f6; padding: 2px 6px; border-radius: 4px;">${rowItem.sku}</strong></div>`
+                      : ""
+                  }
 
-            html += `</tr>`;
+                  <div style="display: flex; gap: 24px; align-items: center; margin-top: 2px; padding-top: 8px; border-top: 1px dashed #e5e7eb;">
+                    <div style="font-size: 13px; color: #4b5563;">进货单价: <strong style="color: #111827;">¥${rowItem.price.toFixed(2)}</strong></div>
+                    <div style="font-size: 13px; color: #4b5563;">采购数量: <strong style="font-size: 16px; color: #2563eb;">${rowItem.quantity}</strong></div>
+                    <div style="font-size: 13px; color: #059669; margin-left: auto;">小计: <strong style="font-size: 17px; font-weight: 800;">¥${rowItem.subtotal.toFixed(2)}</strong></div>
+                  </div>
+                </div>
+              </div>
+            `;
           }
 
-          // 如果是最后一页，追加合计行
+          html += `</div>`;
+
+          // 如果是最后一页，追加底部总计卡片
           if (isLastPage) {
-            const showQtyCol = tableColumns.some((c) => c.key === "quantity");
-            const showSubtotalCol = tableColumns.some((c) => c.key === "subtotal");
-
-            if (showQtyCol || showSubtotalCol) {
-              html += `
-                <tr style="background-color: #f9fafb; font-weight: bold;">
-                  <td colspan="${Math.max(1, tableColumns.length - (showQtyCol ? (showSubtotalCol ? 2 : 1) : 1))}" style="border: 1px solid #d1d5db; padding: 8px; text-align: right; font-size: 11px;">合计采购：</td>
-                  ${showQtyCol ? `<td style="border: 1px solid #d1d5db; padding: 8px 4px; text-align: center; color: #111827; font-size: 11px;">${totalQty}</td>` : ""}
-                  ${showSubtotalCol ? `<td style="border: 1px solid #d1d5db; padding: 8px 4px; text-align: center; color: #059669; font-size: 11px;">¥${totalAmount.toFixed(2)}</td>` : ""}
-                </tr>
-              `;
-            }
+            html += `
+              <div style="margin-top: 12px; background-color: #f9fafb; border: 1.5px solid #e5e7eb; border-radius: 12px; padding: 12px 18px; display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 14px; font-weight: 800; color: #374151;">全单采购汇总合计：</span>
+                <div style="display: flex; gap: 24px; align-items: center;">
+                  <span style="font-size: 13px; color: #4b5563;">总数量: <strong style="font-size: 16px; color: #111827;">${totalQty}</strong> 件</span>
+                  <span style="font-size: 13px; color: #059669;">总金额: <strong style="font-size: 18px; font-weight: 800;">¥${totalAmount.toFixed(2)}</strong></span>
+                </div>
+              </div>
+            `;
           }
-
-          html += `
-                </tbody>
-              </table>
-            </div>
-          `;
 
           // 5. 页脚页码
           html += `
-            <div style="margin-top: auto; pt-3; border-top: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center; font-size: 10px; color: #9ca3af;">
-              <span>Goods Manager 采购打印明细</span>
+            <div style="margin-top: auto; padding-top: 12px; border-top: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center; font-size: 10px; color: #9ca3af;">
+              <span>Goods Manager 采购打印单</span>
               <span>第 ${pageIdx + 1} 页 / 共 ${totalPages} 页</span>
             </div>
           `;
