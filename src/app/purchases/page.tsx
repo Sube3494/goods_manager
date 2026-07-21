@@ -828,8 +828,8 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
 
             if (displayAddress) {
               html += `
-                <div style="background-color: #fef2f2; border: 1.5px solid #fecaca; border-radius: 12px; padding: 12px 16px; margin-bottom: 16px;">
-                  <p style="font-size: 15px; font-weight: 800; color: #dc2626; margin: 0; word-break: break-all;">收货地址：${displayAddress}</p>
+                <div style="background-color: #fef2f2; border: 1.5px solid #fecaca; border-radius: 12px; padding: 12px 20px; margin-bottom: 16px; display: flex; align-items: center; justify-content: center; text-align: center; box-sizing: border-box;">
+                  <p style="font-size: 15px; font-weight: 800; color: #dc2626; margin: 0; text-align: center; line-height: 1.4; word-break: break-all;">收货地址：${displayAddress}</p>
                 </div>
               `;
             }
@@ -886,7 +886,7 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
                     ${
                       showSku && rowItem.sku
                         ? `
-                          <div style="display: inline-flex; align-items: center; justify-content: center; height: 22px; padding: 0 8px; background-color: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 6px; color: #0f172a; font-size: 11px; font-weight: 700; font-family: system-ui, -apple-system, sans-serif; margin-top: 2px;">
+                          <div style="display: inline-block; height: 20px; line-height: 18px; padding: 0 8px; background-color: #f1f5f9; border: 1.2px solid #cbd5e1; border-radius: 6px; color: #0f172a; font-size: 11px; font-weight: 700; font-family: system-ui, -apple-system, sans-serif; margin-top: 2px; box-sizing: border-box; text-align: center; vertical-align: middle;">
                             ${rowItem.sku}
                           </div>
                         `
@@ -956,7 +956,7 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
                               ? `
                                 <div style="font-size: 12px; color: #334155; font-weight: 600; display: flex; align-items: center;">
                                   <span>SKU / 编码:</span>
-                                  <span style="display: inline-flex; align-items: center; justify-content: center; height: 22px; padding: 0 8px; background-color: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 6px; color: #0f172a; font-size: 12px; font-weight: 700; font-family: system-ui, -apple-system, sans-serif; margin-left: 6px;">
+                                  <span style="display: inline-block; height: 20px; line-height: 18px; padding: 0 8px; background-color: #f1f5f9; border: 1.2px solid #cbd5e1; border-radius: 6px; color: #0f172a; font-size: 12px; font-weight: 700; font-family: system-ui, -apple-system, sans-serif; margin-left: 6px; box-sizing: border-box; vertical-align: middle; text-align: center;">
                                     ${rowItem.sku}
                                   </span>
                                 </div>
