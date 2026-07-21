@@ -7,7 +7,7 @@ import { Shop, StatsData } from "@/lib/types";
 import { PromotionCalendarModal } from "@/app/orders/PromotionCalendarModal";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { DatePicker } from "@/components/ui/DatePicker";
-import { cn } from "@/lib/utils";
+import { cn, getPlatformMeta } from "@/lib/utils";
 
 function Panel({
   title,
@@ -161,12 +161,16 @@ function ChartTooltip({
       <div className="mt-2.5 space-y-2">
         {platformEntries.length > 0 ? (
           platformEntries.map(([platform, amount]) => {
-            const icon = platform.includes("美团") ? "⚡" : platform.includes("淘宝") || platform.includes("天猫") ? "🛍️" : platform.includes("京东") ? "🔴" : "🏪";
+            const meta = getPlatformMeta(platform);
             return (
               <div key={platform} className="flex items-center justify-between gap-4 text-xs">
                 <span className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300 font-semibold">
-                  <span>{icon}</span>
-                  <span>{platform}:</span>
+                  {meta?.iconSrc ? (
+                    <img src={meta.iconSrc} alt={platform} className="h-3.5 w-3.5 object-contain shrink-0" />
+                  ) : (
+                    <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-500" />
+                  )}
+                  <span>{meta?.name || platform}:</span>
                 </span>
                 <span className={cn("font-bold tabular-nums", amount < 0 ? "text-rose-500" : "text-emerald-600 dark:text-emerald-400")}>
                   {money(amount)}
