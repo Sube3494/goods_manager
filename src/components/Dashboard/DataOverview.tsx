@@ -148,7 +148,9 @@ function ChartTooltip({
 
   const dataPoint = payload[0]?.payload;
   const platformProfits = dataPoint?.platformPureProfit || {};
-  const platformEntries = Object.entries(platformProfits).filter(([, val]) => val !== 0 || Object.keys(platformProfits).length <= 1);
+  const platformEntries = Object.entries(platformProfits)
+    .filter(([, val]) => val !== 0 || Object.keys(platformProfits).length <= 1)
+    .sort(([, a], [, b]) => (b as number) - (a as number));
   const totalPureProfit = dataPoint?.pureProfit ?? 0;
 
   return (
@@ -164,16 +166,11 @@ function ChartTooltip({
             const meta = getPlatformMeta(platform);
             return (
               <div key={platform} className="flex items-center justify-between gap-4 text-xs">
-                <span className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300 font-semibold">
-                  {meta?.iconSrc ? (
-                    <img src={meta.iconSrc} alt={platform} className="h-3.5 w-3.5 object-contain shrink-0" />
-                  ) : (
-                    <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-500" />
-                  )}
-                  <span>{meta?.name || platform}:</span>
+                <span className="text-slate-700 dark:text-slate-300 font-semibold">
+                  {meta?.name || platform}:
                 </span>
-                <span className={cn("font-bold tabular-nums", amount < 0 ? "text-rose-500" : "text-emerald-600 dark:text-emerald-400")}>
-                  {money(amount)}
+                <span className={cn("font-bold tabular-nums", (amount as number) < 0 ? "text-rose-500" : "text-emerald-600 dark:text-emerald-400")}>
+                  {money(amount as number)}
                 </span>
               </div>
             );
