@@ -979,11 +979,11 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
   );
 
   const handleExport = useCallback(async (specificPO?: PurchaseOrder, columnsToInclude: string[] = exportColumns, format: "excel" | "pdf" = "excel") => {
-    // 过滤得到需要的表格列
+    // 过滤得到需要的表格列 (商品名称改为居中对齐)
     const tableColumns = [
       { key: "index", header: "序号", width: 8, align: "center" as const },
       { key: "image", header: "商品图片", width: 18, align: "center" as const },
-      { key: "name", header: "商品名称", width: 35, align: "left" as const },
+      { key: "name", header: "商品名称", width: 35, align: "center" as const },
       { key: "sku", header: "货品编码", width: 18, align: "center" as const },
       { key: "price", header: "单价", width: 12, align: "center" as const },
       { key: "quantity", header: "数量", width: 12, align: "center" as const },
@@ -1056,26 +1056,6 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
         addressCell.font = { size: 14, bold: true, color: { argb: 'FFFF0000' } }; 
         addressCell.alignment = { horizontal: 'left', vertical: 'middle', wrapText: false };
         worksheet.getRow(addrRowIdx).height = 25;
-      }
-      
-      // 添加店铺名称
-      let displayShopName = "";
-      if (columnsToInclude.includes("shopName")) {
-        if (specificPO) {
-          displayShopName = specificPO.shopName || "";
-        } else if (targets.length > 0) {
-          displayShopName = targets.map(t => t.shopName).filter(Boolean).join(", ") || "";
-        }
-      }
-
-      if (displayShopName) {
-        worksheet.addRow([`收货店铺：${displayShopName}`]);
-        const shopRowIdx = worksheet.rowCount;
-        worksheet.mergeCells(`A${shopRowIdx}:${lastColLetter}${shopRowIdx}`);
-        const shopCell = worksheet.getCell(`A${shopRowIdx}`);
-        shopCell.font = { size: 12, bold: true, color: { argb: 'FF0000FF' } }; 
-        shopCell.alignment = { horizontal: 'left', vertical: 'middle', wrapText: false };
-        worksheet.getRow(shopRowIdx).height = 22;
       }
 
       // 添加空行
