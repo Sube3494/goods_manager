@@ -738,21 +738,10 @@ export async function GET(request: NextRequest) {
       brushExpense: 0,
       promotionExpense: 0,
       pureProfit: 0,
+      platformPureProfit: {} as Record<string, number>,
     });
 
-    const businessTrendMap = new Map<string, {
-      trueOrderCount: number;
-      brushOrderCount: number;
-      otherOrderCount: number;
-      userPaid: number;
-      brushPaid: number;
-      platformCommission: number;
-      deliveryExpense: number;
-      productCost: number;
-      brushExpense: number;
-      promotionExpense: number;
-      pureProfit: number;
-    }>();
+    const businessTrendMap = new Map<string, ReturnType<typeof createTrendBucket>>();
     dateSeries.forEach((item) => {
       businessTrendMap.set(item.date, createTrendBucket());
     });
@@ -857,10 +846,12 @@ export async function GET(request: NextRequest) {
           if (point) {
             point.brushPaid = FinanceMath.add(point.brushPaid, adjustedPaidYuan);
             point.pureProfit = FinanceMath.add(point.pureProfit, -commissionYuan - deliveryYuan - defaultBrushCommission - returnExtraExpenseYuan);
+            point.platformPureProfit[platform] = FinanceMath.add(point.platformPureProfit[platform] || 0, -commissionYuan - deliveryYuan - defaultBrushCommission - returnExtraExpenseYuan);
           }
           if (platformPoint) {
             platformPoint.brushPaid = FinanceMath.add(platformPoint.brushPaid, adjustedPaidYuan);
             platformPoint.pureProfit = FinanceMath.add(platformPoint.pureProfit, -commissionYuan - deliveryYuan - defaultBrushCommission - returnExtraExpenseYuan);
+            platformPoint.platformPureProfit[platform] = FinanceMath.add(platformPoint.platformPureProfit[platform] || 0, -commissionYuan - deliveryYuan - defaultBrushCommission - returnExtraExpenseYuan);
           }
         } else {
           const orderCostYuan = orderCostMeta?.productCost || 0;
@@ -887,9 +878,11 @@ export async function GET(request: NextRequest) {
 
           if (point) {
             point.pureProfit = FinanceMath.add(point.pureProfit, pureProfit);
+            point.platformPureProfit[platform] = FinanceMath.add(point.platformPureProfit[platform] || 0, pureProfit);
           }
           if (platformPoint) {
             platformPoint.pureProfit = FinanceMath.add(platformPoint.pureProfit, pureProfit);
+            platformPoint.platformPureProfit[platform] = FinanceMath.add(platformPoint.platformPureProfit[platform] || 0, pureProfit);
           }
         }
       } else {
@@ -958,6 +951,7 @@ export async function GET(request: NextRequest) {
           brushExpense: point?.brushExpense || 0,
           promotionExpense: point?.promotionExpense || 0,
           pureProfit: point?.pureProfit || 0,
+          platformPureProfit: point?.platformPureProfit || {},
           netProfit: profit,
         };
       });
