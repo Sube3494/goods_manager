@@ -833,17 +833,28 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
             `;
           }
 
-          // 采购卡片列表：高对比度、清晰防淡化渲染，且精准响应用户的勾选配置
+          // 采购卡片列表：高对比度、极其规整的固定序列 + 图文详情布局
           html += `<div style="flex: 1; display: flex; flex-direction: column; gap: 14px; overflow: hidden;">`;
 
           for (const rowItem of pageItems) {
             html += `
-              <div style="border: 1.5px solid #cbd5e1; border-radius: 14px; padding: 14px 16px; background-color: #ffffff; display: flex; gap: 18px; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.04);">
-                <!-- 左侧主图（受 showImage 控制） -->
+              <div style="border: 1.5px solid #cbd5e1; border-radius: 14px; padding: 14px 16px; background-color: #ffffff; display: flex; gap: 16px; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.04);">
+                <!-- 1. 最左侧：绝对固定、极为规整的序号圆形徽章（受 showIndex 控制） -->
+                ${
+                  showIndex
+                    ? `
+                      <div style="width: 32px; height: 32px; min-width: 32px; border-radius: 50%; background-color: #f1f5f9; border: 1.5px solid #94a3b8; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; color: #0f172a; flex-shrink: 0;">
+                        ${rowItem.globalIndex}
+                      </div>
+                    `
+                    : ""
+                }
+
+                <!-- 2. 中间：100px x 100px 超清主图（受 showImage 控制） -->
                 ${
                   showImage
                     ? `
-                      <div style="width: 104px; height: 104px; min-width: 104px; border-radius: 10px; overflow: hidden; border: 1.5px solid #cbd5e1; background-color: #f8fafc; display: flex; align-items: center; justify-content: center;">
+                      <div style="width: 104px; height: 104px; min-width: 104px; border-radius: 10px; overflow: hidden; border: 1.5px solid #cbd5e1; background-color: #f8fafc; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
                         ${
                           rowItem.imageUrl
                             ? `<img src="${rowItem.imageUrl}" style="width: 100%; height: 100%; object-fit: cover;" />`
@@ -854,39 +865,42 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
                     : ""
                 }
                 
-                <!-- 右侧详情区（受 showIndex, showName, showSku, showPrice, showQty, showSubtotal 控制） -->
-                <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px;">
-                  ${
-                    showIndex || showName
-                      ? `
-                        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;">
-                          <h3 style="font-size: 16px; font-weight: 800; color: #09090b; margin: 0; line-height: 1.35; word-break: break-all;">
-                            ${showIndex ? `<span style="display: inline-block; background-color: #0f172a; color: #ffffff; padding: 2px 9px; border-radius: 6px; font-size: 12px; font-weight: 800; margin-right: 8px;"># ${rowItem.globalIndex}</span>` : ""}
-                            ${showName ? rowItem.productName : ""}
-                          </h3>
-                        </div>
-                      `
-                      : ""
-                  }
+                <!-- 3. 右侧详情区（仅当勾选了名称、SKU、单价、数量或小计时渲染） -->
+                ${
+                  showName || showSku || showPrice || showQty || showSubtotal
+                    ? `
+                      <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px;">
+                        ${
+                          showName
+                            ? `
+                              <h3 style="font-size: 16px; font-weight: 800; color: #09090b; margin: 0; line-height: 1.35; word-break: break-all;">
+                                ${rowItem.productName}
+                              </h3>
+                            `
+                            : ""
+                        }
 
-                  ${
-                    showSku && rowItem.sku
-                      ? `<div style="font-size: 12px; color: #334155; font-family: monospace; font-weight: 600;">SKU / 编码: <strong style="color: #0f172a; background-color: #f1f5f9; border: 1px solid #cbd5e1; padding: 2px 8px; border-radius: 4px; font-weight: 800;">${rowItem.sku}</strong></div>`
-                      : ""
-                  }
+                        ${
+                          showSku && rowItem.sku
+                            ? `<div style="font-size: 12px; color: #334155; font-family: monospace; font-weight: 600;">SKU / 编码: <strong style="color: #0f172a; background-color: #f1f5f9; border: 1px solid #cbd5e1; padding: 2px 8px; border-radius: 4px; font-weight: 800;">${rowItem.sku}</strong></div>`
+                            : ""
+                        }
 
-                  ${
-                    showPrice || showQty || showSubtotal
-                      ? `
-                        <div style="display: flex; gap: 24px; align-items: center; margin-top: 2px; padding-top: 8px; border-top: 1.5px dashed #cbd5e1;">
-                          ${showPrice ? `<div style="font-size: 13px; color: #334155; font-weight: 600;">进货单价: <strong style="color: #0f172a; font-size: 14px; font-weight: 800;">¥${rowItem.price.toFixed(2)}</strong></div>` : ""}
-                          ${showQty ? `<div style="font-size: 13px; color: #334155; font-weight: 600;">采购数量: <strong style="font-size: 17px; color: #1d4ed8; font-weight: 800;">${rowItem.quantity}</strong></div>` : ""}
-                          ${showSubtotal ? `<div style="font-size: 13px; color: #047857; font-weight: 600; margin-left: auto;">小计: <strong style="font-size: 18px; font-weight: 800;">¥${rowItem.subtotal.toFixed(2)}</strong></div>` : ""}
-                        </div>
-                      `
-                      : ""
-                  }
-                </div>
+                        ${
+                          showPrice || showQty || showSubtotal
+                            ? `
+                              <div style="display: flex; gap: 24px; align-items: center; margin-top: 2px; padding-top: 8px; border-top: 1.5px dashed #cbd5e1;">
+                                ${showPrice ? `<div style="font-size: 13px; color: #334155; font-weight: 600;">进货单价: <strong style="color: #0f172a; font-size: 14px; font-weight: 800;">¥${rowItem.price.toFixed(2)}</strong></div>` : ""}
+                                ${showQty ? `<div style="font-size: 13px; color: #334155; font-weight: 600;">采购数量: <strong style="font-size: 17px; color: #1d4ed8; font-weight: 800;">${rowItem.quantity}</strong></div>` : ""}
+                                ${showSubtotal ? `<div style="font-size: 13px; color: #047857; font-weight: 600; margin-left: auto;">小计: <strong style="font-size: 18px; font-weight: 800;">¥${rowItem.subtotal.toFixed(2)}</strong></div>` : ""}
+                              </div>
+                            `
+                            : ""
+                        }
+                      </div>
+                    `
+                    : ""
+                }
               </div>
             `;
           }
