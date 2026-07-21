@@ -749,10 +749,11 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
         }
 
         // 3. 智能判断排版模式：
-        // 模式 A：网格大图画册模式 (当包含图片且勾选属性 <= 3 时，如只选了序号 + 图片 + 名称)
-        // 模式 B：详细采购卡片模式 (当包含图片且勾选较多属性，如包含单价、数量、小计等)
-        // 模式 C：纯文本表格模式 (当未勾选图片时)
-        const isGridCatalogMode = showImage && tableColumns.length <= 3;
+        // 模式 A：网格大图画册模式 (只有勾选了图片 + 序号，且无任何其他属性时)
+        // 模式 B：列表/详细卡片模式 (只要勾选了名称、SKU、单价、数量或小计等任何其他属性，直接回归列表)
+        // 模式 C：纯文本表格模式 (未勾选图片时)
+        const hasExtraAttributes = showName || showSku || showPrice || showQty || showSubtotal;
+        const isGridCatalogMode = showImage && !hasExtraAttributes;
         const hasHeaderBanner = Boolean(displayAddress);
 
         let FIRST_PAGE_LIMIT = 5;
