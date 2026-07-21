@@ -820,9 +820,9 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
 
           if (isFirstPage) {
             html += `
-              <div style="text-align: center; margin-bottom: 16px;">
-                <h1 style="font-size: 24px; font-weight: 800; margin: 0 0 4px 0; color: #111827; letter-spacing: -0.5px;">${title}</h1>
-                <p style="font-size: 11px; color: #6b7280; margin: 0;">生成时间：${dateStr}</p>
+              <div style="width: 100%; text-align: center; margin-bottom: 20px; box-sizing: border-box;">
+                <h1 style="font-size: 24px; font-weight: 800; margin: 0 auto 6px auto; color: #111827; letter-spacing: -0.5px; line-height: 1.3; text-align: center;">${title}</h1>
+                <p style="font-size: 12px; color: #64748b; margin: 0; text-align: center;">生成时间：${dateStr}</p>
               </div>
             `;
 
@@ -885,7 +885,11 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
 
                     ${
                       showSku && rowItem.sku
-                        ? `<div style="font-size: 11px; color: #334155; font-family: monospace; font-weight: 600; background-color: #f1f5f9; border: 1px solid #cbd5e1; padding: 1px 6px; border-radius: 4px; margin-top: 2px;">${rowItem.sku}</div>`
+                        ? `
+                          <div style="display: inline-flex; align-items: center; justify-content: center; height: 22px; padding: 0 8px; background-color: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 6px; color: #0f172a; font-size: 11px; font-weight: 700; font-family: system-ui, -apple-system, sans-serif; margin-top: 2px;">
+                            ${rowItem.sku}
+                          </div>
+                        `
                         : ""
                     }
                   </div>
@@ -949,7 +953,14 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
 
                           ${
                             showSku && rowItem.sku
-                              ? `<div style="font-size: 12px; color: #334155; font-family: monospace; font-weight: 600;">SKU / 编码: <strong style="color: #0f172a; background-color: #f1f5f9; border: 1px solid #cbd5e1; padding: 2px 8px; border-radius: 4px; font-weight: 800;">${rowItem.sku}</strong></div>`
+                              ? `
+                                <div style="font-size: 12px; color: #334155; font-weight: 600; display: flex; align-items: center;">
+                                  <span>SKU / 编码:</span>
+                                  <span style="display: inline-flex; align-items: center; justify-content: center; height: 22px; padding: 0 8px; background-color: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 6px; color: #0f172a; font-size: 12px; font-weight: 700; font-family: system-ui, -apple-system, sans-serif; margin-left: 6px;">
+                                    ${rowItem.sku}
+                                  </span>
+                                </div>
+                              `
                               : ""
                           }
 
@@ -1893,7 +1904,6 @@ function ExportSettingsModal({ isOpen, onClose, onConfirm, selectedColumns, onCh
 
   const allColumns = [
     { key: "shippingAddress", label: "收货地址 (外部信息)", desc: "在表格/文档上方以红色特大字体展示采购收货详细地址" },
-    { key: "shopName", label: "店铺名称 (外部信息)", desc: "在表格/文档上方以蓝色字体展示收货的店铺名称" },
     { key: "index", label: "序号", desc: "明细列：显示商品排列序号 (1, 2, 3...)" },
     { key: "image", label: "商品图片", desc: "明细列：在导出中嵌入商品实物缩略图" },
     { key: "name", label: "商品名称", desc: "明细列：商品详细标题" },
