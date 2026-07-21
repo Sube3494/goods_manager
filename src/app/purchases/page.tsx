@@ -828,8 +828,8 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
 
             if (displayAddress) {
               html += `
-                <div style="background-color: #fef2f2; border: 1.5px solid #fecaca; border-radius: 12px; padding: 12px 20px; margin-bottom: 16px; display: flex; align-items: center; justify-content: center; text-align: center; box-sizing: border-box;">
-                  <p style="font-size: 15px; font-weight: 800; color: #dc2626; margin: 0; text-align: center; line-height: 1.4; word-break: break-all;">收货地址：${displayAddress}</p>
+                <div style="width: 100%; background-color: #fef2f2; border: 1.5px solid #fecaca; border-radius: 12px; padding: 12px 16px; margin-bottom: 16px; box-sizing: border-box;">
+                  <p style="font-size: 15px; font-weight: 800; color: #dc2626; margin: 0; text-align: center; line-height: 1.4; word-break: break-all; width: 100%;">收货地址：${displayAddress}</p>
                 </div>
               `;
             }
@@ -964,13 +964,15 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
                             showSku && rowItem.sku
                               ? (() => {
                                   const textStr = String(rowItem.sku);
-                                  const skuW = Math.max(52, textStr.length * 8.5 + 16);
+                                  const skuBadgeW = Math.max(50, textStr.length * 8.5 + 16);
+                                  const labelW = 76;
+                                  const totalW = labelW + skuBadgeW;
                                   return `
-                                    <div style="font-size: 12px; color: #334155; font-weight: 600; display: flex; align-items: center; gap: 6px;">
-                                      <span>SKU / 编码:</span>
-                                      <svg width="${skuW}" height="22" viewBox="0 0 ${skuW} 22" style="display: block; flex-shrink: 0;">
-                                        <rect x="0.5" y="0.5" width="${skuW - 1}" height="21" rx="5" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1" />
-                                        <text x="${skuW / 2}" y="11.5" text-anchor="middle" dominant-baseline="central" fill="#0f172a" font-size="12" font-weight="700" font-family="system-ui, -apple-system, sans-serif">
+                                    <div style="height: 22px; margin-top: 1px;">
+                                      <svg width="${totalW}" height="22" viewBox="0 0 ${totalW} 22" style="display: block;">
+                                        <text x="0" y="11.5" dominant-baseline="central" fill="#334155" font-size="12" font-weight="600" font-family="system-ui, -apple-system, sans-serif">SKU / 编码:</text>
+                                        <rect x="${labelW + 0.5}" y="0.5" width="${skuBadgeW - 1}" height="21" rx="5" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1" />
+                                        <text x="${labelW + skuBadgeW / 2}" y="11.5" text-anchor="middle" dominant-baseline="central" fill="#0f172a" font-size="12" font-weight="700" font-family="system-ui, -apple-system, sans-serif">
                                           ${textStr}
                                         </text>
                                       </svg>
