@@ -878,17 +878,18 @@ export async function GET(request: NextRequest) {
           const rate = isOffline ? 0 : (shopRateMap.get(matchedShopName) ?? 0.06);
           const deliveryYuan = getDeliveryFee(order.delivery) / 100;
           const hasReadyCost = Boolean(orderCostMeta) && (orderCostMeta?.missingCostItemCount || 0) <= 0;
-          if (hasReadyCost) {
-              const pureProfit = FinanceMath.add(
+          const pureProfit = hasReadyCost
+            ? FinanceMath.add(
                 FinanceMath.multiply(expectedIncomeYuan, 1 - rate),
                 -deliveryYuan - orderCostYuan - returnExtraExpenseYuan
-              );
-            if (point) {
-              point.pureProfit = FinanceMath.add(point.pureProfit, pureProfit);
-            }
-            if (platformPoint) {
-              platformPoint.pureProfit = FinanceMath.add(platformPoint.pureProfit, pureProfit);
-            }
+              )
+            : 0;
+
+          if (point) {
+            point.pureProfit = FinanceMath.add(point.pureProfit, pureProfit);
+          }
+          if (platformPoint) {
+            platformPoint.pureProfit = FinanceMath.add(platformPoint.pureProfit, pureProfit);
           }
         }
       } else {
