@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { Search, Plus, Store, X, ArrowUp, Trash2, AlertCircle } from "lucide-react";
+import { Search, Plus, Store, X, ArrowUp, Trash2, AlertCircle, Zap } from "lucide-react";
 import Link from "next/link";
 import { ImportModal } from "@/components/Goods/ImportModal";
 import { GoodsCard } from "@/components/Goods/GoodsCard";
@@ -980,13 +980,15 @@ export default function ShopGoodsPage() {
             type="button"
             onClick={() => setViewMode("quickEdit")}
             className={cn(
-              "px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1",
+              "px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 touch-manipulation",
               viewMode === "quickEdit"
                 ? "bg-amber-500 text-white shadow-md shadow-amber-500/20"
                 : "text-muted-foreground hover:text-foreground"
             )}
           >
-            <span>⚡ 快速编辑模式</span>
+            <Zap size={14} className="shrink-0" />
+            <span className="hidden sm:inline">快速编辑模式</span>
+            <span className="sm:hidden">快速编辑</span>
           </button>
         </div>
       </div>

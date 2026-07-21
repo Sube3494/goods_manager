@@ -6,7 +6,7 @@ import { GoodsCardSkeleton } from "@/components/Goods/GoodsCardSkeleton";
 import { QuickEditTable } from "@/components/Goods/QuickEditTable";
 import { ImportModal } from "@/components/Goods/ImportModal";
 import { ProductFormModal } from "@/components/Goods/ProductFormModal";
-import { Search, Plus, Download, ArrowUp, X, RotateCcw, Settings, AlertCircle } from "lucide-react";
+import { Search, Plus, Download, ArrowUp, X, RotateCcw, Settings, AlertCircle, Zap } from "lucide-react";
 import { Product, Category, Supplier, GalleryItem } from "@/lib/types";
 import { ManageLibrariesModal } from "@/components/Goods/ManageLibrariesModal";
 import { BatchEditModal } from "@/components/Goods/BatchEditModal";
@@ -967,13 +967,15 @@ export default function GoodsPage() {
             type="button"
             onClick={() => setViewMode("quickEdit")}
             className={cn(
-              "px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1",
+              "px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 touch-manipulation",
               viewMode === "quickEdit"
                 ? "bg-amber-500 text-white shadow-md shadow-amber-500/20"
                 : "text-muted-foreground hover:text-foreground"
             )}
           >
-            <span>⚡ 快速编辑模式</span>
+            <Zap size={14} className="shrink-0" />
+            <span className="hidden sm:inline">快速编辑模式</span>
+            <span className="sm:hidden">快速编辑</span>
           </button>
         </div>
       </div>
