@@ -843,7 +843,7 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
                 ${
                   showIndex
                     ? `
-                      <div style="width: 32px; height: 32px; min-width: 32px; border-radius: 50%; background-color: #f1f5f9; border: 1.5px solid #94a3b8; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; color: #0f172a; flex-shrink: 0;">
+                      <div style="width: 32px; height: 32px; min-width: 32px; border-radius: 50%; background-color: #f1f5f9; border: 1.5px solid #94a3b8; text-align: center; line-height: 29px; font-size: 13px; font-weight: 800; color: #0f172a; flex-shrink: 0; box-sizing: border-box;">
                         ${rowItem.globalIndex}
                       </div>
                     `
