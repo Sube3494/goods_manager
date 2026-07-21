@@ -737,6 +737,7 @@ export async function GET(request: NextRequest) {
       promotionExpense: 0,
       pureProfit: 0,
       platformPureProfit: {} as Record<string, number>,
+      platformOrderCount: {} as Record<string, number>,
     });
 
     const businessTrendMap = new Map<string, ReturnType<typeof createTrendBucket>>();
@@ -782,6 +783,7 @@ export async function GET(request: NextRequest) {
           point.otherOrderCount += 1;
         } else {
           point.trueOrderCount += 1;
+          point.platformOrderCount[platform] = (point.platformOrderCount[platform] || 0) + 1;
         }
       }
       if (platformPoint) {
@@ -791,6 +793,7 @@ export async function GET(request: NextRequest) {
           platformPoint.otherOrderCount += 1;
         } else {
           platformPoint.trueOrderCount += 1;
+          platformPoint.platformOrderCount[platform] = (platformPoint.platformOrderCount[platform] || 0) + 1;
         }
       }
       if (isBrush) {
@@ -950,6 +953,7 @@ export async function GET(request: NextRequest) {
           promotionExpense: point?.promotionExpense || 0,
           pureProfit: point?.pureProfit || 0,
           platformPureProfit: point?.platformPureProfit || {},
+          platformOrderCount: point?.platformOrderCount || {},
           netProfit: profit,
         };
       });

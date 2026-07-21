@@ -190,6 +190,50 @@ function ChartTooltip({
   );
 }
 
+// 订单波动图专属 tooltip：显示各平台真单量（降序）
+function OrderTooltip({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean;
+  payload?: Array<{ payload?: { platformOrderCount?: Record<string, number>; orderCount?: number; trueOrderCount?: number } }>;
+  label?: string;
+}) {
+  if (!active || !payload?.length) return null;
+  const dataPoint = payload[0]?.payload;
+  const platformCounts = dataPoint?.platformOrderCount || {};
+  const entries = Object.entries(platformCounts)
+    .filter(([, v]) => (v as number) > 0)
+    .sort(([, a], [, b]) => (b as number) - (a as number));
+  const total = dataPoint?.trueOrderCount ?? dataPoint?.orderCount ?? 0;
+
+  return (
+    <div className="min-w-[170px] rounded-[22px] border border-black/8 bg-white/95 p-3.5 shadow-[0_18px_50px_rgba(15,23,42,0.16)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/95">
+      <div className="flex items-center justify-between gap-2 border-b border-black/5 dark:border-white/5 pb-2">
+        <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">{label} 平台单量</span>
+        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-600 dark:text-sky-400">各平台拆分</span>
+      </div>
+      <div className="mt-2.5 space-y-2">
+        {entries.length > 0 ? (
+          entries.map(([platform, count]) => (
+            <div key={platform} className="flex items-center justify-between gap-4 text-xs">
+              <span className="text-slate-700 dark:text-slate-300 font-semibold">{platform}:</span>
+              <span className="font-bold tabular-nums text-sky-600 dark:text-sky-400">{count as number} 单</span>
+            </div>
+          ))
+        ) : (
+          <div className="text-xs text-muted-foreground py-1 text-center">暂无平台数据</div>
+        )}
+        <div className="flex items-center justify-between gap-4 text-xs border-t border-dashed border-black/10 dark:border-white/10 pt-2.5 mt-2 font-black">
+          <span className="text-foreground">当日总计:</span>
+          <span className="text-sm tabular-nums font-black text-foreground">{total} 单</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 interface CustomizedDotProps {
   cx?: number;
   cy?: number;
@@ -588,7 +632,7 @@ export function DataOverview({
                 <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="rgba(148,163,184,0.18)" />
                 <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={12} />
                 <YAxis tickLine={false} axisLine={false} fontSize={12} width={40} allowDecimals={false} />
-                <Tooltip content={<ChartTooltip valueFormatter={countTooltip} nameMap={orderTooltipNameMap} />} />
+                <Tooltip content={<OrderTooltip />} />
                 <Line type="monotone" dataKey={orderSeriesKey} name={orderSeriesKey} stroke={orderSeriesColor} strokeWidth={2.5} dot={{ r: 2.5 }} activeDot={{ r: 4 }} />
               </LineChart>
             </ResponsiveContainer>

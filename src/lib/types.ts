@@ -620,6 +620,7 @@ export interface DashboardBusinessTrendPoint {
   netProfit: number;
   pureProfit?: number;
   platformPureProfit?: Record<string, number>;
+  platformOrderCount?: Record<string, number>;
   promotionExpense?: number;
   orderCount: number;
   cumulativeOrderCount: number;
