@@ -666,7 +666,7 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
       tableColumns: { key: string; header: string; width: number; align: "center" | "left" }[] = [],
       columnsToInclude: string[] = []
     ) => {
-      showToast("正在准备高保真 PDF 导出数据，请稍候...", "info");
+      showToast("正在准备高保真 A4 规范 PDF 导出数据，请稍候...", "info");
 
       try {
         const html2canvas = (await import("html2canvas")).default;
@@ -695,55 +695,36 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
           }
         }
 
-        const container = document.createElement("div");
-        container.style.position = "absolute";
-        container.style.left = "-9999px";
-        container.style.top = "-9999px";
-        container.style.width = "820px";
-        container.style.backgroundColor = "#ffffff";
-        container.style.padding = "32px";
-        container.style.color = "#111827";
-        container.style.fontFamily = "system-ui, -apple-system, sans-serif";
+        // 1. 列宽精确百分比映射，解决“序号”霸屏与后几列被挤出页面问题
+        const colWidthWeights: Record<string, number> = {
+          index: 6,
+          image: 16,
+          name: 36,
+          sku: 20,
+          price: 8,
+          quantity: 7,
+          subtotal: 7,
+        };
 
-        let html = `
-          <div style="text-align: center; margin-bottom: 20px;">
-            <h1 style="font-size: 22px; font-weight: 800; margin: 0 0 6px 0; color: #111827;">${title}</h1>
-            <p style="font-size: 12px; color: #6b7280; margin: 0;">生成时间：${dateStr}</p>
-          </div>
-        `;
-
-        if (displayAddress) {
-          html += `
-            <div style="background-color: #fef2f2; border: 1px solid #fecaca; border-radius: 12px; padding: 12px 16px; margin-bottom: 12px;">
-              <p style="font-size: 16px; font-weight: 800; color: #dc2626; margin: 0;">收货地址：${displayAddress}</p>
-            </div>
-          `;
-        }
-
-        if (displayShopName) {
-          html += `
-            <div style="background-color: #eff6ff; border: 1px solid #bfdbfe; border-radius: 12px; padding: 10px 16px; margin-bottom: 16px;">
-              <p style="font-size: 14px; font-weight: 800; color: #2563eb; margin: 0;">收货店铺：${displayShopName}</p>
-            </div>
-          `;
-        }
-
-        html += `
-          <table style="width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px;">
-            <thead>
-              <tr style="background-color: #f3f4f6;">
-        `;
-
-        tableColumns.forEach((col) => {
-          html += `<th style="border: 1px solid #d1d5db; padding: 10px 8px; text-align: ${col.align}; font-weight: 800; color: #374151;">${col.header}</th>`;
+        const totalWeight = tableColumns.reduce((sum, col) => sum + (colWidthWeights[col.key] || 15), 0);
+        const normalizedCols = tableColumns.map((col) => {
+          const w = colWidthWeights[col.key] || 15;
+          const pct = ((w / totalWeight) * 100).toFixed(1);
+          return { ...col, widthPct: `${pct}%` };
         });
 
-        html += `
-              </tr>
-            </thead>
-            <tbody>
-        `;
+        // 2. 平铺收集所有的商品数据行
+        interface FlatItem {
+          globalIndex: number;
+          productName: string;
+          sku: string;
+          imageUrl: string | null;
+          price: number;
+          quantity: number;
+          subtotal: number;
+        }
 
+        const flatItems: FlatItem[] = [];
         let globalIndex = 1;
         let totalQty = 0;
         let totalAmount = 0;
@@ -763,64 +744,193 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
             totalQty += qty;
             totalAmount += subtotal;
 
-            const imageUrl = item.shopProduct?.image || item.image;
-            const productName = item.shopProduct?.name || item.product?.name || "未知商品";
-            const sku = item.shopProductId ? item.shopProduct?.sku || "" : item.product?.sku || "";
-
-            html += `<tr style="border-bottom: 1px solid #e5e7eb;">`;
-
-            tableColumns.forEach((col) => {
-              if (col.key === "index") {
-                html += `<td style="border: 1px solid #d1d5db; padding: 8px; text-align: center;">${globalIndex}</td>`;
-              } else if (col.key === "image") {
-                html += `
-                  <td style="border: 1px solid #d1d5db; padding: 6px; text-align: center; width: 75px;">
-                    ${
-                      imageUrl
-                        ? `<img src="${imageUrl}" style="width: 60px; height: 60px; object-fit: cover; border-radius: 8px; border: 1px solid #e5e7eb; display: block; margin: 0 auto;" />`
-                        : `<span style="color: #9ca3af; font-size: 11px;">无图片</span>`
-                    }
-                  </td>
-                `;
-              } else if (col.key === "name") {
-                html += `<td style="border: 1px solid #d1d5db; padding: 8px; text-align: left; font-weight: 500; word-break: break-all;">${productName}</td>`;
-              } else if (col.key === "sku") {
-                html += `<td style="border: 1px solid #d1d5db; padding: 8px; text-align: center; color: #4b5563; font-family: monospace;">${sku}</td>`;
-              } else if (col.key === "price") {
-                html += `<td style="border: 1px solid #d1d5db; padding: 8px; text-align: center;">¥${price.toFixed(2)}</td>`;
-              } else if (col.key === "quantity") {
-                html += `<td style="border: 1px solid #d1d5db; padding: 8px; text-align: center; font-weight: bold; color: #111827;">${qty}</td>`;
-              } else if (col.key === "subtotal") {
-                html += `<td style="border: 1px solid #d1d5db; padding: 8px; text-align: center; font-weight: bold; color: #059669;">¥${subtotal.toFixed(2)}</td>`;
-              }
+            flatItems.push({
+              globalIndex,
+              productName: item.shopProduct?.name || item.product?.name || "未知商品",
+              sku: item.shopProductId ? item.shopProduct?.sku || "" : item.product?.sku || "",
+              imageUrl: item.shopProduct?.image || item.image || null,
+              price,
+              quantity: qty,
+              subtotal,
             });
-
-            html += `</tr>`;
             globalIndex++;
           }
         }
 
-        const showQtyCol = tableColumns.some((c) => c.key === "quantity");
-        const showSubtotalCol = tableColumns.some((c) => c.key === "subtotal");
+        // 3. 计算物理分页（首页受收货地址与店铺影响，能容纳 6 条；续页能容纳 8 条）
+        const FIRST_PAGE_LIMIT = displayAddress || displayShopName ? 5 : 6;
+        const OTHER_PAGE_LIMIT = 7;
 
-        if (showQtyCol || showSubtotalCol) {
-          html += `
-            <tr style="background-color: #f9fafb; font-weight: bold;">
-              <td colspan="${Math.max(1, tableColumns.length - (showQtyCol ? (showSubtotalCol ? 2 : 1) : 1))}" style="border: 1px solid #d1d5db; padding: 10px; text-align: right;">合计：</td>
-              ${showQtyCol ? `<td style="border: 1px solid #d1d5db; padding: 10px; text-align: center; color: #111827;">${totalQty}</td>` : ""}
-              ${showSubtotalCol ? `<td style="border: 1px solid #d1d5db; padding: 10px; text-align: center; color: #059669;">¥${totalAmount.toFixed(2)}</td>` : ""}
-            </tr>
-          `;
+        const pagesData: FlatItem[][] = [];
+        let remaining = [...flatItems];
+
+        if (remaining.length > 0) {
+          pagesData.push(remaining.splice(0, FIRST_PAGE_LIMIT));
+        }
+        while (remaining.length > 0) {
+          pagesData.push(remaining.splice(0, OTHER_PAGE_LIMIT));
         }
 
-        html += `
-            </tbody>
-          </table>
-        `;
+        if (pagesData.length === 0) {
+          pagesData.push([]);
+        }
 
-        container.innerHTML = html;
+        const totalPages = pagesData.length;
+
+        // 4. 创建离屏总容器
+        const container = document.createElement("div");
+        container.style.position = "absolute";
+        container.style.left = "-9999px";
+        container.style.top = "-9999px";
+        container.style.display = "flex";
+        container.style.flexDirection = "column";
+        container.style.gap = "40px";
+        container.style.backgroundColor = "#e5e7eb"; // 灰底便于切页边界隔断
+
+        const pageNodes: HTMLElement[] = [];
+
+        for (let pageIdx = 0; pageIdx < totalPages; pageIdx++) {
+          const pageItems = pagesData[pageIdx];
+          const isFirstPage = pageIdx === 0;
+          const isLastPage = pageIdx === totalPages - 1;
+
+          const pageDiv = document.createElement("div");
+          pageDiv.style.width = "794px";
+          pageDiv.style.minHeight = "1123px";
+          pageDiv.style.height = "1123px"; // 固定精准 A4 比例
+          pageDiv.style.padding = "36px 40px";
+          pageDiv.style.boxSizing = "border-box";
+          pageDiv.style.backgroundColor = "#ffffff";
+          pageDiv.style.color = "#111827";
+          pageDiv.style.position = "relative";
+          pageDiv.style.display = "flex";
+          pageDiv.style.flexDirection = "column";
+          pageDiv.style.fontFamily = "system-ui, -apple-system, sans-serif";
+
+          let html = ``;
+
+          if (isFirstPage) {
+            html += `
+              <div style="text-align: center; margin-bottom: 16px;">
+                <h1 style="font-size: 22px; font-weight: 800; margin: 0 0 4px 0; color: #111827;">${title}</h1>
+                <p style="font-size: 11px; color: #6b7280; margin: 0;">生成时间：${dateStr}</p>
+              </div>
+            `;
+
+            if (displayAddress) {
+              html += `
+                <div style="background-color: #fef2f2; border: 1.5px solid #fecaca; border-radius: 10px; padding: 10px 14px; margin-bottom: 10px;">
+                  <p style="font-size: 15px; font-weight: 800; color: #dc2626; margin: 0; word-break: break-all;">收货地址：${displayAddress}</p>
+                </div>
+              `;
+            }
+
+            if (displayShopName) {
+              html += `
+                <div style="background-color: #eff6ff; border: 1.5px solid #bfdbfe; border-radius: 10px; padding: 8px 14px; margin-bottom: 14px;">
+                  <p style="font-size: 13px; font-weight: 800; color: #2563eb; margin: 0;">收货店铺：${displayShopName}</p>
+                </div>
+              `;
+            }
+          } else {
+            html += `
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; border-b: 2px solid #111827; padding-bottom: 6px;">
+                <h2 style="font-size: 14px; font-weight: 800; margin: 0; color: #111827;">${title} (续页)</h2>
+                <span style="font-size: 11px; color: #6b7280;">${dateStr}</span>
+              </div>
+            `;
+          }
+
+          // 表格区域 (使用 table-layout: fixed 和精确 col width)
+          html += `
+            <div style="flex: 1; overflow: hidden;">
+              <table style="width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 12px; margin-top: 4px;">
+                <colgroup>
+                  ${normalizedCols.map((c) => `<col style="width: ${c.widthPct};" />`).join("")}
+                </colgroup>
+                <thead>
+                  <tr style="background-color: #f3f4f6;">
+                    ${normalizedCols
+                      .map(
+                        (col) =>
+                          `<th style="border: 1px solid #d1d5db; padding: 8px 6px; text-align: ${col.align}; font-weight: 800; color: #374151; font-size: 11px;">${col.header}</th>`
+                      )
+                      .join("")}
+                  </tr>
+                </thead>
+                <tbody>
+          `;
+
+          for (const rowItem of pageItems) {
+            html += `<tr style="border-bottom: 1px solid #e5e7eb;">`;
+
+            tableColumns.forEach((col) => {
+              if (col.key === "index") {
+                html += `<td style="border: 1px solid #d1d5db; padding: 6px 4px; text-align: center; font-size: 11px;">${rowItem.globalIndex}</td>`;
+              } else if (col.key === "image") {
+                html += `
+                  <td style="border: 1px solid #d1d5db; padding: 4px; text-align: center;">
+                    ${
+                      rowItem.imageUrl
+                        ? `<img src="${rowItem.imageUrl}" style="width: 54px; height: 54px; object-fit: cover; border-radius: 6px; border: 1px solid #e5e7eb; display: block; margin: 0 auto;" />`
+                        : `<span style="color: #9ca3af; font-size: 10px;">无图</span>`
+                    }
+                  </td>
+                `;
+              } else if (col.key === "name") {
+                html += `<td style="border: 1px solid #d1d5db; padding: 6px 8px; text-align: left; font-weight: 500; font-size: 11px; line-height: 1.3; word-break: break-all;">${rowItem.productName}</td>`;
+              } else if (col.key === "sku") {
+                html += `<td style="border: 1px solid #d1d5db; padding: 6px; text-align: center; color: #4b5563; font-family: monospace; font-size: 10px; word-break: break-all;">${rowItem.sku}</td>`;
+              } else if (col.key === "price") {
+                html += `<td style="border: 1px solid #d1d5db; padding: 6px 4px; text-align: center; font-size: 11px;">¥${rowItem.price.toFixed(2)}</td>`;
+              } else if (col.key === "quantity") {
+                html += `<td style="border: 1px solid #d1d5db; padding: 6px 4px; text-align: center; font-weight: bold; color: #111827; font-size: 11px;">${rowItem.quantity}</td>`;
+              } else if (col.key === "subtotal") {
+                html += `<td style="border: 1px solid #d1d5db; padding: 6px 4px; text-align: center; font-weight: bold; color: #059669; font-size: 11px;">¥${rowItem.subtotal.toFixed(2)}</td>`;
+              }
+            });
+
+            html += `</tr>`;
+          }
+
+          // 如果是最后一页，追加合计行
+          if (isLastPage) {
+            const showQtyCol = tableColumns.some((c) => c.key === "quantity");
+            const showSubtotalCol = tableColumns.some((c) => c.key === "subtotal");
+
+            if (showQtyCol || showSubtotalCol) {
+              html += `
+                <tr style="background-color: #f9fafb; font-weight: bold;">
+                  <td colspan="${Math.max(1, tableColumns.length - (showQtyCol ? (showSubtotalCol ? 2 : 1) : 1))}" style="border: 1px solid #d1d5db; padding: 8px; text-align: right; font-size: 11px;">合计采购：</td>
+                  ${showQtyCol ? `<td style="border: 1px solid #d1d5db; padding: 8px 4px; text-align: center; color: #111827; font-size: 11px;">${totalQty}</td>` : ""}
+                  ${showSubtotalCol ? `<td style="border: 1px solid #d1d5db; padding: 8px 4px; text-align: center; color: #059669; font-size: 11px;">¥${totalAmount.toFixed(2)}</td>` : ""}
+                </tr>
+              `;
+            }
+          }
+
+          html += `
+                </tbody>
+              </table>
+            </div>
+          `;
+
+          // 5. 页脚页码
+          html += `
+            <div style="margin-top: auto; pt-3; border-top: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center; font-size: 10px; color: #9ca3af;">
+              <span>Goods Manager 采购打印明细</span>
+              <span>第 ${pageIdx + 1} 页 / 共 ${totalPages} 页</span>
+            </div>
+          `;
+
+          pageDiv.innerHTML = html;
+          container.appendChild(pageDiv);
+          pageNodes.push(pageDiv);
+        }
+
         document.body.appendChild(container);
 
+        // 等待所有页面上的图片全部加载完成
         const images = Array.from(container.querySelectorAll("img"));
         await Promise.all(
           images.map((img) => {
@@ -832,38 +942,29 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
           })
         );
 
-        const canvas = await html2canvas(container, {
-          scale: 2,
-          useCORS: true,
-          logging: false,
-          backgroundColor: "#ffffff",
-        });
+        // 6. 逐页生成高清 Image 拼接导出 PDF
+        const pdf = new jsPDF("p", "mm", "a4");
+
+        for (let i = 0; i < pageNodes.length; i++) {
+          const canvas = await html2canvas(pageNodes[i], {
+            scale: 2,
+            useCORS: true,
+            logging: false,
+            backgroundColor: "#ffffff",
+          });
+
+          const imgData = canvas.toDataURL("image/jpeg", 0.95);
+          if (i > 0) {
+            pdf.addPage();
+          }
+          pdf.addImage(imgData, "JPEG", 0, 0, 210, 297); // 完整精准铺满 A4 (210mm x 297mm)
+        }
 
         document.body.removeChild(container);
 
-        const imgData = canvas.toDataURL("image/jpeg", 0.95);
-        const pdf = new jsPDF("p", "mm", "a4");
-        const pdfWidth = pdf.internal.pageSize.getWidth();
-        const pdfHeight = pdf.internal.pageSize.getHeight();
-        const imgWidth = pdfWidth;
-        const imgHeight = (canvas.height * pdfWidth) / canvas.width;
-
-        let heightLeft = imgHeight;
-        let position = 0;
-
-        pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight);
-        heightLeft -= pdfHeight;
-
-        while (heightLeft > 0) {
-          position = heightLeft - imgHeight;
-          pdf.addPage();
-          pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight);
-          heightLeft -= pdfHeight;
-        }
-
         const filename = `${title}_${now.toISOString().slice(0, 10)}.pdf`;
         pdf.save(filename);
-        showToast(specificPO ? `已导出 PDF 单据` : `已成功导出 ${targets.length} 张 PDF 采购单`, "success");
+        showToast(specificPO ? `已导出标准 A4 PDF 单据` : `已成功导出 ${targets.length} 张 A4 PDF 采购单`, "success");
       } catch (error) {
         console.error("PDF export failed:", error);
         showToast("生成 PDF 失败，请稍后重试", "error");
