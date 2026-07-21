@@ -988,11 +988,10 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
             `;
           }
 
-          // 5. 页脚页码
+          // 5. 页脚页码 (已移除 'Goods Manager 采购打印单' 文本)
           html += `
-            <div style="margin-top: auto; padding-top: 12px; border-top: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center; font-size: 10px; color: #9ca3af;">
-              <span>Goods Manager 采购打印单</span>
-              <span>第 ${pageIdx + 1} 页 / 共 ${totalPages} 页</span>
+            <div style="margin-top: auto; padding-top: 12px; border-top: 1px solid #e5e7eb; text-align: center; font-size: 10px; color: #9ca3af;">
+              第 ${pageIdx + 1} 页 / 共 ${totalPages} 页
             </div>
           `;
 
@@ -1035,7 +1034,8 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
 
         document.body.removeChild(container);
 
-        const filename = `${title}_${now.toISOString().slice(0, 10)}.pdf`;
+        const timestamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}_${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}${String(now.getSeconds()).padStart(2, "0")}`;
+        const filename = `${title}_${timestamp}.pdf`;
         pdf.save(filename);
         showToast(specificPO ? `已导出标准 A4 PDF 单据` : `已成功导出 ${targets.length} 张 A4 PDF 采购单`, "success");
       } catch (error) {
