@@ -955,6 +955,8 @@ export async function GET(request: NextRequest) {
           cumulativeOrderCount: cumulativeOrders,
           productCost: point?.productCost || 0,
           brushExpense: point?.brushExpense || 0,
+          promotionExpense: point?.promotionExpense || 0,
+          pureProfit: point?.pureProfit || 0,
           netProfit: profit,
         };
       });

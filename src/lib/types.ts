@@ -618,6 +618,8 @@ export interface DashboardBusinessTrendPoint {
   date: string;
   label: string;
   netProfit: number;
+  pureProfit?: number;
+  promotionExpense?: number;
   orderCount: number;
   cumulativeOrderCount: number;
   trueOrderCount: number;

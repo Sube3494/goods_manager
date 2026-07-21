@@ -130,33 +130,79 @@ function ChartTooltip({
   nameMap,
 }: {
   active?: boolean;
-  payload?: Array<{ value?: number | string; name?: string; color?: string }>;
+  payload?: Array<{
+    value?: number | string;
+    name?: string;
+    color?: string;
+    payload?: {
+      pureProfit?: number;
+      promotionExpense?: number;
+      brushExpense?: number;
+      netProfit?: number;
+    };
+  }>;
   label?: string;
   valueFormatter: (value: unknown) => string;
   nameMap?: Record<string, string>;
 }) {
   if (!active || !payload?.length) return null;
 
+  const dataPoint = payload[0]?.payload;
+  const hasDetails = dataPoint && typeof dataPoint.pureProfit === "number";
+
   return (
-    <div className="min-w-[148px] rounded-[18px] border border-black/8 bg-white/92 px-3.5 py-3 shadow-[0_18px_50px_rgba(15,23,42,0.12)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/92 dark:shadow-[0_18px_50px_rgba(0,0,0,0.35)]">
-      <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">{label}</div>
-      <div className="mt-2.5 space-y-2">
-        {payload.map((item) => {
-          const rawName = String(item.name || "");
-          const displayName = nameMap?.[rawName] || rawName;
-          const valNum = Number(item.value);
-          const isNegative = !Number.isNaN(valNum) && valNum < 0;
-          return (
-            <div key={rawName} className="flex items-center justify-between gap-4">
-              <div className="flex min-w-0 items-center gap-2">
-                <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: isNegative ? "#ef4444" : (item.color || "#60a5fa") }} />
-                <span className="truncate text-xs font-medium text-slate-600 dark:text-slate-300">{displayName}</span>
-              </div>
-              <span className={cn("shrink-0 text-sm font-black tabular-nums", isNegative ? "text-red-500" : "text-slate-900 dark:text-white")}>{valueFormatter(item.value)}</span>
+    <div className="min-w-[180px] rounded-[20px] border border-black/8 bg-white/94 p-3.5 shadow-[0_18px_50px_rgba(15,23,42,0.14)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/94">
+      <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">{label}</div>
+
+      {hasDetails ? (
+        <div className="mt-2.5 space-y-1.5 border-t border-black/5 dark:border-white/5 pt-2">
+          {/* 1. 订单纯利润 (与顶部/平台卡片纯利润 100% 对齐) */}
+          <div className="flex items-center justify-between gap-4 text-xs">
+            <span className="text-muted-foreground font-medium flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-emerald-500" />
+              订单纯利润:
+            </span>
+            <span className="font-extrabold text-foreground tabular-nums">{money(dataPoint.pureProfit)}</span>
+          </div>
+
+          {/* 2. 扣除推广/刷单营销费用 */}
+          {Boolean((dataPoint.promotionExpense || 0) + (dataPoint.brushExpense || 0)) && (
+            <div className="flex items-center justify-between gap-4 text-[11px] text-muted-foreground">
+              <span className="flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-rose-500" />
+                扣除推广/刷单:
+              </span>
+              <span className="font-bold text-rose-500 tabular-nums">-{money((dataPoint.promotionExpense || 0) + (dataPoint.brushExpense || 0))}</span>
             </div>
-          );
-        })}
-      </div>
+          )}
+
+          {/* 3. 最终结余净利润 */}
+          <div className="flex items-center justify-between gap-4 text-xs border-t border-dashed border-black/8 dark:border-white/10 pt-1.5 mt-1">
+            <span className="font-bold text-foreground">结余净利润:</span>
+            <span className={cn("font-black text-sm tabular-nums", (dataPoint.netProfit || 0) < 0 ? "text-red-500" : "text-emerald-600 dark:text-emerald-400")}>
+              {money(dataPoint.netProfit)}
+            </span>
+          </div>
+        </div>
+      ) : (
+        <div className="mt-2.5 space-y-2">
+          {payload.map((item) => {
+            const rawName = String(item.name || "");
+            const displayName = nameMap?.[rawName] || rawName;
+            const valNum = Number(item.value);
+            const isNegative = !Number.isNaN(valNum) && valNum < 0;
+            return (
+              <div key={rawName} className="flex items-center justify-between gap-4">
+                <div className="flex min-w-0 items-center gap-2">
+                  <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: isNegative ? "#ef4444" : (item.color || "#60a5fa") }} />
+                  <span className="truncate text-xs font-medium text-slate-600 dark:text-slate-300">{displayName}</span>
+                </div>
+                <span className={cn("shrink-0 text-sm font-black tabular-nums", isNegative ? "text-red-500" : "text-slate-900 dark:text-white")}>{valueFormatter(item.value)}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
