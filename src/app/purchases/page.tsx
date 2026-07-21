@@ -885,11 +885,20 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
 
                     ${
                       showSku && rowItem.sku
-                        ? `
-                          <div style="display: inline-block; height: 20px; line-height: 18px; padding: 0 8px; background-color: #f1f5f9; border: 1.2px solid #cbd5e1; border-radius: 6px; color: #0f172a; font-size: 11px; font-weight: 700; font-family: system-ui, -apple-system, sans-serif; margin-top: 2px; box-sizing: border-box; text-align: center; vertical-align: middle;">
-                            ${rowItem.sku}
-                          </div>
-                        `
+                        ? (() => {
+                            const textStr = String(rowItem.sku);
+                            const skuW = Math.max(48, textStr.length * 8 + 14);
+                            return `
+                              <div style="margin-top: 2px;">
+                                <svg width="${skuW}" height="22" viewBox="0 0 ${skuW} 22" style="display: block;">
+                                  <rect x="0.5" y="0.5" width="${skuW - 1}" height="21" rx="5" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1" />
+                                  <text x="${skuW / 2}" y="11.5" text-anchor="middle" dominant-baseline="central" fill="#0f172a" font-size="11" font-weight="700" font-family="system-ui, -apple-system, sans-serif">
+                                    ${textStr}
+                                  </text>
+                                </svg>
+                              </div>
+                            `;
+                          })()
                         : ""
                     }
                   </div>
@@ -953,14 +962,21 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
 
                           ${
                             showSku && rowItem.sku
-                              ? `
-                                <div style="font-size: 12px; color: #334155; font-weight: 600; display: flex; align-items: center;">
-                                  <span>SKU / 编码:</span>
-                                  <span style="display: inline-block; height: 20px; line-height: 18px; padding: 0 8px; background-color: #f1f5f9; border: 1.2px solid #cbd5e1; border-radius: 6px; color: #0f172a; font-size: 12px; font-weight: 700; font-family: system-ui, -apple-system, sans-serif; margin-left: 6px; box-sizing: border-box; vertical-align: middle; text-align: center;">
-                                    ${rowItem.sku}
-                                  </span>
-                                </div>
-                              `
+                              ? (() => {
+                                  const textStr = String(rowItem.sku);
+                                  const skuW = Math.max(52, textStr.length * 8.5 + 16);
+                                  return `
+                                    <div style="font-size: 12px; color: #334155; font-weight: 600; display: flex; align-items: center; gap: 6px;">
+                                      <span>SKU / 编码:</span>
+                                      <svg width="${skuW}" height="22" viewBox="0 0 ${skuW} 22" style="display: block; flex-shrink: 0;">
+                                        <rect x="0.5" y="0.5" width="${skuW - 1}" height="21" rx="5" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1" />
+                                        <text x="${skuW / 2}" y="11.5" text-anchor="middle" dominant-baseline="central" fill="#0f172a" font-size="12" font-weight="700" font-family="system-ui, -apple-system, sans-serif">
+                                          ${textStr}
+                                        </text>
+                                      </svg>
+                                    </div>
+                                  `;
+                                })()
                               : ""
                           }
 
