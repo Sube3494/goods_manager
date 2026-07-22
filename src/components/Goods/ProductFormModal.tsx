@@ -165,6 +165,7 @@ export function ProductFormModal({
   const [isBatchMode, setIsBatchMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const [isSingleCoverDraggingOver, setIsSingleCoverDraggingOver] = useState(false);
   // 移动端排序模式 (Mobile reorder mode)
   const [isReorderMode, setIsReorderMode] = useState(false);
   const [selectedDates, setSelectedDates] = useState<Record<string, string>>({});
@@ -613,6 +614,32 @@ export function ProductFormModal({
   const handleDragLeave = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDraggingOver(false);
+  };
+
+  const handleSingleCoverDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsSingleCoverDraggingOver(false);
+    
+    if (isUploading) return;
+    
+    const files = e.dataTransfer.files;
+    if (!files || files.length === 0) return;
+
+    const mockEvent = {
+      target: { files, value: "" }
+    } as unknown as React.ChangeEvent<HTMLInputElement>;
+    
+    await handleFileUpload(mockEvent, true);
+  };
+
+  const handleSingleCoverDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (!isUploading) setIsSingleCoverDraggingOver(true);
+  };
+
+  const handleSingleCoverDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsSingleCoverDraggingOver(false);
   };
 
   const setAsMainImage = (url: string) => {
@@ -1586,7 +1613,17 @@ export function ProductFormModal({
                         </div>
 
                         <div className="flex items-center gap-4">
-                          <label className="relative flex h-28 w-28 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-2xl border border-dashed border-border bg-white/70 dark:bg-white/5 hover:border-primary/40 hover:bg-primary/5 transition-all">
+                          <label 
+                            onDragOver={handleSingleCoverDragOver}
+                            onDragLeave={handleSingleCoverDragLeave}
+                            onDrop={handleSingleCoverDrop}
+                            className={cn(
+                              "relative flex h-28 w-28 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed transition-all",
+                              isSingleCoverDraggingOver
+                                ? "border-primary bg-primary/10 shadow-lg scale-[1.03]"
+                                : "border-border bg-white/70 dark:bg-white/5 hover:border-primary/40 hover:bg-primary/5"
+                            )}
+                          >
                             <input
                               type="file"
                               className="hidden"
@@ -1603,15 +1640,17 @@ export function ProductFormModal({
                                 className="object-cover"
                               />
                             ) : (
-                              <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                                <Camera size={20} />
-                                <span className="text-[11px] font-medium">上传封面</span>
+                              <div className="flex flex-col items-center gap-1.5 p-2 text-center text-muted-foreground">
+                                <Camera size={22} className={cn(isSingleCoverDraggingOver ? "text-primary animate-bounce" : "")} />
+                                <span className="text-[11px] font-medium leading-tight">
+                                  {isSingleCoverDraggingOver ? "松开上传" : "点击/拖拽上传"}
+                                </span>
                               </div>
                             )}
                           </label>
 
                           <div className="min-w-0 text-xs text-muted-foreground leading-6">
-                            <div>仅支持单张封面图。</div>
+                            <div>支持点击或直接将图片拖拽至上方方框。</div>
                             {isUploading && <div className="text-primary font-medium mt-1">{String(isUploading)}</div>}
                           </div>
                         </div>
