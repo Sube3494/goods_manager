@@ -164,8 +164,6 @@ export function ProductSelectionModal({
     }
   };
 
-  const [hoveredImage, setHoveredImage] = useState<{ url: string; name: string; x: number; y: number } | null>(null);
-
   const isGridView = imageOnly || viewMode === "grid";
 
   useEffect(() => {
@@ -729,17 +727,6 @@ export function ProductSelectionModal({
                                 ? "w-full aspect-square overflow-hidden bg-muted relative"
                                 : "h-11 w-11 shrink-0 rounded-lg overflow-hidden bg-muted border border-border/50 relative"
                             )}
-                            onMouseEnter={(e) => {
-                              if (!product.image) return;
-                              const rect = e.currentTarget.getBoundingClientRect();
-                              setHoveredImage({
-                                url: product.image,
-                                name: product.name,
-                                x: Math.min(window.innerWidth - 300, rect.right + 12),
-                                y: Math.max(12, Math.min(window.innerHeight - 300, rect.top - 20))
-                              });
-                            }}
-                            onMouseLeave={() => setHoveredImage(null)}
                           >
                             {product.image ? (
                                 <Image 
@@ -920,29 +907,6 @@ export function ProductSelectionModal({
                </div>
             </div>
           </div>
-
-          {hoveredImage && (
-            <div
-              className="fixed z-120000 pointer-events-none rounded-2xl overflow-hidden border border-white/20 bg-white/95 dark:bg-gray-900/95 shadow-2xl backdrop-blur-xl p-2.5 transition-all duration-150 animate-in fade-in zoom-in-95"
-              style={{
-                left: `${hoveredImage.x}px`,
-                top: `${hoveredImage.y}px`,
-              }}
-            >
-              <div className="relative w-64 h-64 rounded-xl overflow-hidden bg-muted border border-border/40">
-                <Image
-                  src={hoveredImage.url}
-                  alt={hoveredImage.name}
-                  fill
-                  className="object-cover"
-                  unoptimized
-                />
-              </div>
-              <div className="mt-2 px-1 max-w-[256px]">
-                <p className="text-xs font-bold text-foreground truncate">{hoveredImage.name}</p>
-              </div>
-            </div>
-          )}
         </>,
         document.body
       );
