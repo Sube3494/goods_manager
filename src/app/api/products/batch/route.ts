@@ -70,3 +70,134 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: "Failed to batch update products" }, { status: 500 });
   }
 }
+
+export async function PATCH(request: Request) {
+  try {
+    const user = await getAuthorizedUser("product:update");
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized or insufficient permissions" }, { status: 401 });
+    }
+
+    const body = await request.json();
+    const { ids, categoryId, supplierId, isDiscontinued, costPrice, isShelfLife, shelfLifeDays } = body || {};
+
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return NextResponse.json({ error: "No product IDs provided" }, { status: 400 });
+    }
+
+    const updateData: Record<string, unknown> = {};
+
+    if (typeof categoryId !== "undefined") {
+      updateData.categoryId = categoryId ? String(categoryId) : null;
+    }
+    if (typeof supplierId !== "undefined") {
+      updateData.supplierId = supplierId ? String(supplierId) : null;
+    }
+    if (typeof isDiscontinued === "boolean") {
+      updateData.isDiscontinued = isDiscontinued;
+    }
+    if (typeof costPrice !== "undefined") {
+      const num = Number(costPrice);
+      updateData.costPrice = Number.isFinite(num) && num >= 0 ? num : 0;
+    }
+    if (typeof isShelfLife === "boolean") {
+      updateData.isShelfLife = isShelfLife;
+    }
+    if (typeof shelfLifeDays !== "undefined") {
+      const num = Number(shelfLifeDays);
+      updateData.shelfLifeDays = Number.isFinite(num) && num >= 0 ? Math.floor(num) : 0;
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
+    }
+
+    const result = await prisma.product.updateMany({
+      where: {
+        id: { in: ids.map(String) },
+        userId: user.id,
+      },
+      data: updateData,
+    });
+
+    return NextResponse.json({
+      success: true,
+      count: result.count,
+    });
+  } catch (error) {
+    console.error("Failed to patch batch products:", error);
+    return NextResponse.json({ error: "Failed to batch update products" }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const user = await getAuthorizedUser("product:delete");
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized or insufficient permissions" }, { status: 401 });
+    }
+
+    const body = await request.json();
+    const { ids } = body || {};
+
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return NextResponse.json({ error: "No product IDs provided" }, { status: 400 });
+    }
+
+    const validIds = ids.map(String);
+
+    const userProducts = await prisma.product.findMany({
+      where: {
+        id: { in: validIds },
+        userId: user.id,
+      },
+      select: { id: true },
+    });
+
+    const allowedIds = userProducts.map((p) => p.id);
+
+    if (allowedIds.length === 0) {
+      return NextResponse.json({ success: true, count: 0 });
+    }
+
+    let deletedCount = 0;
+    let softDeletedCount = 0;
+
+    for (const id of allowedIds) {
+      try {
+        await prisma.galleryItem.deleteMany({
+          where: { productId: id },
+        });
+
+        await prisma.product.delete({
+          where: { id },
+        });
+        deletedCount++;
+      } catch (error: unknown) {
+        if (error && typeof error === "object" && "code" in error && error.code === "P2003") {
+          await prisma.product.update({
+            where: { id },
+            data: {
+              isDiscontinued: true,
+              sku: `DEL-${Date.now().toString().slice(-4)}-${Math.floor(Math.random() * 1000)}`,
+            },
+          });
+          softDeletedCount++;
+        } else {
+          console.error(`Failed to delete product ${id}:`, error);
+        }
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      deletedCount,
+      softDeletedCount,
+      totalProcessed: deletedCount + softDeletedCount,
+    });
+  } catch (error) {
+    console.error("Failed to batch delete products:", error);
+    return NextResponse.json({ error: "Failed to batch delete products" }, { status: 500 });
+  }
+}
+
