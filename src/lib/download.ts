@@ -59,7 +59,84 @@ function buildDownloadUrl(url: string, filename: string) {
   }
 }
 
+export async function convertWebpBlobToJpeg(blob: Blob): Promise<{ blob: Blob; isConverted: boolean }> {
+  if (typeof window === "undefined") return { blob, isConverted: false };
+
+  const isWebp = blob.type === "image/webp" || blob.type === "image/x-webp";
+  if (!isWebp) return { blob, isConverted: false };
+
+  try {
+    const blobUrl = URL.createObjectURL(blob);
+    const img = new window.Image();
+    img.crossOrigin = "anonymous";
+    img.src = blobUrl;
+
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = (err) => reject(err);
+    });
+
+    const canvas = document.createElement("canvas");
+    canvas.width = img.width || 1200;
+    canvas.height = img.height || 1200;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      URL.revokeObjectURL(blobUrl);
+      return { blob, isConverted: false };
+    }
+
+    // 填充白色底色（防止白色变黑色透明底）
+    ctx.fillStyle = "#FFFFFF";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0);
+
+    const jpegBlob = await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob((b) => resolve(b), "image/jpeg", 0.92);
+    });
+
+    URL.revokeObjectURL(blobUrl);
+
+    if (jpegBlob) {
+      return { blob: jpegBlob, isConverted: true };
+    }
+  } catch (error) {
+    console.warn("Auto converting WebP to JPEG failed, using fallback:", error);
+  }
+
+  return { blob, isConverted: false };
+}
+
+function normalizeDownloadFilename(filename: string, isWebp = false): string {
+  let name = filename || "download";
+  if (isWebp || /\.webp$/i.test(name)) {
+    if (/\.webp$/i.test(name)) {
+      name = name.replace(/\.webp$/i, ".jpg");
+    } else if (!/\.jpe?g$/i.test(name)) {
+      name = `${name}.jpg`;
+    }
+  }
+  return name;
+}
+
 export function triggerBrowserDownload(url: string, filename: string) {
+  const isWebp = /\.webp$/i.test(filename) || inferFileExtensionFromUrl(url) === "webp";
+  if (isWebp) {
+    // 遇到 WebP 格式时，走 triggerFetchedBlobDownload 进行离线转码下载
+    triggerFetchedBlobDownload(url, filename).catch(() => {
+      const finalUrl = buildDownloadUrl(url, filename);
+      const link = document.createElement("a");
+      link.href = finalUrl;
+      link.download = normalizeDownloadFilename(filename, true);
+      link.rel = "noopener noreferrer";
+      link.target = isSameOrigin(finalUrl) ? "_self" : "_blank";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    });
+    return;
+  }
+
   const finalUrl = buildDownloadUrl(url, filename);
   const link = document.createElement("a");
 
@@ -93,8 +170,19 @@ export async function triggerFetchedBlobDownload(url: string, filename: string) 
     throw new Error(`Download request failed: ${response.status}`);
   }
 
-  const blob = await response.blob();
-  triggerBlobDownload(blob, filename);
+  const rawBlob = await response.blob();
+  const isWebpHint = rawBlob.type === "image/webp" || rawBlob.type === "image/x-webp" || /\.webp$/i.test(filename) || inferFileExtensionFromUrl(url) === "webp";
+
+  let finalBlob = rawBlob;
+  let targetFilename = filename;
+
+  if (isWebpHint) {
+    const { blob, isConverted } = await convertWebpBlobToJpeg(rawBlob);
+    finalBlob = blob;
+    targetFilename = normalizeDownloadFilename(filename, isConverted || isWebpHint);
+  }
+
+  triggerBlobDownload(finalBlob, targetFilename);
 }
 
 export async function triggerIOSMediaShare(url: string, filename: string) {
@@ -112,13 +200,24 @@ export async function triggerIOSMediaShare(url: string, filename: string) {
       return false;
     }
 
-    const blob = await response.blob();
-    const file = new File([blob], filename, {
-      type: blob.type || undefined,
+    const rawBlob = await response.blob();
+    const isWebpHint = rawBlob.type === "image/webp" || rawBlob.type === "image/x-webp" || /\.webp$/i.test(filename) || inferFileExtensionFromUrl(url) === "webp";
+
+    let finalBlob = rawBlob;
+    let targetFilename = filename;
+
+    if (isWebpHint) {
+      const { blob, isConverted } = await convertWebpBlobToJpeg(rawBlob);
+      finalBlob = blob;
+      targetFilename = normalizeDownloadFilename(filename, isConverted || isWebpHint);
+    }
+
+    const file = new File([finalBlob], targetFilename, {
+      type: finalBlob.type || "image/jpeg",
       lastModified: Date.now(),
     });
 
-    const shareData = { files: [file], title: filename };
+    const shareData = { files: [file], title: targetFilename };
     const canShare = typeof navigator.canShare === "function" ? navigator.canShare(shareData) : true;
     if (!canShare) {
       return false;
