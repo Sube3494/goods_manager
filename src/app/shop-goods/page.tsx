@@ -916,14 +916,14 @@ export default function ShopGoodsPage() {
       const worksheet = workbook.addWorksheet(sheetName);
 
       const columnsConfig = [
-        { header: "店铺", key: "shopName", width: 20, align: "left" as const },
+        { header: "店铺", key: "shopName", width: 20, align: "center" as const },
         { header: "主图", key: "image", width: 16, align: "center" as const },
-        { header: "商品名称", key: "name", width: 34, align: "left" as const },
+        { header: "商品名称", key: "name", width: 36, align: "left" as const },
         { header: "SKU/店内码", key: "sku", width: 22, align: "center" as const },
         { header: "分类", key: "categoryName", width: 18, align: "center" as const },
         { header: "供应商", key: "supplierName", width: 20, align: "center" as const },
-        { header: "进货单价", key: "costPrice", width: 16, align: "right" as const, numFmt: "￥#,##0.00" },
-        { header: "库存", key: "stock", width: 14, align: "right" as const, numFmt: "#,##0" },
+        { header: "进货单价", key: "costPrice", width: 16, align: "center" as const, numFmt: "￥#,##0.00" },
+        { header: "库存", key: "stock", width: 14, align: "center" as const, numFmt: "#,##0" },
         { header: "备注", key: "remark", width: 28, align: "left" as const },
       ];
 

@@ -119,35 +119,68 @@ function normalizeDownloadFilename(filename: string, isWebp = false): string {
   return name;
 }
 
-export function triggerBrowserDownload(url: string, filename: string) {
-  const isWebp = /\.webp$/i.test(filename) || inferFileExtensionFromUrl(url) === "webp";
-  if (isWebp) {
-    // 遇到 WebP 格式时，走 triggerFetchedBlobDownload 进行离线转码下载
-    triggerFetchedBlobDownload(url, filename).catch(() => {
-      const finalUrl = buildDownloadUrl(url, filename);
-      const link = document.createElement("a");
-      link.href = finalUrl;
-      link.download = normalizeDownloadFilename(filename, true);
-      link.rel = "noopener noreferrer";
-      link.target = isSameOrigin(finalUrl) ? "_self" : "_blank";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    });
-    return;
+export async function forceFetchImageBlob(url: string): Promise<Blob> {
+  // 1. 尝试直接 fetch
+  try {
+    const response = await fetch(url, { credentials: "include" });
+    if (response.ok) {
+      return await response.blob();
+    }
+  } catch {
+    // 忽略错误，降级到 Canvas 跨域转码提取
   }
 
-  const finalUrl = buildDownloadUrl(url, filename);
-  const link = document.createElement("a");
+  // 2. 如果 fetch 因跨域或网络受限失败，使用 Canvas 强行加载图片并导出 Blob
+  return await new Promise<Blob>((resolve, reject) => {
+    if (typeof window === "undefined") {
+      reject(new Error("Environment does not support Image element"));
+      return;
+    }
 
-  link.href = finalUrl;
-  link.download = filename;
-  link.rel = "noopener noreferrer";
-  link.target = isSameOrigin(finalUrl) ? "_self" : "_blank";
+    const img = new window.Image();
+    img.crossOrigin = "anonymous";
+    img.src = url;
 
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+    img.onload = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width || 800;
+        canvas.height = img.height || 800;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(img, 0, 0);
+          canvas.toBlob((blob) => {
+            if (blob) {
+              resolve(blob);
+            } else {
+              reject(new Error("Canvas toBlob output null"));
+            }
+          }, "image/jpeg", 0.95);
+          return;
+        }
+      } catch (err) {
+        reject(err);
+      }
+    };
+
+    img.onerror = (err) => reject(err);
+  });
+}
+
+export function triggerBrowserDownload(url: string, filename: string) {
+  // 不管是同源还是跨域，统一转为同源 Blob 触发真实弹窗保存
+  triggerFetchedBlobDownload(url, filename).catch(() => {
+    // 最后的极其罕见的保底
+    const finalUrl = buildDownloadUrl(url, filename);
+    const link = document.createElement("a");
+    link.href = finalUrl;
+    link.download = filename;
+    link.rel = "noopener noreferrer";
+    link.target = "_self";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  });
 }
 
 export function triggerBlobDownload(blob: Blob, filename: string) {
@@ -165,12 +198,7 @@ export function triggerBlobDownload(blob: Blob, filename: string) {
 }
 
 export async function triggerFetchedBlobDownload(url: string, filename: string) {
-  const response = await fetch(url, { credentials: "include" });
-  if (!response.ok) {
-    throw new Error(`Download request failed: ${response.status}`);
-  }
-
-  const rawBlob = await response.blob();
+  const rawBlob = await forceFetchImageBlob(url);
   const isWebpHint = rawBlob.type === "image/webp" || rawBlob.type === "image/x-webp" || /\.webp$/i.test(filename) || inferFileExtensionFromUrl(url) === "webp";
 
   let finalBlob = rawBlob;
@@ -195,12 +223,7 @@ export async function triggerIOSMediaShare(url: string, filename: string) {
   }
 
   try {
-    const response = await fetch(url, { credentials: "include" });
-    if (!response.ok) {
-      return false;
-    }
-
-    const rawBlob = await response.blob();
+    const rawBlob = await forceFetchImageBlob(url);
     const isWebpHint = rawBlob.type === "image/webp" || rawBlob.type === "image/x-webp" || /\.webp$/i.test(filename) || inferFileExtensionFromUrl(url) === "webp";
 
     let finalBlob = rawBlob;

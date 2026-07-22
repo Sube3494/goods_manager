@@ -464,16 +464,21 @@ export async function PUT(
     const storage = await getStorageStrategy();
     const normalizedProductImage = storage.stripUrl(productImage) || null;
 
-    // 完美图片判定：前端提交新图 > 店铺原有独立图片 > 关联主库商品图片 > 关联来源商品图片
-    let finalProductImage = normalizedProductImage;
-    if (!finalProductImage) {
-      if (existing.productImage) {
-        finalProductImage = existing.productImage;
-      } else if (existing.product?.image) {
-        finalProductImage = storage.stripUrl(existing.product.image);
-      } else if (sourceProductImage) {
-        finalProductImage = storage.stripUrl(sourceProductImage);
+    // 智能继承判定：如果提交图片与关联主图/来源图一致，保持 null 继承模式；否则保存独立图片
+    const inheritedRawImage = existing.product?.image || sourceProductImage;
+    const inheritedStrippedImage = inheritedRawImage ? storage.stripUrl(inheritedRawImage) : null;
+
+    let finalProductImage: string | null = null;
+    if (normalizedProductImage) {
+      if (inheritedStrippedImage && (normalizedProductImage === inheritedStrippedImage || storage.resolveUrl(normalizedProductImage) === storage.resolveUrl(inheritedStrippedImage))) {
+        // 与继承主图一致，保持 null 以防破坏继承关系
+        finalProductImage = null;
+      } else {
+        // 用户手动更改了独立图片
+        finalProductImage = normalizedProductImage;
       }
+    } else if (existing.productImage) {
+      finalProductImage = existing.productImage;
     }
 
     const updated = await prisma.shopProduct.update({

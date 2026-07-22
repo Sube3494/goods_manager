@@ -684,13 +684,13 @@ export default function GoodsPage() {
       const worksheet = workbook.addWorksheet("商品库");
 
       const columnsConfig = [
-        { header: "商品名称", key: "name", width: 34, align: "left" as const },
+        { header: "商品名称", key: "name", width: 36, align: "left" as const },
         { header: "主图", key: "image", width: 16, align: "center" as const },
         { header: "SKU/店内码", key: "sku", width: 22, align: "center" as const },
         { header: "分类", key: "category", width: 18, align: "center" as const },
-        { header: "进货单价", key: "costPrice", width: 16, align: "right" as const, numFmt: "￥#,##0.00" },
+        { header: "进货单价", key: "costPrice", width: 16, align: "center" as const, numFmt: "￥#,##0.00" },
         { header: "供应商", key: "supplier", width: 20, align: "center" as const },
-        { header: "关联门店数", key: "shopCount", width: 14, align: "right" as const, numFmt: "#,##0" },
+        { header: "关联门店数", key: "shopCount", width: 14, align: "center" as const, numFmt: "#,##0" },
         { header: "公开状态", key: "isPublic", width: 14, align: "center" as const },
         { header: "生产状态", key: "isDiscontinued", width: 14, align: "center" as const },
         { header: "商品参数", key: "specs", width: 28, align: "left" as const },

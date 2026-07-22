@@ -291,41 +291,63 @@ export async function GET(request: NextRequest) {
         .map((id) => pagedItems.find((item) => item.id === id))
         .filter((item): item is NonNullable<typeof item> => Boolean(item));
 
+      const sourceIdsNeedFetch = Array.from(
+        new Set(
+          orderedItems
+            .filter((i) => !i.productImage && !i.product?.image && i.sourceProductId)
+            .map((i) => i.sourceProductId!)
+        )
+      );
+
+      const sourceProductsMap = new Map<string, { image: string | null }>();
+      if (sourceIdsNeedFetch.length > 0) {
+        const fetchedSources = await prisma.product.findMany({
+          where: { id: { in: sourceIdsNeedFetch } },
+          select: { id: true, image: true },
+        });
+        fetchedSources.forEach((sp) => sourceProductsMap.set(sp.id, sp));
+      }
+
       const storage = await getStorageStrategy();
-      const resolved = orderedItems.map((item) => ({
-        id: item.id,
-        sourceProductId: item.sourceProductId || item.productId || item.id,
-        productId: item.productId || null,
-        sku: item.sku || null,
-        jdSkuId: item.jdSkuId || null,
-        name: item.productName || item.product?.name || "未命名商品",
-        image: item.productImage
-          ? storage.resolveUrl(item.productImage)
-          : item.product?.image
-          ? storage.resolveUrl(item.product.image)
-          : null,
-        categoryId: item.categoryId || item.product?.categoryId || null,
-        categoryName: item.categoryName || item.product?.category?.name || "未分类",
-        supplierId: item.supplierId || item.product?.supplierId || null,
-        supplier: item.product?.supplier
-          ? { id: item.product.supplier.id, name: item.product.supplier.name }
-          : null,
-        costPrice: item.costPrice ?? 0,
-        stock: item.stock ?? 0,
-        shopId: item.shopId,
-        shopName: item.shop?.name || "",
-        isPublic: item.isPublic ?? true,
-        isDiscontinued: item.isDiscontinued ?? false,
-        isShelfLife: item.isShelfLife ?? false,
-        shelfLifeDays: item.shelfLifeDays ?? null,
-        sourceType: "shopProduct" as const,
-        shopProductId: item.id,
-        isStandaloneShopProduct: !item.productId,
-        remark: item.remark || null,
-        specs: item.specs ?? null,
-        createdAt: item.createdAt,
-        updatedAt: item.updatedAt,
-      }));
+      const resolved = orderedItems.map((item) => {
+        const sourceImage = item.sourceProductId ? sourceProductsMap.get(item.sourceProductId)?.image : null;
+        return {
+          id: item.id,
+          sourceProductId: item.sourceProductId || item.productId || item.id,
+          productId: item.productId || null,
+          sku: item.sku || null,
+          jdSkuId: item.jdSkuId || null,
+          name: item.productName || item.product?.name || "未命名商品",
+          image: item.productImage
+            ? storage.resolveUrl(item.productImage)
+            : item.product?.image
+            ? storage.resolveUrl(item.product.image)
+            : sourceImage
+            ? storage.resolveUrl(sourceImage)
+            : null,
+          categoryId: item.categoryId || item.product?.categoryId || null,
+          categoryName: item.categoryName || item.product?.category?.name || "未分类",
+          supplierId: item.supplierId || item.product?.supplierId || null,
+          supplier: item.product?.supplier
+            ? { id: item.product.supplier.id, name: item.product.supplier.name }
+            : null,
+          costPrice: item.costPrice ?? 0,
+          stock: item.stock ?? 0,
+          shopId: item.shopId,
+          shopName: item.shop?.name || "",
+          isPublic: item.isPublic ?? true,
+          isDiscontinued: item.isDiscontinued ?? false,
+          isShelfLife: item.isShelfLife ?? false,
+          shelfLifeDays: item.shelfLifeDays ?? null,
+          sourceType: "shopProduct" as const,
+          shopProductId: item.id,
+          isStandaloneShopProduct: !item.productId,
+          remark: item.remark || null,
+          specs: item.specs ?? null,
+          createdAt: item.createdAt,
+          updatedAt: item.updatedAt,
+        };
+      });
 
       return NextResponse.json({
         items: resolved,
