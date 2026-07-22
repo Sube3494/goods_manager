@@ -416,6 +416,16 @@ export async function PUT(
       return NextResponse.json({ error: "Shop product not found" }, { status: 404 });
     }
 
+    // 查询可能关联的来源商品图片
+    let sourceProductImage: string | null = null;
+    if (existing.sourceProductId) {
+      const sourceProd = await prisma.product.findUnique({
+        where: { id: existing.sourceProductId },
+        select: { image: true },
+      });
+      sourceProductImage = sourceProd?.image || null;
+    }
+
     const productName = String(body?.name || "").trim();
     const normalizedSku = normalizeSku(body?.sku);
     const normalizedJdSkuId = normalizeSku(body?.jdSkuId);
@@ -454,10 +464,16 @@ export async function PUT(
     const storage = await getStorageStrategy();
     const normalizedProductImage = storage.stripUrl(productImage) || null;
 
-    // 当提供了图片时直接保存；如果未提供但已关联主商品，保持当前图片或主商品图片
+    // 完美图片判定：前端提交新图 > 店铺原有独立图片 > 关联主库商品图片 > 关联来源商品图片
     let finalProductImage = normalizedProductImage;
-    if (!finalProductImage && existing.productImage) {
-      finalProductImage = existing.productImage;
+    if (!finalProductImage) {
+      if (existing.productImage) {
+        finalProductImage = existing.productImage;
+      } else if (existing.product?.image) {
+        finalProductImage = storage.stripUrl(existing.product.image);
+      } else if (sourceProductImage) {
+        finalProductImage = storage.stripUrl(sourceProductImage);
+      }
     }
 
     const updated = await prisma.shopProduct.update({
@@ -509,6 +525,8 @@ export async function PUT(
       ? storage.resolveUrl(updated.productImage)
       : existing.product?.image
       ? storage.resolveUrl(existing.product.image)
+      : sourceProductImage
+      ? storage.resolveUrl(sourceProductImage)
       : null;
 
     return NextResponse.json({

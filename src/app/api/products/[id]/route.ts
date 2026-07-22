@@ -151,6 +151,11 @@ export async function PUT(
       }
     }
 
+    const storage = await getStorageStrategy();
+    const existingProduct = await prisma.product.findUnique({ where: { id }, select: { image: true } });
+    const strippedImage = image ? storage.stripUrl(image) : null;
+    const finalImage = image !== undefined && image !== "" ? strippedImage : (existingProduct?.image || null);
+
     const product = await prisma.$transaction(async (tx) => {
       await tx.product.update({
         where: { id },
@@ -161,7 +166,7 @@ export async function PUT(
           costPrice: Number(costPrice || body.price),
           categoryId,
           supplierId,
-          image,
+          image: finalImage,
           isPublic,
           remark: remark !== undefined ? remark : undefined,
           isShelfLife: isShelfLife !== undefined ? Boolean(isShelfLife) : undefined,
@@ -182,7 +187,6 @@ export async function PUT(
       });
     });
 
-    const storage = await getStorageStrategy();
     return NextResponse.json({
       ...product,
       image: product.image ? storage.resolveUrl(product.image) : null,

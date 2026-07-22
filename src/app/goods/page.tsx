@@ -23,7 +23,84 @@ import { useUser } from "@/hooks/useUser";
 import { hasPermission } from "@/lib/permissions";
 import { SessionUser } from "@/lib/permissions";
 import { useDebounce } from "@/hooks/useDebounce";
-import { formatLocalDate } from "@/lib/dateUtils";
+async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: ArrayBuffer; width?: number; height?: number; extension: "jpeg" | "png" } | null> {
+  if (!imageUrl || imageUrl === "暂无图片") return null;
+  try {
+    let rawBuffer: ArrayBuffer | null = null;
+    try {
+      const response = await fetch(imageUrl);
+      if (response.ok) {
+        rawBuffer = await response.arrayBuffer();
+      }
+    } catch {
+      rawBuffer = null;
+    }
+
+    let blobUrl = "";
+    if (rawBuffer) {
+      const blob = new Blob([rawBuffer]);
+      blobUrl = URL.createObjectURL(blob);
+    } else {
+      blobUrl = imageUrl;
+    }
+
+    return await new Promise((resolve) => {
+      const img = typeof window !== "undefined" ? new window.Image() : ({} as HTMLImageElement);
+      if (!rawBuffer) {
+        img.crossOrigin = "anonymous";
+      }
+      img.onload = () => {
+        try {
+          const canvas = document.createElement("canvas");
+          const width = img.width || 120;
+          const height = img.height || 120;
+          canvas.width = width;
+          canvas.height = height;
+
+          const ctx = canvas.getContext("2d");
+          if (!ctx) {
+            if (blobUrl && rawBuffer) URL.revokeObjectURL(blobUrl);
+            resolve(rawBuffer ? { buffer: rawBuffer, width, height, extension: "jpeg" } : null);
+            return;
+          }
+
+          ctx.fillStyle = "#FFFFFF";
+          ctx.fillRect(0, 0, width, height);
+          ctx.drawImage(img, 0, 0);
+
+          const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+          if (blobUrl && rawBuffer) URL.revokeObjectURL(blobUrl);
+
+          const base64Data = dataUrl.split(",")[1];
+          const binaryString = atob(base64Data);
+          const bytes = new Uint8Array(binaryString.length);
+          for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+          }
+
+          resolve({
+            buffer: bytes.buffer,
+            width,
+            height,
+            extension: "jpeg",
+          });
+        } catch {
+          if (blobUrl && rawBuffer) URL.revokeObjectURL(blobUrl);
+          resolve(rawBuffer ? { buffer: rawBuffer, width: img.width || 120, height: img.height || 120, extension: "jpeg" } : null);
+        }
+      };
+
+      img.onerror = () => {
+        if (blobUrl && rawBuffer) URL.revokeObjectURL(blobUrl);
+        resolve(rawBuffer ? { buffer: rawBuffer, width: 100, height: 100, extension: "jpeg" } : null);
+      };
+
+      img.src = blobUrl;
+    });
+  } catch {
+    return null;
+  }
+}
 
 export default function GoodsPage() {
   const { user } = useUser();
@@ -567,87 +644,150 @@ export default function GoodsPage() {
   const filteredGoods = items;
 
   const handleExport = useCallback(async () => {
-    showToast("正在准备导出数据...", "info");
     try {
-      // 使用与当前筛选一致的参数，但 pageSize 设为极大值以获取全部数据
+      showToast("正在获取主库商品数据...", "info");
       const queryParams = new URLSearchParams({
         page: "1",
-        pageSize: "99999",
+        all: "true",
         search: debouncedSearch,
         category: selectedCategory,
         status: selectedStatus,
-        supplierId: selectedSupplier,
-        sortBy: sortBy,
-        includeShopOnly: "true",
-        ...(activeLibraryId ? { libraryId: activeLibraryId } : {}),
+        supplier: selectedSupplier,
+        sort: sortBy,
+        ...(activeLibraryId && activeLibraryId !== "all" ? { libraryId: activeLibraryId } : {}),
       });
 
       const res = await fetch(`/api/products?${queryParams.toString()}`);
-      if (!res.ok) throw new Error("Export fetch failed");
-
+      if (!res.ok) throw new Error("获取商品数据失败");
       const data = await res.json();
-      const allGoods: Product[] = data.items || [];
+      const allGoods: Product[] = Array.isArray(data.items) ? data.items : [];
 
       if (allGoods.length === 0) {
-        showToast("没有可导出的商品", "error");
+        showToast("没有可导出的商品数据", "error");
         return;
       }
 
-      const exportData = allGoods.map(g => {
-        // 基础数据
-        const baseData: Record<string, string | number | boolean | null | undefined> = {
-          "商品名称": g.name,
-          "SKU/店内码": g.sku || "",
-          "分类": typeof g.category === 'object' ? (g.category as Category).name : String(g.category),
-          "进货单价": g.costPrice,
-          "关联门店数": g.assignedShopIds?.length || 0,
-          "供应商": g.supplier?.name || "未知供应商",
-          "商品图片": g.image || "暂无图片",
-          "图库图片": Array.isArray(g.gallery) ? g.gallery.map((img: GalleryItem) => img.url).join("\n") : "",
-          "公开状态": g.isPublic ? "公开" : "私密",
-          "生产状态": g.isDiscontinued ? "已停止生产" : "正常供应",
-          "备注": g.remark || "",
-          "创建时间": g.createdAt ? new Date(g.createdAt).toLocaleString() : ""
-        };
-
-        // 合并规格参数 (Merge specs into a single column)
-        if (g.specs && typeof g.specs === 'object') {
-          const specString = Object.entries(g.specs)
-            .map(([key, value]) => `${key}: ${value}`)
-            .join("\n");
-          baseData["商品参数"] = specString;
-        } else {
-          baseData["商品参数"] = "";
-        }
-
-        return baseData;
-      });
+      showToast(`正在转码图片与生成 Excel 表格 (共 ${allGoods.length} 条)...`, "info");
 
       const ExcelJS = (await import("exceljs")).default;
       const { saveAs } = await import("file-saver");
       
       const workbook = new ExcelJS.Workbook();
-      const worksheet = workbook.addWorksheet("商品模板");
+      workbook.creator = "Goods Manager";
+      workbook.lastModifiedBy = "Goods Manager";
+      workbook.created = new Date();
+      workbook.modified = new Date();
 
-      if (exportData.length > 0) {
-        const headers = Object.keys(exportData[0]);
-        const headerRow = worksheet.addRow(headers);
-        headerRow.font = { bold: true };
-        
-        exportData.forEach(data => {
-          worksheet.addRow(headers.map(h => data[h]));
+      const worksheet = workbook.addWorksheet("商品库");
+
+      const columnsConfig = [
+        { header: "商品名称", key: "name", width: 34, align: "left" as const },
+        { header: "主图", key: "image", width: 16, align: "center" as const },
+        { header: "SKU/店内码", key: "sku", width: 22, align: "center" as const },
+        { header: "分类", key: "category", width: 18, align: "center" as const },
+        { header: "进货单价", key: "costPrice", width: 16, align: "right" as const, numFmt: "￥#,##0.00" },
+        { header: "供应商", key: "supplier", width: 20, align: "center" as const },
+        { header: "关联门店数", key: "shopCount", width: 14, align: "right" as const, numFmt: "#,##0" },
+        { header: "公开状态", key: "isPublic", width: 14, align: "center" as const },
+        { header: "生产状态", key: "isDiscontinued", width: 14, align: "center" as const },
+        { header: "商品参数", key: "specs", width: 28, align: "left" as const },
+        { header: "备注", key: "remark", width: 28, align: "left" as const },
+        { header: "创建时间", key: "createdAt", width: 20, align: "center" as const },
+      ];
+
+      worksheet.columns = columnsConfig.map(c => ({ key: c.key, width: c.width }));
+
+      // 表头样式
+      const headerRow = worksheet.addRow(columnsConfig.map(c => c.header));
+      headerRow.height = 30;
+      headerRow.eachCell((cell) => {
+        cell.font = { name: "微软雅黑", size: 11, bold: true, color: { argb: "FF1F2937" } };
+        cell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: "FFF3F4F6" },
+        };
+        cell.alignment = { horizontal: "center", vertical: "middle" };
+        cell.border = {
+          top: { style: "thin", color: { argb: "FFE5E7EB" } },
+          bottom: { style: "medium", color: { argb: "FFD1D5DB" } },
+          left: { style: "thin", color: { argb: "FFE5E7EB" } },
+          right: { style: "thin", color: { argb: "FFE5E7EB" } },
+        };
+      });
+
+      let rowIndex = 2;
+      for (const g of allGoods) {
+        const categoryName = typeof g.category === "object" ? (g.category as Category).name : String(g.category || "未分类");
+        const supplierName = g.supplier?.name || "未知供应商";
+        const costPrice = typeof g.costPrice === "number" ? g.costPrice : 0;
+        const shopCount = g.assignedShopIds?.length || 0;
+        const createdAt = g.createdAt ? new Date(g.createdAt).toLocaleString() : "";
+        let specString = "";
+        if (g.specs && typeof g.specs === "object") {
+          specString = Object.entries(g.specs)
+            .map(([k, v]) => `${k}: ${v}`)
+            .join("\n");
+        }
+
+        const row = worksheet.addRow({
+          name: g.name || "",
+          image: "",
+          sku: g.sku || "",
+          category: categoryName,
+          costPrice,
+          supplier: supplierName,
+          shopCount,
+          isPublic: g.isPublic ? "公开" : "私密",
+          isDiscontinued: g.isDiscontinued ? "已停止生产" : "正常供应",
+          specs: specString,
+          remark: g.remark || "",
+          createdAt,
         });
 
-        worksheet.eachRow((row: import("exceljs").Row) => {
-          row.eachCell((cell: import("exceljs").Cell) => {
-            cell.font = { ...cell.font, name: '微软雅黑' };
-          });
+        row.height = 72;
+
+        columnsConfig.forEach((col, colIdx) => {
+          const cell = row.getCell(colIdx + 1);
+          cell.font = { name: "微软雅黑", size: 10 };
+          cell.alignment = {
+            horizontal: col.align,
+            vertical: "middle",
+            wrapText: col.key === "name" || col.key === "remark" || col.key === "specs",
+          };
+          if (col.numFmt) {
+            cell.numFmt = col.numFmt;
+          }
+          cell.border = {
+            top: { style: "thin", color: { argb: "FFE5E7EB" } },
+            bottom: { style: "thin", color: { argb: "FFE5E7EB" } },
+            left: { style: "thin", color: { argb: "FFE5E7EB" } },
+            right: { style: "thin", color: { argb: "FFE5E7EB" } },
+          };
         });
+
+        if (g.image) {
+          const imgResult = await loadAndConvertImageForExcel(g.image);
+          if (imgResult) {
+            const imageId = workbook.addImage({
+              buffer: imgResult.buffer,
+              extension: imgResult.extension,
+            });
+            worksheet.addImage(imageId, {
+              tl: { col: 1 + 0.08, row: rowIndex - 1 + 0.08 } as any,
+              br: { col: 2 - 0.08, row: rowIndex - 0.08 } as any,
+              editAs: "oneCell",
+            });
+          }
+        }
+
+        rowIndex++;
       }
 
       const buffer = await workbook.xlsx.writeBuffer();
-      saveAs(new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), `商品模板库导出_${formatLocalDate(new Date())}.xlsx`);
-      showToast(`已导出 ${allGoods.length} 条商品数据`, "success");
+      const filename = `商品模板库导出_${new Date().toLocaleString("sv-SE", { hour12: false }).replace(" ", "_").replace(/:/g, "-")}.xlsx`;
+      saveAs(new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), filename);
+      showToast(`已成功导出 ${allGoods.length} 条商品数据 (含主图)`, "success");
     } catch (error) {
       console.error("Export failed:", error);
       showToast("导出失败，请重试", "error");
