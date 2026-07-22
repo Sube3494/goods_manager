@@ -17,6 +17,7 @@ import { CustomSelect } from "@/components/ui/CustomSelect";
 import { ActionBar } from "@/components/ui/ActionBar";
 import { useToast } from "@/components/ui/Toast";
 import { useDebounce } from "@/hooks/useDebounce";
+import { ExportProgressModal } from "@/components/ui/ExportProgressModal";
 import { Category, Product, Shop, ShopCatalogItem, Supplier } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -887,6 +888,8 @@ export default function ShopGoodsPage() {
     }
   }, [categories, fetchSelectedItems, selectedIds, showToast]);
 
+  const [exportProgress, setExportProgress] = useState<{ isOpen: boolean; current: number; total: number } | null>(null);
+
   const handleExport = useCallback(async () => {
     try {
       showToast("正在获取店铺商品数据...", "info");
@@ -899,7 +902,7 @@ export default function ShopGoodsPage() {
         return;
       }
 
-      showToast(`正在转码图片与生成 Excel 表格 (共 ${exportItems.length} 条)...`, "info");
+      setExportProgress({ isOpen: true, current: 0, total: exportItems.length });
 
       const ExcelJS = (await import("exceljs")).default;
       const { saveAs } = await import("file-saver");
@@ -949,7 +952,8 @@ export default function ShopGoodsPage() {
         };
       });
 
-      // 逐行写入数据并嵌入图片
+      // 预先初始化表格数据行
+      const rowElements: { item: ShopCatalogItem; rowIndex: number }[] = [];
       let rowIndex = 2;
       for (const item of exportItems) {
         const supplierName = suppliers.find((supplier) => supplier.id === item.supplierId)?.name || "";
@@ -990,23 +994,47 @@ export default function ShopGoodsPage() {
           };
         });
 
-        // 如果存在主图，抓取转码并嵌入 Excel
-        if (item.image) {
-          const imgResult = await loadAndConvertImageForExcel(item.image);
-          if (imgResult) {
-            const imageId = workbook.addImage({
-              buffer: imgResult.buffer,
-              extension: imgResult.extension,
-            });
-            worksheet.addImage(imageId, {
-              tl: { col: 1 + 0.08, row: rowIndex - 1 + 0.08 } as any,
-              br: { col: 2 - 0.08, row: rowIndex - 0.08 } as any,
-              editAs: "oneCell",
-            });
-          }
-        }
-
+        rowElements.push({ item, rowIndex });
         rowIndex++;
+      }
+
+      // 分批并发下载抓取转码主图，并实时推进进度条
+      let processedCount = 0;
+      const concurrency = 6;
+      for (let i = 0; i < rowElements.length; i += concurrency) {
+        const chunk = rowElements.slice(i, i + concurrency);
+        await Promise.all(
+          chunk.map(async ({ item, rowIndex: rIdx }) => {
+            if (item.image) {
+              const imgResult = await loadAndConvertImageForExcel(item.image);
+              if (imgResult) {
+                const imageId = workbook.addImage({
+                  buffer: imgResult.buffer,
+                  extension: imgResult.extension,
+                });
+
+                const imgW = imgResult.width || 100;
+                const imgH = imgResult.height || 100;
+                const scale = Math.min(75 / imgW, 75 / imgH);
+                const finalW = Math.round(imgW * scale);
+                const finalH = Math.round(imgH * scale);
+
+                const COL_WIDTH_PX = 135;
+                const ROW_HEIGHT_PX = 96; // 72pt / 0.75
+                const colOffset = ((COL_WIDTH_PX - finalW) / 2) / COL_WIDTH_PX;
+                const rowOffset = ((ROW_HEIGHT_PX - finalH) / 2) / ROW_HEIGHT_PX;
+
+                worksheet.addImage(imageId, {
+                  tl: { col: 1 + colOffset, row: rIdx - 1 + rowOffset } as any,
+                  ext: { width: finalW, height: finalH } as any,
+                  editAs: "oneCell",
+                });
+              }
+            }
+            processedCount++;
+            setExportProgress({ isOpen: true, current: processedCount, total: exportItems.length });
+          })
+        );
       }
 
       const buffer = await workbook.xlsx.writeBuffer();
@@ -1016,6 +1044,8 @@ export default function ShopGoodsPage() {
     } catch (error) {
       console.error("Failed to export shop products:", error);
       showToast("导出店铺商品失败", "error");
+    } finally {
+      setExportProgress(null);
     }
   }, [buildAggregateQuery, selectedShop, showToast, suppliers]);
 
@@ -1267,6 +1297,15 @@ export default function ShopGoodsPage() {
           )}
         </AnimatePresence>,
         document.body
+      )}
+      {exportProgress && (
+        <ExportProgressModal
+          isOpen={exportProgress.isOpen}
+          current={exportProgress.current}
+          total={exportProgress.total}
+          title="正在生成店铺商品 Excel 数据包"
+          subtitle="正在抓取转码商品主图并排版单元格，请稍候..."
+        />
       )}
     </div>
   );

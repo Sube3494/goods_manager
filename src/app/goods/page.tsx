@@ -23,6 +23,7 @@ import { useUser } from "@/hooks/useUser";
 import { hasPermission } from "@/lib/permissions";
 import { SessionUser } from "@/lib/permissions";
 import { useDebounce } from "@/hooks/useDebounce";
+import { ExportProgressModal } from "@/components/ui/ExportProgressModal";
 async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: ArrayBuffer; width?: number; height?: number; extension: "jpeg" | "png" } | null> {
   if (!imageUrl || imageUrl === "暂无图片") return null;
   try {
@@ -643,6 +644,8 @@ export default function GoodsPage() {
   // No local sorting needed anymore, we trust server-side globally-sorted pagination
   const filteredGoods = items;
 
+  const [exportProgress, setExportProgress] = useState<{ isOpen: boolean; current: number; total: number } | null>(null);
+
   const handleExport = useCallback(async () => {
     try {
       showToast("正在获取主库商品数据...", "info");
@@ -667,7 +670,7 @@ export default function GoodsPage() {
         return;
       }
 
-      showToast(`正在转码图片与生成 Excel 表格 (共 ${allGoods.length} 条)...`, "info");
+      setExportProgress({ isOpen: true, current: 0, total: allGoods.length });
 
       const ExcelJS = (await import("exceljs")).default;
       const { saveAs } = await import("file-saver");
@@ -716,6 +719,7 @@ export default function GoodsPage() {
         };
       });
 
+      const rowElements: { g: Product; rowIndex: number }[] = [];
       let rowIndex = 2;
       for (const g of allGoods) {
         const categoryName = typeof g.category === "object" ? (g.category as Category).name : String(g.category || "未分类");
@@ -766,22 +770,47 @@ export default function GoodsPage() {
           };
         });
 
-        if (g.image) {
-          const imgResult = await loadAndConvertImageForExcel(g.image);
-          if (imgResult) {
-            const imageId = workbook.addImage({
-              buffer: imgResult.buffer,
-              extension: imgResult.extension,
-            });
-            worksheet.addImage(imageId, {
-              tl: { col: 1 + 0.08, row: rowIndex - 1 + 0.08 } as any,
-              br: { col: 2 - 0.08, row: rowIndex - 0.08 } as any,
-              editAs: "oneCell",
-            });
-          }
-        }
-
+        rowElements.push({ g, rowIndex });
         rowIndex++;
+      }
+
+      // 并发分批抓取转码图片并驱动进度条更新
+      let processedCount = 0;
+      const concurrency = 6;
+      for (let i = 0; i < rowElements.length; i += concurrency) {
+        const chunk = rowElements.slice(i, i + concurrency);
+        await Promise.all(
+          chunk.map(async ({ g, rowIndex: rIdx }) => {
+            if (g.image) {
+              const imgResult = await loadAndConvertImageForExcel(g.image);
+              if (imgResult) {
+                const imageId = workbook.addImage({
+                  buffer: imgResult.buffer,
+                  extension: imgResult.extension,
+                });
+
+                const imgW = imgResult.width || 100;
+                const imgH = imgResult.height || 100;
+                const scale = Math.min(75 / imgW, 75 / imgH);
+                const finalW = Math.round(imgW * scale);
+                const finalH = Math.round(imgH * scale);
+
+                const COL_WIDTH_PX = 135;
+                const ROW_HEIGHT_PX = 96; // 72pt / 0.75
+                const colOffset = ((COL_WIDTH_PX - finalW) / 2) / COL_WIDTH_PX;
+                const rowOffset = ((ROW_HEIGHT_PX - finalH) / 2) / ROW_HEIGHT_PX;
+
+                worksheet.addImage(imageId, {
+                  tl: { col: 1 + colOffset, row: rIdx - 1 + rowOffset } as any,
+                  ext: { width: finalW, height: finalH } as any,
+                  editAs: "oneCell",
+                });
+              }
+            }
+            processedCount++;
+            setExportProgress({ isOpen: true, current: processedCount, total: allGoods.length });
+          })
+        );
       }
 
       const buffer = await workbook.xlsx.writeBuffer();
@@ -791,6 +820,8 @@ export default function GoodsPage() {
     } catch (error) {
       console.error("Export failed:", error);
       showToast("导出失败，请重试", "error");
+    } finally {
+      setExportProgress(null);
     }
   }, [debouncedSearch, selectedCategory, selectedStatus, selectedSupplier, sortBy, activeLibraryId, showToast]);
 
@@ -1340,6 +1371,15 @@ export default function GoodsPage() {
           )}
         </AnimatePresence>,
         document.body
+      )}
+      {exportProgress && (
+        <ExportProgressModal
+          isOpen={exportProgress.isOpen}
+          current={exportProgress.current}
+          total={exportProgress.total}
+          title="正在生成商品库 Excel 数据包"
+          subtitle="正在抓取转码商品主图并排版单元格，请稍候..."
+        />
       )}
     </div>
   );
