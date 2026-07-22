@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import Image from "next/image";
 import { createPortal } from "react-dom";
-import { X, Search, Check, Loader2, Package } from "lucide-react";
+import { X, Search, Check, Loader2, Package, LayoutGrid, List } from "lucide-react";
 import { Category, Product } from "@/lib/types";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { useToast } from "@/components/ui/Toast";
@@ -148,6 +148,25 @@ export function ProductSelectionModal({
   const [isInitialized, setIsInitialized] = useState(false);
   const [libraries, setLibraries] = useState<any[]>([]);
   const [activeLibraryId, setActiveLibraryId] = useState<string>(lockLibraryId || "all");
+
+  const [viewMode, setViewMode] = useState<"grid" | "list">(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("product_picker_view_mode");
+      if (saved === "grid" || saved === "list") return saved;
+    }
+    return "grid";
+  });
+
+  const handleViewModeChange = (mode: "grid" | "list") => {
+    setViewMode(mode);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("product_picker_view_mode", mode);
+    }
+  };
+
+  const [hoveredImage, setHoveredImage] = useState<{ url: string; name: string; x: number; y: number } | null>(null);
+
+  const isGridView = imageOnly || viewMode === "grid";
 
   useEffect(() => {
     if (isOpen) {
@@ -576,7 +595,7 @@ export function ProductSelectionModal({
                  </div>
 
                 {shouldShowCategoryFilter && (
-                  <div className="w-36 sm:w-44 shrink-0">
+                  <div className="w-32 sm:w-40 shrink-0">
                     <CustomSelect
                       options={[
                         { value: "all", label: "所有分类" },
@@ -585,8 +604,41 @@ export function ProductSelectionModal({
                       value={selectedCategoryName}
                       onChange={setSelectedCategoryName}
                       placeholder="筛选分类"
-                      triggerClassName="h-11 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-5 text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all dark:hover:bg-white/10"
+                      triggerClassName="h-11 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-4 text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all dark:hover:bg-white/10"
                     />
+                  </div>
+                )}
+
+                {!imageOnly && (
+                  <div className="flex items-center p-1 bg-zinc-100 dark:bg-white/10 rounded-full border border-border/50 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => handleViewModeChange("grid")}
+                      title="大图网格"
+                      className={cn(
+                        "p-1.5 rounded-full transition-all text-xs flex items-center gap-1.5 font-bold px-2.5 sm:px-3 cursor-pointer",
+                        isGridView
+                          ? "bg-white dark:bg-gray-800 text-primary shadow-xs"
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      <LayoutGrid size={15} />
+                      <span className="hidden sm:inline">大图</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleViewModeChange("list")}
+                      title="列表视图"
+                      className={cn(
+                        "p-1.5 rounded-full transition-all text-xs flex items-center gap-1.5 font-bold px-2.5 sm:px-3 cursor-pointer",
+                        !isGridView
+                          ? "bg-white dark:bg-gray-800 text-primary shadow-xs"
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      <List size={15} />
+                      <span className="hidden sm:inline">列表</span>
+                    </button>
                   </div>
                 )}
               </div>
@@ -627,15 +679,15 @@ export function ProductSelectionModal({
                 </div>
               )}
 
-              <div className={cn("relative flex-1 overflow-y-auto no-scrollbar min-h-[220px]", imageOnly ? "" : "space-y-2")}>
+              <div className={cn("relative flex-1 overflow-y-auto no-scrollbar min-h-[220px]", isGridView ? "" : "space-y-2")}>
                  {(showInitialSkeleton && products.length === 0) ? (
-                    <div className={cn(imageOnly ? "grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5" : "space-y-2")}>
+                    <div className={cn(isGridView ? "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3.5" : "space-y-2")}>
                         {[...Array(6)].map((_, i) => (
-                           <ProductSkeleton key={i} imageOnly={imageOnly} />
+                           <ProductSkeleton key={i} imageOnly={isGridView} />
                         ))}
                     </div>
                  ) : (
-                    <div className={cn(imageOnly ? "grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5" : "space-y-1.5")}>
+                    <div className={cn(isGridView ? "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3.5" : "space-y-1.5")}>
                     {displayedProducts.map((product: Product) => {
                       const selectionKey = getSelectionKey(product);
                       const isSelected = tempSelectedIds.includes(selectionKey);
@@ -645,67 +697,103 @@ export function ProductSelectionModal({
                          <button
                           key={product.id}
                           type="button"
-                         onClick={() => toggleProduct(product)}
-                            disabled={isAlreadySelected}
-                            className={cn(
-                             imageOnly
-                               ? "group relative aspect-square overflow-hidden rounded-2xl border transition-all cursor-pointer"
+                          onClick={() => toggleProduct(product)}
+                          disabled={isAlreadySelected}
+                          className={cn(
+                             isGridView
+                               ? "group relative flex flex-col overflow-hidden rounded-2xl border transition-all cursor-pointer text-left bg-white dark:bg-white/5 shadow-xs"
                                : "group relative flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-all cursor-pointer min-h-[64px]",
                              isSelected 
-                               ? "bg-white dark:bg-white/5 border-primary shadow-md" 
+                               ? "border-primary ring-2 ring-primary/20 bg-primary/5 dark:bg-primary/10 shadow-md" 
                                : isAlreadySelected
-                               ? "bg-white/70 dark:bg-white/5 border-emerald-500/20 shadow-sm opacity-70 cursor-not-allowed"
-                               : "bg-white dark:bg-white/5 border-border/60 shadow-sm hover:border-primary/20 hover:bg-zinc-50 dark:hover:bg-white/10"
+                               ? "border-emerald-500/20 bg-emerald-50/20 dark:bg-emerald-950/10 shadow-xs opacity-75 cursor-not-allowed"
+                               : "border-border/60 shadow-xs hover:border-primary/30 hover:bg-zinc-50/50 dark:hover:bg-white/10"
                            )}
                         >
                           <div className={cn(
-                            imageOnly
-                              ? "absolute top-2.5 right-2.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border transition-all z-10 shadow-xl hover:scale-110"
+                            isGridView
+                              ? "absolute top-2.5 right-2.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border transition-all z-10 shadow-md"
                               : "order-last ml-auto flex h-6 w-6 shrink-0 items-center justify-center rounded-full border transition-all",
                             isSelected 
                               ? "bg-primary border-primary text-primary-foreground shadow-sm shadow-primary/20"
                               : isAlreadySelected
-                              ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-500"
-                              : "bg-transparent border-muted-foreground/50 text-transparent group-hover:border-foreground/60"
+                              ? "bg-emerald-500 border-emerald-500 text-white"
+                              : "bg-black/20 dark:bg-white/20 backdrop-blur-xs border-white/60 text-transparent group-hover:border-foreground/60"
                           )}>
-                            {(isSelected || isAlreadySelected) && <Check size={12} strokeWidth={4} />}
+                            {(isSelected || isAlreadySelected) && <Check size={14} strokeWidth={3.5} />}
                           </div>
 
-                          <div className={cn(
-                            imageOnly
-                              ? "h-full w-full overflow-hidden bg-muted relative"
-                              : "h-10 w-10 shrink-0 rounded-lg overflow-hidden bg-muted border border-border/50 relative"
-                          )}>
+                          <div 
+                            className={cn(
+                              isGridView
+                                ? "w-full aspect-square overflow-hidden bg-muted relative"
+                                : "h-11 w-11 shrink-0 rounded-lg overflow-hidden bg-muted border border-border/50 relative"
+                            )}
+                            onMouseEnter={(e) => {
+                              if (!product.image) return;
+                              const rect = e.currentTarget.getBoundingClientRect();
+                              setHoveredImage({
+                                url: product.image,
+                                name: product.name,
+                                x: Math.min(window.innerWidth - 300, rect.right + 12),
+                                y: Math.max(12, Math.min(window.innerHeight - 300, rect.top - 20))
+                              });
+                            }}
+                            onMouseLeave={() => setHoveredImage(null)}
+                          >
                             {product.image ? (
                                 <Image 
                                    src={product.image} 
                                    alt={product.name} 
-                                    width={imageOnly ? 240 : 40} 
-                                    height={imageOnly ? 240 : 40} 
-                                    className="h-full w-full object-cover" 
+                                    width={isGridView ? 300 : 48} 
+                                    height={isGridView ? 300 : 48} 
+                                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" 
                                     unoptimized
                                 />
                             ) : (
                                 <div className="h-full w-full flex items-center justify-center text-muted-foreground">
-                                    <Package size={20} />
+                                    <Package size={isGridView ? 32 : 20} />
                                 </div>
                             )}
                           </div>
                           
-                           {!imageOnly && (
-                           <div className="flex min-w-0 flex-1 flex-col justify-center gap-1 pr-1">
-                             <span className={cn("truncate text-sm font-medium leading-snug", isSelected ? "text-primary dark:text-foreground" : "text-foreground")}>{product.name}</span>
-                             <div className="flex min-w-0 items-center gap-1 overflow-hidden">
-                                {showSku && productCode && (
-                                  <span className="shrink-0 rounded bg-zinc-100 dark:bg-white/10 px-1.5 py-0.5 font-mono text-[10px] font-bold text-zinc-800 dark:text-zinc-200">
-                                    编号：{productCode}
+                          {isGridView ? (
+                            <div className="p-3 flex flex-col gap-1.5 flex-1 min-w-0">
+                              {isAlreadySelected && (
+                                <div className="inline-flex w-fit rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                                  {selectedBadgeLabel}
+                                </div>
+                              )}
+                              <span className={cn("line-clamp-2 text-xs font-bold leading-snug", isSelected ? "text-primary dark:text-foreground" : "text-foreground")}>
+                                {product.name}
+                              </span>
+                              <div className="mt-auto flex flex-wrap items-center gap-1 pt-1">
+                                {productCode && (
+                                  <span className="truncate max-w-full rounded bg-zinc-100 dark:bg-white/10 px-1.5 py-0.5 font-mono text-[10px] font-bold text-zinc-700 dark:text-zinc-300">
+                                    #{productCode}
                                   </span>
                                 )}
-                                {product.shopName && (
-                                  <span className="shrink-0 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">
-                                    {product.shopName}
+                                {product.category?.name && (
+                                  <span className="truncate max-w-full rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                                    {product.category.name}
                                   </span>
                                 )}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex min-w-0 flex-1 flex-col justify-center gap-1 pr-1">
+                              <span className={cn("truncate text-sm font-medium leading-snug", isSelected ? "text-primary dark:text-foreground" : "text-foreground")}>{product.name}</span>
+                              <div className="flex min-w-0 items-center gap-1 overflow-hidden">
+                                 {showSku && productCode && (
+                                   <span className="shrink-0 rounded bg-zinc-100 dark:bg-white/10 px-1.5 py-0.5 font-mono text-[10px] font-bold text-zinc-800 dark:text-zinc-200">
+                                     编号：{productCode}
+                                   </span>
+                                 )}
+                                 {product.shopName && (
+                                   <span className="shrink-0 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">
+                                     {product.shopName}
+                                   </span>
+                                 )}
                                 {product.category?.name && (
                                   <span className="shrink-0 rounded bg-secondary/80 px-1.5 py-0.5 text-[10px] text-muted-foreground">
                                     {product.category.name}
@@ -832,7 +920,30 @@ export function ProductSelectionModal({
                </div>
             </div>
           </div>
+
+          {hoveredImage && (
+            <div
+              className="fixed z-120000 pointer-events-none rounded-2xl overflow-hidden border border-white/20 bg-white/95 dark:bg-gray-900/95 shadow-2xl backdrop-blur-xl p-2.5 transition-all duration-150 animate-in fade-in zoom-in-95"
+              style={{
+                left: `${hoveredImage.x}px`,
+                top: `${hoveredImage.y}px`,
+              }}
+            >
+              <div className="relative w-64 h-64 rounded-xl overflow-hidden bg-muted border border-border/40">
+                <Image
+                  src={hoveredImage.url}
+                  alt={hoveredImage.name}
+                  fill
+                  className="object-cover"
+                  unoptimized
+                />
+              </div>
+              <div className="mt-2 px-1 max-w-[256px]">
+                <p className="text-xs font-bold text-foreground truncate">{hoveredImage.name}</p>
+              </div>
+            </div>
+          )}
         </>,
-    document.body
-  );
+        document.body
+      );
 }
