@@ -15,14 +15,25 @@ interface TopOutboundProduct {
   };
 }
 
+type TopTimeRange = "7d" | "30d" | "month" | "all";
+
+const TIME_RANGE_OPTIONS: { key: TopTimeRange; label: string }[] = [
+  { key: "7d", label: "近7天" },
+  { key: "30d", label: "近30天" },
+  { key: "month", label: "本月" },
+  { key: "all", label: "全部" },
+];
+
 export function TopOutboundProducts() {
   const [items, setItems] = useState<TopOutboundProduct[]>([]);
+  const [timeRange, setTimeRange] = useState<TopTimeRange>("30d");
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     async function fetchTop() {
+      setIsLoading(true);
       try {
-        const res = await fetch("/api/stats/top-outbound");
+        const res = await fetch(`/api/stats/top-outbound?range=${timeRange}`);
         if (res.ok) {
           const data = await res.json();
           setItems(data);
@@ -34,12 +45,12 @@ export function TopOutboundProducts() {
       }
     }
     fetchTop();
-  }, []);
+  }, [timeRange]);
 
   const cardClass = "h-full w-full overflow-hidden rounded-[22px] border border-black/8 dark:border-white/10 bg-zinc-50/55 dark:bg-white/[0.04] shadow-xs dark:shadow-none backdrop-blur-xl";
 
   const TitleSection = () => (
-    <div className="flex items-center justify-between gap-3 border-b border-black/6 dark:border-white/8 px-4 py-3 sm:px-5">
+    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/6 dark:border-white/8 px-4 py-3 sm:px-5">
       <div className="min-w-0">
         <div className="flex items-center gap-2">
           <div className="flex h-7 w-7 items-center justify-center rounded-lg border border-black/8 bg-black/[0.03] text-muted-foreground dark:border-white/10 dark:bg-white/[0.04]">
@@ -51,12 +62,33 @@ export function TopOutboundProducts() {
           </div>
         </div>
       </div>
-      {items.length > 0 && (
-        <div className="inline-flex items-center gap-1 rounded-full border border-black/8 bg-black/[0.03] px-2.5 py-1 text-[10px] font-bold text-muted-foreground dark:border-white/10 dark:bg-white/[0.04]">
-          <Trophy size={11} />
-          前 {items.length} 名
+
+      <div className="flex items-center gap-2">
+        <div className="inline-flex items-center rounded-full border border-black/8 bg-black/3 p-0.5 dark:border-white/10 dark:bg-white/4">
+          {TIME_RANGE_OPTIONS.map((opt) => (
+            <button
+              key={opt.key}
+              type="button"
+              onClick={() => setTimeRange(opt.key)}
+              className={cn(
+                "rounded-full px-2 py-0.5 text-[10px] font-bold transition-all",
+                timeRange === opt.key
+                  ? "bg-background text-foreground shadow-xs dark:bg-white/10"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {opt.label}
+            </button>
+          ))}
         </div>
-      )}
+
+        {items.length > 0 && (
+          <div className="inline-flex items-center gap-1 rounded-full border border-black/8 bg-black/[0.03] px-2.5 py-1 text-[10px] font-bold text-muted-foreground dark:border-white/10 dark:bg-white/[0.04]">
+            <Trophy size={11} />
+            前 {items.length} 名
+          </div>
+        )}
+      </div>
     </div>
   );
 

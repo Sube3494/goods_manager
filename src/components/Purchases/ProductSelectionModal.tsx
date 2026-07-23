@@ -744,62 +744,64 @@ export function ProductSelectionModal({
                             )}
                           </div>
                           
-                          {isGridView ? (
-                            <div className="p-3 flex flex-col gap-1.5 flex-1 min-w-0">
-                              {isAlreadySelected && (
-                                <div className="inline-flex w-fit rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
-                                  {selectedBadgeLabel}
-                                </div>
-                              )}
-                              <span className={cn("line-clamp-2 text-xs font-bold leading-snug", isSelected ? "text-primary dark:text-foreground" : "text-foreground")}>
-                                {product.name}
-                              </span>
-                              <div className="mt-auto flex flex-wrap items-center gap-1 pt-1">
-                                {productCode && (
-                                  <span className="truncate max-w-full rounded bg-zinc-100 dark:bg-white/10 px-1.5 py-0.5 font-mono text-[10px] font-bold text-zinc-700 dark:text-zinc-300">
-                                    #{productCode}
-                                  </span>
+                          {!imageOnly && (
+                            isGridView ? (
+                              <div className="p-3 flex flex-col gap-1.5 flex-1 min-w-0">
+                                {isAlreadySelected && (
+                                  <div className="inline-flex w-fit rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                                    {selectedBadgeLabel}
+                                  </div>
                                 )}
-                                {product.category?.name && (
-                                  <span className="truncate max-w-full rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
-                                    {product.category.name}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="flex min-w-0 flex-1 flex-col justify-center gap-1 pr-1">
-                              <span className={cn("truncate text-sm font-medium leading-snug", isSelected ? "text-primary dark:text-foreground" : "text-foreground")}>{product.name}</span>
-                              <div className="flex min-w-0 items-center gap-1 overflow-hidden">
-                                 {showSku && productCode && (
-                                   <span className="shrink-0 rounded bg-zinc-100 dark:bg-white/10 px-1.5 py-0.5 font-mono text-[10px] font-bold text-zinc-800 dark:text-zinc-200">
-                                     编号：{productCode}
-                                   </span>
-                                 )}
-                                 {product.shopName && (
-                                   <span className="shrink-0 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">
-                                     {product.shopName}
-                                   </span>
-                                 )}
-                                {product.category?.name && (
-                                  <span className="shrink-0 rounded bg-secondary/80 px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                                    {product.category.name}
-                                  </span>
-                                )}
-                                {!minimalView && product.remark && (
-                                    <span className="flex min-w-0 items-center gap-1 truncate rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-600 dark:text-amber-500">
-                                        <span className="shrink-0 font-bold opacity-70">注:</span>
-                                        <span className="truncate">{product.remark}</span>
+                                <span className={cn("line-clamp-2 text-xs font-bold leading-snug", isSelected ? "text-primary dark:text-foreground" : "text-foreground")}>
+                                  {product.name}
+                                </span>
+                                <div className="mt-auto flex flex-wrap items-center gap-1 pt-1">
+                                  {productCode && (
+                                    <span className="truncate max-w-full rounded bg-zinc-100 dark:bg-white/10 px-1.5 py-0.5 font-mono text-[10px] font-bold text-zinc-700 dark:text-zinc-300">
+                                      #{productCode}
                                     </span>
-                                )}
-                                {showPrice && !minimalView && (
-                                  <span className="ml-auto shrink-0 text-sm font-semibold text-foreground">
-                                      ￥{product.costPrice}
-                                  </span>
-                                )}
-                             </div>
-                          </div>
-                           )}
+                                  )}
+                                  {product.category?.name && (
+                                    <span className="truncate max-w-full rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                                      {product.category.name}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="flex min-w-0 flex-1 flex-col justify-center gap-1 pr-1">
+                                <span className={cn("truncate text-sm font-medium leading-snug", isSelected ? "text-primary dark:text-foreground" : "text-foreground")}>{product.name}</span>
+                                <div className="flex min-w-0 items-center gap-1 overflow-hidden">
+                                   {showSku && productCode && (
+                                     <span className="shrink-0 rounded bg-zinc-100 dark:bg-white/10 px-1.5 py-0.5 font-mono text-[10px] font-bold text-zinc-800 dark:text-zinc-200">
+                                       编号：{productCode}
+                                     </span>
+                                   )}
+                                   {product.shopName && (
+                                     <span className="shrink-0 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">
+                                       {product.shopName}
+                                     </span>
+                                   )}
+                                  {product.category?.name && (
+                                    <span className="shrink-0 rounded bg-secondary/80 px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                                      {product.category.name}
+                                    </span>
+                                  )}
+                                  {!minimalView && product.remark && (
+                                      <span className="flex min-w-0 items-center gap-1 truncate rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-600 dark:text-amber-500">
+                                          <span className="shrink-0 font-bold opacity-70">注:</span>
+                                          <span className="truncate">{product.remark}</span>
+                                      </span>
+                                  )}
+                                  {showPrice && !minimalView && (
+                                    <span className="ml-auto shrink-0 text-sm font-semibold text-foreground">
+                                        ￥{product.costPrice}
+                                    </span>
+                                  )}
+                               </div>
+                            </div>
+                            )
+                          )}
                            {imageOnly && (
                            <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-linear-to-t from-black/80 via-black/35 to-transparent px-2.5 pb-2.5 pt-10 text-left">
                               {isAlreadySelected && (

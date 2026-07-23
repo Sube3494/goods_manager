@@ -37,9 +37,19 @@ const cardClass =
 const tabClass =
   "inline-flex items-center rounded-full border px-3 py-1.5 text-[11px] font-bold transition-colors";
 
+type TopTimeRange = "7d" | "30d" | "month" | "all";
+
+const TIME_RANGE_OPTIONS: { key: TopTimeRange; label: string }[] = [
+  { key: "7d", label: "近7天" },
+  { key: "30d", label: "近30天" },
+  { key: "month", label: "本月" },
+  { key: "all", label: "全部" },
+];
+
 export function DashboardFeedPanel({ recentInboundItems, isLoading = false, selectedShopName = "" }: Props) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabKey>("inbound");
+  const [topTimeRange, setTopTimeRange] = useState<TopTimeRange>("30d");
   const [topItems, setTopItems] = useState<TopOutboundProduct[]>([]);
   const [isTopLoading, setIsTopLoading] = useState(true);
 
@@ -51,6 +61,7 @@ export function DashboardFeedPanel({ recentInboundItems, isLoading = false, sele
       try {
         const query = new URLSearchParams();
         if (selectedShopName) query.set("shopName", selectedShopName);
+        query.set("range", topTimeRange);
         const res = await fetch(`/api/stats/top-outbound?${query.toString()}`, { cache: "no-store" });
         if (!res.ok || !isMounted) return;
         const data = await res.json();
@@ -66,7 +77,7 @@ export function DashboardFeedPanel({ recentInboundItems, isLoading = false, sele
     return () => {
       isMounted = false;
     };
-  }, [selectedShopName]);
+  }, [selectedShopName, topTimeRange]);
 
   const headerMeta =
     activeTab === "inbound"
@@ -288,35 +299,55 @@ export function DashboardFeedPanel({ recentInboundItems, isLoading = false, sele
         )}
       </div>
 
-      <div className="border-b border-black/6 px-4 py-3 dark:border-white/8 sm:px-5">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/6 px-4 py-3 dark:border-white/8 sm:px-5">
         <div className="overflow-x-auto">
           <div className="inline-flex min-w-full rounded-full border border-black/8 bg-black/3 p-1 dark:border-white/10 dark:bg-white/4 sm:min-w-0">
-          <button
-            type="button"
-            onClick={() => setActiveTab("inbound")}
-            className={cn(
-              `${tabClass} min-w-0 flex-1 justify-center whitespace-nowrap sm:min-w-[88px] sm:flex-none`,
-              activeTab === "inbound"
-                ? "border-transparent bg-background text-foreground shadow-xs dark:bg-white/8"
-                : "border-transparent bg-transparent text-muted-foreground hover:text-foreground"
-            )}
-          >
-            最近入库
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("top")}
-            className={cn(
-              `${tabClass} min-w-0 flex-1 justify-center whitespace-nowrap sm:min-w-[88px] sm:flex-none`,
-              activeTab === "top"
-                ? "border-transparent bg-background text-foreground shadow-xs dark:bg-white/8"
-                : "border-transparent bg-transparent text-muted-foreground hover:text-foreground"
-            )}
-          >
-            热销榜
-          </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("inbound")}
+              className={cn(
+                `${tabClass} min-w-0 flex-1 justify-center whitespace-nowrap sm:min-w-[88px] sm:flex-none`,
+                activeTab === "inbound"
+                  ? "border-transparent bg-background text-foreground shadow-xs dark:bg-white/8"
+                  : "border-transparent bg-transparent text-muted-foreground hover:text-foreground"
+              )}
+            >
+              最近入库
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("top")}
+              className={cn(
+                `${tabClass} min-w-0 flex-1 justify-center whitespace-nowrap sm:min-w-[88px] sm:flex-none`,
+                activeTab === "top"
+                  ? "border-transparent bg-background text-foreground shadow-xs dark:bg-white/8"
+                  : "border-transparent bg-transparent text-muted-foreground hover:text-foreground"
+              )}
+            >
+              热销榜
+            </button>
           </div>
         </div>
+
+        {activeTab === "top" && (
+          <div className="inline-flex items-center rounded-full border border-black/8 bg-black/3 p-1 dark:border-white/10 dark:bg-white/4">
+            {TIME_RANGE_OPTIONS.map((opt) => (
+              <button
+                key={opt.key}
+                type="button"
+                onClick={() => setTopTimeRange(opt.key)}
+                className={cn(
+                  "rounded-full px-2.5 py-1 text-[11px] font-bold transition-all",
+                  topTimeRange === opt.key
+                    ? "bg-background text-foreground shadow-xs dark:bg-white/10"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="max-h-[560px] overflow-y-auto custom-scrollbar">

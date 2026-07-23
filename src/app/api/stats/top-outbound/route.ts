@@ -11,12 +11,32 @@ export async function GET(request: NextRequest) {
     }
 
     const shopName = (request.nextUrl.searchParams.get("shopName") || "").trim();
+    const range = (request.nextUrl.searchParams.get("range") || "30d").trim();
+
+    let dateFilter: { gte?: Date } | undefined = undefined;
+    const now = new Date();
+
+    if (range === "today") {
+      dateFilter = { gte: new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0) };
+    } else if (range === "7d") {
+      dateFilter = { gte: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000) };
+    } else if (range === "30d") {
+      dateFilter = { gte: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000) };
+    } else if (range === "month") {
+      dateFilter = { gte: new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0) };
+    } else if (range === "all") {
+      dateFilter = undefined;
+    } else {
+      dateFilter = { gte: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000) };
+    }
+
     const storage = await getStorageStrategy();
     const outboundItems = await prisma.outboundOrderItem.findMany({
       where: {
         outboundOrder: {
           userId: session.id,
           ...(shopName ? { note: { contains: `[店铺:${shopName}]` } } : {}),
+          ...(dateFilter ? { date: dateFilter } : {}),
         },
       },
       select: {
