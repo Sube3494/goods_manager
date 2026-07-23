@@ -670,6 +670,18 @@ export default function GoodsPage() {
         return;
       }
 
+      // 按商品分类（种类）归类排序，未分类放在最后，同一分类内按商品名称排序
+      allGoods.sort((a, b) => {
+        const catA = (typeof a.category === "object" ? a.category?.name : a.category) || "未分类";
+        const catB = (typeof b.category === "object" ? b.category?.name : b.category) || "未分类";
+        if (catA !== catB) {
+          if (catA === "未分类") return 1;
+          if (catB === "未分类") return -1;
+          return catA.localeCompare(catB, "zh-CN");
+        }
+        return (a.name || "").localeCompare(b.name || "", "zh-CN");
+      });
+
       setExportProgress({ isOpen: true, current: 0, total: allGoods.length });
 
       const ExcelJS = (await import("exceljs")).default;

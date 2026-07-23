@@ -385,10 +385,23 @@ export default function BrushProductsPage() {
         return;
       }
 
-      const exportData = filteredItems.map((item) => ({
+      // 复制数组并按分类和商品名称进行归类排序
+      const sortedItems = [...filteredItems].sort((a, b) => {
+        const catA = (typeof a.product.category === "object" ? a.product.category?.name : a.product.category) || "未分类";
+        const catB = (typeof b.product.category === "object" ? b.product.category?.name : b.product.category) || "未分类";
+        if (catA !== catB) {
+          if (catA === "未分类") return 1;
+          if (catB === "未分类") return -1;
+          return catA.localeCompare(catB, "zh-CN");
+        }
+        return (a.product.name || "").localeCompare(b.product.name || "", "zh-CN");
+      });
+
+      const exportData = sortedItems.map((item) => ({
         商品图片: "",
         商品名称: item.product.name,
         "SKU/店内码": item.product.sku || "",
+        分类: (typeof item.product.category === "object" ? item.product.category?.name : item.product.category) || "未分类",
         供应商: item.product.supplier?.name || "",
         刷单关键词: item.brushKeyword || "",
         备注: item.product.remark || "",
@@ -427,7 +440,7 @@ export default function BrushProductsPage() {
       });
 
       const preparedImages = await Promise.all(
-        filteredItems.map((item) => getExcelImageSource(item.product.image))
+        sortedItems.map((item) => getExcelImageSource(item.product.image))
       );
 
       preparedImages.forEach((image, index) => {

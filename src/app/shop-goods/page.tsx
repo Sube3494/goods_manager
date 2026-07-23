@@ -902,6 +902,23 @@ export default function ShopGoodsPage() {
         return;
       }
 
+      // 按店铺和商品分类（种类）归类排序，未分类放在最后，同一分类内按商品名称排序
+      exportItems.sort((a, b) => {
+        const shopA = a.shopName || "";
+        const shopB = b.shopName || "";
+        if (shopA !== shopB) {
+          return shopA.localeCompare(shopB, "zh-CN");
+        }
+        const catA = a.categoryName || "未分类";
+        const catB = b.categoryName || "未分类";
+        if (catA !== catB) {
+          if (catA === "未分类") return 1;
+          if (catB === "未分类") return -1;
+          return catA.localeCompare(catB, "zh-CN");
+        }
+        return (a.name || "").localeCompare(b.name || "", "zh-CN");
+      });
+
       setExportProgress({ isOpen: true, current: 0, total: exportItems.length });
 
       const ExcelJS = (await import("exceljs")).default;
