@@ -11,6 +11,7 @@ interface ExportProgressModalProps {
   total: number;
   title?: string;
   subtitle?: string;
+  onCancel?: () => void;
 }
 
 export function ExportProgressModal({
@@ -19,6 +20,7 @@ export function ExportProgressModal({
   total,
   title = "正在生成 Excel 数据表格",
   subtitle = "正在处理商品数据与图片嵌入，请稍候...",
+  onCancel,
 }: ExportProgressModalProps) {
   const [mounted, setMounted] = useState(false);
 
@@ -78,13 +80,22 @@ export function ExportProgressModal({
               />
             </div>
 
-            {/* 状态底部提示 */}
-            <div className="mt-4 pt-3 border-t border-border/50 flex items-center justify-between text-[11px] text-muted-foreground">
-              <span className="flex items-center gap-1.5">
+            {/* 状态底部提示与取消按钮 */}
+            <div className="mt-4 pt-3 border-t border-border/50 flex items-center justify-between gap-3">
+              <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground truncate">
                 <Loader2 size={13} className="animate-spin text-primary shrink-0" />
                 正在并发抓取图片并整合工作表...
               </span>
-              <span className="font-mono text-muted-foreground/80">ExcelJS Engine</span>
+              
+              {onCancel && (
+                <button
+                  type="button"
+                  onClick={onCancel}
+                  className="shrink-0 px-3.5 py-1.5 rounded-full text-xs font-bold text-red-500 hover:text-red-600 bg-red-500/10 hover:bg-red-500/20 active:scale-95 transition-all"
+                >
+                  取消导出
+                </button>
+              )}
             </div>
           </motion.div>
         </div>

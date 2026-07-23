@@ -13,6 +13,7 @@ import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { ActionBar } from "@/components/ui/ActionBar";
 import { ImportModal } from "@/components/Goods/ImportModal";
+import { ExportProgressModal } from "@/components/ui/ExportProgressModal";
 
 async function blobToDataUrl(blob: Blob) {
   return await new Promise<string>((resolve, reject) => {
@@ -377,7 +378,15 @@ export default function BrushProductsPage() {
     });
   };
 
+  const [exportProgress, setExportProgress] = useState<{ isOpen: boolean; current: number; total: number } | null>(null);
+  const exportCancelledRef = useRef(false);
+
+  const handleCancelExport = useCallback(() => {
+    exportCancelledRef.current = true;
+  }, []);
+
   const handleExport = useCallback(async () => {
+    exportCancelledRef.current = false;
     showToast("正在准备导出数据...", "info");
     try {
       if (filteredItems.length === 0) {
@@ -396,6 +405,8 @@ export default function BrushProductsPage() {
         }
         return (a.product.name || "").localeCompare(b.product.name || "", "zh-CN");
       });
+
+      setExportProgress({ isOpen: true, current: 0, total: sortedItems.length });
 
       const exportData = sortedItems.map((item) => ({
         商品图片: "",
@@ -426,7 +437,7 @@ export default function BrushProductsPage() {
         header,
         key: header,
         width:
-          header === "商品图片" ? 18 :
+          header === "商品图片" ? 22 :
           header === "商品名称" ? 34 :
           header === "刷单关键词" || header === "备注" ? 24 :
           18,
@@ -439,31 +450,51 @@ export default function BrushProductsPage() {
         });
       });
 
-      const preparedImages = await Promise.all(
-        sortedItems.map((item) => getExcelImageSource(item.product.image))
-      );
-
-      preparedImages.forEach((image, index) => {
-        const rowNumber = index + 2;
-        const row = worksheet.getRow(rowNumber);
-        row.height = 96;
-
-        if (!image) {
-          worksheet.getCell(`A${rowNumber}`).value = "无图";
-          worksheet.getCell(`A${rowNumber}`).alignment = { horizontal: "center", vertical: "middle" };
+      let processedCount = 0;
+      const concurrency = 6;
+      for (let i = 0; i < sortedItems.length; i += concurrency) {
+        if (exportCancelledRef.current) {
+          showToast("导出已取消", "info");
           return;
         }
+        const chunk = sortedItems.slice(i, i + concurrency);
+        await Promise.all(
+          chunk.map(async (item, idx) => {
+            const index = i + idx;
+            const rowNumber = index + 2;
+            const row = worksheet.getRow(rowNumber);
+            row.height = 108;
 
-        const imageId = workbook.addImage({
-          base64: image.base64,
-          extension: image.extension,
-        });
+            if (item.product.image && !exportCancelledRef.current) {
+              const image = await getExcelImageSource(item.product.image);
+              if (image && !exportCancelledRef.current) {
+                const imageId = workbook.addImage({
+                  base64: image.base64,
+                  extension: image.extension,
+                });
 
-        worksheet.addImage(imageId, {
-          tl: { col: 0.2, row: rowNumber - 1 + 0.15 },
-          ext: { width: 72, height: 72 },
-        });
-      });
+                worksheet.addImage(imageId, {
+                  tl: { col: 0.1, row: rowNumber - 1 + 0.08 },
+                  ext: { width: 118, height: 118 },
+                });
+              } else if (!image) {
+                worksheet.getCell(`A${rowNumber}`).value = "无图";
+                worksheet.getCell(`A${rowNumber}`).alignment = { horizontal: "center", vertical: "middle" };
+              }
+            } else if (!item.product.image) {
+              worksheet.getCell(`A${rowNumber}`).value = "无图";
+              worksheet.getCell(`A${rowNumber}`).alignment = { horizontal: "center", vertical: "middle" };
+            }
+            processedCount++;
+            setExportProgress({ isOpen: true, current: processedCount, total: sortedItems.length });
+          })
+        );
+      }
+
+      if (exportCancelledRef.current) {
+        showToast("导出已取消", "info");
+        return;
+      }
 
       const buffer = await workbook.xlsx.writeBuffer();
       const timestamp = new Date()
@@ -480,6 +511,8 @@ export default function BrushProductsPage() {
     } catch (error) {
       console.error("Failed to export brush products:", error);
       showToast("导出失败，请重试", "error");
+    } finally {
+      setExportProgress(null);
     }
   }, [filteredItems, showToast]);
 
@@ -792,6 +825,17 @@ export default function BrushProductsPage() {
         onDelete={handleBatchRemove}
         label="个商品"
       />
+
+      {exportProgress && (
+        <ExportProgressModal
+          isOpen={exportProgress.isOpen}
+          current={exportProgress.current}
+          total={exportProgress.total}
+          title="正在生成刷单商品库 Excel 数据包"
+          subtitle="正在抓取转码商品主图并排版单元格，请稍候..."
+          onCancel={handleCancelExport}
+        />
+      )}
     </div>
   );
 }

@@ -889,8 +889,14 @@ export default function ShopGoodsPage() {
   }, [categories, fetchSelectedItems, selectedIds, showToast]);
 
   const [exportProgress, setExportProgress] = useState<{ isOpen: boolean; current: number; total: number } | null>(null);
+  const exportCancelledRef = useRef(false);
+
+  const handleCancelExport = useCallback(() => {
+    exportCancelledRef.current = true;
+  }, []);
 
   const handleExport = useCallback(async () => {
+    exportCancelledRef.current = false;
     try {
       showToast("正在获取店铺商品数据...", "info");
       const queryParams = buildAggregateQuery(1, { pageSize: "2000" });
@@ -934,7 +940,7 @@ export default function ShopGoodsPage() {
 
       const columnsConfig = [
         { header: "店铺", key: "shopName", width: 20, align: "center" as const },
-        { header: "主图", key: "image", width: 16, align: "center" as const },
+        { header: "主图", key: "image", width: 22, align: "center" as const },
         { header: "商品名称", key: "name", width: 36, align: "left" as const },
         { header: "SKU/店内码", key: "sku", width: 22, align: "center" as const },
         { header: "分类", key: "categoryName", width: 18, align: "center" as const },
@@ -989,7 +995,7 @@ export default function ShopGoodsPage() {
           remark: item.remark || "",
         });
 
-        row.height = 72; // 为嵌入主图保留充裕行高
+        row.height = 108; // 为嵌入主图保留充裕行高
 
         // 设置每个单元格样式
         columnsConfig.forEach((col, colIdx) => {
@@ -1019,12 +1025,16 @@ export default function ShopGoodsPage() {
       let processedCount = 0;
       const concurrency = 6;
       for (let i = 0; i < rowElements.length; i += concurrency) {
+        if (exportCancelledRef.current) {
+          showToast("导出已取消", "info");
+          return;
+        }
         const chunk = rowElements.slice(i, i + concurrency);
         await Promise.all(
           chunk.map(async ({ item, rowIndex: rIdx }) => {
-            if (item.image) {
+            if (item.image && !exportCancelledRef.current) {
               const imgResult = await loadAndConvertImageForExcel(item.image);
-              if (imgResult) {
+              if (imgResult && !exportCancelledRef.current) {
                 const imageId = workbook.addImage({
                   buffer: imgResult.buffer,
                   extension: imgResult.extension,
@@ -1032,14 +1042,14 @@ export default function ShopGoodsPage() {
 
                 const imgW = imgResult.width || 100;
                 const imgH = imgResult.height || 100;
-                const scale = Math.min(75 / imgW, 75 / imgH);
+                const scale = Math.min(125 / imgW, 125 / imgH);
                 const finalW = Math.round(imgW * scale);
                 const finalH = Math.round(imgH * scale);
 
-                const COL_WIDTH_PX = 135;
-                const ROW_HEIGHT_PX = 96; // 72pt / 0.75
-                const colOffset = ((COL_WIDTH_PX - finalW) / 2) / COL_WIDTH_PX;
-                const rowOffset = ((ROW_HEIGHT_PX - finalH) / 2) / ROW_HEIGHT_PX;
+                const COL_WIDTH_PX = 176;
+                const ROW_HEIGHT_PX = 144; // 108pt / 0.75
+                const colOffset = Math.max(0, ((COL_WIDTH_PX - finalW) / 2) / COL_WIDTH_PX);
+                const rowOffset = Math.max(0, ((ROW_HEIGHT_PX - finalH) / 2) / ROW_HEIGHT_PX);
 
                 worksheet.addImage(imageId, {
                   tl: { col: 1 + colOffset, row: rIdx - 1 + rowOffset } as any,
@@ -1052,6 +1062,11 @@ export default function ShopGoodsPage() {
             setExportProgress({ isOpen: true, current: processedCount, total: exportItems.length });
           })
         );
+      }
+
+      if (exportCancelledRef.current) {
+        showToast("导出已取消", "info");
+        return;
       }
 
       const buffer = await workbook.xlsx.writeBuffer();
@@ -1322,6 +1337,7 @@ export default function ShopGoodsPage() {
           total={exportProgress.total}
           title="正在生成店铺商品 Excel 数据包"
           subtitle="正在抓取转码商品主图并排版单元格，请稍候..."
+          onCancel={handleCancelExport}
         />
       )}
     </div>
