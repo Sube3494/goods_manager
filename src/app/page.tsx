@@ -202,6 +202,8 @@ export default function Home() {
             recentInboundItems={statsData?.recentInboundItems || []}
             isLoading={isLoading}
             selectedShopName={selectedShopName}
+            shopOptions={shopOptions}
+            onShopChange={setSelectedShopName}
           />
         </div>
       </div>

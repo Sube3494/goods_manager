@@ -1,14 +1,13 @@
-"use client";
-
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowRight, BadgePlus, Clock, Package, PackageOpen, Trophy, TrendingUp } from "lucide-react";
+import { ArrowRight, BadgePlus, Clock, Package, PackageOpen, Trophy, TrendingUp, Store } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { zhCN } from "date-fns/locale/zh-CN";
 import { cn } from "@/lib/utils";
-import { RecentInboundItem } from "@/lib/types";
+import { RecentInboundItem, Shop } from "@/lib/types";
 import { useRouter } from "next/navigation";
+import { CustomSelect } from "@/components/ui/CustomSelect";
 
 type TabKey = "inbound" | "top";
 
@@ -29,6 +28,8 @@ interface Props {
   recentInboundItems: RecentInboundItem[];
   isLoading?: boolean;
   selectedShopName?: string;
+  shopOptions?: Shop[];
+  onShopChange?: (shopName: string) => void;
 }
 
 const cardClass =
@@ -46,12 +47,30 @@ const TIME_RANGE_OPTIONS: { key: TopTimeRange; label: string }[] = [
   { key: "all", label: "全部" },
 ];
 
-export function DashboardFeedPanel({ recentInboundItems, isLoading = false, selectedShopName = "" }: Props) {
+export function DashboardFeedPanel({
+  recentInboundItems,
+  isLoading = false,
+  selectedShopName = "",
+  shopOptions = [],
+  onShopChange,
+}: Props) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabKey>("inbound");
   const [topTimeRange, setTopTimeRange] = useState<TopTimeRange>("30d");
   const [topItems, setTopItems] = useState<TopOutboundProduct[]>([]);
   const [isTopLoading, setIsTopLoading] = useState(true);
+  const [feedShopName, setFeedShopName] = useState<string>(selectedShopName || "");
+
+  useEffect(() => {
+    setFeedShopName(selectedShopName || "");
+  }, [selectedShopName]);
+
+  const filteredInboundItems = useMemo(() => {
+    if (!feedShopName) return recentInboundItems;
+    return recentInboundItems.filter(
+      (item) => item.purchaseOrder?.shopName === feedShopName
+    );
+  }, [recentInboundItems, feedShopName]);
 
   useEffect(() => {
     let isMounted = true;
@@ -60,7 +79,7 @@ export function DashboardFeedPanel({ recentInboundItems, isLoading = false, sele
       setIsTopLoading(true);
       try {
         const query = new URLSearchParams();
-        if (selectedShopName) query.set("shopName", selectedShopName);
+        if (feedShopName) query.set("shopName", feedShopName);
         query.set("range", topTimeRange);
         const res = await fetch(`/api/stats/top-outbound?${query.toString()}`, { cache: "no-store" });
         if (!res.ok || !isMounted) return;
@@ -77,7 +96,7 @@ export function DashboardFeedPanel({ recentInboundItems, isLoading = false, sele
     return () => {
       isMounted = false;
     };
-  }, [selectedShopName, topTimeRange]);
+  }, [feedShopName, topTimeRange]);
 
   const headerMeta =
     activeTab === "inbound"
@@ -118,7 +137,7 @@ export function DashboardFeedPanel({ recentInboundItems, isLoading = false, sele
 
     return (
       <div className="grid gap-3 p-4 sm:p-5 xl:grid-cols-2">
-        {recentInboundItems.map((item) => {
+        {filteredInboundItems.map((item) => {
           const productName = item.product?.name || "未知商品";
           const rawSku = item.product?.sku;
           const productSku = String(rawSku || "").replace(/\(自编\)|（自编）/gi, "").trim();
@@ -330,25 +349,43 @@ export function DashboardFeedPanel({ recentInboundItems, isLoading = false, sele
           </div>
         </div>
 
-        {activeTab === "top" && (
-          <div className="inline-flex items-center rounded-full border border-black/8 bg-black/3 p-1 dark:border-white/10 dark:bg-white/4">
-            {TIME_RANGE_OPTIONS.map((opt) => (
-              <button
-                key={opt.key}
-                type="button"
-                onClick={() => setTopTimeRange(opt.key)}
-                className={cn(
-                  "rounded-full px-2.5 py-1 text-[11px] font-bold transition-all",
-                  topTimeRange === opt.key
-                    ? "bg-background text-foreground shadow-xs dark:bg-white/10"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {shopOptions && shopOptions.length > 0 ? (
+            <CustomSelect
+              value={feedShopName}
+              onChange={(val) => {
+                setFeedShopName(val);
+                if (onShopChange) onShopChange(val);
+              }}
+              options={[
+                { value: "", label: "全部店铺" },
+                ...shopOptions.map((shop) => ({ value: shop.name, label: shop.name })),
+              ]}
+              className="h-8 min-w-[110px]"
+              triggerClassName="h-full rounded-full border border-black/8 bg-white px-3 text-xs shadow-none dark:border-white/10 dark:bg-white/[0.04]"
+            />
+          ) : null}
+
+          {activeTab === "top" && (
+            <div className="inline-flex items-center rounded-full border border-black/8 bg-black/3 p-1 dark:border-white/10 dark:bg-white/4">
+              {TIME_RANGE_OPTIONS.map((opt) => (
+                <button
+                  key={opt.key}
+                  type="button"
+                  onClick={() => setTopTimeRange(opt.key)}
+                  className={cn(
+                    "rounded-full px-2.5 py-1 text-[11px] font-bold transition-all",
+                    topTimeRange === opt.key
+                      ? "bg-background text-foreground shadow-xs dark:bg-white/10"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="max-h-[560px] overflow-y-auto custom-scrollbar">
