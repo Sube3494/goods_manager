@@ -359,10 +359,10 @@ export function DashboardFeedPanel({
           {activeTab === "inbound" && headerMeta.onAction ? (
             <button
               onClick={headerMeta.onAction}
-              className="group inline-flex shrink-0 items-center gap-0.5 rounded-full border border-black/8 px-1.5 py-0.5 text-[9px] font-bold text-muted-foreground transition-colors hover:text-foreground dark:border-white/10 sm:gap-1 sm:px-2.5 sm:py-1 sm:text-[10px]"
+              className="group flex h-7 shrink-0 items-center justify-center gap-1 rounded-full border border-black/8 bg-white px-2.5 text-[10px] font-bold text-muted-foreground transition-all hover:border-black/20 hover:text-foreground dark:border-white/10 dark:bg-white/[0.04] dark:hover:bg-white/10 sm:h-8 sm:px-3 sm:text-xs"
             >
               历史
-              <ArrowRight size={10} className="transition-transform group-hover:translate-x-0.5 sm:size-[11px]" />
+              <ArrowRight size={11} className="transition-transform group-hover:translate-x-0.5 sm:size-3" />
             </button>
           ) : null}
         </div>
