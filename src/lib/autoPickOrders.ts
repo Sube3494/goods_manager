@@ -11,6 +11,7 @@ import { buildShopDedupeKey, findMatchingShopRecord, normalizeExternalId, normal
 import { getOutboundOrderItemSchemaErrorMessage } from "@/lib/prismaSchemaCompat";
 import { getStorageStrategy } from "@/lib/storage";
 import { returnOutboundOrderById } from "@/lib/outboundReturns";
+import { normalizeJdSkuIds, replaceProductJdSkuMappings } from "@/lib/productJdSku";
 
 export type AutoPickInboundItem = {
   productName?: string;
@@ -5926,6 +5927,76 @@ export async function fixHistoryShopOrdersForUser(userId: string): Promise<numbe
   }
 
   return updatedCount;
+}
+
+export async function backfillJdSkuIdForManualMatchedShopProducts(
+  tx: Prisma.TransactionClient,
+  userId: string
+) {
+  const items = await tx.autoPickOrderItem.findMany({
+    where: {
+      order: {
+        userId,
+        OR: [
+          { platform: "京东" },
+          { platform: { contains: "jingdong", mode: "insensitive" } },
+          { platform: { contains: "jd", mode: "insensitive" } },
+        ],
+      },
+    },
+    select: {
+      id: true,
+      productNo: true,
+      rawPayload: true,
+    },
+  });
+
+  for (const item of items) {
+    const rawPayloadRecord = item.rawPayload && typeof item.rawPayload === "object" && !Array.isArray(item.rawPayload)
+      ? (item.rawPayload as Record<string, unknown>)
+      : {};
+    const manualMatched = rawPayloadRecord.manualMatchedProduct && typeof rawPayloadRecord.manualMatchedProduct === "object" && !Array.isArray(rawPayloadRecord.manualMatchedProduct)
+      ? (rawPayloadRecord.manualMatchedProduct as Record<string, unknown>)
+      : null;
+    const shopProductId = String(manualMatched?.shopProductId || manualMatched?.id || "").trim();
+    const sourceId = String(item.productNo || rawPayloadRecord.source_id || rawPayloadRecord.sourceId || "").trim();
+
+    if (shopProductId && sourceId) {
+      const shopProduct = await tx.shopProduct.findFirst({
+        where: { id: shopProductId, shop: { userId } },
+        select: { id: true, productId: true, jdSkuId: true },
+      });
+
+      if (shopProduct) {
+        const existingIds = normalizeJdSkuIds(shopProduct.jdSkuId);
+        if (!existingIds.includes(sourceId)) {
+          const nextJdSkuIds = Array.from(new Set([...existingIds, sourceId]));
+          const primaryStr = nextJdSkuIds.join(",");
+
+          await tx.shopProduct.update({
+            where: { id: shopProduct.id },
+            data: { jdSkuId: primaryStr },
+          });
+
+          if (shopProduct.productId) {
+            const existingProductSkus = await tx.productJdSku.findMany({
+              where: { productId: shopProduct.productId },
+              select: { jdSkuId: true },
+            });
+            const productJdSkuIds = Array.from(new Set([
+              ...existingProductSkus.map((i) => i.jdSkuId),
+              ...nextJdSkuIds,
+            ]));
+            await replaceProductJdSkuMappings(tx, shopProduct.productId, userId, productJdSkuIds);
+            await tx.product.update({
+              where: { id: shopProduct.productId },
+              data: { jdSkuId: productJdSkuIds[0] || null },
+            });
+          }
+        }
+      }
+    }
+  }
 }
 
 

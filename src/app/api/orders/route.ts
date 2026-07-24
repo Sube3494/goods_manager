@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
 import {
+  backfillJdSkuIdForManualMatchedShopProducts,
   normalizeAutoPickIntegrationConfig,
   readCustomerMaskedPhoneFromRawPayload,
   readCustomerNameFromRawPayload,
@@ -1508,6 +1509,7 @@ export async function GET(request: NextRequest) {
             cancelledPlatformCounts,
           },
         };
+    await backfillJdSkuIdForManualMatchedShopProducts(prisma, session.id);
 
     const productNames = Array.from(new Set(
       orders.flatMap((order) => order.items.map((item) => String(item.productName || "").trim()).filter(Boolean))
