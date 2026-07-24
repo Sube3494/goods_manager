@@ -367,23 +367,18 @@ export function DashboardFeedPanel({
           ) : null}
 
           {activeTab === "top" && (
-            <div className="inline-flex items-center rounded-full border border-black/8 bg-black/3 p-1 dark:border-white/10 dark:bg-white/4">
-              {TIME_RANGE_OPTIONS.map((opt) => (
-                <button
-                  key={opt.key}
-                  type="button"
-                  onClick={() => setTopTimeRange(opt.key)}
-                  className={cn(
-                    "rounded-full px-2.5 py-1 text-[11px] font-bold transition-all",
-                    topTimeRange === opt.key
-                      ? "bg-background text-foreground shadow-xs dark:bg-white/10"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
+            <CustomSelect
+              value={topTimeRange}
+              onChange={(val) => setTopTimeRange(val as TopTimeRange)}
+              options={[
+                { value: "7d", label: "近 7 天" },
+                { value: "30d", label: "近 30 天" },
+                { value: "month", label: "本月" },
+                { value: "all", label: "全部时间" },
+              ]}
+              className="h-8 min-w-[96px]"
+              triggerClassName="h-full rounded-full border border-black/8 bg-white px-3 text-xs shadow-none dark:border-white/10 dark:bg-white/[0.04]"
+            />
           )}
         </div>
       </div>
