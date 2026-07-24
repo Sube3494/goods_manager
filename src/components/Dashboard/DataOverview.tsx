@@ -7,6 +7,8 @@ import { Shop, StatsData } from "@/lib/types";
 import { PromotionCalendarModal } from "@/app/orders/PromotionCalendarModal";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { DatePicker } from "@/components/ui/DatePicker";
+import { RefreshCw } from "lucide-react";
+import { format } from "date-fns";
 import { cn, getPlatformMeta } from "@/lib/utils";
 
 function Panel({
@@ -285,6 +287,9 @@ export function DataOverview({
   endDate,
   onStartDateChange,
   onEndDateChange,
+  isLoading = false,
+  lastSynced = null,
+  onRefresh,
 }: {
   data: StatsData | null;
   rangePreset: string;
@@ -296,6 +301,9 @@ export function DataOverview({
   endDate: string;
   onStartDateChange: (value: string) => void;
   onEndDateChange: (value: string) => void;
+  isLoading?: boolean;
+  lastSynced?: Date | null;
+  onRefresh?: () => void;
 }) {
   const router = useRouter();
   const todayDate = new Date().toISOString().slice(0, 10);
@@ -345,19 +353,55 @@ export function DataOverview({
 
   return (
     <div className="space-y-5 sm:space-y-8">
-      <section className="sticky top-2 z-30 min-w-0 rounded-[24px] border border-black/10 bg-white/88 px-4 py-3 shadow-lg shadow-black/5 backdrop-blur-xl dark:border-white/10 dark:bg-zinc-900/88">
+      <section className="overflow-hidden rounded-[28px] border border-black/8 bg-white/75 p-4 shadow-xs backdrop-blur-sm dark:border-white/10 dark:bg-white/4 sm:p-5 space-y-4">
+        <div className="flex items-center justify-between gap-3 border-b border-black/6 pb-3.5 dark:border-white/8">
+          <div className="min-w-0 flex-1">
+            <h1 className="text-[26px] font-black leading-none tracking-tight text-foreground sm:text-3xl">概览</h1>
+            <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
+              经营结果与趋势
+            </p>
+          </div>
+
+          {onRefresh ? (
+            <button
+              onClick={onRefresh}
+              disabled={isLoading}
+              className="group relative flex h-10 shrink-0 items-center gap-2 rounded-xl border border-black/8 bg-white/75 px-3 transition-all hover:border-primary/30 hover:bg-white sm:gap-2.5 sm:px-3.5 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <div className={`flex h-5 w-5 items-center justify-center rounded-full ${isLoading ? "bg-primary/20" : "bg-black/5 transition-colors group-hover:bg-primary/15 dark:bg-white/10"}`}>
+                <RefreshCw
+                  size={12}
+                  className={cn(
+                    "transition-all duration-700",
+                    isLoading ? "animate-spin text-primary" : "text-muted-foreground group-hover:rotate-180 group-hover:text-primary"
+                  )}
+                />
+              </div>
+
+              <div className="flex flex-col items-start leading-none">
+                <span className="text-[9px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
+                  {isLoading ? "同步中..." : "系统同步"}
+                </span>
+                <span className="mt-0.5 text-[10px] font-mono tabular-nums text-foreground/80 sm:text-[11px]">
+                  {lastSynced && !isLoading ? format(lastSynced, "HH:mm:ss") : "点击刷新"}
+                </span>
+              </div>
+            </button>
+          ) : null}
+        </div>
+
         <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-          <div className="col-span-1 space-y-2">
+          <div className="col-span-1 space-y-1.5">
             <label className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">店铺范围</label>
             <CustomSelect
               value={selectedShopName}
               onChange={onSelectedShopNameChange}
               options={[{ value: "", label: "全部店铺" }, ...shopOptions.map((shop) => ({ value: shop.name, label: shop.name }))]}
-              className="h-11"
-              triggerClassName="h-full rounded-xl border border-black/8 bg-white px-4 text-sm shadow-none dark:border-white/10 dark:bg-white/[0.03]"
+              className="h-10"
+              triggerClassName="h-full rounded-xl border border-black/8 bg-white px-3.5 text-sm shadow-none dark:border-white/10 dark:bg-white/[0.03]"
             />
           </div>
-          <div className="col-span-1 space-y-2">
+          <div className="col-span-1 space-y-1.5">
             <label className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">时间范围</label>
             <CustomSelect
               value={rangePreset}
@@ -369,23 +413,23 @@ export function DataOverview({
                 { value: "90d", label: "最近 90 天" },
                 { value: "custom", label: "自定义" },
               ]}
-              className="h-11"
-              triggerClassName="h-full rounded-xl border border-black/8 bg-white px-4 text-sm shadow-none dark:border-white/10 dark:bg-white/[0.03]"
+              className="h-10"
+              triggerClassName="h-full rounded-xl border border-black/8 bg-white px-3.5 text-sm shadow-none dark:border-white/10 dark:bg-white/[0.03]"
             />
           </div>
-          <div className="col-span-1 space-y-2">
+          <div className="col-span-1 space-y-1.5">
             <label className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">起始日期</label>
             <DatePicker
               value={startDate}
               onChange={onStartDateChange}
               maxDate={endDate || todayDate}
               showClear={false}
-              className="h-11 w-full"
-              triggerClassName="h-full rounded-xl border border-black/8 bg-white px-4 text-sm shadow-none dark:border-white/10 dark:bg-white/[0.03]"
+              className="h-10 w-full"
+              triggerClassName="h-full rounded-xl border border-black/8 bg-white px-3.5 text-sm shadow-none dark:border-white/10 dark:bg-white/[0.03]"
             />
           </div>
-          <div className="col-span-1 space-y-2">
-            <div className="flex items-center justify-between gap-3">
+          <div className="col-span-1 space-y-1.5">
+            <div className="flex items-center justify-between gap-2">
               <label className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">结束日期</label>
               <span className="text-[11px] font-bold text-primary">共 {int(rangeDays)} 天</span>
             </div>
@@ -395,8 +439,8 @@ export function DataOverview({
               minDate={startDate}
               maxDate={todayDate}
               showClear={false}
-              className="h-11 w-full"
-              triggerClassName="h-full rounded-xl border border-black/8 bg-white px-4 text-sm shadow-none dark:border-white/10 dark:bg-white/[0.03]"
+              className="h-10 w-full"
+              triggerClassName="h-full rounded-xl border border-black/8 bg-white px-3.5 text-sm shadow-none dark:border-white/10 dark:bg-white/[0.03]"
             />
           </div>
         </div>
