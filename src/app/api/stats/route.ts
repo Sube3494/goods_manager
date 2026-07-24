@@ -1011,8 +1011,9 @@ export async function GET(request: NextRequest) {
         (!item.purchaseOrder?.shopName || sp.shop?.name === item.purchaseOrder.shopName)
       );
 
-      const rawSku = matchedShopProduct?.sku || item.product?.sku || "";
-      const cleanSku = String(rawSku || "").replace(/\(自编\)|（自编）/gi, "").trim();
+      // 店铺商品与模板库严格隔离：只能且只使用店铺本身(ShopProduct)的编号与属性
+      const shopProductSku = matchedShopProduct ? (matchedShopProduct.sku || "") : "";
+      const cleanSku = String(shopProductSku).replace(/\(自编\)|（自编）/gi, "").trim();
 
       return {
         id: item.id,
@@ -1020,6 +1021,7 @@ export async function GET(request: NextRequest) {
         product: item.product
           ? {
               ...item.product,
+              name: matchedShopProduct?.productName || item.product.name,
               sku: cleanSku || null,
               image: item.product.image ? storage.resolveUrl(item.product.image) : null,
             }
