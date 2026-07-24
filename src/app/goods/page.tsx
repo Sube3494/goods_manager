@@ -654,22 +654,42 @@ export default function GoodsPage() {
   const handleExport = useCallback(async () => {
     exportCancelledRef.current = false;
     try {
-      showToast("正在获取主库商品数据...", "info");
-      const queryParams = new URLSearchParams({
-        page: "1",
-        all: "true",
-        search: debouncedSearch,
-        category: selectedCategory,
-        status: selectedStatus,
-        supplier: selectedSupplier,
-        sort: sortBy,
-        ...(activeLibraryId && activeLibraryId !== "all" ? { libraryId: activeLibraryId } : {}),
-      });
+      let allGoods: Product[];
 
-      const res = await fetch(`/api/products?${queryParams.toString()}`);
-      if (!res.ok) throw new Error("获取商品数据失败");
-      const data = await res.json();
-      const allGoods: Product[] = Array.isArray(data.items) ? data.items : [];
+      if (selectedIds.length > 0) {
+        // 有选中商品时，只导出选中的商品
+        showToast(`正在导出 ${selectedIds.length} 件选中商品...`, "info");
+        // 先用页面中已有的数据
+        const selectedFromCurrent = items.filter(item => selectedIds.includes(item.id));
+        const remainingIds = selectedIds.filter(id => !selectedFromCurrent.find(item => item.id === id));
+        // 若有翻页后选中的商品不在当前页，批量拉取剩余的
+        if (remainingIds.length > 0) {
+          const res = await fetch(`/api/products?${new URLSearchParams({ ids: remainingIds.join(","), all: "true" }).toString()}`);
+          if (!res.ok) throw new Error("获取选中商品数据失败");
+          const data = await res.json();
+          const extra: Product[] = Array.isArray(data.items) ? data.items : [];
+          allGoods = [...selectedFromCurrent, ...extra];
+        } else {
+          allGoods = selectedFromCurrent;
+        }
+      } else {
+        // 无选中时，导出所有符合当前筛选条件的商品
+        showToast("正在获取主库商品数据...", "info");
+        const queryParams = new URLSearchParams({
+          page: "1",
+          all: "true",
+          search: debouncedSearch,
+          category: selectedCategory,
+          status: selectedStatus,
+          supplier: selectedSupplier,
+          sort: sortBy,
+          ...(activeLibraryId && activeLibraryId !== "all" ? { libraryId: activeLibraryId } : {}),
+        });
+        const res = await fetch(`/api/products?${queryParams.toString()}`);
+        if (!res.ok) throw new Error("获取商品数据失败");
+        const data = await res.json();
+        allGoods = Array.isArray(data.items) ? data.items : [];
+      }
 
       if (allGoods.length === 0) {
         showToast("没有可导出的商品数据", "error");
@@ -841,7 +861,8 @@ export default function GoodsPage() {
       }
 
       const buffer = await workbook.xlsx.writeBuffer();
-      const filename = `商品模板库导出_${new Date().toLocaleString("sv-SE", { hour12: false }).replace(" ", "_").replace(/:/g, "-")}.xlsx`;
+      const prefix = selectedIds.length > 0 ? `选中商品导出_` : `商品模板库导出_`;
+      const filename = `${prefix}${new Date().toLocaleString("sv-SE", { hour12: false }).replace(" ", "_").replace(/:/g, "-")}.xlsx`;
       saveAs(new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), filename);
       showToast(`已成功导出 ${allGoods.length} 条商品数据 (含主图)`, "success");
     } catch (error) {
@@ -850,7 +871,7 @@ export default function GoodsPage() {
     } finally {
       setExportProgress(null);
     }
-  }, [debouncedSearch, selectedCategory, selectedStatus, selectedSupplier, sortBy, activeLibraryId, showToast]);
+  }, [debouncedSearch, selectedCategory, selectedStatus, selectedSupplier, sortBy, activeLibraryId, selectedIds, items, showToast]);
 
 
   const handleImport = async (data: Record<string, unknown>[] | Record<string, unknown[]>) => {

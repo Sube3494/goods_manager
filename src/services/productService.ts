@@ -38,6 +38,7 @@ export class ProductService {
     shopFilterMode?: "assigned" | "unassigned";
     includeShopOnly?: boolean;
     libraryId?: string;
+    filterIds?: string[];
   }) {
     const {
       userId,
@@ -59,9 +60,15 @@ export class ProductService {
       shopFilterMode = "assigned",
       includeShopOnly = false,
       libraryId,
+      filterIds,
     } = params;
 
     const andConditions: Prisma.ProductWhereInput[] = [];
+
+    // 如果传入了明确的 ID 列表，直接按它过滤，跳过其他安全判断以外的层层筛选
+    if (filterIds && filterIds.length > 0) {
+      andConditions.push({ id: { in: filterIds } });
+    }
 
     // 判断是否有库的权限
     const isSuperAdmin = role === "SUPER_ADMIN";

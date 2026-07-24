@@ -86,6 +86,8 @@ export async function GET(request: Request) {
     const shopFilterModeParam = searchParams.get("shopFilterMode");
     const shopFilterMode = shopFilterModeParam === "unassigned" ? "unassigned" : "assigned";
     const libraryId = searchParams.get("libraryId") || undefined;
+    const idsParam = searchParams.get("ids") || "";
+    const filterIds = idsParam ? idsParam.split(",").map(s => s.trim()).filter(Boolean) : undefined;
 
     const [field, order] = sortByParam.split("-") as [string, "asc" | "desc"];
 
@@ -109,6 +111,7 @@ export async function GET(request: Request) {
       shopFilterMode,
       includeShopOnly,
       libraryId,
+      filterIds,
     });
 
     if (idsOnly && 'ids' in result.items) {
