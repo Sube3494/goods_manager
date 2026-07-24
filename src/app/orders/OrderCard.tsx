@@ -472,6 +472,12 @@ export function getPlatformBadgeMeta(platform?: string | null) {
   };
 }
 
+export function isJdOrder(platform?: string | null, channelTag?: string | null) {
+  const p = String(platform || "").trim().toLowerCase();
+  const c = String(channelTag || "").trim().toLowerCase();
+  return p === "jd" || p.includes("jingdong") || p.includes("jddj") || p.includes("京东") || c === "daojia";
+}
+
 export function getOrderItemDisplay(item: AutoPickOrderItem) {
   const matchedProduct = item.matchedProduct;
   const rawPayload = item.rawPayload && typeof item.rawPayload === "object" && !Array.isArray(item.rawPayload)
@@ -1007,6 +1013,7 @@ export function ProductStripItem({
   showMatchStatus = false,
   returnedQuantity = 0,
   returnedDetails = [],
+  isJdOrder = false,
 }: {
   display: { name: string; sku: string; image: string | null; quantity: number; sourceId?: string };
   onEditMatch?: () => void;
@@ -1021,6 +1028,7 @@ export function ProductStripItem({
     refundAmount?: number;
     extraExpense?: number;
   }>;
+  isJdOrder?: boolean;
 }) {
   return (
     <div className="flex items-center gap-2.5 rounded-2xl border border-black/6 bg-white/70 px-2.5 py-2 dark:border-white/8 dark:bg-white/4 sm:gap-3 sm:rounded-[18px] sm:px-3 sm:py-2.5">
@@ -1047,8 +1055,8 @@ export function ProductStripItem({
         <div className="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] font-medium text-muted-foreground sm:mt-1">
           <span>{display.sku}</span>
           <span>x{display.quantity}</span>
-          {display.sourceId ? (
-            <span className="font-mono text-[10px] font-semibold text-amber-700 dark:text-amber-300 bg-amber-500/10 dark:bg-amber-500/20 px-1.5 py-0.5 rounded border border-amber-500/20 leading-none">
+          {isJdOrder && display.sourceId ? (
+            <span className="font-mono text-[10px] font-normal text-amber-700 dark:text-amber-300 bg-amber-500/10 dark:bg-amber-500/20 px-1.5 py-0.5 rounded border border-amber-500/20 leading-none">
               JD SKU: {display.sourceId}
             </span>
           ) : null}
@@ -1859,6 +1867,7 @@ export function OrderCard({
                     showMatchStatus={displayIndex === 0}
                     returnedQuantity={returnedItemQuantityMap.get(normalizeReturnedItemKey(display.name)) || 0}
                     returnedDetails={returnedItemDetailsMap.get(normalizeReturnedItemKey(display.name)) || []}
+                    isJdOrder={isJdOrder}
                   />
                 ))
               )}
