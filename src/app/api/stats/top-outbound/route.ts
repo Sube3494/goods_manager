@@ -37,6 +37,12 @@ export async function GET(request: NextRequest) {
           userId: session.id,
           ...(shopName ? { note: { contains: `[店铺:${shopName}]` } } : {}),
           ...(dateFilter ? { date: dateFilter } : {}),
+          // 严格剔除手动出库单，只计算真实订单(自动推单/订单导入)的销量
+          OR: [
+            { note: { contains: "平台单号:" } },
+            { note: { contains: "推单" } },
+            { note: { contains: "导入" } },
+          ],
         },
       },
       select: {
