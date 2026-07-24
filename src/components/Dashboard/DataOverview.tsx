@@ -158,8 +158,8 @@ function ChartTooltip({
   return (
     <div className="min-w-[190px] rounded-[22px] border border-black/8 bg-white/95 p-3.5 shadow-[0_18px_50px_rgba(15,23,42,0.16)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/95">
       <div className="flex items-center justify-between gap-2 border-b border-black/5 dark:border-white/5 pb-2">
-        <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">{label} 平台纯利润</span>
-        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">各平台拆分</span>
+        <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">{label} 平台纯利润</span>
+        <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">各平台拆分</span>
       </div>
 
       <div className="mt-2.5 space-y-2">
@@ -167,23 +167,23 @@ function ChartTooltip({
           platformEntries.map(([platform, amount]) => {
             const meta = getPlatformMeta(platform);
             return (
-              <div key={platform} className="flex items-center justify-between gap-4 text-xs">
-                <span className="text-slate-700 dark:text-slate-300 font-semibold">
+              <div key={platform} className="flex items-center justify-between gap-4 text-xs font-normal">
+                <span className="text-slate-700 dark:text-slate-300 font-normal">
                   {meta?.name || platform}:
                 </span>
-                <span className={cn("font-bold tabular-nums", (amount as number) < 0 ? "text-rose-500" : "text-emerald-600 dark:text-emerald-400")}>
+                <span className={cn("font-normal tabular-nums", (amount as number) < 0 ? "text-rose-500" : "text-emerald-600 dark:text-emerald-400")}>
                   {money(amount as number)}
                 </span>
               </div>
             );
           })
         ) : (
-          <div className="text-xs text-muted-foreground py-1 text-center">暂无平台纯利润明细</div>
+          <div className="text-xs text-muted-foreground py-1 text-center font-normal">暂无平台纯利润明细</div>
         )}
 
-        <div className="flex items-center justify-between gap-4 text-xs border-t border-dashed border-black/10 dark:border-white/10 pt-2.5 mt-2 font-black">
-          <span className="text-foreground">当日纯利润总计:</span>
-          <span className={cn("text-sm tabular-nums font-black", totalPureProfit < 0 ? "text-rose-500" : "text-emerald-600 dark:text-emerald-400")}>
+        <div className="flex items-center justify-between gap-4 text-xs border-t border-dashed border-black/10 dark:border-white/10 pt-2.5 mt-2 font-normal">
+          <span className="text-foreground font-normal">当日纯利润总计:</span>
+          <span className={cn("text-sm tabular-nums font-normal", totalPureProfit < 0 ? "text-rose-500" : "text-emerald-600 dark:text-emerald-400")}>
             {money(totalPureProfit)}
           </span>
         </div>
@@ -211,25 +211,25 @@ function OrderTooltip({
   const total = dataPoint?.trueOrderCount ?? dataPoint?.orderCount ?? 0;
 
   return (
-    <div className="min-w-[170px] rounded-[22px] border border-black/8 bg-white/95 p-3.5 shadow-[0_18px_50px_rgba(15,23,42,0.16)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/95">
+    <div className="min-w-[170px] rounded-[22px] border border-black/8 bg-white/95 p-3.5 shadow-[0_18px_50px_rgba(15,23,42,0.16)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/95 font-normal">
       <div className="flex items-center justify-between gap-2 border-b border-black/5 dark:border-white/5 pb-2">
-        <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">{label} 平台单量</span>
-        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-600 dark:text-sky-400">各平台拆分</span>
+        <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">{label} 平台单量</span>
+        <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-600 dark:text-sky-400">各平台拆分</span>
       </div>
       <div className="mt-2.5 space-y-2">
         {entries.length > 0 ? (
           entries.map(([platform, count]) => (
-            <div key={platform} className="flex items-center justify-between gap-4 text-xs">
-              <span className="text-slate-700 dark:text-slate-300 font-semibold">{platform}:</span>
-              <span className="font-bold tabular-nums text-sky-600 dark:text-sky-400">{count as number} 单</span>
+            <div key={platform} className="flex items-center justify-between gap-4 text-xs font-normal">
+              <span className="text-slate-700 dark:text-slate-300 font-normal">{platform}:</span>
+              <span className="font-normal tabular-nums text-sky-600 dark:text-sky-400">{count as number} 单</span>
             </div>
           ))
         ) : (
-          <div className="text-xs text-muted-foreground py-1 text-center">暂无平台数据</div>
+          <div className="text-xs text-muted-foreground py-1 text-center font-normal">暂无平台数据</div>
         )}
-        <div className="flex items-center justify-between gap-4 text-xs border-t border-dashed border-black/10 dark:border-white/10 pt-2.5 mt-2 font-black">
-          <span className="text-foreground">当日总计:</span>
-          <span className="text-sm tabular-nums font-black text-foreground">{total} 单</span>
+        <div className="flex items-center justify-between gap-4 text-xs border-t border-dashed border-black/10 dark:border-white/10 pt-2.5 mt-2 font-normal">
+          <span className="text-foreground font-normal">当日总计:</span>
+          <span className="text-sm tabular-nums font-normal text-foreground">{total} 单</span>
         </div>
       </div>
     </div>
