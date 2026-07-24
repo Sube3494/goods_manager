@@ -325,8 +325,6 @@ export function DataOverview({
   const [profitPlatform, setProfitPlatform] = useState("all");
   const [orderPlatform, setOrderPlatform] = useState("all");
   const [orderScope, setOrderScope] = useState<"all" | "true">("all");
-  const [profitDays, setProfitDays] = useState<string>("all");
-  const [orderDays, setOrderDays] = useState<string>("all");
 
   const businessTrend = data?.businessTrend || [];
   const rangeDays = useMemo(() => countDays(startDate, endDate), [endDate, startDate]);
@@ -339,26 +337,9 @@ export function DataOverview({
     { value: "淘宝", label: "淘宝" },
     { value: "线下交易", label: "线下交易" },
   ];
-  const chartDaysOptions = [
-    { value: "all", label: "全部范围" },
-    { value: "7", label: "最近 7 天" },
-    { value: "30", label: "最近 30 天" },
-    { value: "90", label: "最近 90 天" },
-  ];
 
-  const profitTrend = useMemo(() => {
-    const raw = profitPlatform === "all" ? businessTrend : (platformBusinessTrend[profitPlatform] || []);
-    if (profitDays === "all") return raw;
-    const num = Number(profitDays);
-    return Number.isFinite(num) && num > 0 ? raw.slice(-num) : raw;
-  }, [profitPlatform, businessTrend, platformBusinessTrend, profitDays]);
-
-  const orderTrend = useMemo(() => {
-    const raw = orderPlatform === "all" ? businessTrend : (platformBusinessTrend[orderPlatform] || []);
-    if (orderDays === "all") return raw;
-    const num = Number(orderDays);
-    return Number.isFinite(num) && num > 0 ? raw.slice(-num) : raw;
-  }, [orderPlatform, businessTrend, platformBusinessTrend, orderDays]);
+  const profitTrend = profitPlatform === "all" ? businessTrend : (platformBusinessTrend[profitPlatform] || []);
+  const orderTrend = orderPlatform === "all" ? businessTrend : (platformBusinessTrend[orderPlatform] || []);
   const orderSeriesKey = orderScope === "true" ? "trueOrderCount" : "orderCount";
   const orderSeriesColor = orderScope === "true" ? "#10b981" : "#0ea5e9";
   const orderTooltipNameMap: Record<string, string> = orderScope === "true"
@@ -635,24 +616,14 @@ export function DataOverview({
         <Panel
           title="每日盈亏"
           subtitle="每日净利润走势"
-          actionMobileStack
           action={(
-            <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:items-center sm:gap-2">
-              <CustomSelect
-                value={profitDays}
-                onChange={setProfitDays}
-                options={chartDaysOptions}
-                className="h-9 min-w-0 sm:min-w-[104px]"
-                triggerClassName="h-full rounded-xl border border-black/8 bg-white px-2.5 text-xs shadow-none dark:border-white/10 dark:bg-white/[0.03]"
-              />
-              <CustomSelect
-                value={profitPlatform}
-                onChange={setProfitPlatform}
-                options={platformOptions}
-                className="h-9 min-w-0 sm:min-w-[104px]"
-                triggerClassName="h-full rounded-xl border border-black/8 bg-white px-2.5 text-xs shadow-none dark:border-white/10 dark:bg-white/[0.03]"
-              />
-            </div>
+            <CustomSelect
+              value={profitPlatform}
+              onChange={setProfitPlatform}
+              options={platformOptions}
+              className="h-9 min-w-[116px]"
+              triggerClassName="h-full rounded-xl border border-black/8 bg-white px-3 text-sm shadow-none dark:border-white/10 dark:bg-white/[0.03]"
+            />
           )}
         >
           <div className="h-[260px] sm:h-[290px] [&_.recharts-wrapper]:outline-none [&_.recharts-surface]:outline-none [&_*:focus]:outline-none">
@@ -679,14 +650,7 @@ export function DataOverview({
           subtitle={orderScope === "true" ? "按日期查看真单变化" : "按日期查看订单变化"}
           actionMobileStack
           action={(
-            <div className="grid w-full grid-cols-3 gap-1.5 sm:flex sm:w-auto sm:items-center sm:gap-2">
-              <CustomSelect
-                value={orderDays}
-                onChange={setOrderDays}
-                options={chartDaysOptions}
-                className="h-9 min-w-0 sm:min-w-[100px]"
-                triggerClassName="h-full rounded-xl border border-black/8 bg-white px-2.5 text-xs shadow-none dark:border-white/10 dark:bg-white/[0.03]"
-              />
+            <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:items-center">
               <CustomSelect
                 value={orderScope}
                 onChange={(value) => setOrderScope(value as "all" | "true")}
@@ -694,15 +658,15 @@ export function DataOverview({
                   { value: "all", label: "全部订单" },
                   { value: "true", label: "去除刷单" },
                 ]}
-                className="h-9 min-w-0 sm:min-w-[104px]"
-                triggerClassName="h-full rounded-xl border border-black/8 bg-white px-2.5 text-xs shadow-none dark:border-white/10 dark:bg-white/[0.03]"
+                className="h-9 min-w-0 sm:min-w-[116px]"
+                triggerClassName="h-full rounded-xl border border-black/8 bg-white px-3 text-sm shadow-none dark:border-white/10 dark:bg-white/[0.03]"
               />
               <CustomSelect
                 value={orderPlatform}
                 onChange={setOrderPlatform}
                 options={platformOptions}
-                className="h-9 min-w-0 sm:min-w-[104px]"
-                triggerClassName="h-full rounded-xl border border-black/8 bg-white px-2.5 text-xs shadow-none dark:border-white/10 dark:bg-white/[0.03]"
+                className="h-9 min-w-0 sm:min-w-[116px]"
+                triggerClassName="h-full rounded-xl border border-black/8 bg-white px-3 text-sm shadow-none dark:border-white/10 dark:bg-white/[0.03]"
               />
             </div>
           )}
