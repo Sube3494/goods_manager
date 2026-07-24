@@ -322,6 +322,7 @@ export async function GET(request: NextRequest) {
         },
         select: {
           id: true,
+          productId: true,
           shopId: true,
           stock: true,
           costPrice: true,
@@ -1002,7 +1003,11 @@ export async function GET(request: NextRequest) {
 
     const transformedInboundItems = recentInboundItems.map((item) => {
       const matchedShopProduct = shopProductRows.find((sp) =>
-        (sp.sourceProductId === item.productId || sp.id === item.productId) &&
+        (
+          (sp.productId && sp.productId === item.productId) ||
+          (sp.sourceProductId && sp.sourceProductId === item.productId) ||
+          sp.id === item.productId
+        ) &&
         (!item.purchaseOrder?.shopName || sp.shop?.name === item.purchaseOrder.shopName)
       );
 
