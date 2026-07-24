@@ -36,7 +36,7 @@ const cardClass =
   "h-full w-full overflow-hidden rounded-[30px] border border-black/8 bg-white/75 shadow-xs backdrop-blur-sm dark:border-white/10 dark:bg-white/4";
 
 const tabClass =
-  "inline-flex items-center rounded-full border px-3 py-1.5 text-[11px] font-bold transition-colors";
+  "inline-flex items-center rounded-full border px-2 py-1 text-[10px] font-bold transition-colors sm:px-3 sm:py-1.5 sm:text-[11px]";
 
 type TopTimeRange = "7d" | "30d" | "month" | "all";
 
@@ -292,9 +292,9 @@ export function DashboardFeedPanel({
 
   return (
     <section className={cn(cardClass, "min-w-0 overflow-x-clip")}>
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/6 px-4 py-3 dark:border-white/8 sm:px-5">
-        <div className="flex items-center gap-2">
-          <div className="inline-flex rounded-full border border-black/8 bg-black/3 p-1 dark:border-white/10 dark:bg-white/4">
+      <div className="flex items-center justify-between gap-1 border-b border-black/6 px-3 py-2 dark:border-white/8 sm:gap-3 sm:px-5 sm:py-3">
+        <div className="flex shrink-0 items-center gap-1">
+          <div className="inline-flex rounded-full border border-black/8 bg-black/3 p-0.5 dark:border-white/10 dark:bg-white/4 sm:p-1">
             <button
               type="button"
               onClick={() => setActiveTab("inbound")}
@@ -305,7 +305,7 @@ export function DashboardFeedPanel({
                   : "border-transparent bg-transparent text-muted-foreground hover:text-foreground"
               )}
             >
-              <BadgePlus size={13} className="mr-1 shrink-0" />
+              <BadgePlus size={11} className="mr-0.5 shrink-0 sm:mr-1 sm:size-[13px]" />
               最近入库
             </button>
             <button
@@ -318,13 +318,13 @@ export function DashboardFeedPanel({
                   : "border-transparent bg-transparent text-muted-foreground hover:text-foreground"
               )}
             >
-              <TrendingUp size={13} className="mr-1 shrink-0" />
+              <TrendingUp size={11} className="mr-0.5 shrink-0 sm:mr-1 sm:size-[13px]" />
               热销榜
             </button>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1 sm:gap-2">
           {shopOptions && shopOptions.length > 0 ? (
             <CustomSelect
               value={feedShopName}
@@ -336,8 +336,8 @@ export function DashboardFeedPanel({
                 { value: "", label: "全部店铺" },
                 ...shopOptions.map((shop) => ({ value: shop.name, label: shop.name })),
               ]}
-              className="h-8 min-w-[104px]"
-              triggerClassName="h-full rounded-full border border-black/8 bg-white px-3 text-xs shadow-none dark:border-white/10 dark:bg-white/[0.04]"
+              className="h-7 min-w-[74px] sm:h-8 sm:min-w-[104px]"
+              triggerClassName="h-full rounded-full border border-black/8 bg-white px-2 text-[10px] sm:px-3 sm:text-xs shadow-none dark:border-white/10 dark:bg-white/[0.04]"
             />
           ) : null}
 
@@ -351,18 +351,18 @@ export function DashboardFeedPanel({
                 { value: "month", label: "本月" },
                 { value: "all", label: "全部时间" },
               ]}
-              className="h-8 min-w-[96px]"
-              triggerClassName="h-full rounded-full border border-black/8 bg-white px-3 text-xs shadow-none dark:border-white/10 dark:bg-white/[0.04]"
+              className="h-7 min-w-[72px] sm:h-8 sm:min-w-[96px]"
+              triggerClassName="h-full rounded-full border border-black/8 bg-white px-2 text-[10px] sm:px-3 sm:text-xs shadow-none dark:border-white/10 dark:bg-white/[0.04]"
             />
           )}
 
           {activeTab === "inbound" && headerMeta.onAction ? (
             <button
               onClick={headerMeta.onAction}
-              className="group inline-flex shrink-0 items-center gap-1 rounded-full border border-black/8 px-2.5 py-1 text-[10px] font-bold text-muted-foreground transition-colors hover:text-foreground dark:border-white/10"
+              className="group inline-flex shrink-0 items-center gap-0.5 rounded-full border border-black/8 px-1.5 py-0.5 text-[9px] font-bold text-muted-foreground transition-colors hover:text-foreground dark:border-white/10 sm:gap-1 sm:px-2.5 sm:py-1 sm:text-[10px]"
             >
-              入库历史
-              <ArrowRight size={11} className="transition-transform group-hover:translate-x-0.5" />
+              历史
+              <ArrowRight size={10} className="transition-transform group-hover:translate-x-0.5 sm:size-[11px]" />
             </button>
           ) : null}
         </div>
