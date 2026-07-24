@@ -1000,21 +1000,32 @@ export async function GET(request: NextRequest) {
       { key: "duplicate-template", label: "多店重复铺货", value: duplicateSourceProductCount, tone: "info" as const, hint: "同模板已铺到多个店铺", href: "/shop-goods" },
     ];
 
-    const transformedInboundItems = recentInboundItems.map((item) => ({
-      id: item.id,
-      productId: item.productId,
-      product: item.product
-        ? {
-            ...item.product,
-            image: item.product.image ? storage.resolveUrl(item.product.image) : null,
-          }
-        : null,
-      supplier: item.supplier,
-      quantity: item.quantity,
-      costPrice: item.costPrice,
-      purchaseOrder: item.purchaseOrder,
-      subtotal: FinanceMath.multiply(item.costPrice, item.quantity),
-    }));
+    const transformedInboundItems = recentInboundItems.map((item) => {
+      const matchedShopProduct = shopProductRows.find((sp) =>
+        (sp.sourceProductId === item.productId || sp.id === item.productId) &&
+        (!item.purchaseOrder?.shopName || sp.shop?.name === item.purchaseOrder.shopName)
+      );
+
+      const rawSku = matchedShopProduct?.sku || item.product?.sku || "";
+      const cleanSku = String(rawSku || "").replace(/\(自编\)|（自编）/gi, "").trim();
+
+      return {
+        id: item.id,
+        productId: item.productId,
+        product: item.product
+          ? {
+              ...item.product,
+              sku: cleanSku || null,
+              image: item.product.image ? storage.resolveUrl(item.product.image) : null,
+            }
+          : null,
+        supplier: item.supplier,
+        quantity: item.quantity,
+        costPrice: item.costPrice,
+        purchaseOrder: item.purchaseOrder,
+        subtotal: FinanceMath.multiply(item.costPrice, item.quantity),
+      };
+    });
     perf.lap("response-build");
     perf.log("GET /api/stats", {
       shopName: shopName || null,

@@ -120,7 +120,8 @@ export function DashboardFeedPanel({ recentInboundItems, isLoading = false, sele
       <div className="grid gap-3 p-4 sm:p-5 xl:grid-cols-2">
         {recentInboundItems.map((item) => {
           const productName = item.product?.name || "未知商品";
-          const productSku = item.product?.sku;
+          const rawSku = item.product?.sku;
+          const productSku = String(rawSku || "").replace(/\(自编\)|（自编）/gi, "").trim();
           const productImage = item.product?.image;
 
           return (
