@@ -5138,6 +5138,21 @@ async function resolveOutboundItemsForAutoPickOrder(
         );
       }
 
+      const targetShopProductId = resolvedShopProduct.id;
+      const rawPayloadRecord = item.rawPayload && typeof item.rawPayload === "object" && !Array.isArray(item.rawPayload)
+        ? (item.rawPayload as Record<string, unknown>)
+        : {};
+      const targetSourceId = String(item.productNo || rawPayloadRecord.source_id || rawPayloadRecord.sourceId || "").trim();
+      const isJdOrder = order.platform && (
+        order.platform.includes("京东") ||
+        order.platform.toLowerCase().includes("daojia") ||
+        order.platform.toLowerCase().includes("jd")
+      );
+
+      if (isJdOrder && targetShopProductId && targetSourceId) {
+        await syncJdSkuIdForShopProduct(tx, userId, targetShopProductId, targetSourceId);
+      }
+
       resolvedItems.push({
         productId: String(
           resolvedShopProduct?.productId
@@ -5929,6 +5944,50 @@ export async function fixHistoryShopOrdersForUser(userId: string): Promise<numbe
   return updatedCount;
 }
 
+export async function syncJdSkuIdForShopProduct(
+  tx: Prisma.TransactionClient,
+  userId: string,
+  shopProductId: string,
+  sourceId: string
+) {
+  const cleanSourceId = String(sourceId || "").trim();
+  if (!shopProductId || !cleanSourceId) return;
+
+  const shopProduct = await tx.shopProduct.findFirst({
+    where: { id: shopProductId, shop: { userId } },
+    select: { id: true, productId: true, jdSkuId: true },
+  });
+
+  if (!shopProduct) return;
+
+  const existingIds = normalizeJdSkuIds(shopProduct.jdSkuId);
+  if (!existingIds.includes(cleanSourceId)) {
+    const nextJdSkuIds = Array.from(new Set([...existingIds, cleanSourceId]));
+    const primaryStr = nextJdSkuIds.join(",");
+
+    await tx.shopProduct.update({
+      where: { id: shopProduct.id },
+      data: { jdSkuId: primaryStr },
+    });
+
+    if (shopProduct.productId) {
+      const existingProductSkus = await tx.productJdSku.findMany({
+        where: { productId: shopProduct.productId },
+        select: { jdSkuId: true },
+      });
+      const productJdSkuIds = Array.from(new Set([
+        ...existingProductSkus.map((i) => i.jdSkuId),
+        ...nextJdSkuIds,
+      ]));
+      await replaceProductJdSkuMappings(tx, shopProduct.productId, userId, productJdSkuIds);
+      await tx.product.update({
+        where: { id: shopProduct.productId },
+        data: { jdSkuId: productJdSkuIds[0] || null },
+      });
+    }
+  }
+}
+
 export async function backfillJdSkuIdForManualMatchedShopProducts(
   tx: Prisma.TransactionClient,
   userId: string
@@ -5962,39 +6021,7 @@ export async function backfillJdSkuIdForManualMatchedShopProducts(
     const sourceId = String(item.productNo || rawPayloadRecord.source_id || rawPayloadRecord.sourceId || "").trim();
 
     if (shopProductId && sourceId) {
-      const shopProduct = await tx.shopProduct.findFirst({
-        where: { id: shopProductId, shop: { userId } },
-        select: { id: true, productId: true, jdSkuId: true },
-      });
-
-      if (shopProduct) {
-        const existingIds = normalizeJdSkuIds(shopProduct.jdSkuId);
-        if (!existingIds.includes(sourceId)) {
-          const nextJdSkuIds = Array.from(new Set([...existingIds, sourceId]));
-          const primaryStr = nextJdSkuIds.join(",");
-
-          await tx.shopProduct.update({
-            where: { id: shopProduct.id },
-            data: { jdSkuId: primaryStr },
-          });
-
-          if (shopProduct.productId) {
-            const existingProductSkus = await tx.productJdSku.findMany({
-              where: { productId: shopProduct.productId },
-              select: { jdSkuId: true },
-            });
-            const productJdSkuIds = Array.from(new Set([
-              ...existingProductSkus.map((i) => i.jdSkuId),
-              ...nextJdSkuIds,
-            ]));
-            await replaceProductJdSkuMappings(tx, shopProduct.productId, userId, productJdSkuIds);
-            await tx.product.update({
-              where: { id: shopProduct.productId },
-              data: { jdSkuId: productJdSkuIds[0] || null },
-            });
-          }
-        }
-      }
+      await syncJdSkuIdForShopProduct(tx, userId, shopProductId, sourceId);
     }
   }
 }
