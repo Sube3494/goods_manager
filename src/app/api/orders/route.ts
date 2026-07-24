@@ -342,7 +342,7 @@ function normalizeShopProductSkuForPlatformMatch(
   item: { sku?: string | null; jdSkuId?: string | null }
 ) {
   if (isJDPlatform(platform)) {
-    return normalizeSkuDigits(item.jdSkuId || item.sku);
+    return normalizeSkuDigits(item.jdSkuId);
   }
   return normalizeSkuDigits(item.sku || item.jdSkuId);
 }
@@ -1518,14 +1518,14 @@ export async function GET(request: NextRequest) {
       }))
     ));
 
-    const shopProducts = (productNames.length > 0 || productSkuCandidates.length > 0)
+    const shopProducts = productSkuCandidates.length > 0
       ? await prisma.shopProduct.findMany({
             where: {
               shop: { userId: session.id },
               OR: [
-                ...(productNames.length > 0 ? [{ productName: { in: productNames } }] : []),
-                ...(productSkuCandidates.length > 0 ? [{ sku: { in: productSkuCandidates } }] : []),
-                ...(productSkuCandidates.length > 0 ? [{ jdSkuId: { in: productSkuCandidates } }] : []),
+                { sku: { in: productSkuCandidates } },
+                { jdSkuId: { in: productSkuCandidates } },
+                { product: { jdSkuMappings: { some: { jdSkuId: { in: productSkuCandidates } } } } },
               ],
             },
             select: {

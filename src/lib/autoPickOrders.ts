@@ -259,6 +259,7 @@ type MaiyatianOrderDetailResponse = {
     goods?: Array<{
       goods_name?: string;
       sku_code?: string;
+      source_id?: string;
       number?: string | number;
       thumb?: string;
       pickup_time?: string | number;
@@ -1488,9 +1489,15 @@ function parseAmountsFromDetail(detail: MaiyatianOrderDetailResponse["data"], pl
 
 function buildItemsFromDetailJSON(detail: MaiyatianOrderDetailResponse["data"]): AutoPickInboundItem[] {
   const goods = detail && Array.isArray(detail.goods) ? detail.goods : [];
+  const channelTag = String(detail?.channel_tag || detail?.goods_channel_tag || "").trim().toLowerCase();
+  const sourceTag = String(detail?.source_tag || "").trim().toLowerCase();
+  const isJD = channelTag === "daojia" || sourceTag === "daojia";
+
   return goods.map((item) => ({
     productName: String(item.goods_name || "").trim(),
-    productNo: String(item.sku_code || "").trim() || undefined,
+    productNo: isJD
+      ? (String(item.source_id || "").trim() || undefined)
+      : (String(item.sku_code || item.source_id || "").trim() || undefined),
     quantity: Math.max(1, Number(item.number || 0) || 1),
     thumb: String(item.thumb || "").trim() || undefined,
   })).filter((item) => item.productName || item.productNo);
@@ -2546,7 +2553,7 @@ export function normalizeAutoPickOrderPayload(payload: unknown): AutoPickInbound
   const extend = input.extend && typeof input.extend === "object" && !Array.isArray(input.extend)
     ? input.extend as Record<string, unknown>
     : null;
-  const items = Array.isArray(input.items) ? input.items : [];
+  const items = Array.isArray(input.items) ? input.items : (Array.isArray(input.goods) ? input.goods : []);
   const userInfo = input.userInfo && typeof input.userInfo === "object" && !Array.isArray(input.userInfo)
     ? input.userInfo as Record<string, unknown>
     : (input.user_info && typeof input.user_info === "object" && !Array.isArray(input.user_info)
@@ -2754,10 +2761,16 @@ export function normalizeAutoPickOrderPayload(payload: unknown): AutoPickInbound
     })(),
     items: items.map((item) => {
       const current = typeof item === "object" && item ? item as Record<string, unknown> : {};
+      const rawSourceId = String(current.source_id || current.sourceId || "").trim();
+      const rawSkuCode = String(current.sku_code || current.skuCode || "").trim();
+      const rawProductNo = String(current.productNo || "").trim();
+      const targetProductNo = isJD
+        ? (rawSourceId || rawProductNo)
+        : (rawProductNo || rawSkuCode || rawSourceId);
       return {
-        productName: String(current.productName || "").trim(),
-        productNo: String(current.productNo || "").trim() || undefined,
-        quantity: Math.max(0, Number(current.quantity || 0)),
+        productName: String(current.productName || current.goods_name || "").trim(),
+        productNo: targetProductNo || undefined,
+        quantity: Math.max(0, Number(current.quantity || current.number || 0)),
         thumb: String(current.thumb || "").trim() || undefined,
       };
     }),
@@ -2798,14 +2811,14 @@ function getInvalidAutoPickOrderPayloadReason(payload: unknown) {
   }
 
   const input = payload as Record<string, unknown>;
-  const items = Array.isArray(input.items) ? input.items : [];
+  const items = Array.isArray(input.items) ? input.items : (Array.isArray(input.goods) ? input.goods : []);
   const normalizedItems = items
     .map((item) => {
       const current = typeof item === "object" && item ? item as Record<string, unknown> : {};
       return {
-        productName: String(current.productName || "").trim(),
-        productNo: String(current.productNo || "").trim(),
-        quantity: Math.max(0, Number(current.quantity || 0)),
+        productName: String(current.productName || current.goods_name || "").trim(),
+        productNo: String(current.productNo || current.source_id || current.sourceId || "").trim(),
+        quantity: Math.max(0, Number(current.quantity || current.number || 0)),
       };
     })
     .filter((item) => item.productName && item.quantity > 0);
@@ -2972,16 +2985,40 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
       ...nextRawPayload,
       systemMeta: nextSystemMeta,
     };
-    const existingItemPayloadMap = new Map<string, Array<unknown>>();
+    const exactQueue = new Map<string, Array<unknown>>();
+    const productNoQueue = new Map<string, Array<unknown>>();
+    const fallbackQueue: Array<unknown> = [];
+
     for (const currentItem of existing?.items || []) {
-      const signature = buildAutoPickOrderItemSignature(currentItem);
-      const queue = existingItemPayloadMap.get(signature) || [];
-      queue.push(currentItem.rawPayload);
-      existingItemPayloadMap.set(signature, queue);
+      const pName = String(currentItem.productName || "").trim().toLowerCase();
+      const pNo = String(currentItem.productNo || "").trim().toLowerCase();
+      const pQty = Math.max(1, Number(currentItem.quantity || 1) || 1);
+
+      const exactKey = `${pName}::${pNo}::${pQty}`;
+
+      if (!exactQueue.has(exactKey)) exactQueue.set(exactKey, []);
+      exactQueue.get(exactKey)!.push(currentItem.rawPayload);
+
+      if (pNo) {
+        if (!productNoQueue.has(pNo)) productNoQueue.set(pNo, []);
+        productNoQueue.get(pNo)!.push(currentItem.rawPayload);
+      }
+
+      fallbackQueue.push(currentItem.rawPayload);
     }
+
     const items = normalizedItems.map((item) => {
-      const signature = buildAutoPickOrderItemSignature(item);
-      const preservedRawPayload = existingItemPayloadMap.get(signature)?.shift();
+      const pName = String(item.productName || "").trim().toLowerCase();
+      const pNo = String(item.productNo || "").trim().toLowerCase();
+      const pQty = Math.max(1, Number(item.quantity || 1) || 1);
+
+      const exactKey = `${pName}::${pNo}::${pQty}`;
+
+      const preservedRawPayload =
+        exactQueue.get(exactKey)?.shift() ||
+        (pNo ? productNoQueue.get(pNo)?.shift() : undefined) ||
+        (normalizedItems.length === (existing?.items?.length || 0) ? fallbackQueue.shift() : undefined);
+
       return {
         productName: item.productName,
         productNo: item.productNo,
@@ -3796,7 +3833,7 @@ function normalizeShopProductSkuForPlatformMatch(
   item: { sku?: string | null; jdSkuId?: string | null }
 ) {
   if (isJdPlatform(platform)) {
-    return normalizeAutoPickSkuForMatch(item.jdSkuId || item.sku);
+    return normalizeAutoPickSkuForMatch(item.jdSkuId);
   }
   return normalizeAutoPickSkuForMatch(item.sku || item.jdSkuId);
 }
@@ -3813,10 +3850,14 @@ async function findExistingShopProductByShopAndSku(
   }
 
   if (isJdPlatform(platform)) {
+    const targetJdSku = String(sku || "").trim();
     const directJdHit = await tx.shopProduct.findFirst({
       where: {
         shopId,
-        jdSkuId: String(sku || "").trim(),
+        OR: [
+          { jdSkuId: targetJdSku },
+          { product: { jdSkuMappings: { some: { jdSkuId: targetJdSku } } } },
+        ],
       },
       select: {
         id: true,
@@ -3830,6 +3871,7 @@ async function findExistingShopProductByShopAndSku(
     if (directJdHit) {
       return directJdHit;
     }
+    return null;
   }
 
   const directHit = await tx.shopProduct.findFirst({

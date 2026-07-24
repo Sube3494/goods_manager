@@ -474,22 +474,44 @@ export function getPlatformBadgeMeta(platform?: string | null) {
 
 export function getOrderItemDisplay(item: AutoPickOrderItem) {
   const matchedProduct = item.matchedProduct;
+  const rawPayload = item.rawPayload && typeof item.rawPayload === "object" && !Array.isArray(item.rawPayload)
+    ? item.rawPayload as Record<string, unknown>
+    : {};
+  const sourceId = String(
+    item.productNo
+    || rawPayload.source_id
+    || rawPayload.sourceId
+    || ""
+  ).trim();
+
   return {
     name: matchedProduct?.name || item.productName || "未命名商品",
     sku: matchedProduct?.sku || item.productNo || "-",
     image: matchedProduct?.image || item.thumb || null,
     quantity: item.quantity,
+    sourceId: sourceId || undefined,
   };
 }
 
 export function getExpandedOrderItemDisplays(item: AutoPickOrderItem) {
   const matchedProduct = item.matchedProduct;
+  const rawPayload = item.rawPayload && typeof item.rawPayload === "object" && !Array.isArray(item.rawPayload)
+    ? item.rawPayload as Record<string, unknown>
+    : {};
+  const sourceId = String(
+    item.productNo
+    || rawPayload.source_id
+    || rawPayload.sourceId
+    || ""
+  ).trim();
+
   if (Array.isArray(item.displayItems) && item.displayItems.length > 0) {
     return item.displayItems.map((displayItem) => ({
       name: displayItem.name || item.productName || "未命名商品",
       sku: displayItem.sku || matchedProduct?.sku || item.productNo || "-",
       image: displayItem.image || item.thumb || null,
       quantity: displayItem.quantity,
+      sourceId: sourceId || undefined,
     }));
   }
 
@@ -986,7 +1008,7 @@ export function ProductStripItem({
   returnedQuantity = 0,
   returnedDetails = [],
 }: {
-  display: { name: string; sku: string; image: string | null; quantity: number };
+  display: { name: string; sku: string; image: string | null; quantity: number; sourceId?: string };
   onEditMatch?: () => void;
   showEditMatch?: boolean;
   matchedProduct?: AutoPickOrderItem['matchedProduct'];
@@ -1025,6 +1047,11 @@ export function ProductStripItem({
         <div className="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] font-medium text-muted-foreground sm:mt-1">
           <span>{display.sku}</span>
           <span>x{display.quantity}</span>
+          {display.sourceId ? (
+            <span className="font-mono text-[10px] font-semibold text-amber-700 dark:text-amber-300 bg-amber-500/10 dark:bg-amber-500/20 px-1.5 py-0.5 rounded border border-amber-500/20 leading-none">
+              JD SKU: {display.sourceId}
+            </span>
+          ) : null}
           {showMatchStatus ? (
             <span className={cn(
               "inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none",

@@ -75,6 +75,7 @@ export async function PATCH(
       },
       select: {
         id: true,
+        productNo: true,
         rawPayload: true,
         order: {
           select: {
@@ -210,6 +211,8 @@ export async function PATCH(
       },
       select: {
         id: true,
+        productId: true,
+        jdSkuId: true,
         productName: true,
         sku: true,
         productImage: true,
@@ -257,6 +260,42 @@ export async function PATCH(
     }
 
     await prisma.$transaction(async (tx) => {
+      const targetJdSkuId = String(
+        orderItem.productNo
+        || basePayload.source_id
+        || basePayload.sourceId
+        || basePayload.sku_code
+        || basePayload.skuCode
+        || ""
+      ).trim();
+
+      if (targetJdSkuId) {
+        if (shopProduct.productId) {
+          await tx.productJdSku.createMany({
+            data: [{
+              productId: shopProduct.productId,
+              userId: user.id,
+              jdSkuId: targetJdSkuId,
+            }],
+            skipDuplicates: true,
+          });
+        }
+
+        if (!shopProduct.jdSkuId) {
+          await tx.shopProduct.update({
+            where: { id: shopProduct.id },
+            data: { jdSkuId: targetJdSkuId },
+          });
+        }
+
+        if (!orderItem.productNo) {
+          await tx.autoPickOrderItem.update({
+            where: { id: orderItem.id },
+            data: { productNo: targetJdSkuId },
+          });
+        }
+      }
+
       await tx.autoPickOrderItem.update({
         where: { id: orderItem.id },
         data: {
