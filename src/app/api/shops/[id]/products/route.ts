@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
 import { getStorageStrategy } from "@/lib/storage";
+import { normalizeJdSkuIds } from "@/lib/productJdSku";
 import { Prisma } from "../../../../../../prisma/generated-client";
 import { pinyin } from "pinyin-pro";
 
@@ -224,6 +225,7 @@ export async function GET(
               categoryId: true,
               supplierId: true,
               category: { select: { name: true } },
+              jdSkuMappings: { select: { jdSkuId: true } },
             },
           },
         },
@@ -234,35 +236,42 @@ export async function GET(
         .filter((item): item is NonNullable<typeof item> => Boolean(item));
 
       const storage = await getStorageStrategy();
-      const resolved = orderedItems.map((item) => ({
-        id: item.id,
-        sourceProductId: item.sourceProductId || item.productId || item.id,
-        productId: item.productId || null,
-        sku: item.sku || null,
-        jdSkuId: item.jdSkuId || null,
-        name: item.productName || item.product?.name || "未命名商品",
-        image: item.productImage
-          ? storage.resolveUrl(item.productImage)
-          : item.product?.image
-          ? storage.resolveUrl(item.product.image)
-          : null,
-        categoryId: item.categoryId || item.product?.categoryId || null,
-        categoryName: item.categoryName || item.product?.category?.name || "未分类",
-        supplierId: item.supplierId || item.product?.supplierId || null,
-        costPrice: item.costPrice ?? 0,
-        stock: item.stock ?? 0,
-        isPublic: item.isPublic ?? true,
-        isDiscontinued: item.isDiscontinued ?? false,
-        isShelfLife: item.isShelfLife ?? false,
-        shelfLifeDays: item.shelfLifeDays ?? null,
-        sourceType: "shopProduct" as const,
-        shopProductId: item.id,
-        isStandaloneShopProduct: !item.productId,
-        remark: item.remark || null,
-        specs: item.specs ?? null,
-        createdAt: item.createdAt,
-        updatedAt: item.updatedAt,
-      }));
+      const resolved = orderedItems.map((item) => {
+        const aggregatedJdSkuIds = Array.from(new Set([
+          ...normalizeJdSkuIds(item.jdSkuId),
+          ...(item.product?.jdSkuMappings?.map((mapping: any) => mapping.jdSkuId) || []),
+        ]));
+        return {
+          id: item.id,
+          sourceProductId: item.sourceProductId || item.productId || item.id,
+          productId: item.productId || null,
+          sku: item.sku || null,
+          jdSkuId: aggregatedJdSkuIds.join(",") || item.jdSkuId || null,
+          jdSkuIds: aggregatedJdSkuIds,
+          name: item.productName || item.product?.name || "未命名商品",
+          image: item.productImage
+            ? storage.resolveUrl(item.productImage)
+            : item.product?.image
+            ? storage.resolveUrl(item.product.image)
+            : null,
+          categoryId: item.categoryId || item.product?.categoryId || null,
+          categoryName: item.categoryName || item.product?.category?.name || "未分类",
+          supplierId: item.supplierId || item.product?.supplierId || null,
+          costPrice: item.costPrice ?? 0,
+          stock: item.stock ?? 0,
+          isPublic: item.isPublic ?? true,
+          isDiscontinued: item.isDiscontinued ?? false,
+          isShelfLife: item.isShelfLife ?? false,
+          shelfLifeDays: item.shelfLifeDays ?? null,
+          sourceType: "shopProduct" as const,
+          shopProductId: item.id,
+          isStandaloneShopProduct: !item.productId,
+          remark: item.remark || null,
+          specs: item.specs ?? null,
+          createdAt: item.createdAt,
+          updatedAt: item.updatedAt,
+        };
+      });
 
       return NextResponse.json({
         items: resolved,
@@ -301,6 +310,7 @@ export async function GET(
               categoryId: true,
               supplierId: true,
               category: { select: { name: true } },
+              jdSkuMappings: { select: { jdSkuId: true } },
             },
           },
         },
@@ -319,35 +329,42 @@ export async function GET(
     ]);
 
     const storage = await getStorageStrategy();
-    const resolved = items.map((item) => ({
-      id: item.id,
-      sourceProductId: item.sourceProductId || item.productId || item.id,
-      productId: item.productId || null,
-      sku: item.sku || null,
-      jdSkuId: item.jdSkuId || null,
-      name: item.productName || item.product?.name || "未命名商品",
-      image: item.productImage
-        ? storage.resolveUrl(item.productImage)
-        : item.product?.image
-        ? storage.resolveUrl(item.product.image)
-        : null,
-      categoryId: item.categoryId || item.product?.categoryId || null,
-      categoryName: item.categoryName || item.product?.category?.name || "未分类",
-      supplierId: item.supplierId || item.product?.supplierId || null,
-      costPrice: item.costPrice ?? 0,
-      stock: item.stock ?? 0,
-      isPublic: item.isPublic ?? true,
-      isDiscontinued: item.isDiscontinued ?? false,
-      isShelfLife: item.isShelfLife ?? false,
-      shelfLifeDays: item.shelfLifeDays ?? null,
-      sourceType: "shopProduct" as const,
-      shopProductId: item.id,
-      isStandaloneShopProduct: !item.productId,
-      remark: item.remark || null,
-      specs: item.specs ?? null,
-      createdAt: item.createdAt,
-      updatedAt: item.updatedAt,
-    }));
+    const resolved = items.map((item) => {
+      const aggregatedJdSkuIds = Array.from(new Set([
+        ...normalizeJdSkuIds(item.jdSkuId),
+        ...(item.product?.jdSkuMappings?.map((mapping: any) => mapping.jdSkuId) || []),
+      ]));
+      return {
+        id: item.id,
+        sourceProductId: item.sourceProductId || item.productId || item.id,
+        productId: item.productId || null,
+        sku: item.sku || null,
+        jdSkuId: aggregatedJdSkuIds.join(",") || item.jdSkuId || null,
+        jdSkuIds: aggregatedJdSkuIds,
+        name: item.productName || item.product?.name || "未命名商品",
+        image: item.productImage
+          ? storage.resolveUrl(item.productImage)
+          : item.product?.image
+          ? storage.resolveUrl(item.product.image)
+          : null,
+        categoryId: item.categoryId || item.product?.categoryId || null,
+        categoryName: item.categoryName || item.product?.category?.name || "未分类",
+        supplierId: item.supplierId || item.product?.supplierId || null,
+        costPrice: item.costPrice ?? 0,
+        stock: item.stock ?? 0,
+        isPublic: item.isPublic ?? true,
+        isDiscontinued: item.isDiscontinued ?? false,
+        isShelfLife: item.isShelfLife ?? false,
+        shelfLifeDays: item.shelfLifeDays ?? null,
+        sourceType: "shopProduct" as const,
+        shopProductId: item.id,
+        isStandaloneShopProduct: !item.productId,
+        remark: item.remark || null,
+        specs: item.specs ?? null,
+        createdAt: item.createdAt,
+        updatedAt: item.updatedAt,
+      };
+    });
 
     return NextResponse.json({
       items: resolved,

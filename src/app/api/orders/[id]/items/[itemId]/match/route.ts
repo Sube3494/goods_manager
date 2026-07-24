@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
 import { getStorageStrategy } from "@/lib/storage";
+import { normalizeJdSkuIds, replaceProductJdSkuMappings } from "@/lib/productJdSku";
 import { Prisma } from "../../../../../../../../prisma/generated-client";
 
 function readRawPayloadRecord(rawPayload: unknown) {
@@ -270,21 +271,29 @@ export async function PATCH(
       ).trim();
 
       if (targetJdSkuId) {
-        if (shopProduct.productId) {
-          await tx.productJdSku.createMany({
-            data: [{
-              productId: shopProduct.productId,
-              userId: user.id,
-              jdSkuId: targetJdSkuId,
-            }],
-            skipDuplicates: true,
-          });
-        }
+        const existingJdSkuIds = normalizeJdSkuIds(shopProduct.jdSkuId);
+        const nextJdSkuIds = Array.from(new Set([...existingJdSkuIds, targetJdSkuId]));
+        const primaryJdSkuIdStr = nextJdSkuIds.join(",");
 
-        if (!shopProduct.jdSkuId) {
-          await tx.shopProduct.update({
-            where: { id: shopProduct.id },
-            data: { jdSkuId: targetJdSkuId },
+        await tx.shopProduct.update({
+          where: { id: shopProduct.id },
+          data: { jdSkuId: primaryJdSkuIdStr },
+        });
+
+        if (shopProduct.productId) {
+          const existingProductJdSkus = await tx.productJdSku.findMany({
+            where: { productId: shopProduct.productId },
+            select: { jdSkuId: true },
+          });
+          const productJdSkuIds = Array.from(new Set([
+            ...existingProductJdSkus.map((item) => item.jdSkuId),
+            ...nextJdSkuIds,
+          ]));
+
+          await replaceProductJdSkuMappings(tx, shopProduct.productId, user.id, productJdSkuIds);
+          await tx.product.update({
+            where: { id: shopProduct.productId },
+            data: { jdSkuId: productJdSkuIds[0] || null },
           });
         }
 
