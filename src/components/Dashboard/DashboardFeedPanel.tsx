@@ -197,12 +197,12 @@ export function DashboardFeedPanel({
   };
 
   const renderTopOutbound = () => {
-    if (isTopLoading) {
+    if (isTopLoading && !topItems.length) {
       return (
-        <div className="grid gap-3 p-4 sm:p-5 xl:grid-cols-2">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="flex items-center gap-3 rounded-[16px] border border-black/6 bg-white/75 px-3 py-2.5 animate-pulse dark:border-white/8 dark:bg-white/4">
-              <div className="h-12 w-12 shrink-0 rounded-lg border border-black/3 bg-black/3 dark:border-white/5 dark:bg-white/5" />
+        <div className="grid gap-3 p-4 sm:p-5 xl:grid-cols-2 min-h-[300px]">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="flex items-center gap-3 rounded-[16px] border border-black/6 bg-white/75 px-3 py-3 animate-pulse dark:border-white/8 dark:bg-white/4">
+              <div className="h-10 w-10 shrink-0 rounded-lg border border-black/3 bg-black/3 dark:border-white/5 dark:bg-white/5" />
               <div className="flex-1 space-y-2">
                 <div className="h-4 w-2/3 rounded-full bg-black/3 dark:bg-white/5" />
                 <div className="h-3 w-1/3 rounded-full bg-black/3 dark:bg-white/5" />
@@ -215,7 +215,7 @@ export function DashboardFeedPanel({
 
     if (!topItems.length) {
       return (
-        <div className="flex flex-col items-center justify-center py-10 text-center opacity-35">
+        <div className="flex min-h-[300px] flex-col items-center justify-center py-10 text-center opacity-35">
           <PackageOpen size={34} className="text-muted-foreground" />
           <p className="mt-3 text-[11px] font-bold tracking-widest text-muted-foreground">暂无热销数据</p>
         </div>
@@ -223,69 +223,63 @@ export function DashboardFeedPanel({
     }
 
     return (
-      <div className="grid gap-3 p-4 sm:p-5 xl:grid-cols-2">
-        <AnimatePresence initial={false}>
-          {topItems.map((item, index) => (
-            <motion.div
-              key={`${item.productId}-${item.latestOutboundAt || "unknown"}-${index}`}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
-              transition={{ duration: 0.18, delay: index * 0.03 }}
-              className="group min-w-0 overflow-hidden flex flex-col gap-3 rounded-[16px] border border-black/6 bg-white/78 px-3 py-3 transition-colors hover:border-black/10 hover:bg-white dark:border-white/8 dark:bg-white/3 dark:hover:border-white/12 dark:hover:bg-white/5 sm:flex-row sm:items-center sm:gap-3 sm:py-2.5"
-            >
-              <div className="flex min-w-0 flex-1 items-start gap-3">
-                <div className={cn(
-                  "flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl border text-[10px] font-black tabular-nums shadow-inner",
-                  index < 3
-                    ? "border-amber-500/25 bg-amber-500/12 text-amber-500"
-                    : "border-black/8 bg-black/3 text-muted-foreground dark:border-white/10 dark:bg-white/4"
-                )}>
-                  {index + 1}
-                </div>
-                <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-black/5 bg-black/5 dark:border-white/10 dark:bg-muted/20">
-                  {item.product.image ? (
-                    <Image src={item.product.image} alt={item.product.name} fill className="object-cover" sizes="48px" />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center text-muted-foreground/20">
-                      <PackageOpen size={18} />
-                    </div>
-                  )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-[13px] font-medium leading-5 tracking-tight text-foreground transition-colors group-hover:text-primary sm:leading-normal">
-                    {item.product.name}
-                  </p>
-                  <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[10px] text-muted-foreground">
-                    {item.shopName ? (
-                      <>
-                        <span className="rounded-full bg-slate-100 dark:bg-white/5 px-1.5 py-0.5 text-muted-foreground font-medium">{item.shopName}</span>
-                        <span className="h-1 w-1 rounded-full bg-black/10 dark:bg-white/12" />
-                      </>
-                    ) : null}
-                    <span className="font-mono">编号</span>
-                    <span className="h-1 w-1 rounded-full bg-black/10 dark:bg-white/12" />
-                    <span className="max-w-full truncate font-mono">{item.product.sku || "未填写"}</span>
-                    <span className="rounded-full bg-primary/10 px-1.5 py-0.5 font-medium text-primary">数量 {item.totalQuantity}</span>
+      <div className={cn("grid gap-3 p-4 sm:p-5 xl:grid-cols-2 min-h-[300px] transition-opacity duration-200", isTopLoading && "opacity-50 pointer-events-none")}>
+        {topItems.map((item, index) => (
+          <div
+            key={`${item.productId}-${item.latestOutboundAt || "unknown"}-${index}`}
+            className="group min-w-0 overflow-hidden flex flex-col gap-3 rounded-[16px] border border-black/6 bg-white/78 px-3 py-3 transition-colors hover:border-black/10 hover:bg-white dark:border-white/8 dark:bg-white/3 dark:hover:border-white/12 dark:hover:bg-white/5 sm:flex-row sm:items-center sm:gap-3 sm:py-2.5"
+          >
+            <div className="flex min-w-0 flex-1 items-start gap-3">
+              <div className={cn(
+                "flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl border text-[10px] font-black tabular-nums shadow-inner",
+                index < 3
+                  ? "border-amber-500/25 bg-amber-500/12 text-amber-500"
+                  : "border-black/8 bg-black/3 text-muted-foreground dark:border-white/10 dark:bg-white/4"
+              )}>
+                {index + 1}
+              </div>
+              <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-black/5 bg-black/5 dark:border-white/10 dark:bg-muted/20 sm:h-10 sm:w-10">
+                {item.product.image ? (
+                  <Image src={item.product.image} alt={item.product.name} fill className="object-cover" sizes="48px" />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-muted-foreground/20">
+                    <PackageOpen size={18} />
                   </div>
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[13px] font-medium leading-5 tracking-tight text-foreground transition-colors group-hover:text-primary sm:leading-normal">
+                  {item.product.name}
+                </p>
+                <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[10px] text-muted-foreground">
+                  {item.shopName ? (
+                    <>
+                      <span className="rounded-full bg-slate-100 dark:bg-white/5 px-1.5 py-0.5 text-muted-foreground font-medium">{item.shopName}</span>
+                      <span className="h-1 w-1 rounded-full bg-black/10 dark:bg-white/12" />
+                    </>
+                  ) : null}
+                  <span className="font-mono">编号</span>
+                  <span className="h-1 w-1 rounded-full bg-black/10 dark:bg-white/12" />
+                  <span className="max-w-full truncate font-mono">{item.product.sku || "未填写"}</span>
+                  <span className="rounded-full bg-primary/10 px-1.5 py-0.5 font-medium text-primary">数量 {item.totalQuantity}</span>
                 </div>
               </div>
-              <div className="flex items-center justify-between gap-3 border-t border-black/6 pt-2 dark:border-white/8 sm:w-[88px] sm:shrink-0 sm:flex-col sm:items-end sm:border-t-0 sm:border-l sm:pt-0 sm:pl-3 sm:text-right">
-                <div className="text-[10px] font-bold text-muted-foreground sm:w-full sm:text-right">
-                  最近销售
-                </div>
-                <div className="flex items-center gap-1 text-[10px] font-medium text-muted-foreground sm:mt-1 sm:w-full sm:justify-end sm:text-[9px]">
-                  <Clock size={10} strokeWidth={3} className="shrink-0" />
-                  <span className="truncate">
-                    {item.latestOutboundAt
-                      ? formatDistanceToNow(new Date(item.latestOutboundAt), { addSuffix: true, locale: zhCN })
-                      : "未知"}
-                  </span>
-                </div>
+            </div>
+            <div className="flex items-center justify-between gap-3 border-t border-black/6 pt-2 dark:border-white/8 sm:w-[88px] sm:shrink-0 sm:flex-col sm:items-end sm:border-t-0 sm:border-l sm:pt-0 sm:pl-3 sm:text-right">
+              <div className="text-[10px] font-bold text-muted-foreground sm:w-full sm:text-right">
+                最近销售
               </div>
-            </motion.div>
-          ))}
-        </AnimatePresence>
+              <div className="flex items-center gap-1 text-[10px] font-medium text-muted-foreground sm:mt-1 sm:w-full sm:justify-end sm:text-[9px]">
+                <Clock size={10} strokeWidth={3} className="shrink-0" />
+                <span className="truncate">
+                  {item.latestOutboundAt
+                    ? formatDistanceToNow(new Date(item.latestOutboundAt), { addSuffix: true, locale: zhCN })
+                    : "未知"}
+                </span>
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
     );
   };
