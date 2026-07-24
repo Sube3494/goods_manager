@@ -1052,22 +1052,24 @@ export function ProductStripItem({
         <div className="line-clamp-2 wrap-break-word text-[13px] font-medium leading-4.5 text-foreground sm:text-sm sm:leading-5 sm:line-clamp-1">
           {display.name}
         </div>
-        <div className="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] font-medium text-muted-foreground sm:mt-1">
-          <span>{display.sku}</span>
-          <span>x{display.quantity}</span>
-          {isJdOrder && display.sourceId ? (
-            <span className="font-mono text-[10px] font-normal text-amber-700 dark:text-amber-300 bg-amber-500/10 dark:bg-amber-500/20 px-1.5 py-0.5 rounded border border-amber-500/20 leading-none">
-              JD SKU: {display.sourceId}
-            </span>
-          ) : null}
+        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-medium text-muted-foreground sm:mt-1 sm:gap-x-2.5">
+          <span className="shrink-0">{display.sku}</span>
+          <span className="shrink-0">x{display.quantity}</span>
           {showMatchStatus ? (
             <span className={cn(
-              "inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none",
+              "inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none whitespace-nowrap",
               matchedProduct
                 ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
                 : "bg-rose-500/10 text-rose-700 dark:text-rose-400"
             )}>
               {matchedProduct ? (matchedProduct.isManual ? "手动" : "自动") : "未匹配"}
+            </span>
+          ) : null}
+          {isJdOrder && display.sourceId ? (
+            <span className="inline-flex shrink-0 items-center font-mono text-[10px] font-normal text-amber-700 dark:text-amber-300 bg-amber-500/10 dark:bg-amber-500/20 px-1.5 py-0.5 rounded border border-amber-500/20 leading-none whitespace-nowrap">
+              <span className="hidden sm:inline">JD SKU:&nbsp;</span>
+              <span className="sm:hidden">JD:&nbsp;</span>
+              {display.sourceId}
             </span>
           ) : null}
           {returnedQuantity > 0 ? (
