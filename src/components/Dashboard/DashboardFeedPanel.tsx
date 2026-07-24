@@ -292,58 +292,33 @@ export function DashboardFeedPanel({
 
   return (
     <section className={cn(cardClass, "min-w-0 overflow-x-clip")}>
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/6 px-4 py-3 dark:border-white/8 sm:flex-nowrap sm:px-5">
-        <div className="min-w-0 flex flex-1 items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-black/8 bg-black/3 text-muted-foreground dark:border-white/10 dark:bg-white/4">
-            {headerMeta.icon}
-          </div>
-          <div className="min-w-0">
-            <h3 className="text-sm font-black tracking-tight text-foreground sm:text-base">{headerMeta.title}</h3>
-            <p className="mt-0.5 text-[11px] text-muted-foreground">{headerMeta.subtitle}</p>
-          </div>
-        </div>
-
-        {headerMeta.onAction ? (
-          <button
-            onClick={headerMeta.onAction}
-            className="group inline-flex max-w-full shrink-0 items-center gap-1 rounded-full border border-black/8 px-2.5 py-1 text-[10px] font-bold text-muted-foreground transition-colors hover:text-foreground dark:border-white/10"
-          >
-            {headerMeta.actionLabel}
-            <ArrowRight size={11} className="transition-transform group-hover:translate-x-0.5" />
-          </button>
-        ) : (
-          <span className="inline-flex items-center gap-1 rounded-full border border-black/8 bg-black/3 px-2.5 py-1 text-[10px] font-bold text-muted-foreground dark:border-white/10 dark:bg-white/4">
-            <Trophy size={11} />
-            {headerMeta.actionLabel}
-          </span>
-        )}
-      </div>
-
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/6 px-4 py-3 dark:border-white/8 sm:px-5">
-        <div className="overflow-x-auto">
-          <div className="inline-flex min-w-full rounded-full border border-black/8 bg-black/3 p-1 dark:border-white/10 dark:bg-white/4 sm:min-w-0">
+        <div className="flex items-center gap-2">
+          <div className="inline-flex rounded-full border border-black/8 bg-black/3 p-1 dark:border-white/10 dark:bg-white/4">
             <button
               type="button"
               onClick={() => setActiveTab("inbound")}
               className={cn(
-                `${tabClass} min-w-0 flex-1 justify-center whitespace-nowrap sm:min-w-[88px] sm:flex-none`,
+                `${tabClass} whitespace-nowrap`,
                 activeTab === "inbound"
                   ? "border-transparent bg-background text-foreground shadow-xs dark:bg-white/8"
                   : "border-transparent bg-transparent text-muted-foreground hover:text-foreground"
               )}
             >
+              <BadgePlus size={13} className="mr-1 shrink-0" />
               最近入库
             </button>
             <button
               type="button"
               onClick={() => setActiveTab("top")}
               className={cn(
-                `${tabClass} min-w-0 flex-1 justify-center whitespace-nowrap sm:min-w-[88px] sm:flex-none`,
+                `${tabClass} whitespace-nowrap`,
                 activeTab === "top"
                   ? "border-transparent bg-background text-foreground shadow-xs dark:bg-white/8"
                   : "border-transparent bg-transparent text-muted-foreground hover:text-foreground"
               )}
             >
+              <TrendingUp size={13} className="mr-1 shrink-0" />
               热销榜
             </button>
           </div>
@@ -361,7 +336,7 @@ export function DashboardFeedPanel({
                 { value: "", label: "全部店铺" },
                 ...shopOptions.map((shop) => ({ value: shop.name, label: shop.name })),
               ]}
-              className="h-8 min-w-[110px]"
+              className="h-8 min-w-[104px]"
               triggerClassName="h-full rounded-full border border-black/8 bg-white px-3 text-xs shadow-none dark:border-white/10 dark:bg-white/[0.04]"
             />
           ) : null}
@@ -380,6 +355,16 @@ export function DashboardFeedPanel({
               triggerClassName="h-full rounded-full border border-black/8 bg-white px-3 text-xs shadow-none dark:border-white/10 dark:bg-white/[0.04]"
             />
           )}
+
+          {activeTab === "inbound" && headerMeta.onAction ? (
+            <button
+              onClick={headerMeta.onAction}
+              className="group inline-flex shrink-0 items-center gap-1 rounded-full border border-black/8 px-2.5 py-1 text-[10px] font-bold text-muted-foreground transition-colors hover:text-foreground dark:border-white/10"
+            >
+              入库历史
+              <ArrowRight size={11} className="transition-transform group-hover:translate-x-0.5" />
+            </button>
+          ) : null}
         </div>
       </div>
 
