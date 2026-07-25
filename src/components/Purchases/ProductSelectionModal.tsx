@@ -84,6 +84,7 @@ interface ProductSelectionModalProps {
   respectPublicVisibility?: boolean;
   lockLibraryId?: string;
   showQuantityControls?: boolean;
+  disableAlreadySelected?: boolean;
 }
 
 function ProductSkeleton({ imageOnly = false }: { imageOnly?: boolean }) {
@@ -126,6 +127,7 @@ export function ProductSelectionModal({
   allowMultipleToggle = false,
   lockLibraryId,
   showQuantityControls = false,
+  disableAlreadySelected = true,
 }: ProductSelectionModalProps) {
   const [localSingleSelect, setLocalSingleSelect] = useState(Boolean(singleSelect));
   const queryRef = useRef(query);
@@ -227,7 +229,11 @@ export function ProductSelectionModal({
   useEffect(() => {
     if (isOpen) {
       setLocalSingleSelect(Boolean(singleSelect));
-      setTempSelectedIds([]);
+      if (!disableAlreadySelected && Array.isArray(selectedIds) && selectedIds.length > 0) {
+        setTempSelectedIds(selectedIds);
+      } else {
+        setTempSelectedIds([]);
+      }
       setSelectedProducts([]);
       setProducts([]);
       setSearchQuery("");
@@ -240,7 +246,7 @@ export function ProductSelectionModal({
       lastLoadedSignatureRef.current = "";
 
       // singleSelect 模式（如"修改商品匹配"）下，已选商品应以勾选态显示而非被过滤掉
-      setShowUnselectedOnly(!singleSelect);
+      setShowUnselectedOnly(!disableAlreadySelected ? false : !singleSelect);
       setIsLoading(usesPrefetchedData ? externalLoading : true);
       setShowInitialSkeleton(!(usesPrefetchedData && !externalLoading));
       pageRef.current = 1;
@@ -510,7 +516,7 @@ export function ProductSelectionModal({
 
   const toggleProduct = useCallback((product: Product) => {
     const id = getSelectionKey(product);
-    if (selectedIds.includes(id)) {
+    if (disableAlreadySelected && selectedIds.includes(id)) {
       return;
     }
     if (localSingleSelect) {
@@ -700,7 +706,7 @@ export function ProductSelectionModal({
                     {displayedProducts.map((product: Product) => {
                       const selectionKey = getSelectionKey(product);
                       const isSelected = tempSelectedIds.includes(selectionKey);
-                      const isAlreadySelected = selectedIds.includes(selectionKey);
+                      const isAlreadySelected = disableAlreadySelected && selectedIds.includes(selectionKey);
                       const productCode = getProductCode(product);
                       return (
                          <button

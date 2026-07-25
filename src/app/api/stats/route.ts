@@ -445,11 +445,15 @@ export async function GET(request: NextRequest) {
       prisma.dailyPromotionExpense.findMany({
         where: {
           userId: user.id,
+          ...(shopName ? { shopName } : {}),
           date: { gte: startDate, lte: endDate },
         },
         select: {
           date: true,
           amount: true,
+          amountMeituan: true,
+          amountJingdong: true,
+          amountTaobao: true,
         },
       }),
     ]);
@@ -927,6 +931,19 @@ export async function GET(request: NextRequest) {
       const point = businessTrendMap.get(key);
       if (point) {
         point.promotionExpense = FinanceMath.add(point.promotionExpense, item.amount || 0);
+      }
+
+      const meituanPoint = platformTrendMaps.get("美团")?.get(key);
+      if (meituanPoint && item.amountMeituan) {
+        meituanPoint.promotionExpense = FinanceMath.add(meituanPoint.promotionExpense, item.amountMeituan || 0);
+      }
+      const jingdongPoint = platformTrendMaps.get("京东")?.get(key);
+      if (jingdongPoint && item.amountJingdong) {
+        jingdongPoint.promotionExpense = FinanceMath.add(jingdongPoint.promotionExpense, item.amountJingdong || 0);
+      }
+      const taobaoPoint = platformTrendMaps.get("淘宝")?.get(key);
+      if (taobaoPoint && item.amountTaobao) {
+        taobaoPoint.promotionExpense = FinanceMath.add(taobaoPoint.promotionExpense, item.amountTaobao || 0);
       }
     });
 
