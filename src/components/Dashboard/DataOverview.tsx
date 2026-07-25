@@ -154,12 +154,15 @@ function ChartTooltip({
     .filter(([, val]) => val !== 0 || Object.keys(platformProfits).length <= 1)
     .sort(([, a], [, b]) => (b as number) - (a as number));
   const totalPureProfit = dataPoint?.pureProfit ?? 0;
+  const promotionExpense = dataPoint?.promotionExpense ?? 0;
+  const brushExpense = dataPoint?.brushExpense ?? 0;
+  const netProfit = dataPoint?.netProfit ?? (totalPureProfit - promotionExpense - brushExpense);
 
   return (
-    <div className="min-w-[190px] rounded-[22px] border border-black/8 bg-white/95 p-3.5 shadow-[0_18px_50px_rgba(15,23,42,0.16)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/95">
+    <div className="min-w-[210px] rounded-[22px] border border-black/8 bg-white/95 p-3.5 shadow-[0_18px_50px_rgba(15,23,42,0.16)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/95 font-normal">
       <div className="flex items-center justify-between gap-2 border-b border-black/5 dark:border-white/5 pb-2">
-        <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">{label} 平台纯利润</span>
-        <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">各平台拆分</span>
+        <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">{label} 盈亏明细</span>
+        <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">数据拆分</span>
       </div>
 
       <div className="mt-2.5 space-y-2">
@@ -169,7 +172,7 @@ function ChartTooltip({
             return (
               <div key={platform} className="flex items-center justify-between gap-4 text-xs font-normal">
                 <span className="text-slate-700 dark:text-slate-300 font-normal">
-                  {meta?.name || platform}:
+                  {meta?.name || platform}订单纯利:
                 </span>
                 <span className={cn("font-normal tabular-nums", (amount as number) < 0 ? "text-rose-500" : "text-emerald-600 dark:text-emerald-400")}>
                   {money(amount as number)}
@@ -178,13 +181,34 @@ function ChartTooltip({
             );
           })
         ) : (
-          <div className="text-xs text-muted-foreground py-1 text-center font-normal">暂无平台纯利润明细</div>
+          <div className="text-xs text-muted-foreground py-1 text-center font-normal">暂无订单纯利润明细</div>
         )}
 
         <div className="flex items-center justify-between gap-4 text-xs border-t border-dashed border-black/10 dark:border-white/10 pt-2.5 mt-2 font-normal">
-          <span className="text-foreground font-normal">当日纯利润总计:</span>
-          <span className={cn("text-sm tabular-nums font-normal", totalPureProfit < 0 ? "text-rose-500" : "text-emerald-600 dark:text-emerald-400")}>
+          <span className="text-slate-600 dark:text-slate-400 font-normal">订单纯利润小计:</span>
+          <span className={cn("tabular-nums font-semibold", totalPureProfit < 0 ? "text-rose-500" : "text-emerald-600 dark:text-emerald-400")}>
             {money(totalPureProfit)}
+          </span>
+        </div>
+
+        {promotionExpense > 0 && (
+          <div className="flex items-center justify-between gap-4 text-xs font-normal text-amber-600 dark:text-amber-400">
+            <span>扣除推广费:</span>
+            <span className="tabular-nums font-semibold">-{money(promotionExpense)}</span>
+          </div>
+        )}
+
+        {brushExpense > 0 && (
+          <div className="flex items-center justify-between gap-4 text-xs font-normal text-rose-500">
+            <span>扣除刷单支出:</span>
+            <span className="tabular-nums font-semibold">-{money(brushExpense)}</span>
+          </div>
+        )}
+
+        <div className="flex items-center justify-between gap-4 text-xs border-t border-solid border-black/10 dark:border-white/10 pt-2 mt-2 font-bold">
+          <span className="text-foreground">当日最终净利润:</span>
+          <span className={cn("text-sm tabular-nums font-extrabold", netProfit < 0 ? "text-rose-500" : "text-emerald-600 dark:text-emerald-400")}>
+            {money(netProfit)}
           </span>
         </div>
       </div>
