@@ -1731,20 +1731,31 @@ export async function GET(request: NextRequest) {
           const hasStrictMatchForAllSegmentsFromSku = segmentsFromSku.length > 1
             && segmentsFromSku.every((candidate) => Boolean(resolveStrictSkuMatch(candidate)));
 
-          const displayItems = (manualMatchedProduct && manualMatchedProduct.bundleItems && Array.isArray(manualMatchedProduct.bundleItems))
-            ? manualMatchedProduct.bundleItems.map((bItem: any) => ({
-                name: bItem.name || item.productName || "未命名商品",
-                sku: (
-                  isJDPlatform(order.platform)
-                    ? (bItem.jdSkuId || bItem.sku)
-                    : (bItem.sku || bItem.jdSkuId)
-                ) || "-",
-                image: bItem.image || null,
-                quantity: item.quantity,
-              }))
+          const bundleItems = manualMatchedProduct?.bundleItems;
+          const displayItems = (manualMatchedProduct && bundleItems && Array.isArray(bundleItems))
+            ? bundleItems.map((bItem: any) => {
+                const bQty = typeof bItem.quantity === "number" && bItem.quantity > 0
+                  ? bItem.quantity
+                  : (item.quantity > 1 && item.quantity % bundleItems.length === 0
+                    ? Math.max(1, Math.floor(item.quantity / bundleItems.length))
+                    : 1);
+                return {
+                  name: bItem.name || item.productName || "未命名商品",
+                  sku: (
+                    isJDPlatform(order.platform)
+                      ? (bItem.jdSkuId || bItem.sku)
+                      : (bItem.sku || bItem.jdSkuId)
+                  ) || "-",
+                  image: bItem.image || null,
+                  quantity: bQty,
+                };
+              })
             : hasStrictMatchForAllSegmentsFromSku
             ? segmentsFromSku.map((candidate) => {
                 const segmentMatchedProduct = resolveStrictSkuMatch(candidate);
+                const segQty = item.quantity > 1 && item.quantity % segmentsFromSku.length === 0
+                  ? Math.max(1, Math.floor(item.quantity / segmentsFromSku.length))
+                  : 1;
                 return {
                   name: segmentMatchedProduct?.name || item.productName || "未命名商品",
                   sku: (
@@ -1753,7 +1764,7 @@ export async function GET(request: NextRequest) {
                       : (segmentMatchedProduct?.sku || segmentMatchedProduct?.jdSkuId)
                   ) || candidate,
                   image: segmentMatchedProduct?.image || item.thumb || null,
-                  quantity: item.quantity,
+                  quantity: segQty,
                 };
               })
             : undefined;
