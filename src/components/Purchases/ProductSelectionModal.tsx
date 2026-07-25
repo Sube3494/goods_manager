@@ -83,6 +83,7 @@ interface ProductSelectionModalProps {
   loadAllOnOpen?: boolean;
   respectPublicVisibility?: boolean;
   lockLibraryId?: string;
+  showQuantityControls?: boolean;
 }
 
 function ProductSkeleton({ imageOnly = false }: { imageOnly?: boolean }) {
@@ -124,6 +125,7 @@ export function ProductSelectionModal({
   respectPublicVisibility = true,
   allowMultipleToggle = false,
   lockLibraryId,
+  showQuantityControls = false,
 }: ProductSelectionModalProps) {
   const [localSingleSelect, setLocalSingleSelect] = useState(Boolean(singleSelect));
   const queryRef = useRef(query);
@@ -133,6 +135,7 @@ export function ProductSelectionModal({
 
   const [tempSelectedIds, setTempSelectedIds] = useState<string[]>([]);
   const [selectedProducts, setSelectedProducts] = useState<Product[]>([]);
+  const [productQuantities, setProductQuantities] = useState<Record<string, number>>({});
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [hasLoadedResults, setHasLoadedResults] = useState(false);
@@ -529,7 +532,15 @@ export function ProductSelectionModal({
   }, [getSelectionKey, selectedIds, localSingleSelect]);
 
   const handleConfirm = () => {
-    onSelect(selectedProducts, targetPlatform);
+    const productsWithQty = selectedProducts.map(p => {
+      const key = getSelectionKey(p);
+      const qty = productQuantities[key] || 1;
+      return {
+        ...p,
+        matchQuantity: qty,
+      };
+    });
+    onSelect(productsWithQty, targetPlatform);
     onClose();
   };
 
@@ -849,6 +860,57 @@ export function ProductSelectionModal({
                     </div>
                   )}
                 </div>
+
+                {showQuantityControls && selectedProducts.length > 0 && (
+                  <div className="mt-3 border-t border-border/50 bg-amber-500/10 rounded-2xl p-3 shrink-0">
+                    <div className="text-xs font-bold text-amber-800 dark:text-amber-300 mb-2 flex items-center gap-1.5">
+                      <span>已选商品配比数量:</span>
+                      <span className="text-[11px] font-normal text-muted-foreground">（可手动调整每个商品在当前订单中的匹配数量）</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2.5 max-h-28 overflow-y-auto pr-1">
+                      {selectedProducts.map((product) => {
+                        const key = getSelectionKey(product);
+                        const currentQty = productQuantities[key] || 1;
+                        return (
+                          <div key={key} className="flex items-center gap-2 bg-white dark:bg-gray-800 border border-border/70 rounded-xl px-2.5 py-1.5 shadow-xs">
+                            {product.image && (
+                              <img src={product.image} alt="" className="w-6 h-6 rounded-md object-cover" />
+                            )}
+                            <span className="text-xs font-medium text-foreground max-w-[120px] truncate" title={product.name}>
+                              {product.name}
+                            </span>
+                            <div className="flex items-center gap-1 bg-muted/60 rounded-lg p-0.5 border border-border/40">
+                              <button
+                                type="button"
+                                onClick={() => setProductQuantities(prev => ({ ...prev, [key]: Math.max(1, (prev[key] || 1) - 1) }))}
+                                className="w-5 h-5 flex items-center justify-center rounded text-xs font-bold hover:bg-white dark:hover:bg-white/10 active:scale-90"
+                              >
+                                -
+                              </button>
+                              <input
+                                type="number"
+                                min={1}
+                                value={currentQty}
+                                onChange={(e) => {
+                                  const val = Math.max(1, parseInt(e.target.value) || 1);
+                                  setProductQuantities(prev => ({ ...prev, [key]: val }));
+                                }}
+                                className="w-8 text-center text-xs font-bold bg-transparent outline-none border-none p-0"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setProductQuantities(prev => ({ ...prev, [key]: (prev[key] || 1) + 1 }))}
+                                className="w-5 h-5 flex items-center justify-center rounded text-xs font-bold hover:bg-white dark:hover:bg-white/10 active:scale-90"
+                              >
+                                +
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
             </div>
 
             <div className="flex flex-col sm:flex-row items-center justify-between border-t border-border/50 p-5 sm:p-8 shrink-0 bg-zinc-50/50 dark:bg-white/5 gap-4">

@@ -81,6 +81,7 @@ export async function PATCH(
         order: {
           select: {
             orderNo: true,
+            platform: true,
           },
         },
       },
@@ -146,6 +147,14 @@ export async function PATCH(
     const storage = await getStorageStrategy();
     const productIds = productId.split(/[+＋]/).map(item => item.trim()).filter(Boolean);
 
+    const rawItems: Array<{ id: string; quantity?: number }> = Array.isArray(body?.items) ? body.items : [];
+    const itemsQtyMap = new Map<string, number>();
+    for (const item of rawItems) {
+      if (item && item.id) {
+        itemsQtyMap.set(String(item.id).trim(), Math.max(1, Number(item.quantity || 1) || 1));
+      }
+    }
+
     if (productIds.length > 1) {
       const shopProducts = await prisma.shopProduct.findMany({
         where: {
@@ -171,7 +180,10 @@ export async function PATCH(
 
       const matchedProduct = {
         id: shopProducts.map((p) => p.id).join("+"),
-        name: shopProducts.map((p) => p.productName || "未命名商品").join(" + "),
+        name: shopProducts.map((p) => {
+          const qty = itemsQtyMap.get(p.id);
+          return qty && qty > 1 ? `${p.productName || "未命名商品"} x${qty}` : (p.productName || "未命名商品");
+        }).join(" + "),
         sku: shopProducts.map((p) => p.sku || "").join(" + "),
         image: shopProducts[0]?.productImage ? storage.resolveUrl(shopProducts[0].productImage) : null,
         sourceType: "shopProduct" as const,
@@ -186,6 +198,7 @@ export async function PATCH(
           sourceType: "shopProduct" as const,
           shopProductId: p.id,
           shopName: p.shop?.name || null,
+          quantity: itemsQtyMap.get(p.id) || 1,
         })),
       };
 
@@ -229,6 +242,7 @@ export async function PATCH(
       return NextResponse.json({ error: "只能匹配当前店铺商品，模板库商品不参与订单匹配" }, { status: 404 });
     }
 
+    const singleQty = itemsQtyMap.get(shopProduct.id) || (body?.quantity ? Number(body.quantity) : undefined);
     const matchedProduct = {
       id: shopProduct.id,
       name: shopProduct.productName || "未命名商品",
@@ -238,6 +252,7 @@ export async function PATCH(
       shopProductId: shopProduct.id,
       shopName: shopProduct.shop?.name || null,
       isManual: true,
+      ...(singleQty && singleQty > 0 ? { quantity: singleQty } : {}),
     };
 
     if (autoMatchedProduct?.shopProductId && autoMatchedProduct.shopProductId === matchedProduct.shopProductId) {
@@ -270,31 +285,40 @@ export async function PATCH(
         || ""
       ).trim();
 
-      if (targetJdSkuId) {
-        const existingJdSkuIds = normalizeJdSkuIds(shopProduct.jdSkuId);
-        const nextJdSkuIds = Array.from(new Set([...existingJdSkuIds, targetJdSkuId]));
-        const primaryJdSkuIdStr = nextJdSkuIds.join(",");
+      const platformStr = String(orderItem.order?.platform || "");
+      const isJdOrder = platformStr.includes("京东") ||
+        platformStr.toLowerCase().includes("daojia") ||
+        platformStr.toLowerCase().includes("jd");
 
-        await tx.shopProduct.update({
-          where: { id: shopProduct.id },
-          data: { jdSkuId: primaryJdSkuIdStr },
-        });
+      if (isJdOrder && targetJdSkuId) {
+        try {
+          const existingJdSkuIds = normalizeJdSkuIds(shopProduct.jdSkuId);
+          const nextJdSkuIds = Array.from(new Set([...existingJdSkuIds, targetJdSkuId]));
+          const primaryJdSkuIdStr = nextJdSkuIds.join(",");
 
-        if (shopProduct.productId) {
-          const existingProductJdSkus = await tx.productJdSku.findMany({
-            where: { productId: shopProduct.productId },
-            select: { jdSkuId: true },
+          await tx.shopProduct.update({
+            where: { id: shopProduct.id },
+            data: { jdSkuId: primaryJdSkuIdStr },
           });
-          const productJdSkuIds = Array.from(new Set([
-            ...existingProductJdSkus.map((item) => item.jdSkuId),
-            ...nextJdSkuIds,
-          ]));
 
-          await replaceProductJdSkuMappings(tx, shopProduct.productId, user.id, productJdSkuIds);
-          await tx.product.update({
-            where: { id: shopProduct.productId },
-            data: { jdSkuId: productJdSkuIds[0] || null },
-          });
+          if (shopProduct.productId) {
+            const existingProductJdSkus = await tx.productJdSku.findMany({
+              where: { productId: shopProduct.productId },
+              select: { jdSkuId: true },
+            });
+            const productJdSkuIds = Array.from(new Set([
+              ...existingProductJdSkus.map((item) => item.jdSkuId),
+              ...nextJdSkuIds,
+            ]));
+
+            await replaceProductJdSkuMappings(tx, shopProduct.productId, user.id, productJdSkuIds);
+            await tx.product.update({
+              where: { id: shopProduct.productId },
+              data: { jdSkuId: productJdSkuIds[0] || null },
+            });
+          }
+        } catch (error) {
+          console.warn("[match/route] 忽略冲突的 jdSkuId 更新:", error);
         }
 
         if (!orderItem.productNo) {

@@ -5030,10 +5030,16 @@ async function resolveOutboundItemsForAutoPickOrder(
               || ""
             ).trim() || null;
 
+            const bundleItemQty = typeof bundleItem.quantity === "number" && bundleItem.quantity > 0
+              ? bundleItem.quantity
+              : (item.quantity > 1 && item.quantity % bundleItems.length === 0
+                ? Math.max(1, Math.floor(item.quantity / bundleItems.length))
+                : Math.max(1, Number(item.quantity || 1) || 1));
+
             resolvedItems.push({
               productId: resolvedSubProductId,
               shopProductId: bundleItem.shopProductId || bundleItem.id,
-              quantity: Math.max(1, Number(item.quantity || 1) || 1),
+              quantity: bundleItemQty,
               price: FinanceMath.divide(perResolvedPrice, bundleItems.length),
             });
           }
@@ -5960,31 +5966,35 @@ export async function syncJdSkuIdForShopProduct(
 
   if (!shopProduct) return;
 
-  const existingIds = normalizeJdSkuIds(shopProduct.jdSkuId);
-  if (!existingIds.includes(cleanSourceId)) {
-    const nextJdSkuIds = Array.from(new Set([...existingIds, cleanSourceId]));
-    const primaryStr = nextJdSkuIds.join(",");
+  try {
+    const existingIds = normalizeJdSkuIds(shopProduct.jdSkuId);
+    if (!existingIds.includes(cleanSourceId)) {
+      const nextJdSkuIds = Array.from(new Set([...existingIds, cleanSourceId]));
+      const primaryStr = nextJdSkuIds.join(",");
 
-    await tx.shopProduct.update({
-      where: { id: shopProduct.id },
-      data: { jdSkuId: primaryStr },
-    });
+      await tx.shopProduct.update({
+        where: { id: shopProduct.id },
+        data: { jdSkuId: primaryStr },
+      });
 
-    if (shopProduct.productId) {
-      const existingProductSkus = await tx.productJdSku.findMany({
-        where: { productId: shopProduct.productId },
-        select: { jdSkuId: true },
-      });
-      const productJdSkuIds = Array.from(new Set([
-        ...existingProductSkus.map((i) => i.jdSkuId),
-        ...nextJdSkuIds,
-      ]));
-      await replaceProductJdSkuMappings(tx, shopProduct.productId, userId, productJdSkuIds);
-      await tx.product.update({
-        where: { id: shopProduct.productId },
-        data: { jdSkuId: productJdSkuIds[0] || null },
-      });
+      if (shopProduct.productId) {
+        const existingProductSkus = await tx.productJdSku.findMany({
+          where: { productId: shopProduct.productId },
+          select: { jdSkuId: true },
+        });
+        const productJdSkuIds = Array.from(new Set([
+          ...existingProductSkus.map((i) => i.jdSkuId),
+          ...nextJdSkuIds,
+        ]));
+        await replaceProductJdSkuMappings(tx, shopProduct.productId, userId, productJdSkuIds);
+        await tx.product.update({
+          where: { id: shopProduct.productId },
+          data: { jdSkuId: productJdSkuIds[0] || null },
+        });
+      }
     }
+  } catch (error) {
+    console.warn("[syncJdSkuIdForShopProduct] 忽略已存在的 jdSkuId 冲突:", error);
   }
 }
 

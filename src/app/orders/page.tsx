@@ -1715,7 +1715,7 @@ export default function OrdersPage() {
     setMatchEditorTarget(null);
   }, [isSavingMatch]);
 
-  const saveManualMatch = useCallback(async (productId: string) => {
+  const saveManualMatch = useCallback(async (productId: string, items?: Array<{ id: string; quantity: number }>) => {
     if (!matchEditorTarget?.orderId || !matchEditorTarget.itemId) return;
 
     setIsSavingMatch(true);
@@ -1723,7 +1723,7 @@ export default function OrdersPage() {
       const response = await fetch(`/api/orders/${matchEditorTarget.orderId}/items/${matchEditorTarget.itemId}/match`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ productId }),
+        body: JSON.stringify({ productId, items }),
       });
       const data = await response.json().catch(() => ({}));
 
@@ -2306,12 +2306,17 @@ export default function OrdersPage() {
       <ProductSelectionModal
         isOpen={isMatchPickerOpen}
         onClose={closeMatchEditor}
+        showQuantityControls={true}
         onSelect={(products) => {
-          const resolvedIds = products
-            .map((p) => String(p.shopProductId || p.id || p.sourceProductId || p.productId || "").trim())
-            .filter(Boolean);
+          const items = products.map((p) => {
+            const id = String(p.shopProductId || p.id || p.sourceProductId || p.productId || "").trim();
+            const quantity = Math.max(1, (p as any).matchQuantity || 1);
+            return { id, quantity };
+          }).filter((item) => Boolean(item.id));
+
+          const resolvedIds = items.map((item) => item.id);
           if (resolvedIds.length === 0) return;
-          void saveManualMatch(resolvedIds.join("+"));
+          void saveManualMatch(resolvedIds.join("+"), items);
         }}
         selectedIds={matchEditorTarget?.currentMatchedProductId ? matchEditorTarget.currentMatchedProductId.split("+").filter(Boolean) : []}
         singleSelect
