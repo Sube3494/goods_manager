@@ -3,8 +3,9 @@
 import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Upload, X, FileSpreadsheet, CheckCircle, AlertCircle } from "lucide-react";
+import { Upload, X, FileSpreadsheet, CheckCircle, AlertCircle, EyeOff, Ban } from "lucide-react";
 import * as XLSX from "xlsx";
+import { cn } from "@/lib/utils";
 
 interface ImportModalProps {
   isOpen: boolean;
@@ -32,11 +33,24 @@ export function ImportModal({
   const [dragActive, setDragActive] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [previewData, setPreviewData] = useState<Record<string, unknown>[]>([]);
+  const [ignoredColumns, setIgnoredColumns] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [progress, setProgress] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const toggleIgnoreColumn = (colKey: string) => {
+    setIgnoredColumns((prev) => {
+      const next = new Set(prev);
+      if (next.has(colKey)) {
+        next.delete(colKey);
+      } else {
+        next.add(colKey);
+      }
+      return next;
+    });
+  };
 
   const handleDownloadTemplate = () => {
     if (!templateData) return;
@@ -63,6 +77,7 @@ export function ImportModal({
 
   const processFile = async (file: File) => {
     setError(null);
+    setIgnoredColumns(new Set());
     if (!file.name.match(/\.(xlsx|xls|csv)$/)) {
       setError("请上传有效的 Excel 或 CSV 文件");
       return;
@@ -103,19 +118,32 @@ export function ImportModal({
             const data = e.target?.result;
             const workbook = XLSX.read(data, { type: "binary" });
             
+            const filterRow = (row: Record<string, unknown>) => {
+              if (ignoredColumns.size === 0) return row;
+              const clean: Record<string, unknown> = {};
+              Object.keys(row).forEach((key) => {
+                if (!ignoredColumns.has(key)) {
+                  clean[key] = row[key];
+                }
+              });
+              return clean;
+            };
+
             let importData: any = null;
             if (multiSheet) {
               const result: Record<string, unknown[]> = {};
               workbook.SheetNames.forEach(name => {
                   const sheet = workbook.Sheets[name];
-                  result[name] = XLSX.utils.sheet_to_json(sheet);
+                  const rawData = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet);
+                  result[name] = rawData.map(filterRow);
               });
               importData = result;
             } else {
               const sheetName = workbook.SheetNames[0];
               const sheet = workbook.Sheets[sheetName];
-              importData = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet).map((row) => ({
-                ...row,
+              const rawData = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet);
+              importData = rawData.map((row) => ({
+                ...filterRow(row),
                 __sheetName: sheetName,
               }));
             }
@@ -308,7 +336,7 @@ export function ImportModal({
                       <p className="text-xs text-muted-foreground mt-0.5">文件解析完成，准备导入系统</p>
                     </div>
                     <button 
-                        onClick={() => { setFile(null); setPreviewData([]); }}
+                        onClick={() => { setFile(null); setPreviewData([]); setIgnoredColumns(new Set()); }}
                         className="h-9 px-4 rounded-full text-xs font-medium text-destructive hover:bg-destructive/10 transition-colors shrink-0"
                     >
                         移除文件
@@ -316,33 +344,79 @@ export function ImportModal({
                   </div>
 
                   <div className="rounded-2xl border border-border overflow-hidden bg-white/5">
-                    <div className="bg-muted/50 px-5 py-3 text-[10px] font-black text-muted-foreground uppercase tracking-widest border-b border-border">
-                        数据预览 (前 5 条)
+                    <div className="bg-muted/50 px-5 py-3 flex items-center justify-between border-b border-border flex-wrap gap-2">
+                        <div className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
+                          数据预览 (前 5 条)
+                        </div>
+                        <div className="text-xs text-muted-foreground flex items-center gap-2">
+                          <span>点击表头图标可 <strong className="text-amber-500 font-semibold">忽略/恢复</strong> 对应的列</span>
+                          {ignoredColumns.size > 0 && (
+                            <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold text-[10px]">
+                              已忽略 {ignoredColumns.size} 列
+                            </span>
+                          )}
+                        </div>
                     </div>
                     <div className="max-h-64 overflow-y-auto scrollbar-none">
-                        <table className="w-full text-sm text-left">
-                            <thead className="bg-muted/30 text-muted-foreground sticky top-0 backdrop-blur-md">
+                        <table className="w-full text-sm text-left border-collapse">
+                            <thead className="bg-muted/30 text-muted-foreground sticky top-0 backdrop-blur-md z-10">
                                 <tr>
-                                    {Object.keys(previewData[0] || {}).map((key) => (
-                                        <th key={key} className="px-5 py-3 font-bold whitespace-nowrap">
-                                            {key.startsWith("*") ? (
-                                                <span className="flex items-center gap-0.5">
-                                                    <span className="text-red-500 text-xs">*</span>
-                                                    {key.slice(1)}
-                                                </span>
-                                            ) : (
-                                                key
-                                            )}
-                                        </th>
-                                    ))}
+                                    {Object.keys(previewData[0] || {}).map((key) => {
+                                        const isIgnored = ignoredColumns.has(key);
+                                        return (
+                                            <th 
+                                              key={key} 
+                                              onClick={() => toggleIgnoreColumn(key)}
+                                              className={cn(
+                                                "px-4 py-3 font-bold whitespace-nowrap cursor-pointer select-none transition-colors group border-b border-border",
+                                                isIgnored ? "bg-amber-500/10 text-amber-600/70 dark:text-amber-400/70" : "hover:bg-muted/60"
+                                              )}
+                                              title={isIgnored ? "点击取消忽略，恢复导入此列" : "点击忽略此列，不导入系统"}
+                                            >
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className={cn(isIgnored && "line-through opacity-60")}>
+                                                      {key.startsWith("*") ? (
+                                                          <span className="inline-flex items-center gap-0.5">
+                                                              <span className="text-red-500 text-xs">*</span>
+                                                              {key.slice(1)}
+                                                          </span>
+                                                      ) : (
+                                                          key
+                                                      )}
+                                                    </span>
+                                                    {isIgnored ? (
+                                                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-amber-500/20 text-amber-700 dark:text-amber-300 font-bold">
+                                                        <Ban size={11} />
+                                                        已忽略
+                                                      </span>
+                                                    ) : (
+                                                      <span className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-amber-500 text-xs">
+                                                        <EyeOff size={13} />
+                                                      </span>
+                                                    )}
+                                                </div>
+                                            </th>
+                                        );
+                                    })}
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-border">
                                 {previewData.map((row, i) => (
                                     <tr key={i} className="hover:bg-muted/20 transition-colors">
-                                        {Object.values(row).map((val, j) => (
-                                            <td key={j} className="px-5 py-3 text-foreground/70 truncate max-w-[200px]">{String(val || "-")}</td>
-                                        ))}
+                                        {Object.entries(row).map(([colKey, val], j) => {
+                                            const isIgnored = ignoredColumns.has(colKey);
+                                            return (
+                                              <td 
+                                                key={j} 
+                                                className={cn(
+                                                  "px-4 py-3 text-foreground/70 truncate max-w-[200px] transition-opacity",
+                                                  isIgnored && "opacity-30 line-through bg-amber-500/5 text-muted-foreground"
+                                                )}
+                                              >
+                                                {String(val ?? "-")}
+                                              </td>
+                                            );
+                                        })}
                                     </tr>
                                 ))}
                             </tbody>

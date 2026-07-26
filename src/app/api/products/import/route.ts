@@ -120,15 +120,20 @@ export async function POST(request: Request) {
             const galleryText = String(item['图库图片'] || "");
             const galleryUrls = galleryText ? galleryText.split(/[\n,，]/).map(url => url.trim()).filter(Boolean) : [];
 
-            if (!sku) {
+            // 如果未填 SKU，且有商品名称，则自动生成唯一 SKU 编码；若无商品名称则拒绝
+            let finalSku = sku;
+            if (!finalSku) {
+              if (!name) {
                 failCount++;
-                errors.push({ sku: "未知", reason: "未填写 SKU" });
+                errors.push({ sku: "未知", reason: "缺少商品名称，且未填写 SKU" });
                 continue;
+              }
+              finalSku = `SKU-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
             }
 
             // Find existing product by SKU GLOBALLY
             const product = await prisma.product.findUnique({
-                where: { sku: sku }
+                where: { sku: finalSku }
             });
 
             if (product) {
@@ -306,7 +311,7 @@ export async function POST(request: Request) {
 
                 const newProduct = await prisma.product.create({
                     data: {
-                        sku,
+                        sku: finalSku,
                         name,
                         categoryId: finalCategoryId as string,
                         supplierId: finalSupplierId,
