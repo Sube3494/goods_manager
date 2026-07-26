@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { AutoPickOrder, AutoPickOrderItem, PurchaseOrder, PurchaseStatus } from "@/lib/types";
 import { formatLocalDate } from "@/lib/dateUtils";
 import { isShopNameMatch } from "@/lib/shopIdentity";
+import { pinyinMatch } from "@/lib/pinyin";
 import { AUTO_PICK_EXTRA_STATUS_FILTERS, getBaseAutoPickStatusDisplay, getAutoPickStatusFilterLabel, isAutoPickExtraStatusFilter, matchesAutoPickStatusFilter } from "@/lib/autoPickOrderStatus";
 import {
   OrderCard,
@@ -423,14 +424,26 @@ export function AllOrdersView({
     setStatus("all");
   }, [status, statusOptions]);
 
-  // 前端过滤（针对店铺筛选项）
+  // 前端过滤（针对店铺与拼音搜索筛选项）
   const filteredOrders = useMemo(() => {
+    const q = query.trim();
     return orders.filter((order) => {
       if (shop !== "all" && order.matchedShopName !== shop) return false;
       if (!matchesAutoPickStatusFilter(order, status)) return false;
+      if (q) {
+        const matchesQuery =
+          pinyinMatch(order.orderNo, q) ||
+          pinyinMatch(order.platform || "", q) ||
+          pinyinMatch(order.userAddress || "", q) ||
+          pinyinMatch(order.matchedShopName || "", q) ||
+          pinyinMatch(order.customerName || "", q) ||
+          pinyinMatch(order.customerPhone || "", q) ||
+          order.items?.some((i) => pinyinMatch(i.productName || "", q) || pinyinMatch(i.productNo || "", q));
+        if (!matchesQuery) return false;
+      }
       return true;
     });
-  }, [orders, shop, status]);
+  }, [orders, shop, status, query]);
 
   const orderOverviewCounts = useMemo(() => {
     if (shop === "all") {

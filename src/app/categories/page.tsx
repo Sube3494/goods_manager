@@ -20,6 +20,8 @@ const CATEGORY_COLOR = {
   hoverBorder: 'hover:border-blue-500/30' 
 };
 
+import { pinyinMatch } from "@/lib/pinyin";
+
 export default function CategoriesPage() {
   const { user } = useUser();
   const [categories, setCategories] = useState<Category[]>([]);
@@ -128,7 +130,7 @@ export default function CategoriesPage() {
   };
 
   const filteredCategories = categories.filter((c: Category) => 
-    c.name.toLowerCase().includes(searchQuery.toLowerCase())
+    pinyinMatch(c.name, searchQuery)
   );
 
   return (

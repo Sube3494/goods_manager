@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown, Check, Plus, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { pinyinMatch } from "@/lib/pinyin";
 
 interface Option {
   value: string;
@@ -72,9 +73,7 @@ export function CustomSelect({
 
   const selectedLabel = options.find((opt) => opt.value === value)?.label || placeholder;
   const filteredOptions = isSearchable
-    ? options.filter((option) =>
-        option.label.toLowerCase().includes(searchQuery.toLowerCase())
-      )
+    ? options.filter((option) => pinyinMatch(option.label, searchQuery))
     : options;
 
   useEffect(() => {

@@ -11,6 +11,8 @@ import { hasPermission } from "@/lib/permissions";
 import { Supplier } from "@/lib/types";
 import { SessionUser } from "@/lib/permissions";
 
+import { pinyinMatch } from "@/lib/pinyin";
+
 export default function SuppliersPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -122,8 +124,8 @@ export default function SuppliersPage() {
   };
 
   const filteredSuppliers = suppliers.filter(s => 
-    s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (s.contact && s.contact.toLowerCase().includes(searchQuery.toLowerCase())) ||
+    pinyinMatch(s.name, searchQuery) ||
+    (s.contact && pinyinMatch(s.contact, searchQuery)) ||
     (s.code && s.code.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 

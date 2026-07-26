@@ -12,6 +12,7 @@ import {
   readRiderPhoneFromDelivery,
   readRiderPhoneFromRawPayload,
 } from "@/lib/autoPickOrders";
+import { processDueAutoCompleteJobs } from "@/lib/autoPickAutoComplete";
 import { parseAsShanghaiTime } from "@/lib/dateUtils";
 import { doesAutoPickOrderRequirePickConfirmation, isAutoPickOrderCancelledStatus, isAutoPickOrderDeletedStatus, isAutoPickOtherPickupOrder, isAutoPickPickCompleted, isAutoPickPickupOrder, resolveAutoPickBusinessStatus } from "@/lib/autoPickOrderStatus";
 import { createRequestPerfTracker } from "@/lib/perf";
@@ -795,6 +796,9 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    // 隐式触发已到期的订单自动送达/自动完成状态变更
+    void processDueAutoCompleteJobs(5).catch(() => {});
+
     const storage = await getStorageStrategy();
     const searchParams = request.nextUrl.searchParams;
     const liteMode = searchParams.get("_lite") === "1";
