@@ -986,16 +986,6 @@ export default function GoodsPage() {
                   <span className="hidden sm:inline ml-2">导入</span>
                 </button>
                 <div className="w-px h-3 bg-white/20 mx-0.5 hidden sm:block"></div>
-                <button
-                  onClick={handleSyncStandaloneProducts}
-                  disabled={isSyncingStandalone}
-                  className="flex items-center justify-center rounded-full w-7 h-7 sm:w-auto sm:px-4 text-xs sm:text-sm font-medium text-foreground hover:bg-white/10 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-                  title="同步历史单店自建商品"
-                >
-                  <span className="hidden sm:inline">{isSyncingStandalone ? "同步自建中..." : "同步自建"}</span>
-                  <span className="inline sm:hidden text-[10px]">{isSyncingStandalone ? "同步中" : "自建"}</span>
-                </button>
-                <div className="w-px h-3 bg-white/20 mx-0.5 hidden sm:block"></div>
                 <button 
                   onClick={handleCreate}
                   className="flex items-center gap-2 rounded-full bg-primary px-3 sm:px-6 h-7 sm:h-8 text-[11px] sm:text-sm font-bold text-primary-foreground shadow-lg shadow-primary/30 hover:shadow-primary/50 hover:-translate-y-0.5 transition-all whitespace-nowrap"

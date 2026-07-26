@@ -159,6 +159,8 @@ const BatchEditForm = ({
               <CustomSelect
                 value={categoryId}
                 onChange={setCategoryId}
+                searchable={true}
+                searchPlaceholder="搜索分类..."
                 options={[
                   { value: "keep", label: "保持原分类" },
                   ...categories.map(c => ({ value: c.id, label: c.name }))
@@ -175,6 +177,8 @@ const BatchEditForm = ({
               <CustomSelect
                 value={supplierId}
                 onChange={setSupplierId}
+                searchable={true}
+                searchPlaceholder="搜索供应商..."
                 options={[
                   { value: "keep", label: "保持原供应商" },
                   ...suppliers.map(s => ({ value: s.id, label: s.name }))

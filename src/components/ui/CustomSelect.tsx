@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, Check, Plus } from "lucide-react";
+import { ChevronDown, Check, Plus, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Option {
@@ -35,12 +35,14 @@ export function CustomSelect({
   triggerClassName,
   onAddNew,
   addNewLabel,
-  searchable = false,
+  searchable,
   searchPlaceholder = "搜索...",
 }: CustomSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [isMobile, setIsMobile] = useState(false);
+
+  const isSearchable = searchable ?? options.length >= 5;
 
   useEffect(() => {
     const checkMobile = () => {
@@ -69,7 +71,7 @@ export function CustomSelect({
   const [mounted, setMounted] = useState(false);
 
   const selectedLabel = options.find((opt) => opt.value === value)?.label || placeholder;
-  const filteredOptions = searchable
+  const filteredOptions = isSearchable
     ? options.filter((option) =>
         option.label.toLowerCase().includes(searchQuery.toLowerCase())
       )
@@ -81,11 +83,11 @@ export function CustomSelect({
   }, []);
 
   useEffect(() => {
-    if (isOpen && searchable) {
+    if (isOpen && isSearchable) {
       const handle = requestAnimationFrame(() => inputRef.current?.focus());
       return () => cancelAnimationFrame(handle);
     }
-  }, [isOpen, searchable]);
+  }, [isOpen, isSearchable]);
 
 
 
@@ -207,6 +209,35 @@ export function CustomSelect({
               } as React.CSSProperties}
               className="select-dropdown-container rounded-2xl bg-white/95 dark:bg-[#0c1222]/95 backdrop-blur-2xl border border-black/8 dark:border-white/10 shadow-2xl dark:shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] focus:outline-none overflow-hidden"
             >
+              {isSearchable && (
+                <div className="p-2 border-b border-border/40 sticky top-0 bg-white/95 dark:bg-[#0c1222]/95 backdrop-blur-md z-10">
+                  <div className="relative flex items-center">
+                    <Search size={13} className="absolute left-2.5 text-muted-foreground pointer-events-none" />
+                    <input
+                      ref={inputRef}
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder={searchPlaceholder}
+                      onClick={(e) => e.stopPropagation()}
+                      className="w-full h-8 pl-8 pr-7 bg-muted/50 dark:bg-white/5 border border-border/50 rounded-lg text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/40 transition-all font-normal"
+                    />
+                    {searchQuery && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSearchQuery("");
+                          inputRef.current?.focus();
+                        }}
+                        className="absolute right-2 text-muted-foreground hover:text-foreground text-xs p-0.5"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
               <div className="max-h-60 overflow-auto p-1.5 py-2">
                 {filteredOptions.length > 0 ? (
                   filteredOptions.map((option, index) => (
