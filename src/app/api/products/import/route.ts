@@ -64,8 +64,16 @@ export async function POST(request: Request) {
     let failCount = 0;
     const errors: { sku: string; reason: string }[] = [];
 
-    // 智能识别当前库中最大的 SKU 编码规则并支持自动递增
+    // 智能识别【当前目标产品库 (libraryId)】中最大的 SKU 编码规则并支持自动递增
+    const libraryWhere: Record<string, unknown> = {};
+    if (libraryId) {
+      libraryWhere.libraryId = libraryId;
+    } else if (userId && session.role !== "SUPER_ADMIN") {
+      libraryWhere.userId = userId;
+    }
+
     const existingSkuRecords = await prisma.product.findMany({
+      where: libraryWhere,
       select: { sku: true },
     });
 
@@ -106,15 +114,20 @@ export async function POST(request: Request) {
     }
 
     let nextAutoNumber = globalMaxNum + 1;
-    const existingSkuSet = new Set(existingSkuRecords.map(r => r.sku).filter(Boolean));
+    
+    // 查询全局所有已存在的 SKU 集合，防止主键唯一约束冲突
+    const allGlobalSkuRecords = await prisma.product.findMany({
+      select: { sku: true },
+    });
+    const globalExistingSkuSet = new Set(allGlobalSkuRecords.map(r => r.sku).filter(Boolean));
 
     const generateNextSku = () => {
       let candidate = `${globalMaxPrefix}${String(nextAutoNumber).padStart(globalPadLength, "0")}`;
-      while (existingSkuSet.has(candidate)) {
+      while (globalExistingSkuSet.has(candidate)) {
         nextAutoNumber++;
         candidate = `${globalMaxPrefix}${String(nextAutoNumber).padStart(globalPadLength, "0")}`;
       }
-      existingSkuSet.add(candidate);
+      globalExistingSkuSet.add(candidate);
       nextAutoNumber++;
       return candidate;
     };
@@ -192,7 +205,7 @@ export async function POST(request: Request) {
                   nextAutoNumber = num + 1;
                 }
               }
-              existingSkuSet.add(finalSku);
+              globalExistingSkuSet.add(finalSku);
             }
 
             // Find existing product by SKU GLOBALLY
