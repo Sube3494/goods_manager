@@ -363,6 +363,18 @@ export function DataOverview({
   ];
 
   const profitTrend = profitPlatform === "all" ? businessTrend : (platformBusinessTrend[profitPlatform] || []);
+  
+  const profitGradientOffset = useMemo(() => {
+    if (!profitTrend || profitTrend.length === 0) return 0;
+    const values = profitTrend.map((i) => i.netProfit);
+    const dataMax = Math.max(...values);
+    const dataMin = Math.min(...values);
+
+    if (dataMax <= 0) return 0;
+    if (dataMin >= 0) return 1;
+
+    return dataMax / (dataMax - dataMin);
+  }, [profitTrend]);
   const orderTrend = orderPlatform === "all" ? businessTrend : (platformBusinessTrend[orderPlatform] || []);
   const orderSeriesKey = orderScope === "true" ? "trueOrderCount" : "orderCount";
   const orderSeriesColor = orderScope === "true" ? "#10b981" : "#0ea5e9";
@@ -654,16 +666,22 @@ export function DataOverview({
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart accessibilityLayer={false} data={profitTrend} margin={{ top: 18, right: 10, left: 0, bottom: 0 }}>
                 <defs>
+                  <linearGradient id="netProfitStroke" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset={profitGradientOffset} stopColor="#22c55e" stopOpacity={1} />
+                    <stop offset={profitGradientOffset} stopColor="#ef4444" stopOpacity={1} />
+                  </linearGradient>
                   <linearGradient id="netProfitFill" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#22c55e" stopOpacity={0.28} />
-                    <stop offset="100%" stopColor="#22c55e" stopOpacity={0.03} />
+                    <stop offset="0%" stopColor="#22c55e" stopOpacity={0.25} />
+                    <stop offset={profitGradientOffset} stopColor="#22c55e" stopOpacity={0.03} />
+                    <stop offset={profitGradientOffset} stopColor="#ef4444" stopOpacity={0.03} />
+                    <stop offset="100%" stopColor="#ef4444" stopOpacity={0.25} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="rgba(148,163,184,0.18)" />
                 <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={12} />
                 <YAxis tickLine={false} axisLine={false} fontSize={12} width={52} />
                 <Tooltip content={<ChartTooltip valueFormatter={amountTooltip} nameMap={{ netProfit: "净利润" }} />} />
-                <Area type="monotone" dataKey="netProfit" name="netProfit" stroke="#22c55e" fill="url(#netProfitFill)" strokeWidth={2.5} dot={<CustomizedDot />} activeDot={<CustomizedActiveDot />} />
+                <Area type="monotone" dataKey="netProfit" name="netProfit" stroke="url(#netProfitStroke)" fill="url(#netProfitFill)" strokeWidth={2.5} dot={<CustomizedDot />} activeDot={<CustomizedActiveDot />} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
