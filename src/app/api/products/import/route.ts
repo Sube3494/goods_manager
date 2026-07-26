@@ -64,6 +64,61 @@ export async function POST(request: Request) {
     let failCount = 0;
     const errors: { sku: string; reason: string }[] = [];
 
+    // 智能识别当前库中最大的 SKU 编码规则并支持自动递增
+    const existingSkuRecords = await prisma.product.findMany({
+      select: { sku: true },
+    });
+
+    const prefixMap = new Map<string, { maxNum: number; padLength: number; count: number }>();
+    let globalMaxPrefix = "B";
+    let globalMaxNum = 0;
+    let globalPadLength = 3;
+    let maxCount = 0;
+
+    const skuRegex = /^(.*?)(\d+)$/;
+
+    existingSkuRecords.forEach(({ sku: s }) => {
+      if (!s) return;
+      const match = s.trim().match(skuRegex);
+      if (match) {
+        const prefix = match[1];
+        const numStr = match[2];
+        const num = parseInt(numStr, 10);
+        const padLength = numStr.length;
+
+        const current = prefixMap.get(prefix) || { maxNum: 0, padLength: padLength, count: 0 };
+        current.maxNum = Math.max(current.maxNum, num);
+        current.count += 1;
+        current.padLength = Math.max(current.padLength, padLength);
+        prefixMap.set(prefix, current);
+
+        if (current.count > maxCount) {
+          maxCount = current.count;
+          globalMaxPrefix = prefix;
+        }
+      }
+    });
+
+    if (prefixMap.has(globalMaxPrefix)) {
+      const info = prefixMap.get(globalMaxPrefix)!;
+      globalMaxNum = info.maxNum;
+      globalPadLength = Math.max(3, info.padLength);
+    }
+
+    let nextAutoNumber = globalMaxNum + 1;
+    const existingSkuSet = new Set(existingSkuRecords.map(r => r.sku).filter(Boolean));
+
+    const generateNextSku = () => {
+      let candidate = `${globalMaxPrefix}${String(nextAutoNumber).padStart(globalPadLength, "0")}`;
+      while (existingSkuSet.has(candidate)) {
+        nextAutoNumber++;
+        candidate = `${globalMaxPrefix}${String(nextAutoNumber).padStart(globalPadLength, "0")}`;
+      }
+      existingSkuSet.add(candidate);
+      nextAutoNumber++;
+      return candidate;
+    };
+
     for (const item of products) {
         try {
             // Map keys for SKU and Quantity (Supporting both internal formats and exported headers)
@@ -120,7 +175,7 @@ export async function POST(request: Request) {
             const galleryText = String(item['图库图片'] || "");
             const galleryUrls = galleryText ? galleryText.split(/[\n,，]/).map(url => url.trim()).filter(Boolean) : [];
 
-            // 如果未填 SKU，且有商品名称，则自动生成唯一 SKU 编码；若无商品名称则拒绝
+            // 如果未填 SKU，且有商品名称，按当前库最大编码格式智能自动递增；若无商品名称则拒绝
             let finalSku = sku;
             if (!finalSku) {
               if (!name) {
@@ -128,7 +183,16 @@ export async function POST(request: Request) {
                 errors.push({ sku: "未知", reason: "缺少商品名称，且未填写 SKU" });
                 continue;
               }
-              finalSku = `SKU-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+              finalSku = generateNextSku();
+            } else {
+              const match = finalSku.trim().match(skuRegex);
+              if (match && match[1] === globalMaxPrefix) {
+                const num = parseInt(match[2], 10);
+                if (!isNaN(num) && num >= nextAutoNumber) {
+                  nextAutoNumber = num + 1;
+                }
+              }
+              existingSkuSet.add(finalSku);
             }
 
             // Find existing product by SKU GLOBALLY

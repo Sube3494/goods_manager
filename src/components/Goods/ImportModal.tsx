@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Upload, X, FileSpreadsheet, CheckCircle, AlertCircle, EyeOff, Ban } from "lucide-react";
+import { Upload, X, FileSpreadsheet, CheckCircle, AlertCircle, EyeOff, Ban, ArrowLeftRight } from "lucide-react";
 import * as XLSX from "xlsx";
 import { cn } from "@/lib/utils";
 
@@ -343,13 +343,20 @@ export function ImportModal({
                     </button>
                   </div>
 
-                  <div className="rounded-2xl border border-border overflow-hidden bg-white/5">
+                  <div className="relative rounded-2xl border border-border overflow-hidden bg-white/5 shadow-sm">
                     <div className="bg-muted/50 px-5 py-3 flex items-center justify-between border-b border-border flex-wrap gap-2">
-                        <div className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
-                          数据预览 (前 5 条)
+                        <div className="flex items-center gap-3">
+                          <div className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
+                            数据预览 (前 5 条)
+                          </div>
+                          <div className="hidden sm:flex items-center gap-1 text-[11px] text-muted-foreground bg-black/5 dark:bg-white/5 px-2.5 py-1 rounded-full border border-black/5 dark:border-white/5">
+                            <ArrowLeftRight size={12} className="text-primary animate-pulse" />
+                            <span>支持左右滑动/拖拽查看更多列</span>
+                          </div>
                         </div>
+
                         <div className="text-xs text-muted-foreground flex items-center gap-2">
-                          <span>点击表头图标可 <strong className="text-amber-500 font-semibold">忽略/恢复</strong> 对应的列</span>
+                          <span>点击表头可 <strong className="text-amber-500 font-semibold">忽略/恢复</strong> 列</span>
                           {ignoredColumns.size > 0 && (
                             <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold text-[10px]">
                               已忽略 {ignoredColumns.size} 列
@@ -357,70 +364,82 @@ export function ImportModal({
                           )}
                         </div>
                     </div>
-                    <div className="max-h-64 overflow-y-auto scrollbar-none">
-                        <table className="w-full text-sm text-left border-collapse">
-                            <thead className="bg-muted/30 text-muted-foreground sticky top-0 backdrop-blur-md z-10">
-                                <tr>
-                                    {Object.keys(previewData[0] || {}).map((key) => {
-                                        const isIgnored = ignoredColumns.has(key);
-                                        return (
-                                            <th 
-                                              key={key} 
-                                              onClick={() => toggleIgnoreColumn(key)}
-                                              className={cn(
-                                                "px-4 py-3 font-bold whitespace-nowrap cursor-pointer select-none transition-colors group border-b border-border",
-                                                isIgnored ? "bg-amber-500/10 text-amber-600/70 dark:text-amber-400/70" : "hover:bg-muted/60"
-                                              )}
-                                              title={isIgnored ? "点击取消忽略，恢复导入此列" : "点击忽略此列，不导入系统"}
-                                            >
-                                                <div className="flex items-center gap-1.5">
-                                                    <span className={cn(isIgnored && "line-through opacity-60")}>
-                                                      {key.startsWith("*") ? (
-                                                          <span className="inline-flex items-center gap-0.5">
-                                                              <span className="text-red-500 text-xs">*</span>
-                                                              {key.slice(1)}
-                                                          </span>
-                                                      ) : (
-                                                          key
-                                                      )}
-                                                    </span>
-                                                    {isIgnored ? (
-                                                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-amber-500/20 text-amber-700 dark:text-amber-300 font-bold">
-                                                        <Ban size={11} />
-                                                        已忽略
-                                                      </span>
-                                                    ) : (
-                                                      <span className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-amber-500 text-xs">
-                                                        <EyeOff size={13} />
-                                                      </span>
-                                                    )}
-                                                </div>
-                                            </th>
-                                        );
-                                    })}
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-border">
-                                {previewData.map((row, i) => (
-                                    <tr key={i} className="hover:bg-muted/20 transition-colors">
-                                        {Object.entries(row).map(([colKey, val], j) => {
-                                            const isIgnored = ignoredColumns.has(colKey);
-                                            return (
-                                              <td 
-                                                key={j} 
+
+                    <div className="relative">
+                      {/* 右侧渐变滚幅指示遮罩 */}
+                      <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white dark:from-gray-900 to-transparent z-20 opacity-80" />
+
+                      <div className="max-h-72 overflow-x-auto overflow-y-auto scrollbar-thin scrollbar-thumb-muted-foreground/20 hover:scrollbar-thumb-muted-foreground/40 touch-pan-x touch-pan-y">
+                          <table className="w-max min-w-full text-sm text-left border-collapse">
+                              <thead className="bg-slate-100 dark:bg-gray-800/90 text-muted-foreground sticky top-0 backdrop-blur-md z-10 border-b border-border">
+                                  <tr>
+                                      {Object.keys(previewData[0] || {}).map((key, idx) => {
+                                          const isIgnored = ignoredColumns.has(key);
+                                          const isFirst = idx === 0;
+                                          return (
+                                              <th 
+                                                key={key} 
+                                                onClick={() => toggleIgnoreColumn(key)}
                                                 className={cn(
-                                                  "px-4 py-3 text-foreground/70 truncate max-w-[200px] transition-opacity",
-                                                  isIgnored && "opacity-30 line-through bg-amber-500/5 text-muted-foreground"
+                                                  "px-4 py-3.5 font-bold whitespace-nowrap cursor-pointer select-none transition-all duration-200 group border-b border-border min-w-[130px]",
+                                                  isFirst && "sticky left-0 z-20 shadow-[2px_0_5px_rgba(0,0,0,0.05)] bg-slate-100 dark:bg-gray-800",
+                                                  isIgnored 
+                                                    ? "bg-amber-500/10 text-amber-600 dark:text-amber-400" 
+                                                    : "hover:bg-primary/10 hover:text-primary"
                                                 )}
+                                                title={isIgnored ? "点击取消忽略，恢复导入此列" : "点击忽略此列，不导入系统"}
                                               >
-                                                {String(val ?? "-")}
-                                              </td>
-                                            );
-                                        })}
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                                  <div className="flex items-center justify-between gap-2">
+                                                      <span className={cn("font-bold", isIgnored && "line-through opacity-60 text-amber-600 dark:text-amber-400")}>
+                                                        {key.startsWith("*") ? (
+                                                            <span className="inline-flex items-center gap-0.5">
+                                                                <span className="text-red-500 text-xs">*</span>
+                                                                {key.slice(1)}
+                                                            </span>
+                                                        ) : (
+                                                            key
+                                                        )}
+                                                      </span>
+                                                      {isIgnored ? (
+                                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] bg-amber-500/20 text-amber-700 dark:text-amber-300 font-bold shrink-0 shadow-sm">
+                                                          <Ban size={11} />
+                                                          已忽略
+                                                        </span>
+                                                      ) : (
+                                                        <span className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-amber-500 text-xs shrink-0">
+                                                          <EyeOff size={13} />
+                                                        </span>
+                                                      )}
+                                                  </div>
+                                              </th>
+                                          );
+                                      })}
+                                  </tr>
+                              </thead>
+                              <tbody className="divide-y divide-border/60">
+                                  {previewData.map((row, i) => (
+                                      <tr key={i} className="hover:bg-muted/30 transition-colors">
+                                          {Object.entries(row).map(([colKey, val], j) => {
+                                              const isIgnored = ignoredColumns.has(colKey);
+                                              const isFirst = j === 0;
+                                              return (
+                                                <td 
+                                                  key={j} 
+                                                  className={cn(
+                                                    "px-4 py-3 text-foreground/80 truncate max-w-[240px] transition-all duration-200",
+                                                    isFirst && "sticky left-0 z-10 font-semibold bg-white dark:bg-gray-900 shadow-[2px_0_5px_rgba(0,0,0,0.03)]",
+                                                    isIgnored && "opacity-35 line-through bg-amber-500/5 text-amber-700/60 dark:text-amber-300/60"
+                                                  )}
+                                                >
+                                                  {String(val ?? "-")}
+                                                </td>
+                                              );
+                                          })}
+                                      </tr>
+                                  ))}
+                              </tbody>
+                          </table>
+                      </div>
                     </div>
                   </div>
                 </div>
