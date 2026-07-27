@@ -739,7 +739,7 @@ export async function POST(
         categoryId: categoryMap.get(product.category?.name || "") || null,
         categoryName: product.category?.name || null,
         supplierId: product.supplier?.name ? (supplierMap.get(product.supplier.name) || null) : null,
-        costPrice: 0,
+        costPrice: typeof product.costPrice === "number" && Number.isFinite(product.costPrice) ? product.costPrice : 0,
         stock: 0,
         isPublic: product.isPublic,
         isDiscontinued: product.isDiscontinued,
