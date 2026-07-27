@@ -315,10 +315,36 @@ function extractDeliveryRangeLeadingSegment(text: string) {
   return firstTimeMatch?.[1]?.trim() || normalized;
 }
 
+function extractDeliveryRangeTrailingSegment(text: string) {
+  const normalized = String(text || "").trim();
+  if (!normalized) return "";
+
+  const parts = normalized.split(/\s*[-~至]\s*/);
+  if (parts.length > 1) {
+    const endTime = parts[parts.length - 1].trim();
+    if (/\d{1,2}:\d{2}/.test(endTime)) {
+      return endTime;
+    }
+  }
+
+  return normalized;
+}
+
 function resolveAutoPickDeliveryDeadline(input: Record<string, unknown>) {
   const directDeadline = String(input.deliveryDeadline || input.delivery_deadline || "").trim();
   const startTimestamp = Number(input.delivery_time || input.deliveryTime || 0);
   const endTimestamp = Number(input.delivery_end || input.deliveryEnd || 0);
+
+  const platform = String(input.platform || "").trim();
+  const channelTag = String(input.channelTag || input.channel_tag || "").trim();
+  const sourceTag = String(input.source_tag || "").trim().toLowerCase();
+  const goodsChannelTag = String(input.goods_channel_tag || "").trim().toLowerCase();
+  const isJD = platform === "京东"
+    || channelTag === "daojia"
+    || sourceTag === "daojia"
+    || goodsChannelTag === "daojia"
+    || platform.includes("京东")
+    || platform.toLowerCase().includes("jd");
 
   const startAt = Number.isFinite(startTimestamp) && startTimestamp > 0
     ? new Date(startTimestamp * 1000)
@@ -327,20 +353,34 @@ function resolveAutoPickDeliveryDeadline(input: Record<string, unknown>) {
     ? new Date(endTimestamp * 1000)
     : null;
 
-  if (startAt && endAt) {
-    return formatDeadlineSegment(endAt);
-  }
-
-  if (endAt) {
-    return formatDeadlineSegment(endAt);
-  }
-
-  if (looksLikeDeliveryTimeRange(directDeadline)) {
-    return extractDeliveryRangeLeadingSegment(directDeadline);
-  }
-
-  if (startAt) {
-    return formatDeadlineSegment(startAt);
+  if (isJD) {
+    // 只有京东订单是读时间段结束的时间
+    if (startAt && endAt) {
+      return formatDeadlineSegment(endAt);
+    }
+    if (endAt) {
+      return formatDeadlineSegment(endAt);
+    }
+    if (looksLikeDeliveryTimeRange(directDeadline)) {
+      return extractDeliveryRangeTrailingSegment(directDeadline);
+    }
+    if (startAt) {
+      return formatDeadlineSegment(startAt);
+    }
+  } else {
+    // 其他平台都是时间段开始的时间
+    if (startAt && endAt) {
+      return formatDeadlineSegment(startAt);
+    }
+    if (startAt) {
+      return formatDeadlineSegment(startAt);
+    }
+    if (looksLikeDeliveryTimeRange(directDeadline)) {
+      return extractDeliveryRangeLeadingSegment(directDeadline);
+    }
+    if (endAt) {
+      return formatDeadlineSegment(endAt);
+    }
   }
 
   return undefined;
@@ -1142,6 +1182,14 @@ function parseDeliveryDeadlineFromTimestamp(rawValue: string | number | undefine
   return fullText.slice(5, 16);
 }
 
+function parseMaiyatianDeliveryDeadline(platform: string, deliveryTime: unknown, deliveryEnd: unknown) {
+  const isJD = platform === "京东" || platform.includes("京东") || platform.toLowerCase().includes("jd");
+  const chosenTimestamp = isJD
+    ? pickFirstValidTimeValue(deliveryEnd, deliveryTime)
+    : pickFirstValidTimeValue(deliveryTime, deliveryEnd);
+  return parseDeliveryDeadlineFromTimestamp(chosenTimestamp as string | number | undefined);
+}
+
 function parseCentsValue(rawValue: string | number | undefined) {
   const value = Number(rawValue || 0);
   return Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0;
@@ -1319,7 +1367,7 @@ function buildListenedOrderFromRawOrder(rawOrder: MaiyatianRawOrder): AutoPickIn
     longitude: parseCoordinate(rawOrder.longitude),
     latitude: parseCoordinate(rawOrder.latitude),
     status: resolveMaiyatianOrderStatus(rawOrder as Record<string, unknown>),
-    deliveryDeadline: parseDeliveryDeadlineFromTimestamp(rawOrder.delivery_time),
+    deliveryDeadline: parseMaiyatianDeliveryDeadline(platform, rawOrder.delivery_time, rawOrder.delivery_end),
     deliveryTimeRange: parseDeliveryTimeRange(rawOrder.delivery_time_format),
     distanceKm: Math.max(0, Number(rawOrder.delivery_distance || 0) / 1000),
     distanceIsLinear: false,
@@ -1367,7 +1415,7 @@ function buildListenedOrderFromQueryOrder(rawOrder: MaiyatianQueryOrder): AutoPi
     longitude: parseCoordinate(rawOrder.longitude as string | number | undefined),
     latitude: parseCoordinate(rawOrder.latitude as string | number | undefined),
     status: resolveMaiyatianOrderStatus(rawOrder),
-    deliveryDeadline: parseDeliveryDeadlineFromTimestamp(rawOrder.delivery_time as string | number | undefined),
+    deliveryDeadline: parseMaiyatianDeliveryDeadline(platform, rawOrder.delivery_time, rawOrder.delivery_end),
     deliveryTimeRange: parseDeliveryTimeRange(rawOrder.delivery_time_format as string | undefined),
     distanceKm: Math.max(0, Number(rawOrder.delivery_distance || 0) / 1000),
     distanceIsLinear: false,

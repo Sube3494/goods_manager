@@ -597,7 +597,7 @@ export function getProductCostStatusText(order: Pick<AutoPickOrder, "productCost
   return "";
 }
 
-export function getDeadlineDisplay(order: Pick<AutoPickOrder, "isPickup" | "deliveryDeadline" | "deliveryTimeRange" | "orderTime" | "createdAt">) {
+export function getDeadlineDisplay(order: Pick<AutoPickOrder, "isPickup" | "deliveryDeadline" | "deliveryTimeRange" | "orderTime" | "createdAt"> & { platform?: string | null; channelTag?: string | null }) {
   const deadlineText = String(order.deliveryDeadline || "").trim();
   const rangeText = String(order.deliveryTimeRange || "").trim();
   const text = order.isPickup ? (rangeText || deadlineText) : (rangeText || deadlineText);
@@ -630,15 +630,26 @@ export function getDeadlineDisplay(order: Pick<AutoPickOrder, "isPickup" | "deli
     return trimmed;
   };
 
-  // 如果包含范围连字符，则提取时间段的截止时间并拼接日期前缀
+  const isJd = isJdOrder(order.platform, order.channelTag);
+
+  // 优先匹配标准时间段: HH:mm-HH:mm, HH:mm~HH:mm, HH:mm至HH:mm 等
+  const rangeMatch = text.match(/(\d{1,2}:\d{2}(?::\d{2})?)\s*[-~至]\s*(\d{1,2}:\d{2}(?::\d{2})?)/);
+  if (rangeMatch) {
+    const startTime = rangeMatch[1];
+    const endTime = rangeMatch[2];
+    const targetTime = isJd ? endTime : startTime;
+    return ensureSeconds(`${datePrefix}${targetTime}`);
+  }
+
+  // 如果包含范围连字符：只有京东订单是读取时间段结束的时间，其他平台都是时间段开始的时间
   const parts = text.split(/\s*[-~至]\s*/);
   if (parts.length > 1) {
-    const endTime = parts[parts.length - 1].trim();
-    const timeMatch = endTime.match(/\d{1,2}:\d{2}(:\d{2})?/);
+    const targetSegment = isJd ? parts[parts.length - 1].trim() : parts[0].trim();
+    const timeMatch = targetSegment.match(/\d{1,2}:\d{2}(:\d{2})?/);
     if (timeMatch) {
       return ensureSeconds(`${datePrefix}${timeMatch[0]}`);
     }
-    return ensureSeconds(`${datePrefix}${endTime}`);
+    return ensureSeconds(`${datePrefix}${targetSegment}`);
   }
 
   // 兜底：如果只是单一时间，也尝试仅抓取时分并拼接日期前缀
