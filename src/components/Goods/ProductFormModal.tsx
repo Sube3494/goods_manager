@@ -24,6 +24,21 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+function resolveImageUrl(url?: string | null): string {
+  if (!url) return "";
+  const trimmed = url.trim();
+  if (!trimmed) return "";
+  if (trimmed.startsWith("//")) return `https:${trimmed}`;
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://") || trimmed.startsWith("data:")) return trimmed;
+  if (trimmed.startsWith("/api/uploads/")) return trimmed;
+  if (trimmed.startsWith("api/uploads/")) return `/${trimmed}`;
+  let clean = trimmed;
+  if (clean.startsWith("/uploads/")) clean = clean.substring(9);
+  else if (clean.startsWith("uploads/")) clean = clean.substring(8);
+  else if (clean.startsWith("/")) clean = clean.substring(1);
+  return `/api/uploads/${clean}`;
+}
+
 function normalizeJdSkuPreview(value: string) {
   return Array.from(
     new Set(

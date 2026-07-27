@@ -166,7 +166,8 @@ export class LocalStorageStrategy implements StorageStrategy {
 
   resolveUrl(path: string): string {
     if (!path) return path;
-    if (path.startsWith('http')) return path;
+    if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('data:')) return path;
+    if (path.startsWith('//')) return `https:${path}`;
     if (path.startsWith('/api/uploads/')) return path;
     if (path.startsWith('api/uploads/')) return `/${path}`;
     
@@ -598,10 +599,34 @@ export class MinioStorageStrategy implements StorageStrategy {
   }
 
   private resolveObjectName(url: string): string {
+    if (!url) return "";
     const bucketName = this.config.minioBucket || "goods-manager";
     let objectName = "";
-    if (url.startsWith('http')) {
+    if (url.startsWith('http://') || url.startsWith('https://')) {
       const publicUrlStr = this.config.minioPublicUrl ? this.config.minioPublicUrl.replace(/\/$/, "") : null;
+      const endpointStr = this.config.minioEndpoint ? this.config.minioEndpoint.replace(/^\[|\]$/g, '') : null;
+      
+      let isOurMinio = false;
+      if (publicUrlStr && url.startsWith(publicUrlStr)) {
+        isOurMinio = true;
+      } else if (endpointStr && url.includes(endpointStr)) {
+        isOurMinio = true;
+      } else {
+        try {
+          const parsed = new URL(url);
+          if (parsed.pathname.startsWith(`/${bucketName}/`)) {
+            isOurMinio = true;
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      if (!isOurMinio) {
+        // 第三方外部网络图片，不属于本系统 MinIO 存储，保持原 URL
+        return url;
+      }
+
       if (publicUrlStr && url.startsWith(publicUrlStr)) {
         const remaining = url.substring(publicUrlStr.length).replace(/^\//, '');
         const pathParts = remaining.split("/");

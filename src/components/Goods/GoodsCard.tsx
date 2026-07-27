@@ -5,6 +5,21 @@ import { Product } from "@/lib/types";
 import { getCategoryName, cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/Toast";
 
+function resolveImageUrl(url?: string | null): string {
+  if (!url) return "";
+  const trimmed = url.trim();
+  if (!trimmed) return "";
+  if (trimmed.startsWith("//")) return `https:${trimmed}`;
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://") || trimmed.startsWith("data:")) return trimmed;
+  if (trimmed.startsWith("/api/uploads/")) return trimmed;
+  if (trimmed.startsWith("api/uploads/")) return `/${trimmed}`;
+  let clean = trimmed;
+  if (clean.startsWith("/uploads/")) clean = clean.substring(9);
+  else if (clean.startsWith("uploads/")) clean = clean.substring(8);
+  else if (clean.startsWith("/")) clean = clean.substring(1);
+  return `/api/uploads/${clean}`;
+}
+
 export const GoodsCard = memo(function GoodsCard({ 
   product, 
   onEdit,
@@ -100,9 +115,9 @@ export const GoodsCard = memo(function GoodsCard({
         
         {product.image ? (
           <Image
-            src={product.image}
+            src={resolveImageUrl(product.image)}
             alt={product.name}
-            fill
+            fill unoptimized
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
             priority={priority}
             className="object-cover transition-transform duration-700 ease-out group-hover:scale-110"
