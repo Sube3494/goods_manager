@@ -216,15 +216,17 @@ function ChartTooltip({
   );
 }
 
-// 订单波动图专属 tooltip：显示各平台真单量（降序）
+// 订单波动图专属 tooltip：根据 orderScope（全部订单 / 去除刷单）显示准确单量拆分与总计
 function OrderTooltip({
   active,
   payload,
   label,
+  orderScope = "all",
 }: {
   active?: boolean;
-  payload?: Array<{ payload?: { platformOrderCount?: Record<string, number>; orderCount?: number; trueOrderCount?: number } }>;
+  payload?: Array<{ payload?: { platformOrderCount?: Record<string, number>; orderCount?: number; trueOrderCount?: number; brushOrderCount?: number; otherOrderCount?: number } }>;
   label?: string;
+  orderScope?: "all" | "true";
 }) {
   if (!active || !payload?.length) return null;
   const dataPoint = payload[0]?.payload;
@@ -232,13 +234,22 @@ function OrderTooltip({
   const entries = Object.entries(platformCounts)
     .filter(([, v]) => (v as number) > 0)
     .sort(([, a], [, b]) => (b as number) - (a as number));
-  const total = dataPoint?.trueOrderCount ?? dataPoint?.orderCount ?? 0;
+
+  const isTrueScope = orderScope === "true";
+  const total = isTrueScope
+    ? (dataPoint?.trueOrderCount ?? 0)
+    : (dataPoint?.orderCount ?? 0);
+
+  const brushCount = dataPoint?.brushOrderCount ?? 0;
+  const otherCount = dataPoint?.otherOrderCount ?? 0;
 
   return (
-    <div className="min-w-[170px] rounded-[22px] border border-black/8 bg-white/95 p-3.5 shadow-[0_18px_50px_rgba(15,23,42,0.16)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/95 font-normal">
+    <div className="min-w-[180px] rounded-[22px] border border-black/8 bg-white/95 p-3.5 shadow-[0_18px_50px_rgba(15,23,42,0.16)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/95 font-normal">
       <div className="flex items-center justify-between gap-2 border-b border-black/5 dark:border-white/5 pb-2">
-        <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">{label} 平台单量</span>
-        <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-600 dark:text-sky-400">各平台拆分</span>
+        <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">{label} 单量明细</span>
+        <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-600 dark:text-sky-400">
+          {isTrueScope ? "去除刷单" : "全部订单"}
+        </span>
       </div>
       <div className="mt-2.5 space-y-2">
         {entries.length > 0 ? (
@@ -249,11 +260,27 @@ function OrderTooltip({
             </div>
           ))
         ) : (
-          <div className="text-xs text-muted-foreground py-1 text-center font-normal">暂无平台数据</div>
+          <div className="text-xs text-muted-foreground py-1 text-center font-normal">暂无真单数据</div>
+        )}
+        {!isTrueScope && (brushCount > 0 || otherCount > 0) && (
+          <>
+            {brushCount > 0 && (
+              <div className="flex items-center justify-between gap-4 text-xs font-normal">
+                <span className="text-purple-600 dark:text-purple-400 font-normal">刷单:</span>
+                <span className="font-normal tabular-nums text-purple-600 dark:text-purple-400">{brushCount} 单</span>
+              </div>
+            )}
+            {otherCount > 0 && (
+              <div className="flex items-center justify-between gap-4 text-xs font-normal">
+                <span className="text-amber-600 dark:text-amber-400 font-normal">已取消/异常:</span>
+                <span className="font-normal tabular-nums text-amber-600 dark:text-amber-400">{otherCount} 单</span>
+              </div>
+            )}
+          </>
         )}
         <div className="flex items-center justify-between gap-4 text-xs border-t border-dashed border-black/10 dark:border-white/10 pt-2.5 mt-2 font-normal">
           <span className="text-foreground font-normal">当日总计:</span>
-          <span className="text-sm tabular-nums font-normal text-foreground">{total} 单</span>
+          <span className="text-sm tabular-nums font-bold text-foreground">{total} 单</span>
         </div>
       </div>
     </div>
@@ -719,7 +746,7 @@ export function DataOverview({
                 <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="rgba(148,163,184,0.18)" />
                 <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={12} />
                 <YAxis tickLine={false} axisLine={false} fontSize={12} width={40} allowDecimals={false} />
-                <Tooltip content={<OrderTooltip />} />
+                <Tooltip content={<OrderTooltip orderScope={orderScope} />} />
                 <Line type="monotone" dataKey={orderSeriesKey} name={orderSeriesKey} stroke={orderSeriesColor} strokeWidth={2.5} dot={{ r: 2.5 }} activeDot={{ r: 4 }} />
               </LineChart>
             </ResponsiveContainer>
