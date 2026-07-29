@@ -206,6 +206,7 @@ export function ProductSelectionModal({
   const [targetPlatform, setTargetPlatform] = useState("美团");
   const PLATFORMS = ["美团", "淘宝", "京东"];
   const shouldShowCategoryFilter = !imageOnly && (!minimalView || showCategoryFilter);
+  const shouldShowLibraryTabs = libraries.length > 1 && !lockLibraryId;
   const loadingDelayRef = useRef<NodeJS.Timeout | null>(null);
   const lastLoadedSignatureRef = useRef("");
   const usesPrefetchedData = Array.isArray(prefetchedProducts);
@@ -576,7 +577,7 @@ export function ProductSelectionModal({
             </div>
 
             <div className="flex-1 overflow-hidden flex flex-col p-5 sm:p-8 space-y-4">
-              {libraries.length > 1 && (
+              {shouldShowLibraryTabs && (
                 <div className="flex flex-wrap gap-2 border-b border-border/50 pb-3 shrink-0">
                   {libraries.map((lib) => (
                     <button

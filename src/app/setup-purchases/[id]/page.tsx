@@ -117,6 +117,7 @@ function SetupPurchaseDetailContent() {
       const res = await fetch(`/api/setup-purchases/${id}/items/${itemId}`, { method: "DELETE" });
       if (res.ok) {
         showToast("记录已移除", "success");
+        setItems(prev => prev.filter(item => item.id !== itemId));
         fetchData();
       } else {
         showToast("移除失败", "error");
@@ -275,7 +276,13 @@ function SetupPurchaseDetailContent() {
   }, [items, supplierFilter, checkStatusFilter, query]);
 
   const selectedProductIds = useMemo(() => {
-    return items.map(item => item.productId).filter((id): id is string => id !== null);
+    const ids = items.flatMap((item) => [
+      item.productId,
+      item.product?.shopProductId,
+      item.product?.sourceProductId,
+      item.product?.id,
+    ]);
+    return Array.from(new Set(ids.map((value) => String(value || "").trim()).filter(Boolean)));
   }, [items]);
 
 async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: ArrayBuffer; width: number; height: number; extension: "jpeg" | "png" } | null> {
