@@ -153,6 +153,7 @@ type MatchedCatalogProduct = {
   jdSkuId?: string | null;
   image?: string | null;
   sourceType: "product" | "shopProduct";
+  productId?: string | null;
   shopProductId?: string | null;
   shopId?: string | null;
   shopName?: string | null;
@@ -327,6 +328,7 @@ function readManualMatchedProduct(rawPayload: unknown): MatchedCatalogProduct | 
     sku: String(record.sku || "").trim() || null,
     image: String(record.image || "").trim() || null,
     sourceType,
+    productId: String(record.productId || "").trim() || null,
     shopProductId,
     shopName: String(record.shopName || "").trim() || null,
     isManual: true,
@@ -1040,9 +1042,6 @@ export async function GET(request: NextRequest) {
     if (orderNos.size > 0) {
       const outboundWhere: Prisma.OutboundOrderWhereInput = {
         userId: session.id,
-        status: {
-          not: "Returned",
-        },
         ...(minDate && maxDate ? {
           date: {
             gte: new Date(minDate.getTime() - 24 * 60 * 60 * 1000),
@@ -1538,6 +1537,8 @@ export async function GET(request: NextRequest) {
               id: true,
               sku: true,
               jdSkuId: true,
+              productId: true,
+              sourceProductId: true,
               productName: true,
               productImage: true,
               shop: {
@@ -1558,6 +1559,8 @@ export async function GET(request: NextRequest) {
       jdSkuId: item.jdSkuId,
       image: item.productImage ? storage.resolveUrl(item.productImage) : null,
       sourceType: "shopProduct" as const,
+      productId: item.productId || item.sourceProductId || null,
+      shopProductId: item.id,
       shopId: item.shop?.id || null,
       shopName: item.shop?.name || null,
     }));
