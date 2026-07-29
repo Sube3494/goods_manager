@@ -127,44 +127,46 @@ export function ManageLibrariesModal({
 
   return createPortal(
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm transition-all">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-3 backdrop-blur-sm transition-all sm:p-4">
         <motion.div
           initial={{ opacity: 0, scale: 0.95, y: 10 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 10 }}
           transition={{ duration: 0.2 }}
-          className="relative w-full max-w-2xl max-h-[85vh] flex flex-col rounded-3xl border border-white/10 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-xl shadow-2xl overflow-hidden"
+          className="relative flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-[26px] border border-black/10 bg-white/96 shadow-[0_24px_80px_rgba(15,23,42,0.24)] backdrop-blur-xl dark:border-white/10 dark:bg-[#111722]/96 dark:shadow-[0_28px_90px_rgba(0,0,0,0.52)] sm:rounded-[30px]"
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4 border-b border-border dark:border-white/10">
-            <div>
-              <h2 className="text-xl font-bold text-foreground">管理商品模板库</h2>
-              <p className="text-xs text-muted-foreground mt-0.5">配置商品库档案名称、切换公私有或删除无商品库</p>
+          <div className="flex items-start justify-between gap-4 border-b border-black/8 px-4 py-4 dark:border-white/8 sm:px-7 sm:py-5">
+            <div className="min-w-0">
+              <h2 className="text-xl font-black tracking-tight text-foreground sm:text-2xl">管理商品模板库</h2>
+              <p className="mt-1 text-xs font-medium leading-5 text-muted-foreground sm:text-sm">配置商品库档案名称，系统内置库仅支持改名。</p>
             </div>
             <button
+              type="button"
               onClick={onClose}
-              className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors"
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-transparent text-muted-foreground transition-all hover:border-black/8 hover:bg-black/5 hover:text-foreground dark:hover:border-white/10 dark:hover:bg-white/8"
+              aria-label="关闭"
             >
-              <X size={18} />
+              <X size={19} />
             </button>
           </div>
 
           {/* Form to create new library */}
-          <form onSubmit={handleCreate} className="p-4 sm:p-6 border-b border-border dark:border-white/10 bg-muted/20 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          <form onSubmit={handleCreate} className="flex flex-col gap-3 border-b border-black/8 bg-slate-50/80 p-4 dark:border-white/8 dark:bg-white/[0.03] sm:flex-row sm:items-center sm:p-6">
             <div className="flex-1">
               <input
                 type="text"
                 placeholder="新建商品库名称..."
                 value={newLibName}
                 onChange={(e) => setNewLibName(e.target.value)}
-                className="w-full h-10 px-4 rounded-xl border border-border bg-white dark:bg-white/5 text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all placeholder:text-muted-foreground"
+                className="h-11 w-full rounded-2xl border border-black/8 bg-white px-4 text-sm font-medium text-foreground outline-none transition-all placeholder:text-muted-foreground/70 focus:border-primary/30 focus:ring-2 focus:ring-primary/15 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-white/6 dark:focus:border-primary/40"
                 disabled={isSaving}
               />
             </div>
             <button
               type="submit"
               disabled={isSaving || !newLibName.trim()}
-              className="h-10 px-5 rounded-xl bg-primary text-primary-foreground font-bold text-sm shadow-md hover:opacity-95 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-primary px-5 text-sm font-black text-primary-foreground shadow-lg shadow-primary/15 transition-all hover:bg-primary/90 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
               新增商品库
@@ -172,42 +174,44 @@ export function ManageLibrariesModal({
           </form>
 
           {/* List of libraries */}
-          <div className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-4 max-h-[45vh]">
-            <div className="rounded-2xl border border-border overflow-hidden">
+          <div className="max-h-[45vh] flex-1 space-y-4 overflow-y-auto bg-white/70 p-3 dark:bg-transparent sm:p-6">
+            <div className="overflow-hidden rounded-[22px] border border-black/8 bg-white shadow-xs dark:border-white/10 dark:bg-white/[0.035]">
               <table className="w-full text-left border-collapse text-sm">
                 <thead>
-                  <tr className="bg-muted/30 border-b border-border text-xs text-muted-foreground font-semibold">
-                    <th className="px-3 sm:px-5 py-2.5 sm:py-3">商品库名称</th>
-                    <th className="px-3 sm:px-5 py-2.5 sm:py-3 text-right">操作</th>
+                  <tr className="border-b border-black/8 bg-slate-50 text-xs font-bold text-muted-foreground dark:border-white/8 dark:bg-white/[0.045]">
+                    <th className="px-4 py-3 sm:px-5">商品库名称</th>
+                    <th className="px-4 py-3 text-right sm:px-5">操作</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border">
+                <tbody className="divide-y divide-black/6 dark:divide-white/8">
                   {libraries.map((lib) => {
                     const isSystem = lib.code === "public" || lib.code === "secret";
                     const isEditing = editingId === lib.id;
 
                     return (
-                      <tr key={lib.id} className="hover:bg-muted/10 transition-colors group">
-                        <td className="px-3 sm:px-5 py-2.5 sm:py-3 font-medium text-foreground">
+                      <tr key={lib.id} className="group transition-colors hover:bg-black/[0.025] dark:hover:bg-white/[0.045]">
+                        <td className="px-4 py-3.5 font-semibold text-foreground sm:px-5">
                           {isEditing ? (
                             <div className="flex items-center gap-2 w-full">
                               <input
                                 type="text"
                                 value={editingName}
                                 onChange={(e) => setEditingName(e.target.value)}
-                                className="px-2 py-1 text-sm rounded-lg border border-border bg-white dark:bg-white/5 outline-none focus:ring-2 focus:ring-primary/20 flex-1 min-w-[70px] max-w-[9rem] sm:max-w-[15rem]"
+                                className="h-9 min-w-[70px] max-w-[11rem] flex-1 rounded-xl border border-black/8 bg-white px-3 text-sm font-semibold text-foreground outline-none transition-all focus:border-primary/30 focus:ring-2 focus:ring-primary/15 dark:border-white/10 dark:bg-white/6 sm:max-w-[18rem]"
                                 autoFocus
                               />
                               <button
+                                type="button"
                                 onClick={() => handleSaveEdit(lib.id, lib.isPublic)}
-                                className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20"
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-emerald-500/15 bg-emerald-500/10 text-emerald-600 transition-all hover:bg-emerald-500/18 dark:text-emerald-400"
                                 title="保存"
                               >
                                 <Check size={14} />
                               </button>
                               <button
+                                type="button"
                                 onClick={() => setEditingId(null)}
-                                className="p-1.5 rounded-lg bg-red-500/10 text-red-600 hover:bg-red-500/20"
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-rose-500/15 bg-rose-500/10 text-rose-600 transition-all hover:bg-rose-500/18 dark:text-rose-400"
                                 title="取消"
                               >
                                 <X size={14} />
@@ -217,22 +221,23 @@ export function ManageLibrariesModal({
                             <div className="flex items-center gap-2">
                               <span>{lib.name}</span>
                               {isSystem && (
-                                <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-primary/5 text-primary border border-primary/10 font-bold scale-90">
+                                <span className="inline-flex items-center rounded-full border border-primary/15 bg-primary/8 px-2 py-0.5 text-[10px] font-black leading-none text-primary">
                                   内置
                                 </span>
                               )}
                             </div>
                           )}
                         </td>
-                        <td className="px-3 sm:px-5 py-2.5 sm:py-3 text-right">
+                        <td className="px-4 py-3.5 text-right sm:px-5">
                           <div className="flex justify-end gap-1.5">
                             {!isEditing && (
                               <button
+                                type="button"
                                 onClick={() => {
                                   setEditingId(lib.id);
                                   setEditingName(lib.name);
                                 }}
-                                className="p-1.5 rounded-lg hover:bg-primary/10 text-muted-foreground hover:text-primary transition-all"
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-xl text-muted-foreground transition-all hover:bg-primary/10 hover:text-primary"
                                 title="编辑名称"
                               >
                                 <Edit3 size={14} />
@@ -240,8 +245,9 @@ export function ManageLibrariesModal({
                             )}
                             {!isSystem && (
                               <button
+                                type="button"
                                 onClick={() => handleDelete(lib.id)}
-                                className="p-1.5 rounded-lg hover:bg-red-500/10 text-muted-foreground hover:text-red-500 transition-all"
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-xl text-muted-foreground transition-all hover:bg-rose-500/10 hover:text-rose-500"
                                 title="删除"
                               >
                                 <Trash2 size={14} />

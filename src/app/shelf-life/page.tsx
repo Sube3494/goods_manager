@@ -454,7 +454,7 @@ export default function ShelfLifeDashboard() {
                               {/* 商品 */}
                               <td className="px-3 py-2.5 text-center">
                                 <div className="flex items-center justify-center gap-2.5 mx-auto w-fit max-w-full cursor-default">
-                                  <div className="relative w-7 h-7 shrink-0 rounded-full overflow-hidden bg-white dark:bg-black flex items-center justify-center border border-black/5 dark:border-white/5 shadow-xs">
+                                  <div className="relative w-7 h-7 shrink-0 rounded-full overflow-hidden bg-transparent flex items-center justify-center">
                                     {batch.productImage ? (
                                       <Image 
                                         src={batch.productImage} 
@@ -595,7 +595,7 @@ export default function ShelfLifeDashboard() {
                           {/* 1. 卡片头部：商品信息与状态 Badge 左右对齐 */}
                           <div className="flex items-start justify-between gap-3 w-full min-w-0">
                             <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                              <div className="relative w-8 h-8 shrink-0 rounded-full overflow-hidden bg-white dark:bg-black flex items-center justify-center border border-black/5 dark:border-white/5 shadow-xs">
+                              <div className="relative w-8 h-8 shrink-0 rounded-full overflow-hidden bg-transparent flex items-center justify-center">
                                 {batch.productImage ? (
                                   <Image 
                                     src={batch.productImage} 
@@ -740,7 +740,7 @@ export default function ShelfLifeDashboard() {
                 <div className="bg-primary/5 dark:bg-white/5 border border-primary/10 dark:border-white/5 rounded-2xl p-4 text-xs space-y-4 font-sans">
                   {/* 商品卡片头部 */}
                   <div className="flex items-center gap-3 border-b border-black/5 dark:border-white/5 pb-3">
-                    <div className="relative w-10 h-10 shrink-0 rounded-full overflow-hidden bg-white dark:bg-black border border-black/5 dark:border-white/5 shadow-xs">
+                    <div className="relative w-10 h-10 shrink-0 rounded-full overflow-hidden bg-transparent">
                       {activeAdjustBatch.productImage ? (
                         <Image 
                           src={activeAdjustBatch.productImage} 
