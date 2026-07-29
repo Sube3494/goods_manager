@@ -164,6 +164,7 @@ export interface AutoPickOrderItem {
     image?: string | null;
     sourceType: "product" | "shopProduct";
     shopProductId?: string | null;
+    productId?: string | null;
     shopName?: string | null;
     isManual?: boolean;
   } | null;

@@ -524,11 +524,24 @@ export function getExpandedOrderItemDisplays(item: AutoPickOrderItem) {
   return [getOrderItemDisplay(item)];
 }
 
-export function normalizeReturnedItemKey(value: string | null | undefined) {
-  return String(value || "")
-    .trim()
-    .replace(/\s+/g, "")
-    .toLowerCase();
+function getMatchedProductIds(item: AutoPickOrderItem) {
+  const matched = item.matchedProduct;
+  if (!matched) {
+    return { productId: "", shopProductId: "" };
+  }
+
+  const id = String(matched.id || "").trim();
+  const productId = String(matched.productId || (matched.sourceType === "product" ? id : "")).trim();
+  const shopProductId = String(matched.shopProductId || (matched.sourceType === "shopProduct" ? id : "")).trim();
+
+  return { productId, shopProductId };
+}
+
+function getReturnedProductKey(item: AutoPickOrderItem) {
+  const { productId, shopProductId } = getMatchedProductIds(item);
+  if (shopProductId) return `shop:${shopProductId}`;
+  if (productId) return `product:${productId}`;
+  return "";
 }
 
 export function getOrderSourceLabel(order: AutoPickOrder) {
@@ -1388,9 +1401,21 @@ export function OrderCard({
   const productCost = Number(order.productCost || 0);
   const productCostBreakdown = Array.isArray(order.productCostBreakdown) ? order.productCostBreakdown : [];
   const outboundReturnDetails = Array.isArray(order.outboundReturnDetails) ? order.outboundReturnDetails : [];
+  const productKeyByOutboundItemId = productCostBreakdown.reduce((acc, item) => {
+    const outboundOrderItemId = String(item.outboundOrderItemId || "").trim();
+    if (!outboundOrderItemId) return acc;
+    const shopProductId = String(item.shopProductId || "").trim();
+    const productId = String(item.productId || "").trim();
+    acc.set(
+      outboundOrderItemId,
+      shopProductId ? `shop:${shopProductId}` : productId ? `product:${productId}` : ""
+    );
+    return acc;
+  }, new Map<string, string>());
   const returnedItemQuantityMap = outboundReturnDetails.reduce((acc, entry) => {
     for (const item of entry.items || []) {
-      const key = normalizeReturnedItemKey(item.name);
+      const outboundOrderItemId = String(item.outboundOrderItemId || "").trim();
+      const key = productKeyByOutboundItemId.get(outboundOrderItemId) || "";
       if (!key) continue;
       acc.set(key, (acc.get(key) || 0) + Math.max(0, Number(item.quantity || 0)));
     }
@@ -1398,7 +1423,8 @@ export function OrderCard({
   }, new Map<string, number>());
   const returnedItemDetailsMap = outboundReturnDetails.reduce((acc, entry) => {
     for (const item of entry.items || []) {
-      const key = normalizeReturnedItemKey(item.name);
+      const outboundOrderItemId = String(item.outboundOrderItemId || "").trim();
+      const key = productKeyByOutboundItemId.get(outboundOrderItemId) || "";
       if (!key) continue;
       const list = acc.get(key) || [];
       list.push({
@@ -1554,6 +1580,15 @@ export function OrderCard({
                     </div>
                   ) : null}
                   <StatusBadge order={order} />
+                  {hasRefundAmount ? (
+                    <span
+                      title="出库退款金额"
+                      className="inline-flex h-7 min-w-0 items-center gap-0.5 rounded-full border border-rose-500/15 bg-rose-500/10 px-1.5 text-[11px] font-medium leading-none text-rose-700 dark:text-rose-400 sm:h-8 sm:gap-1.5 sm:px-2.5 sm:text-[13px]"
+                    >
+                      <span className="shrink-0">已退款</span>
+                      <span className="truncate font-semibold">{toCurrency(refundAmount)}</span>
+                    </span>
+                  ) : null}
                   {completed && (hasPureProfit || order.productCostStatus === "pending-backfill") ? (
                     <div
                       ref={profitTooltipRef}
@@ -1878,8 +1913,8 @@ export function OrderCard({
                     onEditMatch={() => onOpenMatchEditor(order, item)}
                     matchedProduct={item.matchedProduct}
                     showMatchStatus={displayIndex === 0}
-                    returnedQuantity={returnedItemQuantityMap.get(normalizeReturnedItemKey(display.name)) || 0}
-                    returnedDetails={returnedItemDetailsMap.get(normalizeReturnedItemKey(display.name)) || []}
+                    returnedQuantity={returnedItemQuantityMap.get(getReturnedProductKey(item)) || 0}
+                    returnedDetails={returnedItemDetailsMap.get(getReturnedProductKey(item)) || []}
                     isJdOrder={isJdOrder}
                   />
                 ))
