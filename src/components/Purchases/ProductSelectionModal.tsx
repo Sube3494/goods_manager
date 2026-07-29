@@ -85,6 +85,7 @@ interface ProductSelectionModalProps {
   lockLibraryId?: string;
   showQuantityControls?: boolean;
   disableAlreadySelected?: boolean;
+  defaultViewMode?: "grid" | "list";
 }
 
 function ProductSkeleton({ imageOnly = false }: { imageOnly?: boolean }) {
@@ -128,6 +129,7 @@ export function ProductSelectionModal({
   lockLibraryId,
   showQuantityControls = false,
   disableAlreadySelected = true,
+  defaultViewMode,
 }: ProductSelectionModalProps) {
   const [localSingleSelect, setLocalSingleSelect] = useState(Boolean(singleSelect));
   const queryRef = useRef(query);
@@ -155,6 +157,7 @@ export function ProductSelectionModal({
   const [activeLibraryId, setActiveLibraryId] = useState<string>(lockLibraryId || "all");
 
   const [viewMode, setViewMode] = useState<"grid" | "list">(() => {
+    if (defaultViewMode) return defaultViewMode;
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("product_picker_view_mode");
       if (saved === "grid" || saved === "list") return saved;
@@ -173,9 +176,12 @@ export function ProductSelectionModal({
 
   useEffect(() => {
     if (isOpen) {
+      if (defaultViewMode) {
+        setViewMode(defaultViewMode);
+      }
       setActiveLibraryId(lockLibraryId || "all");
     }
-  }, [isOpen, lockLibraryId]);
+  }, [defaultViewMode, isOpen, lockLibraryId]);
 
   useEffect(() => {
     if (isOpen) {
