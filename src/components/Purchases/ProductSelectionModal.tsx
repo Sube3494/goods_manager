@@ -635,20 +635,6 @@ export function ProductSelectionModal({
                   <div className="flex items-center p-1 bg-zinc-100 dark:bg-white/10 rounded-full border border-border/50 shrink-0">
                     <button
                       type="button"
-                      onClick={() => handleViewModeChange("grid")}
-                      title="大图网格"
-                      className={cn(
-                        "p-1.5 rounded-full transition-all text-xs flex items-center gap-1.5 font-bold px-2.5 sm:px-3 cursor-pointer",
-                        isGridView
-                          ? "bg-white dark:bg-gray-800 text-primary shadow-xs"
-                          : "text-muted-foreground hover:text-foreground"
-                      )}
-                    >
-                      <LayoutGrid size={15} />
-                      <span className="hidden sm:inline">大图</span>
-                    </button>
-                    <button
-                      type="button"
                       onClick={() => handleViewModeChange("list")}
                       title="列表视图"
                       className={cn(
@@ -660,6 +646,20 @@ export function ProductSelectionModal({
                     >
                       <List size={15} />
                       <span className="hidden sm:inline">列表</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleViewModeChange("grid")}
+                      title="大图网格"
+                      className={cn(
+                        "p-1.5 rounded-full transition-all text-xs flex items-center gap-1.5 font-bold px-2.5 sm:px-3 cursor-pointer",
+                        isGridView
+                          ? "bg-white dark:bg-gray-800 text-primary shadow-xs"
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      <LayoutGrid size={15} />
+                      <span className="hidden sm:inline">大图</span>
                     </button>
                   </div>
                 )}

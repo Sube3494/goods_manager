@@ -1467,6 +1467,7 @@ export function PurchaseOrderModal({
             query={purchaseCatalogQuery}
             loadAllOnOpen
             lockLibraryId={lockedLibraryIdForPurchase}
+            defaultViewMode="list"
           />
 
           {/* Image Gallery Preview */}

@@ -841,6 +841,7 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
         onClose={() => setIsProductSelectOpen(false)}
         onSelect={handleBatchProductSelect}
         selectedIds={selectedProductIds}
+        defaultViewMode="list"
       />
     </div>
   );
