@@ -1411,6 +1411,33 @@ export async function GET(request: NextRequest) {
           const deleted = isAutoPickOrderDeletedStatus(order.status);
           const platform = order.platform || "线下交易";
           const deliveryFee = readDeliveryFee(order.delivery);
+          const lockedResolvedShop = readResolvedAutoPickShop(order.rawPayload);
+          const mappingDebug = resolveMappedShopDebug(
+            order.shopId,
+            readShopNameFromRawPayload(order.rawPayload) || null,
+            readShopAddressFromRawPayload(order.rawPayload) || order.shopAddress || null,
+            userProfile?.permissions
+          );
+          const matchedShopId = lockedResolvedShop?.id || null;
+          const matchedShopName = String(
+            String(lockedResolvedShop?.name || "").trim() || mappingDebug.localShopName || ""
+          ).trim();
+          const shopProfitKey = matchedShopId || matchedShopName || order.shopId || order.shopAddress || "未匹配店铺";
+          const shopProfitName = matchedShopName || order.shopAddress || order.shopId || "未匹配店铺";
+          const ensureShopProfit = () => {
+            if (!acc.shopProfit[shopProfitKey]) {
+              acc.shopProfit[shopProfitKey] = {
+                id: matchedShopId || null,
+                name: shopProfitName,
+                amount: 0,
+                count: 0,
+                deliveryFee: 0,
+                productCost: 0,
+                platformCommission: 0,
+              };
+            }
+            return acc.shopProfit[shopProfitKey];
+          };
           if ((cancelled || deleted) && deliveryFee > 0 && !isRefundableMeituanDelivery(order.platform, order.delivery)) {
             acc.totalDeliveryFee += deliveryFee;
             acc.platformDelivery[platform] = (acc.platformDelivery[platform] || 0) + deliveryFee;
@@ -1419,6 +1446,9 @@ export async function GET(request: NextRequest) {
               acc.platformProfit[platform] = { amount: 0, count: 0 };
             }
             acc.platformProfit[platform].amount -= deliveryFee;
+            const shopProfit = ensureShopProfit();
+            shopProfit.amount -= deliveryFee;
+            shopProfit.deliveryFee += deliveryFee;
           }
           if (!cancelled && !deleted) {
             const outboundMeta = outboundByOrderNo.get(order.orderNo) || null;
@@ -1446,17 +1476,6 @@ export async function GET(request: NextRequest) {
             }
 
             // 计算该 order 的 pureProfit
-            const lockedResolvedShop = readResolvedAutoPickShop(order.rawPayload);
-            const mappingDebug = resolveMappedShopDebug(
-              order.shopId,
-              readShopNameFromRawPayload(order.rawPayload) || null,
-              readShopAddressFromRawPayload(order.rawPayload) || order.shopAddress || null,
-              userProfile?.permissions
-            );
-            const matchedShopId = lockedResolvedShop?.id || null;
-            const matchedShopName = String(
-              String(lockedResolvedShop?.name || "").trim() || mappingDebug.localShopName || ""
-            ).trim();
             const hiddenDeletedOfflineIncome = deleted && order.platform === "线下交易";
             const safeExpectedIncome = hiddenDeletedOfflineIncome
               ? null
@@ -1489,6 +1508,12 @@ export async function GET(request: NextRequest) {
             }
             acc.platformProfit[platform].amount += profitValue;
             acc.platformProfit[platform].count += 1;
+            const shopProfit = ensureShopProfit();
+            shopProfit.amount += profitValue;
+            shopProfit.count += 1;
+            shopProfit.deliveryFee += deliveryFee;
+            shopProfit.productCost += productCost;
+            shopProfit.platformCommission += adjustedMetrics.platformCommission;
           }
           acc.itemCount += order.items.reduce((sum: number, item) => sum + item.quantity, 0);
           return acc;
@@ -1502,6 +1527,7 @@ export async function GET(request: NextRequest) {
           platformDelivery: {} as Record<string, number>,
           pureProfit: 0,
           platformProfit: {} as Record<string, { amount: number; count: number }>,
+          shopProfit: {} as Record<string, { id: string | null; name: string; amount: number; count: number; deliveryFee: number; productCost: number; platformCommission: number }>,
         });
 
     const truePlatformCounts: Record<string, number> = {};

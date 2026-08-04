@@ -137,6 +137,7 @@ function ChartTooltip({
     payload?: {
       pureProfit?: number;
       platformPureProfit?: Record<string, number>;
+      shopPureProfit?: Record<string, number>;
       promotionExpense?: number;
       brushExpense?: number;
       netProfit?: number;
@@ -152,6 +153,10 @@ function ChartTooltip({
   const platformProfits = dataPoint?.platformPureProfit || {};
   const platformEntries = Object.entries(platformProfits)
     .filter(([, val]) => val !== 0 || Object.keys(platformProfits).length <= 1)
+    .sort(([, a], [, b]) => (b as number) - (a as number));
+  const shopProfits = dataPoint?.shopPureProfit || {};
+  const shopEntries = Object.entries(shopProfits)
+    .filter(([, val]) => val !== 0 || Object.keys(shopProfits).length <= 1)
     .sort(([, a], [, b]) => (b as number) - (a as number));
   const totalPureProfit = dataPoint?.pureProfit ?? 0;
   const promotionExpense = dataPoint?.promotionExpense ?? 0;
@@ -183,6 +188,20 @@ function ChartTooltip({
         ) : (
           <div className="text-xs text-muted-foreground py-1 text-center font-normal">暂无订单纯利润明细</div>
         )}
+
+        {shopEntries.length > 0 ? (
+          <div className="space-y-1.5 rounded-2xl bg-slate-100/70 p-2 dark:bg-white/5">
+            <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">店铺利润</div>
+            {shopEntries.map(([shop, amount]) => (
+              <div key={shop} className="flex items-center justify-between gap-4 text-xs font-normal">
+                <span className="max-w-[130px] truncate text-slate-700 dark:text-slate-300 font-normal">{shop}</span>
+                <span className={cn("font-normal tabular-nums", (amount as number) < 0 ? "text-rose-500" : "text-emerald-600 dark:text-emerald-400")}>
+                  {money(amount as number)}
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : null}
 
         <div className="flex items-center justify-between gap-4 text-xs border-t border-dashed border-black/10 dark:border-white/10 pt-2.5 mt-2 font-normal">
           <span className="text-slate-600 dark:text-slate-400 font-normal">订单纯利润小计:</span>

@@ -20,6 +20,7 @@ import {
   RefreshCw,
   Search,
   Settings2,
+  Store,
   TriangleAlert,
   TimerReset,
   Truck,
@@ -54,6 +55,15 @@ import { ORDER_SHORTAGE_PURCHASE_NOTE_KEYWORD } from "@/lib/purchaseOrderTypes";
 type OrderAction = "self-delivery" | "complete-delivery" | "pickup-complete" | "sync" | "outbound";
 type OrdersTab = "today" | "all";
 type PurchaseDraftPayload = PurchaseOrder & { sourceOrderId?: string };
+type ShopProfitInfo = {
+  id: string | null;
+  name: string;
+  amount: number;
+  count: number;
+  deliveryFee: number;
+  productCost: number;
+  platformCommission: number;
+};
 
 type OrderResponse = {
   items: AutoPickOrder[];
@@ -1128,6 +1138,7 @@ export default function OrdersPage() {
       platformDelivery?: Record<string, number>;
       pureProfit: number;
       platformProfit?: Record<string, { amount: number; count: number }>;
+      shopProfit?: Record<string, ShopProfitInfo>;
     };
     overview: {
       totalCount: number;
@@ -1155,6 +1166,7 @@ export default function OrdersPage() {
         platformDelivery: {},
         pureProfit: 0,
         platformProfit: {},
+        shopProfit: {},
       },
       overview: {
         totalCount: 0,
@@ -1182,6 +1194,7 @@ export default function OrdersPage() {
         platformDelivery: {},
         pureProfit: 0,
         platformProfit: {},
+        shopProfit: {},
       },
       overview: {
         totalCount: 0,
@@ -1205,6 +1218,13 @@ export default function OrdersPage() {
   const activeTotal = tabData[activeTab].total;
   const activeEligibleBrushSyncOrders = tabData[activeTab].eligibleBrushSyncOrders;
   const isSubComponentLoading = tabData[activeTab].isLoading;
+  const [isShopProfitOpen, setIsShopProfitOpen] = useState(false);
+  const shopProfitEntries = useMemo(() => {
+    return Object.entries(activeSummary.shopProfit || {})
+      .map(([key, info]) => ({ key, ...info }))
+      .filter((info) => info.amount !== 0 || info.count > 0 || info.deliveryFee > 0)
+      .sort((a, b) => b.amount - a.amount);
+  }, [activeSummary.shopProfit]);
 
   const [allOrdersMounted, setAllOrdersMounted] = useState(false);
 
@@ -2103,10 +2123,17 @@ export default function OrdersPage() {
               </div>
 
               {/* 平台纯利润分布卡片 */}
-              <div className="min-w-0 h-full rounded-[20px] border border-black/8 bg-white/76 px-4 py-3.5 shadow-xs dark:border-white/10 dark:bg-white/5 flex flex-col gap-2.5">
+              <button
+                type="button"
+                onClick={() => setIsShopProfitOpen(true)}
+                className="group min-w-0 h-full rounded-[20px] border border-black/8 bg-white/76 px-4 py-3.5 text-left shadow-xs transition hover:border-emerald-400/40 hover:bg-emerald-50/60 focus:outline-none focus:ring-2 focus:ring-emerald-400/40 dark:border-white/10 dark:bg-white/5 dark:hover:border-emerald-300/35 dark:hover:bg-emerald-400/8 flex flex-col gap-2.5"
+              >
                 <div className="flex flex-col w-full">
                   <div className="flex items-center justify-between sm:block">
-                    <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">纯利润</div>
+                    <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
+                      <span>纯利润</span>
+                      <Store className="h-3.5 w-3.5 opacity-0 transition group-hover:opacity-100" />
+                    </div>
                     <div className={cn(
                       "sm:hidden text-[22px] font-bold leading-none tracking-tight",
                       activeSummary.pureProfit < 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"
@@ -2121,7 +2148,7 @@ export default function OrdersPage() {
                     {toCurrency(activeSummary.pureProfit)}
                   </div>
                   <div className="mt-1.5 text-xs text-muted-foreground">
-                    {activeTab === "today" ? "今日各平台纯利润汇总" : "当前筛选各平台纯利润汇总"}
+                    {activeTab === "today" ? "点击查看今日各店利润" : "点击查看当前筛选各店利润"}
                   </div>
                 </div>
                 {activeSummary.platformProfit && Object.entries(activeSummary.platformProfit).some(([, info]) => info.amount !== 0) ? (
@@ -2149,7 +2176,7 @@ export default function OrdersPage() {
                     })}
                   </div>
                 ) : null}
-              </div>
+              </button>
 
               {/* 最右侧：配送费和推广费垂直列 */}
               <div className={cn(
@@ -2240,6 +2267,93 @@ export default function OrdersPage() {
           </div>
         )}
       </div>
+
+      {isShopProfitOpen
+        ? createPortal(
+            <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm" onMouseDown={() => setIsShopProfitOpen(false)}>
+              <div
+                className="flex max-h-[86vh] w-full max-w-3xl flex-col overflow-hidden rounded-[24px] border border-black/10 bg-white text-slate-950 shadow-2xl dark:border-white/10 dark:bg-[#111827] dark:text-white"
+                onMouseDown={(event) => event.stopPropagation()}
+              >
+                <div className="flex items-start justify-between gap-4 border-b border-black/8 px-6 py-5 dark:border-white/10">
+                  <div>
+                    <div className="flex items-center gap-2 text-xl font-bold">
+                      <Store className="h-5 w-5 text-emerald-500" />
+                      <span>店铺利润</span>
+                    </div>
+                    <div className="mt-1 text-sm text-muted-foreground">
+                      {activeTab === "today" ? "今日订单纯利润按店铺汇总" : "当前筛选订单纯利润按店铺汇总"}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsShopProfitOpen(false)}
+                    className="rounded-full p-2 text-muted-foreground transition hover:bg-black/5 hover:text-foreground dark:hover:bg-white/10"
+                    aria-label="关闭"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 border-b border-black/8 px-6 py-4 dark:border-white/10 sm:grid-cols-4">
+                  <div className="rounded-2xl bg-slate-100 px-3 py-2 dark:bg-white/6">
+                    <div className="text-xs text-muted-foreground">总纯利润</div>
+                    <div className={cn("mt-1 text-lg font-bold", activeSummary.pureProfit < 0 ? "text-rose-500" : "text-emerald-500")}>
+                      {toCurrency(activeSummary.pureProfit)}
+                    </div>
+                  </div>
+                  <div className="rounded-2xl bg-slate-100 px-3 py-2 dark:bg-white/6">
+                    <div className="text-xs text-muted-foreground">店铺数</div>
+                    <div className="mt-1 text-lg font-bold">{shopProfitEntries.length}</div>
+                  </div>
+                  <div className="rounded-2xl bg-slate-100 px-3 py-2 dark:bg-white/6">
+                    <div className="text-xs text-muted-foreground">有效订单</div>
+                    <div className="mt-1 text-lg font-bold">{activeSummary.validOrderCount}</div>
+                  </div>
+                  <div className="rounded-2xl bg-slate-100 px-3 py-2 dark:bg-white/6">
+                    <div className="text-xs text-muted-foreground">配送费</div>
+                    <div className="mt-1 text-lg font-bold">{toCurrency(activeSummary.totalDeliveryFee)}</div>
+                  </div>
+                </div>
+
+                <div className="overflow-y-auto px-6 py-4">
+                  {shopProfitEntries.length > 0 ? (
+                    <div className="overflow-hidden rounded-2xl border border-black/8 dark:border-white/10">
+                      <div className="grid grid-cols-[minmax(0,1.5fr)_0.8fr_0.8fr_0.8fr_0.8fr_0.8fr] gap-3 bg-slate-100 px-4 py-3 text-xs font-semibold text-muted-foreground dark:bg-white/6">
+                        <div>店铺</div>
+                        <div className="text-right">纯利润</div>
+                        <div className="text-right">订单</div>
+                        <div className="text-right">配送费</div>
+                        <div className="text-right">货品成本</div>
+                        <div className="text-right">佣金</div>
+                      </div>
+                      <div className="divide-y divide-black/6 dark:divide-white/8">
+                        {shopProfitEntries.map((shop) => (
+                          <div key={shop.key} className="grid grid-cols-[minmax(0,1.5fr)_0.8fr_0.8fr_0.8fr_0.8fr_0.8fr] items-center gap-3 px-4 py-3 text-sm">
+                            <div className="min-w-0">
+                              <div className="truncate font-semibold">{shop.name}</div>
+                              {shop.id ? <div className="mt-0.5 truncate text-xs text-muted-foreground">{shop.id}</div> : null}
+                            </div>
+                            <div className={cn("text-right font-bold", shop.amount < 0 ? "text-rose-500" : "text-emerald-500")}>{toCurrency(shop.amount)}</div>
+                            <div className="text-right tabular-nums">{shop.count}</div>
+                            <div className="text-right tabular-nums">{toCurrency(shop.deliveryFee)}</div>
+                            <div className="text-right tabular-nums">{toCurrency(shop.productCost)}</div>
+                            <div className="text-right tabular-nums">{toCurrency(shop.platformCommission)}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="rounded-2xl border border-dashed border-black/12 py-12 text-center text-sm text-muted-foreground dark:border-white/12">
+                      暂无店铺利润明细
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>,
+            document.body
+          )
+        : null}
 
       {isIntegrationOpen
         ? createPortal(

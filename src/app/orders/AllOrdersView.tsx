@@ -24,6 +24,7 @@ import {
 
 type OrderAction = "self-delivery" | "complete-delivery" | "pickup-complete" | "sync" | "outbound" | "sync-brush";
 type PurchaseDraftPayload = PurchaseOrder & { sourceOrderId?: string };
+type ShopProfitInfo = { id: string | null; name: string; amount: number; count: number; deliveryFee: number; productCost: number; platformCommission: number };
 
 interface AllOrdersViewProps {
   refreshTrigger: number;
@@ -31,7 +32,7 @@ interface AllOrdersViewProps {
   onOpenMatchEditor: (order: AutoPickOrder, item: AutoPickOrderItem) => void;
   onOpenPurchaseDraft?: (draft: PurchaseDraftPayload) => void;
   onDataLoad: (data: {
-    summary: { receivedAmount: number; platformCommission: number; validOrderCount: number; itemCount: number; totalDeliveryFee: number; platformReceived?: Record<string, { amount: number; count: number }>; platformDelivery?: Record<string, number>; pureProfit: number; platformProfit?: Record<string, { amount: number; count: number }> };
+    summary: { receivedAmount: number; platformCommission: number; validOrderCount: number; itemCount: number; totalDeliveryFee: number; platformReceived?: Record<string, { amount: number; count: number }>; platformDelivery?: Record<string, number>; pureProfit: number; platformProfit?: Record<string, { amount: number; count: number }>; shopProfit?: Record<string, ShopProfitInfo> };
     overview: { totalCount: number; trueOrderCount: number; brushCount: number; cancelledCount: number; platformBreakdown?: { truePlatformCounts: Record<string, number>; brushPlatformCounts: Record<string, number>; cancelledPlatformCounts: Record<string, number> } };
     total: number;
     eligibleBrushSyncOrders: AutoPickOrder[];
@@ -69,6 +70,7 @@ export function AllOrdersView({
     platformDelivery?: Record<string, number>;
     pureProfit: number;
     platformProfit?: Record<string, { amount: number; count: number }>;
+    shopProfit?: Record<string, ShopProfitInfo>;
   }>({
     receivedAmount: 0,
     platformCommission: 0,
@@ -79,6 +81,7 @@ export function AllOrdersView({
     platformDelivery: {},
     pureProfit: 0,
     platformProfit: {},
+    shopProfit: {},
   });
   const [overview, setOverview] = useState<{
     totalCount: number;

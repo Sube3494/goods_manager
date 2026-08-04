@@ -422,6 +422,7 @@ export async function GET(request: NextRequest) {
           status: true,
           orderTime: true,
           shopId: true,
+          shopAddress: true,
           rawPayload: true,
           actualPaid: true,
           delivery: true,
@@ -752,6 +753,7 @@ export async function GET(request: NextRequest) {
       promotionExpense: 0,
       pureProfit: 0,
       platformPureProfit: {} as Record<string, number>,
+      shopPureProfit: {} as Record<string, number>,
       platformOrderCount: {} as Record<string, number>,
     });
 
@@ -790,6 +792,11 @@ export async function GET(request: NextRequest) {
       const isOther = isAutoPickOrderCancelledStatus(order.status)
         || isAutoPickOrderDeletedStatus(order.status)
         || isVoidedOfflineOrder(order);
+      const matchedShopName = resolveAutoPickMatchedShopName(order, user.permissions) || order.shopAddress || order.shopId || "未匹配店铺";
+      const addShopPureProfit = (target: ReturnType<typeof createTrendBucket> | undefined, amount: number) => {
+        if (!target || amount === 0) return;
+        target.shopPureProfit[matchedShopName] = FinanceMath.add(target.shopPureProfit[matchedShopName] || 0, amount);
+      };
 
       if (point) {
         if (isBrush) {
@@ -827,11 +834,13 @@ export async function GET(request: NextRequest) {
             point.deliveryExpense = FinanceMath.add(point.deliveryExpense, deliveryYuan);
             point.pureProfit = FinanceMath.add(point.pureProfit, -deliveryYuan);
             point.platformPureProfit[platform] = FinanceMath.add(point.platformPureProfit[platform] || 0, -deliveryYuan);
+            addShopPureProfit(point, -deliveryYuan);
           }
           if (platformPoint) {
             platformPoint.deliveryExpense = FinanceMath.add(platformPoint.deliveryExpense, deliveryYuan);
             platformPoint.pureProfit = FinanceMath.add(platformPoint.pureProfit, -deliveryYuan);
             platformPoint.platformPureProfit[platform] = FinanceMath.add(platformPoint.platformPureProfit[platform] || 0, -deliveryYuan);
+            addShopPureProfit(platformPoint, -deliveryYuan);
           }
         }
       } else {
@@ -875,15 +884,18 @@ export async function GET(request: NextRequest) {
         }
 
         if (isBrush) {
+          const brushPureProfit = -commissionYuan - deliveryYuan - defaultBrushCommission - returnExtraExpenseYuan;
           if (point) {
             point.brushPaid = FinanceMath.add(point.brushPaid, adjustedPaidYuan);
-            point.pureProfit = FinanceMath.add(point.pureProfit, -commissionYuan - deliveryYuan - defaultBrushCommission - returnExtraExpenseYuan);
-            point.platformPureProfit[platform] = FinanceMath.add(point.platformPureProfit[platform] || 0, -commissionYuan - deliveryYuan - defaultBrushCommission - returnExtraExpenseYuan);
+            point.pureProfit = FinanceMath.add(point.pureProfit, brushPureProfit);
+            point.platformPureProfit[platform] = FinanceMath.add(point.platformPureProfit[platform] || 0, brushPureProfit);
+            addShopPureProfit(point, brushPureProfit);
           }
           if (platformPoint) {
             platformPoint.brushPaid = FinanceMath.add(platformPoint.brushPaid, adjustedPaidYuan);
-            platformPoint.pureProfit = FinanceMath.add(platformPoint.pureProfit, -commissionYuan - deliveryYuan - defaultBrushCommission - returnExtraExpenseYuan);
-            platformPoint.platformPureProfit[platform] = FinanceMath.add(platformPoint.platformPureProfit[platform] || 0, -commissionYuan - deliveryYuan - defaultBrushCommission - returnExtraExpenseYuan);
+            platformPoint.pureProfit = FinanceMath.add(platformPoint.pureProfit, brushPureProfit);
+            platformPoint.platformPureProfit[platform] = FinanceMath.add(platformPoint.platformPureProfit[platform] || 0, brushPureProfit);
+            addShopPureProfit(platformPoint, brushPureProfit);
           }
         } else {
           const orderCostYuan = orderCostMeta?.productCost || 0;
@@ -896,7 +908,6 @@ export async function GET(request: NextRequest) {
             platformPoint.productCost = FinanceMath.add(platformPoint.productCost, orderCostYuan);
           }
 
-          const matchedShopName = resolveAutoPickMatchedShopName(order, user.permissions) || "";
           const isOffline = order.platform === "线下交易";
           const rate = isOffline ? 0 : (shopRateMap.get(matchedShopName) ?? 0.06);
           const deliveryYuan = getDeliveryFee(order.delivery) / 100;
@@ -911,10 +922,12 @@ export async function GET(request: NextRequest) {
           if (point) {
             point.pureProfit = FinanceMath.add(point.pureProfit, pureProfit);
             point.platformPureProfit[platform] = FinanceMath.add(point.platformPureProfit[platform] || 0, pureProfit);
+            addShopPureProfit(point, pureProfit);
           }
           if (platformPoint) {
             platformPoint.pureProfit = FinanceMath.add(platformPoint.pureProfit, pureProfit);
             platformPoint.platformPureProfit[platform] = FinanceMath.add(platformPoint.platformPureProfit[platform] || 0, pureProfit);
+            addShopPureProfit(platformPoint, pureProfit);
           }
         }
       }
@@ -980,6 +993,7 @@ export async function GET(request: NextRequest) {
           promotionExpense: point?.promotionExpense || 0,
           pureProfit: point?.pureProfit || 0,
           platformPureProfit: point?.platformPureProfit || {},
+          shopPureProfit: point?.shopPureProfit || {},
           platformOrderCount: point?.platformOrderCount || {},
           netProfit: profit,
         };
