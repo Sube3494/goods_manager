@@ -65,6 +65,11 @@ type ShopProfitInfo = {
   platformCommission: number;
 };
 
+function normalizeDisplayPlatform(platform?: string | null) {
+  const raw = String(platform || "").trim();
+  return raw.toLowerCase() === "other" || !raw ? "线下交易" : raw;
+}
+
 type OrderResponse = {
   items: AutoPickOrder[];
   meta: {
@@ -720,7 +725,7 @@ function BrushSyncPickerModal({
   const platformOptions = useMemo(
     () => [
       { value: "all", label: "全部平台" },
-      ...Array.from(new Set(orders.map((order) => String(order.platform || "").trim()).filter(Boolean)))
+      ...Array.from(new Set(orders.map((order) => normalizeDisplayPlatform(order.platform))))
         .sort((a, b) => a.localeCompare(b, "zh-CN"))
         .map((item) => ({ value: item, label: item })),
     ],
@@ -729,7 +734,7 @@ function BrushSyncPickerModal({
   const filteredOrders = useMemo(() => {
     const keyword = query.trim().toLowerCase();
     return orders.filter((order) => {
-      if (selectedPlatform !== "all" && String(order.platform || "").trim() !== selectedPlatform) {
+      if (selectedPlatform !== "all" && normalizeDisplayPlatform(order.platform) !== selectedPlatform) {
         return false;
       }
 
@@ -862,7 +867,7 @@ function BrushSyncPickerModal({
             {filteredOrders.length > 0 ? filteredOrders.map((order) => {
               const selected = selectedIds.includes(order.id);
               const platformMeta = getPlatformBadgeMeta(order.platform);
-              const platformLabel = String(order.platform || "").trim() || platformMeta.iconAlt;
+              const platformLabel = platformMeta.iconAlt;
               return (
                 <button
                   key={order.id}

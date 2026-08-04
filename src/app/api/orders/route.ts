@@ -1706,15 +1706,22 @@ export async function GET(request: NextRequest) {
         : (shopRateMap.get(matchedShopName) ?? 0.06);
       const productCost = outboundMeta?.productCost || 0;
       const deliveryFee = readDeliveryFee(order.delivery);
+      const cancelledDeliveryLoss = (isAutoPickOrderCancelledStatus(order.status) || isAutoPickOrderDeletedStatus(order.status))
+        && deliveryFee > 0
+        && !isRefundableMeituanDelivery(order.platform, order.delivery);
       const missingCostItemCount = outboundMeta?.missingCostItemCount || 0;
       const hasOutbound = Boolean(outboundMeta);
-      const productCostStatus = !hasOutbound
+      const productCostStatus = cancelledDeliveryLoss
+        ? "ready" as const
+        : !hasOutbound
         ? "pending-outbound" as const
         : missingCostItemCount > 0
           ? "pending-backfill" as const
           : "ready" as const;
       const pureProfit = hiddenDeletedOfflineIncome
         ? null
+        : cancelledDeliveryLoss
+        ? -deliveryFee
         : order.isMainSystemSelfDelivery
         ? - (Math.abs(Number(order.platformCommission || 0)) + brushCommission + returnExtraExpense)
         : (productCostStatus === "ready"

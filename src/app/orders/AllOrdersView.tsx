@@ -26,6 +26,11 @@ type OrderAction = "self-delivery" | "complete-delivery" | "pickup-complete" | "
 type PurchaseDraftPayload = PurchaseOrder & { sourceOrderId?: string };
 type ShopProfitInfo = { id: string | null; name: string; amount: number; count: number; deliveryFee: number; productCost: number; platformCommission: number };
 
+function normalizeDisplayPlatform(platform?: string | null) {
+  const raw = String(platform || "").trim();
+  return raw.toLowerCase() === "other" || !raw ? "线下交易" : raw;
+}
+
 interface AllOrdersViewProps {
   refreshTrigger: number;
   onOpenCostBackfill: (order: AutoPickOrder) => void;
@@ -183,7 +188,9 @@ export function AllOrdersView({
       setMeta(data.meta || { total: 0, page: 1, pageSize: ALL_ORDERS_BATCH_SIZE, totalPages: 1 });
       setCurrentPage(effectivePage);
 
-      if (Array.isArray(data.filters?.platforms)) setPlatforms(data.filters.platforms);
+      if (Array.isArray(data.filters?.platforms)) {
+        setPlatforms(Array.from(new Set(data.filters.platforms.map(normalizeDisplayPlatform))));
+      }
       if (Array.isArray(data.filters?.statuses)) setStatuses(data.filters.statuses);
 
       if (data.summary) setSummary(data.summary);
@@ -468,7 +475,7 @@ export function AllOrdersView({
     const cancelledPlatformCounts: Record<string, number> = {};
 
     for (const item of filteredOrders) {
-      const platform = item.platform || "线下交易";
+      const platform = normalizeDisplayPlatform(item.platform);
       const cancelled = isCancelledStatus(item.status) || isDeletedStatus(item.status);
       if (cancelled) {
         cancelledPlatformCounts[platform] = (cancelledPlatformCounts[platform] || 0) + 1;

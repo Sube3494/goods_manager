@@ -1059,7 +1059,36 @@ function normalizePlatformName(platform: string) {
     return "";
   }
   if (normalized === "淘宝闪购") return "淘宝";
+  if (normalized.toLowerCase() === "other") return "线下交易";
   return normalized;
+}
+
+const MANUAL_DELIVERY_PLACEHOLDER_PRODUCT_NO = "__manual_delivery_placeholder__";
+const MANUAL_DELIVERY_PLACEHOLDER_PRODUCT_NAME = "手工配送占位商品";
+
+function isManualDeliveryPlaceholderEligible(input: {
+  platform?: string | null;
+  channelTag?: string | null;
+  delivery?: unknown;
+}) {
+  const platform = String(input.platform || "").trim();
+  const channelTag = String(input.channelTag || "").trim().toLowerCase();
+  const delivery = input.delivery && typeof input.delivery === "object" && !Array.isArray(input.delivery)
+    ? input.delivery as Record<string, unknown>
+    : {};
+  const sendFee = Number(delivery.sendFee ?? delivery.send_fee ?? 0);
+  const hasDeliveryCost = Number.isFinite(sendFee) && sendFee > 0;
+  return channelTag === "other" || platform === "线下交易" && hasDeliveryCost;
+}
+
+function createManualDeliveryPlaceholderItem() {
+  return {
+    productName: MANUAL_DELIVERY_PLACEHOLDER_PRODUCT_NAME,
+    productNo: MANUAL_DELIVERY_PLACEHOLDER_PRODUCT_NO,
+    quantity: 1,
+    thumb: undefined,
+    isManualDeliveryPlaceholder: true,
+  };
 }
 
 function inferPlatformNameFromChannelTag(channelTag: unknown) {
@@ -1074,6 +1103,10 @@ function inferPlatformNameFromChannelTag(channelTag: unknown) {
 
   if (normalizedTag === "daojia") {
     return "京东";
+  }
+
+  if (normalizedTag === "other") {
+    return "线下交易";
   }
 
   return "";
@@ -2848,7 +2881,15 @@ export function normalizeAutoPickOrderPayload(payload: unknown): AutoPickInbound
   }
 
   if (!normalized.items?.length) {
-    return null;
+    if (isManualDeliveryPlaceholderEligible({
+      platform: normalized.platform,
+      channelTag: normalized.channelTag,
+      delivery: normalized.delivery,
+    })) {
+      normalized.items = [createManualDeliveryPlaceholderItem()];
+    } else {
+      return null;
+    }
   }
 
   return normalized;
@@ -2878,7 +2919,12 @@ function getInvalidAutoPickOrderPayloadReason(payload: unknown) {
   if (!String(input.orderTime || "").trim()) missingFields.push("orderTime");
   if (!String(input.userAddress || "").trim()) missingFields.push("userAddress");
   if (!String(input.id || "").trim()) missingFields.push("id");
-  if (normalizedItems.length === 0) missingFields.push("items");
+  const canUseManualDeliveryPlaceholder = isManualDeliveryPlaceholderEligible({
+    platform: normalizePlatformName(String(input.platform || "")),
+    channelTag: String(input.channelTag || input.channel_tag || "").trim(),
+    delivery: input.delivery,
+  });
+  if (normalizedItems.length === 0 && !canUseManualDeliveryPlaceholder) missingFields.push("items");
 
   if (missingFields.length > 0) {
     return `missing or invalid fields: ${missingFields.join(", ")}`;

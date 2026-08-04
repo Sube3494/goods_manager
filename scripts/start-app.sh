@@ -20,4 +20,11 @@ else
   echo "! purchase items data migration failed, but service will continue to start."
 fi
 
+echo "→ Running other platform data migration..."
+if bun scripts/migrate-other-platform-to-offline.js; then
+  echo "✓ other platform data migration completed."
+else
+  echo "! other platform data migration failed, but service will continue to start."
+fi
+
 exec bun server.js

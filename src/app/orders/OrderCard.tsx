@@ -438,7 +438,7 @@ export function getPlatformBadgeMeta(platform?: string | null) {
   const text = String(platform || "").trim();
   const normalized = text.toLowerCase();
 
-  if (normalized.includes("线下交易") || normalized.includes("线下")) {
+  if (normalized === "other" || normalized.includes("线下交易") || normalized.includes("线下")) {
     return {
       iconSrc: "/platform/线下交易.svg",
       iconAlt: "线下交易",

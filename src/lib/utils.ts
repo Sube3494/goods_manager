@@ -175,8 +175,9 @@ export interface PlatformBadgeMeta {
 export function getPlatformMeta(platform: string | undefined | null): PlatformBadgeMeta | null {
   if (!platform) return null;
   let name = platform.trim();
+  const normalized = name.toLowerCase();
 
-  if (name.includes("线下") || name.includes("线下交易")) {
+  if (normalized === "other" || name.includes("线下") || name.includes("线下交易")) {
     return {
       name: "线下交易",
       iconSrc: "/platform/线下交易.svg",
