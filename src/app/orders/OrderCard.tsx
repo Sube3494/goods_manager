@@ -192,6 +192,25 @@ export function summarizeOrders(orders: AutoPickOrder[]) {
       acc.platformProfit[platform].amount += orderPureProfit;
       acc.platformProfit[platform].count += 1;
 
+      const shopName = String(order.matchedShopName || "未绑定店铺").trim() || "未绑定店铺";
+      const shopKey = order.matchedShopName ? shopName : "unmatched";
+      if (!acc.shopProfit[shopKey]) {
+        acc.shopProfit[shopKey] = {
+          id: null,
+          name: shopName,
+          amount: 0,
+          count: 0,
+          deliveryFee: 0,
+          productCost: 0,
+          platformCommission: 0,
+        };
+      }
+      acc.shopProfit[shopKey].amount += orderPureProfit;
+      acc.shopProfit[shopKey].count += 1;
+      acc.shopProfit[shopKey].deliveryFee += deliveryFee;
+      acc.shopProfit[shopKey].productCost += Math.max(0, Number(order.productCost || 0));
+      acc.shopProfit[shopKey].platformCommission += Math.max(0, Number(order.platformCommission || 0));
+
       if (deliveryFee > 0) {
         acc.platformDelivery[platform] = (acc.platformDelivery[platform] || 0) + deliveryFee;
       }
@@ -219,6 +238,7 @@ export function summarizeOrders(orders: AutoPickOrder[]) {
     platformDelivery: {} as Record<string, number>,
     pureProfit: 0,
     platformProfit: {} as Record<string, { amount: number; count: number }>,
+    shopProfit: {} as Record<string, { id: string | null; name: string; amount: number; count: number; deliveryFee: number; productCost: number; platformCommission: number }>,
   });
 }
 
