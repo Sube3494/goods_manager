@@ -1023,6 +1023,127 @@ function OrderAmountEditModal({
   );
 }
 
+function OfflineOrderEditModal({
+  order,
+  onClose,
+  onSave,
+}: {
+  order: AutoPickOrder;
+  onClose: () => void;
+  onSave: (values: {
+    actualPaid: number;
+    deliveryFee: number;
+    userAddress: string;
+    customerRemark: string;
+  }) => Promise<boolean>;
+}) {
+  const { showToast } = useToast();
+  const [actualPaid, setActualPaid] = useState(() => formatCurrencyInputFromCents(order.actualPaid));
+  const [deliveryFee, setDeliveryFee] = useState(() => formatCurrencyInputFromCents(getDeliveryFee(order.delivery)));
+  const [userAddress, setUserAddress] = useState(() => String(order.userAddress || ""));
+  const [customerRemark, setCustomerRemark] = useState(() => String(order.customerRemark || ""));
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSave = async () => {
+    const nextActualPaid = parseCurrencyInputToCents(actualPaid);
+    const nextDeliveryFee = parseCurrencyInputToCents(deliveryFee);
+    if (nextActualPaid == null) {
+      showToast("请输入有效的商品金额", "error");
+      return;
+    }
+    if (nextDeliveryFee == null) {
+      showToast("请输入有效的配送支出", "error");
+      return;
+    }
+
+    setIsSaving(true);
+    const ok = await onSave({
+      actualPaid: nextActualPaid,
+      deliveryFee: nextDeliveryFee,
+      userAddress,
+      customerRemark,
+    });
+    setIsSaving(false);
+    if (ok) {
+      onClose();
+    }
+  };
+
+  const inputClass = "h-11 w-full rounded-2xl border border-black/8 bg-white/88 px-3 text-sm font-semibold text-foreground outline-none transition focus:border-primary/45 focus:ring-2 focus:ring-primary/10 dark:border-white/10 dark:bg-white/5";
+
+  return createPortal(
+    <div className="fixed inset-0 z-100000 flex items-center justify-center px-4">
+      <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm" onClick={() => { if (!isSaving) onClose(); }} />
+      <div className="relative w-full max-w-lg rounded-[28px] border border-black/8 bg-white/96 shadow-[0_24px_64px_rgba(15,23,42,0.20)] dark:border-white/10 dark:bg-[#0d1420]/98">
+        <div className="flex items-start justify-between gap-3 border-b border-black/8 px-6 pb-4 pt-6 dark:border-white/10">
+          <div>
+            <h3 className="text-xl font-semibold tracking-tight text-foreground">修改线下订单</h3>
+            <p className="mt-2 text-xs leading-5 text-muted-foreground">用于修正金额、配送支出、地址和备注；商品明细变更仍建议作废重录以保持库存准确。</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isSaving}
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-black/8 bg-white/80 text-muted-foreground transition-all hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-white/4"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="space-y-4 px-6 py-5">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block">
+              <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">商品金额</span>
+              <div className="mt-2 flex items-center rounded-2xl border border-black/8 bg-white/88 px-3 dark:border-white/10 dark:bg-white/5">
+                <span className="text-sm font-bold text-muted-foreground">¥</span>
+                <input value={actualPaid} onChange={(event) => setActualPaid(event.target.value)} inputMode="decimal" className="h-11 w-full bg-transparent px-2 text-sm font-semibold text-foreground outline-none" />
+              </div>
+            </label>
+            <label className="block">
+              <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">配送支出</span>
+              <div className="mt-2 flex items-center rounded-2xl border border-black/8 bg-white/88 px-3 dark:border-white/10 dark:bg-white/5">
+                <span className="text-sm font-bold text-muted-foreground">¥</span>
+                <input value={deliveryFee} onChange={(event) => setDeliveryFee(event.target.value)} inputMode="decimal" className="h-11 w-full bg-transparent px-2 text-sm font-semibold text-foreground outline-none" />
+              </div>
+            </label>
+          </div>
+
+          <label className="block">
+            <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">配送地址</span>
+            <input value={userAddress} onChange={(event) => setUserAddress(event.target.value)} className={cn("mt-2", inputClass)} placeholder="线下送货上门 / 线下柜台交易" />
+          </label>
+
+          <label className="block">
+            <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">备注</span>
+            <textarea value={customerRemark} onChange={(event) => setCustomerRemark(event.target.value)} rows={3} className={cn("mt-2 min-h-22 py-3 resize-none", inputClass)} placeholder="订单备注" />
+          </label>
+
+          <div className="flex gap-3 pt-1">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isSaving}
+              className="inline-flex h-11 flex-1 items-center justify-center rounded-2xl border border-black/8 bg-white/85 px-4 text-sm font-bold text-foreground transition-all hover:bg-white disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-white/5"
+            >
+              取消
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleSave()}
+              disabled={isSaving}
+              className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-2xl bg-foreground px-4 text-sm font-bold text-background transition-all hover:opacity-92 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-black"
+            >
+              {isSaving ? <Loader2 size={15} className="animate-spin" /> : null}
+              保存修改
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 export function DetailStat({
   label,
   value,
@@ -1287,6 +1408,8 @@ export function OrderCard({
   const [isUpdatingBrush, setIsUpdatingBrush] = useState(false);
   const [isAmountEditorOpen, setIsAmountEditorOpen] = useState(false);
   const [isSavingAmount, setIsSavingAmount] = useState(false);
+  const [isOfflineEditorOpen, setIsOfflineEditorOpen] = useState(false);
+  const [isSavingOfflineEdit, setIsSavingOfflineEdit] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [isDeletingOffline, setIsDeletingOffline] = useState(false);
   const { showToast } = useToast();
@@ -1358,6 +1481,38 @@ export function OrderCard({
       return false;
     } finally {
       setIsSavingAmount(false);
+    }
+  }, [order.id, showToast, onRefresh]);
+
+  const handleSaveOfflineOrder = useCallback(async (values: {
+    actualPaid: number;
+    deliveryFee: number;
+    userAddress: string;
+    customerRemark: string;
+  }) => {
+    try {
+      setIsSavingOfflineEdit(true);
+      const res = await fetch(`/api/orders/${order.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          offlineEdit: values,
+        }),
+      });
+      if (res.ok) {
+        showToast("线下订单修改成功", "success");
+        onRefresh?.();
+        return true;
+      }
+      const data = await res.json().catch(() => ({}));
+      showToast(data.error || "修改失败", "error");
+      return false;
+    } catch (err) {
+      console.error("修改线下订单失败", err);
+      showToast("网络请求失败，请稍后重试", "error");
+      return false;
+    } finally {
+      setIsSavingOfflineEdit(false);
     }
   }, [order.id, showToast, onRefresh]);
 
@@ -2028,11 +2183,11 @@ export function OrderCard({
           <div className={cn(
             "grid gap-2 lg:min-w-110",
             showManualDeliveryMarker
-              ? "grid-cols-2 sm:grid-cols-2 lg:min-w-0 lg:w-64 ml-auto"
+              ? "grid-cols-3 sm:grid-cols-3 lg:min-w-0 lg:w-96 ml-auto"
               : order.platform === "线下交易"
               ? deleted
                 ? "grid-cols-1 sm:grid-cols-1 lg:min-w-0 lg:w-32 ml-auto"
-                : "grid-cols-2 sm:grid-cols-2 lg:min-w-0 lg:w-64 ml-auto"
+                : "grid-cols-3 sm:grid-cols-3 lg:min-w-0 lg:w-96 ml-auto"
               : "grid-cols-4 sm:grid-cols-4"
           )}>
             <ActionButton
@@ -2042,6 +2197,15 @@ export function OrderCard({
               mobileIconOnly={order.platform !== "线下交易"}
               title={expanded ? "收起详情" : "展开详情"}
             />
+            {order.platform === "线下交易" && !deleted ? (
+              <ActionButton
+                label={isSavingOfflineEdit ? "保存中" : "修改"}
+                icon={isSavingOfflineEdit ? <Loader2 size={14} className="animate-spin" /> : <Pencil size={14} />}
+                onClick={() => setIsOfflineEditorOpen(true)}
+                disabled={isSavingOfflineEdit || Boolean(actingId)}
+                title="修改这张线下订单的金额、配送支出、地址和备注"
+              />
+            ) : null}
             {order.platform === "线下交易" && !deleted ? (
               <ActionButton
                 label={isDeletingOffline ? "作废中" : "作废"}
@@ -2279,6 +2443,17 @@ export function OrderCard({
             }
           }}
           onSave={handleSaveExpectedIncome}
+        />
+      ) : null}
+      {isOfflineEditorOpen ? (
+        <OfflineOrderEditModal
+          order={order}
+          onClose={() => {
+            if (!isSavingOfflineEdit) {
+              setIsOfflineEditorOpen(false);
+            }
+          }}
+          onSave={handleSaveOfflineOrder}
         />
       ) : null}
       <ConfirmModal

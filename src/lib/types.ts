@@ -221,6 +221,7 @@ export interface AutoPickOrder {
   customerPhone?: string | null;
   customerMaskedPhone?: string | null;
   customerPhoneExtension?: string | null;
+  customerRemark?: string | null;
   items: AutoPickOrderItem[];
   autoCompleteAt?: string | null;
   completedAt?: string | null;
@@ -280,7 +281,6 @@ export interface AutoPickOrder {
   firstMissingCostPurchaseOrderId?: string | null;
   firstMissingCostPurchaseOrderItemId?: string | null;
   lastSyncedAt?: string | null;
-  customerRemark?: string | null;
   createdAt?: string;
   updatedAt?: string;
   detailLoaded?: boolean;

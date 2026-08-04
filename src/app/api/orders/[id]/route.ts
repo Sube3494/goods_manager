@@ -89,15 +89,31 @@ export async function PATCH(
     const hasBrushToggle = body.isMainSystemSelfDelivery !== undefined;
     const nextExpectedIncome = Number(body.expectedIncome);
     const hasExpectedIncome = Number.isFinite(nextExpectedIncome);
+    const hasOfflineEdit = body.offlineEdit && typeof body.offlineEdit === "object";
     const hasAmountEdit = hasExpectedIncome;
 
-    if (!hasBrushToggle && !hasAmountEdit) {
+    if (!hasBrushToggle && !hasAmountEdit && !hasOfflineEdit) {
       return NextResponse.json({ error: "参数错误" }, { status: 400 });
     }
 
     if (hasAmountEdit) {
       if (nextExpectedIncome < 0) {
         return NextResponse.json({ error: "金额不能小于 0" }, { status: 400 });
+      }
+    }
+
+    const offlineEdit = hasOfflineEdit ? body.offlineEdit as Record<string, unknown> : null;
+    const offlineActualPaid = offlineEdit ? Number(offlineEdit.actualPaid) : NaN;
+    const offlineDeliveryFee = offlineEdit ? Number(offlineEdit.deliveryFee) : NaN;
+    const offlineUserAddress = offlineEdit ? String(offlineEdit.userAddress || "").trim() : "";
+    const offlineCustomerRemark = offlineEdit ? String(offlineEdit.customerRemark || "").trim() : "";
+
+    if (offlineEdit) {
+      if (!Number.isFinite(offlineActualPaid) || offlineActualPaid < 0) {
+        return NextResponse.json({ error: "商品金额不能小于 0" }, { status: 400 });
+      }
+      if (!Number.isFinite(offlineDeliveryFee) || offlineDeliveryFee < 0) {
+        return NextResponse.json({ error: "配送支出不能小于 0" }, { status: 400 });
       }
     }
 
@@ -108,15 +124,21 @@ export async function PATCH(
       },
       select: {
         id: true,
+        platform: true,
         actualPaid: true,
         expectedIncome: true,
         platformCommission: true,
+        delivery: true,
         rawPayload: true,
       },
     });
 
     if (!order) {
       return NextResponse.json({ error: "订单不存在" }, { status: 404 });
+    }
+
+    if (offlineEdit && order.platform !== "线下交易") {
+      return NextResponse.json({ error: "当前只支持修改线下订单" }, { status: 400 });
     }
 
     const rawPayload = order.rawPayload && typeof order.rawPayload === "object" && !Array.isArray(order.rawPayload)
@@ -135,11 +157,23 @@ export async function PATCH(
       ? systemMeta.manualAmountOverride as Record<string, any>
       : {};
 
-    const actualPaid = order.actualPaid;
-    const expectedIncome = hasExpectedIncome ? Math.round(nextExpectedIncome) : order.expectedIncome;
+    const actualPaid = offlineEdit ? Math.round(offlineActualPaid) : order.actualPaid;
+    const expectedIncome = offlineEdit ? Math.round(offlineActualPaid) : (hasExpectedIncome ? Math.round(nextExpectedIncome) : order.expectedIncome);
     const platformCommission = hasAmountEdit
       ? Math.max(0, Math.round(Number(actualPaid || 0) - Number(expectedIncome || 0)))
-      : order.platformCommission;
+      : offlineEdit
+        ? 0
+        : order.platformCommission;
+    const existingDelivery = order.delivery && typeof order.delivery === "object" && !Array.isArray(order.delivery)
+      ? order.delivery as Record<string, unknown>
+      : {};
+    const nextDelivery = offlineEdit
+      ? {
+          ...existingDelivery,
+          sendFee: Math.round(offlineDeliveryFee),
+          isOffline: true,
+        }
+      : null;
 
     await prisma.autoPickOrder.update({
       where: { id: order.id },
@@ -151,8 +185,24 @@ export async function PATCH(
               platformCommission,
             }
           : {}),
+        ...(offlineEdit
+          ? {
+              actualPaid,
+              expectedIncome,
+              platformCommission,
+              userAddress: offlineUserAddress || (Math.round(offlineDeliveryFee) > 0 ? "线下送货上门" : "线下柜台交易"),
+              customerRemark: offlineCustomerRemark || null,
+              delivery: nextDelivery as Prisma.InputJsonValue,
+            }
+          : {}),
         rawPayload: {
           ...rawPayload,
+          ...(offlineEdit
+            ? {
+                note: offlineCustomerRemark,
+                customerRemark: offlineCustomerRemark,
+              }
+            : {}),
           systemMeta: {
             ...systemMeta,
             ...(hasBrushToggle
@@ -168,6 +218,19 @@ export async function PATCH(
                   manualAmountOverride: {
                     ...manualAmountOverride,
                     expectedIncome,
+                    updatedAt: new Date().toISOString(),
+                    updatedBy: String(user.name || user.email || user.id),
+                  },
+                }
+              : {}),
+            ...(offlineEdit
+              ? {
+                  manualOfflineEdit: {
+                    actualPaid,
+                    expectedIncome,
+                    deliveryFee: Math.round(offlineDeliveryFee),
+                    userAddress: offlineUserAddress,
+                    customerRemark: offlineCustomerRemark,
                     updatedAt: new Date().toISOString(),
                     updatedBy: String(user.name || user.email || user.id),
                   },
