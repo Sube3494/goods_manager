@@ -1406,11 +1406,11 @@ export function OrderCard({
   const hasDeliveryAddress = Boolean(String(order.userAddress || "").trim());
   const pickup = Boolean(order.isPickup) || (order.platform === "线下交易" && deliveryFee <= 0 && !hasDeliveryAddress);
   const showManualDeliveryMarker = order.platform === "线下交易" && !pickup;
-  const showPlatformActions = order.platform !== "线下交易" || showManualDeliveryMarker;
+  const showPlatformActions = order.platform !== "线下交易";
   const hideDeletedOfflineIncome = deleted && order.platform === "线下交易";
   const delivering = !pickup && isDeliveringStatus(order.status);
   const hasOutbound = Boolean(order.hasOutbound);
-  const showBrushMarker = !pickup && order.isMainSystemSelfDelivery;
+  const showBrushMarker = !pickup && !showManualDeliveryMarker && order.isMainSystemSelfDelivery;
   const orderTypeLabel = getOrderTypeLabel(order);
   const platformMeta = getPlatformBadgeMeta(order.platform);
   const commissionDisplay = getCommissionDisplay(order.platformCommission);
@@ -1481,7 +1481,12 @@ export function OrderCard({
   const settlementAfterRate = Math.round(expectedIncome * (1 - serviceFeeRate));
   const isJdOrder = String(order.platform || "").includes("京东");
   const pureProfitTooltipRows = hasPureProfit
-    ? (order.isMainSystemSelfDelivery
+    ? (showManualDeliveryMarker
+      ? [
+          { label: "订单收入", value: toCurrency(expectedIncome) },
+          { label: "扣配送费", value: toCurrency(-deliveryFee) },
+        ]
+      : order.isMainSystemSelfDelivery
       ? [
           { label: "扣平台佣金", value: toCurrency(order.platformCommission) },
           { label: "扣刷单佣金", value: toCurrency(- (Math.abs(pureProfit) - Math.abs(Number(order.platformCommission || 0)))) },
@@ -2022,7 +2027,9 @@ export function OrderCard({
 
           <div className={cn(
             "grid gap-2 lg:min-w-110",
-            order.platform === "线下交易" && !showManualDeliveryMarker
+            showManualDeliveryMarker
+              ? "grid-cols-2 sm:grid-cols-2 lg:min-w-0 lg:w-64 ml-auto"
+              : order.platform === "线下交易"
               ? deleted
                 ? "grid-cols-1 sm:grid-cols-1 lg:min-w-0 lg:w-32 ml-auto"
                 : "grid-cols-2 sm:grid-cols-2 lg:min-w-0 lg:w-64 ml-auto"

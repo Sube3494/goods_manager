@@ -732,6 +732,18 @@ function readDeliveryFee(delivery: unknown) {
   return Number.isFinite(value) ? Math.max(0, value) : 0;
 }
 
+function isOfflineManualDeliveryLossOrder(input: {
+  platform?: string | null;
+  actualPaid?: number | null;
+  expectedIncome?: number | null;
+  deliveryFee?: number | null;
+}) {
+  return String(input.platform || "").trim() === "线下交易"
+    && Number(input.deliveryFee || 0) > 0
+    && Number(input.actualPaid || 0) <= 0
+    && Number(input.expectedIncome || 0) <= 0;
+}
+
 function isRefundableMeituanDelivery(platform: unknown, delivery: unknown) {
   const deliveryObj = delivery && typeof delivery === "object" && !Array.isArray(delivery)
     ? delivery as Record<string, unknown>
@@ -1487,7 +1499,15 @@ export async function GET(request: NextRequest) {
             const returnExtraExpense = outboundMeta?.extraExpense || 0;
             const missingCostItemCount = outboundMeta?.missingCostItemCount || 0;
             const hasOutbound = Boolean(outboundMeta);
-            const productCostStatus = !hasOutbound
+            const isManualDeliveryLoss = isOfflineManualDeliveryLossOrder({
+              platform: order.platform,
+              actualPaid: order.actualPaid,
+              expectedIncome: adjustedMetrics.expectedIncome,
+              deliveryFee,
+            });
+            const productCostStatus = isManualDeliveryLoss
+              ? "ready" as const
+              : !hasOutbound
               ? "pending-outbound" as const
               : missingCostItemCount > 0
                 ? "pending-backfill" as const
@@ -1495,6 +1515,8 @@ export async function GET(request: NextRequest) {
             const isBrush = readMainSystemSelfDeliveryFlag(order.rawPayload);
             const orderPureProfit = hiddenDeletedOfflineIncome
               ? null
+              : isManualDeliveryLoss
+              ? -deliveryFee
               : isBrush
               ? - (Math.abs(Number(adjustedMetrics.platformCommission || 0)) + brushCommission + returnExtraExpense)
               : (productCostStatus === "ready"
@@ -1709,9 +1731,15 @@ export async function GET(request: NextRequest) {
       const cancelledDeliveryLoss = (isAutoPickOrderCancelledStatus(order.status) || isAutoPickOrderDeletedStatus(order.status))
         && deliveryFee > 0
         && !isRefundableMeituanDelivery(order.platform, order.delivery);
+      const manualDeliveryLoss = isOfflineManualDeliveryLossOrder({
+        platform: order.platform,
+        actualPaid: order.actualPaid,
+        expectedIncome: adjustedMetrics.expectedIncome,
+        deliveryFee,
+      });
       const missingCostItemCount = outboundMeta?.missingCostItemCount || 0;
       const hasOutbound = Boolean(outboundMeta);
-      const productCostStatus = cancelledDeliveryLoss
+      const productCostStatus = cancelledDeliveryLoss || manualDeliveryLoss
         ? "ready" as const
         : !hasOutbound
         ? "pending-outbound" as const
@@ -1721,6 +1749,8 @@ export async function GET(request: NextRequest) {
       const pureProfit = hiddenDeletedOfflineIncome
         ? null
         : cancelledDeliveryLoss
+        ? -deliveryFee
+        : manualDeliveryLoss
         ? -deliveryFee
         : order.isMainSystemSelfDelivery
         ? - (Math.abs(Number(order.platformCommission || 0)) + brushCommission + returnExtraExpense)

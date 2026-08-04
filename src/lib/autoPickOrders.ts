@@ -1063,6 +1063,19 @@ function normalizePlatformName(platform: string) {
   return normalized;
 }
 
+function getAutoPickPlatformAliases(platform?: string | null) {
+  const normalized = String(platform || "").trim();
+  const aliases = new Set<string>();
+  if (normalized) {
+    aliases.add(normalized);
+  }
+  if (normalized === "线下交易" || normalized.toLowerCase() === "other") {
+    aliases.add("线下交易");
+    aliases.add("other");
+  }
+  return Array.from(aliases).filter(Boolean);
+}
+
 const MANUAL_DELIVERY_PLACEHOLDER_PRODUCT_NO = "__manual_delivery_placeholder__";
 const MANUAL_DELIVERY_PLACEHOLDER_PRODUCT_NAME = "手工配送占位商品";
 
@@ -2966,12 +2979,14 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
     await ensureShopProductsForAutoPickOrder(tx, userId, normalized, normalizedItems);
     const resolvedInternalShop = await resolveAutoPickInternalShop(tx, userId, normalized);
 
+    const platformAliases = getAutoPickPlatformAliases(normalized.platform);
+
     const existingCandidates = await tx.autoPickOrder.findMany({
       where: {
         userId,
         OR: [
           {
-            platform: normalized.platform || "",
+            platform: { in: platformAliases },
             orderNo: normalized.orderNo || "",
           },
           {
@@ -3235,14 +3250,13 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
     });
   }
 
-  const becameDelivering =
+  const isDeliveringSelfDelivery =
     isAutoPickOrderDeliveringStatus(order.status)
-    && !isAutoPickOrderDeliveringStatus(previousStatus)
     && !isAutoPickPickupOrder(order.rawPayload, order.userAddress, order.shopAddress)
     && !isAutoPickOrderAbnormalStatus(order.status);
   const triggeredByMainSystem = Boolean(readAutoPickSystemMeta(order.rawPayload)?.mainSystemSelfDelivery?.triggered);
 
-  if (becameDelivering && triggeredByMainSystem && !order.autoCompleteAt) {
+  if (isDeliveringSelfDelivery && triggeredByMainSystem && !order.autoCompleteAt) {
     const integrationConfig = await getAutoPickIntegrationConfigByUserId(userId);
     const autoCompleteAt = estimateAutoCompleteAtForOrder(order, integrationConfig.selfDeliveryTiming);
 
@@ -4152,10 +4166,11 @@ export async function applyAutoPickProgress(userId: string, payload: unknown) {
     throw new Error("Invalid progress payload");
   }
 
+  const platformAliases = getAutoPickPlatformAliases(progress.platform);
   let order = await prisma.autoPickOrder.findFirst({
     where: {
       userId,
-      platform: progress.platform,
+      platform: { in: platformAliases },
       orderNo: progress.orderNo,
     },
     orderBy: {
@@ -4182,7 +4197,7 @@ export async function applyAutoPickProgress(userId: string, payload: unknown) {
   if (shouldRefreshAutoPickOrderOnProgressStatusHint(progress.statusHint)) {
     const refreshedOrder = await refreshAutoPickOrderFromPlugin(userId, {
       id: order.sourceId,
-      platform: progress.platform,
+      platform: resolveAutoPickCommandPlatform(order) || progress.platform,
       orderNo: progress.orderNo,
       orderTime: order.orderTime,
     }).catch(() => null);
