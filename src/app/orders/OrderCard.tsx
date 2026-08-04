@@ -1382,7 +1382,10 @@ export function OrderCard({
   const deleted = getBaseAutoPickStatusDisplay(order.status) === "已删除";
   const terminal = isTerminalStatus(order.status);
   const abnormal = isAbnormalStatus(order.status);
-  const pickup = Boolean(order.isPickup) || order.platform === "线下交易";
+  const deliveryFee = getDeliveryFee(order.delivery);
+  const hasDeliveryAddress = Boolean(String(order.userAddress || "").trim());
+  const pickup = Boolean(order.isPickup) || (order.platform === "线下交易" && deliveryFee <= 0 && !hasDeliveryAddress);
+  const showManualDeliveryMarker = order.platform === "线下交易" && !pickup;
   const hideDeletedOfflineIncome = deleted && order.platform === "线下交易";
   const delivering = !pickup && isDeliveringStatus(order.status);
   const hasOutbound = Boolean(order.hasOutbound);
@@ -1413,7 +1416,6 @@ export function OrderCard({
     ? "-"
     : (hasPureProfit ? toCurrency(pureProfit) : (productCostStatusText || "-"));
   const serviceFeeRate = Number(order.serviceFeeRate || 0);
-  const deliveryFee = getDeliveryFee(order.delivery);
   const productCost = Number(order.productCost || 0);
   const productCostBreakdown = Array.isArray(order.productCostBreakdown) ? order.productCostBreakdown : [];
   const outboundReturnDetails = Array.isArray(order.outboundReturnDetails) ? order.outboundReturnDetails : [];
@@ -1557,6 +1559,11 @@ export function OrderCard({
                   {pickup && order.platform !== "线下交易" ? (
                     <span className="inline-flex h-7 items-center rounded-full border border-sky-500/15 bg-sky-500/10 px-1.5 text-[11px] font-medium leading-none text-sky-700 dark:text-sky-400 sm:h-8 sm:px-2.5 sm:text-[13px]">
                       到店自取
+                    </span>
+                  ) : null}
+                  {showManualDeliveryMarker ? (
+                    <span className="inline-flex h-7 items-center rounded-full border border-orange-500/15 bg-orange-500/10 px-1.5 text-[11px] font-medium leading-none text-orange-700 dark:text-orange-300 sm:h-8 sm:px-2.5 sm:text-[13px]">
+                      手工配送
                     </span>
                   ) : null}
                   {showBrushMarker ? (
