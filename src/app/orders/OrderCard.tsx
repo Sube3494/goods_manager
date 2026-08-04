@@ -207,7 +207,7 @@ export function summarizeOrders(orders: AutoPickOrder[]) {
         acc.totalDeliveryFee += getDeliveryFee(order.delivery);
       }
     }
-    acc.itemCount += getItemCount(order.items);
+    acc.itemCount += getItemCount(getVisibleOrderItems(order.items));
     return acc;
   }, {
     receivedAmount: 0,
@@ -522,6 +522,21 @@ export function getExpandedOrderItemDisplays(item: AutoPickOrderItem) {
   }
 
   return [getOrderItemDisplay(item)];
+}
+
+const MANUAL_DELIVERY_PLACEHOLDER_PRODUCT_NO = "__manual_delivery_placeholder__";
+
+function isManualDeliveryPlaceholderItem(item: AutoPickOrderItem) {
+  const rawPayload = item.rawPayload && typeof item.rawPayload === "object" && !Array.isArray(item.rawPayload)
+    ? item.rawPayload as Record<string, unknown>
+    : {};
+
+  return String(item.productNo || "").trim() === MANUAL_DELIVERY_PLACEHOLDER_PRODUCT_NO
+    || rawPayload.isManualDeliveryPlaceholder === true;
+}
+
+function getVisibleOrderItems(items: AutoPickOrderItem[]) {
+  return items.filter((item) => !isManualDeliveryPlaceholderItem(item));
 }
 
 function getMatchedProductIds(item: AutoPickOrderItem) {
@@ -1360,7 +1375,8 @@ export function OrderCard({
   }, [order.id, showToast, onRefresh]);
 
   const profitTooltipRef = useRef<HTMLDivElement | null>(null);
-  const itemCount = getItemCount(order.items);
+  const visibleItems = getVisibleOrderItems(order.items);
+  const itemCount = getItemCount(visibleItems);
   const completed = isCompletedStatus(order.status);
   const cancelled = isCancelledStatus(order.status);
   const deleted = getBaseAutoPickStatusDisplay(order.status) === "已删除";
@@ -1893,10 +1909,11 @@ export function OrderCard({
 
       <div className="px-3.5 py-3 sm:px-5 sm:py-4">
         <div className="grid gap-3">
+          {visibleItems.length > 0 ? (
             <div className="rounded-[18px] border border-black/6 bg-black/2 p-2.5 dark:border-white/8 dark:bg-white/3 sm:rounded-3xl sm:p-4">
               <div className="flex items-center justify-between gap-3">
                 <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
-                  {order.items.length > 1 ? "商品列表" : "商品"}
+                  {visibleItems.length > 1 ? "商品列表" : "商品"}
                 </div>
                 <div className="flex flex-wrap items-center justify-end gap-2">
                   <div className="text-xs font-medium text-muted-foreground">共 {itemCount} 件商品</div>
@@ -1904,7 +1921,7 @@ export function OrderCard({
               </div>
 
             <div className="mt-2 grid gap-1.5 sm:mt-2.5 sm:gap-2">
-              {order.items.flatMap((item, index) =>
+              {visibleItems.flatMap((item, index) =>
                 getExpandedOrderItemDisplays(item).map((display, displayIndex) => (
                   <ProductStripItem
                     key={`${item.productNo || item.productName}-${index}-${display.sku}-${displayIndex}`}
@@ -1921,6 +1938,7 @@ export function OrderCard({
               )}
             </div>
           </div>
+          ) : null}
         </div>
 
         <div className="mt-2.5 flex flex-col gap-2 border-t border-black/6 pt-2.5 dark:border-white/6 lg:flex-row lg:items-center lg:justify-between lg:pt-4">
