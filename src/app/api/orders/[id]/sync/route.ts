@@ -12,6 +12,7 @@ import {
   readRiderPhoneFromDelivery,
   readRiderPhoneFromRawPayload,
   refreshAutoPickOrderFromPlugin,
+  resolveAutoPickCommandPlatform,
   syncAutoOutboundFromCompletedAutoPickOrder,
   syncBrushOrderFromCompletedAutoPickOrder,
 } from "@/lib/autoPickOrders";
@@ -47,7 +48,7 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
 
     const refreshedOrder = await refreshAutoPickOrderFromPlugin(session.id, {
       id: order.sourceId,
-      platform: order.platform,
+      platform: resolveAutoPickCommandPlatform(order),
       orderNo: order.orderNo,
       orderTime: order.orderTime,
     });

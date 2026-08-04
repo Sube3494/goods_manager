@@ -1406,6 +1406,7 @@ export function OrderCard({
   const hasDeliveryAddress = Boolean(String(order.userAddress || "").trim());
   const pickup = Boolean(order.isPickup) || (order.platform === "线下交易" && deliveryFee <= 0 && !hasDeliveryAddress);
   const showManualDeliveryMarker = order.platform === "线下交易" && !pickup;
+  const showPlatformActions = order.platform !== "线下交易" || showManualDeliveryMarker;
   const hideDeletedOfflineIncome = deleted && order.platform === "线下交易";
   const delivering = !pickup && isDeliveringStatus(order.status);
   const hasOutbound = Boolean(order.hasOutbound);
@@ -2021,7 +2022,7 @@ export function OrderCard({
 
           <div className={cn(
             "grid gap-2 lg:min-w-110",
-            order.platform === "线下交易"
+            order.platform === "线下交易" && !showManualDeliveryMarker
               ? deleted
                 ? "grid-cols-1 sm:grid-cols-1 lg:min-w-0 lg:w-32 ml-auto"
                 : "grid-cols-2 sm:grid-cols-2 lg:min-w-0 lg:w-64 ml-auto"
@@ -2043,7 +2044,7 @@ export function OrderCard({
                 title="作废这张录错的线下订单，并自动回滚关联出库库存"
               />
             ) : null}
-            {order.platform !== "线下交易" && (
+            {showPlatformActions && (
               <>
                 <ActionButton
                   label="同步"

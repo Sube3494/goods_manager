@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
-import { callAutoPickCommand, refreshAutoPickOrderFromPlugin, syncAutoOutboundFromCompletedAutoPickOrder, syncBrushOrderFromCompletedAutoPickOrder, wasAutoPickOrderSelfDeliveryTriggeredByMainSystem } from "@/lib/autoPickOrders";
+import { callAutoPickCommand, refreshAutoPickOrderFromPlugin, resolveAutoPickCommandPlatform, syncAutoOutboundFromCompletedAutoPickOrder, syncBrushOrderFromCompletedAutoPickOrder, wasAutoPickOrderSelfDeliveryTriggeredByMainSystem } from "@/lib/autoPickOrders";
 import { cancelAutoCompleteJob } from "@/lib/autoPickAutoComplete";
 import { emitAutoPickOrderEvent } from "@/lib/autoPickOrderEvents";
 import {
@@ -53,8 +53,9 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
       return NextResponse.json({ error: "Order is not main-system self delivery" }, { status: 409 });
     }
 
+    const commandPlatform = resolveAutoPickCommandPlatform(order);
     const result = await callAutoPickCommand(session.id, "/complete-delivery", {
-      platform: order.platform,
+      platform: commandPlatform,
       dailyPlatformSequence: order.dailyPlatformSequence,
       orderNo: order.orderNo,
       sourceId: order.sourceId,
@@ -88,7 +89,7 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
 
       void refreshAutoPickOrderFromPlugin(session.id, {
         id: order.sourceId,
-        platform: order.platform,
+        platform: commandPlatform,
         orderNo: order.orderNo,
         orderTime: order.orderTime,
       }).catch((refreshError) => {

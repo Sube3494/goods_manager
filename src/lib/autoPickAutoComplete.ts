@@ -1,5 +1,5 @@
 import prisma from "@/lib/prisma";
-import { callAutoPickCommand, refreshAutoPickOrderFromPlugin, syncAutoOutboundFromCompletedAutoPickOrder, syncBrushOrderFromCompletedAutoPickOrder } from "@/lib/autoPickOrders";
+import { callAutoPickCommand, refreshAutoPickOrderFromPlugin, resolveAutoPickCommandPlatform, syncAutoOutboundFromCompletedAutoPickOrder, syncBrushOrderFromCompletedAutoPickOrder } from "@/lib/autoPickOrders";
 import { emitAutoPickOrderEvent } from "@/lib/autoPickOrderEvents";
 import { isAutoPickOrderAbnormalStatus, isAutoPickOrderCompletedStatus, isAutoPickOrderTerminalStatus } from "@/lib/autoPickOrderStatus";
 import { AutoPickAutoCompleteJobStatus } from "../../prisma/generated-client";
@@ -229,6 +229,7 @@ async function retryAutoCompleteAfterRefresh(job: {
     orderNo: string;
     sourceId: string;
     deliveryId: string | null;
+    rawPayload?: unknown;
     orderTime: Date;
   };
 }) {
@@ -276,7 +277,7 @@ async function retryAutoCompleteAfterRefresh(job: {
   }
 
   const retryResult = await callAutoPickCommand(refreshedOrder.userId, "/complete-delivery", {
-    platform: refreshedOrder.platform,
+    platform: resolveAutoPickCommandPlatform(refreshedOrder),
     dailyPlatformSequence: refreshedOrder.dailyPlatformSequence,
     orderNo: refreshedOrder.orderNo,
     sourceId: refreshedOrder.sourceId,
@@ -442,6 +443,7 @@ export async function processDueAutoCompleteJobs(limit = 20) {
           orderNo: true,
           sourceId: true,
           deliveryId: true,
+          rawPayload: true,
           orderTime: true,
         },
       },
@@ -475,7 +477,7 @@ export async function processDueAutoCompleteJobs(limit = 20) {
       }
 
       const result = await callAutoPickCommand(order.userId, "/complete-delivery", {
-        platform: order.platform,
+        platform: resolveAutoPickCommandPlatform(order),
         dailyPlatformSequence: order.dailyPlatformSequence,
         orderNo: order.orderNo,
         sourceId: order.sourceId,

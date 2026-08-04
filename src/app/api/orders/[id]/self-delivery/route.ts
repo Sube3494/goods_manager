@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
-import { callAutoPickCommand, getAutoPickIntegrationConfigByUserId, markAutoPickOrderMainSystemSelfDelivery, refreshAutoPickOrderFromPlugin } from "@/lib/autoPickOrders";
+import { callAutoPickCommand, getAutoPickIntegrationConfigByUserId, markAutoPickOrderMainSystemSelfDelivery, refreshAutoPickOrderFromPlugin, resolveAutoPickCommandPlatform } from "@/lib/autoPickOrders";
 import { cancelAutoCompleteJob, ensureAutoCompleteJob } from "@/lib/autoPickAutoComplete";
 import {
   isAutoPickOrderAbnormalStatus,
@@ -95,8 +95,9 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
       }, { status: 409 });
     }
 
+    const commandPlatform = resolveAutoPickCommandPlatform(commandOrder);
     const result = await callAutoPickCommand(session.id, "/self-delivery", {
-      platform: commandOrder.platform,
+      platform: commandPlatform,
       dailyPlatformSequence: commandOrder.dailyPlatformSequence,
       orderNo: commandOrder.orderNo,
       sourceId,
@@ -105,7 +106,7 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
     if (result.ok) {
       const refreshedOrder = await waitForDeliveringSelfDelivery(session.id, {
         id: sourceId,
-        platform: commandOrder.platform,
+        platform: commandPlatform,
         orderNo: commandOrder.orderNo,
         orderTime: commandOrder.orderTime,
       });

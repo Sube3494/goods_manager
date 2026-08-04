@@ -4595,6 +4595,32 @@ export async function callAutoPickCommand(userId: string, pathname: "/self-deliv
   };
 }
 
+export function resolveAutoPickCommandPlatform(order: { platform?: string | null; rawPayload?: unknown }) {
+  const rawPayload = order.rawPayload && typeof order.rawPayload === "object" && !Array.isArray(order.rawPayload)
+    ? order.rawPayload as Record<string, unknown>
+    : {};
+  const candidates = [
+    rawPayload.channel_tag,
+    rawPayload.channelTag,
+    rawPayload.platform_code,
+    rawPayload.platformCode,
+    rawPayload.source_type,
+    rawPayload.sourceType,
+    rawPayload.originalPlatform,
+    rawPayload.rawPlatform,
+  ];
+
+  for (const candidate of candidates) {
+    const value = String(candidate || "").trim();
+    if (value) {
+      return value;
+    }
+  }
+
+  const displayPlatform = String(order.platform || "").trim();
+  return displayPlatform === "线下交易" ? "other" : displayPlatform;
+}
+
 export async function markAutoPickOrderMainSystemSelfDelivery(userId: string, orderId: string) {
   const order = await prisma.autoPickOrder.findFirst({
     where: {
