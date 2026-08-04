@@ -29,22 +29,31 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "请先填写麦芽田 Cookie" }, { status: 400 });
     }
 
-    const [shops, user] = await Promise.all([
+    const [shops, user, dbShops] = await Promise.all([
       fetchMaiyatianShippingShopsByCookie(cookie),
       prisma.user.findUnique({
         where: { id: session.id },
         select: { shippingAddresses: true },
       }),
+      prisma.shop.findMany({
+        where: { userId: session.id },
+        select: { id: true, addressBookId: true, libraryId: true },
+      }),
     ]);
 
     const localShops = Array.isArray(user?.shippingAddresses)
       ? (user.shippingAddresses as ShippingAddress[])
-          .map((item, index) => ({
-            id: String(item?.id || `shipping-${index}`),
-            name: String(item?.label || "").trim(),
-            address: getAddressDetail(item),
-            isDefault: Boolean(item?.isDefault),
-          }))
+          .map((item, index) => {
+            const addressBookId = String(item?.id || `shipping-${index}`);
+            const dbShop = dbShops.find((shop) => shop.addressBookId === addressBookId);
+            return {
+              id: dbShop ? dbShop.id : addressBookId,
+              name: String(item?.label || "").trim(),
+              address: getAddressDetail(item),
+              isDefault: Boolean(item?.isDefault),
+              libraryId: dbShop?.libraryId || null,
+            };
+          })
           .filter((item) => item.name && item.address)
       : [];
 

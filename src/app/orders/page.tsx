@@ -108,6 +108,7 @@ type LocalShopOption = {
   name: string;
   address: string;
   isDefault?: boolean;
+  libraryId?: string | null;
 };
 
 type TimingFieldKey = keyof AutoPickIntegrationConfig["selfDeliveryTiming"];
@@ -1291,6 +1292,7 @@ export default function OrdersPage() {
     itemName: string;
     shopName: string;
     shopId: string;
+    libraryId: string;
     currentMatchedProductId: string;
   } | null>(null);
 
@@ -1516,6 +1518,7 @@ export default function OrdersPage() {
               name: String(item?.name || "").trim(),
               address: String(item?.address || "").trim(),
               isDefault: Boolean(item?.isDefault),
+              libraryId: item?.libraryId ? String(item.libraryId) : null,
             }))
             .filter((item: LocalShopOption) => item.id && item.name)
         : [];
@@ -1596,6 +1599,7 @@ export default function OrdersPage() {
               name: String(item?.name || "").trim(),
               address: String(item?.address || "").trim(),
               isDefault: Boolean(item?.isDefault),
+              libraryId: item?.libraryId ? String(item.libraryId) : null,
             }))
             .filter((item: LocalShopOption) => item.id && item.name)
         );
@@ -1722,17 +1726,23 @@ export default function OrdersPage() {
   // 商品匹配逻辑
   const openMatchEditor = useCallback((order: AutoPickOrder, item: AutoPickOrderItem) => {
     const resolvedShopName = order.matchedShopName || "";
-    const resolvedShopId = localShops.find((s) => s.name === resolvedShopName)?.id || "";
+    const resolvedShop = localShops.find((s) => s.name === resolvedShopName);
+    const resolvedShopId = resolvedShop?.id || "";
+    const mappedLibraryId = integrationConfig.maiyatianShopMappings.find(
+      (mapping) => mapping.localShopName === resolvedShopName
+    )?.libraryId || "";
+    const resolvedLibraryId = resolvedShop?.libraryId || mappedLibraryId || "";
     setMatchEditorTarget({
       orderId: order.id,
       itemId: String(item.id || "").trim(),
       itemName: item.productName || "未命名商品",
       shopName: resolvedShopName,
       shopId: resolvedShopId,
+      libraryId: resolvedLibraryId,
       currentMatchedProductId: item.matchedProduct?.shopProductId || item.matchedProduct?.id || "",
     });
     setIsMatchPickerOpen(true);
-  }, [localShops]);
+  }, [integrationConfig.maiyatianShopMappings, localShops]);
 
   const closeMatchEditor = useCallback(() => {
     if (isSavingMatch) return;
@@ -2451,7 +2461,9 @@ export default function OrdersPage() {
           all: "true",
           ...(matchEditorTarget?.shopId ? { shopId: matchEditorTarget.shopId } : {}),
           ...(matchEditorTarget?.shopName ? { shopName: matchEditorTarget.shopName } : {}),
+          ...(matchEditorTarget?.libraryId ? { libraryId: matchEditorTarget.libraryId } : {}),
         }}
+        lockLibraryId={matchEditorTarget?.libraryId || undefined}
         emptyStateText={matchEditorTarget?.shopName ? `当前店铺“${matchEditorTarget.shopName}”下没有找到候选商品` : "未找到相关商品"}
       />
 

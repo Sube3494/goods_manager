@@ -32,7 +32,7 @@ export async function GET() {
     // 查询当前用户的所有本地店铺
     const dbShops = await prisma.shop.findMany({
       where: { userId: session.id },
-      select: { id: true, addressBookId: true }
+      select: { id: true, addressBookId: true, libraryId: true }
     });
 
     const localShops = addresses
@@ -45,6 +45,7 @@ export async function GET() {
           name: String(item?.label || "").trim(),
           address: getAddressDetail(item),
           isDefault: Boolean(item?.isDefault),
+          libraryId: dbShop?.libraryId || null,
         };
       })
       .filter((item) => item.name && item.address);
