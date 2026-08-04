@@ -23,7 +23,7 @@ interface SelectedItem {
 }
 
 interface CreateOfflineOrderModalProps {
-  shopOptions: Array<{ id: string; name: string; address?: string | null }>;
+  shopOptions: Array<{ id: string; name: string; address?: string | null; libraryId?: string | null }>;
   onClose: () => void;
   onSuccess: () => void;
 }
@@ -213,7 +213,9 @@ export function CreateOfflineOrderModal({ shopOptions, onClose, onSuccess }: Cre
     }
   };
 
-  const selectedShopName = shopOptions.find((o) => o.id === shopId)?.name || "";
+  const selectedShop = shopOptions.find((o) => o.id === shopId);
+  const selectedShopName = selectedShop?.name || "";
+  const selectedShopLibraryId = String(selectedShop?.libraryId || "").trim();
 
   // 统一样式的输入框容器 class
   const inputContainerClass = "flex h-11 w-full items-center gap-3 rounded-xl border border-black/8 bg-white px-3 text-sm focus-within:ring-2 focus-within:ring-primary/10 dark:border-white/10 dark:bg-white/3 focus-within:border-primary/50 dark:focus-within:border-primary/50 transition-all";
@@ -570,6 +572,8 @@ export function CreateOfflineOrderModal({ shopOptions, onClose, onSuccess }: Cre
           showPlatformSelector={false}
           showCategoryFilter
           showPrice={false}
+          defaultViewMode="list"
+          lockLibraryId={selectedShopLibraryId || undefined}
           title={`添加“${selectedShopName}”的交易商品`}
           fetchPath="/api/shop-products"
           query={{
