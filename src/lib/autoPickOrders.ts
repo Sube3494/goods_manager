@@ -3009,11 +3009,10 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
     const deliveryTimeRange = shouldKeepTerminalStatus
       ? existing?.deliveryTimeRange || normalized.deliveryTimeRange || null
       : normalized.deliveryTimeRange || existing?.deliveryTimeRange || null;
-    const nextDeliveryValue = normalized.delivery
-      ? asPrismaJsonValue(normalized.delivery)
-      : hasDeliveryValue(existing?.delivery)
-        ? (existing?.delivery as Prisma.InputJsonValue)
-        : Prisma.DbNull;
+    const mergedDelivery = mergeAutoPickDeliveryValue(normalized.delivery, existing?.delivery);
+    const nextDeliveryValue = mergedDelivery
+      ? asPrismaJsonValue(mergedDelivery)
+      : Prisma.DbNull;
     const nextRawPayload = mergeAutoPickSystemMeta(
       normalized as unknown as Record<string, unknown>,
       existing?.rawPayload
@@ -3689,8 +3688,59 @@ function shouldRefreshAutoPickOrderOnProgressStatusHint(statusHint?: string | nu
   ].includes(normalized);
 }
 
+function isMeaningfulDeliveryField(value: unknown) {
+  if (value == null) {
+    return false;
+  }
+  if (typeof value === "string") {
+    return value.trim() !== "";
+  }
+  if (typeof value === "number") {
+    return Number.isFinite(value) && value > 0;
+  }
+  if (typeof value === "boolean") {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return value.length > 0;
+  }
+  if (typeof value === "object") {
+    return Object.values(value as Record<string, unknown>).some(isMeaningfulDeliveryField);
+  }
+  return true;
+}
+
+function readDeliveryRecord(value: unknown) {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
 function hasDeliveryValue(value: unknown) {
-  return Boolean(value && typeof value === "object" && !Array.isArray(value) && Object.keys(value as Record<string, unknown>).length > 0);
+  const record = readDeliveryRecord(value);
+  return Boolean(record && Object.values(record).some(isMeaningfulDeliveryField));
+}
+
+function mergeAutoPickDeliveryValue(incoming: unknown, existing: unknown) {
+  const incomingRecord = hasDeliveryValue(incoming) ? readDeliveryRecord(incoming) : null;
+  const existingRecord = hasDeliveryValue(existing) ? readDeliveryRecord(existing) : null;
+  if (!incomingRecord && !existingRecord) {
+    return null;
+  }
+  if (!incomingRecord) {
+    return existingRecord;
+  }
+  if (!existingRecord) {
+    return incomingRecord;
+  }
+
+  const merged = { ...existingRecord };
+  Object.entries(incomingRecord).forEach(([key, value]) => {
+    if (isMeaningfulDeliveryField(value)) {
+      merged[key] = value;
+    }
+  });
+  return merged;
 }
 
 function readAutoPickRawPayloadRecord(rawPayload: unknown) {

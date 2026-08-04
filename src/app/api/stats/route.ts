@@ -63,6 +63,23 @@ function readMainSystemSelfDeliveryFlag(rawPayload: unknown) {
   return Boolean((marker as Record<string, unknown>).triggered);
 }
 
+function isRefundableMeituanDelivery(platform: unknown, delivery: unknown) {
+  const deliveryObj = delivery && typeof delivery === "object" && !Array.isArray(delivery)
+    ? delivery as Record<string, unknown>
+    : {};
+  const haystack = [
+    platform,
+    deliveryObj.logisticName,
+    deliveryObj.logistic_name,
+    deliveryObj.track,
+    deliveryObj.deliveryName,
+    deliveryObj.delivery_name,
+    deliveryObj.deliveryTypeName,
+    deliveryObj.delivery_type_name,
+  ].map((value) => String(value || "").trim().toLowerCase()).join(" ");
+  return haystack.includes("美团") || haystack.includes("meituan");
+}
+
 function isVoidedOfflineOrder(order: {
   platform?: string | null;
   rawPayload?: unknown;
@@ -702,14 +719,7 @@ export async function GET(request: NextRequest) {
         platformCommission = FinanceMath.add(platformCommission, commissionYuan);
         deliveryExpense = FinanceMath.add(deliveryExpense, deliveryYuan);
       } else {
-        const platformStr = String(order.platform || "").trim().toLowerCase();
-        const deliveryObj = order.delivery && typeof order.delivery === "object" && !Array.isArray(order.delivery)
-          ? order.delivery as Record<string, unknown>
-          : {};
-        const logisticNameStr = String(deliveryObj.logisticName || deliveryObj.logistic_name || "").trim().toLowerCase();
-        const isMeituanRelated = platformStr.includes("美团") || platformStr.includes("meituan") ||
-                                 logisticNameStr.includes("美团") || logisticNameStr.includes("meituan");
-        if (!isMeituanRelated) {
+        if (!isRefundableMeituanDelivery(order.platform, order.delivery)) {
           const deliveryYuan = getDeliveryFee(order.delivery) / 100;
           deliveryExpense = FinanceMath.add(deliveryExpense, deliveryYuan);
         }
@@ -808,7 +818,23 @@ export async function GET(request: NextRequest) {
       }
       platformBuckets.set(platform, current);
 
-      if (!isOther) {
+      if (isOther) {
+        const deliveryYuan = isRefundableMeituanDelivery(order.platform, order.delivery)
+          ? 0
+          : getDeliveryFee(order.delivery) / 100;
+        if (deliveryYuan > 0) {
+          if (point) {
+            point.deliveryExpense = FinanceMath.add(point.deliveryExpense, deliveryYuan);
+            point.pureProfit = FinanceMath.add(point.pureProfit, -deliveryYuan);
+            point.platformPureProfit[platform] = FinanceMath.add(point.platformPureProfit[platform] || 0, -deliveryYuan);
+          }
+          if (platformPoint) {
+            platformPoint.deliveryExpense = FinanceMath.add(platformPoint.deliveryExpense, deliveryYuan);
+            platformPoint.pureProfit = FinanceMath.add(platformPoint.pureProfit, -deliveryYuan);
+            platformPoint.platformPureProfit[platform] = FinanceMath.add(platformPoint.platformPureProfit[platform] || 0, -deliveryYuan);
+          }
+        }
+      } else {
         const paidYuan = (order.actualPaid || 0) / 100;
         const isOffline = order.platform === "线下交易";
         const deliveryYuan = getDeliveryFee(order.delivery) / 100;
@@ -889,23 +915,6 @@ export async function GET(request: NextRequest) {
           if (platformPoint) {
             platformPoint.pureProfit = FinanceMath.add(platformPoint.pureProfit, pureProfit);
             platformPoint.platformPureProfit[platform] = FinanceMath.add(platformPoint.platformPureProfit[platform] || 0, pureProfit);
-          }
-        }
-      } else {
-        const platformStr = String(order.platform || "").trim().toLowerCase();
-        const deliveryObj = order.delivery && typeof order.delivery === "object" && !Array.isArray(order.delivery)
-          ? order.delivery as Record<string, unknown>
-          : {};
-        const logisticNameStr = String(deliveryObj.logisticName || deliveryObj.logistic_name || "").trim().toLowerCase();
-        const isMeituanRelated = platformStr.includes("美团") || platformStr.includes("meituan") ||
-                                 logisticNameStr.includes("美团") || logisticNameStr.includes("meituan");
-        if (!isMeituanRelated) {
-          const deliveryYuan = getDeliveryFee(order.delivery) / 100;
-          if (point) {
-            point.deliveryExpense = FinanceMath.add(point.deliveryExpense, deliveryYuan);
-          }
-          if (platformPoint) {
-            platformPoint.deliveryExpense = FinanceMath.add(platformPoint.deliveryExpense, deliveryYuan);
           }
         }
       }

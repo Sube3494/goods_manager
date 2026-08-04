@@ -732,6 +732,23 @@ function readDeliveryFee(delivery: unknown) {
   return Number.isFinite(value) ? Math.max(0, value) : 0;
 }
 
+function isRefundableMeituanDelivery(platform: unknown, delivery: unknown) {
+  const deliveryObj = delivery && typeof delivery === "object" && !Array.isArray(delivery)
+    ? delivery as Record<string, unknown>
+    : {};
+  const haystack = [
+    platform,
+    deliveryObj.logisticName,
+    deliveryObj.logistic_name,
+    deliveryObj.track,
+    deliveryObj.deliveryName,
+    deliveryObj.delivery_name,
+    deliveryObj.deliveryTypeName,
+    deliveryObj.delivery_type_name,
+  ].map((value) => String(value || "").trim().toLowerCase()).join(" ");
+  return haystack.includes("美团") || haystack.includes("meituan");
+}
+
 type ParsedOutboundCostSnapshot = {
   quantity: number;
   totalCost: number;
@@ -1392,6 +1409,17 @@ export async function GET(request: NextRequest) {
           const metrics = resolveIncomeMetrics(order.platform, expectedIncome, order.actualPaid, order.platformCommission);
           const cancelled = isAutoPickOrderCancelledStatus(order.status);
           const deleted = isAutoPickOrderDeletedStatus(order.status);
+          const platform = order.platform || "线下交易";
+          const deliveryFee = readDeliveryFee(order.delivery);
+          if ((cancelled || deleted) && deliveryFee > 0 && !isRefundableMeituanDelivery(order.platform, order.delivery)) {
+            acc.totalDeliveryFee += deliveryFee;
+            acc.platformDelivery[platform] = (acc.platformDelivery[platform] || 0) + deliveryFee;
+            acc.pureProfit -= deliveryFee;
+            if (!acc.platformProfit[platform]) {
+              acc.platformProfit[platform] = { amount: 0, count: 0 };
+            }
+            acc.platformProfit[platform].amount -= deliveryFee;
+          }
           if (!cancelled && !deleted) {
             const outboundMeta = outboundByOrderNo.get(order.orderNo) || null;
             const refundAmount = outboundMeta?.refundAmount || 0;
@@ -1406,14 +1434,12 @@ export async function GET(request: NextRequest) {
             acc.platformCommission += adjustedMetrics.platformCommission;
             acc.validOrderCount += 1;
 
-            const platform = order.platform || "线下交易";
             if (!acc.platformReceived[platform]) {
               acc.platformReceived[platform] = { amount: 0, count: 0 };
             }
             acc.platformReceived[platform].amount += expected;
             acc.platformReceived[platform].count += 1;
 
-            const deliveryFee = readDeliveryFee(order.delivery);
             acc.totalDeliveryFee += deliveryFee;
             if (deliveryFee > 0) {
               acc.platformDelivery[platform] = (acc.platformDelivery[platform] || 0) + deliveryFee;
