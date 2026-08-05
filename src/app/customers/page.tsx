@@ -155,14 +155,14 @@ function CustomerProductPill({
         )}
       </span>
       <span className="min-w-0 truncate">
-        <span className="font-bold">{name}</span>
+        <span className="font-medium">{name}</span>
         {subtitle ? <span className="ml-1 text-muted-foreground">{subtitle}</span> : null}
       </span>
       {typeof count === "number" ? (
-        <span className="shrink-0 rounded-full border border-cyan-400/25 bg-cyan-400/10 px-1.5 py-0.5 font-black text-cyan-700 dark:text-cyan-200">{count}次</span>
+        <span className="shrink-0 rounded-full border border-border/60 bg-muted/45 px-1.5 py-0.5 font-medium text-foreground/75 dark:border-white/10 dark:bg-white/8 dark:text-white/80">{count}次</span>
       ) : null}
       {typeof quantity === "number" ? (
-        <span className="shrink-0 font-black text-primary">{quantity}件</span>
+        <span className="shrink-0 font-medium text-primary">{quantity}件</span>
       ) : null}
     </span>
   );
@@ -254,12 +254,12 @@ function CustomerShipmentRecordsModal({
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-cyan-400/20 bg-cyan-400/10 text-cyan-600 dark:text-cyan-200">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-border/60 bg-muted/35 text-muted-foreground dark:border-white/10 dark:bg-white/8 dark:text-white/70">
                     <PackageSearch size={17} />
                   </div>
                   <div className="min-w-0">
-                    <h3 className="truncate text-base font-black text-foreground sm:text-lg">{title}</h3>
-                    <p className="truncate text-xs font-bold text-muted-foreground">{subtitle}</p>
+                    <h3 className="truncate text-base font-medium text-foreground sm:text-lg">{title}</h3>
+                    <p className="truncate text-xs font-medium text-muted-foreground">{subtitle}</p>
                   </div>
                 </div>
               </div>
@@ -289,7 +289,7 @@ function CustomerShipmentRecordsModal({
               </div>
               <div className="grid grid-cols-2 items-center gap-2 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto]">
                 <DatePicker value={startDate} onChange={setStartDate} maxDate={endDate} placeholder="开始日期" className="h-9 min-w-0 sm:w-[136px]" triggerClassName="h-full rounded-xl border-border bg-white shadow-sm dark:bg-white/5" />
-                <span className="hidden text-xs font-bold text-muted-foreground sm:block">至</span>
+                <span className="hidden text-xs font-medium text-muted-foreground sm:block">至</span>
                 <DatePicker value={endDate} onChange={setEndDate} minDate={startDate} placeholder="结束日期" className="h-9 min-w-0 sm:w-[136px]" triggerClassName="h-full rounded-xl border-border bg-white shadow-sm dark:bg-white/5" />
                 {(startDate || endDate || keyword) ? (
                   <button
@@ -299,7 +299,7 @@ function CustomerShipmentRecordsModal({
                       setEndDate("");
                       setKeyword("");
                     }}
-                    className="col-span-2 h-9 rounded-xl border border-border bg-white px-3 text-sm font-bold text-muted-foreground shadow-sm transition-colors hover:bg-muted/60 hover:text-foreground dark:border-white/10 dark:bg-white/5 sm:col-span-1"
+                    className="col-span-2 h-9 rounded-xl border border-border bg-white px-3 text-sm font-medium text-muted-foreground shadow-sm transition-colors hover:bg-muted/60 hover:text-foreground dark:border-white/10 dark:bg-white/5 sm:col-span-1"
                   >
                     清空
                   </button>
@@ -309,22 +309,22 @@ function CustomerShipmentRecordsModal({
 
             <div className="mt-3 grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
               <div className="flex h-9 items-center justify-center gap-2 rounded-xl border border-border/70 bg-muted/30 px-2 dark:border-white/10 dark:bg-white/[0.035] sm:justify-start sm:px-3">
-                <span className="text-xs font-bold text-muted-foreground">发货单</span>
-                <span className="text-base font-black text-foreground">{data?.totalOrders || 0}</span>
+                <span className="text-xs font-medium text-muted-foreground">发货单</span>
+                <span className="text-base font-medium text-foreground">{data?.totalOrders || 0}</span>
               </div>
               {isGroupTarget ? (
                 <div className="flex h-9 items-center justify-center gap-2 rounded-xl border border-border/70 bg-muted/30 px-2 dark:border-white/10 dark:bg-white/[0.035] sm:justify-start sm:px-3">
-                  <span className="text-xs font-bold text-muted-foreground">客户数</span>
-                  <span className="text-base font-black text-foreground">{data?.group?.customerCount || 0}</span>
+                  <span className="text-xs font-medium text-muted-foreground">客户数</span>
+                  <span className="text-base font-medium text-foreground">{data?.group?.customerCount || 0}</span>
                 </div>
               ) : null}
               <div className="flex h-9 items-center justify-center gap-2 rounded-xl border border-border/70 bg-muted/30 px-2 dark:border-white/10 dark:bg-white/[0.035] sm:justify-start sm:px-3">
-                <span className="text-xs font-bold text-muted-foreground">商品种类</span>
-                <span className="text-base font-black text-foreground">{data?.productStats?.length || 0}</span>
+                <span className="text-xs font-medium text-muted-foreground">商品种类</span>
+                <span className="text-base font-medium text-foreground">{data?.productStats?.length || 0}</span>
               </div>
               <div className="flex h-9 items-center justify-center gap-2 rounded-xl border border-border/70 bg-muted/30 px-2 dark:border-white/10 dark:bg-white/[0.035] sm:justify-start sm:px-3">
-                <span className="text-xs font-bold text-muted-foreground">总数量</span>
-                <span className="text-base font-black text-foreground">{data?.totalQuantity || 0}</span>
+                <span className="text-xs font-medium text-muted-foreground">总数量</span>
+                <span className="text-base font-medium text-foreground">{data?.totalQuantity || 0}</span>
               </div>
             </div>
           </div>
@@ -346,14 +346,14 @@ function CustomerShipmentRecordsModal({
                   {isGroupTarget && data.customerStats && data.customerStats.length > 0 ? (
                     <div className="mb-3">
                       <div className="mb-2 flex items-center justify-between gap-3">
-                        <h4 className="text-sm font-black text-foreground">客户汇总</h4>
+                        <h4 className="text-sm font-medium text-foreground">客户汇总</h4>
                       </div>
                       <div className="flex flex-wrap gap-2">
                         {visibleCustomerStats.map((item) => (
-                          <span key={item.id} className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-border/50 bg-white/70 px-2.5 py-1 text-[10px] font-bold text-foreground shadow-sm dark:border-white/8 dark:bg-white/6">
+                          <span key={item.id} className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-border/50 bg-white/70 px-2.5 py-1 text-[10px] font-medium text-foreground shadow-sm dark:border-white/8 dark:bg-white/6">
                             <span className="shrink-0">{item.name}</span>
                             {item.phone ? <span className="min-w-0 truncate text-muted-foreground max-[420px]:max-w-[86px]">{item.phone}</span> : null}
-                            <span className="text-cyan-600 dark:text-cyan-200">{item.orderCount}单</span>
+                            <span className="text-foreground/70 dark:text-white/75">{item.orderCount}单</span>
                             <span className="text-primary">{item.totalQuantity}件</span>
                           </span>
                         ))}
@@ -361,7 +361,7 @@ function CustomerShipmentRecordsModal({
                           <button
                             type="button"
                             onClick={() => setIsCustomerStatsExpanded((prev) => !prev)}
-                            className="inline-flex items-center rounded-full border border-border/50 bg-muted/40 px-2.5 py-1 text-[10px] font-black text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground dark:border-white/8 dark:bg-white/6"
+                            className="inline-flex items-center rounded-full border border-border/50 bg-muted/40 px-2.5 py-1 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground dark:border-white/8 dark:bg-white/6"
                           >
                             {isCustomerStatsExpanded ? "收起" : `还有 ${hiddenCustomerStatsCount} 位`}
                           </button>
@@ -370,7 +370,7 @@ function CustomerShipmentRecordsModal({
                     </div>
                   ) : null}
                   <div className="mb-2 flex items-center justify-between gap-3">
-                    <h4 className="text-sm font-black text-foreground">商品汇总</h4>
+                    <h4 className="text-sm font-medium text-foreground">商品汇总</h4>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {(data.productStats || []).map((item) => (
@@ -389,19 +389,19 @@ function CustomerShipmentRecordsModal({
 
                 <section>
                   <div className="mb-2">
-                    <h4 className="text-sm font-black text-foreground">发货明细</h4>
+                    <h4 className="text-sm font-medium text-foreground">发货明细</h4>
                   </div>
                 {data.records.map((record) => (
                   <article key={record.id} className="rounded-xl border border-border bg-white/80 p-3 shadow-sm dark:border-white/10 dark:bg-white/[0.04]">
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                       <div className="min-w-0">
-                        <div className="text-sm font-black text-foreground">{record.id}</div>
-                        <div className="text-xs font-bold text-muted-foreground">
+                        <div className="text-sm font-medium text-foreground">{record.id}</div>
+                        <div className="text-xs font-medium text-muted-foreground">
                           {formatDateTime(record.date)}
                           {isGroupTarget && record.customerName ? <span className="ml-2">{record.customerName}</span> : null}
                         </div>
                       </div>
-                      <div className="flex flex-wrap items-center gap-2 text-xs font-bold text-muted-foreground">
+                      <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-muted-foreground">
                         <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-emerald-600 dark:text-emerald-300">{record.status}</span>
                         {record.logisticsNames.length > 0 ? <span>{record.logisticsNames.join(" / ")}</span> : null}
                         {record.trackingNumbers.length > 0 ? <span className="font-mono">{record.trackingNumbers.join(" / ")}</span> : null}
@@ -494,7 +494,7 @@ function CustomerModal({
         >
           <div className="flex items-center justify-between border-b border-border/10 p-6">
             <div>
-              <h3 className="text-xl font-black text-foreground">{initialData ? "编辑客户" : "新建客户"}</h3>
+              <h3 className="text-xl font-medium text-foreground">{initialData ? "编辑客户" : "新建客户"}</h3>
               <p className="mt-1 text-xs text-muted-foreground">发货地址会自动沉淀，也可以在这里手动维护。</p>
             </div>
             <button
@@ -509,7 +509,7 @@ function CustomerModal({
           <form onSubmit={handleSubmit} className="space-y-4 p-6">
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="space-y-2">
-                <span className="text-xs font-bold text-muted-foreground">客户姓名 <span className="text-rose-500">*</span></span>
+                <span className="text-xs font-medium text-muted-foreground">客户姓名 <span className="text-rose-500">*</span></span>
                 <input
                   value={form.contactName}
                   onChange={(e) => setForm((prev) => ({ ...prev, contactName: e.target.value }))}
@@ -518,7 +518,7 @@ function CustomerModal({
                 />
               </label>
               <label className="space-y-2">
-                <span className="text-xs font-bold text-muted-foreground">手机号 <span className="text-rose-500">*</span></span>
+                <span className="text-xs font-medium text-muted-foreground">手机号 <span className="text-rose-500">*</span></span>
                 <input
                   value={form.contactPhone}
                   onChange={(e) => setForm((prev) => ({ ...prev, contactPhone: e.target.value }))}
@@ -528,7 +528,7 @@ function CustomerModal({
               </label>
             </div>
             <label className="space-y-2 block">
-              <span className="text-xs font-bold text-muted-foreground">客户分组</span>
+              <span className="text-xs font-medium text-muted-foreground">客户分组</span>
               <input
                 value={form.group}
                 onChange={(e) => setForm((prev) => ({ ...prev, group: e.target.value }))}
@@ -537,7 +537,7 @@ function CustomerModal({
               />
             </label>
             <label className="space-y-2 block">
-              <span className="text-xs font-bold text-muted-foreground">完整地址 <span className="text-rose-500">*</span></span>
+              <span className="text-xs font-medium text-muted-foreground">完整地址 <span className="text-rose-500">*</span></span>
               <textarea
                 value={form.address}
                 onChange={(e) => setForm((prev) => ({ ...prev, address: e.target.value }))}
@@ -551,14 +551,14 @@ function CustomerModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="h-10 rounded-full border border-border bg-white px-5 text-sm font-bold text-muted-foreground transition-all hover:bg-muted/40 active:scale-95 dark:border-white/10 dark:bg-white/5"
+                className="h-10 rounded-full border border-border bg-white px-5 text-sm font-medium text-muted-foreground transition-all hover:bg-muted/40 active:scale-95 dark:border-white/10 dark:bg-white/5"
               >
                 取消
               </button>
               <button
                 type="submit"
                 disabled={isSubmitting || !form.contactName.trim() || !form.contactPhone.trim() || !form.address.trim()}
-                className="inline-flex h-10 min-w-[96px] items-center justify-center rounded-full bg-foreground px-5 text-sm font-black text-background transition-all hover:-translate-y-0.5 disabled:pointer-events-none disabled:opacity-50 dark:text-black"
+                className="inline-flex h-10 min-w-[96px] items-center justify-center rounded-full bg-foreground px-5 text-sm font-medium text-background transition-all hover:-translate-y-0.5 disabled:pointer-events-none disabled:opacity-50 dark:text-black"
               >
                 {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : "确认保存"}
               </button>
@@ -612,7 +612,7 @@ function CustomerGroupModal({
           className="relative z-10 w-full max-w-md overflow-hidden rounded-[28px] border border-white/10 bg-white shadow-2xl backdrop-blur-xl dark:bg-[#101722]/95"
         >
           <div className="border-b border-border/10 p-6">
-            <h3 className="text-xl font-black text-foreground">设置客户分组</h3>
+            <h3 className="text-xl font-medium text-foreground">设置客户分组</h3>
             <p className="mt-1 text-xs text-muted-foreground">将为已选 {selectedCount} 位客户设置分组，留空则移出分组。</p>
           </div>
           <form
@@ -628,7 +628,7 @@ function CustomerGroupModal({
             className="space-y-5 p-6"
           >
             <label className="space-y-2 block">
-              <span className="text-xs font-bold text-muted-foreground">分组名称</span>
+              <span className="text-xs font-medium text-muted-foreground">分组名称</span>
               <input
                 value={group}
                 onChange={(event) => setGroup(event.target.value)}
@@ -641,14 +641,14 @@ function CustomerGroupModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="h-10 rounded-full border border-border bg-white px-5 text-sm font-bold text-muted-foreground transition-all hover:bg-muted/40 active:scale-95 dark:border-white/10 dark:bg-white/5"
+                className="h-10 rounded-full border border-border bg-white px-5 text-sm font-medium text-muted-foreground transition-all hover:bg-muted/40 active:scale-95 dark:border-white/10 dark:bg-white/5"
               >
                 取消
               </button>
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="inline-flex h-10 min-w-[96px] items-center justify-center rounded-full bg-foreground px-5 text-sm font-black text-background transition-all hover:-translate-y-0.5 disabled:pointer-events-none disabled:opacity-50 dark:text-black"
+                className="inline-flex h-10 min-w-[96px] items-center justify-center rounded-full bg-foreground px-5 text-sm font-medium text-background transition-all hover:-translate-y-0.5 disabled:pointer-events-none disabled:opacity-50 dark:text-black"
               >
                 {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : "确认"}
               </button>
@@ -998,7 +998,7 @@ export default function CustomersPage() {
             <div className="flex flex-wrap items-center gap-3">
               <h1 className="text-3xl font-black tracking-tight text-foreground max-[480px]:text-2xl">客户管理</h1>
               {!isLoading ? (
-                <span className="rounded-full border border-border bg-white/75 px-3 py-1 text-xs font-black text-muted-foreground shadow-sm dark:border-white/10 dark:bg-white/5">
+                <span className="rounded-full border border-border bg-white/75 px-3 py-1 text-xs font-medium text-muted-foreground shadow-sm dark:border-white/10 dark:bg-white/5">
                   {totalItems} 位客户
                 </span>
               ) : null}
@@ -1010,7 +1010,7 @@ export default function CustomersPage() {
               <button
                 type="button"
                 onClick={() => setRecordsTarget({ type: "group", group: selectedGroupName })}
-                className="inline-flex h-10 w-10 items-center justify-center gap-2 rounded-full border border-cyan-400/25 bg-cyan-400/10 text-sm font-black text-cyan-700 shadow-sm transition-all hover:-translate-y-0.5 hover:bg-cyan-400/15 dark:text-cyan-200 sm:h-11 sm:w-auto sm:px-4"
+                className="inline-flex h-10 w-10 items-center justify-center gap-2 rounded-full border border-border bg-white/75 text-sm font-medium text-foreground shadow-sm transition-all hover:-translate-y-0.5 hover:bg-white dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10 sm:h-11 sm:w-auto sm:px-4"
                 title="查看组别数据"
               >
                 <BarChart3 size={16} />
@@ -1020,7 +1020,7 @@ export default function CustomersPage() {
             <button
               type="button"
               onClick={() => setIsImportOpen(true)}
-              className="inline-flex h-10 w-10 items-center justify-center gap-2 rounded-full border border-border bg-white/75 text-sm font-black text-foreground shadow-sm transition-all hover:-translate-y-0.5 hover:bg-white dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10 sm:h-11 sm:w-auto sm:px-4"
+              className="inline-flex h-10 w-10 items-center justify-center gap-2 rounded-full border border-border bg-white/75 text-sm font-medium text-foreground shadow-sm transition-all hover:-translate-y-0.5 hover:bg-white dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10 sm:h-11 sm:w-auto sm:px-4"
               title="导入客户"
             >
               <Upload size={16} />
@@ -1030,7 +1030,7 @@ export default function CustomersPage() {
               type="button"
               onClick={handleExport}
               disabled={isExporting}
-              className="inline-flex h-10 w-10 items-center justify-center gap-2 rounded-full border border-border bg-white/75 text-sm font-black text-foreground shadow-sm transition-all hover:-translate-y-0.5 hover:bg-white disabled:pointer-events-none disabled:opacity-60 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10 sm:h-11 sm:w-auto sm:px-4"
+              className="inline-flex h-10 w-10 items-center justify-center gap-2 rounded-full border border-border bg-white/75 text-sm font-medium text-foreground shadow-sm transition-all hover:-translate-y-0.5 hover:bg-white disabled:pointer-events-none disabled:opacity-60 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10 sm:h-11 sm:w-auto sm:px-4"
               title="导出客户"
             >
               {isExporting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
@@ -1042,7 +1042,7 @@ export default function CustomersPage() {
                 setEditingCustomer(null);
                 setIsModalOpen(true);
               }}
-              className="inline-flex h-10 w-10 items-center justify-center gap-2 rounded-full bg-foreground text-sm font-black text-background shadow-lg transition-all hover:-translate-y-0.5 dark:text-black sm:h-11 sm:w-auto sm:px-5"
+              className="inline-flex h-10 w-10 items-center justify-center gap-2 rounded-full bg-foreground text-sm font-medium text-background shadow-lg transition-all hover:-translate-y-0.5 dark:text-black sm:h-11 sm:w-auto sm:px-5"
               title="新建客户"
             >
               <Plus size={16} />
@@ -1089,7 +1089,7 @@ export default function CustomersPage() {
           </div>
 
           <div className="flex flex-col gap-2 rounded-2xl border border-border bg-white/75 p-2 shadow-sm dark:border-white/10 dark:bg-white/5 md:flex-row md:items-center">
-            <div className="flex h-8 shrink-0 items-center gap-2 px-2 text-sm font-black text-muted-foreground md:h-10">
+            <div className="flex h-8 shrink-0 items-center gap-2 px-2 text-sm font-medium text-muted-foreground md:h-10">
               <BarChart3 size={16} />
               <span>进货统计</span>
             </div>
@@ -1102,7 +1102,7 @@ export default function CustomersPage() {
                 className="h-10 min-w-0 md:w-40"
                 triggerClassName="h-full rounded-xl border-border bg-white shadow-sm dark:bg-white/5 md:rounded-2xl"
               />
-              <span className="shrink-0 text-center text-xs font-bold text-muted-foreground max-[380px]:hidden">至</span>
+              <span className="shrink-0 text-center text-xs font-medium text-muted-foreground max-[380px]:hidden">至</span>
               <DatePicker
                 value={endDate}
                 onChange={setEndDate}
@@ -1119,7 +1119,7 @@ export default function CustomersPage() {
                   setStartDate("");
                   setEndDate("");
                 }}
-                className="h-10 shrink-0 rounded-xl border border-border bg-white px-4 text-sm font-bold text-muted-foreground shadow-sm transition-colors hover:bg-muted/60 hover:text-foreground dark:border-white/10 dark:bg-white/5 md:rounded-2xl"
+                className="h-10 shrink-0 rounded-xl border border-border bg-white px-4 text-sm font-medium text-muted-foreground shadow-sm transition-colors hover:bg-muted/60 hover:text-foreground dark:border-white/10 dark:bg-white/5 md:rounded-2xl"
               >
                 清空
               </button>
@@ -1147,7 +1147,7 @@ export default function CustomersPage() {
                       key={customer.id}
                       className={cn(
                         "group rounded-[22px] border bg-white/78 p-3 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-xl dark:bg-white/[0.055] sm:rounded-[24px] sm:p-4",
-                        isSelected ? "border-cyan-400/50 ring-2 ring-cyan-400/15" : "border-border/70 dark:border-white/10"
+                        isSelected ? "border-foreground/25 ring-2 ring-foreground/8 dark:border-white/20 dark:ring-white/10" : "border-border/70 dark:border-white/10"
                       )}
                     >
                       <div className="grid grid-cols-[22px_42px_minmax(0,1fr)_auto] items-start gap-2 sm:flex sm:justify-between sm:gap-3">
@@ -1160,8 +1160,8 @@ export default function CustomersPage() {
                           className={cn(
                             "mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-all",
                             isSelected
-                              ? "border-cyan-500 bg-cyan-500 text-white"
-                              : "border-border bg-white/60 text-transparent hover:border-cyan-400 dark:border-white/15 dark:bg-white/5"
+                              ? "border-foreground bg-foreground text-background dark:text-black"
+                              : "border-border bg-white/60 text-transparent hover:border-foreground/35 dark:border-white/15 dark:bg-white/5"
                           )}
                           title={isSelected ? "取消选择" : "选择客户"}
                         >
@@ -1173,15 +1173,15 @@ export default function CustomersPage() {
                           className="min-w-0 text-left"
                           title={getCustomerName(customer)}
                         >
-                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-cyan-400/20 bg-cyan-400/10 text-cyan-600 transition-all hover:bg-cyan-400/15 dark:text-cyan-200">
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-border/60 bg-muted/35 text-muted-foreground transition-all hover:bg-muted/55 dark:border-white/10 dark:bg-white/8 dark:text-white/70">
                             <User size={18} />
                           </div>
                         </button>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
                             <div className="min-w-0">
-                              <h3 className="truncate text-base font-black text-foreground">{customer.contactName || "未命名客户"}</h3>
-                              <div className="mt-1 flex min-w-0 items-center gap-1.5 text-[11px] font-bold text-muted-foreground">
+                              <h3 className="truncate text-base font-medium text-foreground">{customer.contactName || "未命名客户"}</h3>
+                              <div className="mt-1 flex min-w-0 items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
                                 <span className="truncate">{customer.contactPhone || "未填写电话"}</span>
                                 {customer.contactPhone ? (
                                   <span
@@ -1212,7 +1212,7 @@ export default function CustomersPage() {
                           <button type="button" onClick={(event) => { event.stopPropagation(); setRecordsTarget({ type: "customer", customer }); }} className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-emerald-500/10 hover:text-emerald-600 sm:rounded-xl sm:p-2" title="查看进货记录">
                             <Eye size={15} />
                           </button>
-                          <button type="button" onClick={(event) => { event.stopPropagation(); handleCopy(customer); }} className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-cyan-500/10 hover:text-cyan-600 sm:rounded-xl sm:p-2" title="复制地址">
+                          <button type="button" onClick={(event) => { event.stopPropagation(); handleCopy(customer); }} className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground sm:rounded-xl sm:p-2" title="复制地址">
                             <Copy size={15} />
                           </button>
                           <button type="button" onClick={(event) => { event.stopPropagation(); setEditingCustomer(customer); setIsModalOpen(true); }} className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary sm:rounded-xl sm:p-2" title="编辑">
@@ -1226,7 +1226,7 @@ export default function CustomersPage() {
 
                       <div className="mt-3 rounded-2xl border border-border/50 bg-muted/25 p-3 text-sm dark:border-white/8 dark:bg-white/[0.035] sm:mt-4">
                         <div className="flex items-start gap-2 text-foreground">
-                          <MapPin size={14} className="mt-0.5 shrink-0 text-cyan-500" />
+                          <MapPin size={14} className="mt-0.5 shrink-0 text-muted-foreground" />
                           <span className="line-clamp-2 leading-5">{customer.address}</span>
                         </div>
                       </div>
