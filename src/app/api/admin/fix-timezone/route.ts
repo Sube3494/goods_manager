@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getAuthorizedAdmin } from "@/lib/auth";
+import { getAuthorizedUser } from "@/lib/auth";
 
 export async function POST() {
   try {
-    const session = await getAuthorizedAdmin();
-    if (!session) {
+    const session = await getAuthorizedUser();
+    if (!session || (session.role !== "SUPER_ADMIN" && session.role !== "ADMIN")) {
       return NextResponse.json({ error: "权限不足，仅管理员可执行线上时区修复" }, { status: 403 });
     }
 
