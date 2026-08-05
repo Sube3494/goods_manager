@@ -352,7 +352,6 @@ function CustomerShipmentRecordsModal({
                         {visibleCustomerStats.map((item) => (
                           <span key={item.id} className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-border/50 bg-white/70 px-2.5 py-1 text-[10px] font-medium text-foreground shadow-sm dark:border-white/8 dark:bg-white/6">
                             <span className="shrink-0">{item.name}</span>
-                            {item.phone ? <span className="min-w-0 truncate text-muted-foreground max-[420px]:max-w-[86px]">{item.phone}</span> : null}
                             <span className="text-foreground/70 dark:text-white/75">{item.orderCount}单</span>
                             <span className="text-primary">{item.totalQuantity}件</span>
                           </span>
