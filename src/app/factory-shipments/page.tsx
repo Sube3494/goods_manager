@@ -1725,6 +1725,7 @@ function FactoryShipmentDetailModal({
   const [isSaving, setIsSaving] = useState(false);
   const [editItems, setEditItems] = useState<SelectedShipmentItem[]>([]);
   const [isSelectionModalOpen, setIsSelectionModalOpen] = useState(false);
+  const [isShipDatePopoverOpen, setIsShipDatePopoverOpen] = useState(false);
   
   const [editForm, setEditForm] = useState({
     status: "",
@@ -2217,6 +2218,7 @@ function FactoryShipmentDetailModal({
                     </div>
                   </div>
                   <div className="mt-3 grid grid-cols-2 gap-2.5">
+                    {/* 左侧：创建时间 */}
                     <div className="rounded-2xl border border-border/60 bg-white/70 p-3.5 dark:border-white/10 dark:bg-white/4">
                       <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">创建时间</div>
                       <div className="mt-1.5 font-mono text-base font-semibold tracking-tight text-foreground">
@@ -2224,38 +2226,89 @@ function FactoryShipmentDetailModal({
                         <div className="text-xs font-normal text-muted-foreground mt-0.5">{format(parseSafeDate(order.createdAt), "HH:mm")}</div>
                       </div>
                     </div>
-                    <div className="rounded-2xl border border-border/60 bg-white/70 p-3.5 dark:border-white/10 dark:bg-white/4 flex flex-col justify-between">
-                      <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">发货时间</div>
-                      <div className="mt-1 flex flex-col gap-1">
-                        <DatePicker
-                          value={editForm.date ? format(parseSafeDate(editForm.date), "yyyy-MM-dd") : format(parseSafeDate(order.date), "yyyy-MM-dd")}
-                          onChange={(newDateStr) => {
-                            if (!newDateStr) return;
-                            const currentHHmm = editForm.date
-                              ? format(parseSafeDate(editForm.date), "HH:mm")
-                              : format(parseSafeDate(order.date), "HH:mm");
-                            setEditForm((prev) => ({ ...prev, date: `${newDateStr} ${currentHHmm}` }));
-                          }}
-                          showClear={false}
-                          className="w-full"
-                          triggerClassName="w-full h-8 px-2 text-xs sm:text-sm font-semibold border-border/40 bg-transparent hover:bg-black/5 dark:hover:bg-white/5"
-                        />
-                        <div className="flex items-center justify-between px-1 mt-0.5">
-                          <span className="text-[10px] text-muted-foreground">具体时刻</span>
-                          <input
-                            type="time"
-                            value={editForm.date ? format(parseSafeDate(editForm.date), "HH:mm") : format(parseSafeDate(order.date), "HH:mm")}
-                            onChange={(e) => {
-                              const newTime = e.target.value;
-                              const currentDateStr = editForm.date
-                                ? format(parseSafeDate(editForm.date), "yyyy-MM-dd")
-                                : format(parseSafeDate(order.date), "yyyy-MM-dd");
-                              setEditForm((prev) => ({ ...prev, date: `${currentDateStr} ${newTime}` }));
-                            }}
-                            className="text-xs font-mono font-semibold text-foreground bg-transparent border-b border-border/60 hover:border-primary focus:outline-none focus:border-primary py-0 px-1 w-16 text-right"
-                          />
-                        </div>
+
+                    {/* 右侧：发货时间 (绝对对称 + 精美修改浮层) */}
+                    <div className="relative rounded-2xl border border-border/60 bg-white/70 p-3.5 dark:border-white/10 dark:bg-white/4">
+                      <div className="flex items-center justify-between">
+                        <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">发货时间</div>
+                        <button
+                          type="button"
+                          onClick={() => setIsShipDatePopoverOpen(!isShipDatePopoverOpen)}
+                          className="text-[11px] font-medium text-primary hover:underline focus:outline-none"
+                        >
+                          {isShipDatePopoverOpen ? "完成" : "修改"}
+                        </button>
                       </div>
+
+                      <div className="mt-1.5 font-mono text-base font-semibold tracking-tight text-foreground">
+                        <div>{format(parseSafeDate(editForm.date || order.date), "yyyy-MM-dd")}</div>
+                        <div className="text-xs font-normal text-muted-foreground mt-0.5">{format(parseSafeDate(editForm.date || order.date), "HH:mm")}</div>
+                      </div>
+
+                      {/* 精美修改浮层 */}
+                      {isShipDatePopoverOpen && (
+                        <div className="absolute right-0 top-full mt-2 z-50 w-64 rounded-2xl border border-border/80 bg-white p-4 shadow-2xl dark:border-white/15 dark:bg-zinc-900">
+                          <div className="text-xs font-bold text-foreground mb-2.5 flex items-center justify-between border-b border-border/40 pb-2">
+                            <span>修改发货时间</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const nowStr = format(new Date(), "yyyy-MM-dd HH:mm");
+                                setEditForm((prev) => ({ ...prev, date: nowStr }));
+                              }}
+                              className="text-[11px] font-medium text-primary hover:underline"
+                            >
+                              设为此时此刻
+                            </button>
+                          </div>
+                          
+                          <div className="space-y-3">
+                            <div>
+                              <div className="text-[10px] text-muted-foreground mb-1">发货日期</div>
+                              <DatePicker
+                                value={editForm.date ? format(parseSafeDate(editForm.date), "yyyy-MM-dd") : format(parseSafeDate(order.date), "yyyy-MM-dd")}
+                                onChange={(newDateStr) => {
+                                  if (!newDateStr) return;
+                                  const currentHHmm = editForm.date
+                                    ? format(parseSafeDate(editForm.date), "HH:mm")
+                                    : format(parseSafeDate(order.date), "HH:mm");
+                                  setEditForm((prev) => ({ ...prev, date: `${newDateStr} ${currentHHmm}` }));
+                                }}
+                                showClear={false}
+                                className="w-full"
+                                triggerClassName="w-full h-8 px-2 text-xs font-medium border-border/60 bg-zinc-50 dark:bg-white/5 rounded-xl"
+                              />
+                            </div>
+
+                            <div>
+                              <div className="text-[10px] text-muted-foreground mb-1">发货时刻 (HH:mm)</div>
+                              <input
+                                type="text"
+                                maxLength={5}
+                                placeholder="12:00"
+                                value={editForm.date ? format(parseSafeDate(editForm.date), "HH:mm") : format(parseSafeDate(order.date), "HH:mm")}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  const currentDateStr = editForm.date
+                                    ? format(parseSafeDate(editForm.date), "yyyy-MM-dd")
+                                    : format(parseSafeDate(order.date), "yyyy-MM-dd");
+                                  setEditForm((prev) => ({ ...prev, date: `${currentDateStr} ${val}` }));
+                                }}
+                                className="w-full h-8 px-3 rounded-xl border border-border/60 bg-zinc-50 dark:bg-white/5 text-xs font-mono font-medium focus:outline-none focus:border-primary"
+                              />
+                            </div>
+                          </div>
+                          <div className="mt-3.5 text-right">
+                            <button
+                              type="button"
+                              onClick={() => setIsShipDatePopoverOpen(false)}
+                              className="px-3.5 py-1 text-xs font-bold text-white bg-primary rounded-xl shadow-sm hover:bg-primary/90 transition-all"
+                            >
+                              确定
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
