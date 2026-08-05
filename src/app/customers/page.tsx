@@ -132,6 +132,41 @@ function sanitizeExportFileName(value: string) {
     .slice(0, 80) || "分组数据";
 }
 
+function CustomerGroupSuggestions({
+  groups,
+  value,
+  onSelect,
+}: {
+  groups: string[];
+  value: string;
+  onSelect: (group: string) => void;
+}) {
+  const normalizedValue = value.trim();
+  const visibleGroups = groups
+    .filter((group) => group && group !== normalizedValue)
+    .slice(0, 8);
+
+  if (visibleGroups.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="flex flex-wrap gap-2">
+      {visibleGroups.map((group) => (
+        <button
+          key={group}
+          type="button"
+          onClick={() => onSelect(group)}
+          className="inline-flex h-7 max-w-full items-center rounded-full border border-border/60 bg-muted/30 px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/30 hover:bg-primary/10 hover:text-primary dark:border-white/10 dark:bg-white/6"
+          title={group}
+        >
+          <span className="truncate">{group}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function CustomerProductPill({
   name,
   variant,
@@ -601,11 +636,13 @@ function CustomerShipmentRecordsModal({
 function CustomerModal({
   isOpen,
   initialData,
+  groupSuggestions,
   onClose,
   onSubmit,
 }: {
   isOpen: boolean;
   initialData?: Customer | null;
+  groupSuggestions: string[];
   onClose: () => void;
   onSubmit: (form: CustomerForm) => Promise<void>;
 }) {
@@ -696,8 +733,13 @@ function CustomerModal({
               <input
                 value={form.group}
                 onChange={(e) => setForm((prev) => ({ ...prev, group: e.target.value }))}
-                placeholder="例如：老客户 / 团购 / 贵州"
+                placeholder=""
                 className="h-11 w-full rounded-2xl border border-border bg-white px-4 text-sm outline-none transition-all focus:ring-2 focus:ring-primary/20 dark:border-white/10 dark:bg-white/5"
+              />
+              <CustomerGroupSuggestions
+                groups={groupSuggestions}
+                value={form.group}
+                onSelect={(group) => setForm((prev) => ({ ...prev, group }))}
               />
             </label>
             <label className="space-y-2 block">
@@ -739,12 +781,14 @@ function CustomerGroupModal({
   isOpen,
   selectedCount,
   initialGroup,
+  groupSuggestions,
   onClose,
   onSubmit,
 }: {
   isOpen: boolean;
   selectedCount: number;
   initialGroup: string;
+  groupSuggestions: string[];
   onClose: () => void;
   onSubmit: (group: string) => Promise<void>;
 }) {
@@ -796,9 +840,14 @@ function CustomerGroupModal({
               <input
                 value={group}
                 onChange={(event) => setGroup(event.target.value)}
-                placeholder="例如：老客户 / 团购 / 贵州"
+                placeholder=""
                 className="h-11 w-full rounded-2xl border border-border bg-white px-4 text-sm outline-none transition-all focus:ring-2 focus:ring-primary/20 dark:border-white/10 dark:bg-white/5"
                 autoFocus
+              />
+              <CustomerGroupSuggestions
+                groups={groupSuggestions}
+                value={group}
+                onSelect={setGroup}
               />
             </label>
             <div className="-mx-6 -mb-6 flex justify-end gap-3 border-t border-border/10 bg-zinc-50/60 p-6 dark:bg-card/30">
@@ -825,9 +874,210 @@ function CustomerGroupModal({
   );
 }
 
+function CustomerGroupManageModal({
+  isOpen,
+  groups,
+  onClose,
+  onCreate,
+  onRename,
+  onClear,
+}: {
+  isOpen: boolean;
+  groups: Array<{ name: string; count: number }>;
+  onClose: () => void;
+  onCreate: (group: string) => Promise<void>;
+  onRename: (sourceGroup: string, targetGroup: string) => Promise<void>;
+  onClear: (sourceGroup: string) => Promise<void>;
+}) {
+  const [newGroupName, setNewGroupName] = useState("");
+  const [editingGroup, setEditingGroup] = useState("");
+  const [draftName, setDraftName] = useState("");
+  const [submittingGroup, setSubmittingGroup] = useState("");
+  const [isCreatingGroup, setIsCreatingGroup] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setNewGroupName("");
+      setEditingGroup("");
+      setDraftName("");
+      setSubmittingGroup("");
+      setIsCreatingGroup(false);
+    }
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  return createPortal(
+    <AnimatePresence>
+      <div className="fixed inset-0 z-60000 flex items-center justify-center p-4">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+          onClick={onClose}
+        />
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95, y: 18 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.95, y: 18 }}
+          className="relative z-10 flex max-h-[calc(100dvh-2rem)] w-full max-w-xl flex-col overflow-hidden rounded-[28px] border border-white/10 bg-white shadow-2xl backdrop-blur-xl dark:bg-[#101722]/95"
+        >
+          <div className="flex items-start justify-between gap-3 border-b border-border/10 p-6">
+            <div>
+              <h3 className="text-xl font-medium text-foreground">分组管理</h3>
+              <p className="mt-1 text-xs text-muted-foreground">重命名分组会同步更新该分组下的客户；清空会把客户移出分组。</p>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+            >
+              <X size={18} />
+            </button>
+          </div>
+
+          <div className="shrink-0 border-b border-border/10 p-4 sm:p-6">
+            <form
+              onSubmit={async (event) => {
+                event.preventDefault();
+                const value = newGroupName.trim();
+                if (!value) return;
+                setIsCreatingGroup(true);
+                try {
+                  await onCreate(value);
+                  setNewGroupName("");
+                } finally {
+                  setIsCreatingGroup(false);
+                }
+              }}
+              className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2"
+            >
+              <input
+                value={newGroupName}
+                onChange={(event) => setNewGroupName(event.target.value)}
+                placeholder="新建分组名称..."
+                className="h-10 min-w-0 rounded-full border border-border bg-white px-4 text-sm outline-none transition-all focus:border-primary/30 focus:ring-2 focus:ring-primary/20 dark:border-white/10 dark:bg-white/5"
+              />
+              <button
+                type="submit"
+                disabled={isCreatingGroup || !newGroupName.trim()}
+                className="inline-flex h-10 min-w-[96px] items-center justify-center gap-1.5 rounded-full border border-border bg-white px-3 text-sm font-medium text-foreground shadow-sm transition-all hover:bg-muted/50 disabled:pointer-events-none disabled:opacity-50 dark:border-white/10 dark:bg-white/8 dark:hover:bg-white/12"
+              >
+                {isCreatingGroup ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />}
+                新增分组
+              </button>
+            </form>
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
+            {groups.length === 0 ? (
+              <EmptyState
+                icon={<User size={32} />}
+                title="暂无客户分组"
+                description="可以先新建空分组，再把客户加入进来。"
+              />
+            ) : (
+              <div className="space-y-2">
+                {groups.map((group) => {
+                  const isEditing = editingGroup === group.name;
+                  const isSubmitting = submittingGroup === group.name;
+                  return (
+                    <div key={group.name} className="rounded-2xl border border-border bg-white/80 p-3 shadow-sm dark:border-white/10 dark:bg-white/[0.04]">
+                      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
+                        <div className="min-w-0">
+                          <div className="truncate text-sm font-semibold text-foreground">{group.name}</div>
+                          <div className="mt-1 text-xs font-medium text-muted-foreground">{group.count} 位客户</div>
+                        </div>
+                        <div className="flex min-w-0 shrink-0 items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingGroup(group.name);
+                              setDraftName(group.name);
+                            }}
+                            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-full border border-border bg-white px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted/50 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10 max-[420px]:w-9 max-[420px]:px-0"
+                            title="改名"
+                          >
+                            <Edit2 size={14} />
+                            <span className="max-[420px]:sr-only">改名</span>
+                          </button>
+                          <button
+                            type="button"
+                            disabled={isSubmitting}
+                            onClick={async () => {
+                              setSubmittingGroup(group.name);
+                              try {
+                                await onClear(group.name);
+                              } finally {
+                                setSubmittingGroup("");
+                              }
+                            }}
+                            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-full border border-rose-500/20 bg-rose-500/10 px-3 text-xs font-medium text-rose-600 transition-colors hover:bg-rose-500/15 disabled:pointer-events-none disabled:opacity-60 dark:text-rose-300 max-[420px]:w-9 max-[420px]:px-0"
+                            title="清空"
+                          >
+                            {isSubmitting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                            <span className="max-[420px]:sr-only">清空</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {isEditing ? (
+                        <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                          <input
+                            value={draftName}
+                            onChange={(event) => setDraftName(event.target.value)}
+                            className="h-10 min-w-0 flex-1 rounded-xl border border-border bg-white px-3 text-sm outline-none transition-all focus:ring-2 focus:ring-primary/20 dark:border-white/10 dark:bg-white/5"
+                            autoFocus
+                          />
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingGroup("");
+                                setDraftName("");
+                              }}
+                              className="h-10 rounded-full border border-border bg-white px-4 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted/50 dark:border-white/10 dark:bg-white/5"
+                            >
+                              取消
+                            </button>
+                            <button
+                              type="button"
+                              disabled={isSubmitting || !draftName.trim() || draftName.trim() === group.name}
+                              onClick={async () => {
+                                setSubmittingGroup(group.name);
+                                try {
+                                  await onRename(group.name, draftName.trim());
+                                  setEditingGroup("");
+                                  setDraftName("");
+                                } finally {
+                                  setSubmittingGroup("");
+                                }
+                              }}
+                              className="inline-flex h-10 min-w-[76px] items-center justify-center rounded-full bg-foreground px-4 text-sm font-medium text-background transition-all disabled:pointer-events-none disabled:opacity-50 dark:text-black"
+                            >
+                              {isSubmitting ? <Loader2 size={15} className="animate-spin" /> : "保存"}
+                            </button>
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </motion.div>
+      </div>
+    </AnimatePresence>,
+    document.body
+  );
+}
+
 export default function CustomersPage() {
   const { showToast } = useToast();
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [customerGroups, setCustomerGroups] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [startDate, setStartDate] = useState("");
@@ -840,6 +1090,7 @@ export default function CustomersPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
+  const [isGroupManageOpen, setIsGroupManageOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [recordsTarget, setRecordsTarget] = useState<{ type: "customer"; customer: Customer } | { type: "group"; group: string } | null>(null);
@@ -856,13 +1107,15 @@ export default function CustomersPage() {
       const params = new URLSearchParams();
       if (startDate) params.set("startDate", startDate);
       if (endDate) params.set("endDate", endDate);
+      params.set("includeGroups", "1");
       const query = params.toString();
       const res = await fetch(`/api/customers${query ? `?${query}` : ""}`);
       const data = await res.json().catch(() => null);
       if (!res.ok) {
         throw new Error(data?.error || "加载客户失败");
       }
-      setCustomers(Array.isArray(data) ? data : []);
+      setCustomers(Array.isArray(data) ? data : (Array.isArray(data?.customers) ? data.customers : []));
+      setCustomerGroups(Array.isArray(data?.groups) ? data.groups : []);
     } catch (error) {
       console.error("Failed to fetch customers:", error);
       showToast(error instanceof Error ? error.message : "加载客户失败", "error");
@@ -905,13 +1158,23 @@ export default function CustomersPage() {
   }, [customers, groupFilter, searchQuery, sortMode]);
 
   const groupOptions = useMemo(() => {
-    const groups = Array.from(new Set(customers.map((customer) => customer.group || "").filter(Boolean))).sort((a, b) => a.localeCompare(b, "zh-Hans-CN"));
     return [
       { value: "all", label: "全部分组" },
       { value: "__ungrouped", label: "未分组" },
-      ...groups.map((group) => ({ value: group, label: group })),
+      ...customerGroups.map((group) => ({ value: group, label: group })),
     ];
-  }, [customers]);
+  }, [customerGroups]);
+  const existingGroups = useMemo(
+    () => customerGroups,
+    [customerGroups]
+  );
+  const groupStats = useMemo(
+    () => existingGroups.map((group) => ({
+      name: group,
+      count: customers.filter((customer) => (customer.group || "") === group).length,
+    })),
+    [customers, existingGroups]
+  );
 
   const totalItems = filteredCustomers.length;
   const hasDateFilter = Boolean(startDate || endDate);
@@ -1017,6 +1280,60 @@ export default function CustomersPage() {
     showToast(group ? `已设置为「${group}」` : "已移出分组", "success");
     setSelectedIds([]);
     setIsGroupModalOpen(false);
+    await fetchCustomers();
+  };
+
+  const handleCreateGroup = async (group: string) => {
+    const res = await fetch("/api/customers", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "create-group", targetGroup: group }),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      showToast(data?.error || "新增分组失败", "error");
+      return;
+    }
+
+    showToast(`已新增「${group}」分组`, "success");
+    await fetchCustomers();
+  };
+
+  const handleRenameGroup = async (sourceGroup: string, targetGroup: string) => {
+    const res = await fetch("/api/customers", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "rename-group", sourceGroup, targetGroup }),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      showToast(data?.error || "重命名分组失败", "error");
+      return;
+    }
+
+    if (groupFilter === sourceGroup) {
+      setGroupFilter(targetGroup);
+    }
+    showToast(`已重命名为「${targetGroup}」`, "success");
+    await fetchCustomers();
+  };
+
+  const handleClearGroup = async (sourceGroup: string) => {
+    const res = await fetch("/api/customers", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "clear-group", sourceGroup }),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      showToast(data?.error || "清空分组失败", "error");
+      return;
+    }
+
+    if (groupFilter === sourceGroup) {
+      setGroupFilter("all");
+    }
+    showToast(`已清空「${sourceGroup}」分组`, "success");
     await fetchCustomers();
   };
 
@@ -1170,6 +1487,15 @@ export default function CustomersPage() {
             <p className="mt-2 hidden text-sm text-muted-foreground sm:block">发货单里的收件人会自动收集到这里，方便查找、编辑和复制地址。</p>
           </div>
           <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 sm:flex-nowrap">
+            <button
+              type="button"
+              onClick={() => setIsGroupManageOpen(true)}
+              className="inline-flex h-10 w-10 items-center justify-center gap-2 rounded-full border border-border bg-white/75 text-sm font-medium text-foreground shadow-sm transition-all hover:-translate-y-0.5 hover:bg-white dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10 sm:h-11 sm:w-auto sm:px-4"
+              title="分组管理"
+            >
+              <User size={16} />
+              <span className="hidden sm:inline">分组</span>
+            </button>
             {selectedGroupName ? (
               <button
                 type="button"
@@ -1439,6 +1765,7 @@ export default function CustomersPage() {
       <CustomerModal
         isOpen={isModalOpen}
         initialData={editingCustomer}
+        groupSuggestions={existingGroups}
         onClose={() => {
           setIsModalOpen(false);
           setEditingCustomer(null);
@@ -1470,8 +1797,17 @@ export default function CustomersPage() {
         isOpen={isGroupModalOpen}
         selectedCount={selectedIds.length}
         initialGroup={selectedGroup}
+        groupSuggestions={existingGroups}
         onClose={() => setIsGroupModalOpen(false)}
         onSubmit={handleBatchGroup}
+      />
+      <CustomerGroupManageModal
+        isOpen={isGroupManageOpen}
+        groups={groupStats}
+        onClose={() => setIsGroupManageOpen(false)}
+        onCreate={handleCreateGroup}
+        onRename={handleRenameGroup}
+        onClear={handleClearGroup}
       />
       <ConfirmModal
         isOpen={confirmConfig.isOpen}

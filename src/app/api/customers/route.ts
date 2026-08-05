@@ -55,6 +55,32 @@ function getStringValue(row: Record<string, unknown>, keys: string[]) {
   return "";
 }
 
+function readCustomerGroups(permissions: unknown) {
+  if (!permissions || typeof permissions !== "object" || Array.isArray(permissions)) {
+    return [];
+  }
+  const groups = (permissions as Record<string, unknown>).customerGroups;
+  if (!Array.isArray(groups)) {
+    return [];
+  }
+  return Array.from(new Set(
+    groups
+      .map((group) => String(group || "").trim())
+      .filter(Boolean)
+  )).sort((a, b) => a.localeCompare(b, "zh-Hans-CN"));
+}
+
+function mergePermissionsWithCustomerGroups(permissions: unknown, groups: string[]) {
+  const base = permissions && typeof permissions === "object" && !Array.isArray(permissions)
+    ? permissions as Record<string, unknown>
+    : {};
+  return {
+    ...base,
+    customerGroups: Array.from(new Set(groups.map((group) => String(group || "").trim()).filter(Boolean)))
+      .sort((a, b) => a.localeCompare(b, "zh-Hans-CN")),
+  };
+}
+
 async function applyShipmentUsageStats(
   customers: CustomerAddressItem[],
   userId: string,
@@ -125,13 +151,25 @@ export async function GET(request: Request) {
     const startDate = parseDateBoundary(searchParams.get("startDate"));
     const endDate = parseDateBoundary(searchParams.get("endDate"), true);
 
+    const includeGroups = searchParams.get("includeGroups") === "1";
     const user = await prisma.user.findUnique({
       where: { id: session.id },
-      select: { shippingAddresses: true },
+      select: { shippingAddresses: true, permissions: true },
     });
 
     const customers = normalizeCustomerAddresses(user?.shippingAddresses);
     const customersWithStats = await applyShipmentUsageStats(customers, session.id, startDate, endDate);
+
+    if (includeGroups) {
+      const customerGroups = Array.from(new Set([
+        ...readCustomerGroups(user?.permissions),
+        ...customers.map((customer) => customer.group || "").filter(Boolean),
+      ])).sort((a, b) => a.localeCompare(b, "zh-Hans-CN"));
+      return NextResponse.json({
+        customers: sortCustomers(customersWithStats),
+        groups: customerGroups,
+      });
+    }
 
     return NextResponse.json(sortCustomers(customersWithStats));
   } catch (error) {
@@ -254,23 +292,92 @@ export async function PATCH(request: Request) {
     }
 
     const body = await request.json().catch(() => null);
+    const action = String(body?.action || "").trim();
+    const sourceGroup = String(body?.sourceGroup || "").trim();
+    const targetGroup = String(body?.targetGroup || "").trim();
     const ids = Array.isArray(body?.ids)
       ? body.ids.map((id: unknown) => String(id || "").trim()).filter(Boolean)
       : [];
     const group = String(body?.group || "").trim();
+
+    const user = await prisma.user.findUnique({
+      where: { id: session.id },
+      select: { shippingAddresses: true, permissions: true },
+    });
+    const customers = normalizeCustomerAddresses(user?.shippingAddresses);
+    let updatedCount = 0;
+    const now = new Date().toISOString();
+
+    if (action === "create-group") {
+      const newGroup = targetGroup || group;
+      if (!newGroup) {
+        return NextResponse.json({ error: "请输入分组名称" }, { status: 400 });
+      }
+      const existingGroups = Array.from(new Set([
+        ...readCustomerGroups(user?.permissions),
+        ...customers.map((customer) => customer.group || "").filter(Boolean),
+      ]));
+      if (existingGroups.includes(newGroup)) {
+        return NextResponse.json({ error: "分组已存在" }, { status: 400 });
+      }
+
+      await prisma.user.update({
+        where: { id: session.id },
+        data: {
+          permissions: mergePermissionsWithCustomerGroups(user?.permissions, [...existingGroups, newGroup]) as Prisma.InputJsonValue,
+        },
+      });
+
+      return NextResponse.json({ success: true, group: newGroup, updatedCount: 0 });
+    }
+
+    if (action === "rename-group" || action === "clear-group") {
+      if (!sourceGroup) {
+        return NextResponse.json({ error: "请选择要管理的分组" }, { status: 400 });
+      }
+      if (action === "rename-group" && !targetGroup) {
+        return NextResponse.json({ error: "请输入新的分组名称" }, { status: 400 });
+      }
+      if (action === "rename-group" && sourceGroup === targetGroup) {
+        return NextResponse.json({ error: "新分组名称不能和原分组相同" }, { status: 400 });
+      }
+      const existingStoredGroups = readCustomerGroups(user?.permissions);
+      const nextStoredGroups = action === "rename-group"
+        ? existingStoredGroups.map((groupName) => groupName === sourceGroup ? targetGroup : groupName)
+        : existingStoredGroups.filter((groupName) => groupName !== sourceGroup);
+
+      const nextCustomers = customers.map((customer) => {
+        if ((customer.group || "") !== sourceGroup) {
+          return customer;
+        }
+        updatedCount += 1;
+        return {
+          ...customer,
+          group: action === "rename-group" ? targetGroup : "",
+          updatedAt: now,
+        };
+      });
+
+      if (updatedCount === 0 && !existingStoredGroups.includes(sourceGroup)) {
+        return NextResponse.json({ error: "分组不存在" }, { status: 404 });
+      }
+
+      await prisma.user.update({
+        where: { id: session.id },
+        data: {
+          shippingAddresses: nextCustomers as unknown as Prisma.InputJsonValue,
+          permissions: mergePermissionsWithCustomerGroups(user?.permissions, nextStoredGroups) as Prisma.InputJsonValue,
+        },
+      });
+
+      return NextResponse.json({ success: true, updatedCount });
+    }
 
     if (ids.length === 0) {
       return NextResponse.json({ error: "请选择要分组的客户" }, { status: 400 });
     }
 
     const idSet = new Set(ids);
-    const user = await prisma.user.findUnique({
-      where: { id: session.id },
-      select: { shippingAddresses: true },
-    });
-    const customers = normalizeCustomerAddresses(user?.shippingAddresses);
-    let updatedCount = 0;
-    const now = new Date().toISOString();
     const nextCustomers = customers.map((customer) => {
       if (!idSet.has(customer.id)) {
         return customer;
