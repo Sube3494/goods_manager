@@ -124,6 +124,14 @@ function formatDateTime(value?: string | Date | null) {
   return date.toLocaleString("zh-CN", { hour12: false });
 }
 
+function sanitizeExportFileName(value: string) {
+  return String(value || "分组数据")
+    .trim()
+    .replace(/[\\/:*?"<>|]/g, "_")
+    .replace(/\s+/g, "_")
+    .slice(0, 80) || "分组数据";
+}
+
 function CustomerProductPill({
   name,
   variant,
@@ -183,6 +191,7 @@ function CustomerShipmentRecordsModal({
   const [keyword, setKeyword] = useState("");
   const [data, setData] = useState<ShipmentRecordResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isExportingRecords, setIsExportingRecords] = useState(false);
   const [isCustomerStatsExpanded, setIsCustomerStatsExpanded] = useState(false);
   const isGroupTarget = target?.type === "group";
   const title = target?.type === "group" ? `${target.group} 分组的进货记录` : target ? `${getCustomerName(target.customer)} 的进货记录` : "";
@@ -232,6 +241,148 @@ function CustomerShipmentRecordsModal({
     setIsCustomerStatsExpanded(false);
   }, [target]);
 
+  const handleExportRecords = async () => {
+    if (!target || target.type !== "group") {
+      showToast("请选择客户分组后导出", "info");
+      return;
+    }
+    if (!data || data.records.length === 0) {
+      showToast("没有可导出的分组数据", "info");
+      return;
+    }
+
+    setIsExportingRecords(true);
+    try {
+      const ExcelJS = (await import("exceljs")).default;
+      const { saveAs } = await import("file-saver");
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = "Goods Manager";
+      workbook.lastModifiedBy = "Goods Manager";
+      workbook.created = new Date();
+      workbook.modified = new Date();
+
+      const applySheetStyle = (worksheet: import("exceljs").Worksheet, wrapColumns: number[] = []) => {
+        worksheet.views = [{ state: "frozen", ySplit: 1 }];
+        const headerRow = worksheet.getRow(1);
+        headerRow.font = { bold: true, color: { argb: "FF111827" } };
+        headerRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF3F4F6" } };
+        headerRow.alignment = { vertical: "middle", horizontal: "center" };
+        headerRow.height = 26;
+        worksheet.eachRow((row, rowNumber) => {
+          row.eachCell((cell, colNumber) => {
+            cell.border = {
+              top: { style: "thin", color: { argb: "FFE5E7EB" } },
+              left: { style: "thin", color: { argb: "FFE5E7EB" } },
+              bottom: { style: "thin", color: { argb: "FFE5E7EB" } },
+              right: { style: "thin", color: { argb: "FFE5E7EB" } },
+            };
+            if (rowNumber > 1) {
+              cell.alignment = {
+                vertical: "middle",
+                horizontal: colNumber === 1 ? "center" : "left",
+                wrapText: wrapColumns.includes(colNumber),
+              };
+            }
+          });
+          if (rowNumber > 1) {
+            row.height = 30;
+          }
+        });
+      };
+
+      const customerSheet = workbook.addWorksheet("客户汇总");
+      customerSheet.columns = [
+        { header: "序号", key: "index", width: 8 },
+        { header: "客户姓名", key: "name", width: 18 },
+        { header: "手机号", key: "phone", width: 18 },
+        { header: "发货单数", key: "orderCount", width: 12 },
+        { header: "商品总件数", key: "totalQuantity", width: 14 },
+      ];
+      (data.customerStats || []).forEach((item, index) => {
+        customerSheet.addRow({
+          index: index + 1,
+          name: item.name,
+          phone: item.phone,
+          orderCount: item.orderCount,
+          totalQuantity: item.totalQuantity,
+        });
+      });
+      customerSheet.getColumn("C").numFmt = "@";
+      applySheetStyle(customerSheet);
+
+      const productSheet = workbook.addWorksheet("商品汇总");
+      productSheet.columns = [
+        { header: "序号", key: "index", width: 8 },
+        { header: "商品名称", key: "name", width: 44 },
+        { header: "规格", key: "variant", width: 18 },
+        { header: "SKU", key: "sku", width: 18 },
+        { header: "发货次数", key: "shipmentCount", width: 12 },
+        { header: "商品总件数", key: "totalQuantity", width: 14 },
+      ];
+      (data.productStats || []).forEach((item, index) => {
+        productSheet.addRow({
+          index: index + 1,
+          name: item.name,
+          variant: item.variant,
+          sku: item.sku,
+          shipmentCount: item.shipmentCount,
+          totalQuantity: item.totalQuantity,
+        });
+      });
+      productSheet.getColumn("D").numFmt = "@";
+      applySheetStyle(productSheet, [2]);
+
+      const detailSheet = workbook.addWorksheet("发货明细");
+      detailSheet.columns = [
+        { header: "发货单号", key: "recordId", width: 22 },
+        { header: "发货时间", key: "date", width: 22 },
+        { header: "状态", key: "status", width: 12 },
+        { header: "客户姓名", key: "customerName", width: 18 },
+        { header: "客户电话", key: "customerPhone", width: 18 },
+        { header: "商品名称", key: "itemName", width: 44 },
+        { header: "规格", key: "variant", width: 18 },
+        { header: "SKU", key: "sku", width: 18 },
+        { header: "数量", key: "quantity", width: 10 },
+        { header: "物流", key: "logisticsName", width: 18 },
+        { header: "运单号", key: "trackingNumber", width: 24 },
+      ];
+      data.records.forEach((record) => {
+        record.items.forEach((item) => {
+          detailSheet.addRow({
+            recordId: record.id,
+            date: formatDateTime(record.date),
+            status: record.status,
+            customerName: record.customerName || "",
+            customerPhone: record.customerPhone || "",
+            itemName: item.name,
+            variant: item.variant,
+            sku: item.sku,
+            quantity: item.quantity,
+            logisticsName: item.tracking?.logisticsName || record.logisticsNames.join(" / "),
+            trackingNumber: item.tracking?.trackingNumber || record.trackingNumbers.join(" / "),
+          });
+        });
+      });
+      detailSheet.getColumn("E").numFmt = "@";
+      detailSheet.getColumn("H").numFmt = "@";
+      detailSheet.getColumn("K").numFmt = "@";
+      applySheetStyle(detailSheet, [6]);
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const timestamp = new Date().toLocaleString("sv-SE", { hour12: false }).replace(" ", "_").replace(/:/g, "-");
+      saveAs(
+        new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }),
+        `${sanitizeExportFileName(target.group)}_分组数据_${timestamp}.xlsx`
+      );
+      showToast(`已导出 ${target.group} 分组数据`, "success");
+    } catch (error) {
+      console.error("Failed to export customer group records:", error);
+      showToast("导出分组数据失败", "error");
+    } finally {
+      setIsExportingRecords(false);
+    }
+  };
+
   if (!isOpen || !target) return null;
 
   return createPortal(
@@ -263,13 +414,27 @@ function CustomerShipmentRecordsModal({
                   </div>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={onClose}
-                className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-              >
-                <X size={18} />
-              </button>
+              <div className="flex shrink-0 items-center gap-2">
+                {isGroupTarget ? (
+                  <button
+                    type="button"
+                    onClick={handleExportRecords}
+                    disabled={isExportingRecords || isLoading || !data || data.records.length === 0}
+                    className="inline-flex h-9 items-center justify-center gap-2 rounded-full border border-border bg-white px-3 text-xs font-medium text-foreground shadow-sm transition-colors hover:bg-muted/50 disabled:pointer-events-none disabled:opacity-50 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10"
+                    title="导出分组数据"
+                  >
+                    {isExportingRecords ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
+                    <span className="hidden sm:inline">导出</span>
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                >
+                  <X size={18} />
+                </button>
+              </div>
             </div>
 
             <div className="mt-3 grid gap-2 lg:grid-cols-[minmax(0,1fr)_auto]">
