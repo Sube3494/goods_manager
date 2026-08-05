@@ -19,9 +19,13 @@ export async function PATCH(
     const contactName = String(body.contactName || "").trim();
     const contactPhone = String(body.contactPhone || "").trim();
     const address = String(body.address || body.detailAddress || "").trim();
+    const group = String(body.group || "").trim();
 
     if (!contactName) {
       return NextResponse.json({ error: "客户姓名不能为空" }, { status: 400 });
+    }
+    if (!contactPhone) {
+      return NextResponse.json({ error: "客户手机号不能为空" }, { status: 400 });
     }
     if (!address) {
       return NextResponse.json({ error: "客户地址不能为空" }, { status: 400 });
@@ -44,6 +48,7 @@ export async function PATCH(
       detailAddress: address,
       contactName,
       contactPhone,
+      group,
       updatedAt: new Date().toISOString(),
     };
     const nextCustomers = customers.map((customer) => customer.id === id ? updated : customer);

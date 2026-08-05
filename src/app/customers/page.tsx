@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowDownAZ, BarChart3, Copy, Download, Edit2, Loader2, MapPin, Plus, Search, Trash2, Upload, User, X } from "lucide-react";
+import { ArrowDownAZ, BarChart3, Copy, Download, Edit2, Eye, Loader2, MapPin, PackageSearch, Plus, Search, Trash2, Upload, User, X } from "lucide-react";
+import Image from "next/image";
 import { createPortal } from "react-dom";
 import { ActionBar } from "@/components/ui/ActionBar";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
@@ -21,6 +22,7 @@ type Customer = {
   detailAddress?: string;
   contactName?: string;
   contactPhone?: string;
+  group?: string;
   isDefault: boolean;
   source?: string;
   createdAt?: string;
@@ -32,14 +34,66 @@ type Customer = {
 type CustomerForm = {
   contactName: string;
   contactPhone: string;
+  group: string;
   address: string;
 };
 
 type SortMode = "recent" | "usage-desc" | "usage-asc" | "name-asc" | "name-desc";
 
+type ShipmentRecord = {
+  id: string;
+  date: string;
+  status: string;
+  customerId?: string;
+  customerName?: string;
+  customerPhone?: string;
+  trackingNumbers: string[];
+  logisticsNames: string[];
+  items: Array<{
+    id: string;
+    statsKey: string;
+    name: string;
+    variant: string;
+    sku: string;
+    image?: string | null;
+    quantity: number;
+    tracking: {
+      logisticsName?: string;
+      trackingNumber?: string;
+    } | null;
+  }>;
+};
+
+type ShipmentRecordResponse = {
+  totalOrders: number;
+  totalQuantity: number;
+  group?: {
+    name: string;
+    customerCount: number;
+  };
+  customerStats?: Array<{
+    id: string;
+    name: string;
+    phone: string;
+    orderCount: number;
+    totalQuantity: number;
+  }>;
+  productStats: Array<{
+    key: string;
+    name: string;
+    variant: string;
+    sku: string;
+    image?: string | null;
+    shipmentCount: number;
+    totalQuantity: number;
+  }>;
+  records: ShipmentRecord[];
+};
+
 const emptyForm: CustomerForm = {
   contactName: "",
   contactPhone: "",
+  group: "",
   address: "",
 };
 
@@ -63,6 +117,323 @@ function getCustomerName(customer: Customer) {
   return customer.contactName || customer.label || "未命名客户";
 }
 
+function formatDateTime(value?: string | Date | null) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleString("zh-CN", { hour12: false });
+}
+
+function CustomerProductPill({
+  name,
+  variant,
+  sku,
+  image,
+  quantity,
+  count,
+  trackingNumber,
+}: {
+  name: string;
+  variant?: string;
+  sku?: string;
+  image?: string | null;
+  quantity?: number;
+  count?: number;
+  trackingNumber?: string;
+}) {
+  const subtitle = [variant, sku].filter(Boolean).join(" / ");
+  return (
+    <span
+      className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full border border-border/50 bg-white/70 p-0.5 pr-2 text-[10px] font-medium text-foreground shadow-sm max-[420px]:max-w-full dark:border-white/8 dark:bg-white/6"
+      title={[name, subtitle, trackingNumber].filter(Boolean).join(" ")}
+    >
+      <span className="relative flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white dark:bg-black">
+        {image ? (
+          <Image src={image} alt="" fill sizes="24px" unoptimized className="object-cover" />
+        ) : (
+          <PackageSearch size={11} className="text-muted-foreground/50" />
+        )}
+      </span>
+      <span className="min-w-0 truncate">
+        <span className="font-bold">{name}</span>
+        {subtitle ? <span className="ml-1 text-muted-foreground">{subtitle}</span> : null}
+      </span>
+      {typeof count === "number" ? (
+        <span className="shrink-0 rounded-full border border-cyan-400/25 bg-cyan-400/10 px-1.5 py-0.5 font-black text-cyan-700 dark:text-cyan-200">{count}次</span>
+      ) : null}
+      {typeof quantity === "number" ? (
+        <span className="shrink-0 font-black text-primary">{quantity}件</span>
+      ) : null}
+    </span>
+  );
+}
+
+function CustomerShipmentRecordsModal({
+  target,
+  isOpen,
+  onClose,
+}: {
+  target: { type: "customer"; customer: Customer } | { type: "group"; group: string } | null;
+  isOpen: boolean;
+  onClose: () => void;
+}) {
+  const { showToast } = useToast();
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [keyword, setKeyword] = useState("");
+  const [data, setData] = useState<ShipmentRecordResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isCustomerStatsExpanded, setIsCustomerStatsExpanded] = useState(false);
+  const isGroupTarget = target?.type === "group";
+  const title = target?.type === "group" ? `${target.group} 分组的进货记录` : target ? `${getCustomerName(target.customer)} 的进货记录` : "";
+  const subtitle = target?.type === "group" ? `${data?.group?.customerCount || 0} 位客户` : target ? (target.customer.contactPhone || "未填写电话") : "";
+  const visibleCustomerStats = isCustomerStatsExpanded ? (data?.customerStats || []) : (data?.customerStats || []).slice(0, 6);
+  const hiddenCustomerStatsCount = Math.max(0, (data?.customerStats?.length || 0) - visibleCustomerStats.length);
+
+  const fetchRecords = useCallback(async () => {
+    if (!target || !isOpen) return;
+
+    setIsLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (startDate) params.set("startDate", startDate);
+      if (endDate) params.set("endDate", endDate);
+      if (keyword.trim()) params.set("keyword", keyword.trim());
+      const query = params.toString();
+      const res = target.type === "group"
+        ? await fetch(`/api/customer-groups/shipment-records?group=${encodeURIComponent(target.group)}${query ? `&${query}` : ""}`)
+        : await fetch(`/api/customers/${target.customer.id}/shipment-records${query ? `?${query}` : ""}`);
+      const result = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(result?.error || "加载进货记录失败");
+      }
+      setData(result);
+    } catch (error) {
+      console.error("Failed to fetch customer shipment records:", error);
+      showToast(error instanceof Error ? error.message : "加载进货记录失败", "error");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [endDate, isOpen, keyword, showToast, startDate, target]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setStartDate("");
+      setEndDate("");
+      setKeyword("");
+      setData(null);
+      setIsCustomerStatsExpanded(false);
+      return;
+    }
+    fetchRecords();
+  }, [fetchRecords, isOpen]);
+
+  useEffect(() => {
+    setIsCustomerStatsExpanded(false);
+  }, [target]);
+
+  if (!isOpen || !target) return null;
+
+  return createPortal(
+    <AnimatePresence>
+      <div className="fixed inset-0 z-60000 flex items-center justify-center p-3 sm:p-5">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+          onClick={onClose}
+        />
+        <motion.div
+          initial={{ opacity: 0, scale: 0.96, y: 18 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.96, y: 18 }}
+          className="relative z-10 flex max-h-[calc(100dvh-1rem)] w-full max-w-5xl flex-col overflow-hidden rounded-[24px] border border-white/10 bg-white shadow-2xl backdrop-blur-xl dark:bg-[#101722]/95 sm:max-h-[calc(100dvh-2rem)] sm:rounded-[28px]"
+        >
+          <div className="shrink-0 border-b border-border/10 p-3 sm:p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-cyan-400/20 bg-cyan-400/10 text-cyan-600 dark:text-cyan-200">
+                    <PackageSearch size={17} />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="truncate text-base font-black text-foreground sm:text-lg">{title}</h3>
+                    <p className="truncate text-xs font-bold text-muted-foreground">{subtitle}</p>
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="mt-3 grid gap-2 lg:grid-cols-[minmax(0,1fr)_auto]">
+              <div className="flex h-9 items-center gap-2 rounded-xl border border-border bg-white px-3 shadow-sm dark:border-white/10 dark:bg-white/5">
+                <Search size={16} className="shrink-0 text-muted-foreground" />
+                <input
+                  value={keyword}
+                  onChange={(event) => setKeyword(event.target.value)}
+                  placeholder="搜索商品名称、规格、SKU..."
+                  className="min-w-0 flex-1 bg-transparent text-sm outline-none"
+                />
+                {keyword ? (
+                  <button type="button" onClick={() => setKeyword("")} className="text-muted-foreground hover:text-foreground">
+                    <X size={15} />
+                  </button>
+                ) : null}
+              </div>
+              <div className="grid grid-cols-2 items-center gap-2 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto]">
+                <DatePicker value={startDate} onChange={setStartDate} maxDate={endDate} placeholder="开始日期" className="h-9 min-w-0 sm:w-[136px]" triggerClassName="h-full rounded-xl border-border bg-white shadow-sm dark:bg-white/5" />
+                <span className="hidden text-xs font-bold text-muted-foreground sm:block">至</span>
+                <DatePicker value={endDate} onChange={setEndDate} minDate={startDate} placeholder="结束日期" className="h-9 min-w-0 sm:w-[136px]" triggerClassName="h-full rounded-xl border-border bg-white shadow-sm dark:bg-white/5" />
+                {(startDate || endDate || keyword) ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStartDate("");
+                      setEndDate("");
+                      setKeyword("");
+                    }}
+                    className="col-span-2 h-9 rounded-xl border border-border bg-white px-3 text-sm font-bold text-muted-foreground shadow-sm transition-colors hover:bg-muted/60 hover:text-foreground dark:border-white/10 dark:bg-white/5 sm:col-span-1"
+                  >
+                    清空
+                  </button>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="mt-3 grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
+              <div className="flex h-9 items-center justify-center gap-2 rounded-xl border border-border/70 bg-muted/30 px-2 dark:border-white/10 dark:bg-white/[0.035] sm:justify-start sm:px-3">
+                <span className="text-xs font-bold text-muted-foreground">发货单</span>
+                <span className="text-base font-black text-foreground">{data?.totalOrders || 0}</span>
+              </div>
+              {isGroupTarget ? (
+                <div className="flex h-9 items-center justify-center gap-2 rounded-xl border border-border/70 bg-muted/30 px-2 dark:border-white/10 dark:bg-white/[0.035] sm:justify-start sm:px-3">
+                  <span className="text-xs font-bold text-muted-foreground">客户数</span>
+                  <span className="text-base font-black text-foreground">{data?.group?.customerCount || 0}</span>
+                </div>
+              ) : null}
+              <div className="flex h-9 items-center justify-center gap-2 rounded-xl border border-border/70 bg-muted/30 px-2 dark:border-white/10 dark:bg-white/[0.035] sm:justify-start sm:px-3">
+                <span className="text-xs font-bold text-muted-foreground">商品种类</span>
+                <span className="text-base font-black text-foreground">{data?.productStats?.length || 0}</span>
+              </div>
+              <div className="flex h-9 items-center justify-center gap-2 rounded-xl border border-border/70 bg-muted/30 px-2 dark:border-white/10 dark:bg-white/[0.035] sm:justify-start sm:px-3">
+                <span className="text-xs font-bold text-muted-foreground">总数量</span>
+                <span className="text-base font-black text-foreground">{data?.totalQuantity || 0}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4">
+            {isLoading ? (
+              <div className="flex h-64 items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+            ) : !data || data.records.length === 0 ? (
+              <EmptyState
+                icon={<PackageSearch size={32} />}
+                title="没有进货记录"
+                description="当前筛选条件下没有完整发货记录。"
+              />
+            ) : (
+              <div className="space-y-3">
+                <section>
+                  {isGroupTarget && data.customerStats && data.customerStats.length > 0 ? (
+                    <div className="mb-3">
+                      <div className="mb-2 flex items-center justify-between gap-3">
+                        <h4 className="text-sm font-black text-foreground">客户汇总</h4>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {visibleCustomerStats.map((item) => (
+                          <span key={item.id} className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-border/50 bg-white/70 px-2.5 py-1 text-[10px] font-bold text-foreground shadow-sm dark:border-white/8 dark:bg-white/6">
+                            <span className="shrink-0">{item.name}</span>
+                            {item.phone ? <span className="min-w-0 truncate text-muted-foreground max-[420px]:max-w-[86px]">{item.phone}</span> : null}
+                            <span className="text-cyan-600 dark:text-cyan-200">{item.orderCount}单</span>
+                            <span className="text-primary">{item.totalQuantity}件</span>
+                          </span>
+                        ))}
+                        {(hiddenCustomerStatsCount > 0 || isCustomerStatsExpanded) ? (
+                          <button
+                            type="button"
+                            onClick={() => setIsCustomerStatsExpanded((prev) => !prev)}
+                            className="inline-flex items-center rounded-full border border-border/50 bg-muted/40 px-2.5 py-1 text-[10px] font-black text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground dark:border-white/8 dark:bg-white/6"
+                          >
+                            {isCustomerStatsExpanded ? "收起" : `还有 ${hiddenCustomerStatsCount} 位`}
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
+                  ) : null}
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <h4 className="text-sm font-black text-foreground">商品汇总</h4>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {(data.productStats || []).map((item) => (
+                      <CustomerProductPill
+                        key={item.key}
+                        name={item.name}
+                        variant={item.variant}
+                        sku={item.sku}
+                        image={item.image}
+                        count={item.shipmentCount}
+                        quantity={item.totalQuantity}
+                      />
+                    ))}
+                  </div>
+                </section>
+
+                <section>
+                  <div className="mb-2">
+                    <h4 className="text-sm font-black text-foreground">发货明细</h4>
+                  </div>
+                {data.records.map((record) => (
+                  <article key={record.id} className="rounded-xl border border-border bg-white/80 p-3 shadow-sm dark:border-white/10 dark:bg-white/[0.04]">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0">
+                        <div className="text-sm font-black text-foreground">{record.id}</div>
+                        <div className="text-xs font-bold text-muted-foreground">
+                          {formatDateTime(record.date)}
+                          {isGroupTarget && record.customerName ? <span className="ml-2">{record.customerName}</span> : null}
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2 text-xs font-bold text-muted-foreground">
+                        <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-emerald-600 dark:text-emerald-300">{record.status}</span>
+                        {record.logisticsNames.length > 0 ? <span>{record.logisticsNames.join(" / ")}</span> : null}
+                        {record.trackingNumbers.length > 0 ? <span className="font-mono">{record.trackingNumbers.join(" / ")}</span> : null}
+                      </div>
+                    </div>
+
+                    <div className="mt-2 flex flex-wrap gap-2 rounded-xl border border-border/70 p-2 dark:border-white/10">
+                      {record.items.map((item) => (
+                        <CustomerProductPill
+                          key={item.id}
+                          name={item.name}
+                          variant={item.variant}
+                          sku={item.sku}
+                          image={item.image}
+                          quantity={item.quantity}
+                          trackingNumber={item.tracking?.trackingNumber}
+                        />
+                      ))}
+                    </div>
+                  </article>
+                ))}
+                </section>
+              </div>
+            )}
+          </div>
+        </motion.div>
+      </div>
+    </AnimatePresence>,
+    document.body
+  );
+}
+
 function CustomerModal({
   isOpen,
   initialData,
@@ -82,6 +453,7 @@ function CustomerModal({
     setForm(initialData ? {
       contactName: initialData.contactName || "",
       contactPhone: initialData.contactPhone || "",
+      group: initialData.group || "",
       address: initialData.address || initialData.detailAddress || "",
     } : emptyForm);
   }, [isOpen, initialData]);
@@ -90,12 +462,13 @@ function CustomerModal({
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!form.contactName.trim() || !form.address.trim()) return;
+    if (!form.contactName.trim() || !form.contactPhone.trim() || !form.address.trim()) return;
     setIsSubmitting(true);
     try {
       await onSubmit({
         contactName: form.contactName.trim(),
         contactPhone: form.contactPhone.trim(),
+        group: form.group.trim(),
         address: form.address.trim(),
       });
     } finally {
@@ -145,7 +518,7 @@ function CustomerModal({
                 />
               </label>
               <label className="space-y-2">
-                <span className="text-xs font-bold text-muted-foreground">手机号</span>
+                <span className="text-xs font-bold text-muted-foreground">手机号 <span className="text-rose-500">*</span></span>
                 <input
                   value={form.contactPhone}
                   onChange={(e) => setForm((prev) => ({ ...prev, contactPhone: e.target.value }))}
@@ -154,6 +527,15 @@ function CustomerModal({
                 />
               </label>
             </div>
+            <label className="space-y-2 block">
+              <span className="text-xs font-bold text-muted-foreground">客户分组</span>
+              <input
+                value={form.group}
+                onChange={(e) => setForm((prev) => ({ ...prev, group: e.target.value }))}
+                placeholder="例如：老客户 / 团购 / 贵州"
+                className="h-11 w-full rounded-2xl border border-border bg-white px-4 text-sm outline-none transition-all focus:ring-2 focus:ring-primary/20 dark:border-white/10 dark:bg-white/5"
+              />
+            </label>
             <label className="space-y-2 block">
               <span className="text-xs font-bold text-muted-foreground">完整地址 <span className="text-rose-500">*</span></span>
               <textarea
@@ -175,10 +557,100 @@ function CustomerModal({
               </button>
               <button
                 type="submit"
-                disabled={isSubmitting || !form.contactName.trim() || !form.address.trim()}
+                disabled={isSubmitting || !form.contactName.trim() || !form.contactPhone.trim() || !form.address.trim()}
                 className="inline-flex h-10 min-w-[96px] items-center justify-center rounded-full bg-foreground px-5 text-sm font-black text-background transition-all hover:-translate-y-0.5 disabled:pointer-events-none disabled:opacity-50 dark:text-black"
               >
                 {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : "确认保存"}
+              </button>
+            </div>
+          </form>
+        </motion.div>
+      </div>
+    </AnimatePresence>,
+    document.body
+  );
+}
+
+function CustomerGroupModal({
+  isOpen,
+  selectedCount,
+  initialGroup,
+  onClose,
+  onSubmit,
+}: {
+  isOpen: boolean;
+  selectedCount: number;
+  initialGroup: string;
+  onClose: () => void;
+  onSubmit: (group: string) => Promise<void>;
+}) {
+  const [group, setGroup] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setGroup(initialGroup);
+    }
+  }, [initialGroup, isOpen]);
+
+  if (!isOpen) return null;
+
+  return createPortal(
+    <AnimatePresence>
+      <div className="fixed inset-0 z-60000 flex items-center justify-center p-4">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+          onClick={onClose}
+        />
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95, y: 18 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.95, y: 18 }}
+          className="relative z-10 w-full max-w-md overflow-hidden rounded-[28px] border border-white/10 bg-white shadow-2xl backdrop-blur-xl dark:bg-[#101722]/95"
+        >
+          <div className="border-b border-border/10 p-6">
+            <h3 className="text-xl font-black text-foreground">设置客户分组</h3>
+            <p className="mt-1 text-xs text-muted-foreground">将为已选 {selectedCount} 位客户设置分组，留空则移出分组。</p>
+          </div>
+          <form
+            onSubmit={async (event) => {
+              event.preventDefault();
+              setIsSubmitting(true);
+              try {
+                await onSubmit(group.trim());
+              } finally {
+                setIsSubmitting(false);
+              }
+            }}
+            className="space-y-5 p-6"
+          >
+            <label className="space-y-2 block">
+              <span className="text-xs font-bold text-muted-foreground">分组名称</span>
+              <input
+                value={group}
+                onChange={(event) => setGroup(event.target.value)}
+                placeholder="例如：老客户 / 团购 / 贵州"
+                className="h-11 w-full rounded-2xl border border-border bg-white px-4 text-sm outline-none transition-all focus:ring-2 focus:ring-primary/20 dark:border-white/10 dark:bg-white/5"
+                autoFocus
+              />
+            </label>
+            <div className="-mx-6 -mb-6 flex justify-end gap-3 border-t border-border/10 bg-zinc-50/60 p-6 dark:bg-card/30">
+              <button
+                type="button"
+                onClick={onClose}
+                className="h-10 rounded-full border border-border bg-white px-5 text-sm font-bold text-muted-foreground transition-all hover:bg-muted/40 active:scale-95 dark:border-white/10 dark:bg-white/5"
+              >
+                取消
+              </button>
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="inline-flex h-10 min-w-[96px] items-center justify-center rounded-full bg-foreground px-5 text-sm font-black text-background transition-all hover:-translate-y-0.5 disabled:pointer-events-none disabled:opacity-50 dark:text-black"
+              >
+                {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : "确认"}
               </button>
             </div>
           </form>
@@ -196,14 +668,17 @@ export default function CustomersPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [groupFilter, setGroupFilter] = useState("all");
   const [sortMode, setSortMode] = useState<SortMode>("recent");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(12);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
+  const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [recordsTarget, setRecordsTarget] = useState<{ type: "customer"; customer: Customer } | { type: "group"; group: string } | null>(null);
   const [confirmConfig, setConfirmConfig] = useState({
     isOpen: false,
     title: "",
@@ -244,8 +719,11 @@ export default function CustomersPage() {
             .some((value) => String(value || "").toLowerCase().includes(keyword))
         )
       : customers;
+    const groupMatched = groupFilter === "all"
+      ? matched
+      : matched.filter((customer) => (customer.group || "") === (groupFilter === "__ungrouped" ? "" : groupFilter));
 
-    return [...matched].sort((a, b) => {
+    return [...groupMatched].sort((a, b) => {
       if (sortMode === "usage-desc") {
         return (b.usageCount || 0) - (a.usageCount || 0) || getCustomerTime(b).localeCompare(getCustomerTime(a));
       }
@@ -260,10 +738,20 @@ export default function CustomersPage() {
       }
       return getCustomerTime(b).localeCompare(getCustomerTime(a)) || getCustomerName(a).localeCompare(getCustomerName(b), "zh-Hans-CN");
     });
-  }, [customers, searchQuery, sortMode]);
+  }, [customers, groupFilter, searchQuery, sortMode]);
+
+  const groupOptions = useMemo(() => {
+    const groups = Array.from(new Set(customers.map((customer) => customer.group || "").filter(Boolean))).sort((a, b) => a.localeCompare(b, "zh-Hans-CN"));
+    return [
+      { value: "all", label: "全部分组" },
+      { value: "__ungrouped", label: "未分组" },
+      ...groups.map((group) => ({ value: group, label: group })),
+    ];
+  }, [customers]);
 
   const totalItems = filteredCustomers.length;
   const hasDateFilter = Boolean(startDate || endDate);
+  const selectedGroupName = groupFilter !== "all" && groupFilter !== "__ungrouped" ? groupFilter : "";
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
   const paginatedCustomers = useMemo(
     () => filteredCustomers.slice((currentPage - 1) * pageSize, currentPage * pageSize),
@@ -272,7 +760,7 @@ export default function CustomersPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, startDate, endDate, sortMode, pageSize]);
+  }, [groupFilter, searchQuery, startDate, endDate, sortMode, pageSize]);
 
   useEffect(() => {
     if (currentPage > totalPages) {
@@ -282,7 +770,7 @@ export default function CustomersPage() {
 
   useEffect(() => {
     setSelectedIds([]);
-  }, [currentPage, searchQuery, startDate, endDate, sortMode, pageSize]);
+  }, [currentPage, groupFilter, searchQuery, startDate, endDate, sortMode, pageSize]);
 
   const handleSubmit = async (form: CustomerForm) => {
     const isEditing = Boolean(editingCustomer);
@@ -350,6 +838,31 @@ export default function CustomersPage() {
     });
   };
 
+  const handleBatchGroup = async (group: string) => {
+    const res = await fetch("/api/customers", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: selectedIds, group }),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      showToast(data?.error || "设置分组失败", "error");
+      return;
+    }
+
+    showToast(group ? `已设置为「${group}」` : "已移出分组", "success");
+    setSelectedIds([]);
+    setIsGroupModalOpen(false);
+    await fetchCustomers();
+  };
+
+  const selectedGroup = useMemo(() => {
+    const selected = customers.filter((customer) => selectedIds.includes(customer.id));
+    if (selected.length === 0) return "";
+    const firstGroup = selected[0]?.group || "";
+    return selected.every((customer) => (customer.group || "") === firstGroup) ? firstGroup : "";
+  }, [customers, selectedIds]);
+
   const handleCopy = async (customer: Customer) => {
     const success = await copyToClipboard(getCustomerText(customer));
     showToast(success ? "已复制客户地址" : "复制失败", success ? "success" : "error");
@@ -383,6 +896,7 @@ export default function CustomersPage() {
         { header: "序号", key: "index", width: 8 },
         { header: "客户姓名", key: "contactName", width: 18 },
         { header: "手机号", key: "contactPhone", width: 18 },
+        { header: "客户分组", key: "group", width: 16 },
         { header: "完整地址", key: "address", width: 62 },
         { header: "进货次数", key: "usageCount", width: 12 },
         { header: "来源", key: "source", width: 16 },
@@ -401,6 +915,7 @@ export default function CustomersPage() {
           index: index + 1,
           contactName: customer.contactName || "",
           contactPhone: customer.contactPhone || "",
+          group: customer.group || "",
           address: customer.address || "",
           usageCount: customer.usageCount || 0,
           source: customer.source === "factory-shipment" ? "发货自动收集" : "手动维护",
@@ -420,8 +935,8 @@ export default function CustomersPage() {
           if (rowNumber > 1) {
             cell.alignment = {
               vertical: "middle",
-              horizontal: colNumber === 1 || colNumber === 5 ? "center" : "left",
-              wrapText: colNumber === 4,
+              horizontal: colNumber === 1 || colNumber === 6 ? "center" : "left",
+              wrapText: colNumber === 5,
             };
           }
         });
@@ -431,7 +946,7 @@ export default function CustomersPage() {
         }
       });
       worksheet.getColumn("C").numFmt = "@";
-      worksheet.getColumn("G").numFmt = "yyyy-mm-dd hh:mm:ss";
+      worksheet.getColumn("H").numFmt = "yyyy-mm-dd hh:mm:ss";
 
       const buffer = await workbook.xlsx.writeBuffer();
       const timestamp = new Date().toLocaleString("sv-SE", { hour12: false }).replace(" ", "_").replace(/:/g, "-");
@@ -476,12 +991,12 @@ export default function CustomersPage() {
   };
 
   return (
-    <div className="min-h-[calc(100dvh-4rem)] p-4 sm:p-6 lg:p-8">
-      <div className="mx-auto max-w-7xl space-y-6">
+    <div className="min-h-[calc(100dvh-4rem)] p-3 sm:p-6 lg:p-8">
+      <div className="mx-auto max-w-7xl space-y-4 sm:space-y-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <div className="flex flex-wrap items-center gap-3">
-              <h1 className="text-3xl font-black tracking-tight text-foreground">客户管理</h1>
+              <h1 className="text-3xl font-black tracking-tight text-foreground max-[480px]:text-2xl">客户管理</h1>
               {!isLoading ? (
                 <span className="rounded-full border border-border bg-white/75 px-3 py-1 text-xs font-black text-muted-foreground shadow-sm dark:border-white/10 dark:bg-white/5">
                   {totalItems} 位客户
@@ -494,21 +1009,21 @@ export default function CustomersPage() {
             <button
               type="button"
               onClick={() => setIsImportOpen(true)}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-border bg-white/75 px-4 text-sm font-black text-foreground shadow-sm transition-all hover:-translate-y-0.5 hover:bg-white dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10"
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-border bg-white/75 px-3 text-sm font-black text-foreground shadow-sm transition-all hover:-translate-y-0.5 hover:bg-white dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10 sm:h-11 sm:px-4"
               title="导入客户"
             >
               <Upload size={16} />
-              <span className="hidden sm:inline">导入</span>
+              <span>导入</span>
             </button>
             <button
               type="button"
               onClick={handleExport}
               disabled={isExporting}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-border bg-white/75 px-4 text-sm font-black text-foreground shadow-sm transition-all hover:-translate-y-0.5 hover:bg-white disabled:pointer-events-none disabled:opacity-60 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10"
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-border bg-white/75 px-3 text-sm font-black text-foreground shadow-sm transition-all hover:-translate-y-0.5 hover:bg-white disabled:pointer-events-none disabled:opacity-60 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10 sm:h-11 sm:px-4"
               title="导出客户"
             >
               {isExporting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
-              <span className="hidden sm:inline">导出</span>
+              <span>导出</span>
             </button>
             <button
               type="button"
@@ -516,17 +1031,17 @@ export default function CustomersPage() {
                 setEditingCustomer(null);
                 setIsModalOpen(true);
               }}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-foreground px-4 text-sm font-black text-background shadow-lg transition-all hover:-translate-y-0.5 dark:text-black sm:px-5"
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-foreground px-3 text-sm font-black text-background shadow-lg transition-all hover:-translate-y-0.5 dark:text-black sm:h-11 sm:px-5"
             >
               <Plus size={16} />
-              <span className="hidden sm:inline">新建客户</span>
+              <span className="max-[380px]:hidden sm:inline">新建客户</span>
             </button>
           </div>
         </div>
 
         <div className="grid gap-3 xl:grid-cols-[minmax(360px,1fr)_minmax(520px,auto)]">
-          <div className="grid grid-cols-[minmax(0,1fr)_minmax(120px,38%)] items-center gap-2 rounded-2xl border border-border bg-white/75 p-2 shadow-sm dark:border-white/10 dark:bg-white/5 sm:grid-cols-[minmax(0,1fr)_auto]">
-            <div className="flex h-10 min-w-0 items-center gap-3 px-2 sm:h-11">
+          <div className="grid grid-cols-2 items-center gap-2 rounded-2xl border border-border bg-white/75 p-2 shadow-sm dark:border-white/10 dark:bg-white/5 sm:grid-cols-[minmax(0,1fr)_auto_auto_auto]">
+            <div className="col-span-2 flex h-10 min-w-0 items-center gap-3 rounded-xl bg-muted/20 px-2 sm:col-span-1 sm:h-11 sm:bg-transparent">
               <Search size={18} className="shrink-0 text-muted-foreground" />
               <input
                 value={searchQuery}
@@ -541,19 +1056,40 @@ export default function CustomersPage() {
               ) : null}
             </div>
             <div className="flex h-10 min-w-0 items-center gap-1 sm:h-9 sm:w-40">
+              <CustomSelect
+                value={groupFilter}
+                onChange={setGroupFilter}
+                options={groupOptions}
+                className="h-full min-w-0 flex-1"
+                triggerClassName="h-full rounded-xl border-border/50 bg-transparent px-3 text-foreground shadow-none hover:bg-muted/40 dark:border-white/10 dark:bg-transparent dark:hover:bg-white/8 sm:rounded-full"
+              />
+            </div>
+            {selectedGroupName ? (
+              <button
+                type="button"
+                onClick={() => setRecordsTarget({ type: "group", group: selectedGroupName })}
+                className="h-10 rounded-xl border border-cyan-400/25 bg-cyan-400/10 px-3 text-sm font-black text-cyan-700 shadow-sm transition-colors hover:bg-cyan-400/15 dark:text-cyan-200 sm:h-9 sm:rounded-full"
+              >
+                组别数据
+              </button>
+            ) : null}
+            <div className={cn(
+              "flex h-10 min-w-0 items-center gap-1 rounded-xl bg-muted/20 px-2 sm:h-9 sm:w-40 sm:bg-transparent sm:px-0",
+              selectedGroupName && "col-span-2 sm:col-span-1"
+            )}>
               <ArrowDownAZ size={15} className="shrink-0 text-muted-foreground" />
               <CustomSelect
                 value={sortMode}
                 onChange={(value) => setSortMode(value as SortMode)}
                 options={sortOptions}
                 className="h-full min-w-0 flex-1"
-                triggerClassName="h-full rounded-full border-border/50 bg-transparent px-3 text-foreground shadow-none hover:bg-muted/40 dark:border-white/10 dark:bg-transparent dark:hover:bg-white/8"
+                triggerClassName="h-full rounded-xl border-border/50 bg-transparent px-3 text-foreground shadow-none hover:bg-muted/40 dark:border-white/10 dark:bg-transparent dark:hover:bg-white/8 sm:rounded-full"
               />
             </div>
           </div>
 
           <div className="flex flex-col gap-2 rounded-2xl border border-border bg-white/75 p-2 shadow-sm dark:border-white/10 dark:bg-white/5 md:flex-row md:items-center">
-            <div className="flex h-10 shrink-0 items-center gap-2 px-2 text-sm font-black text-muted-foreground">
+            <div className="flex h-8 shrink-0 items-center gap-2 px-2 text-sm font-black text-muted-foreground md:h-10">
               <BarChart3 size={16} />
               <span>进货统计</span>
             </div>
@@ -564,7 +1100,7 @@ export default function CustomersPage() {
                 placeholder="开始日期"
                 maxDate={endDate}
                 className="h-10 min-w-0 md:w-40"
-                triggerClassName="h-full rounded-2xl border-border bg-white shadow-sm dark:bg-white/5"
+                triggerClassName="h-full rounded-xl border-border bg-white shadow-sm dark:bg-white/5 md:rounded-2xl"
               />
               <span className="shrink-0 text-center text-xs font-bold text-muted-foreground max-[380px]:hidden">至</span>
               <DatePicker
@@ -573,7 +1109,7 @@ export default function CustomersPage() {
                 placeholder="结束日期"
                 minDate={startDate}
                 className="h-10 min-w-0 md:w-40"
-                triggerClassName="h-full rounded-2xl border-border bg-white shadow-sm dark:bg-white/5"
+                triggerClassName="h-full rounded-xl border-border bg-white shadow-sm dark:bg-white/5 md:rounded-2xl"
               />
             </div>
             {hasDateFilter ? (
@@ -583,7 +1119,7 @@ export default function CustomersPage() {
                   setStartDate("");
                   setEndDate("");
                 }}
-                className="h-10 shrink-0 rounded-2xl border border-border bg-white px-4 text-sm font-bold text-muted-foreground shadow-sm transition-colors hover:bg-muted/60 hover:text-foreground dark:border-white/10 dark:bg-white/5"
+                className="h-10 shrink-0 rounded-xl border border-border bg-white px-4 text-sm font-bold text-muted-foreground shadow-sm transition-colors hover:bg-muted/60 hover:text-foreground dark:border-white/10 dark:bg-white/5 md:rounded-2xl"
               >
                 清空
               </button>
@@ -610,20 +1146,39 @@ export default function CustomersPage() {
                     <article
                       key={customer.id}
                       className={cn(
-                        "group rounded-[24px] border bg-white/78 p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-xl dark:bg-white/[0.055]",
+                        "group rounded-[22px] border bg-white/78 p-3 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-xl dark:bg-white/[0.055] sm:rounded-[24px] sm:p-4",
                         isSelected ? "border-cyan-400/50 ring-2 ring-cyan-400/15" : "border-border/70 dark:border-white/10"
                       )}
                     >
-                      <div className="flex items-start justify-between gap-3">
+                      <div className="grid grid-cols-[22px_42px_minmax(0,1fr)_auto] items-start gap-2 sm:flex sm:justify-between sm:gap-3">
                         <button
                           type="button"
-                          onClick={() => setSelectedIds((prev) => prev.includes(customer.id) ? prev.filter((id) => id !== customer.id) : [...prev, customer.id])}
-                          className="min-w-0 flex-1 text-left"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setSelectedIds((prev) => prev.includes(customer.id) ? prev.filter((id) => id !== customer.id) : [...prev, customer.id]);
+                          }}
+                          className={cn(
+                            "mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-all",
+                            isSelected
+                              ? "border-cyan-500 bg-cyan-500 text-white"
+                              : "border-border bg-white/60 text-transparent hover:border-cyan-400 dark:border-white/15 dark:bg-white/5"
+                          )}
+                          title={isSelected ? "取消选择" : "选择客户"}
                         >
+                          <span className="h-2 w-2 rounded-full bg-current" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(event) => event.stopPropagation()}
+                          className="min-w-0 text-left"
+                          title={getCustomerName(customer)}
+                        >
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-cyan-400/20 bg-cyan-400/10 text-cyan-600 transition-all hover:bg-cyan-400/15 dark:text-cyan-200">
+                            <User size={18} />
+                          </div>
+                        </button>
+                        <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-cyan-400/20 bg-cyan-400/10 text-cyan-600 dark:text-cyan-200">
-                              <User size={18} />
-                            </div>
                             <div className="min-w-0">
                               <h3 className="truncate text-base font-black text-foreground">{customer.contactName || "未命名客户"}</h3>
                               <div className="mt-1 flex min-w-0 items-center gap-1.5 text-[11px] font-bold text-muted-foreground">
@@ -652,29 +1207,32 @@ export default function CustomersPage() {
                               </div>
                             </div>
                           </div>
-                        </button>
-                        <div className="flex shrink-0 items-center gap-1">
-                          <button type="button" onClick={() => handleCopy(customer)} className="rounded-xl p-2 text-muted-foreground transition-colors hover:bg-cyan-500/10 hover:text-cyan-600" title="复制地址">
+                        </div>
+                        <div className="flex max-w-[132px] shrink-0 flex-wrap items-center justify-end gap-0.5 sm:max-w-none sm:flex-nowrap sm:gap-1">
+                          <button type="button" onClick={(event) => { event.stopPropagation(); setRecordsTarget({ type: "customer", customer }); }} className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-emerald-500/10 hover:text-emerald-600 sm:rounded-xl sm:p-2" title="查看进货记录">
+                            <Eye size={15} />
+                          </button>
+                          <button type="button" onClick={(event) => { event.stopPropagation(); handleCopy(customer); }} className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-cyan-500/10 hover:text-cyan-600 sm:rounded-xl sm:p-2" title="复制地址">
                             <Copy size={15} />
                           </button>
-                          <button type="button" onClick={() => { setEditingCustomer(customer); setIsModalOpen(true); }} className="rounded-xl p-2 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary" title="编辑">
+                          <button type="button" onClick={(event) => { event.stopPropagation(); setEditingCustomer(customer); setIsModalOpen(true); }} className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary sm:rounded-xl sm:p-2" title="编辑">
                             <Edit2 size={15} />
                           </button>
-                          <button type="button" onClick={() => handleDelete(customer)} className="rounded-xl p-2 text-muted-foreground transition-colors hover:bg-rose-500/10 hover:text-rose-500" title="删除">
+                          <button type="button" onClick={(event) => { event.stopPropagation(); handleDelete(customer); }} className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-rose-500/10 hover:text-rose-500 sm:rounded-xl sm:p-2" title="删除">
                             <Trash2 size={15} />
                           </button>
                         </div>
                       </div>
 
-                      <div className="mt-4 rounded-2xl border border-border/50 bg-muted/25 p-3 text-sm dark:border-white/8 dark:bg-white/[0.035]">
+                      <div className="mt-3 rounded-2xl border border-border/50 bg-muted/25 p-3 text-sm dark:border-white/8 dark:bg-white/[0.035] sm:mt-4">
                         <div className="flex items-start gap-2 text-foreground">
                           <MapPin size={14} className="mt-0.5 shrink-0 text-cyan-500" />
                           <span className="line-clamp-2 leading-5">{customer.address}</span>
                         </div>
                       </div>
 
-                      <div className="mt-3 flex items-center justify-between text-[11px] text-muted-foreground">
-                        <span>{customer.source === "factory-shipment" ? "发货自动收集" : "手动维护"}</span>
+                      <div className="mt-3 flex items-center justify-between gap-3 text-[11px] text-muted-foreground">
+                        <span className="min-w-0 truncate">{customer.group ? `分组：${customer.group}` : (customer.source === "factory-shipment" ? "发货自动收集" : "手动维护")}</span>
                         <span>进货 {customer.usageCount || 0} 次</span>
                       </div>
                     </article>
@@ -707,13 +1265,9 @@ export default function CustomersPage() {
         onDelete={handleBatchDelete}
         extraActions={[
           {
-            label: "复制选中",
-            icon: <Copy size={15} />,
-            onClick: async () => {
-              const selected = customers.filter((customer) => selectedIds.includes(customer.id));
-              const success = await copyToClipboard(selected.map(getCustomerText).join("\n"));
-              showToast(success ? `已复制 ${selected.length} 个客户地址` : "复制失败", success ? "success" : "error");
-            },
+            label: "设置分组",
+            icon: <User size={15} />,
+            onClick: () => setIsGroupModalOpen(true),
           },
         ]}
       />
@@ -732,15 +1286,28 @@ export default function CustomersPage() {
         onClose={() => setIsImportOpen(false)}
         onImport={handleImport}
         title="导入客户"
-        description="支持 Excel 或 CSV。至少包含“客户姓名”和“完整地址”，手机号可选；已存在的客户会自动跳过。"
+        description="支持 Excel 或 CSV。至少包含“客户姓名”“手机号”和“完整地址”；已存在的客户会自动跳过。"
         templateFileName="客户导入模板.xlsx"
         templateData={[
           {
             客户姓名: "张女士",
             手机号: "13800000000",
+            客户分组: "老客户",
             完整地址: "贵州省遵义市汇川区香港路184号盛邦帝标A座11楼A6房",
           },
         ]}
+      />
+      <CustomerShipmentRecordsModal
+        target={recordsTarget}
+        isOpen={Boolean(recordsTarget)}
+        onClose={() => setRecordsTarget(null)}
+      />
+      <CustomerGroupModal
+        isOpen={isGroupModalOpen}
+        selectedCount={selectedIds.length}
+        initialGroup={selectedGroup}
+        onClose={() => setIsGroupModalOpen(false)}
+        onSubmit={handleBatchGroup}
       />
       <ConfirmModal
         isOpen={confirmConfig.isOpen}

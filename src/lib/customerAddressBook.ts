@@ -8,6 +8,7 @@ type CustomerAddressInput = {
 };
 
 type CustomerAddressItem = AddressItem & {
+  group?: string;
   source?: string;
   createdAt?: string;
   updatedAt?: string;
@@ -59,6 +60,7 @@ export function normalizeCustomerAddresses(addresses: unknown): CustomerAddressI
         serviceFeeRate: typeof item.serviceFeeRate === "number" ? item.serviceFeeRate : undefined,
         longitude: typeof item.longitude === "number" ? item.longitude : undefined,
         latitude: typeof item.latitude === "number" ? item.latitude : undefined,
+        group: normalizeText(item.group),
         source: normalizeText(item.source),
         createdAt: normalizeText(item.createdAt),
         updatedAt: normalizeText(item.updatedAt),
@@ -84,6 +86,7 @@ export function normalizeCustomerAddresses(addresses: unknown): CustomerAddressI
       ...existing,
       label: existing.label || customer.label,
       isDefault: existing.isDefault || customer.isDefault,
+      group: existing.group || customer.group,
       source: existing.source || customer.source,
       createdAt: createdAtValues[0] || "",
       updatedAt: updatedAtValues[updatedAtValues.length - 1] || "",

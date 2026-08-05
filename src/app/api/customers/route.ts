@@ -67,7 +67,7 @@ async function applyShipmentUsageStats(
 
   const where: Prisma.OutboundOrderWhereInput = {
     userId,
-    status: "已发货",
+    status: { in: ["已发货", "部分发货"] },
     OR: [
       { note: { contains: "[厂家发货]" } },
       { note: { contains: "[销售]" } },
@@ -151,9 +151,13 @@ export async function POST(request: Request) {
     const contactName = String(body.contactName || "").trim();
     const contactPhone = String(body.contactPhone || "").trim();
     const address = String(body.address || body.detailAddress || "").trim();
+    const group = String(body.group || "").trim();
 
     if (!contactName) {
       return NextResponse.json({ error: "客户姓名不能为空" }, { status: 400 });
+    }
+    if (!contactPhone) {
+      return NextResponse.json({ error: "客户手机号不能为空" }, { status: 400 });
     }
     if (!address) {
       return NextResponse.json({ error: "客户地址不能为空" }, { status: 400 });
@@ -179,6 +183,7 @@ export async function POST(request: Request) {
       detailAddress: address,
       contactName,
       contactPhone,
+      group,
       isDefault: customers.length === 0,
       source: "manual",
       createdAt: now,
@@ -241,6 +246,59 @@ export async function DELETE(request: Request) {
   }
 }
 
+export async function PATCH(request: Request) {
+  try {
+    const session = await getAuthorizedUser("outbound:manage");
+    if (!session) {
+      return NextResponse.json({ error: "Permission denied" }, { status: 403 });
+    }
+
+    const body = await request.json().catch(() => null);
+    const ids = Array.isArray(body?.ids)
+      ? body.ids.map((id: unknown) => String(id || "").trim()).filter(Boolean)
+      : [];
+    const group = String(body?.group || "").trim();
+
+    if (ids.length === 0) {
+      return NextResponse.json({ error: "请选择要分组的客户" }, { status: 400 });
+    }
+
+    const idSet = new Set(ids);
+    const user = await prisma.user.findUnique({
+      where: { id: session.id },
+      select: { shippingAddresses: true },
+    });
+    const customers = normalizeCustomerAddresses(user?.shippingAddresses);
+    let updatedCount = 0;
+    const now = new Date().toISOString();
+    const nextCustomers = customers.map((customer) => {
+      if (!idSet.has(customer.id)) {
+        return customer;
+      }
+      updatedCount += 1;
+      return {
+        ...customer,
+        group,
+        updatedAt: now,
+      };
+    });
+
+    if (updatedCount === 0) {
+      return NextResponse.json({ error: "客户不存在" }, { status: 404 });
+    }
+
+    await prisma.user.update({
+      where: { id: session.id },
+      data: { shippingAddresses: nextCustomers as unknown as Prisma.InputJsonValue },
+    });
+
+    return NextResponse.json({ success: true, updatedCount });
+  } catch (error) {
+    console.error("Failed to batch group customers:", error);
+    return NextResponse.json({ error: "批量设置分组失败" }, { status: 500 });
+  }
+}
+
 export async function PUT(request: Request) {
   try {
     const session = await getAuthorizedUser("outbound:manage");
@@ -269,11 +327,12 @@ export async function PUT(request: Request) {
       const contactName = getStringValue(row, ["客户姓名", "姓名", "收件人", "联系人", "contactName", "name", "recipientName"]);
       const contactPhone = getStringValue(row, ["手机号", "电话", "客户电话", "联系电话", "contactPhone", "phone", "recipientPhone"]);
       const address = getStringValue(row, ["完整地址", "客户地址", "地址", "收件地址", "detailAddress", "address", "recipientAddress"]);
+      const group = getStringValue(row, ["客户分组", "分组", "组别", "group", "customerGroup"]);
 
-      if (!contactName || !address) {
+      if (!contactName || !contactPhone || !address) {
         skipped += 1;
         if (errors.length < 20) {
-          errors.push(`缺少必要字段：${contactName || "未填写姓名"} / ${address || "未填写地址"}`);
+          errors.push(`缺少必要字段：${contactName || "未填写姓名"} / ${contactPhone || "未填写手机号"} / ${address || "未填写地址"}`);
         }
         continue;
       }
@@ -293,6 +352,7 @@ export async function PUT(request: Request) {
         detailAddress: address,
         contactName,
         contactPhone,
+        group,
         isDefault: nextCustomers.length === 0,
         source: "manual",
         createdAt: now,
