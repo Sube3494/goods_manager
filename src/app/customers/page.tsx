@@ -120,9 +120,7 @@ function getCustomerName(customer: Customer) {
 
 function formatDateTime(value?: string | Date | null) {
   if (!value) return "-";
-  const date = typeof value === "string" && value.endsWith("Z")
-    ? new Date(value.slice(0, -1))
-    : new Date(value);
+  const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "-";
   return date.toLocaleString("zh-CN", { hour12: false });
 }

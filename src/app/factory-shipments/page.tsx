@@ -127,10 +127,11 @@ function parseSafeDate(dateInput: Date | string | null | undefined): Date {
   if (!dateInput) return new Date();
   if (dateInput instanceof Date) return dateInput;
   const str = String(dateInput).trim();
-  if (str.endsWith('Z')) {
-    return new Date(str.slice(0, -1));
-  }
-  return new Date(str);
+  const date = new Date(str);
+  if (!isNaN(date.getTime())) return date;
+  const formattedStr = str.replace(' ', 'T');
+  const d2 = new Date(formattedStr);
+  return isNaN(d2.getTime()) ? new Date() : d2;
 }
 
 type CustomerAddressOption = {
