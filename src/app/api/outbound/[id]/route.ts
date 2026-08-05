@@ -5,6 +5,7 @@ import { hasPermission, SessionUser } from "@/lib/permissions";
 import { InventoryService as OutboundInventoryService } from "@/services/inventoryService";
 import { buildFactoryShipmentNote, parseFactoryShipmentNote, type FactoryShipmentTrackingEntry } from "@/lib/utils";
 import { collectFactoryShipmentCustomer } from "@/lib/customerAddressBook";
+import { parseAsShanghaiTime } from "@/lib/dateUtils";
 import { Prisma } from "../../../../../prisma/generated-client";
 
 type ShipmentItemIdentity = {
@@ -370,7 +371,7 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { status, notePayload, items } = body;
+    const { status, notePayload, items, date: requestedDate } = body;
 
     const requestedShopProductIds = Array.isArray(items)
       ? items
@@ -621,16 +622,24 @@ export async function PUT(
         }
       }
 
+      const wasShipped = existingOrder.status === "已发货" || existingOrder.status === "部分发货";
+      const willBeShipped = finalStatus === "已发货" || finalStatus === "部分发货";
+      const isNewlyShipped = !wasShipped && willBeShipped;
+
+      let updatedDate: Date | undefined = undefined;
+      if (requestedDate) {
+        updatedDate = parseAsShanghaiTime(requestedDate);
+      } else if (isNewlyShipped) {
+        updatedDate = new Date();
+      }
+
       if (notePayload) {
         try {
-          const wasShipped = existingOrder.status === "已发货" || existingOrder.status === "部分发货";
-          const willBeShipped = finalStatus === "已发货" || finalStatus === "部分发货";
-          const isShipped = !wasShipped && willBeShipped;
           await collectFactoryShipmentCustomer(tx, session.id, {
             recipientName: notePayload.recipientName,
             recipientPhone: notePayload.recipientPhone,
             recipientAddress: notePayload.recipientAddress,
-          }, isShipped);
+          }, isNewlyShipped);
         } catch (err) {
           console.error("Failed to auto-collect customer during outbound update:", err);
         }
@@ -641,6 +650,7 @@ export async function PUT(
         data: {
           status: finalStatus,
           ...(note !== undefined && { note }),
+          ...(updatedDate && { date: updatedDate }),
         },
       });
     });
