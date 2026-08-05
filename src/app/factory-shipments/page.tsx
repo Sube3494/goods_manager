@@ -2225,9 +2225,12 @@ function FactoryShipmentDetailModal({
                     </div>
                     <div className="rounded-2xl border border-border/60 bg-white/70 px-3.5 py-3 dark:border-white/10 dark:bg-white/4">
                       <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">发货时间</div>
-                      <div className="mt-1.5 text-base font-semibold tracking-tight text-foreground">
-                        {format(parseSafeDate(order.date), "yyyy-MM-dd HH:mm", { locale: zhCN })}
-                      </div>
+                      <input
+                        type="datetime-local"
+                        value={editForm.date ? format(parseSafeDate(editForm.date), "yyyy-MM-dd'T'HH:mm") : format(parseSafeDate(order.date), "yyyy-MM-dd'T'HH:mm")}
+                        onChange={(e) => setEditForm((prev) => ({ ...prev, date: e.target.value }))}
+                        className="mt-1 text-sm font-semibold tracking-tight text-foreground bg-transparent border-0 p-0 focus:outline-none focus:ring-0 cursor-pointer w-full"
+                      />
                     </div>
                   </div>
                 </div>
