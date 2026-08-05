@@ -27,8 +27,6 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Unauthorized or insufficient permissions" }, { status: 401 });
     }
 
-
-
     const { searchParams } = new URL(request.url);
     const scope = searchParams.get("scope");
     const excludeReturned = searchParams.get("excludeReturned") === "1";

@@ -1,49 +1,26 @@
 import { NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
 import { getAuthorizedAdmin } from "@/lib/auth";
 
+/**
+ * 此接口已废弃。
+ *
+ * 历史背景：服务器原运行在 UTC 时区，导致出库单 date 字段比实际业务时间快 8 小时。
+ * 该接口曾用于修正历史数据。
+ *
+ * 现服务器时区已更新为 Asia/Shanghai，新数据写入均正确，历史数据已于上线前修复完毕。
+ * 再次执行可能误判合法数据（业务日期与创建时间相差约 8 小时的单据），请勿调用。
+ */
 export async function POST() {
-  try {
-    const session = await getAuthorizedAdmin("roles:manage");
-    if (!session) {
-      return NextResponse.json({ error: "权限不足，仅超级管理员或拥有管理权限的用户可执行" }, { status: 403 });
-    }
-
-    // 获取近期 300 张发货单进行巡检校准
-    const recentOrders = await prisma.outboundOrder.findMany({
-      orderBy: { createdAt: "desc" },
-      take: 300,
-    });
-
-    let fixCount = 0;
-    const fixedIds: string[] = [];
-
-    for (const order of recentOrders) {
-      const diffMs = order.date.getTime() - order.createdAt.getTime();
-      const eightHoursMs = 8 * 60 * 60 * 1000;
-      // 如果业务时间比系统创建时间快了大约 8 小时（误差在 30 分钟内）
-      if (Math.abs(diffMs - eightHoursMs) < 30 * 60 * 1000) {
-        await prisma.outboundOrder.update({
-          where: { id: order.id },
-          data: {
-            date: order.createdAt,
-          },
-        });
-        fixedIds.push(order.id);
-        fixCount++;
-      }
-    }
-
-    return NextResponse.json({
-      success: true,
-      message: `线上时区校准执行完成！共成功修正 ${fixCount} 张异常单据。`,
-      fixedCount: fixCount,
-      fixedIds,
-    });
-  } catch (error: any) {
-    console.error("线上时区数据校准失败:", error);
-    return NextResponse.json({ error: error.message || "服务器内部错误" }, { status: 500 });
+  const session = await getAuthorizedAdmin("roles:manage");
+  if (!session) {
+    return NextResponse.json({ error: "权限不足，仅超级管理员或拥有管理权限的用户可执行" }, { status: 403 });
   }
+
+  return NextResponse.json({
+    success: false,
+    message: "此接口已废弃。服务器时区已更新为 Asia/Shanghai，历史数据已修复完毕，无需再次执行。再次执行可能损坏合法数据。",
+    deprecated: true,
+  }, { status: 410 });
 }
 
 export async function GET() {
