@@ -2245,7 +2245,7 @@ function FactoryShipmentDetailModal({
                       </div>
 
                       {isEditing ? (
-                        <div className="mt-1.5 space-y-1.5">
+                        <div className="mt-1.5 grid grid-cols-[1fr_auto] gap-1.5 items-center">
                           <DatePicker
                             value={editForm.date ? format(parseSafeDate(editForm.date), "yyyy-MM-dd") : format(parseSafeDate(order.date), "yyyy-MM-dd")}
                             onChange={(newDateStr) => {
@@ -2257,7 +2257,21 @@ function FactoryShipmentDetailModal({
                             }}
                             showClear={false}
                             className="w-full"
-                            triggerClassName="w-full h-8 px-2.5 text-xs font-mono font-semibold rounded-xl border border-border/60 bg-white dark:bg-white/5"
+                            triggerClassName="w-full h-8 px-2 text-xs font-mono font-semibold rounded-xl border border-border/60 bg-white dark:bg-white/5"
+                          />
+                          <input
+                            type="text"
+                            maxLength={5}
+                            placeholder="08:00"
+                            value={editForm.date ? format(parseSafeDate(editForm.date), "HH:mm") : format(parseSafeDate(order.date), "HH:mm")}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              const currentDateStr = editForm.date
+                                ? format(parseSafeDate(editForm.date), "yyyy-MM-dd")
+                                : format(parseSafeDate(order.date), "yyyy-MM-dd");
+                              setEditForm((prev) => ({ ...prev, date: `${currentDateStr} ${val}` }));
+                            }}
+                            className="w-16 h-8 px-1 text-center text-xs font-mono font-semibold text-foreground rounded-xl border border-border/60 bg-white dark:bg-white/5 focus:outline-none focus:border-primary shrink-0"
                           />
                         </div>
                       ) : (
