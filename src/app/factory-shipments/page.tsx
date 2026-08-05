@@ -3210,8 +3210,11 @@ export default function FactoryShipmentsPage() {
   const [customerGroupFilter, setCustomerGroupFilter] = useState("all");
   const [exportGroupValue, setExportGroupValue] = useState("all");
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [isExportProgressOpen, setIsExportProgressOpen] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
   const [exportProgressLabel, setExportProgressLabel] = useState("");
+  const [exportStartDate, setExportStartDate] = useState("");
+  const [exportEndDate, setExportEndDate] = useState("");
   const [shippingFilter, setShippingFilter] = useState<string[]>(["all"]);
   const [paymentFilter, setPaymentFilter] = useState("all");
   const [compensationFilter, setCompensationFilter] = useState("all");
@@ -3616,6 +3619,15 @@ export default function FactoryShipmentsPage() {
     })) || "";
   }, [customerGroupByIdentity]);
 
+  const filterOrdersByExportDate = useCallback((orders: OutboundOrder[]) => {
+    if (!exportStartDate && !exportEndDate) return orders;
+    return orders.filter((order) => {
+      const orderDate = order.date ? format(parseSafeDate(order.date), "yyyy-MM-dd") : "";
+      if (!orderDate) return false;
+      return (!exportStartDate || orderDate >= exportStartDate) && (!exportEndDate || orderDate <= exportEndDate);
+    });
+  }, [exportEndDate, exportStartDate]);
+
   const handleExportShipments = useCallback(async (exportOrders: OutboundOrder[], fileLabel: string) => {
     if (exportOrders.length === 0) {
       showToast("暂无发货记录可导出", "info");
@@ -3623,6 +3635,7 @@ export default function FactoryShipmentsPage() {
     }
 
     setIsExporting(true);
+    setIsExportProgressOpen(true);
     setExportProgress(4);
     setExportProgressLabel("准备导出数据...");
     try {
@@ -4219,9 +4232,10 @@ export default function FactoryShipmentsPage() {
     } finally {
       setIsExporting(false);
       window.setTimeout(() => {
+        setIsExportProgressOpen(false);
         setExportProgress(0);
         setExportProgressLabel("");
-      }, 500);
+      }, 900);
     }
   }, [getShipmentCustomerGroup, showToast]);
 
@@ -4231,15 +4245,22 @@ export default function FactoryShipmentsPage() {
       showToast("暂无客户分组可导出", "info");
       return;
     }
-    const exportOrders = shipmentOrders.filter((order) => getShipmentCustomerGroup(order) === targetGroup);
+    const exportOrders = filterOrdersByExportDate(shipmentOrders.filter((order) => getShipmentCustomerGroup(order) === targetGroup));
     setIsExportModalOpen(false);
     void handleExportShipments(exportOrders, `_${targetGroup}_分组导出`);
-  }, [customerGroups, exportGroupValue, getShipmentCustomerGroup, handleExportShipments, shipmentOrders, showToast]);
+  }, [customerGroups, exportGroupValue, filterOrdersByExportDate, getShipmentCustomerGroup, handleExportShipments, shipmentOrders, showToast]);
 
   const handleConfirmFullExport = useCallback(() => {
+    const exportOrders = filterOrdersByExportDate(shipmentOrders);
     setIsExportModalOpen(false);
-    void handleExportShipments(shipmentOrders, "_全量导出");
-  }, [handleExportShipments, shipmentOrders]);
+    void handleExportShipments(exportOrders, "_全量导出");
+  }, [filterOrdersByExportDate, handleExportShipments, shipmentOrders]);
+
+  const openExportModal = useCallback(() => {
+    setExportStartDate(startDate);
+    setExportEndDate(endDate);
+    setIsExportModalOpen(true);
+  }, [endDate, startDate]);
 
   const totalItems = filteredOrders.length;
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
@@ -4295,7 +4316,7 @@ export default function FactoryShipmentsPage() {
         <div className="flex items-center gap-3 self-end sm:self-auto">
           <button
             type="button"
-            onClick={() => setIsExportModalOpen(true)}
+            onClick={openExportModal}
             disabled={isExporting || shipmentOrders.length === 0}
             className="flex h-9 shrink-0 items-center gap-2 rounded-full border border-border bg-white px-4 text-xs font-bold text-foreground shadow-sm transition-all hover:bg-muted/40 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 md:h-10 md:px-5 md:text-sm dark:border-white/10 dark:bg-white/5"
           >
@@ -4413,20 +4434,22 @@ export default function FactoryShipmentsPage() {
                 </button>
               </div>
               <div className="space-y-3 px-6 py-5">
-                {isExporting ? (
-                  <div className="rounded-2xl border border-border bg-zinc-50 p-3 dark:border-white/10 dark:bg-white/[0.04]">
-                    <div className="mb-2 flex items-center justify-between gap-3 text-xs font-semibold text-muted-foreground">
-                      <span className="truncate">{exportProgressLabel || "正在导出..."}</span>
-                      <span>{exportProgress}%</span>
-                    </div>
-                    <div className="h-2 overflow-hidden rounded-full bg-muted dark:bg-white/10">
-                      <div
-                        className="h-full rounded-full bg-primary transition-all duration-300"
-                        style={{ width: `${Math.min(100, Math.max(0, exportProgress))}%` }}
-                      />
-                    </div>
-                  </div>
-                ) : null}
+                <div className="grid grid-cols-2 gap-2">
+                  <DatePicker
+                    value={exportStartDate}
+                    onChange={setExportStartDate}
+                    placeholder="开始日期"
+                    className="h-12"
+                    triggerClassName="rounded-full border-border bg-zinc-50 px-4 text-sm font-semibold shadow-none dark:border-white/10 dark:bg-white/[0.06]"
+                  />
+                  <DatePicker
+                    value={exportEndDate}
+                    onChange={setExportEndDate}
+                    placeholder="结束日期"
+                    className="h-12"
+                    triggerClassName="rounded-full border-border bg-zinc-50 px-4 text-sm font-semibold shadow-none dark:border-white/10 dark:bg-white/[0.06]"
+                  />
+                </div>
                 <div className="grid grid-cols-[minmax(0,1fr)_116px] items-center gap-2">
                   <div className="min-w-0">
                     <CustomSelect
@@ -4458,6 +4481,52 @@ export default function FactoryShipmentsPage() {
                   {isExporting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
                   {isExporting ? "导出中" : "全量导出"}
                 </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        </AnimatePresence>,
+        document.body
+      ) : null}
+
+      {isExportProgressOpen ? createPortal(
+        <AnimatePresence>
+          <motion.div
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 px-4 py-6 backdrop-blur-xl"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div
+              className="relative z-10 w-full max-w-sm overflow-hidden rounded-[28px] border border-white/10 bg-white p-6 text-center shadow-2xl backdrop-blur-xl dark:bg-[#101722]/95"
+              initial={{ opacity: 0, y: 18, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 18, scale: 0.96 }}
+              transition={{ duration: 0.18 }}
+            >
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-border bg-zinc-50 dark:border-white/10 dark:bg-white/[0.06]">
+                {exportProgress >= 100 ? (
+                  <Check size={30} className="text-emerald-500" />
+                ) : (
+                  <Loader2 size={30} className="animate-spin text-primary" />
+                )}
+              </div>
+              <h3 className="mt-5 text-xl font-bold text-foreground">
+                {exportProgress >= 100 ? "导出完成" : "正在导出"}
+              </h3>
+              <p className="mt-2 min-h-5 text-sm text-muted-foreground">
+                {exportProgressLabel || "正在处理发货记录..."}
+              </p>
+              <div className="mt-5">
+                <div className="mb-2 flex items-center justify-between text-xs font-semibold text-muted-foreground">
+                  <span>导出进度</span>
+                  <span>{exportProgress}%</span>
+                </div>
+                <div className="h-2.5 overflow-hidden rounded-full bg-muted dark:bg-white/10">
+                  <div
+                    className="h-full rounded-full bg-primary transition-all duration-300"
+                    style={{ width: `${Math.min(100, Math.max(0, exportProgress))}%` }}
+                  />
+                </div>
               </div>
             </motion.div>
           </motion.div>
