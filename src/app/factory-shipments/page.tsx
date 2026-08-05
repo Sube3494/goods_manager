@@ -2217,20 +2217,45 @@ function FactoryShipmentDetailModal({
                     </div>
                   </div>
                   <div className="mt-3 grid grid-cols-2 gap-2.5">
-                    <div className="rounded-2xl border border-border/60 bg-white/70 px-3.5 py-3 dark:border-white/10 dark:bg-white/4">
+                    <div className="rounded-2xl border border-border/60 bg-white/70 p-3.5 dark:border-white/10 dark:bg-white/4">
                       <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">创建时间</div>
-                      <div className="mt-1.5 text-base font-semibold tracking-tight text-foreground">
-                        {format(parseSafeDate(order.createdAt), "yyyy-MM-dd HH:mm", { locale: zhCN })}
+                      <div className="mt-1.5 font-mono text-base font-semibold tracking-tight text-foreground">
+                        <div>{format(parseSafeDate(order.createdAt), "yyyy-MM-dd")}</div>
+                        <div className="text-xs font-normal text-muted-foreground mt-0.5">{format(parseSafeDate(order.createdAt), "HH:mm")}</div>
                       </div>
                     </div>
-                    <div className="rounded-2xl border border-border/60 bg-white/70 px-3.5 py-3 dark:border-white/10 dark:bg-white/4">
+                    <div className="rounded-2xl border border-border/60 bg-white/70 p-3.5 dark:border-white/10 dark:bg-white/4 flex flex-col justify-between">
                       <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">发货时间</div>
-                      <input
-                        type="datetime-local"
-                        value={editForm.date ? format(parseSafeDate(editForm.date), "yyyy-MM-dd'T'HH:mm") : format(parseSafeDate(order.date), "yyyy-MM-dd'T'HH:mm")}
-                        onChange={(e) => setEditForm((prev) => ({ ...prev, date: e.target.value }))}
-                        className="mt-1 text-sm font-semibold tracking-tight text-foreground bg-transparent border-0 p-0 focus:outline-none focus:ring-0 cursor-pointer w-full"
-                      />
+                      <div className="mt-1 flex flex-col gap-1">
+                        <DatePicker
+                          value={editForm.date ? format(parseSafeDate(editForm.date), "yyyy-MM-dd") : format(parseSafeDate(order.date), "yyyy-MM-dd")}
+                          onChange={(newDateStr) => {
+                            if (!newDateStr) return;
+                            const currentHHmm = editForm.date
+                              ? format(parseSafeDate(editForm.date), "HH:mm")
+                              : format(parseSafeDate(order.date), "HH:mm");
+                            setEditForm((prev) => ({ ...prev, date: `${newDateStr} ${currentHHmm}` }));
+                          }}
+                          showClear={false}
+                          className="w-full"
+                          triggerClassName="w-full h-8 px-2 text-xs sm:text-sm font-semibold border-border/40 bg-transparent hover:bg-black/5 dark:hover:bg-white/5"
+                        />
+                        <div className="flex items-center justify-between px-1 mt-0.5">
+                          <span className="text-[10px] text-muted-foreground">具体时刻</span>
+                          <input
+                            type="time"
+                            value={editForm.date ? format(parseSafeDate(editForm.date), "HH:mm") : format(parseSafeDate(order.date), "HH:mm")}
+                            onChange={(e) => {
+                              const newTime = e.target.value;
+                              const currentDateStr = editForm.date
+                                ? format(parseSafeDate(editForm.date), "yyyy-MM-dd")
+                                : format(parseSafeDate(order.date), "yyyy-MM-dd");
+                              setEditForm((prev) => ({ ...prev, date: `${currentDateStr} ${newTime}` }));
+                            }}
+                            className="text-xs font-mono font-semibold text-foreground bg-transparent border-b border-border/60 hover:border-primary focus:outline-none focus:border-primary py-0 px-1 w-16 text-right"
+                          />
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
