@@ -2245,9 +2245,9 @@ function FactoryShipmentDetailModal({
                         <div className="text-xs font-normal text-muted-foreground mt-0.5">{format(parseSafeDate(editForm.date || order.date), "HH:mm")}</div>
                       </div>
 
-                      {/* 高颜值的发货时间修改 Popover */}
+                      {/* 全盘使用项目通用 Design Tokens 的精美 Popover */}
                       {isShipDatePopoverOpen && (
-                        <div className="absolute right-0 top-full mt-2 z-[999] w-72 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-4 shadow-2xl backdrop-blur-xl ring-1 ring-black/5 dark:ring-white/10">
+                        <div className="absolute right-0 top-full mt-2 z-[999] w-72 rounded-2xl border border-border/60 bg-white/95 dark:bg-zinc-900/95 p-4 shadow-xl backdrop-blur-xl dark:border-white/10">
                           <div className="text-sm font-bold text-foreground mb-3 flex items-center justify-between border-b border-border/40 pb-2.5">
                             <span>修改发货时间</span>
                             <button
@@ -2256,7 +2256,7 @@ function FactoryShipmentDetailModal({
                                 const nowStr = format(new Date(), "yyyy-MM-dd HH:mm");
                                 setEditForm((prev) => ({ ...prev, date: nowStr }));
                               }}
-                              className="text-xs font-medium text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer"
+                              className="text-xs font-medium text-primary hover:underline cursor-pointer"
                             >
                               设为此时时刻
                             </button>
@@ -2276,7 +2276,7 @@ function FactoryShipmentDetailModal({
                                 }}
                                 showClear={false}
                                 className="w-full"
-                                triggerClassName="w-full h-9 px-3 text-xs font-mono font-medium border border-border/80 bg-zinc-50 dark:bg-zinc-800/80 text-foreground rounded-xl"
+                                triggerClassName="w-full h-9 px-3 text-xs font-mono font-medium border border-border/60 bg-white/80 dark:bg-white/5 text-foreground rounded-xl"
                               />
                             </div>
 
@@ -2294,7 +2294,7 @@ function FactoryShipmentDetailModal({
                                     : format(parseSafeDate(order.date), "yyyy-MM-dd");
                                   setEditForm((prev) => ({ ...prev, date: `${currentDateStr} ${val}` }));
                                 }}
-                                className="w-full h-9 px-3 rounded-xl border border-border/80 bg-zinc-50 dark:bg-zinc-800/80 text-xs font-mono font-semibold text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                                className="w-full h-9 px-3 rounded-xl border border-border/60 bg-white/80 dark:bg-white/5 text-xs font-mono font-semibold text-foreground focus:outline-none focus:border-primary"
                               />
                             </div>
                           </div>
@@ -2303,7 +2303,7 @@ function FactoryShipmentDetailModal({
                             <button
                               type="button"
                               onClick={() => setIsShipDatePopoverOpen(false)}
-                              className="px-4 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl shadow-md cursor-pointer transition-all"
+                              className="px-4 py-1.5 text-xs font-bold text-primary-foreground bg-primary hover:bg-primary/90 rounded-xl shadow-xs cursor-pointer transition-all active:scale-95"
                             >
                               确定
                             </button>
