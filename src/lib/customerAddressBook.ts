@@ -19,11 +19,15 @@ function normalizeText(value?: string | null) {
   return String(value || "").replace(/\s+/g, " ").trim();
 }
 
+function normalizeIdentityText(value?: string | null) {
+  return normalizeText(value).toLowerCase();
+}
+
 function getCustomerKey(item: Pick<CustomerAddressItem, "contactName" | "contactPhone" | "address">) {
   return [
-    normalizeText(item.contactName),
-    normalizeText(item.contactPhone),
-    normalizeText(item.address),
+    normalizeIdentityText(item.contactName),
+    normalizeIdentityText(item.contactPhone),
+    normalizeIdentityText(item.address),
   ].join("|");
 }
 
@@ -33,33 +37,69 @@ function buildCustomerLabel(name: string, phone: string, address: string) {
 }
 
 export function normalizeCustomerAddresses(addresses: unknown): CustomerAddressItem[] {
-  return Array.isArray(addresses)
-    ? addresses
-        .map((item) => item as Partial<CustomerAddressItem>)
-        .filter((item) => normalizeText(item.address))
-        .map((item, index) => {
-          const address = normalizeText(item.address || item.detailAddress);
-          const contactName = normalizeText(item.contactName);
-          const contactPhone = normalizeText(item.contactPhone);
-          return {
-            id: normalizeText(item.id) || `customer_${Date.now()}_${index}`,
-            label: normalizeText(item.label) || buildCustomerLabel(contactName, contactPhone, address),
-            address,
-            detailAddress: address,
-            contactName,
-            contactPhone,
-            isDefault: Boolean(item.isDefault),
-            serviceFeeRate: typeof item.serviceFeeRate === "number" ? item.serviceFeeRate : undefined,
-            longitude: typeof item.longitude === "number" ? item.longitude : undefined,
-            latitude: typeof item.latitude === "number" ? item.latitude : undefined,
-            source: normalizeText(item.source),
-            createdAt: normalizeText(item.createdAt),
-            updatedAt: normalizeText(item.updatedAt),
-            lastUsedAt: normalizeText(item.lastUsedAt),
-            usageCount: typeof item.usageCount === "number" ? item.usageCount : undefined,
-          };
-        })
-    : [];
+  if (!Array.isArray(addresses)) {
+    return [];
+  }
+
+  const customers = addresses
+    .map((item) => item as Partial<CustomerAddressItem>)
+    .filter((item) => normalizeText(item.address || item.detailAddress))
+    .map((item, index) => {
+      const address = normalizeText(item.address || item.detailAddress);
+      const contactName = normalizeText(item.contactName);
+      const contactPhone = normalizeText(item.contactPhone);
+      return {
+        id: normalizeText(item.id) || `customer_${Date.now()}_${index}`,
+        label: normalizeText(item.label) || buildCustomerLabel(contactName, contactPhone, address),
+        address,
+        detailAddress: address,
+        contactName,
+        contactPhone,
+        isDefault: Boolean(item.isDefault),
+        serviceFeeRate: typeof item.serviceFeeRate === "number" ? item.serviceFeeRate : undefined,
+        longitude: typeof item.longitude === "number" ? item.longitude : undefined,
+        latitude: typeof item.latitude === "number" ? item.latitude : undefined,
+        source: normalizeText(item.source),
+        createdAt: normalizeText(item.createdAt),
+        updatedAt: normalizeText(item.updatedAt),
+        lastUsedAt: normalizeText(item.lastUsedAt),
+        usageCount: typeof item.usageCount === "number" ? item.usageCount : undefined,
+      };
+    });
+
+  const deduped = new Map<string, CustomerAddressItem>();
+  for (const customer of customers) {
+    const key = getCustomerKey(customer);
+    const existing = deduped.get(key);
+    if (!existing) {
+      deduped.set(key, customer);
+      continue;
+    }
+
+    const createdAtValues = [existing.createdAt, customer.createdAt].filter(Boolean).sort();
+    const updatedAtValues = [existing.updatedAt, customer.updatedAt].filter(Boolean).sort();
+    const lastUsedAtValues = [existing.lastUsedAt, customer.lastUsedAt].filter(Boolean).sort();
+
+    deduped.set(key, {
+      ...existing,
+      label: existing.label || customer.label,
+      isDefault: existing.isDefault || customer.isDefault,
+      source: existing.source || customer.source,
+      createdAt: createdAtValues[0] || "",
+      updatedAt: updatedAtValues[updatedAtValues.length - 1] || "",
+      lastUsedAt: lastUsedAtValues[lastUsedAtValues.length - 1] || "",
+      usageCount: (existing.usageCount || 0) + (customer.usageCount || 0),
+    });
+  }
+
+  return Array.from(deduped.values());
+}
+
+export function isSameCustomerAddress(
+  a: Pick<CustomerAddressItem, "contactName" | "contactPhone" | "address">,
+  b: Pick<CustomerAddressItem, "contactName" | "contactPhone" | "address">
+) {
+  return getCustomerKey(a) === getCustomerKey(b);
 }
 
 export async function collectFactoryShipmentCustomer(
