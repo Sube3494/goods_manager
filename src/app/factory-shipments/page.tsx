@@ -163,6 +163,7 @@ function CustomerAddressCombobox({
   const [isOpen, setIsOpen] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const displayValue = isOpen ? searchQuery : value;
 
   useEffect(() => {
     if (!isOpen || hasLoaded) return;
@@ -203,13 +204,11 @@ function CustomerAddressCombobox({
     <div className={cn("relative", wrapperClassName)}>
       <input
         type="text"
-        value={value}
+        value={displayValue}
         onFocus={() => setIsOpen(true)}
         onBlur={() => window.setTimeout(() => setIsOpen(false), 120)}
         onChange={(e) => {
-          const nextValue = e.target.value;
-          onChange(nextValue);
-          setSearchQuery(nextValue);
+          setSearchQuery(e.target.value);
           setIsOpen(true);
         }}
         placeholder={placeholder}
@@ -1885,21 +1884,19 @@ function FactoryShipmentDetailModal({
   if (!mounted) return null;
   const parsed = order ? parseFactoryShipmentNote(order.note) : null;
   const selectedProductIds = editItems.map((item) => String(getItemKey(item))).filter(Boolean);
-  const parsedCopyRecipient = parseQuickAddressInput(editForm.recipientLine);
   const copyRecipientLabel = formatRecipientWithRegion(
-    parsedCopyRecipient.recipientName || editForm.recipientName,
-    parsedCopyRecipient.recipientAddress || editForm.recipientAddress
+    editForm.recipientName,
+    editForm.recipientAddress
   );
 
   const copyEditItem = async (item: SelectedShipmentItem) => {
-    const parsedRecipient = parseQuickAddressInput(editForm.recipientLine);
     const recipient = {
-      recipientName: (parsedRecipient.recipientName.trim() || editForm.recipientName.trim()),
-      recipientPhone: (parsedRecipient.recipientPhone.trim() || editForm.recipientPhone.trim()),
-      recipientAddress: (parsedRecipient.recipientAddress.trim() || editForm.recipientAddress.trim()),
+      recipientName: editForm.recipientName.trim(),
+      recipientPhone: editForm.recipientPhone.trim(),
+      recipientAddress: editForm.recipientAddress.trim(),
     };
     if (!recipient.recipientName || !recipient.recipientPhone || !recipient.recipientAddress) {
-      showToast("请先填写完整收件信息后再复制", "error");
+      showToast("请先选择客户后再复制", "error");
       return;
     }
     const text = formatShipmentInfoText(editForm.recipientLine, recipient, [item]);
@@ -1920,14 +1917,13 @@ function FactoryShipmentDetailModal({
 
   const handleSaveEdit = async () => {
     if (!order) return;
-    const parsedRecipient = parseQuickAddressInput(editForm.recipientLine);
     const finalRecipient = {
-      recipientName: editForm.recipientName.trim() || parsedRecipient.recipientName.trim(),
-      recipientPhone: editForm.recipientPhone.trim() || parsedRecipient.recipientPhone.trim(),
-      recipientAddress: editForm.recipientAddress.trim() || parsedRecipient.recipientAddress.trim(),
+      recipientName: editForm.recipientName.trim(),
+      recipientPhone: editForm.recipientPhone.trim(),
+      recipientAddress: editForm.recipientAddress.trim(),
     };
     if (!finalRecipient.recipientName || !finalRecipient.recipientPhone || !finalRecipient.recipientAddress) {
-      showToast("请直接填写完整收件信息，至少包含姓名、手机号和地址", "error");
+      showToast("请先在客户管理新增客户，再从客户列表选择收件人", "error");
       return;
     }
     if (editItems.length === 0) {
@@ -2175,22 +2171,7 @@ function FactoryShipmentDetailModal({
                       {isEditing ? (
                         <CustomerAddressCombobox
                           value={editForm.recipientLine}
-                          onChange={(nextLine) => {
-                            const nextParsed = parseQuickAddressInput(nextLine);
-                            setEditForm((prev) => {
-                              const next = {
-                                ...prev,
-                                recipientLine: nextLine,
-                                recipientName: nextParsed.recipientName,
-                                recipientPhone: nextParsed.recipientPhone,
-                                recipientAddress: nextParsed.recipientAddress,
-                              };
-                              if (nextParsed.parsedDate) {
-                                next.date = nextParsed.parsedDate;
-                              }
-                              return next;
-                            });
-                          }}
+                          onChange={() => {}}
                           onSelectCustomer={(customer) => {
                             if (!customer) {
                               setEditForm((prev) => ({
@@ -2210,7 +2191,7 @@ function FactoryShipmentDetailModal({
                               recipientAddress: String(customer.address || "").trim(),
                             }));
                           }}
-                          placeholder="直接填写或粘贴：姓名 手机号 详细地址"
+                          placeholder="选择客户"
                           wrapperClassName="mt-2.5"
                           className="h-11 w-full rounded-2xl border border-border/70 bg-white px-4 text-sm text-foreground outline-none placeholder:text-muted-foreground/70 dark:border-white/10 dark:bg-[#2b313d]"
                         />
@@ -2706,13 +2687,12 @@ function FactoryShipmentCreateModal({
   };
 
   const handleSubmit = async () => {
-    const parsedAddress = parseQuickAddressInput(quickAddressInput);
     const finalForm = {
       ...form,
-      recipientName: (form.recipientName.trim() || parsedAddress.recipientName.trim()),
-      recipientPhone: (form.recipientPhone.trim() || parsedAddress.recipientPhone.trim()),
-      recipientAddress: (form.recipientAddress.trim() || parsedAddress.recipientAddress.trim()),
-      remark: [parsedAddress.remark.trim(), form.remark.trim()].filter(Boolean).join(" / "),
+      recipientName: form.recipientName.trim(),
+      recipientPhone: form.recipientPhone.trim(),
+      recipientAddress: form.recipientAddress.trim(),
+      remark: form.remark.trim(),
       trackingEntries: selectedItems.map((item) => ({
         itemKey: getItemKey(item),
         itemName: item.name,
@@ -2727,7 +2707,7 @@ function FactoryShipmentCreateModal({
       return;
     }
     if (!finalForm.recipientName || !finalForm.recipientPhone || !finalForm.recipientAddress) {
-      showToast("请直接粘贴完整收件信息，至少包含姓名、手机号和地址", "error");
+      showToast("请先在客户管理新增客户，再从客户列表选择收件人", "error");
       return;
     }
     if (selectedItems.length === 0) {
@@ -2856,7 +2836,7 @@ function FactoryShipmentCreateModal({
                         value={quickAddressInput}
                         onChange={(value) => handleQuickAddressChange(value, null)}
                         onSelectCustomer={(customer) => handleQuickAddressChange(customer ? formatCustomerAddressDisplay(customer) : "", customer)}
-                        placeholder="直接粘贴客户整串地址，系统会在后台自动拆解"
+                        placeholder="选择客户"
                         className="w-full h-10 rounded-xl border border-border bg-white px-4 text-sm text-foreground outline-none placeholder:text-muted-foreground/70 dark:border-white/10 dark:bg-white/5"
                       />
                     </div>
