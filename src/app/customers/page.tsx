@@ -993,8 +993,8 @@ export default function CustomersPage() {
   return (
     <div className="min-h-[calc(100dvh-4rem)] p-3 sm:p-6 lg:p-8">
       <div className="mx-auto max-w-7xl space-y-4 sm:space-y-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-3">
               <h1 className="text-3xl font-black tracking-tight text-foreground max-[480px]:text-2xl">客户管理</h1>
               {!isLoading ? (
@@ -1003,27 +1003,38 @@ export default function CustomersPage() {
                 </span>
               ) : null}
             </div>
-            <p className="mt-2 text-sm text-muted-foreground">发货单里的收件人会自动收集到这里，方便查找、编辑和复制地址。</p>
+            <p className="mt-2 hidden text-sm text-muted-foreground sm:block">发货单里的收件人会自动收集到这里，方便查找、编辑和复制地址。</p>
           </div>
-          <div className="grid grid-cols-3 gap-2 sm:flex sm:items-center">
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 sm:flex-nowrap">
+            {selectedGroupName ? (
+              <button
+                type="button"
+                onClick={() => setRecordsTarget({ type: "group", group: selectedGroupName })}
+                className="inline-flex h-10 w-10 items-center justify-center gap-2 rounded-full border border-cyan-400/25 bg-cyan-400/10 text-sm font-black text-cyan-700 shadow-sm transition-all hover:-translate-y-0.5 hover:bg-cyan-400/15 dark:text-cyan-200 sm:h-11 sm:w-auto sm:px-4"
+                title="查看组别数据"
+              >
+                <BarChart3 size={16} />
+                <span className="hidden sm:inline">组别数据</span>
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={() => setIsImportOpen(true)}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-border bg-white/75 px-3 text-sm font-black text-foreground shadow-sm transition-all hover:-translate-y-0.5 hover:bg-white dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10 sm:h-11 sm:px-4"
+              className="inline-flex h-10 w-10 items-center justify-center gap-2 rounded-full border border-border bg-white/75 text-sm font-black text-foreground shadow-sm transition-all hover:-translate-y-0.5 hover:bg-white dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10 sm:h-11 sm:w-auto sm:px-4"
               title="导入客户"
             >
               <Upload size={16} />
-              <span>导入</span>
+              <span className="hidden sm:inline">导入</span>
             </button>
             <button
               type="button"
               onClick={handleExport}
               disabled={isExporting}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-border bg-white/75 px-3 text-sm font-black text-foreground shadow-sm transition-all hover:-translate-y-0.5 hover:bg-white disabled:pointer-events-none disabled:opacity-60 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10 sm:h-11 sm:px-4"
+              className="inline-flex h-10 w-10 items-center justify-center gap-2 rounded-full border border-border bg-white/75 text-sm font-black text-foreground shadow-sm transition-all hover:-translate-y-0.5 hover:bg-white disabled:pointer-events-none disabled:opacity-60 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10 sm:h-11 sm:w-auto sm:px-4"
               title="导出客户"
             >
               {isExporting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
-              <span>导出</span>
+              <span className="hidden sm:inline">导出</span>
             </button>
             <button
               type="button"
@@ -1031,16 +1042,17 @@ export default function CustomersPage() {
                 setEditingCustomer(null);
                 setIsModalOpen(true);
               }}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-foreground px-3 text-sm font-black text-background shadow-lg transition-all hover:-translate-y-0.5 dark:text-black sm:h-11 sm:px-5"
+              className="inline-flex h-10 w-10 items-center justify-center gap-2 rounded-full bg-foreground text-sm font-black text-background shadow-lg transition-all hover:-translate-y-0.5 dark:text-black sm:h-11 sm:w-auto sm:px-5"
+              title="新建客户"
             >
               <Plus size={16} />
-              <span className="max-[380px]:hidden sm:inline">新建客户</span>
+              <span className="hidden sm:inline">新建客户</span>
             </button>
           </div>
         </div>
 
         <div className="grid gap-3 xl:grid-cols-[minmax(360px,1fr)_minmax(520px,auto)]">
-          <div className="grid grid-cols-2 items-center gap-2 rounded-2xl border border-border bg-white/75 p-2 shadow-sm dark:border-white/10 dark:bg-white/5 sm:grid-cols-[minmax(0,1fr)_auto_auto_auto]">
+          <div className="grid grid-cols-2 items-center gap-2 rounded-2xl border border-border bg-white/75 p-2 shadow-sm dark:border-white/10 dark:bg-white/5 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
             <div className="col-span-2 flex h-10 min-w-0 items-center gap-3 rounded-xl bg-muted/20 px-2 sm:col-span-1 sm:h-11 sm:bg-transparent">
               <Search size={18} className="shrink-0 text-muted-foreground" />
               <input
@@ -1064,19 +1076,7 @@ export default function CustomersPage() {
                 triggerClassName="h-full rounded-xl border-border/50 bg-transparent px-3 text-foreground shadow-none hover:bg-muted/40 dark:border-white/10 dark:bg-transparent dark:hover:bg-white/8 sm:rounded-full"
               />
             </div>
-            {selectedGroupName ? (
-              <button
-                type="button"
-                onClick={() => setRecordsTarget({ type: "group", group: selectedGroupName })}
-                className="h-10 rounded-xl border border-cyan-400/25 bg-cyan-400/10 px-3 text-sm font-black text-cyan-700 shadow-sm transition-colors hover:bg-cyan-400/15 dark:text-cyan-200 sm:h-9 sm:rounded-full"
-              >
-                组别数据
-              </button>
-            ) : null}
-            <div className={cn(
-              "flex h-10 min-w-0 items-center gap-1 rounded-xl bg-muted/20 px-2 sm:h-9 sm:w-40 sm:bg-transparent sm:px-0",
-              selectedGroupName && "col-span-2 sm:col-span-1"
-            )}>
+            <div className="flex h-10 min-w-0 items-center gap-1 rounded-xl bg-muted/20 px-2 sm:h-9 sm:w-40 sm:bg-transparent sm:px-0">
               <ArrowDownAZ size={15} className="shrink-0 text-muted-foreground" />
               <CustomSelect
                 value={sortMode}
