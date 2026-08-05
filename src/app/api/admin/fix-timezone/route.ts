@@ -1,12 +1,10 @@
-import { NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
-import { getAuthorizedUser } from "@/lib/auth";
+import { getAuthorizedAdmin } from "@/lib/auth";
 
 export async function POST() {
   try {
-    const session = await getAuthorizedUser();
-    if (!session || (session.role !== "SUPER_ADMIN" && session.role !== "ADMIN")) {
-      return NextResponse.json({ error: "权限不足，仅管理员可执行线上时区修复" }, { status: 403 });
+    const session = await getAuthorizedAdmin("roles:manage");
+    if (!session) {
+      return NextResponse.json({ error: "权限不足，仅超级管理员或拥有管理权限的用户可执行" }, { status: 403 });
     }
 
     // 获取近期 300 张发货单进行巡检校准
