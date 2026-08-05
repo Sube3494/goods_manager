@@ -1525,6 +1525,7 @@ function FactoryShipmentFilters({
   onReset: () => void;
 }) {
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const selectedProductOptionCount = productOptions.filter((option) => productFilter.includes(option.value)).length;
   const advancedFilterCount = [
     productFilter.length !== productOptions.length,
     customerGroupFilter !== "all",
@@ -1562,12 +1563,13 @@ function FactoryShipmentFilters({
             onChange={onProductFilterChange}
             options={productOptions}
             placeholder="商品种类"
-            displayLabel={`商品种类 ${productFilter.length || 0}`}
+            displayLabel={`商品种类 ${selectedProductOptionCount}`}
             disabled={productOptions.length === 0}
+            allowEmpty
             className="h-full"
             triggerClassName={cn(
               "h-full rounded-full border px-2 text-xs shadow-none",
-              productFilter.length > 0
+              selectedProductOptionCount > 0
                 ? "border-primary/20 bg-primary/8 text-primary dark:border-primary/25 dark:bg-primary/12"
                 : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5 font-normal"
             )}
@@ -1599,12 +1601,13 @@ function FactoryShipmentFilters({
               onChange={onProductFilterChange}
               options={productOptions}
               placeholder="商品种类"
-              displayLabel={`商品种类 ${productFilter.length || 0}`}
+              displayLabel={`商品种类 ${selectedProductOptionCount}`}
               disabled={productOptions.length === 0}
+              allowEmpty
               className="h-full"
               triggerClassName={cn(
                 "h-full rounded-full border px-3 text-xs shadow-none lg:text-sm",
-                productFilter.length > 0
+                selectedProductOptionCount > 0
                   ? "border-primary/20 bg-primary/8 text-primary dark:border-primary/25 dark:bg-primary/12"
                   : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5 font-normal"
               )}
@@ -4389,6 +4392,7 @@ export default function FactoryShipmentsPage() {
   const summaryViewData = useMemo(() => {
     const customerMap = new Map<string, { key: string; name: string; orderIds: Set<string>; quantity: number }>();
     const productMap = new Map<string, { key: string; label: string; image: string; shipmentCount: number; quantity: number; orderIds: Set<string> }>();
+    const selectedProductKeySet = new Set(productFilter);
     const records = filteredOrders.map((order) => {
       const parsed = parseFactoryShipmentNote(order.note);
       const customerKey = getCustomerAddressIdentity({
@@ -4399,7 +4403,10 @@ export default function FactoryShipmentsPage() {
       const customerName = parsed.recipientName || "未命名客户";
       const customerStat = customerMap.get(customerKey) || { key: customerKey, name: customerName, orderIds: new Set<string>(), quantity: 0 };
       customerStat.orderIds.add(order.id);
-      const items = order.items.map((item) => {
+      const visibleItems = productFilter.length === 0
+        ? order.items
+        : order.items.filter((item) => selectedProductKeySet.has(getShipmentProductFilterKey(item)));
+      const items = visibleItems.map((item) => {
         const key = getShipmentProductFilterKey(item);
         const label = getShipmentProductFilterLabel(item);
         const image = item.shopProductVariant?.image || item.productVariant?.image || item.shopProduct?.image || item.product?.image || "";
@@ -4422,7 +4429,7 @@ export default function FactoryShipmentsPage() {
       records,
       totalQuantity: records.reduce((sum, record) => sum + record.items.reduce((itemSum, item) => itemSum + item.quantity, 0), 0),
     };
-  }, [filteredOrders]);
+  }, [filteredOrders, productFilter]);
 
   useEffect(() => {
     setCurrentPage(1);

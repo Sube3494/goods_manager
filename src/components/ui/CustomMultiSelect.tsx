@@ -21,6 +21,7 @@ interface CustomMultiSelectProps {
   className?: string;
   triggerClassName?: string;
   disabled?: boolean;
+  allowEmpty?: boolean;
 }
 
 export function CustomMultiSelect({
@@ -32,6 +33,7 @@ export function CustomMultiSelect({
   className,
   triggerClassName,
   disabled = false,
+  allowEmpty = false,
 }: CustomMultiSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [dropdownPosition, setDropdownPosition] = useState<{
@@ -135,8 +137,7 @@ export function CustomMultiSelect({
       newValue.push(optValue);
     }
 
-    // 如果全部被取消了，则自动回到 ["all"]
-    if (newValue.length === 0) {
+    if (newValue.length === 0 && !allowEmpty) {
       newValue = ["all"];
     }
 

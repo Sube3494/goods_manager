@@ -526,6 +526,7 @@ function CustomerShipmentRecordsModal({
                     placeholder="商品种类"
                     displayLabel={`商品种类 ${visibleProductStats.length || 0}`}
                     disabled={productOptions.length === 0}
+                    allowEmpty
                     className="h-full"
                     triggerClassName="h-full rounded-xl border-border bg-white px-2 text-xs font-medium shadow-sm dark:border-white/10 dark:bg-white/5 sm:px-3"
                   />
