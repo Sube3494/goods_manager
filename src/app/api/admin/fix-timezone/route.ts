@@ -1,3 +1,5 @@
+import { NextResponse } from "next/server";
+import prisma from "@/lib/prisma";
 import { getAuthorizedAdmin } from "@/lib/auth";
 
 export async function POST() {
