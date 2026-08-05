@@ -27,6 +27,25 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Unauthorized or insufficient permissions" }, { status: 401 });
     }
 
+    // 100% 全自动：用户加载发货单列表时自动静默修复历史 8 小时偏差单据
+    try {
+      const candidates = await prisma.outboundOrder.findMany({
+        where: { userId: user.id },
+        select: { id: true, date: true, createdAt: true },
+        take: 100,
+        orderBy: { createdAt: "desc" }
+      });
+      for (const item of candidates) {
+        const diffMs = item.date.getTime() - item.createdAt.getTime();
+        if (Math.abs(diffMs - 8 * 60 * 60 * 1000) < 30 * 60 * 1000) {
+          await prisma.outboundOrder.update({
+            where: { id: item.id },
+            data: { date: item.createdAt }
+          });
+        }
+      }
+    } catch {}
+
     const { searchParams } = new URL(request.url);
     const scope = searchParams.get("scope");
     const excludeReturned = searchParams.get("excludeReturned") === "1";
