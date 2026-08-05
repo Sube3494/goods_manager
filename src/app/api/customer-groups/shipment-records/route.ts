@@ -9,7 +9,7 @@ import { Prisma } from "../../../../../prisma/generated-client";
 function parseDateBoundary(value: string | null, endOfDay = false) {
   const date = String(value || "").trim();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
-  return new Date(`${date}T${endOfDay ? "23:59:59.999" : "00:00:00.000"}+08:00`);
+  return new Date(`${date}T${endOfDay ? "23:59:59.999" : "00:00:00.000"}Z`);
 }
 
 function normalizeSearch(value: unknown) {
