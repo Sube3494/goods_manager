@@ -28,7 +28,10 @@ type ShopProfitInfo = { id: string | null; name: string; amount: number; count: 
 
 function normalizeDisplayPlatform(platform?: string | null) {
   const raw = String(platform || "").trim();
-  return raw.toLowerCase() === "other" || !raw ? "线下交易" : raw;
+  const lower = raw.toLowerCase();
+  if (lower === "other" || !raw) return "线下交易";
+  if (lower === "ebai" || lower === "taobao" || raw.includes("淘宝")) return "淘宝";
+  return raw;
 }
 
 interface AllOrdersViewProps {

@@ -744,6 +744,16 @@ function isOfflineManualDeliveryLossOrder(input: {
     && Number(input.expectedIncome || 0) <= 0;
 }
 
+function normalizeOrderPlatformForSummary(platform?: string | null) {
+  const raw = String(platform || "").trim();
+  const lower = raw.toLowerCase();
+  if (!raw || lower === "other") return "线下交易";
+  if (raw.includes("美团") || lower.includes("meituan") || lower === "shangou") return "美团";
+  if (raw.includes("京东") || lower.includes("jd") || lower === "daojia") return "京东";
+  if (raw.includes("淘宝") || raw.includes("天猫") || lower === "taobao" || lower === "ebai") return "淘宝";
+  return raw;
+}
+
 function isRefundableMeituanDelivery(platform: unknown, delivery: unknown) {
   const deliveryObj = delivery && typeof delivery === "object" && !Array.isArray(delivery)
     ? delivery as Record<string, unknown>
@@ -759,6 +769,17 @@ function isRefundableMeituanDelivery(platform: unknown, delivery: unknown) {
     deliveryObj.delivery_type_name,
   ].map((value) => String(value || "").trim().toLowerCase()).join(" ");
   return haystack.includes("美团") || haystack.includes("meituan");
+}
+
+function hasRealizedCancelledDeliveryCost(input: {
+  deliveryFee: number;
+  platform?: unknown;
+  delivery?: unknown;
+  hasOutbound?: boolean;
+}) {
+  return input.deliveryFee > 0
+    && Boolean(input.hasOutbound)
+    && !isRefundableMeituanDelivery(input.platform, input.delivery);
 }
 
 type ParsedOutboundCostSnapshot = {
@@ -1421,8 +1442,9 @@ export async function GET(request: NextRequest) {
           const metrics = resolveIncomeMetrics(order.platform, expectedIncome, order.actualPaid, order.platformCommission);
           const cancelled = isAutoPickOrderCancelledStatus(order.status);
           const deleted = isAutoPickOrderDeletedStatus(order.status);
-          const platform = order.platform || "线下交易";
+          const platform = normalizeOrderPlatformForSummary(order.platform);
           const deliveryFee = readDeliveryFee(order.delivery);
+          const outboundMeta = outboundByOrderNo.get(order.orderNo) || null;
           const lockedResolvedShop = readResolvedAutoPickShop(order.rawPayload);
           const mappingDebug = resolveMappedShopDebug(
             order.shopId,
@@ -1450,7 +1472,12 @@ export async function GET(request: NextRequest) {
             }
             return acc.shopProfit[shopProfitKey];
           };
-          if ((cancelled || deleted) && deliveryFee > 0 && !isRefundableMeituanDelivery(order.platform, order.delivery)) {
+          if ((cancelled || deleted) && hasRealizedCancelledDeliveryCost({
+            deliveryFee,
+            platform: order.platform,
+            delivery: order.delivery,
+            hasOutbound: Boolean(outboundMeta),
+          })) {
             acc.totalDeliveryFee += deliveryFee;
             acc.platformDelivery[platform] = (acc.platformDelivery[platform] || 0) + deliveryFee;
             acc.pureProfit -= deliveryFee;
@@ -1463,7 +1490,6 @@ export async function GET(request: NextRequest) {
             shopProfit.deliveryFee += deliveryFee;
           }
           if (!cancelled && !deleted) {
-            const outboundMeta = outboundByOrderNo.get(order.orderNo) || null;
             const refundAmount = outboundMeta?.refundAmount || 0;
             const adjustedMetrics = resolveRefundAdjustedIncomeMetrics({
               expectedIncome: metrics.expectedIncome,
@@ -1558,7 +1584,7 @@ export async function GET(request: NextRequest) {
 
     if (includeMetrics) {
       for (const order of summaryOrders) {
-        const platform = order.platform || "线下交易";
+        const platform = normalizeOrderPlatformForSummary(order.platform);
         const cancelled = isAutoPickOrderCancelledStatus(order.status) || isAutoPickOrderDeletedStatus(order.status);
         if (cancelled) {
           cancelledPlatformCounts[platform] = (cancelledPlatformCounts[platform] || 0) + 1;
@@ -1728,9 +1754,14 @@ export async function GET(request: NextRequest) {
         : (shopRateMap.get(matchedShopName) ?? 0.06);
       const productCost = outboundMeta?.productCost || 0;
       const deliveryFee = readDeliveryFee(order.delivery);
+      const hasOutbound = Boolean(outboundMeta);
       const cancelledDeliveryLoss = (isAutoPickOrderCancelledStatus(order.status) || isAutoPickOrderDeletedStatus(order.status))
-        && deliveryFee > 0
-        && !isRefundableMeituanDelivery(order.platform, order.delivery);
+        && hasRealizedCancelledDeliveryCost({
+          deliveryFee,
+          platform: order.platform,
+          delivery: order.delivery,
+          hasOutbound,
+        });
       const manualDeliveryLoss = isOfflineManualDeliveryLossOrder({
         platform: order.platform,
         actualPaid: order.actualPaid,
@@ -1738,7 +1769,6 @@ export async function GET(request: NextRequest) {
         deliveryFee,
       });
       const missingCostItemCount = outboundMeta?.missingCostItemCount || 0;
-      const hasOutbound = Boolean(outboundMeta);
       const productCostStatus = cancelledDeliveryLoss || manualDeliveryLoss
         ? "ready" as const
         : !hasOutbound

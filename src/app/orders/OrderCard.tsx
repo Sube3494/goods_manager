@@ -222,7 +222,7 @@ export function summarizeOrders(orders: AutoPickOrder[]) {
       const logisticNameStr = String(deliveryObj.logisticName || deliveryObj.logistic_name || "").trim().toLowerCase();
       const isMeituanRelated = platformStr.includes("美团") || platformStr.includes("meituan") ||
                                logisticNameStr.includes("美团") || logisticNameStr.includes("meituan");
-      if (!isMeituanRelated) {
+      if (order.hasOutbound && !isMeituanRelated) {
         acc.totalDeliveryFee += getDeliveryFee(order.delivery);
       }
     }
@@ -465,21 +465,21 @@ export function getPlatformBadgeMeta(platform?: string | null) {
     };
   }
 
-  if (normalized.includes("美团")) {
+  if (normalized.includes("美团") || normalized.includes("meituan") || normalized === "shangou") {
     return {
       iconSrc: "/platform/美团.svg",
       iconAlt: "美团",
     };
   }
 
-  if (normalized.includes("京东")) {
+  if (normalized.includes("京东") || normalized.includes("jd") || normalized === "daojia") {
     return {
       iconSrc: "/platform/京东.svg",
       iconAlt: "京东",
     };
   }
 
-  if (normalized.includes("淘宝")) {
+  if (normalized.includes("淘宝") || normalized.includes("taobao") || normalized === "ebai") {
     return {
       iconSrc: "/platform/淘宝.svg",
       iconAlt: "淘宝",

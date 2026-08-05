@@ -683,6 +683,7 @@ export async function GET(request: NextRequest) {
       const isCancelled = isAutoPickOrderCancelledStatus(order.status)
         || isAutoPickOrderDeletedStatus(order.status)
         || isVoidedOfflineOrder(order);
+      const orderCostMeta = outboundMetaByOrderNo.get(String(order.orderNo || "").trim());
       if (!isCancelled) {
         const paidYuan = (order.actualPaid || 0) / 100;
         const isOffline = order.platform === "线下交易";
@@ -694,7 +695,6 @@ export async function GET(request: NextRequest) {
           Number(order.platformCommission || 0) / 100
         );
 
-        const orderCostMeta = outboundMetaByOrderNo.get(String(order.orderNo || "").trim());
         const orderCostYuan = orderCostMeta?.productCost || 0;
         const returnExtraExpenseYuan = orderCostMeta?.extraExpense || 0;
         const refundAmountYuan = orderCostMeta?.refundAmount || 0;
@@ -720,7 +720,7 @@ export async function GET(request: NextRequest) {
         platformCommission = FinanceMath.add(platformCommission, commissionYuan);
         deliveryExpense = FinanceMath.add(deliveryExpense, deliveryYuan);
       } else {
-        if (!isRefundableMeituanDelivery(order.platform, order.delivery)) {
+        if (orderCostMeta && !isRefundableMeituanDelivery(order.platform, order.delivery)) {
           const deliveryYuan = getDeliveryFee(order.delivery) / 100;
           deliveryExpense = FinanceMath.add(deliveryExpense, deliveryYuan);
         }
@@ -764,10 +764,11 @@ export async function GET(request: NextRequest) {
 
     const normalizePlatform = (value: string | null | undefined) => {
       const raw = String(value || "").trim();
+      const lower = raw.toLowerCase();
       if (!raw) return "线下交易";
-      if (raw.includes("美团")) return "美团";
-      if (raw.includes("京东")) return "京东";
-      if (raw.includes("淘宝") || raw.includes("天猫")) return "淘宝";
+      if (raw.includes("美团") || lower.includes("meituan") || lower === "shangou") return "美团";
+      if (raw.includes("京东") || lower.includes("jd") || lower === "daojia") return "京东";
+      if (raw.includes("淘宝") || raw.includes("天猫") || lower === "taobao" || lower === "ebai") return "淘宝";
       return "线下交易";
     };
 
@@ -792,6 +793,7 @@ export async function GET(request: NextRequest) {
       const isOther = isAutoPickOrderCancelledStatus(order.status)
         || isAutoPickOrderDeletedStatus(order.status)
         || isVoidedOfflineOrder(order);
+      const orderCostMeta = outboundMetaByOrderNo.get(String(order.orderNo || "").trim());
       const matchedShopName = resolveAutoPickMatchedShopName(order, user.permissions) || order.shopAddress || order.shopId || "未匹配店铺";
       const addShopPureProfit = (target: ReturnType<typeof createTrendBucket> | undefined, amount: number) => {
         if (!target || amount === 0) return;
@@ -826,9 +828,9 @@ export async function GET(request: NextRequest) {
       platformBuckets.set(platform, current);
 
       if (isOther) {
-        const deliveryYuan = isRefundableMeituanDelivery(order.platform, order.delivery)
-          ? 0
-          : getDeliveryFee(order.delivery) / 100;
+        const deliveryYuan = orderCostMeta && !isRefundableMeituanDelivery(order.platform, order.delivery)
+          ? getDeliveryFee(order.delivery) / 100
+          : 0;
         if (deliveryYuan > 0) {
           if (point) {
             point.deliveryExpense = FinanceMath.add(point.deliveryExpense, deliveryYuan);
@@ -853,7 +855,6 @@ export async function GET(request: NextRequest) {
           paidYuan,
           Number(order.platformCommission || 0) / 100
         );
-        const orderCostMeta = outboundMetaByOrderNo.get(String(order.orderNo || "").trim());
         const refundAmountYuan = orderCostMeta?.refundAmount || 0;
         const returnExtraExpenseYuan = orderCostMeta?.extraExpense || 0;
         const adjustedMetrics = resolveRefundAdjustedIncomeMetrics({

@@ -1058,8 +1058,9 @@ function normalizePlatformName(platform: string) {
   if (!normalized) {
     return "";
   }
-  if (normalized === "淘宝闪购") return "淘宝";
-  if (normalized.toLowerCase() === "other") return "线下交易";
+  const lower = normalized.toLowerCase();
+  if (normalized === "淘宝闪购" || normalized.includes("淘宝") || lower === "taobao" || lower === "ebai") return "淘宝";
+  if (lower === "other") return "线下交易";
   return normalized;
 }
 
@@ -1072,6 +1073,12 @@ function getAutoPickPlatformAliases(platform?: string | null) {
   if (normalized === "线下交易" || normalized.toLowerCase() === "other") {
     aliases.add("线下交易");
     aliases.add("other");
+  }
+  if (normalized === "淘宝" || ["taobao", "ebai"].includes(normalized.toLowerCase())) {
+    aliases.add("淘宝");
+    aliases.add("淘宝闪购");
+    aliases.add("taobao");
+    aliases.add("ebai");
   }
   return Array.from(aliases).filter(Boolean);
 }
@@ -1112,6 +1119,10 @@ function inferPlatformNameFromChannelTag(channelTag: unknown) {
 
   if (normalizedTag === "shangou") {
     return "美团";
+  }
+
+  if (normalizedTag === "ebai" || normalizedTag === "taobao") {
+    return "淘宝";
   }
 
   if (normalizedTag === "daojia") {
