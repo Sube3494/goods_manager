@@ -17,6 +17,7 @@ interface CustomMultiSelectProps {
   value: string[];
   onChange: (value: string[]) => void;
   placeholder?: string;
+  displayLabel?: string;
   className?: string;
   triggerClassName?: string;
   disabled?: boolean;
@@ -27,6 +28,7 @@ export function CustomMultiSelect({
   value = [],
   onChange,
   placeholder = "请选择...",
+  displayLabel: customDisplayLabel,
   className,
   triggerClassName,
   disabled = false,
@@ -57,6 +59,9 @@ export function CustomMultiSelect({
     } else if (selectedLabels.length > 1) {
       displayLabel = `${selectedLabels[0]} +${selectedLabels.length - 1}`;
     }
+  }
+  if (customDisplayLabel) {
+    displayLabel = customDisplayLabel;
   }
 
   useEffect(() => {

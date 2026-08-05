@@ -1199,6 +1199,26 @@ function getItemKey(item: {
   return item.shopProductVariantId || item.productVariantId || item.shopProductId || item.productId || "";
 }
 
+function getShipmentProductFilterKey(item: {
+  productId?: string | null;
+  productVariantId?: string | null;
+  shopProductId?: string | null;
+  shopProductVariantId?: string | null;
+  variantName?: string | null;
+  shopProduct?: { name?: string | null; productName?: string | null } | null;
+  product?: { name?: string | null } | null;
+  shopProductVariant?: { variantName?: string | null; optionSummary?: string | null } | null;
+  productVariant?: { variantName?: string | null; optionSummary?: string | null } | null;
+}) {
+  return getItemKey(item) || resolveShipmentSummaryItemName(item);
+}
+
+function getShipmentProductFilterLabel(item: Parameters<typeof getShipmentProductFilterKey>[0]) {
+  const displayName = resolveShipmentSummaryItemName(item);
+  const split = splitShipmentDisplayName(displayName);
+  return [split.baseName, split.variantLabel].filter(Boolean).join(" ");
+}
+
 function getOrderTotalAmount(order: OutboundOrder) {
   const parsed = parseFactoryShipmentNote(order.note);
   return order.items.reduce((sum, item) => {
@@ -1461,6 +1481,9 @@ function FactoryMetricCard({
 
 function FactoryShipmentFilters({
   searchQuery,
+  productFilter,
+  productOptions,
+  viewSwitcher,
   customerGroupFilter,
   customerGroupOptions,
   shippingFilter,
@@ -1470,6 +1493,7 @@ function FactoryShipmentFilters({
   endDate,
   hasActiveFilters,
   onSearchChange,
+  onProductFilterChange,
   onCustomerGroupChange,
   onShippingChange,
   onPaymentChange,
@@ -1479,6 +1503,9 @@ function FactoryShipmentFilters({
   onReset,
 }: {
   searchQuery: string;
+  productFilter: string[];
+  productOptions: { value: string; label: string }[];
+  viewSwitcher?: ReactNode;
   customerGroupFilter: string;
   customerGroupOptions: { value: string; label: string }[];
   shippingFilter: string[];
@@ -1488,6 +1515,7 @@ function FactoryShipmentFilters({
   endDate: string;
   hasActiveFilters: boolean;
   onSearchChange: (value: string) => void;
+  onProductFilterChange: (value: string[]) => void;
   onCustomerGroupChange: (value: string) => void;
   onShippingChange: (value: string[]) => void;
   onPaymentChange: (value: string) => void;
@@ -1496,10 +1524,21 @@ function FactoryShipmentFilters({
   onEndDateChange: (value: string) => void;
   onReset: () => void;
 }) {
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const advancedFilterCount = [
+    productFilter.length !== productOptions.length,
+    customerGroupFilter !== "all",
+    !shippingFilter.includes("all") && shippingFilter.length > 0,
+    paymentFilter !== "all",
+    compensationFilter !== "all",
+    Boolean(startDate),
+    Boolean(endDate),
+  ].filter(Boolean).length;
+
   return (
-    <div className="mb-6 flex flex-col gap-3 rounded-[24px] border border-border bg-white/70 p-3 shadow-sm dark:border-white/10 dark:bg-white/5 lg:flex-row lg:items-center lg:p-3.5">
-      <div className="grid min-w-0 flex-1 grid-cols-2 items-center gap-2 sm:grid-cols-[minmax(0,1fr)_128px_128px]">
-        <div className="relative col-span-2 min-w-0 flex-1 sm:col-span-1">
+    <div className="space-y-3">
+      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_116px] items-center gap-2 sm:grid-cols-[minmax(240px,1fr)_auto_auto]">
+        <div className="relative min-w-0 flex-1">
           <Search size={16} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <input
             value={searchQuery}
@@ -1517,75 +1556,125 @@ function FactoryShipmentFilters({
             </button>
           ) : null}
         </div>
-        <div className="h-10 min-w-0 lg:h-11">
-          <CustomSelect
-            value={customerGroupFilter}
-            onChange={onCustomerGroupChange}
-            options={customerGroupOptions}
+        <div className="h-10 min-w-0 sm:hidden">
+          <CustomMultiSelect
+            value={productFilter}
+            onChange={onProductFilterChange}
+            options={productOptions}
+            placeholder="商品种类"
+            displayLabel={`商品种类 ${productFilter.length || 0}`}
+            disabled={productOptions.length === 0}
             className="h-full"
             triggerClassName={cn(
-              "h-full rounded-full border px-3 text-xs shadow-none lg:text-sm",
-              customerGroupFilter !== "all"
+              "h-full rounded-full border px-2 text-xs shadow-none",
+              productFilter.length > 0
                 ? "border-primary/20 bg-primary/8 text-primary dark:border-primary/25 dark:bg-primary/12"
                 : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5 font-normal"
             )}
           />
         </div>
-        <div className="h-10 min-w-0 lg:h-11">
-          <CustomMultiSelect
-            value={shippingFilter}
-            onChange={onShippingChange}
-            options={[{ value: "all", label: "全部发货状态" }, ...shippingStatusOptions]}
-            className="h-full"
-            triggerClassName={cn(
-              "h-full rounded-full border px-3 text-xs shadow-none lg:text-sm",
-              shippingFilter.length === 1 && shippingFilter[0] !== "all"
-                ? `${getShippingTone(shippingFilter[0])} font-normal`
-                : shippingFilter.length > 1 && !shippingFilter.includes("all")
-                  ? "bg-primary/8 border-primary/15 text-primary dark:bg-primary/12 dark:border-primary/25 font-bold"
-                  : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5 font-normal"
+        <div className="col-span-2 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 sm:contents">
+          <button
+            type="button"
+            onClick={() => setShowAdvancedFilters((value) => !value)}
+            className={cn(
+              "flex h-10 min-w-0 items-center justify-center gap-1.5 rounded-full border px-3 text-xs font-bold shadow-sm transition lg:h-11 lg:px-4 lg:text-sm",
+              showAdvancedFilters || advancedFilterCount > 0
+                ? "border-primary/20 bg-primary/8 text-primary dark:border-primary/25 dark:bg-primary/12"
+                : "border-border bg-white text-foreground hover:bg-muted/40 dark:border-white/10 dark:bg-white/5"
             )}
-            placeholder="发货状态"
-          />
+          >
+            筛选{advancedFilterCount > 0 ? ` ${advancedFilterCount}` : ""}
+            <ChevronDown size={15} className={cn("transition-transform", showAdvancedFilters && "rotate-180")} />
+          </button>
+          {viewSwitcher ? <div className="flex min-w-0 justify-end [&>div]:w-auto">{viewSwitcher}</div> : null}
         </div>
       </div>
 
-      <div className="grid w-full grid-cols-2 gap-2 lg:flex lg:w-auto lg:flex-row lg:items-center lg:gap-3">
-        <div className="h-10 min-w-0 lg:h-11 lg:w-28 lg:shrink-0">
-          <CustomSelect
-            value={paymentFilter}
-            onChange={onPaymentChange}
-            options={[{ value: "all", label: "货款状态" }, ...paymentStatusOptions]}
-            className="h-full"
-            triggerClassName={cn(
-              "h-full rounded-full border px-3 text-xs shadow-none lg:text-sm",
-              paymentFilter !== "all"
-                ? `${getPaymentTone(paymentFilter)} font-normal`
-                : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5 font-normal"
-            )}
-          />
-        </div>
-        <div className="h-10 min-w-0 lg:h-11 lg:w-28 lg:shrink-0">
-          <CustomSelect
-            value={compensationFilter}
-            onChange={onCompensationChange}
-            options={[{ value: "all", label: "补偿状态" }, ...compensationStatusOptions]}
-            className="h-full"
-            triggerClassName={cn(
-              "h-full rounded-full border px-3 text-xs shadow-none lg:text-sm",
-              compensationFilter !== "all"
-                ? `${getCompensationTone(compensationFilter)} font-normal`
-                : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5 font-normal"
-            )}
-          />
-        </div>
-        <div className="col-span-2 grid grid-cols-2 gap-2 lg:contents">
+      {showAdvancedFilters ? (
+        <div className="grid grid-cols-2 gap-2 rounded-[24px] border border-border bg-white/70 p-3 shadow-sm dark:border-white/10 dark:bg-white/5 sm:grid-cols-3 lg:grid-cols-7">
+          <div className="hidden h-10 min-w-0 sm:block lg:h-11">
+            <CustomMultiSelect
+              value={productFilter}
+              onChange={onProductFilterChange}
+              options={productOptions}
+              placeholder="商品种类"
+              displayLabel={`商品种类 ${productFilter.length || 0}`}
+              disabled={productOptions.length === 0}
+              className="h-full"
+              triggerClassName={cn(
+                "h-full rounded-full border px-3 text-xs shadow-none lg:text-sm",
+                productFilter.length > 0
+                  ? "border-primary/20 bg-primary/8 text-primary dark:border-primary/25 dark:bg-primary/12"
+                  : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5 font-normal"
+              )}
+            />
+          </div>
+          <div className="h-10 min-w-0 lg:h-11">
+            <CustomSelect
+              value={customerGroupFilter}
+              onChange={onCustomerGroupChange}
+              options={customerGroupOptions}
+              className="h-full"
+              triggerClassName={cn(
+                "h-full rounded-full border px-3 text-xs shadow-none lg:text-sm",
+                customerGroupFilter !== "all"
+                  ? "border-primary/20 bg-primary/8 text-primary dark:border-primary/25 dark:bg-primary/12"
+                  : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5 font-normal"
+              )}
+            />
+          </div>
+          <div className="h-10 min-w-0 lg:h-11">
+            <CustomMultiSelect
+              value={shippingFilter}
+              onChange={onShippingChange}
+              options={[{ value: "all", label: "全部发货状态" }, ...shippingStatusOptions]}
+              className="h-full"
+              triggerClassName={cn(
+                "h-full rounded-full border px-3 text-xs shadow-none lg:text-sm",
+                shippingFilter.length === 1 && shippingFilter[0] !== "all"
+                  ? `${getShippingTone(shippingFilter[0])} font-normal`
+                  : shippingFilter.length > 1 && !shippingFilter.includes("all")
+                    ? "bg-primary/8 border-primary/15 text-primary dark:bg-primary/12 dark:border-primary/25 font-bold"
+                    : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5 font-normal"
+              )}
+              placeholder="发货状态"
+            />
+          </div>
+          <div className="h-10 min-w-0 lg:h-11">
+            <CustomSelect
+              value={paymentFilter}
+              onChange={onPaymentChange}
+              options={[{ value: "all", label: "货款状态" }, ...paymentStatusOptions]}
+              className="h-full"
+              triggerClassName={cn(
+                "h-full rounded-full border px-3 text-xs shadow-none lg:text-sm",
+                paymentFilter !== "all"
+                  ? `${getPaymentTone(paymentFilter)} font-normal`
+                  : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5 font-normal"
+              )}
+            />
+          </div>
+          <div className="h-10 min-w-0 lg:h-11">
+            <CustomSelect
+              value={compensationFilter}
+              onChange={onCompensationChange}
+              options={[{ value: "all", label: "补偿状态" }, ...compensationStatusOptions]}
+              className="h-full"
+              triggerClassName={cn(
+                "h-full rounded-full border px-3 text-xs shadow-none lg:text-sm",
+                compensationFilter !== "all"
+                  ? `${getCompensationTone(compensationFilter)} font-normal`
+                  : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5 font-normal"
+              )}
+            />
+          </div>
           <DatePicker
             value={startDate}
             onChange={onStartDateChange}
             maxDate={endDate}
             placeholder="开始日期"
-            className="h-10 lg:h-11 lg:w-32"
+            className="h-10 lg:h-11"
             triggerClassName="h-full rounded-full border-border bg-white shadow-sm dark:bg-white/5"
             isCompact
           />
@@ -1594,21 +1683,21 @@ function FactoryShipmentFilters({
             onChange={onEndDateChange}
             minDate={startDate}
             placeholder="结束日期"
-            className="h-10 lg:h-11 lg:w-32"
+            className="h-10 lg:h-11"
             triggerClassName="h-full rounded-full border-border bg-white shadow-sm dark:bg-white/5"
             isCompact
           />
+          {hasActiveFilters ? (
+            <button
+              type="button"
+              onClick={onReset}
+              className="col-span-2 h-10 rounded-full border border-primary/20 bg-primary/5 px-4 text-xs font-bold text-primary shadow-sm transition-all hover:bg-primary/10 sm:col-span-1 lg:h-11"
+            >
+              重置
+            </button>
+          ) : null}
         </div>
-        {hasActiveFilters ? (
-          <button
-            type="button"
-            onClick={onReset}
-            className="col-span-2 h-10 rounded-full border border-primary/20 bg-primary/5 px-4 text-xs font-bold text-primary shadow-sm transition-all hover:bg-primary/10 sm:col-span-1 sm:h-11"
-          >
-            重置筛选
-          </button>
-        ) : null}
-      </div>
+      ) : null}
     </div>
   );
 }
@@ -3205,8 +3294,10 @@ export default function FactoryShipmentsPage() {
   const [shipmentOrders, setShipmentOrders] = useState<OutboundOrder[]>([]);
   const [customerAddressBook, setCustomerAddressBook] = useState<CustomerAddressOption[]>([]);
   const [customerGroups, setCustomerGroups] = useState<string[]>([]);
+  const [viewMode, setViewMode] = useState<"detail" | "summary">("detail");
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [productFilter, setProductFilter] = useState<string[]>([]);
   const [customerGroupFilter, setCustomerGroupFilter] = useState("all");
   const [exportGroupValue, setExportGroupValue] = useState("all");
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
@@ -3304,6 +3395,34 @@ export default function FactoryShipmentsPage() {
     });
     return map;
   }, [customerAddressBook]);
+
+  const shipmentProductOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    shipmentOrders.forEach((order) => {
+      order.items.forEach((item) => {
+        const key = getShipmentProductFilterKey(item);
+        if (!key || map.has(key)) return;
+        map.set(key, getShipmentProductFilterLabel(item));
+      });
+    });
+    return Array.from(map.entries())
+      .map(([value, label]) => ({ value, label }))
+      .sort((a, b) => a.label.localeCompare(b.label, "zh-Hans-CN"));
+  }, [shipmentOrders]);
+
+  useEffect(() => {
+    const nextValues = shipmentProductOptions.map((option) => option.value);
+    if (nextValues.length === 0) {
+      setProductFilter([]);
+      return;
+    }
+    setProductFilter((prev) => {
+      if (prev.length === 0) return nextValues;
+      const nextSet = new Set(nextValues);
+      const kept = prev.filter((value) => nextSet.has(value));
+      return kept.length > 0 ? kept : nextValues;
+    });
+  }, [shipmentProductOptions]);
 
   const handleQuickUpdateStatus = useCallback(async (
     order: OutboundOrder,
@@ -3556,6 +3675,7 @@ export default function FactoryShipmentsPage() {
       const itemNames = order.items.map(
         (item) => item.shopProduct?.name || item.product?.name || ""
       );
+      const productFilterSet = new Set(productFilter);
 
       const matchesSearch =
         !query ||
@@ -3567,6 +3687,7 @@ export default function FactoryShipmentsPage() {
         pinyinMatch(parsed.compensationStatus || "", query) ||
         itemNames.some((name) => pinyinMatch(name, query));
       const matchesShipping = shippingFilter.includes("all") || shippingFilter.length === 0 || shippingFilter.includes(derivedStatus);
+      const matchesProduct = productFilter.length === 0 || order.items.some((item) => productFilterSet.has(getShipmentProductFilterKey(item)));
       const matchesPayment = paymentFilter === "all" || parsed.paymentStatus === paymentFilter;
       const matchesCompensation =
         compensationFilter === "all" || parsed.compensationStatus === compensationFilter;
@@ -3579,9 +3700,9 @@ export default function FactoryShipmentsPage() {
         || (customerGroupFilter === "__ungrouped" ? !recipientGroup : recipientGroup === customerGroupFilter);
       const matchesStart = !startDate || orderDate >= startDate;
       const matchesEnd = !endDate || orderDate <= endDate;
-      return matchesSearch && matchesShipping && matchesPayment && matchesCompensation && matchesCustomerGroup && matchesStart && matchesEnd;
+      return matchesSearch && matchesShipping && matchesProduct && matchesPayment && matchesCompensation && matchesCustomerGroup && matchesStart && matchesEnd;
     });
-  }, [compensationFilter, customerGroupByIdentity, customerGroupFilter, endDate, paymentFilter, searchQuery, shipmentOrders, shippingFilter, startDate]);
+  }, [compensationFilter, customerGroupByIdentity, customerGroupFilter, endDate, paymentFilter, productFilter, searchQuery, shipmentOrders, shippingFilter, startDate]);
 
   const stats = useMemo(() => {
     const totalQuantity = shipmentOrders.reduce((sum, order) => sum + formatQuantity(order), 0);
@@ -4265,10 +4386,47 @@ export default function FactoryShipmentsPage() {
   const totalItems = filteredOrders.length;
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
   const paginatedOrders = filteredOrders.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const summaryViewData = useMemo(() => {
+    const customerMap = new Map<string, { key: string; name: string; orderIds: Set<string>; quantity: number }>();
+    const productMap = new Map<string, { key: string; label: string; image: string; shipmentCount: number; quantity: number; orderIds: Set<string> }>();
+    const records = filteredOrders.map((order) => {
+      const parsed = parseFactoryShipmentNote(order.note);
+      const customerKey = getCustomerAddressIdentity({
+        contactName: parsed.recipientName,
+        contactPhone: parsed.recipientPhone,
+        address: parsed.recipientAddress,
+      }) || order.id;
+      const customerName = parsed.recipientName || "未命名客户";
+      const customerStat = customerMap.get(customerKey) || { key: customerKey, name: customerName, orderIds: new Set<string>(), quantity: 0 };
+      customerStat.orderIds.add(order.id);
+      const items = order.items.map((item) => {
+        const key = getShipmentProductFilterKey(item);
+        const label = getShipmentProductFilterLabel(item);
+        const image = item.shopProductVariant?.image || item.productVariant?.image || item.shopProduct?.image || item.product?.image || "";
+        const quantity = item.quantity || 0;
+        customerStat.quantity += quantity;
+        const productStat = productMap.get(key) || { key, label, image, shipmentCount: 0, quantity: 0, orderIds: new Set<string>() };
+        productStat.quantity += quantity;
+        productStat.orderIds.add(order.id);
+        productStat.shipmentCount = productStat.orderIds.size;
+        if (!productStat.image && image) productStat.image = image;
+        productMap.set(key, productStat);
+        return { key, label, image, quantity };
+      });
+      customerMap.set(customerKey, customerStat);
+      return { order, parsed, items };
+    });
+    return {
+      customers: Array.from(customerMap.values()).sort((a, b) => b.quantity - a.quantity),
+      products: Array.from(productMap.values()).sort((a, b) => b.quantity - a.quantity),
+      records,
+      totalQuantity: records.reduce((sum, record) => sum + record.items.reduce((itemSum, item) => itemSum + item.quantity, 0), 0),
+    };
+  }, [filteredOrders]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, customerGroupFilter, shippingFilter, paymentFilter, compensationFilter, startDate, endDate, pageSize]);
+  }, [searchQuery, productFilter, customerGroupFilter, shippingFilter, paymentFilter, compensationFilter, startDate, endDate, pageSize]);
 
   useEffect(() => {
     if (currentPage > totalPages) setCurrentPage(totalPages);
@@ -4276,6 +4434,7 @@ export default function FactoryShipmentsPage() {
 
   const hasActiveFilters = Boolean(
     searchQuery || 
+    productFilter.length !== shipmentProductOptions.length ||
     customerGroupFilter !== "all" ||
     (!shippingFilter.includes("all") && shippingFilter.length > 0) || 
     paymentFilter !== "all" || 
@@ -4376,33 +4535,67 @@ export default function FactoryShipmentsPage() {
         </div>
       </section>
 
-      <FactoryShipmentFilters
-        searchQuery={searchQuery}
-        customerGroupFilter={customerGroupFilter}
-        customerGroupOptions={customerGroupOptions}
-        shippingFilter={shippingFilter}
-        paymentFilter={paymentFilter}
-        compensationFilter={compensationFilter}
-        startDate={startDate}
-        endDate={endDate}
-        hasActiveFilters={hasActiveFilters}
-        onSearchChange={setSearchQuery}
-        onCustomerGroupChange={setCustomerGroupFilter}
-        onShippingChange={setShippingFilter}
-        onPaymentChange={setPaymentFilter}
-        onCompensationChange={setCompensationFilter}
-        onStartDateChange={setStartDate}
-        onEndDateChange={setEndDate}
-        onReset={() => {
-          setSearchQuery("");
-          setCustomerGroupFilter("all");
-          setShippingFilter(["all"]);
-          setPaymentFilter("all");
-          setCompensationFilter("all");
-          setStartDate("");
-          setEndDate("");
-        }}
-      />
+      <div className="mb-6">
+        <FactoryShipmentFilters
+            searchQuery={searchQuery}
+            productFilter={productFilter}
+            productOptions={shipmentProductOptions}
+            viewSwitcher={(
+              <div className="flex h-10 shrink-0 rounded-full border border-border bg-white p-1 shadow-sm dark:border-white/10 dark:bg-white/5 lg:h-11">
+                <button
+                  type="button"
+                  onClick={() => setViewMode("detail")}
+                  className={cn(
+                    "flex h-full w-10 items-center justify-center rounded-full transition sm:w-11",
+                    viewMode === "detail" ? "bg-foreground text-background dark:bg-white dark:text-black" : "text-muted-foreground hover:text-foreground"
+                  )}
+                  title="明细视图"
+                  aria-label="明细视图"
+                >
+                  <ListOrdered size={17} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode("summary")}
+                  className={cn(
+                    "flex h-full w-10 items-center justify-center rounded-full transition sm:w-11",
+                    viewMode === "summary" ? "bg-foreground text-background dark:bg-white dark:text-black" : "text-muted-foreground hover:text-foreground"
+                  )}
+                  title="汇总视图"
+                  aria-label="汇总视图"
+                >
+                  <ClipboardList size={17} />
+                </button>
+              </div>
+            )}
+            customerGroupFilter={customerGroupFilter}
+            customerGroupOptions={customerGroupOptions}
+            shippingFilter={shippingFilter}
+            paymentFilter={paymentFilter}
+            compensationFilter={compensationFilter}
+            startDate={startDate}
+            endDate={endDate}
+            hasActiveFilters={hasActiveFilters}
+            onSearchChange={setSearchQuery}
+            onProductFilterChange={setProductFilter}
+            onCustomerGroupChange={setCustomerGroupFilter}
+            onShippingChange={setShippingFilter}
+            onPaymentChange={setPaymentFilter}
+            onCompensationChange={setCompensationFilter}
+            onStartDateChange={setStartDate}
+            onEndDateChange={setEndDate}
+            onReset={() => {
+              setSearchQuery("");
+              setProductFilter(shipmentProductOptions.map((option) => option.value));
+              setCustomerGroupFilter("all");
+              setShippingFilter(["all"]);
+              setPaymentFilter("all");
+              setCompensationFilter("all");
+              setStartDate("");
+              setEndDate("");
+            }}
+        />
+      </div>
 
       {isExportModalOpen ? createPortal(
         <AnimatePresence>
@@ -4534,6 +4727,117 @@ export default function FactoryShipmentsPage() {
         document.body
       ) : null}
 
+      {viewMode === "summary" ? (
+        <div className="rounded-[26px] border border-border bg-white/70 p-3 shadow-sm dark:border-white/10 dark:bg-white/5 sm:p-4">
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <div className="mb-4 h-8 w-8 animate-spin rounded-full border-4 border-primary/20 border-t-primary" />
+              <p className="text-sm font-medium text-muted-foreground">正在加载发货汇总...</p>
+            </div>
+          ) : filteredOrders.length > 0 ? (
+            <div className="space-y-6">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {[
+                  ["发货单", filteredOrders.length],
+                  ["客户数", summaryViewData.customers.length],
+                  ["商品种类", summaryViewData.products.length],
+                  ["总数量", summaryViewData.totalQuantity],
+                ].map(([label, value]) => (
+                  <div key={label} className="flex h-12 items-center justify-center gap-2 rounded-2xl border border-border/70 bg-white/75 px-3 shadow-sm dark:border-white/10 dark:bg-white/[0.04]">
+                    <span className="text-xs font-medium text-muted-foreground">{label}</span>
+                    <span className="text-xl font-semibold tabular-nums text-foreground">{value}</span>
+                  </div>
+                ))}
+              </div>
+
+              <section>
+                <h3 className="mb-3 text-lg font-bold text-foreground">客户汇总</h3>
+                <div className="flex flex-wrap gap-2">
+                  {summaryViewData.customers.slice(0, 12).map((customer) => (
+                    <span key={customer.key} className="inline-flex h-9 max-w-full items-center gap-2 rounded-full border border-border/60 bg-white/85 px-3 text-sm font-medium text-foreground shadow-sm dark:border-white/10 dark:bg-white/[0.05]">
+                      <span className="max-w-[140px] truncate">{customer.name}</span>
+                      <span className="shrink-0 text-muted-foreground">{customer.orderIds.size}单</span>
+                      <span className="shrink-0 tabular-nums">{customer.quantity}件</span>
+                    </span>
+                  ))}
+                  {summaryViewData.customers.length > 12 ? (
+                    <span className="inline-flex h-9 items-center rounded-full border border-border/60 bg-muted/40 px-3 text-sm font-medium text-muted-foreground dark:border-white/10 dark:bg-white/[0.04]">
+                      还有 {summaryViewData.customers.length - 12} 位
+                    </span>
+                  ) : null}
+                </div>
+              </section>
+
+              <section>
+                <h3 className="mb-3 text-lg font-bold text-foreground">商品汇总</h3>
+                <div className="flex flex-wrap gap-2">
+                  {summaryViewData.products.map((item) => (
+                    <span key={item.key} className="inline-flex max-w-full items-center gap-2 rounded-full border border-border/60 bg-white/85 p-1 pr-3 text-sm font-medium text-foreground shadow-sm dark:border-white/10 dark:bg-white/[0.05]">
+                      <span className="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted dark:bg-black">
+                        {item.image ? (
+                          <Image src={item.image} alt="" fill sizes="32px" className="object-cover" />
+                        ) : (
+                          <Package size={15} className="text-muted-foreground/60" />
+                        )}
+                      </span>
+                      <span className="min-w-0 max-w-[240px] truncate">{item.label}</span>
+                      <span className="shrink-0 rounded-full border border-border/50 bg-muted/30 px-2 py-0.5 text-xs text-muted-foreground dark:border-white/10 dark:bg-white/[0.04]">{item.shipmentCount}次</span>
+                      <span className="shrink-0 tabular-nums">{item.quantity}件</span>
+                    </span>
+                  ))}
+                </div>
+              </section>
+
+              <section>
+                <h3 className="mb-3 text-lg font-bold text-foreground">发货明细</h3>
+                <div className="space-y-2">
+                  {summaryViewData.records.map(({ order, parsed, items }) => (
+                    <article key={order.id} className="rounded-2xl border border-border bg-white/80 p-3 shadow-sm dark:border-white/10 dark:bg-white/[0.04]">
+                      <div className="mb-2 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="min-w-0">
+                          <div className="truncate text-sm font-semibold text-foreground">{order.id}</div>
+                          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                            <span>{format(parseSafeDate(order.date), "yyyy/M/d HH:mm", { locale: zhCN })}</span>
+                            <span>{formatRecipientWithRegion(parsed.recipientName, parsed.recipientAddress)}</span>
+                          </div>
+                        </div>
+                        <span className={cn("inline-flex h-7 shrink-0 items-center justify-center rounded-full border px-3 text-xs font-medium", getShippingTone(deriveFactoryShipmentStatusFromOrder(order, parsed)))}>
+                          {deriveFactoryShipmentStatusFromOrder(order, parsed)}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {items.map((item, itemIndex) => (
+                          <span key={`${item.key}-${itemIndex}`} className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-border/50 bg-muted/25 p-0.5 pr-2 text-xs font-medium text-foreground dark:border-white/8 dark:bg-white/[0.04]">
+                            <span className="relative flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white dark:bg-black">
+                              {item.image ? (
+                                <Image src={item.image} alt="" fill sizes="24px" className="object-cover" />
+                              ) : (
+                                <Package size={12} className="text-muted-foreground/50" />
+                              )}
+                            </span>
+                            <span className="min-w-0 max-w-[220px] truncate">{item.label}</span>
+                            <span className="shrink-0 tabular-nums text-primary">x{item.quantity}</span>
+                          </span>
+                        ))}
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </section>
+            </div>
+          ) : (
+            <EmptyState
+              icon={<Truck size={36} strokeWidth={1.5} />}
+              title="暂无发货汇总"
+              description={hasActiveFilters ? "没有筛到结果，换个条件试试。" : "先新建一张发货单吧。"}
+              className="py-16"
+            />
+          )}
+        </div>
+      ) : null}
+
+      {viewMode === "detail" ? (
+      <>
       <div className="hidden overflow-hidden rounded-2xl border border-border bg-white/70 shadow-sm dark:border-white/10 dark:bg-white/5 xl:block">
         <div className="overflow-auto max-h-[calc(100dvh-220px-env(safe-area-inset-bottom,0))]">
           {isLoading ? (
@@ -4967,6 +5271,8 @@ export default function FactoryShipmentsPage() {
           onPageChange={setCurrentPage}
           onPageSizeChange={setPageSize}
         />
+      ) : null}
+      </>
       ) : null}
 
       <FactoryShipmentCreateModal

@@ -2,11 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowDownAZ, BarChart3, Copy, Download, Edit2, Eye, Loader2, MapPin, PackageSearch, Plus, Search, Trash2, Upload, User, X } from "lucide-react";
+import { ArrowDownAZ, BarChart3, Check, Copy, Download, Edit2, Eye, Loader2, MapPin, PackageSearch, Plus, Search, Trash2, Upload, User, X } from "lucide-react";
 import Image from "next/image";
 import { createPortal } from "react-dom";
 import { ActionBar } from "@/components/ui/ActionBar";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
+import { CustomMultiSelect } from "@/components/ui/CustomMultiSelect";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -172,11 +173,11 @@ function CustomerGroupSuggestions({
 function CustomerProductPill({
   name,
   variant,
-  sku,
   image,
   quantity,
   count,
   trackingNumber,
+  selected,
 }: {
   name: string;
   variant?: string;
@@ -185,13 +186,22 @@ function CustomerProductPill({
   quantity?: number;
   count?: number;
   trackingNumber?: string;
+  selected?: boolean;
 }) {
-  const subtitle = [variant, sku].filter(Boolean).join(" / ");
+  const subtitle = String(variant || "").trim();
   return (
     <span
-      className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full border border-border/50 bg-white/70 p-0.5 pr-2 text-[10px] font-medium text-foreground shadow-sm max-[420px]:max-w-full dark:border-white/8 dark:bg-white/6"
+      className={cn(
+        "inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full border bg-white/70 p-0.5 pr-2 text-[10px] font-medium text-foreground shadow-sm max-[420px]:max-w-full dark:bg-white/6",
+        selected ? "border-primary/35 ring-1 ring-primary/20 dark:border-primary/40" : "border-border/50 dark:border-white/8"
+      )}
       title={[name, subtitle, trackingNumber].filter(Boolean).join(" ")}
     >
+      {selected ? (
+        <span className="ml-1 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
+          <Check size={10} strokeWidth={3} />
+        </span>
+      ) : null}
       <span className="relative flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white dark:bg-black">
         {image ? (
           <Image src={image} alt="" fill sizes="24px" unoptimized className="object-cover" />
@@ -230,11 +240,36 @@ function CustomerShipmentRecordsModal({
   const [isLoading, setIsLoading] = useState(false);
   const [isExportingRecords, setIsExportingRecords] = useState(false);
   const [isCustomerStatsExpanded, setIsCustomerStatsExpanded] = useState(false);
+  const [selectedProductKeys, setSelectedProductKeys] = useState<string[]>([]);
   const isGroupTarget = target?.type === "group";
   const title = target?.type === "group" ? `${target.group} 分组的进货记录` : target ? `${getCustomerName(target.customer)} 的进货记录` : "";
   const subtitle = target?.type === "group" ? `${data?.group?.customerCount || 0} 位客户` : target ? (target.customer.contactPhone || "未填写电话") : "";
   const visibleCustomerStats = isCustomerStatsExpanded ? (data?.customerStats || []) : (data?.customerStats || []).slice(0, 6);
   const hiddenCustomerStatsCount = Math.max(0, (data?.customerStats?.length || 0) - visibleCustomerStats.length);
+  const productStats = data?.productStats || [];
+  const selectedProductKeySet = useMemo(() => new Set(selectedProductKeys), [selectedProductKeys]);
+  const visibleProductStats = productStats.filter((item) => selectedProductKeySet.has(item.key));
+  const filteredRecords = useMemo(() => {
+    if (!data) return [];
+    if (selectedProductKeys.length === 0) return [];
+    return data.records
+      .map((record) => ({
+        ...record,
+        items: record.items.filter((item) => selectedProductKeySet.has(item.statsKey)),
+      }))
+      .filter((record) => record.items.length > 0);
+  }, [data, selectedProductKeySet, selectedProductKeys.length]);
+  const filteredTotalQuantity = filteredRecords.reduce(
+    (sum, record) => sum + record.items.reduce((itemSum, item) => itemSum + item.quantity, 0),
+    0
+  );
+  const productOptions = useMemo(
+    () => productStats.map((item) => ({
+      value: item.key,
+      label: [item.name, item.variant].filter(Boolean).join(" "),
+    })),
+    [productStats]
+  );
 
   const fetchRecords = useCallback(async () => {
     if (!target || !isOpen) return;
@@ -269,6 +304,7 @@ function CustomerShipmentRecordsModal({
       setKeyword("");
       setData(null);
       setIsCustomerStatsExpanded(false);
+      setSelectedProductKeys([]);
       return;
     }
     fetchRecords();
@@ -277,6 +313,10 @@ function CustomerShipmentRecordsModal({
   useEffect(() => {
     setIsCustomerStatsExpanded(false);
   }, [target]);
+
+  useEffect(() => {
+    setSelectedProductKeys((data?.productStats || []).map((item) => item.key));
+  }, [data]);
 
   const handleExportRecords = async () => {
     if (!target || target.type !== "group") {
@@ -463,19 +503,33 @@ function CustomerShipmentRecordsModal({
             </div>
 
             <div className="mt-3 grid gap-2 lg:grid-cols-[minmax(0,1fr)_auto]">
-              <div className="flex h-9 items-center gap-2 rounded-xl border border-border bg-white px-3 shadow-sm dark:border-white/10 dark:bg-white/5">
-                <Search size={16} className="shrink-0 text-muted-foreground" />
-                <input
-                  value={keyword}
-                  onChange={(event) => setKeyword(event.target.value)}
-                  placeholder="搜索商品名称、规格、SKU..."
-                  className="min-w-0 flex-1 bg-transparent text-sm outline-none"
-                />
-                {keyword ? (
-                  <button type="button" onClick={() => setKeyword("")} className="text-muted-foreground hover:text-foreground">
-                    <X size={15} />
-                  </button>
-                ) : null}
+              <div className="grid grid-cols-[minmax(0,1fr)_116px] gap-2 sm:grid-cols-[minmax(0,1fr)_150px]">
+                <div className="flex h-9 min-w-0 items-center gap-2 rounded-xl border border-border bg-white px-3 shadow-sm dark:border-white/10 dark:bg-white/5">
+                  <Search size={16} className="shrink-0 text-muted-foreground" />
+                  <input
+                    value={keyword}
+                    onChange={(event) => setKeyword(event.target.value)}
+                    placeholder="搜索商品名称、规格、SKU..."
+                    className="min-w-0 flex-1 bg-transparent text-sm outline-none"
+                  />
+                  {keyword ? (
+                    <button type="button" onClick={() => setKeyword("")} className="text-muted-foreground hover:text-foreground">
+                      <X size={15} />
+                    </button>
+                  ) : null}
+                </div>
+                <div className="h-9 min-w-0">
+                  <CustomMultiSelect
+                    value={selectedProductKeys}
+                    onChange={setSelectedProductKeys}
+                    options={productOptions}
+                    placeholder="商品种类"
+                    displayLabel={`商品种类 ${visibleProductStats.length || 0}`}
+                    disabled={productOptions.length === 0}
+                    className="h-full"
+                    triggerClassName="h-full rounded-xl border-border bg-white px-2 text-xs font-medium shadow-sm dark:border-white/10 dark:bg-white/5 sm:px-3"
+                  />
+                </div>
               </div>
               <div className="grid grid-cols-2 items-center gap-2 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto]">
                 <DatePicker value={startDate} onChange={setStartDate} maxDate={endDate} placeholder="开始日期" className="h-9 min-w-0 sm:w-[136px]" triggerClassName="h-full rounded-xl border-border bg-white shadow-sm dark:bg-white/5" />
@@ -500,7 +554,7 @@ function CustomerShipmentRecordsModal({
             <div className="mt-3 grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
               <div className="flex h-9 items-center justify-center gap-2 rounded-xl border border-border/70 bg-muted/30 px-2 dark:border-white/10 dark:bg-white/[0.035] sm:justify-start sm:px-3">
                 <span className="text-xs font-medium text-muted-foreground">发货单</span>
-                <span className="text-base font-medium text-foreground">{data?.totalOrders || 0}</span>
+                <span className="text-base font-medium text-foreground">{filteredRecords.length || 0}</span>
               </div>
               {isGroupTarget ? (
                 <div className="flex h-9 items-center justify-center gap-2 rounded-xl border border-border/70 bg-muted/30 px-2 dark:border-white/10 dark:bg-white/[0.035] sm:justify-start sm:px-3">
@@ -509,12 +563,8 @@ function CustomerShipmentRecordsModal({
                 </div>
               ) : null}
               <div className="flex h-9 items-center justify-center gap-2 rounded-xl border border-border/70 bg-muted/30 px-2 dark:border-white/10 dark:bg-white/[0.035] sm:justify-start sm:px-3">
-                <span className="text-xs font-medium text-muted-foreground">商品种类</span>
-                <span className="text-base font-medium text-foreground">{data?.productStats?.length || 0}</span>
-              </div>
-              <div className="flex h-9 items-center justify-center gap-2 rounded-xl border border-border/70 bg-muted/30 px-2 dark:border-white/10 dark:bg-white/[0.035] sm:justify-start sm:px-3">
                 <span className="text-xs font-medium text-muted-foreground">总数量</span>
-                <span className="text-base font-medium text-foreground">{data?.totalQuantity || 0}</span>
+                <span className="text-base font-medium text-foreground">{filteredTotalQuantity || 0}</span>
               </div>
             </div>
           </div>
@@ -562,7 +612,7 @@ function CustomerShipmentRecordsModal({
                     <h4 className="text-sm font-medium text-foreground">商品汇总</h4>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {(data.productStats || []).map((item) => (
+                    {visibleProductStats.map((item) => (
                       <CustomerProductPill
                         key={item.key}
                         name={item.name}
@@ -580,7 +630,13 @@ function CustomerShipmentRecordsModal({
                   <div className="mb-2">
                     <h4 className="text-sm font-medium text-foreground">发货明细</h4>
                   </div>
-                {data.records.map((record) => (
+                {filteredRecords.length === 0 ? (
+                  <EmptyState
+                    icon={<PackageSearch size={32} />}
+                    title="未选择商品种类"
+                    description="勾选上方商品后，会显示对应发货明细。"
+                  />
+                ) : filteredRecords.map((record) => (
                   <article key={record.id} className="rounded-xl border border-border bg-white/80 p-3 shadow-sm dark:border-white/10 dark:bg-white/[0.04]">
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                       <div className="min-w-0">
