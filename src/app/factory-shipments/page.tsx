@@ -138,10 +138,24 @@ type CustomerAddressOption = {
   contactName?: string;
   contactPhone?: string;
   address?: string;
+  group?: string;
+};
+
+type CustomerAddressBookResponse = {
+  customers?: CustomerAddressOption[];
+  groups?: string[];
 };
 
 function formatCustomerAddressDisplay(customer: CustomerAddressOption) {
   return [customer.contactName, customer.contactPhone, customer.address].filter(Boolean).join(" ");
+}
+
+function getCustomerAddressIdentity(input: { contactName?: string | null; contactPhone?: string | null; address?: string | null }) {
+  return [
+    String(input.contactName || "").replace(/\s+/g, " ").trim().toLowerCase(),
+    String(input.contactPhone || "").replace(/\s+/g, " ").trim().toLowerCase(),
+    String(input.address || "").replace(/\s+/g, " ").trim().toLowerCase(),
+  ].join("|");
 }
 
 function CustomerAddressCombobox({
@@ -173,7 +187,7 @@ function CustomerAddressCombobox({
       .then((res) => res.ok ? res.json() : [])
       .then((data) => {
         if (!cancelled) {
-          setCustomers(Array.isArray(data) ? data : []);
+          setCustomers(Array.isArray(data) ? data : (Array.isArray(data?.customers) ? data.customers : []));
           setHasLoaded(true);
         }
       })
@@ -1447,6 +1461,8 @@ function FactoryMetricCard({
 
 function FactoryShipmentFilters({
   searchQuery,
+  customerGroupFilter,
+  customerGroupOptions,
   shippingFilter,
   paymentFilter,
   compensationFilter,
@@ -1454,6 +1470,7 @@ function FactoryShipmentFilters({
   endDate,
   hasActiveFilters,
   onSearchChange,
+  onCustomerGroupChange,
   onShippingChange,
   onPaymentChange,
   onCompensationChange,
@@ -1462,6 +1479,8 @@ function FactoryShipmentFilters({
   onReset,
 }: {
   searchQuery: string;
+  customerGroupFilter: string;
+  customerGroupOptions: { value: string; label: string }[];
   shippingFilter: string[];
   paymentFilter: string;
   compensationFilter: string;
@@ -1469,6 +1488,7 @@ function FactoryShipmentFilters({
   endDate: string;
   hasActiveFilters: boolean;
   onSearchChange: (value: string) => void;
+  onCustomerGroupChange: (value: string) => void;
   onShippingChange: (value: string[]) => void;
   onPaymentChange: (value: string) => void;
   onCompensationChange: (value: string) => void;
@@ -1478,8 +1498,8 @@ function FactoryShipmentFilters({
 }) {
   return (
     <div className="mb-6 flex flex-col gap-3 rounded-[24px] border border-border bg-white/70 p-3 shadow-sm dark:border-white/10 dark:bg-white/5 lg:flex-row lg:items-center lg:p-3.5">
-      <div className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_112px] items-center gap-2 sm:grid-cols-[minmax(0,1fr)_128px]">
-        <div className="relative min-w-0 flex-1">
+      <div className="grid min-w-0 flex-1 grid-cols-2 items-center gap-2 sm:grid-cols-[minmax(0,1fr)_128px_128px]">
+        <div className="relative col-span-2 min-w-0 flex-1 sm:col-span-1">
           <Search size={16} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <input
             value={searchQuery}
@@ -1496,6 +1516,20 @@ function FactoryShipmentFilters({
               <X size={14} />
             </button>
           ) : null}
+        </div>
+        <div className="h-10 min-w-0 lg:h-11">
+          <CustomSelect
+            value={customerGroupFilter}
+            onChange={onCustomerGroupChange}
+            options={customerGroupOptions}
+            className="h-full"
+            triggerClassName={cn(
+              "h-full rounded-full border px-3 text-xs shadow-none lg:text-sm",
+              customerGroupFilter !== "all"
+                ? "border-primary/20 bg-primary/8 text-primary dark:border-primary/25 dark:bg-primary/12"
+                : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5 font-normal"
+            )}
+          />
         </div>
         <div className="h-10 min-w-0 lg:h-11">
           <CustomMultiSelect
@@ -3169,8 +3203,15 @@ export default function FactoryShipmentsPage() {
   };
 
   const [shipmentOrders, setShipmentOrders] = useState<OutboundOrder[]>([]);
+  const [customerAddressBook, setCustomerAddressBook] = useState<CustomerAddressOption[]>([]);
+  const [customerGroups, setCustomerGroups] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [customerGroupFilter, setCustomerGroupFilter] = useState("all");
+  const [exportGroupValue, setExportGroupValue] = useState("all");
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [exportProgress, setExportProgress] = useState(0);
+  const [exportProgressLabel, setExportProgressLabel] = useState("");
   const [shippingFilter, setShippingFilter] = useState<string[]>(["all"]);
   const [paymentFilter, setPaymentFilter] = useState("all");
   const [compensationFilter, setCompensationFilter] = useState("all");
@@ -3214,6 +3255,52 @@ export default function FactoryShipmentsPage() {
   useEffect(() => {
     void fetchOrders();
   }, [fetchOrders]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/customers?includeGroups=1")
+      .then((res) => res.ok ? res.json() : null)
+      .then((data: CustomerAddressBookResponse | CustomerAddressOption[] | null) => {
+        if (cancelled) return;
+        if (Array.isArray(data)) {
+          setCustomerAddressBook(data);
+          setCustomerGroups(Array.from(new Set(data.map((customer) => customer.group || "").filter(Boolean))).sort((a, b) => a.localeCompare(b, "zh-Hans-CN")));
+          return;
+        }
+        setCustomerAddressBook(Array.isArray(data?.customers) ? data.customers : []);
+        setCustomerGroups(Array.isArray(data?.groups) ? data.groups : []);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCustomerAddressBook([]);
+          setCustomerGroups([]);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const customerGroupOptions = useMemo(
+    () => [
+      { value: "all", label: "客户分组" },
+      { value: "__ungrouped", label: "未分组客户" },
+      ...customerGroups.map((group) => ({ value: group, label: group })),
+    ],
+    [customerGroups]
+  );
+
+  const customerGroupByIdentity = useMemo(() => {
+    const map = new Map<string, string>();
+    customerAddressBook.forEach((customer) => {
+      map.set(getCustomerAddressIdentity({
+        contactName: customer.contactName,
+        contactPhone: customer.contactPhone,
+        address: customer.address,
+      }), customer.group || "");
+    });
+    return map;
+  }, [customerAddressBook]);
 
   const handleQuickUpdateStatus = useCallback(async (
     order: OutboundOrder,
@@ -3480,11 +3567,18 @@ export default function FactoryShipmentsPage() {
       const matchesPayment = paymentFilter === "all" || parsed.paymentStatus === paymentFilter;
       const matchesCompensation =
         compensationFilter === "all" || parsed.compensationStatus === compensationFilter;
+      const recipientGroup = customerGroupByIdentity.get(getCustomerAddressIdentity({
+        contactName: parsed.recipientName,
+        contactPhone: parsed.recipientPhone,
+        address: parsed.recipientAddress,
+      })) || "";
+      const matchesCustomerGroup = customerGroupFilter === "all"
+        || (customerGroupFilter === "__ungrouped" ? !recipientGroup : recipientGroup === customerGroupFilter);
       const matchesStart = !startDate || orderDate >= startDate;
       const matchesEnd = !endDate || orderDate <= endDate;
-      return matchesSearch && matchesShipping && matchesPayment && matchesCompensation && matchesStart && matchesEnd;
+      return matchesSearch && matchesShipping && matchesPayment && matchesCompensation && matchesCustomerGroup && matchesStart && matchesEnd;
     });
-  }, [compensationFilter, endDate, paymentFilter, searchQuery, shipmentOrders, shippingFilter, startDate]);
+  }, [compensationFilter, customerGroupByIdentity, customerGroupFilter, endDate, paymentFilter, searchQuery, shipmentOrders, shippingFilter, startDate]);
 
   const stats = useMemo(() => {
     const totalQuantity = shipmentOrders.reduce((sum, order) => sum + formatQuantity(order), 0);
@@ -3513,13 +3607,24 @@ export default function FactoryShipmentsPage() {
     };
   }, [shipmentOrders]);
 
-  const handleExportAllShipments = useCallback(async () => {
-    if (shipmentOrders.length === 0) {
+  const getShipmentCustomerGroup = useCallback((order: OutboundOrder) => {
+    const parsed = parseFactoryShipmentNote(order.note);
+    return customerGroupByIdentity.get(getCustomerAddressIdentity({
+      contactName: parsed.recipientName,
+      contactPhone: parsed.recipientPhone,
+      address: parsed.recipientAddress,
+    })) || "";
+  }, [customerGroupByIdentity]);
+
+  const handleExportShipments = useCallback(async (exportOrders: OutboundOrder[], fileLabel: string) => {
+    if (exportOrders.length === 0) {
       showToast("暂无发货记录可导出", "info");
       return;
     }
 
     setIsExporting(true);
+    setExportProgress(4);
+    setExportProgressLabel("准备导出数据...");
     try {
       const ExcelJS = (await import("exceljs")).default;
       const { saveAs } = await import("file-saver");
@@ -3527,12 +3632,40 @@ export default function FactoryShipmentsPage() {
       workbook.creator = "goods";
       workbook.created = new Date();
 
+      const customerSummarySheet = workbook.addWorksheet("客户汇总", {
+        views: [{ state: "frozen", ySplit: 1 }],
+      });
+      const productSummarySheet = workbook.addWorksheet("商品汇总", {
+        views: [{ state: "frozen", ySplit: 1 }],
+      });
       const summarySheet = workbook.addWorksheet("发货汇总", {
         views: [{ state: "frozen", ySplit: 1 }],
       });
       const detailSheet = workbook.addWorksheet("发货明细", {
         views: [{ state: "frozen", ySplit: 1 }],
       });
+
+      const customerSummaryHeaders = [
+        "序号",
+        "客户分组",
+        "收件人",
+        "手机号",
+        "发货单数",
+        "商品总件数",
+        "总金额",
+        "运费",
+      ];
+
+      const productSummaryHeaders = [
+        "序号",
+        "商品名称",
+        "SKU",
+        "发货次数",
+        "商品总件数",
+        "商品金额",
+        "运费",
+        "合计",
+      ];
 
       const summaryHeaders = [
         "序号",
@@ -3574,6 +3707,8 @@ export default function FactoryShipmentsPage() {
         "备注",
       ];
 
+      const customerSummaryHeaderRow = customerSummarySheet.addRow(customerSummaryHeaders);
+      const productSummaryHeaderRow = productSummarySheet.addRow(productSummaryHeaders);
       const summaryHeaderRow = summarySheet.addRow(summaryHeaders);
       const detailHeaderRow = detailSheet.addRow(detailHeaders);
 
@@ -3583,26 +3718,45 @@ export default function FactoryShipmentsPage() {
         alignment: { horizontal: "center" as const, vertical: "middle" as const, wrapText: true },
       };
 
-      summaryHeaderRow.height = 26;
-      detailHeaderRow.height = 26;
-      summaryHeaderRow.eachCell((cell) => {
-        cell.style = headerStyle;
-        cell.border = {
-          top: { style: "thin", color: { argb: "FFBFDBFE" } },
-          left: { style: "thin", color: { argb: "FFBFDBFE" } },
-          bottom: { style: "thin", color: { argb: "FFBFDBFE" } },
-          right: { style: "thin", color: { argb: "FFBFDBFE" } },
-        };
-      });
-      detailHeaderRow.eachCell((cell) => {
-        cell.style = headerStyle;
-        cell.border = {
-          top: { style: "thin", color: { argb: "FFBFDBFE" } },
-          left: { style: "thin", color: { argb: "FFBFDBFE" } },
-          bottom: { style: "thin", color: { argb: "FFBFDBFE" } },
-          right: { style: "thin", color: { argb: "FFBFDBFE" } },
-        };
-      });
+      const styleHeaderRow = (row: import("exceljs").Row) => {
+        row.height = 26;
+        row.eachCell((cell) => {
+          cell.style = headerStyle;
+          cell.border = {
+            top: { style: "thin", color: { argb: "FFBFDBFE" } },
+            left: { style: "thin", color: { argb: "FFBFDBFE" } },
+            bottom: { style: "thin", color: { argb: "FFBFDBFE" } },
+            right: { style: "thin", color: { argb: "FFBFDBFE" } },
+          };
+        });
+      };
+
+      styleHeaderRow(customerSummaryHeaderRow);
+      styleHeaderRow(productSummaryHeaderRow);
+      styleHeaderRow(summaryHeaderRow);
+      styleHeaderRow(detailHeaderRow);
+
+      customerSummarySheet.columns = [
+        { key: "index", width: 8 },
+        { key: "group", width: 16 },
+        { key: "recipient", width: 14 },
+        { key: "phone", width: 16 },
+        { key: "orderCount", width: 12 },
+        { key: "quantity", width: 12 },
+        { key: "amount", width: 14 },
+        { key: "shippingFee", width: 12 },
+      ];
+
+      productSummarySheet.columns = [
+        { key: "index", width: 8 },
+        { key: "name", width: 42 },
+        { key: "sku", width: 18 },
+        { key: "shipmentCount", width: 12 },
+        { key: "quantity", width: 12 },
+        { key: "amount", width: 14 },
+        { key: "shippingFee", width: 12 },
+        { key: "total", width: 14 },
+      ];
 
       summarySheet.columns = [
         { key: "index", width: 8 },
@@ -3661,8 +3815,129 @@ export default function FactoryShipmentsPage() {
         image: { base64: string; extension: "png" | "jpeg" } | null;
       }>> = [];
 
+      const customerStatsMap = new Map<string, {
+        group: string;
+        recipient: string;
+        phone: string;
+        orderIds: Set<string>;
+        quantity: number;
+        amount: number;
+        shippingFee: number;
+      }>();
+      const productStatsMap = new Map<string, {
+        name: string;
+        sku: string;
+        orderIds: Set<string>;
+        quantity: number;
+        amount: number;
+        shippingFee: number;
+      }>();
+
+      exportOrders.forEach((order) => {
+        const parsed = parseFactoryShipmentNote(order.note);
+        const customerGroup = getShipmentCustomerGroup(order) || "未分组";
+        const customerKey = getCustomerAddressIdentity({
+          contactName: parsed.recipientName,
+          contactPhone: parsed.recipientPhone,
+          address: parsed.recipientAddress,
+        }) || order.id;
+        const customerStat = customerStatsMap.get(customerKey) || {
+          group: customerGroup,
+          recipient: parsed.recipientName || "",
+          phone: parsed.recipientPhone || "",
+          orderIds: new Set<string>(),
+          quantity: 0,
+          amount: 0,
+          shippingFee: 0,
+        };
+        customerStat.orderIds.add(order.id);
+
+        order.items.forEach((item) => {
+          const normalizedItemIds = {
+            productId: item.productId || item.shopProduct?.productId || item.product?.id || null,
+            productVariantId: item.productVariantId || item.productVariant?.id || item.shopProductVariant?.productVariantId || null,
+            shopProductId: item.shopProductId || item.shopProduct?.id || undefined,
+            shopProductVariantId: item.shopProductVariantId || item.shopProductVariant?.id || undefined,
+          };
+          const itemKey = getItemKey(normalizedItemIds);
+          const trackingEntry = parsed.trackingEntries.find((entry) => entry.itemKey === itemKey);
+          const productName =
+            item.shopProductVariant?.variantName
+              ? `${item.shopProduct?.name || item.product?.name || "未知商品"} / ${item.shopProductVariant.variantName}`
+              : item.productVariant?.variantName
+                ? `${item.product?.name || "未知商品"} / ${item.productVariant.variantName}`
+                : item.variantName
+                  ? `${item.shopProduct?.name || item.product?.name || "未知商品"} / ${item.variantName}`
+                  : item.shopProduct?.name || item.product?.name || "未知商品";
+          const sku = item.shopProductVariant?.sku || item.productVariant?.sku || item.variantSku || item.shopProduct?.sku || item.product?.sku || "";
+          const itemPrice =
+            Number(item.price) ||
+            Number(item.shopProductVariant?.salePrice) ||
+            Number(item.productVariant?.salePrice) ||
+            Number(item.shopProduct?.costPrice) ||
+            Number(item.product?.costPrice) ||
+            0;
+          const quantity = item.quantity || 0;
+          const shippingFee = Number(trackingEntry?.shippingFee) || 0;
+          const itemAmount = quantity * itemPrice;
+
+          customerStat.quantity += quantity;
+          customerStat.amount += itemAmount + shippingFee;
+          customerStat.shippingFee += shippingFee;
+
+          const productStatKey = `${productName}|${sku}`;
+          const productStat = productStatsMap.get(productStatKey) || {
+            name: productName,
+            sku,
+            orderIds: new Set<string>(),
+            quantity: 0,
+            amount: 0,
+            shippingFee: 0,
+          };
+          productStat.orderIds.add(order.id);
+          productStat.quantity += quantity;
+          productStat.amount += itemAmount;
+          productStat.shippingFee += shippingFee;
+          productStatsMap.set(productStatKey, productStat);
+        });
+
+        customerStatsMap.set(customerKey, customerStat);
+      });
+      setExportProgress(28);
+      setExportProgressLabel("正在生成汇总分表...");
+
+      Array.from(customerStatsMap.values())
+        .sort((a, b) => b.quantity - a.quantity)
+        .forEach((item, index) => {
+          customerSummarySheet.addRow([
+            index + 1,
+            item.group,
+            item.recipient,
+            item.phone,
+            item.orderIds.size,
+            item.quantity,
+            item.amount,
+            item.shippingFee,
+          ]);
+        });
+
+      Array.from(productStatsMap.values())
+        .sort((a, b) => b.quantity - a.quantity)
+        .forEach((item, index) => {
+          productSummarySheet.addRow([
+            index + 1,
+            item.name,
+            item.sku,
+            item.orderIds.size,
+            item.quantity,
+            item.amount,
+            item.shippingFee,
+            item.amount + item.shippingFee,
+          ]);
+        });
+
       let detailIndex = 1;
-      shipmentOrders.forEach((order, orderIndex) => {
+      exportOrders.forEach((order, orderIndex) => {
         const parsed = parseFactoryShipmentNote(order.note);
         const displayStatus = deriveFactoryShipmentStatusFromOrder(order, parsed);
         const formattedDate = order.date ? format(parseSafeDate(order.date), "yyyy-MM-dd") : "";
@@ -3778,7 +4053,17 @@ export default function FactoryShipmentsPage() {
           );
         });
       });
+      setExportProgress(58);
+      setExportProgressLabel("正在生成发货明细...");
 
+      customerSummarySheet.autoFilter = {
+        from: { row: 1, column: 1 },
+        to: { row: Math.max(1, customerSummarySheet.rowCount), column: customerSummaryHeaders.length },
+      };
+      productSummarySheet.autoFilter = {
+        from: { row: 1, column: 1 },
+        to: { row: Math.max(1, productSummarySheet.rowCount), column: productSummaryHeaders.length },
+      };
       summarySheet.autoFilter = {
         from: { row: 1, column: 1 },
         to: { row: Math.max(1, summarySheet.rowCount), column: summaryHeaders.length },
@@ -3787,6 +4072,42 @@ export default function FactoryShipmentsPage() {
         from: { row: 1, column: 1 },
         to: { row: Math.max(1, detailSheet.rowCount), column: detailHeaders.length },
       };
+
+      const styleSummaryDataSheet = (sheet: import("exceljs").Worksheet, centerColumns: Set<string>, wrapColumns: Set<string>) => {
+        sheet.eachRow((row, rowNumber) => {
+          row.eachCell((cell) => {
+            const columnLetter = cell.address.replace(/\d+/g, "");
+            cell.font = { ...cell.font, name: "微软雅黑" };
+            cell.alignment = {
+              vertical: "middle",
+              horizontal: rowNumber === 1 ? "center" : centerColumns.has(columnLetter) ? "center" : "left",
+              wrapText: rowNumber === 1 ? true : wrapColumns.has(columnLetter),
+            };
+            if (rowNumber > 1) {
+              cell.border = {
+                top: { style: "thin", color: { argb: "FFE5E7EB" } },
+                left: { style: "thin", color: { argb: "FFE5E7EB" } },
+                bottom: { style: "thin", color: { argb: "FFE5E7EB" } },
+                right: { style: "thin", color: { argb: "FFE5E7EB" } },
+              };
+              if (rowNumber % 2 === 0) {
+                cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF8FAFC" } };
+              }
+            }
+          });
+        });
+      };
+
+      styleSummaryDataSheet(
+        customerSummarySheet,
+        new Set(["A", "B", "D", "E", "F", "G", "H"]),
+        new Set(["C"])
+      );
+      styleSummaryDataSheet(
+        productSummarySheet,
+        new Set(["A", "C", "D", "E", "F", "G", "H"]),
+        new Set(["B"])
+      );
 
       summarySheet.eachRow((row, rowNumber) => {
         row.eachCell((cell) => {
@@ -3837,11 +4158,30 @@ export default function FactoryShipmentsPage() {
       ["N"].forEach((column) => {
         summarySheet.getColumn(column).numFmt = "¥#,##0.00";
       });
+      customerSummarySheet.getColumn("D").numFmt = "@";
+      ["G", "H"].forEach((column) => {
+        customerSummarySheet.getColumn(column).numFmt = "¥#,##0.00";
+      });
+      productSummarySheet.getColumn("C").numFmt = "@";
+      ["F", "G", "H"].forEach((column) => {
+        productSummarySheet.getColumn(column).numFmt = "¥#,##0.00";
+      });
       ["F", "G", "H"].forEach((column) => {
         detailSheet.getColumn(column).numFmt = "¥#,##0.00";
       });
 
-      const preparedImages = await Promise.all(detailImageTasks);
+      setExportProgress(70);
+      setExportProgressLabel(detailImageTasks.length > 0 ? "正在处理商品图片..." : "正在写入文件...");
+      const preparedImages: Array<{
+        rowNumber: number;
+        image: { base64: string; extension: "png" | "jpeg" } | null;
+      }> = [];
+      for (let index = 0; index < detailImageTasks.length; index += 1) {
+        preparedImages.push(await detailImageTasks[index]);
+        setExportProgress(70 + Math.round(((index + 1) / Math.max(1, detailImageTasks.length)) * 20));
+      }
+      setExportProgress(92);
+      setExportProgressLabel("正在写入文件...");
       preparedImages.forEach(({ rowNumber, image }) => {
         if (!image) {
           detailSheet.getCell(`B${rowNumber}`).value = "无图";
@@ -3862,21 +4202,44 @@ export default function FactoryShipmentsPage() {
       });
 
       const buffer = await workbook.xlsx.writeBuffer();
+      setExportProgress(98);
       const timestamp = format(new Date(), "yyyyMMdd_HHmmss");
       saveAs(
         new Blob([buffer], {
           type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         }),
-        `发货记录全量导出_${timestamp}.xlsx`
+        `发货记录${fileLabel}_${timestamp}.xlsx`
       );
-      showToast(`已导出 ${shipmentOrders.length} 张发货单`, "success");
+      setExportProgress(100);
+      setExportProgressLabel("导出完成");
+      showToast(`已导出 ${exportOrders.length} 张发货单`, "success");
     } catch (error) {
       console.error("Failed to export factory shipments:", error);
       showToast("导出失败，请重试", "error");
     } finally {
       setIsExporting(false);
+      window.setTimeout(() => {
+        setExportProgress(0);
+        setExportProgressLabel("");
+      }, 500);
     }
-  }, [shipmentOrders, showToast]);
+  }, [getShipmentCustomerGroup, showToast]);
+
+  const handleConfirmGroupedExport = useCallback(() => {
+    const targetGroup = exportGroupValue === "all" ? customerGroups[0] : exportGroupValue;
+    if (!targetGroup) {
+      showToast("暂无客户分组可导出", "info");
+      return;
+    }
+    const exportOrders = shipmentOrders.filter((order) => getShipmentCustomerGroup(order) === targetGroup);
+    setIsExportModalOpen(false);
+    void handleExportShipments(exportOrders, `_${targetGroup}_分组导出`);
+  }, [customerGroups, exportGroupValue, getShipmentCustomerGroup, handleExportShipments, shipmentOrders, showToast]);
+
+  const handleConfirmFullExport = useCallback(() => {
+    setIsExportModalOpen(false);
+    void handleExportShipments(shipmentOrders, "_全量导出");
+  }, [handleExportShipments, shipmentOrders]);
 
   const totalItems = filteredOrders.length;
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
@@ -3884,7 +4247,7 @@ export default function FactoryShipmentsPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, shippingFilter, paymentFilter, compensationFilter, startDate, endDate, pageSize]);
+  }, [searchQuery, customerGroupFilter, shippingFilter, paymentFilter, compensationFilter, startDate, endDate, pageSize]);
 
   useEffect(() => {
     if (currentPage > totalPages) setCurrentPage(totalPages);
@@ -3892,6 +4255,7 @@ export default function FactoryShipmentsPage() {
 
   const hasActiveFilters = Boolean(
     searchQuery || 
+    customerGroupFilter !== "all" ||
     (!shippingFilter.includes("all") && shippingFilter.length > 0) || 
     paymentFilter !== "all" || 
     compensationFilter !== "all" || 
@@ -3931,12 +4295,12 @@ export default function FactoryShipmentsPage() {
         <div className="flex items-center gap-3 self-end sm:self-auto">
           <button
             type="button"
-            onClick={() => void handleExportAllShipments()}
+            onClick={() => setIsExportModalOpen(true)}
             disabled={isExporting || shipmentOrders.length === 0}
             className="flex h-9 shrink-0 items-center gap-2 rounded-full border border-border bg-white px-4 text-xs font-bold text-foreground shadow-sm transition-all hover:bg-muted/40 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 md:h-10 md:px-5 md:text-sm dark:border-white/10 dark:bg-white/5"
           >
             {isExporting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
-            {isExporting ? "导出中..." : "全量导出"}
+            {isExporting ? "导出中..." : "导出"}
           </button>
           {selectedOrderIds.length > 0 && (
             <button
@@ -3993,6 +4357,8 @@ export default function FactoryShipmentsPage() {
 
       <FactoryShipmentFilters
         searchQuery={searchQuery}
+        customerGroupFilter={customerGroupFilter}
+        customerGroupOptions={customerGroupOptions}
         shippingFilter={shippingFilter}
         paymentFilter={paymentFilter}
         compensationFilter={compensationFilter}
@@ -4000,6 +4366,7 @@ export default function FactoryShipmentsPage() {
         endDate={endDate}
         hasActiveFilters={hasActiveFilters}
         onSearchChange={setSearchQuery}
+        onCustomerGroupChange={setCustomerGroupFilter}
         onShippingChange={setShippingFilter}
         onPaymentChange={setPaymentFilter}
         onCompensationChange={setCompensationFilter}
@@ -4007,6 +4374,7 @@ export default function FactoryShipmentsPage() {
         onEndDateChange={setEndDate}
         onReset={() => {
           setSearchQuery("");
+          setCustomerGroupFilter("all");
           setShippingFilter(["all"]);
           setPaymentFilter("all");
           setCompensationFilter("all");
@@ -4014,6 +4382,88 @@ export default function FactoryShipmentsPage() {
           setEndDate("");
         }}
       />
+
+      {isExportModalOpen ? createPortal(
+        <AnimatePresence>
+          <motion.div
+            className="fixed inset-0 z-[90] flex items-center justify-center bg-black/45 px-4 py-6 backdrop-blur-xl"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div
+              className="relative z-10 w-full max-w-[460px] overflow-hidden rounded-[28px] border border-white/10 bg-white text-card-foreground shadow-2xl backdrop-blur-xl dark:bg-[#101722]/95"
+              initial={{ opacity: 0, y: 18, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 18, scale: 0.98 }}
+              transition={{ duration: 0.18 }}
+            >
+              <div className="flex items-start justify-between border-b border-border/10 px-6 pb-5 pt-6 dark:border-white/10">
+                <div className="min-w-0">
+                  <h3 className="text-xl font-bold leading-none text-foreground">导出发货记录</h3>
+                  <p className="mt-2 text-sm leading-5 text-muted-foreground">选择分组导出，或导出全部发货单。</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsExportModalOpen(false)}
+                  className="-mr-2 -mt-2 rounded-full p-2 text-muted-foreground transition hover:bg-muted/70 hover:text-foreground"
+                  aria-label="关闭"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+              <div className="space-y-3 px-6 py-5">
+                {isExporting ? (
+                  <div className="rounded-2xl border border-border bg-zinc-50 p-3 dark:border-white/10 dark:bg-white/[0.04]">
+                    <div className="mb-2 flex items-center justify-between gap-3 text-xs font-semibold text-muted-foreground">
+                      <span className="truncate">{exportProgressLabel || "正在导出..."}</span>
+                      <span>{exportProgress}%</span>
+                    </div>
+                    <div className="h-2 overflow-hidden rounded-full bg-muted dark:bg-white/10">
+                      <div
+                        className="h-full rounded-full bg-primary transition-all duration-300"
+                        style={{ width: `${Math.min(100, Math.max(0, exportProgress))}%` }}
+                      />
+                    </div>
+                  </div>
+                ) : null}
+                <div className="grid grid-cols-[minmax(0,1fr)_116px] items-center gap-2">
+                  <div className="min-w-0">
+                    <CustomSelect
+                      value={exportGroupValue === "all" ? (customerGroups[0] || "all") : exportGroupValue}
+                      onChange={setExportGroupValue}
+                      disabled={isExporting}
+                      options={customerGroups.length > 0
+                        ? customerGroups.map((group) => ({ value: group, label: group }))
+                        : [{ value: "all", label: "暂无分组" }]}
+                      triggerClassName="h-12 rounded-full border border-border bg-zinc-50 px-4 text-sm font-semibold shadow-none dark:border-white/10 dark:bg-white/[0.06]"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleConfirmGroupedExport}
+                    disabled={isExporting || customerGroups.length === 0}
+                    className="flex h-12 shrink-0 items-center justify-center gap-2 rounded-full border border-border bg-zinc-900 px-4 text-sm font-bold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:bg-white/[0.08] dark:text-foreground dark:hover:bg-white/[0.12]"
+                  >
+                    {isExporting ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
+                    {isExporting ? "导出中" : "分组导出"}
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleConfirmFullExport}
+                  disabled={isExporting || shipmentOrders.length === 0}
+                  className="flex h-12 w-full items-center justify-center gap-2 rounded-full border border-border bg-zinc-50 px-4 text-sm font-bold text-foreground shadow-sm transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:bg-white/[0.04] dark:hover:bg-white/[0.08]"
+                >
+                  {isExporting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+                  {isExporting ? "导出中" : "全量导出"}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        </AnimatePresence>,
+        document.body
+      ) : null}
 
       <div className="hidden overflow-hidden rounded-2xl border border-border bg-white/70 shadow-sm dark:border-white/10 dark:bg-white/5 xl:block">
         <div className="overflow-auto max-h-[calc(100dvh-220px-env(safe-area-inset-bottom,0))]">

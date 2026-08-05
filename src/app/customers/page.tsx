@@ -119,7 +119,9 @@ function getCustomerName(customer: Customer) {
 
 function formatDateTime(value?: string | Date | null) {
   if (!value) return "-";
-  const date = new Date(value);
+  const date = typeof value === "string" && value.endsWith("Z")
+    ? new Date(value.slice(0, -1))
+    : new Date(value);
   if (Number.isNaN(date.getTime())) return "-";
   return date.toLocaleString("zh-CN", { hour12: false });
 }
@@ -450,18 +452,6 @@ function CustomerShipmentRecordsModal({
                 </div>
               </div>
               <div className="flex shrink-0 items-center gap-2">
-                {isGroupTarget ? (
-                  <button
-                    type="button"
-                    onClick={handleExportRecords}
-                    disabled={isExportingRecords || isLoading || !data || data.records.length === 0}
-                    className="inline-flex h-9 items-center justify-center gap-2 rounded-full border border-border bg-white px-3 text-xs font-medium text-foreground shadow-sm transition-colors hover:bg-muted/50 disabled:pointer-events-none disabled:opacity-50 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10"
-                    title="导出分组数据"
-                  >
-                    {isExportingRecords ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
-                    <span className="hidden sm:inline">导出</span>
-                  </button>
-                ) : null}
                 <button
                   type="button"
                   onClick={onClose}
