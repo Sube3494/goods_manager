@@ -2245,10 +2245,10 @@ function FactoryShipmentDetailModal({
                         <div className="text-xs font-normal text-muted-foreground mt-0.5">{format(parseSafeDate(editForm.date || order.date), "HH:mm")}</div>
                       </div>
 
-                      {/* 精美修改浮层 */}
+                      {/* 高颜值的发货时间修改 Popover */}
                       {isShipDatePopoverOpen && (
-                        <div className="absolute right-0 top-full mt-2 z-50 w-64 rounded-2xl border border-border/80 bg-white p-4 shadow-2xl dark:border-white/15 dark:bg-zinc-900">
-                          <div className="text-xs font-bold text-foreground mb-2.5 flex items-center justify-between border-b border-border/40 pb-2">
+                        <div className="absolute right-0 top-full mt-2 z-[999] w-72 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-4 shadow-2xl backdrop-blur-xl ring-1 ring-black/5 dark:ring-white/10">
+                          <div className="text-sm font-bold text-foreground mb-3 flex items-center justify-between border-b border-border/40 pb-2.5">
                             <span>修改发货时间</span>
                             <button
                               type="button"
@@ -2256,15 +2256,15 @@ function FactoryShipmentDetailModal({
                                 const nowStr = format(new Date(), "yyyy-MM-dd HH:mm");
                                 setEditForm((prev) => ({ ...prev, date: nowStr }));
                               }}
-                              className="text-[11px] font-medium text-primary hover:underline"
+                              className="text-xs font-medium text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer"
                             >
-                              设为此时此刻
+                              设为此时时刻
                             </button>
                           </div>
                           
                           <div className="space-y-3">
                             <div>
-                              <div className="text-[10px] text-muted-foreground mb-1">发货日期</div>
+                              <div className="text-[11px] font-medium text-muted-foreground mb-1.5">发货日期</div>
                               <DatePicker
                                 value={editForm.date ? format(parseSafeDate(editForm.date), "yyyy-MM-dd") : format(parseSafeDate(order.date), "yyyy-MM-dd")}
                                 onChange={(newDateStr) => {
@@ -2276,12 +2276,12 @@ function FactoryShipmentDetailModal({
                                 }}
                                 showClear={false}
                                 className="w-full"
-                                triggerClassName="w-full h-8 px-2 text-xs font-medium border-border/60 bg-zinc-50 dark:bg-white/5 rounded-xl"
+                                triggerClassName="w-full h-9 px-3 text-xs font-mono font-medium border border-border/80 bg-zinc-50 dark:bg-zinc-800/80 text-foreground rounded-xl"
                               />
                             </div>
 
                             <div>
-                              <div className="text-[10px] text-muted-foreground mb-1">发货时刻 (HH:mm)</div>
+                              <div className="text-[11px] font-medium text-muted-foreground mb-1.5">发货时刻 (24小时制 HH:mm)</div>
                               <input
                                 type="text"
                                 maxLength={5}
@@ -2294,15 +2294,16 @@ function FactoryShipmentDetailModal({
                                     : format(parseSafeDate(order.date), "yyyy-MM-dd");
                                   setEditForm((prev) => ({ ...prev, date: `${currentDateStr} ${val}` }));
                                 }}
-                                className="w-full h-8 px-3 rounded-xl border border-border/60 bg-zinc-50 dark:bg-white/5 text-xs font-mono font-medium focus:outline-none focus:border-primary"
+                                className="w-full h-9 px-3 rounded-xl border border-border/80 bg-zinc-50 dark:bg-zinc-800/80 text-xs font-mono font-semibold text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
                               />
                             </div>
                           </div>
-                          <div className="mt-3.5 text-right">
+
+                          <div className="mt-4 text-right">
                             <button
                               type="button"
                               onClick={() => setIsShipDatePopoverOpen(false)}
-                              className="px-3.5 py-1 text-xs font-bold text-white bg-primary rounded-xl shadow-sm hover:bg-primary/90 transition-all"
+                              className="px-4 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl shadow-md cursor-pointer transition-all"
                             >
                               确定
                             </button>
