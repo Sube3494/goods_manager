@@ -12,6 +12,9 @@ import {
   readRiderPhoneFromDelivery,
   readRiderPhoneFromRawPayload,
 } from "@/lib/autoPickOrders";
+import {
+  resolveShopBrushCommission,
+} from "@/lib/shopCommission";
 import { processDueAutoCompleteJobs } from "@/lib/autoPickAutoComplete";
 import { parseAsShanghaiTime } from "@/lib/dateUtils";
 import { doesAutoPickOrderRequirePickConfirmation, isAutoPickOrderCancelledStatus, isAutoPickOrderDeletedStatus, isAutoPickOtherPickupOrder, isAutoPickPickCompleted, isAutoPickPickupOrder, resolveAutoPickBusinessStatus } from "@/lib/autoPickOrderStatus";
@@ -1539,12 +1542,20 @@ export async function GET(request: NextRequest) {
                 ? "pending-backfill" as const
                 : "ready" as const;
             const isBrush = readMainSystemSelfDeliveryFlag(order.rawPayload);
+            const orderBrushCommissionYuan = resolveShopBrushCommission(integrationConfig, {
+              maiyatianShopId: readShopIdFromRawPayload(order.rawPayload),
+              shopName: readShopNameFromRawPayload(order.rawPayload) || order.shopId,
+              shopAddress: readShopAddressFromRawPayload(order.rawPayload) || order.shopAddress,
+              localShopName: matchedShopName || null,
+              rawPayload: order.rawPayload,
+            });
+            const orderBrushCommission = Math.round(orderBrushCommissionYuan * 100);
             const orderPureProfit = hiddenDeletedOfflineIncome
               ? null
               : isManualDeliveryLoss
               ? -deliveryFee
               : isBrush
-              ? - (Math.abs(Number(adjustedMetrics.platformCommission || 0)) + brushCommission + returnExtraExpense)
+              ? - (Math.abs(Number(adjustedMetrics.platformCommission || 0)) + orderBrushCommission + returnExtraExpense)
               : (productCostStatus === "ready"
                 ? Math.round(Number(safeExpectedIncome || 0) * (1 - serviceFeeRate)) - deliveryFee - productCost - returnExtraExpense
                 : null);

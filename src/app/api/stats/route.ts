@@ -2,7 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
 import { FinanceMath } from "@/lib/math";
-import { normalizeAutoPickIntegrationConfig, resolveAutoPickMatchedShopName } from "@/lib/autoPickOrders";
+import {
+  normalizeAutoPickIntegrationConfig,
+  resolveAutoPickMatchedShopName,
+} from "@/lib/autoPickOrders";
+import {
+  resolveShopBrushCommission,
+  readShopIdFromRawPayload,
+  readShopNameFromRawPayload,
+  readShopAddressFromRawPayload,
+} from "@/lib/shopCommission";
 import { isAutoPickOrderCancelledStatus, isAutoPickOrderDeletedStatus } from "@/lib/autoPickOrderStatus";
 import { createRequestPerfTracker } from "@/lib/perf";
 import { getStorageStrategy } from "@/lib/storage";
@@ -715,12 +724,18 @@ export async function GET(request: NextRequest) {
         const expectedIncomeYuan = adjustedMetrics.expectedIncome;
 
         const isBrush = readMainSystemSelfDeliveryFlag(order.rawPayload);
+        const orderBrushCommission = resolveShopBrushCommission(integrationConfig, {
+          maiyatianShopId: readShopIdFromRawPayload(order.rawPayload),
+          shopName: readShopNameFromRawPayload(order.rawPayload) || order.shopId,
+          shopAddress: readShopAddressFromRawPayload(order.rawPayload) || order.shopAddress,
+          rawPayload: order.rawPayload,
+        });
         if (!isBrush) {
           userPaid = FinanceMath.add(userPaid, adjustedPaidYuan);
           productCost = FinanceMath.add(productCost, orderCostYuan);
           returnExtraExpense = FinanceMath.add(returnExtraExpense, returnExtraExpenseYuan);
         } else {
-          brushExpense = FinanceMath.add(brushExpense, defaultBrushCommission);
+          brushExpense = FinanceMath.add(brushExpense, orderBrushCommission);
           returnExtraExpense = FinanceMath.add(returnExtraExpense, returnExtraExpenseYuan);
         }
         platformCommission = FinanceMath.add(platformCommission, commissionYuan);
@@ -891,7 +906,13 @@ export async function GET(request: NextRequest) {
         }
 
         if (isBrush) {
-          const brushPureProfit = -commissionYuan - deliveryYuan - defaultBrushCommission - returnExtraExpenseYuan;
+          const orderBrushCommission = resolveShopBrushCommission(integrationConfig, {
+            maiyatianShopId: readShopIdFromRawPayload(order.rawPayload),
+            shopName: readShopNameFromRawPayload(order.rawPayload) || order.shopId,
+            shopAddress: readShopAddressFromRawPayload(order.rawPayload) || order.shopAddress,
+            rawPayload: order.rawPayload,
+          });
+          const brushPureProfit = -commissionYuan - deliveryYuan - orderBrushCommission - returnExtraExpenseYuan;
           if (point) {
             point.brushPaid = FinanceMath.add(point.brushPaid, adjustedPaidYuan);
             point.pureProfit = FinanceMath.add(point.pureProfit, brushPureProfit);

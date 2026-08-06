@@ -12,6 +12,18 @@ import { getOutboundOrderItemSchemaErrorMessage } from "@/lib/prismaSchemaCompat
 import { getStorageStrategy } from "@/lib/storage";
 import { returnOutboundOrderById } from "@/lib/outboundReturns";
 import { normalizeJdSkuIds, replaceProductJdSkuMappings } from "@/lib/productJdSku";
+import {
+  resolveShopBrushCommission,
+  readShopIdFromRawPayload,
+  readShopNameFromRawPayload,
+  readShopAddressFromRawPayload,
+} from "./shopCommission";
+export {
+  resolveShopBrushCommission,
+  readShopIdFromRawPayload,
+  readShopNameFromRawPayload,
+  readShopAddressFromRawPayload,
+};
 
 export type AutoPickInboundItem = {
   productName?: string;
@@ -898,6 +910,16 @@ function normalizeMaiyatianShopMapping(input: unknown): AutoPickMaiyatianShopMap
   const libraryId = record.libraryId ? String(record.libraryId).trim() : null;
   const libraryName = record.libraryName ? String(record.libraryName).trim() : null;
 
+  const rawCommission = record.brushCommission;
+  const parsedCommission = typeof rawCommission === "number"
+    ? rawCommission
+    : typeof rawCommission === "string" && rawCommission.trim() !== ""
+      ? parseFloat(rawCommission)
+      : undefined;
+  const brushCommission = Number.isFinite(parsedCommission) && (parsedCommission as number) >= 0
+    ? Number((parsedCommission as number).toFixed(2))
+    : undefined;
+
   if (!maiyatianShopId || !maiyatianShopName || !maiyatianShopAddress || !localShopName) {
     return null;
   }
@@ -911,8 +933,10 @@ function normalizeMaiyatianShopMapping(input: unknown): AutoPickMaiyatianShopMap
     cityName: cityName || undefined,
     libraryId: libraryId || undefined,
     libraryName: libraryName || undefined,
+    brushCommission: brushCommission ?? undefined,
   };
 }
+
 
 function normalizeTimingMinutes(value: unknown, fallback: number, options?: { min?: number; max?: number }) {
   const min = options?.min ?? 0;
@@ -3249,11 +3273,7 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
 
   const becameCompleted = isAutoPickOrderCompletedStatus(order.status) && !isAutoPickOrderCompletedStatus(previousStatus);
   if (becameCompleted) {
-    const integrationConfig = await getAutoPickIntegrationConfigByUserId(userId);
-    const defaultBrushCommission = integrationConfig.defaultBrushCommission ?? 0;
-    await syncBrushOrderFromCompletedAutoPickOrder(userId, order.id, {
-      commission: defaultBrushCommission,
-    }).catch((brushError) => {
+    await syncBrushOrderFromCompletedAutoPickOrder(userId, order.id).catch((brushError) => {
       console.error("Failed to sync brush order after webhook upsert:", brushError);
     });
     await syncAutoOutboundFromCompletedAutoPickOrder(userId, order.id).catch((outboundError) => {
@@ -5842,7 +5862,13 @@ export async function syncBrushOrderFromCompletedAutoPickOrder(
     commission = options.commission;
   } else {
     const integrationConfig = await getAutoPickIntegrationConfigByUserId(userId);
-    commission = integrationConfig.defaultBrushCommission ?? 0;
+    commission = resolveShopBrushCommission(integrationConfig, {
+      maiyatianShopId: readShopIdFromRawPayload(order.rawPayload),
+      shopName: readShopNameFromRawPayload(order.rawPayload),
+      shopAddress: readShopAddressFromRawPayload(order.rawPayload) || order.shopAddress,
+      localShopName: options?.preferredMappedShopName || null,
+      rawPayload: order.rawPayload,
+    });
   }
 
   if (existing && options?.overwriteExisting === true) {
@@ -5924,66 +5950,6 @@ export async function syncBrushOrderFromCompletedAutoPickOrder(
   };
 }
 
-export function readShopNameFromRawPayload(rawPayload: unknown) {
-  if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
-    return null;
-  }
-  const record = rawPayload as Record<string, unknown>;
-  const extend = record.extend && typeof record.extend === "object" && !Array.isArray(record.extend)
-    ? record.extend as Record<string, unknown>
-    : null;
-  const candidates = [
-    record.rawShopName,
-    extend?.channel_name,
-    record.channel_name,
-    record.shop_name,
-    record.shopName,
-    record.storeName,
-    record.merchantName,
-    record.merchant_name,
-  ];
-  for (const item of candidates) {
-    const value = String(item || "").trim();
-    if (value) return value;
-  }
-  return null;
-}
-
-export function readShopAddressFromRawPayload(rawPayload: unknown) {
-  if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
-    return null;
-  }
-  const record = rawPayload as Record<string, unknown>;
-  const candidates = [
-    record.rawShopAddress,
-    record.shopAddress,
-    record.storeAddress,
-    record.merchantAddress,
-    record.store_address,
-    record.merchant_address,
-  ];
-  for (const item of candidates) {
-    const value = String(item || "").trim();
-    if (value) return value;
-  }
-  return null;
-}
-
-export function readShopIdFromRawPayload(rawPayload: unknown) {
-  if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
-    return null;
-  }
-  const record = rawPayload as Record<string, unknown>;
-  const delivery = record.delivery && typeof record.delivery === "object" && !Array.isArray(record.delivery)
-    ? record.delivery as Record<string, unknown>
-    : null;
-  const candidates = [record.shop_id, delivery?.shop_id];
-  for (const item of candidates) {
-    const value = String(item || "").trim();
-    if (value) return value;
-  }
-  return null;
-}
 
 export function resolveAutoPickMatchedShopName(
   order: { shopId?: string | null; rawPayload?: unknown },

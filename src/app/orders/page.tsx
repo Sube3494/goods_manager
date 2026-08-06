@@ -47,6 +47,12 @@ import {
   isAutoPickOrderDeliveringStatus,
   isAutoPickOrderTerminalStatus,
 } from "@/lib/autoPickOrderStatus";
+import {
+  resolveShopBrushCommission,
+  readShopIdFromRawPayload,
+  readShopNameFromRawPayload,
+  readShopAddressFromRawPayload,
+} from "@/lib/shopCommission";
 import { AutoPickIntegrationConfig, AutoPickMaiyatianShop, AutoPickOrder, AutoPickOrderItem, PurchaseOrder, PurchaseOrderItem } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { formatLocalDate, formatLocalDateTime } from "@/lib/dateUtils";
@@ -649,22 +655,86 @@ function IntegrationModal({
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">自动推送刷单佣金</div>
-                  <p className="mt-1 text-[11px] text-muted-foreground">订单自动同步刷单时，系统将采用此处设定的佣金金额。</p>
+                  <p className="mt-1 text-[11px] text-muted-foreground">订单自动同步刷单时，系统将优先采用店铺独立设定的佣金金额。</p>
                 </div>
               </div>
-              <div className="mt-3 flex items-center gap-2 rounded-xl border border-black/8 bg-white/80 px-3 dark:border-white/10 dark:bg-[#111827]">
-                <input
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  value={integrationConfig.defaultBrushCommission ?? 0}
-                  onChange={(event) => onChange({ ...integrationConfig, defaultBrushCommission: parseFloat(event.target.value) || 0 })}
-                  placeholder="例如 3.0"
-                  className="h-11 w-full bg-transparent text-sm font-medium outline-none"
-                />
-                <span className="text-sm text-muted-foreground shrink-0 pr-1">元 / 单</span>
+
+              <div className="mt-3">
+                <div className="mb-1 text-xs font-semibold text-foreground">默认全局刷单佣金</div>
+                <div className="flex items-center gap-2 rounded-xl border border-black/8 bg-white/80 px-3 dark:border-white/10 dark:bg-[#111827]">
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    value={integrationConfig.defaultBrushCommission ?? 0}
+                    onChange={(event) => onChange({ ...integrationConfig, defaultBrushCommission: parseFloat(event.target.value) || 0 })}
+                    placeholder="例如 5.0"
+                    className="h-10 w-full bg-transparent text-sm font-medium outline-none"
+                  />
+                  <span className="text-sm text-muted-foreground shrink-0 pr-1">元 / 单</span>
+                </div>
               </div>
-              <p className="mt-2 text-xs leading-5 text-muted-foreground">同步时手动挑单的初始佣金也将默认读取该值。</p>
+
+              <div className="mt-4 pt-3 border-t border-black/5 dark:border-white/5">
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <div className="text-xs font-semibold text-foreground">各店铺独立刷单佣金</div>
+                  <span className="text-[11px] text-muted-foreground">留空时自动继承全局默认佣金</span>
+                </div>
+
+                {integrationConfig.maiyatianShopMappings.length > 0 ? (
+                  <div className="space-y-2">
+                    {integrationConfig.maiyatianShopMappings.map((mapping) => {
+                      const shopCommission = mapping.brushCommission ?? "";
+                      return (
+                        <div
+                          key={mapping.maiyatianShopId}
+                          className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border border-black/8 bg-white/70 p-2.5 dark:border-white/10 dark:bg-white/4"
+                        >
+                          <div className="min-w-0">
+                            <div className="text-xs font-bold text-foreground truncate">
+                              {mapping.maiyatianShopName}
+                              {mapping.localShopName ? (
+                                <span className="ml-1.5 text-[11px] font-normal text-muted-foreground">
+                                  (绑定系统门店: {mapping.localShopName})
+                                </span>
+                              ) : null}
+                            </div>
+                            <div className="text-[10px] text-muted-foreground truncate">
+                              {mapping.maiyatianShopAddress}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <input
+                              type="number"
+                              step="0.1"
+                              min="0"
+                              value={shopCommission}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                const parsed = val === "" ? undefined : parseFloat(val);
+                                const safeVal = typeof parsed === "number" && !isNaN(parsed) && parsed >= 0 ? parsed : undefined;
+                                const nextMappings = integrationConfig.maiyatianShopMappings.map((m) =>
+                                  m.maiyatianShopId === mapping.maiyatianShopId ? { ...m, brushCommission: safeVal } : m
+                                );
+                                onChange({ ...integrationConfig, maiyatianShopMappings: nextMappings });
+                              }}
+                              placeholder={`默认 (${integrationConfig.defaultBrushCommission ?? 0}元)`}
+                              className="h-8 w-28 rounded-lg border border-black/8 bg-white px-2 text-xs font-medium outline-none focus:border-primary/30 dark:border-white/10 dark:bg-[#111827]"
+                            />
+                            <span className="text-xs text-muted-foreground">元/单</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-dashed border-black/8 bg-white/50 px-3 py-3 text-xs text-muted-foreground text-center dark:border-white/10 dark:bg-white/2">
+                    暂未绑定发货门店。请在上方绑定麦芽田发货门店后，在此设置各店铺的独立刷单佣金。
+                  </div>
+                )}
+              </div>
+
+              <p className="mt-3 text-xs leading-5 text-muted-foreground">同步时手动挑单的初始佣金也将读取对应店铺的设定金额。</p>
             </div>
 
             <div className="lg:col-start-1 lg:row-start-5">
@@ -719,9 +789,26 @@ function BrushSyncPickerModal({
   todayDate: string;
 }) {
 
-  const [commission, setCommission] = useState<string>(
-    String(integrationConfig.defaultBrushCommission > 0 ? integrationConfig.defaultBrushCommission : 0)
-  );
+  const initialCommission = useMemo(() => {
+    if (selectedIds.length > 0) {
+      const firstSelectedOrder = orders.find((o) => selectedIds.includes(o.id));
+      if (firstSelectedOrder) {
+        return resolveShopBrushCommission(integrationConfig, {
+          maiyatianShopId: firstSelectedOrder.shopId,
+          shopName: firstSelectedOrder.rawShopName || firstSelectedOrder.matchedShopName || firstSelectedOrder.shopId,
+          shopAddress: firstSelectedOrder.rawShopAddress || firstSelectedOrder.shopAddress,
+          localShopName: firstSelectedOrder.matchedShopName,
+        });
+      }
+    }
+    return integrationConfig.defaultBrushCommission > 0 ? integrationConfig.defaultBrushCommission : 0;
+  }, [orders, selectedIds, integrationConfig]);
+
+  const [commission, setCommission] = useState<string>(String(initialCommission));
+
+  useEffect(() => {
+    setCommission(String(initialCommission));
+  }, [initialCommission]);
   const [query, setQuery] = useState("");
   const [selectedPlatform, setSelectedPlatform] = useState("all");
   const [startDate, setStartDate] = useState("");
