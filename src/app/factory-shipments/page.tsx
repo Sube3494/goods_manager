@@ -424,13 +424,13 @@ const ShipmentItemRow = memo(({
                   className="h-9 w-full rounded-xl border border-border bg-white px-3 py-1.5 text-xs text-foreground outline-none ring-1 ring-transparent transition-all focus:ring-2 focus:ring-primary/20 dark:border-white/10 dark:bg-[#2b313d] disabled:cursor-not-allowed disabled:opacity-50"
                 />
                 {shippedAt && item.trackingNumber?.trim() ? (
-                  <div className="flex items-center gap-1 mt-1 pl-1 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 font-mono whitespace-nowrap">
-                    <span>✓ 发货时间:</span>
+                  <div className="flex items-center gap-1 mt-1 pl-1 text-[10px] font-normal text-emerald-600 dark:text-emerald-400 font-mono whitespace-nowrap">
+                    <span>发货时间:</span>
                     <span>{new Date(shippedAt).toLocaleString("zh-CN", { timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
                   </div>
                 ) : !shippedAt && item.trackingNumber?.trim() ? (
                   <div className="flex items-center gap-1 mt-1 pl-1 text-[10px] font-normal text-muted-foreground/70 font-mono whitespace-nowrap">
-                    <span>⏱ 保存后自动记录发货时间</span>
+                    <span>保存后自动记录发货时间</span>
                   </div>
                 ) : null}
               </div>
@@ -671,13 +671,13 @@ const ShipmentItemRow = memo(({
                   className="h-9 w-full rounded-xl border border-border bg-white px-3 py-1.5 text-xs text-foreground outline-none ring-1 ring-transparent transition-all focus:ring-2 focus:ring-primary/20 dark:border-white/10 dark:bg-[#2b313d] disabled:cursor-not-allowed disabled:opacity-50"
                 />
                 {shippedAt && item.trackingNumber?.trim() ? (
-                  <div className="flex items-center gap-1 mt-1 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 font-mono whitespace-nowrap">
-                    <span>✓ 发货时间:</span>
+                  <div className="flex items-center gap-1 mt-1 pl-1 text-[10px] font-normal text-emerald-600 dark:text-emerald-400 font-mono whitespace-nowrap">
+                    <span>发货时间:</span>
                     <span>{new Date(shippedAt).toLocaleString("zh-CN", { timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
                   </div>
                 ) : !shippedAt && item.trackingNumber?.trim() ? (
-                  <div className="flex items-center gap-1 mt-1 text-[10px] font-normal text-muted-foreground/70 font-mono whitespace-nowrap">
-                    <span>⏱ 保存后自动记录发货时间</span>
+                  <div className="flex items-center gap-1 mt-1 pl-1 text-[10px] font-normal text-muted-foreground/70 font-mono whitespace-nowrap">
+                    <span>保存后自动记录发货时间</span>
                   </div>
                 ) : null}
               </div>
