@@ -728,7 +728,7 @@ export function DataOverview({
                 <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={12} />
                 <YAxis tickLine={false} axisLine={false} fontSize={12} width={52} />
                 <Tooltip
-                  allowEscapeViewBox={{ x: true, y: true }}
+                  allowEscapeViewBox={{ x: false, y: true }}
                   wrapperStyle={{ zIndex: 1000, outline: "none" }}
                   content={<ChartTooltip valueFormatter={amountTooltip} nameMap={{ netProfit: "净利润" }} />}
                 />
@@ -772,7 +772,7 @@ export function DataOverview({
                 <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={12} />
                 <YAxis tickLine={false} axisLine={false} fontSize={12} width={40} allowDecimals={false} />
                 <Tooltip
-                  allowEscapeViewBox={{ x: true, y: true }}
+                  allowEscapeViewBox={{ x: false, y: true }}
                   wrapperStyle={{ zIndex: 1000, outline: "none" }}
                   content={<OrderTooltip orderScope={orderScope} />}
                 />
