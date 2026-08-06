@@ -2245,9 +2245,8 @@ function FactoryShipmentDetailModal({
                     {/* 创建时间 */}
                     <div className="rounded-2xl border border-border/60 bg-white/80 px-3.5 py-3 dark:border-white/10 dark:bg-white/5">
                       <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">创建时间</div>
-                      <div className="mt-1.5 flex items-baseline gap-2 font-mono text-[15px] font-semibold tracking-tight text-foreground/90">
-                        <span>{format(parseSafeDate(order.createdAt), "yyyy-MM-dd")}</span>
-                        <span className="text-xs font-normal text-muted-foreground">{format(parseSafeDate(order.createdAt), "HH:mm")}</span>
+                      <div className="mt-1.5 font-mono text-[15px] font-semibold tracking-tight text-foreground/90">
+                        {format(parseSafeDate(order.createdAt), "yyyy-MM-dd HH:mm")}
                       </div>
                     </div>
                   </div>
