@@ -3696,7 +3696,7 @@ export default function FactoryShipmentsPage() {
     return shipmentOrders.filter((order) => {
       const parsed = parseFactoryShipmentNote(order.note);
       const derivedStatus = deriveFactoryShipmentStatusFromOrder(order, parsed);
-      const orderDate = order.date ? format(parseSafeDate(order.date), "yyyy-MM-dd") : "";
+      const orderDate = order.createdAt ? format(parseSafeDate(order.createdAt), "yyyy-MM-dd") : "";
       const query = searchQuery.trim();
       const itemNames = order.items.map(
         (item) => item.shopProduct?.name || item.product?.name || ""
@@ -3769,7 +3769,7 @@ export default function FactoryShipmentsPage() {
   const filterOrdersByExportDate = useCallback((orders: OutboundOrder[]) => {
     if (!exportStartDate && !exportEndDate) return orders;
     return orders.filter((order) => {
-      const orderDate = order.date ? format(parseSafeDate(order.date), "yyyy-MM-dd") : "";
+      const orderDate = order.createdAt ? format(parseSafeDate(order.createdAt), "yyyy-MM-dd") : "";
       if (!orderDate) return false;
       return (!exportStartDate || orderDate >= exportStartDate) && (!exportEndDate || orderDate <= exportEndDate);
     });
@@ -4100,7 +4100,7 @@ export default function FactoryShipmentsPage() {
       exportOrders.forEach((order, orderIndex) => {
         const parsed = parseFactoryShipmentNote(order.note);
         const displayStatus = deriveFactoryShipmentStatusFromOrder(order, parsed);
-        const formattedDate = order.date ? format(parseSafeDate(order.date), "yyyy-MM-dd") : "";
+        const formattedDate = order.createdAt ? format(parseSafeDate(order.createdAt), "yyyy-MM-dd") : "";
         const logisticsNames = Array.from(new Set(
           (parsed.trackingEntries || []).map((entry) => String(entry.logisticsName || "").trim()).filter(Boolean)
         )).join(" / ");
@@ -5142,8 +5142,8 @@ export default function FactoryShipmentsPage() {
                         {(currentPage - 1) * pageSize + index + 1}
                       </span>
                       <span className="inline-flex h-6 shrink-0 items-center gap-1 rounded-full border border-border/50 bg-muted/40 px-2 text-[10px] font-normal leading-none text-muted-foreground dark:border-white/8 dark:bg-white/6">
-                        <span>{format(parseSafeDate(order.date), "MM-dd")}</span>
-                        <span>{format(parseSafeDate(order.date), "HH:mm")}</span>
+                        <span>{format(parseSafeDate(order.createdAt), "MM-dd")}</span>
+                        <span>{format(parseSafeDate(order.createdAt), "HH:mm")}</span>
                       </span>
                       <div className="min-w-0">
                         <div className="truncate text-sm font-normal text-foreground" title={[parsed.recipientName, parsed.recipientAddress].filter(Boolean).join(" ")}>
