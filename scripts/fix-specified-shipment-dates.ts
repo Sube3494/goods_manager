@@ -4,34 +4,41 @@ import { buildFactoryShipmentNote, parseFactoryShipmentNote } from "../src/lib/u
 
 const prisma = new PrismaClient();
 
-const targetOrders = [
-  { id: "FH-20260731-N323", targetTimeStr: "2026-08-01 22:38:00" },
-  { id: "FH-20260731-EJOW", targetTimeStr: "2026-08-01 22:39:00" },
-  { id: "FH-20260731-2ZXP", targetTimeStr: "2026-08-01 22:38:00" },
-  { id: "FH-20260731-Z2DQ", targetTimeStr: "2026-08-01 22:42:00" },
-  { id: "FH-20260731-QZLA", targetTimeStr: "2026-08-01 22:45:00" },
-  { id: "FH-20260731-P085", targetTimeStr: "2026-08-01 22:46:00" },
-];
+const shouldRun = process.argv.includes("--run");
+
+// 用户明确指定的 6 张单据真实发货时间（北京时间）
+const specifiedOrders: Record<string, string> = {
+  "FH-20260731-N323": "2026-08-01 22:38:00",
+  "FH-20260731-EJOW": "2026-08-01 22:39:00",
+  "FH-20260731-2ZXP": "2026-08-01 22:38:00",
+  "FH-20260731-Z2DQ": "2026-08-01 22:42:00",
+  "FH-20260731-QZLA": "2026-08-01 22:45:00",
+  "FH-20260731-P085": "2026-08-01 22:46:00",
+};
 
 function hasTrackingNumber(entry: { trackingNumber?: string | null }) {
   return Boolean(entry?.trackingNumber?.trim());
 }
 
 async function main() {
-  console.log("🚀 开始修正指定 6 张单据的发货时间与货品发货时间戳...\n");
+  console.log("📌 专属修正以下 6 张单据的真实发货时间：");
+  Object.entries(specifiedOrders).forEach(([id, timeStr]) => {
+    console.log(`  - ${id} => ${timeStr}`);
+  });
+  console.log(`\n⚙️ 运行模式: ${shouldRun ? "【真正写入数据库】" : "【预览对比 (dry-run)】"}\n`);
 
-  for (const item of targetOrders) {
+  for (const [id, timeStr] of Object.entries(specifiedOrders)) {
     const order = await prisma.outboundOrder.findUnique({
-      where: { id: item.id },
+      where: { id },
       select: { id: true, date: true, note: true },
     });
 
     if (!order) {
-      console.log(`⚠️ 单据 ${item.id} 在数据库中未找到，跳过。`);
+      console.log(`⚠️ 单据 ${id} 在数据库中未找到，跳过。`);
       continue;
     }
 
-    const targetDate = parseAsShanghaiTime(item.targetTimeStr);
+    const targetDate = parseAsShanghaiTime(timeStr);
     const parsedNote = parseFactoryShipmentNote(order.note || "");
 
     let newNote = order.note || "";
@@ -60,18 +67,27 @@ async function main() {
       });
     }
 
-    await prisma.outboundOrder.update({
-      where: { id: item.id },
-      data: {
-        date: targetDate,
-        note: newNote,
-      },
-    });
+    console.log(`✅ 单据 ${id}: 当前 ${order.date.toISOString()} -> 修正为目标发货时间: ${targetDate.toISOString()} (${timeStr})`);
 
-    console.log(`✅ 单据 ${item.id} 成功修正发货时间为: ${item.targetTimeStr}`);
+    if (shouldRun) {
+      await prisma.outboundOrder.update({
+        where: { id },
+        data: {
+          date: targetDate,
+          note: newNote,
+        },
+      });
+    }
   }
 
-  console.log("\n🎉 所有指定单据的数据修正完成！");
+  console.log("\n==========================================");
+  if (!shouldRun) {
+    console.log("💡 预览完毕。确认无误后，添加 --run 执行真正写入：");
+    console.log("   npx tsx scripts/fix-specified-shipment-dates.ts --run");
+  } else {
+    console.log("🎉 指定单据的发货时间与货品 shippedAt 已全部成功修正归位！");
+  }
+  console.log("==========================================\n");
 }
 
 main()

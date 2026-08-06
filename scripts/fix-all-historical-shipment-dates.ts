@@ -1,12 +1,23 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { PrismaClient } from "../prisma/generated-client";
+import { parseAsShanghaiTime } from "../src/lib/dateUtils";
 import { buildFactoryShipmentNote, parseFactoryShipmentNote } from "../src/lib/utils";
 
 const prisma = new PrismaClient();
 
 const shouldRun = process.argv.includes("--run");
-// 从命令行参数寻找备份 json 文件，默认使用 factory-shipment-dates-20260806_015608.json
+
+// 用户明确指定的特殊单据发货时间（覆盖备份中的偏差数据）
+const userSpecifiedDates: Record<string, string> = {
+  "FH-20260731-N323": "2026-08-01 22:38:00",
+  "FH-20260731-EJOW": "2026-08-01 22:39:00",
+  "FH-20260731-2ZXP": "2026-08-01 22:38:00",
+  "FH-20260731-Z2DQ": "2026-08-01 22:42:00",
+  "FH-20260731-QZLA": "2026-08-01 22:45:00",
+  "FH-20260731-P085": "2026-08-01 22:46:00",
+};
+
 const foundJson = process.argv.find((arg) => arg.endsWith(".json"));
 const jsonFilename: string = foundJson || "factory-shipment-dates-20260806_015608.json";
 
@@ -46,25 +57,21 @@ async function main() {
   for (const backupOrder of backupOrders) {
     const existing = await prisma.outboundOrder.findUnique({
       where: { id: backupOrder.id },
-      select: { id: true, date: true, note: true, createdAt: true },
+      select: { id: true, date: true, note: true },
     });
 
     if (!existing) continue;
     checkedCount++;
 
-    const rawBackupDate = new Date(backupOrder.date);
-    const rawCreatedAt = backupOrder.createdAt ? new Date(backupOrder.createdAt) : existing.createdAt;
-
-    // 校验备份中的 date 是否被历史 +8 小时误偏移过
-    const diffHours = (rawBackupDate.getTime() - rawCreatedAt.getTime()) / 36e5;
-    let correctDate = rawBackupDate;
-
-    // 若 date 恰好比 createdAt 快约 8 小时，说明是被历史 +8 脚本偏了，纠正为真实的 createdAt
-    if (Math.abs(diffHours - 8) < 0.05) {
-      correctDate = rawCreatedAt;
+    // 优先采用用户明确指定的时间，否则取备份 JSON 中的真实发货时间 backupOrder.date
+    let correctDate: Date;
+    if (userSpecifiedDates[backupOrder.id]) {
+      correctDate = parseAsShanghaiTime(userSpecifiedDates[backupOrder.id]);
+    } else {
+      correctDate = new Date(backupOrder.date);
     }
 
-    // 更新 Note 里的每一个货品 shippedAt 时间戳
+    // 将此发货时间注入更新到 Note 里的每个已填单货品 shippedAt 时间戳中
     let targetNote = existing.note || backupOrder.note || "";
     const parsedNote = parseFactoryShipmentNote(targetNote);
 
@@ -73,7 +80,7 @@ async function main() {
         if (hasTrackingNumber(entry)) {
           return {
             ...entry,
-            shippedAt: entry.shippedAt || correctDate.toISOString(),
+            shippedAt: correctDate.toISOString(),
           };
         }
         return entry;
@@ -98,12 +105,12 @@ async function main() {
 
     if (dateNeedsUpdate || noteNeedsUpdate) {
       fixedCount++;
-      console.log(`📌 需修正单据: ${backupOrder.id}`);
+      console.log(`📌 需恢复单据: ${backupOrder.id}`);
       if (dateNeedsUpdate) {
-        console.log(`   └─ 单据时间: 当前 ${existing.date.toISOString()} -> 修正为 ${correctDate.toISOString()}${Math.abs(diffHours - 8) < 0.05 ? " (已自动纠正 8h 历史偏差)" : ""}`);
+        console.log(`   └─ 发货时间: 当前 ${existing.date.toISOString()} -> 恢复为 ${correctDate.toISOString()}${userSpecifiedDates[backupOrder.id] ? " (已使用你指定的准确时间)" : ""}`);
       }
       if (noteNeedsUpdate) {
-        console.log(`   └─ 货品发货时间: 补齐/纠正 note 中各货品的 shippedAt 时间戳`);
+        console.log(`   └─ 货品发货时间: 注入/更新各个货品记录的 shippedAt 时间戳`);
       }
 
       if (shouldRun) {
@@ -120,18 +127,18 @@ async function main() {
 
   console.log("\n==========================================");
   if (!shouldRun) {
-    console.log(`🔍 检查完成：共扫描 ${checkedCount} 张单据，发现 ${fixedCount} 张单据的时间/货品发货时间需要纠正归位。`);
-    console.log("💡 确认上面的修复预览无误后，加上 --run 执行真正写入数据库：");
+    console.log(`🔍 检查完成：共扫描 ${checkedCount} 张单据，发现 ${fixedCount} 张单据的发货时间/货品独立时间需要恢复归位。`);
+    console.log("💡 确认上面的恢复预览无误后，加上 --run 执行真正写入数据库：");
     console.log(`   npx tsx scripts/fix-all-historical-shipment-dates.ts ${path.basename(backupPath)} --run`);
   } else {
-    console.log(`✅ 全量修正完成！成功纠正并写入了 ${fixedCount} 张单据的正确发货时间及各货品独立时间戳。`);
+    console.log(`✅ 恢复完成！成功将 ${fixedCount} 张单据的发货时间及各货品独立时间戳全量准确写入。`);
   }
   console.log("==========================================\n");
 }
 
 main()
   .catch((err) => {
-    console.error("❌ 全量修正失败:", err);
+    console.error("❌ 恢复失败:", err);
     process.exitCode = 1;
   })
   .finally(async () => {
