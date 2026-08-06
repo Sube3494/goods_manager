@@ -3829,7 +3829,7 @@ export default function FactoryShipmentsPage() {
 
       const summaryHeaders = [
         "序号",
-        "发货日期",
+        "单号创建时间",
         "单号",
         "发货状态",
         "收件人",
@@ -3854,7 +3854,8 @@ export default function FactoryShipmentsPage() {
         "单价",
         "运费",
         "小计",
-        "发货日期",
+        "货品发货时间",
+        "单号创建时间",
         "单号",
         "发货状态",
         "收件人",
@@ -3945,7 +3946,8 @@ export default function FactoryShipmentsPage() {
         { key: "price", width: 12 },
         { key: "shippingFee", width: 12 },
         { key: "subtotal", width: 14 },
-        { key: "date", width: 14 },
+        { key: "itemShippedAt", width: 18 },
+        { key: "createdAt", width: 18 },
         { key: "id", width: 22 },
         { key: "status", width: 12 },
         { key: "recipient", width: 12 },
@@ -4100,7 +4102,7 @@ export default function FactoryShipmentsPage() {
       exportOrders.forEach((order, orderIndex) => {
         const parsed = parseFactoryShipmentNote(order.note);
         const displayStatus = deriveFactoryShipmentStatusFromOrder(order, parsed);
-        const formattedDate = order.createdAt ? format(parseSafeDate(order.createdAt), "yyyy-MM-dd") : "";
+        const formattedDate = order.createdAt ? format(parseSafeDate(order.createdAt), "yyyy-MM-dd HH:mm") : "";
         const logisticsNames = Array.from(new Set(
           (parsed.trackingEntries || []).map((entry) => String(entry.logisticsName || "").trim()).filter(Boolean)
         )).join(" / ");
@@ -4172,6 +4174,9 @@ export default function FactoryShipmentsPage() {
             0;
           const shippingFee = Number(trackingEntry?.shippingFee) || 0;
           const subtotal = item.quantity * itemPrice + shippingFee;
+          const itemShippedAtText = trackingEntry?.shippedAt
+            ? format(parseSafeDate(trackingEntry.shippedAt), "yyyy-MM-dd HH:mm")
+            : (trackingEntry?.trackingNumber?.trim() ? "已填单" : "尚未发货");
 
           const detailRow = detailSheet.addRow([
             detailIndex++,
@@ -4182,6 +4187,7 @@ export default function FactoryShipmentsPage() {
             itemPrice,
             shippingFee,
             subtotal,
+            itemShippedAtText,
             formattedDate,
             order.id,
             displayStatus,
