@@ -4440,6 +4440,9 @@ export default function FactoryShipmentsPage() {
         const label = getShipmentProductFilterLabel(item);
         const image = item.shopProductVariant?.image || item.productVariant?.image || item.shopProduct?.image || item.product?.image || "";
         const quantity = item.quantity || 0;
+        const itemKey = getItemKey(item) || getStableShipmentActionKey(item);
+        const trackingEntry = parsed.trackingEntries.find(e => e.itemKey === itemKey || e.itemKey === getItemKey(item));
+        const shippedAt = trackingEntry?.shippedAt;
         customerStat.quantity += quantity;
         const productStat = productMap.get(key) || { key, label, image, shipmentCount: 0, quantity: 0, orderIds: new Set<string>() };
         productStat.quantity += quantity;
@@ -4447,7 +4450,7 @@ export default function FactoryShipmentsPage() {
         productStat.shipmentCount = productStat.orderIds.size;
         if (!productStat.image && image) productStat.image = image;
         productMap.set(key, productStat);
-        return { key, label, image, quantity };
+        return { key, label, image, quantity, shippedAt, trackingNumber: trackingEntry?.trackingNumber };
       });
       customerMap.set(customerKey, customerStat);
       return { order, parsed, items };
@@ -4843,7 +4846,7 @@ export default function FactoryShipmentsPage() {
                       </div>
                       <div className="flex flex-wrap gap-2">
                         {items.map((item, itemIndex) => (
-                          <span key={`${item.key}-${itemIndex}`} className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-border/50 bg-muted/25 p-0.5 pr-2 text-xs font-medium text-foreground dark:border-white/8 dark:bg-white/[0.04]">
+                          <span key={`${item.key}-${itemIndex}`} className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-border/50 bg-muted/25 p-0.5 pr-2.5 text-xs font-medium text-foreground dark:border-white/8 dark:bg-white/[0.04]">
                             <span className="relative flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white dark:bg-black">
                               {item.image ? (
                                 <Image src={item.image} alt="" fill sizes="24px" className="object-cover" />
@@ -4853,6 +4856,15 @@ export default function FactoryShipmentsPage() {
                             </span>
                             <span className="min-w-0 max-w-[220px] truncate">{item.label}</span>
                             <span className="shrink-0 tabular-nums text-primary">x{item.quantity}</span>
+                            {item.shippedAt ? (
+                              <span className="shrink-0 text-[10px] font-mono text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 bg-emerald-500/10 px-1.5 py-0.5 rounded-full">
+                                {format(parseSafeDate(item.shippedAt), "MM-dd HH:mm")}
+                              </span>
+                            ) : item.trackingNumber?.trim() ? (
+                              <span className="shrink-0 text-[10px] font-mono text-amber-600 dark:text-amber-400 border border-amber-500/20 bg-amber-500/10 px-1.5 py-0.5 rounded-full">
+                                已填单
+                              </span>
+                            ) : null}
                           </span>
                         ))}
                       </div>
