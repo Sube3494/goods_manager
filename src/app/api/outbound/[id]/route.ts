@@ -113,9 +113,12 @@ function mergeFactoryShipmentTrackingEntries(
 
     const finalEntry = normalizeTrackingEntry(baseEntry, nextKey);
     if (finalEntry) {
-      const wasShipped = hasTrackingNumber(carryOverEntry);
-      const willBeShipped = hasTrackingNumber(incomingEntry);
-      if (!wasShipped && willBeShipped && !finalEntry.shippedAt) {
+      // 优先继承已有记录中的 shippedAt
+      if (!finalEntry.shippedAt && carryOverEntry?.shippedAt) {
+        finalEntry.shippedAt = carryOverEntry.shippedAt;
+      }
+      // 只要该货品有快递单号，但尚无 shippedAt，就自动生成当前时间戳
+      if (hasTrackingNumber(finalEntry) && !finalEntry.shippedAt) {
         finalEntry.shippedAt = new Date().toISOString();
       }
       mergedEntries.push(finalEntry);

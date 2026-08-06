@@ -1739,7 +1739,7 @@ function FactoryShipmentDetailModal({
 }: {
   order: OutboundOrder | null;
   onClose: () => void;
-  onUpdated?: () => Promise<void>;
+  onUpdated?: (updatedOrder?: OutboundOrder) => Promise<void>;
   logisticsOptions?: { value: string; label: string }[];
   onAddNewLogistics?: () => void;
 }) {
@@ -2130,6 +2130,7 @@ function FactoryShipmentDetailModal({
                 logisticsName: item.logisticsName?.trim() || "",
                 trackingNumber: item.trackingNumber?.trim() || "",
                 shippingFee: Number(item.shippingFee) || 0,
+                shippedAt: (item as any).shippedAt || parsed?.trackingEntries?.find(e => e.itemKey === (getItemKey(item) || getStableShipmentActionKey(item)))?.shippedAt,
               }))
               .filter((entry) => entry.itemKey && entry.trackingNumber),
             remark: editForm.remark,
@@ -2150,7 +2151,7 @@ function FactoryShipmentDetailModal({
 
       showToast("发货信息已更新", "success");
       if (onUpdated) {
-        await onUpdated();
+        await onUpdated(data?.order);
       }
       onClose();
     } catch (err) {
@@ -2630,7 +2631,7 @@ function FactoryShipmentDetailModal({
                             disabled={!isEditing}
                             logisticsOptions={getSingleRowLogisticsOptions(item.logisticsName)}
                             onAddNewLogistics={onAddNewLogistics}
-                            shippedAt={parsed.trackingEntries.find(e => e.itemKey === getStableShipmentActionKey(item))?.shippedAt}
+                            shippedAt={parsed.trackingEntries.find(e => e.itemKey === getItemKey(item) || e.itemKey === getStableShipmentActionKey(item))?.shippedAt}
                           />
                         ))}
                         <div className="flex items-center justify-end gap-3 rounded-2xl border border-border/70 bg-linear-to-br from-white to-slate-50/70 p-4 dark:border-white/8 dark:from-white/10 dark:to-white/4 shadow-sm mt-3">
@@ -5333,8 +5334,11 @@ export default function FactoryShipmentsPage() {
       <FactoryShipmentDetailModal
         order={detailOrder}
         onClose={() => setDetailOrder(null)}
-        onUpdated={async () => {
+        onUpdated={async (updatedOrder) => {
           await fetchOrders();
+          if (updatedOrder) {
+            setDetailOrder(updatedOrder);
+          }
         }}
         logisticsOptions={logisticsOptions}
         onAddNewLogistics={() => setIsQuickLogisticsOpen(true)}
