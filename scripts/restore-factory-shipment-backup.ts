@@ -1,12 +1,17 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { PrismaClient } from "../prisma/generated-client";
+import { buildFactoryShipmentNote, parseFactoryShipmentNote } from "../src/lib/utils";
 
 const prisma = new PrismaClient();
 
 const shouldRun = process.argv.includes("--run");
 // 从命令行参数寻找 .json 文件名
 const jsonArg = process.argv.find((arg) => arg.endsWith(".json"));
+
+function hasTrackingNumber(entry: { trackingNumber?: string | null }) {
+  return Boolean(entry?.trackingNumber?.trim());
+}
 
 async function main() {
   if (!jsonArg) {
@@ -54,8 +59,40 @@ async function main() {
     const backupDate = new Date(backupOrder.date);
     const currentDate = existing.date;
 
+    // 智能化：升级将备份中的 note 转为最新的带每个货品 shippedAt 的格式
+    let targetNote = backupOrder.note || "";
+    if (targetNote) {
+      const parsedNote = parseFactoryShipmentNote(targetNote);
+      if (parsedNote.isFactoryShipment && parsedNote.trackingEntries.length > 0) {
+        // 遍历备份里的每个货品记录
+        const upgradedTrackingEntries = parsedNote.trackingEntries.map((entry) => {
+          // 如果该货品已有单号，但在备份记录中缺少 shippedAt 发货时间，自动把备份中的单据发货时间 backupDate 赋给该货品！
+          if (hasTrackingNumber(entry) && !entry.shippedAt) {
+            return {
+              ...entry,
+              shippedAt: backupDate.toISOString(),
+            };
+          }
+          return entry;
+        });
+
+        targetNote = buildFactoryShipmentNote({
+          recipientName: parsedNote.recipientName,
+          recipientPhone: parsedNote.recipientPhone,
+          paymentStatus: parsedNote.paymentStatus,
+          compensationStatus: parsedNote.compensationStatus,
+          recipientAddress: parsedNote.recipientAddress,
+          trackingEntries: upgradedTrackingEntries,
+          remark: parsedNote.remark,
+          compensationLogisticsName: parsedNote.compensationLogisticsName,
+          compensationTrackingNumber: parsedNote.compensationTrackingNumber,
+          compensationItems: parsedNote.compensationItems,
+        });
+      }
+    }
+
     const dateDiffers = backupDate.getTime() !== currentDate.getTime();
-    const noteDiffers = backupOrder.note !== undefined && backupOrder.note !== existing.note;
+    const noteDiffers = targetNote !== existing.note;
 
     if (dateDiffers || noteDiffers) {
       restoredCount++;
@@ -64,7 +101,7 @@ async function main() {
         console.log(`   └─ 时间: 当前 ${currentDate.toISOString()} -> 恢复为备份值 ${backupDate.toISOString()}`);
       }
       if (noteDiffers) {
-        console.log(`   └─ 备注/单号信息: 恢复为备份值 (${backupOrder.note || ""})`);
+        console.log(`   └─ 货品独立发货时间: 自动将备份时间升级注入至各货品记录中`);
       }
 
       if (shouldRun) {
@@ -72,7 +109,7 @@ async function main() {
           where: { id: backupOrder.id },
           data: {
             date: backupDate,
-            ...(backupOrder.note !== undefined ? { note: backupOrder.note } : {}),
+            note: targetNote,
           },
         });
       }
@@ -85,7 +122,7 @@ async function main() {
     console.log("💡 确认上面的差异无误后，添加 --run 参数即可执行真正恢复：");
     console.log(`   npx tsx scripts/restore-factory-shipment-backup.ts ${path.basename(backupPath)} --run`);
   } else {
-    console.log(`✅ 恢复完成！成功将 ${restoredCount} 张单据的时间及发货备注恢复为备份数据。`);
+    console.log(`✅ 恢复完成！成功将 ${restoredCount} 张单据的整单时间及各货品的独立发货时间完整恢复为备份数据。`);
   }
   console.log("==========================================\n");
 }
