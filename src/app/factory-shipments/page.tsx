@@ -4827,7 +4827,7 @@ export default function FactoryShipmentsPage() {
                         <div className="min-w-0">
                           <div className="truncate text-sm font-semibold text-foreground">{order.id}</div>
                           <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                            <span>{format(parseSafeDate(order.date), "yyyy/M/d HH:mm", { locale: zhCN })}</span>
+                            <span>{format(parseSafeDate(order.createdAt), "yyyy/M/d HH:mm", { locale: zhCN })}</span>
                             <span>{formatRecipientWithRegion(parsed.recipientName, parsed.recipientAddress)}</span>
                           </div>
                         </div>
@@ -4913,7 +4913,7 @@ export default function FactoryShipmentsPage() {
                     </div>
                   </th>
                   <th className="px-4 py-4 text-center text-xs font-normal uppercase tracking-wider text-muted-foreground">序号</th>
-                  <th className="px-4 py-4 text-center text-xs font-normal uppercase tracking-wider text-muted-foreground">发货时间</th>
+                  <th className="px-4 py-4 text-center text-xs font-normal uppercase tracking-wider text-muted-foreground">创建时间</th>
                   <th className="px-4 py-4 text-center text-xs font-normal uppercase tracking-wider text-muted-foreground">收件人</th>
                   <th className="px-4 py-4 text-center text-xs font-normal uppercase tracking-wider text-muted-foreground">货品概览</th>
                   <th className="px-4 py-4 text-center text-xs font-normal uppercase tracking-wider text-muted-foreground">发货状态</th>
@@ -4954,14 +4954,10 @@ export default function FactoryShipmentsPage() {
                         {(currentPage - 1) * pageSize + index + 1}
                       </td>
                       <td className="px-4 py-4 text-center text-xs text-muted-foreground">
-                        {derivedStatus === "已发货" || derivedStatus === "部分发货" ? (
-                          <div className="flex items-center justify-center gap-2 whitespace-nowrap">
-                            <Calendar size={14} className="shrink-0 text-muted-foreground/75" />
-                            <span className="font-mono tabular-nums">{format(parseSafeDate(order.date), "yyyy-MM-dd HH:mm", { locale: zhCN })}</span>
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground/40">—</span>
-                        )}
+                        <div className="flex items-center justify-center gap-2 whitespace-nowrap">
+                          <Calendar size={14} className="shrink-0 text-muted-foreground/75" />
+                          <span className="font-mono tabular-nums">{format(parseSafeDate(order.createdAt), "yyyy-MM-dd HH:mm", { locale: zhCN })}</span>
+                        </div>
                       </td>
                       <td className="px-4 py-4 text-center text-sm font-normal text-foreground">
                         <div className="flex flex-col items-center gap-1">
