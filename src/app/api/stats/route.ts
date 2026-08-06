@@ -39,7 +39,7 @@ function extractShopNameFromNote(note: string | null | undefined) {
 }
 
 function extractOrderNoFromNote(note: string | null | undefined) {
-  const match = String(note || "").match(/平台单号:\s*([^\s|]+)/);
+  const match = String(note || "").match(/平台单号[:：]\s*([^\s|]+)/);
   return String(match?.[1] || "").trim();
 }
 
@@ -578,12 +578,15 @@ export async function GET(request: NextRequest) {
     const outboundOrdersForCost: OutboundCostLookupRow[] = [];
     if (outboundLookupOrderNos.length > 0) {
       try {
-        outboundOrdersForCost.push(...await prisma.outboundOrder.findMany({
+        outboundOrdersForCost.push(...(await prisma.outboundOrder.findMany({
           where: {
             userId: user.id,
-            OR: outboundLookupOrderNos.map((orderNo) => ({
-              note: { contains: `平台单号: ${orderNo}` },
-            })),
+            OR: outboundLookupOrderNos.flatMap((orderNo) => [
+              { note: { contains: `平台单号: ${orderNo}` } },
+              { note: { contains: `平台单号:${orderNo}` } },
+              { note: { contains: `平台单号：${orderNo}` } },
+              { note: { contains: `平台单号： ${orderNo}` } },
+            ]),
           },
           select: {
             note: true,
@@ -604,18 +607,21 @@ export async function GET(request: NextRequest) {
               },
             },
           },
-        }));
+        }) as unknown as OutboundCostLookupRow[]));
       } catch (error) {
         if (!isPrismaMissingColumnError(error, "OutboundOrderItem.costSnapshot")) {
           throw error;
         }
 
-        outboundOrdersForCost.push(...await prisma.outboundOrder.findMany({
+        outboundOrdersForCost.push(...(await prisma.outboundOrder.findMany({
           where: {
             userId: user.id,
-            OR: outboundLookupOrderNos.map((orderNo) => ({
-              note: { contains: `平台单号: ${orderNo}` },
-            })),
+            OR: outboundLookupOrderNos.flatMap((orderNo) => [
+              { note: { contains: `平台单号: ${orderNo}` } },
+              { note: { contains: `平台单号:${orderNo}` } },
+              { note: { contains: `平台单号：${orderNo}` } },
+              { note: { contains: `平台单号： ${orderNo}` } },
+            ]),
           },
           select: {
             note: true,
@@ -635,7 +641,7 @@ export async function GET(request: NextRequest) {
               },
             },
           },
-        }));
+        }) as unknown as OutboundCostLookupRow[]));
       }
     }
     const outboundMetaByOrderNo = new Map<string, {
@@ -912,8 +918,11 @@ export async function GET(request: NextRequest) {
           const isOffline = order.platform === "线下交易";
           const rate = isOffline ? 0 : (shopRateMap.get(matchedShopName) ?? 0.06);
           const deliveryYuan = getDeliveryFee(order.delivery) / 100;
-          const hasReadyCost = Boolean(orderCostMeta) && (orderCostMeta?.missingCostItemCount || 0) <= 0;
-          const pureProfit = hasReadyCost
+          const isManualDeliveryLoss = isOffline && deliveryYuan > 0 && paidYuan <= 0 && expectedIncomeYuan <= 0;
+          const hasReadyCost = isManualDeliveryLoss || (Boolean(orderCostMeta) && (orderCostMeta?.missingCostItemCount || 0) <= 0);
+          const pureProfit = isManualDeliveryLoss
+            ? -deliveryYuan
+            : hasReadyCost
             ? FinanceMath.add(
                 FinanceMath.multiply(expectedIncomeYuan, 1 - rate),
                 -deliveryYuan - orderCostYuan - returnExtraExpenseYuan

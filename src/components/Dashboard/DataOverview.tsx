@@ -164,7 +164,7 @@ function ChartTooltip({
   const netProfit = dataPoint?.netProfit ?? (totalPureProfit - promotionExpense - brushExpense);
 
   return (
-    <div className="min-w-[210px] rounded-[22px] border border-black/8 bg-white/95 p-3.5 shadow-[0_18px_50px_rgba(15,23,42,0.16)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/95 font-normal">
+    <div className="relative z-[1000] min-w-[200px] max-w-[calc(100vw-32px)] max-h-[70vh] overflow-y-auto rounded-[22px] border border-black/8 bg-white/95 p-3 shadow-[0_18px_50px_rgba(15,23,42,0.22)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/95 font-normal sm:min-w-[210px] sm:p-3.5">
       <div className="flex items-center justify-between gap-2 border-b border-black/5 dark:border-white/5 pb-2">
         <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">{label} 盈亏明细</span>
         <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">数据拆分</span>
@@ -696,6 +696,7 @@ export function DataOverview({
 
       <div className="grid gap-6 xl:grid-cols-2">
         <Panel
+          className="relative z-20"
           title="每日盈亏"
           subtitle="每日净利润走势"
           action={(
@@ -726,7 +727,11 @@ export function DataOverview({
                 <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="rgba(148,163,184,0.18)" />
                 <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={12} />
                 <YAxis tickLine={false} axisLine={false} fontSize={12} width={52} />
-                <Tooltip content={<ChartTooltip valueFormatter={amountTooltip} nameMap={{ netProfit: "净利润" }} />} />
+                <Tooltip
+                  allowEscapeViewBox={{ x: true, y: true }}
+                  wrapperStyle={{ zIndex: 1000, outline: "none" }}
+                  content={<ChartTooltip valueFormatter={amountTooltip} nameMap={{ netProfit: "净利润" }} />}
+                />
                 <Area type="monotone" dataKey="netProfit" name="netProfit" stroke="url(#netProfitStroke)" fill="url(#netProfitFill)" strokeWidth={2.5} dot={<CustomizedDot />} activeDot={<CustomizedActiveDot />} />
               </AreaChart>
             </ResponsiveContainer>
@@ -734,6 +739,7 @@ export function DataOverview({
         </Panel>
 
         <Panel
+          className="relative z-10"
           title="订单波动"
           subtitle={orderScope === "true" ? "按日期查看真单变化" : "按日期查看订单变化"}
           actionMobileStack
@@ -765,7 +771,11 @@ export function DataOverview({
                 <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="rgba(148,163,184,0.18)" />
                 <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={12} />
                 <YAxis tickLine={false} axisLine={false} fontSize={12} width={40} allowDecimals={false} />
-                <Tooltip content={<OrderTooltip orderScope={orderScope} />} />
+                <Tooltip
+                  allowEscapeViewBox={{ x: true, y: true }}
+                  wrapperStyle={{ zIndex: 1000, outline: "none" }}
+                  content={<OrderTooltip orderScope={orderScope} />}
+                />
                 <Line type="monotone" dataKey={orderSeriesKey} name={orderSeriesKey} stroke={orderSeriesColor} strokeWidth={2.5} dot={{ r: 2.5 }} activeDot={{ r: 4 }} />
               </LineChart>
             </ResponsiveContainer>
