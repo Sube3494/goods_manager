@@ -700,8 +700,8 @@ export async function GET(request: NextRequest) {
           },
         },
         orderBy: [
-          { orderTime: "desc" },
           { createdAt: "desc" },
+          { orderTime: "desc" },
         ],
         skip: (page - 1) * pageSize,
         take: pageSize,

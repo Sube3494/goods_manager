@@ -66,7 +66,7 @@ export async function GET(request: Request) {
           }
         }
       },
-      orderBy: { date: 'desc' }
+      orderBy: [{ createdAt: 'desc' }, { date: 'desc' }]
     });
     const storage = await getStorageStrategy();
     const normalizedOrders = orders.map((order) => ({
