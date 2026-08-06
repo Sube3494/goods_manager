@@ -3696,7 +3696,7 @@ export default function FactoryShipmentsPage() {
     return shipmentOrders.filter((order) => {
       const parsed = parseFactoryShipmentNote(order.note);
       const derivedStatus = deriveFactoryShipmentStatusFromOrder(order, parsed);
-      const orderDate = order.createdAt ? format(parseSafeDate(order.createdAt), "yyyy-MM-dd") : "";
+      const orderDate = order.date ? format(parseSafeDate(order.date), "yyyy-MM-dd") : "";
       const query = searchQuery.trim();
       const itemNames = order.items.map(
         (item) => item.shopProduct?.name || item.product?.name || ""
@@ -3769,7 +3769,7 @@ export default function FactoryShipmentsPage() {
   const filterOrdersByExportDate = useCallback((orders: OutboundOrder[]) => {
     if (!exportStartDate && !exportEndDate) return orders;
     return orders.filter((order) => {
-      const orderDate = order.createdAt ? format(parseSafeDate(order.createdAt), "yyyy-MM-dd") : "";
+      const orderDate = order.date ? format(parseSafeDate(order.date), "yyyy-MM-dd") : "";
       if (!orderDate) return false;
       return (!exportStartDate || orderDate >= exportStartDate) && (!exportEndDate || orderDate <= exportEndDate);
     });
