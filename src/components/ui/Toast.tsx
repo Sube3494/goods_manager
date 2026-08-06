@@ -43,11 +43,11 @@ function Toast({ id, message, type, duration = 3000, onClose }: ToastProps) {
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
       layout
-      className="flex items-center gap-3 rounded-xl glass p-4 shadow-lg min-w-[300px]"
+      className="flex w-full min-w-[260px] max-w-[calc(100vw-32px)] items-center gap-3 rounded-xl glass p-3.5 shadow-lg sm:min-w-[300px] sm:max-w-md sm:p-4"
     >
       <div className="shrink-0">{icons[type]}</div>
-      <p className="flex-1 text-sm font-medium text-foreground">{message}</p>
-      <button onClick={() => onClose(id)} className="text-muted-foreground hover:text-foreground">
+      <p className="min-w-0 flex-1 text-sm font-medium leading-snug text-foreground break-words">{message}</p>
+      <button onClick={() => onClose(id)} className="shrink-0 text-muted-foreground hover:text-foreground">
         <X size={16} />
       </button>
     </motion.div>
@@ -76,10 +76,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={{ showToast, updateToast, removeToast }}>
       {children}
-      <div className="fixed bottom-6 right-6 z-1000000 flex flex-col gap-2 pointer-events-none">
+      <div className="fixed bottom-5 left-1/2 z-[1000000] flex -translate-x-1/2 flex-col items-center gap-2 pointer-events-none w-full max-w-[calc(100vw-32px)] sm:left-auto sm:right-6 sm:translate-x-0 sm:items-end sm:w-auto">
         <AnimatePresence>
           {toasts.map((toast) => (
-            <div key={toast.id} className="pointer-events-auto">
+            <div key={toast.id} className="pointer-events-auto w-full sm:w-auto">
                <Toast {...toast} onClose={removeToast} />
             </div>
           ))}

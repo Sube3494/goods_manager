@@ -324,61 +324,61 @@ function IntegrationModal({
   }, [callbackOrderUrl]);
 
   return (
-    <div className="fixed inset-0 z-[100000] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[100000] flex items-center justify-center p-2.5 sm:p-4">
       <div className="absolute inset-0 bg-slate-950/42 backdrop-blur-sm" onClick={onClose} />
       <div
         ref={modalRef}
-        className="relative flex max-h-[calc(100vh-2rem)] w-full max-w-280 flex-col overflow-hidden rounded-[28px] border border-black/8 bg-white/95 shadow-[0_30px_80px_rgba(15,23,42,0.22)] dark:border-white/10 dark:bg-[#0b111e]/98 sm:rounded-4xl"
+        className="relative flex max-h-[calc(100vh-1.5rem)] w-full max-w-280 flex-col overflow-hidden rounded-[24px] border border-black/8 bg-white/95 shadow-[0_30px_80px_rgba(15,23,42,0.22)] dark:border-white/10 dark:bg-[#0b111e]/98 sm:rounded-4xl"
       >
-        <div className="flex items-start justify-between gap-4 px-5 pb-0 pt-5 sm:px-7 sm:pt-7">
+        <div className="flex items-start justify-between gap-3 px-4 pb-0 pt-4 sm:px-7 sm:pt-7">
           <div className="min-w-0 pr-2 sm:pr-0">
             <div className="inline-flex items-center rounded-full border border-black/8 bg-black/3 px-3 py-1 text-[10px] uppercase tracking-[0.18em] text-muted-foreground dark:border-white/10 dark:bg-white/4">
               Auto Pick
             </div>
-            <h2 className="mt-2.5 text-2xl tracking-tight text-foreground">订单对接配置</h2>
-            <p className="mt-1.5 text-sm text-muted-foreground">脚本负责监听订单和执行动作，主系统这里只保留回调配置和门店映射。</p>
+            <h2 className="mt-2 text-xl tracking-tight text-foreground sm:mt-2.5 sm:text-2xl">订单对接配置</h2>
+            <p className="mt-1 text-xs text-muted-foreground sm:mt-1.5 sm:text-sm">脚本负责监听订单和执行动作，主系统这里只保留回调配置和门店映射。</p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-black/8 bg-white/80 text-muted-foreground transition-all hover:text-foreground dark:border-white/10 dark:bg-white/4 mt-1"
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-black/8 bg-white/80 text-muted-foreground transition-all hover:text-foreground dark:border-white/10 dark:bg-white/4 sm:h-10 sm:w-10 sm:mt-1"
           >
             <X size={18} />
           </button>
         </div>
 
-        <div className="mt-6 flex-1 overflow-y-auto px-5 pb-5 sm:px-7 sm:pb-7">
-          <div className="grid gap-5 lg:grid-cols-[420px_minmax(0,1fr)]">
-            <div className="rounded-[18px] border border-black/8 bg-black/2 p-3.5 dark:border-white/10 dark:bg-white/3 lg:col-start-1 lg:row-start-1">
-              <div className="flex items-center justify-between gap-3">
-                <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">系统回调地址</div>
+        <div className="mt-4 flex-1 overflow-y-auto px-4 pb-4 sm:mt-6 sm:px-7 sm:pb-7">
+          <div className="grid gap-4 sm:gap-5 lg:grid-cols-[420px_minmax(0,1fr)]">
+            <div className="rounded-[18px] border border-black/8 bg-black/2 p-3 dark:border-white/10 dark:bg-white/3 sm:p-3.5 lg:col-start-1 lg:row-start-1">
+              <div className="flex items-center justify-between gap-2 min-w-0">
+                <div className="min-w-0 flex-1 truncate text-[11px] uppercase tracking-[0.16em] text-muted-foreground">系统回调地址</div>
                 <button
                   type="button"
                   onClick={() => void copyCallbackUrl()}
-                  className={pillButtonClass}
+                  className={cn(pillButtonClass, "shrink-0")}
                 >
                   <CheckCheck size={12} />
                   {copiedCallback ? "已复制" : "复制"}
                 </button>
               </div>
-              <div className="mt-3 rounded-xl border border-black/8 bg-white/72 px-3 py-3 dark:border-white/10 dark:bg-[#111827]">
+              <div className="mt-2.5 rounded-xl border border-black/8 bg-white/72 px-3 py-2.5 dark:border-white/10 dark:bg-[#111827] sm:mt-3 sm:py-3">
                 <div className="break-all font-mono text-xs leading-5 text-foreground">{callbackOrderUrl}</div>
               </div>
               <p className="mt-2 text-xs leading-5 text-muted-foreground">脚本里的上报地址填这里，`MYSHOP_API_KEY` 填下面的回调密钥。</p>
             </div>
 
-            <div className="rounded-[20px] border border-black/8 bg-black/2 p-3.5 dark:border-white/10 dark:bg-white/3 sm:p-4 lg:col-start-2 lg:row-start-1">
-              <div className="flex items-start justify-between gap-3 sm:items-center">
-                <div>
+            <div className="rounded-[20px] border border-black/8 bg-black/2 p-3 dark:border-white/10 dark:bg-white/3 sm:p-4 lg:col-start-2 lg:row-start-1">
+              <div className="flex items-start justify-between gap-2.5 sm:items-center min-w-0">
+                <div className="min-w-0 flex-1">
                   <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">麦芽田 Cookie</div>
-                  <p className="mt-1 text-xs text-muted-foreground">这里只用于读取麦芽田门店，方便你做门店映射。</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground sm:mt-1">这里只用于读取麦芽田门店，方便你做门店映射。</p>
                 </div>
-                <div className="grid shrink-0 grid-cols-2 gap-2 sm:flex sm:items-center">
+                <div className="flex shrink-0 items-center gap-1.5">
                   {hasCookie ? (
                     <button
                       type="button"
                       onClick={() => setIsEditingCookie((current) => !current)}
-                      className={cn(pillButtonClass, "min-w-16")}
+                      className={cn(pillButtonClass, "px-2.5 py-1 text-[11px]")}
                     >
                       {showCookieEditor ? "取消" : "编辑"}
                     </button>
@@ -387,7 +387,7 @@ function IntegrationModal({
                     <button
                       type="button"
                       onClick={() => onChange({ ...integrationConfig, maiyatianCookie: "" })}
-                      className={cn(pillButtonClass, "min-w-16")}
+                      className={cn(pillButtonClass, "px-2.5 py-1 text-[11px]")}
                     >
                       删除
                     </button>
