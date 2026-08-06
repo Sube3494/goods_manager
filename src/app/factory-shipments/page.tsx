@@ -177,8 +177,14 @@ function CustomerAddressCombobox({
   const [customers, setCustomers] = useState<CustomerAddressOption[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const displayValue = isOpen ? searchQuery : value;
+  const [inputValue, setInputValue] = useState(value);
+  const [isTyping, setIsTyping] = useState(false);
+
+  useEffect(() => {
+    if (!isTyping) {
+      setInputValue(value);
+    }
+  }, [value, isTyping]);
 
   useEffect(() => {
     if (!isOpen || hasLoaded) return;
@@ -205,7 +211,7 @@ function CustomerAddressCombobox({
   }, [hasLoaded, isOpen]);
 
   const filteredCustomers = useMemo(() => {
-    const query = searchQuery.trim();
+    const query = isTyping ? inputValue.trim() : "";
     const list = query
       ? customers.filter((customer) =>
           [customer.contactName, customer.contactPhone, customer.address]
@@ -213,31 +219,43 @@ function CustomerAddressCombobox({
         )
       : customers;
     return list.slice(0, 8);
-  }, [customers, searchQuery]);
+  }, [customers, inputValue, isTyping]);
 
   return (
     <div className={cn("relative", wrapperClassName)}>
       <input
         type="text"
-        value={displayValue}
-        onFocus={() => setIsOpen(true)}
-        onBlur={() => window.setTimeout(() => setIsOpen(false), 120)}
-        onChange={(e) => {
-          setSearchQuery(e.target.value);
+        value={inputValue}
+        onFocus={() => {
           setIsOpen(true);
+        }}
+        onBlur={() => window.setTimeout(() => {
+          setIsOpen(false);
+          setIsTyping(false);
+        }, 150)}
+        onChange={(e) => {
+          const val = e.target.value;
+          setInputValue(val);
+          setIsTyping(true);
+          setIsOpen(true);
+          onChange(val);
+          if (!val) {
+            onSelectCustomer?.(null);
+          }
         }}
         placeholder={placeholder}
         className={cn(className, "truncate pr-[72px]")}
       />
       <div className="absolute inset-y-0 right-3 flex items-center gap-0.5 bg-transparent">
-        {value ? (
+        {inputValue ? (
           <button
             type="button"
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => {
+              setInputValue("");
+              setIsTyping(false);
               onChange("");
               onSelectCustomer?.(null);
-              setSearchQuery("");
               setIsOpen(false);
             }}
             className="flex h-7 w-7 items-center justify-center rounded-full bg-transparent text-muted-foreground transition-colors hover:text-rose-500"
@@ -250,7 +268,6 @@ function CustomerAddressCombobox({
           type="button"
           onMouseDown={(event) => event.preventDefault()}
           onClick={() => {
-            setSearchQuery("");
             setIsOpen((prev) => !prev);
           }}
           className="flex h-7 w-7 items-center justify-center rounded-full bg-transparent text-muted-foreground transition-colors hover:text-foreground"
@@ -267,9 +284,11 @@ function CustomerAddressCombobox({
               type="button"
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => {
-                onChange(formatCustomerAddressDisplay(customer));
+                const formatted = formatCustomerAddressDisplay(customer);
+                setInputValue(formatted);
+                setIsTyping(false);
+                onChange(formatted);
                 onSelectCustomer?.(customer);
-                setSearchQuery("");
                 setIsOpen(false);
               }}
               className="flex w-full flex-col gap-1 rounded-xl bg-white px-3 py-2.5 text-left transition-colors hover:bg-slate-100 dark:bg-white/[0.035] dark:hover:bg-white/[0.07]"
