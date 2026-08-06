@@ -34,7 +34,8 @@ async function main() {
   let totalFixed = 0;
 
   while (true) {
-    const batch = await prisma.outboundOrder.findMany({
+    type OutboundRecord = { id: string; date: Date; createdAt: Date };
+    const batch: OutboundRecord[] = await prisma.outboundOrder.findMany({
       select: { id: true, date: true, createdAt: true },
       orderBy: { createdAt: "asc" },
       take: BATCH_SIZE,
@@ -46,7 +47,7 @@ async function main() {
     cursor = batch[batch.length - 1].id;
     totalScanned += batch.length;
 
-    const toFix = batch.filter((item) => {
+    const toFix = batch.filter((item: OutboundRecord) => {
       const diffMs = item.date.getTime() - item.createdAt.getTime();
       return Math.abs(diffMs - EIGHT_HOURS_MS) < MARGIN_MS;
     });
