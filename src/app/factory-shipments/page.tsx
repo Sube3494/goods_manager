@@ -2241,28 +2241,13 @@ function FactoryShipmentDetailModal({
                       </div>
                     </div>
                   </div>
-                  <div className="mt-3 grid grid-cols-2 gap-2.5">
-                    {/* 左侧：创建时间 */}
+                  <div className="mt-3">
+                    {/* 创建时间 */}
                     <div className="rounded-2xl border border-border/60 bg-white/80 px-3.5 py-3 dark:border-white/10 dark:bg-white/5">
                       <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">创建时间</div>
-                      <div className="mt-1.5 font-mono text-[15px] font-semibold tracking-tight text-foreground/90">
-                        <div>{format(parseSafeDate(order.createdAt), "yyyy-MM-dd")}</div>
-                        <div className="text-xs font-normal text-muted-foreground mt-0.5">{format(parseSafeDate(order.createdAt), "HH:mm")}</div>
-                      </div>
-                    </div>
-
-                    {/* 右侧：发货时间 */}
-                    <div className="rounded-2xl border border-border/60 bg-white/80 px-3.5 py-3 dark:border-white/10 dark:bg-white/5">
-                      <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">发货时间</div>
-                      <div className="mt-1.5 font-mono text-[15px] font-semibold tracking-tight text-foreground/90">
-                        {(editForm.status === "已发货" || editForm.status === "部分发货") ? (
-                          <>
-                            <div>{format(parseSafeDate(order.date), "yyyy-MM-dd")}</div>
-                            <div className="text-xs font-normal text-muted-foreground mt-0.5">{format(parseSafeDate(order.date), "HH:mm")}</div>
-                          </>
-                        ) : (
-                          <span className="text-sm font-normal text-muted-foreground/50">尚未发货</span>
-                        )}
+                      <div className="mt-1.5 flex items-baseline gap-2 font-mono text-[15px] font-semibold tracking-tight text-foreground/90">
+                        <span>{format(parseSafeDate(order.createdAt), "yyyy-MM-dd")}</span>
+                        <span className="text-xs font-normal text-muted-foreground">{format(parseSafeDate(order.createdAt), "HH:mm")}</span>
                       </div>
                     </div>
                   </div>
