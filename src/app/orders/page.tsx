@@ -417,26 +417,26 @@ function IntegrationModal({
               )}
             </div>
 
-            <div className="rounded-[18px] border border-black/8 bg-black/2 p-3.5 dark:border-white/10 dark:bg-white/3 lg:col-start-1 lg:row-start-2">
+            <div className="rounded-[18px] border border-black/8 bg-black/2 p-3 dark:border-white/10 dark:bg-white/3 sm:p-3.5 lg:col-start-1 lg:row-start-2">
               <div className="min-w-0">
                 <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">脚本地址</div>
                 <input
                   value={integrationConfig.pluginBaseUrl}
                   onChange={(event) => onChange({ ...integrationConfig, pluginBaseUrl: event.target.value })}
                   placeholder="例如 http://127.0.0.1:22800"
-                  className="mt-3 h-11 w-full rounded-xl border border-black/8 bg-white/80 px-3 text-sm font-medium outline-none transition-all focus:border-primary/30 focus:ring-2 focus:ring-primary/10 dark:border-white/10 dark:bg-[#111827]"
+                  className="mt-2.5 h-10 w-full rounded-xl border border-black/8 bg-white/80 px-3 text-sm font-medium outline-none transition-all focus:border-primary/30 focus:ring-2 focus:ring-primary/10 dark:border-white/10 dark:bg-[#111827] sm:mt-3 sm:h-11"
                 />
                 <p className="mt-2 text-xs leading-5 text-muted-foreground">主系统通过这个地址调用 `auto-pick` 脚本。</p>
               </div>
               <div className="mt-4 min-w-0 border-t border-black/8 pt-4 dark:border-white/10">
                 <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">回调密钥</div>
-                <div className="mt-3 flex items-center gap-2 rounded-xl border border-black/8 bg-white/80 px-3 dark:border-white/10 dark:bg-[#111827]">
+                <div className="mt-2.5 flex items-center gap-2 rounded-xl border border-black/8 bg-white/80 px-3 dark:border-white/10 dark:bg-[#111827] sm:mt-3 min-w-0">
                   <input
                     type={showInboundApiKey ? "text" : "password"}
                     value={integrationConfig.inboundApiKey}
                     onChange={(event) => onChange({ ...integrationConfig, inboundApiKey: event.target.value })}
                     placeholder="输入或粘贴回调密钥"
-                    className="h-11 w-full bg-transparent font-mono text-sm font-medium outline-none"
+                    className="h-10 min-w-0 flex-1 bg-transparent font-mono text-sm font-medium outline-none sm:h-11"
                   />
                   <button
                     type="button"
@@ -451,11 +451,11 @@ function IntegrationModal({
               </div>
             </div>
 
-            <div className="rounded-[20px] border border-black/8 bg-black/2 p-3.5 dark:border-white/10 dark:bg-white/3 sm:p-4 lg:col-start-2 lg:row-start-2">
-              <div className="flex items-start justify-between gap-3">
-                <div>
+            <div className="rounded-[20px] border border-black/8 bg-black/2 p-3 dark:border-white/10 dark:bg-white/3 sm:p-4 lg:col-start-2 lg:row-start-2">
+              <div className="flex items-start justify-between gap-2.5 sm:items-center min-w-0">
+                <div className="min-w-0 flex-1">
                   <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">麦芽田门店绑定</div>
-                  <p className="mt-1 text-xs text-muted-foreground">读取麦芽田发货门店后，在这里手动映射到系统门店。</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground sm:mt-1">读取麦芽田发货门店后，在这里手动映射到系统门店。</p>
                 </div>
                 <button
                   type="button"
@@ -463,7 +463,7 @@ function IntegrationModal({
                   disabled={isFetchingMaiyatianShops}
                   className={cn(
                     pillButtonClass,
-                    "min-w-22 shrink-0 self-start px-3.5 text-center leading-4",
+                    "shrink-0 self-start px-3 text-center leading-4 sm:px-3.5",
                     "bg-white/88 dark:bg-white/5",
                     "disabled:translate-y-0 disabled:cursor-not-allowed disabled:border-black/6 disabled:bg-black/4 disabled:text-muted-foreground disabled:shadow-none",
                     "dark:disabled:border-white/10 dark:disabled:bg-white/4 dark:disabled:text-white/45"
@@ -480,7 +480,7 @@ function IntegrationModal({
                 </div>
               ) : null}
 
-              <div className="mt-3 space-y-2">
+              <div className="mt-3 space-y-2 min-w-0">
                 {maiyatianShops.length > 0 && (
                   <div className="hidden md:grid md:grid-cols-[1fr_140px_140px] gap-3 px-3 py-1.5 text-[10px] uppercase tracking-[0.16em] text-muted-foreground font-bold border-b border-black/5 dark:border-white/5 pb-2 select-none">
                     <div>麦芽田发货门店</div>
@@ -493,7 +493,7 @@ function IntegrationModal({
                   const mapped = integrationConfig.maiyatianShopMappings.find((item) => item.maiyatianShopId === shop.id);
                   const isMappingInvalid = mapped && !localShops.some(s => s.name === mapped.localShopName);
                   return (
-                    <div key={shop.id} className="group rounded-2xl border border-black/8 bg-white/80 p-3 transition-all hover:bg-white dark:hover:bg-white/8 dark:border-white/10 dark:bg-white/4 md:grid md:grid-cols-[1fr_140px_140px] md:items-center gap-3">
+                    <div key={shop.id} className="group rounded-2xl border border-black/8 bg-white/80 p-3 transition-all hover:bg-white dark:hover:bg-white/8 dark:border-white/10 dark:bg-white/4 md:grid md:grid-cols-[1fr_140px_140px] md:items-center gap-3 min-w-0">
                       {/* 第一列：麦芽田门店信息 + 状态 */}
                       <div className="min-w-0 flex flex-col gap-1 text-left">
                         <div className="text-sm font-bold text-foreground truncate" title={shop.name}>{shop.name}</div>
@@ -517,7 +517,7 @@ function IntegrationModal({
 
                       {/* 第二列：系统门店 */}
                       <div className="mt-3 md:mt-0 flex md:justify-center min-w-0 w-full">
-                        <div className="w-full md:w-[140px] text-left">
+                        <div className="w-full md:w-[140px] text-left min-w-0">
                           <div className="md:hidden text-[10px] uppercase tracking-[0.16em] text-muted-foreground mb-1">系统门店</div>
                           {(() => {
                             const finalOptions = [{ value: "", label: "暂不映射" }, ...localShopOptions];
@@ -563,7 +563,7 @@ function IntegrationModal({
 
                       {/* 第三列：绑定商品库 */}
                       <div className="mt-3 md:mt-0 flex md:justify-center min-w-0 w-full">
-                        <div className="w-full md:w-[140px] text-left">
+                        <div className="w-full md:w-[140px] text-left min-w-0">
                           <div className="md:hidden text-[10px] uppercase tracking-[0.16em] text-muted-foreground mb-1">绑定商品库</div>
                           {mapped?.localShopName && !isMappingInvalid ? (
                             (() => {
@@ -610,13 +610,13 @@ function IntegrationModal({
             </div>
 
             <div className="rounded-[18px] border border-black/8 bg-black/2 p-3 dark:border-white/10 dark:bg-white/3 lg:col-start-1 lg:row-start-3 lg:col-span-2">
-              <div className="flex items-center justify-between gap-3">
-                <div>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 min-w-0">
+                <div className="min-w-0 flex-1">
                   <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">自配完成时间</div>
-                  <p className="mt-1 text-[11px] text-muted-foreground">按环节输入分钟数。</p>
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">按环节输入分钟数。</p>
                 </div>
-                <div className="shrink-0 rounded-full border border-black/8 bg-white/70 px-2.5 py-1 text-[10px] text-foreground dark:border-white/10 dark:bg-white/6">
-                  当前公式: {timingTotalLabel}
+                <div className="min-w-0 shrink-0 rounded-full border border-black/8 bg-white/70 px-2.5 py-1 text-[10px] text-foreground dark:border-white/10 dark:bg-white/6 truncate max-w-full">
+                  公式: {timingTotalLabel}
                 </div>
               </div>
 
