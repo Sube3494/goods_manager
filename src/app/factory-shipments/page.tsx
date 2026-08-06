@@ -305,6 +305,7 @@ const ShipmentItemRow = memo(({
   disabled = false,
   logisticsOptions = [],
   onAddNewLogistics,
+  shippedAt,
 }: {
   item: SelectedShipmentItem;
   isBatchMode: boolean;
@@ -323,6 +324,7 @@ const ShipmentItemRow = memo(({
   disabled?: boolean;
   logisticsOptions?: { value: string; label: string }[];
   onAddNewLogistics?: () => void;
+  shippedAt?: string;
 }) => {
   const itemKey = getItemKey(item) || getStableShipmentActionKey(item);
   const { baseName, variantLabel } = splitShipmentDisplayName(item.name);
@@ -421,6 +423,18 @@ const ShipmentItemRow = memo(({
                   placeholder={isLogisticsSelected ? "多个单号用逗号分隔" : "请先选择物流公司"}
                   className="h-9 w-full rounded-xl border border-border bg-white px-3 py-1.5 text-xs text-foreground outline-none ring-1 ring-transparent transition-all focus:ring-2 focus:ring-primary/20 dark:border-white/10 dark:bg-[#2b313d] disabled:cursor-not-allowed disabled:opacity-50"
                 />
+                {shippedAt && item.trackingNumber?.trim() ? (
+                  <div className="flex items-center gap-1 mt-1 text-[10px] font-medium text-emerald-600 dark:text-emerald-400 font-mono">
+                    <span>✓ 发货时间:</span>
+                    <span>{new Date(shippedAt).toLocaleString("zh-CN", { timeZone: "Asia/Shanghai", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
+                  </div>
+                ) : null}
+                {shippedAt && item.trackingNumber?.trim() ? (
+                  <div className="flex items-center gap-1 mt-1 text-[10px] font-medium text-emerald-600 dark:text-emerald-400 font-mono">
+                    <span>✓ 发货时间:</span>
+                    <span>{new Date(shippedAt).toLocaleString("zh-CN", { timeZone: "Asia/Shanghai", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
+                  </div>
+                ) : null}
               </div>
             </div>
 
@@ -2185,101 +2199,6 @@ function FactoryShipmentDetailModal({
             </div>
 
             <div className="flex-1 space-y-4 overflow-y-auto p-4 sm:p-5">
-            paymentStatus: editForm.paymentStatus,
-            compensationStatus: editForm.compensationStatus,
-            compensationLogisticsName: editForm.compensationLogisticsName,
-            compensationTrackingNumber: editForm.compensationTrackingNumber,
-            compensationItems: editCompensationItems.map((item) => ({
-              itemKey: item.itemKey,
-              itemName: item.name,
-              quantity: item.quantity,
-            })),
-            trackingEntries: editItems
-              .map((item) => ({
-                itemKey: getItemKey(item) || getStableShipmentActionKey(item),
-                itemName: item.name,
-                logisticsName: item.logisticsName?.trim() || "",
-                trackingNumber: item.trackingNumber?.trim() || "",
-                shippingFee: Number(item.shippingFee) || 0,
-              }))
-              .filter((entry) => entry.itemKey && entry.trackingNumber),
-            remark: editForm.remark,
-          },
-          items: editItems.map((item) => ({
-            productId: item.productId || undefined,
-            productVariantId: item.productVariantId || undefined,
-            shopProductId: item.shopProductId || undefined,
-            shopProductVariantId: item.shopProductVariantId || undefined,
-            quantity: item.quantity,
-            price: Number(item.price) || 0,
-          })),
-        })
-      });
-
-      const data = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(formatFactoryShipmentError(data?.error || "保存失败", editItems));
-
-      showToast("发货信息已更新", "success");
-      if (onUpdated) {
-        await onUpdated();
-      }
-      onClose();
-    } catch (err) {
-      console.error("Failed to update factory shipment:", err);
-      showToast(err instanceof Error ? formatFactoryShipmentError(err.message, editItems) : "保存失败", "error");
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleStartEdit = () => {
-    setIsEditing(true);
-  };
-
-  return createPortal(
-    <AnimatePresence>
-      {order && parsed && (
-        <div key={`factory-shipment-detail-${order.id}`} className="fixed inset-0 z-10000 flex items-center justify-center p-4">
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-            onClick={onClose}
-          />
-          <motion.div
-            initial={{ opacity: 0, scale: 0.96, y: 16 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.96, y: 16 }}
-            className="relative w-full max-w-3xl overflow-hidden rounded-[28px] border border-black/5 bg-white shadow-2xl dark:border-white/10 dark:bg-card/98 backdrop-blur-xl flex flex-col max-h-[90vh]"
-          >
-            <div className="flex items-start justify-between border-b border-black/5 px-6 py-5 dark:border-white/10 shrink-0">
-              <div>
-                <div className="flex items-center gap-3">
-                  <h3 className="text-[26px] font-black tracking-tight text-foreground">
-                    {isEditing ? "编辑发货单" : "发货记录详情"}
-                  </h3>
-                  {order.status !== "Returned" && order.status !== "已退回" && !isEditing && (
-                    <button
-                      type="button"
-                      onClick={handleStartEdit}
-                      className="text-xs font-bold text-primary px-3 py-1.5 rounded-xl bg-primary/5 hover:bg-primary/10 hover:scale-[1.02] active:scale-[0.98] transition-all"
-                    >
-                      编辑信息
-                    </button>
-                  )}
-                </div>
-              </div>
-              <button 
-                type="button" 
-                onClick={onClose} 
-                className="rounded-full p-2 text-muted-foreground hover:bg-black/5 dark:hover:bg-white/10 hover:text-foreground transition-colors shrink-0"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="flex-1 space-y-4 overflow-y-auto p-4 sm:p-5">
               <div className="grid gap-3 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
                 <div className="rounded-[22px] border border-border/50 bg-linear-to-br from-zinc-50 via-white to-zinc-50/70 p-4 shadow-sm dark:border-white/10 dark:from-white/7 dark:via-white/4 dark:to-white/2">
                   <div className="flex items-start justify-between gap-3">
@@ -2312,17 +2231,24 @@ function FactoryShipmentDetailModal({
                     </div>
                   </div>
                   <div className="mt-3 grid grid-cols-2 gap-2.5">
-                    <div className="rounded-2xl border border-border/60 bg-white/70 px-3.5 py-3 dark:border-white/10 dark:bg-white/4">
+                    {/* 左侧：创建时间 */}
+                    <div className="rounded-2xl border border-border/60 bg-white/80 px-3.5 py-3 dark:border-white/10 dark:bg-white/5">
                       <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">创建时间</div>
-                      <div className="mt-1.5 text-base font-semibold tracking-tight text-foreground">
-                        {format(parseSafeDate(order.createdAt), "yyyy-MM-dd HH:mm", { locale: zhCN })}
+                      <div className="mt-1.5 font-mono text-[15px] font-semibold tracking-tight text-foreground/90">
+                        <div>{format(parseSafeDate(order.createdAt), "yyyy-MM-dd")}</div>
+                        <div className="text-xs font-normal text-muted-foreground mt-0.5">{format(parseSafeDate(order.createdAt), "HH:mm")}</div>
                       </div>
                     </div>
-                    <div className="rounded-2xl border border-border/60 bg-white/70 px-3.5 py-3 dark:border-white/10 dark:bg-white/4">
+
+                    {/* 右侧：发货时间 */}
+                    <div className="rounded-2xl border border-border/60 bg-white/80 px-3.5 py-3 dark:border-white/10 dark:bg-white/5">
                       <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">发货时间</div>
-                      <div className="mt-1.5 text-base font-semibold tracking-tight text-foreground">
+                      <div className="mt-1.5 font-mono text-[15px] font-semibold tracking-tight text-foreground/90">
                         {(editForm.status === "已发货" || editForm.status === "部分发货") ? (
-                          format(parseSafeDate(order.date), "yyyy-MM-dd HH:mm", { locale: zhCN })
+                          <>
+                            <div>{format(parseSafeDate(order.date), "yyyy-MM-dd")}</div>
+                            <div className="text-xs font-normal text-muted-foreground mt-0.5">{format(parseSafeDate(order.date), "HH:mm")}</div>
+                          </>
                         ) : (
                           <span className="text-sm font-normal text-muted-foreground/50">尚未发货</span>
                         )}
@@ -2694,6 +2620,7 @@ function FactoryShipmentDetailModal({
                             disabled={!isEditing}
                             logisticsOptions={getSingleRowLogisticsOptions(item.logisticsName)}
                             onAddNewLogistics={onAddNewLogistics}
+                            shippedAt={parsed.trackingEntries.find(e => e.itemKey === getStableShipmentActionKey(item))?.shippedAt}
                           />
                         ))}
                         <div className="flex items-center justify-end gap-3 rounded-2xl border border-border/70 bg-linear-to-br from-white to-slate-50/70 p-4 dark:border-white/8 dark:from-white/10 dark:to-white/4 shadow-sm mt-3">
@@ -4946,6 +4873,37 @@ export default function FactoryShipmentsPage() {
       {viewMode === "detail" ? (
       <>
       <div className="hidden overflow-hidden rounded-2xl border border-border bg-white/70 shadow-sm dark:border-white/10 dark:bg-white/5 xl:block">
+        <div className="overflow-auto max-h-[calc(100dvh-220px-env(safe-area-inset-bottom,0))]">
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center py-20 text-center">
+              <div className="mb-4 h-8 w-8 animate-spin rounded-full border-4 border-primary/20 border-t-primary" />
+              <p className="text-sm font-medium text-muted-foreground">正在加载发货记录...</p>
+            </div>
+          ) : paginatedOrders.length > 0 ? (
+            <table className="w-full min-w-[940px] table-fixed border-collapse text-left">
+              <colgroup>
+                <col className="w-[44px]" />
+                <col className="w-[60px]" />
+                <col className="w-[126px]" />
+                <col className="w-[96px]" />
+                <col className="w-[220px]" />
+                <col className="w-[120px]" />
+                <col className="w-[120px]" />
+                <col className="w-[96px]" />
+              </colgroup>
+              <thead className="sticky top-0 z-10 backdrop-blur">
+                <tr className="border-b border-border bg-muted/30">
+                  <th className="w-[44px] px-1 py-3 text-center align-middle">
+                    <div className="flex justify-center">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (selectedOrderIds.length === selectableFilteredOrderIds.length) {
+                            setSelectedOrderIds([]);
+                          } else {
+                            setSelectedOrderIds(selectableFilteredOrderIds);
+                          }
+                        }}
                         className={`relative flex h-[18px] w-[18px] items-center justify-center rounded-full border-2 transition-all duration-300 lg:h-5 lg:w-5 ${
                           selectedOrderIds.length === selectableFilteredOrderIds.length && selectableFilteredOrderIds.length > 0
                             ? "scale-110 border-foreground bg-foreground text-background shadow-lg shadow-black/10 dark:text-black"

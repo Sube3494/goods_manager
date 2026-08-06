@@ -59,6 +59,7 @@ function normalizeTrackingEntry(
     logisticsName,
     trackingNumber,
     shippingFee,
+    shippedAt: entry.shippedAt?.trim() || undefined,
   };
 }
 
@@ -112,6 +113,11 @@ function mergeFactoryShipmentTrackingEntries(
 
     const finalEntry = normalizeTrackingEntry(baseEntry, nextKey);
     if (finalEntry) {
+      const wasShipped = hasTrackingNumber(carryOverEntry);
+      const willBeShipped = hasTrackingNumber(incomingEntry);
+      if (!wasShipped && willBeShipped && !finalEntry.shippedAt) {
+        finalEntry.shippedAt = new Date().toISOString();
+      }
       mergedEntries.push(finalEntry);
     }
   }

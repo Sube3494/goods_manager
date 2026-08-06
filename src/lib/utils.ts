@@ -238,6 +238,7 @@ export interface FactoryShipmentTrackingEntry {
   trackingNumber: string;
   logisticsName?: string;
   shippingFee?: number;
+  shippedAt?: string;
 }
 
 export interface FactoryShipmentCompensationItem {
@@ -270,7 +271,8 @@ export function buildFactoryShipmentNote(payload: FactoryShipmentNotePayload): s
       const logisticsPart = entry.logisticsName?.trim() ? `${entry.logisticsName.trim()}:` : "";
       const trackingPart = entry.trackingNumber?.trim() || "";
       const feePart = entry.shippingFee && entry.shippingFee > 0 ? `:${entry.shippingFee}` : "";
-      return `${entry.itemKey.trim()}=${logisticsPart}${trackingPart}${feePart}`;
+      const shippedAtPart = entry.shippedAt?.trim() ? `@${entry.shippedAt.trim()}` : "";
+      return `${entry.itemKey.trim()}=${logisticsPart}${trackingPart}${feePart}${shippedAtPart}`;
     })
     .join(" ; ");
 
@@ -377,7 +379,15 @@ export function parseFactoryShipmentNote(note: string | undefined | null): Parse
           let trackingNumber = "";
           let shippingFee = 0;
 
-          const colonParts = fullVal.split(":");
+          let shippedAt;
+          const atIdx = fullVal.indexOf("@");
+          const valForColonParse = atIdx !== -1 ? fullVal.slice(0, atIdx) : fullVal;
+          if (atIdx !== -1) {
+            const candidate = fullVal.slice(atIdx + 1).trim();
+            shippedAt = candidate || undefined;
+          }
+
+          const colonParts = valForColonParse.split(":");
           if (colonParts.length >= 3) {
             logisticsName = colonParts[0].trim();
             trackingNumber = colonParts[1].trim();
@@ -386,7 +396,6 @@ export function parseFactoryShipmentNote(note: string | undefined | null): Parse
             const leftPart = colonParts[0].trim();
             const rightPart = colonParts[1].trim();
 
-            // 兼容旧数据里“仅填写运费”被序列化为 `:20` 的情况，避免把运费误解析成快递单号。
             if (!leftPart && rightPart) {
               logisticsName = "";
               trackingNumber = "";
@@ -397,7 +406,7 @@ export function parseFactoryShipmentNote(note: string | undefined | null): Parse
             }
           } else {
             logisticsName = "";
-            trackingNumber = fullVal.trim();
+            trackingNumber = valForColonParse.trim();
           }
 
           return {
@@ -405,6 +414,7 @@ export function parseFactoryShipmentNote(note: string | undefined | null): Parse
             logisticsName,
             trackingNumber,
             shippingFee,
+            shippedAt,
           };
         })
         .filter((entry) => entry.itemKey && (entry.trackingNumber || entry.logisticsName || entry.shippingFee))
