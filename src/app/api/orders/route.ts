@@ -1436,7 +1436,19 @@ export async function GET(request: NextRequest) {
       ? userProfile.permissions as Record<string, unknown>
       : {};
     const integrationConfig = normalizeAutoPickIntegrationConfig(permissionsObj.autoPickIntegration);
-    const brushCommission = Math.round((integrationConfig.defaultBrushCommission || 0) * 100);
+
+    const allOrderNos = Array.from(new Set([...summaryOrders.map((o) => o.orderNo), ...orders.map((o) => o.orderNo)])).filter(Boolean);
+    const customBrushOrders = allOrderNos.length > 0
+      ? await prisma.brushOrder.findMany({
+          where: { userId: session.id, platformOrderId: { in: allOrderNos } },
+          select: { platformOrderId: true, commission: true },
+        })
+      : [];
+    const customBrushCommissionMap = new Map<string, number>(
+      customBrushOrders
+        .filter((b): b is { platformOrderId: string; commission: number } => Boolean(b.platformOrderId))
+        .map((b) => [b.platformOrderId, b.commission])
+    );
 
     const summary = !includeMetrics
       ? null
@@ -1542,13 +1554,16 @@ export async function GET(request: NextRequest) {
                 ? "pending-backfill" as const
                 : "ready" as const;
             const isBrush = readMainSystemSelfDeliveryFlag(order.rawPayload);
-            const orderBrushCommissionYuan = resolveShopBrushCommission(integrationConfig, {
-              maiyatianShopId: readShopIdFromRawPayload(order.rawPayload),
-              shopName: readShopNameFromRawPayload(order.rawPayload) || order.shopId,
-              shopAddress: readShopAddressFromRawPayload(order.rawPayload) || order.shopAddress,
-              localShopName: matchedShopName || null,
-              rawPayload: order.rawPayload,
-            });
+            const customCommission = order.orderNo ? customBrushCommissionMap.get(order.orderNo) : undefined;
+            const orderBrushCommissionYuan = typeof customCommission === "number" && customCommission >= 0
+              ? customCommission
+              : resolveShopBrushCommission(integrationConfig, {
+                  maiyatianShopId: readShopIdFromRawPayload(order.rawPayload),
+                  shopName: readShopNameFromRawPayload(order.rawPayload) || order.shopId,
+                  shopAddress: readShopAddressFromRawPayload(order.rawPayload) || order.shopAddress,
+                  localShopName: matchedShopName || null,
+                  rawPayload: order.rawPayload,
+                });
             const orderBrushCommission = Math.round(orderBrushCommissionYuan * 100);
             const orderPureProfit = hiddenDeletedOfflineIncome
               ? null
@@ -1787,6 +1802,18 @@ export async function GET(request: NextRequest) {
         : missingCostItemCount > 0
           ? "pending-backfill" as const
           : "ready" as const;
+      const customCommission = order.orderNo ? customBrushCommissionMap.get(order.orderNo) : undefined;
+      const orderBrushCommissionYuan = typeof customCommission === "number" && customCommission >= 0
+        ? customCommission
+        : resolveShopBrushCommission(integrationConfig, {
+            maiyatianShopId: readShopIdFromRawPayload(order.rawPayload),
+            shopName: readShopNameFromRawPayload(order.rawPayload) || order.shopId,
+            shopAddress: readShopAddressFromRawPayload(order.rawPayload) || order.shopAddress,
+            localShopName: matchedShopName || null,
+            rawPayload: order.rawPayload,
+          });
+      const orderBrushCommission = Math.round(orderBrushCommissionYuan * 100);
+
       const pureProfit = hiddenDeletedOfflineIncome
         ? null
         : cancelledDeliveryLoss
@@ -1794,7 +1821,7 @@ export async function GET(request: NextRequest) {
         : manualDeliveryLoss
         ? -deliveryFee
         : order.isMainSystemSelfDelivery
-        ? - (Math.abs(Number(order.platformCommission || 0)) + brushCommission + returnExtraExpense)
+        ? - (Math.abs(Number(order.platformCommission || 0)) + orderBrushCommission + returnExtraExpense)
         : (productCostStatus === "ready"
           ? Math.round(Number(safeExpectedIncome || 0) * (1 - serviceFeeRate)) - deliveryFee - productCost - returnExtraExpense
           : null);
@@ -1806,6 +1833,7 @@ export async function GET(request: NextRequest) {
         refundAmount,
         returnExtraExpense,
         platformCommission: adjustedMetrics.platformCommission,
+        brushCommission: orderBrushCommissionYuan,
         matchedShopId,
         matchedShopName,
         autoOutboundStatus: autoOutboundMeta.status,

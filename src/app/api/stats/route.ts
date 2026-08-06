@@ -486,6 +486,12 @@ export async function GET(request: NextRequest) {
     ]);
     perf.lap("secondary-queries");
 
+    const customBrushCommissionMap = new Map<string, number>(
+      brushOrdersInRange
+        .filter((b): b is typeof b & { platformOrderId: string } => Boolean(b.platformOrderId))
+        .map((b) => [b.platformOrderId, b.commission])
+    );
+
     const filteredAutoPickOrdersInRange = shopName
       ? autoPickOrdersInRange.filter((order) => resolveAutoPickMatchedShopName(order, user.permissions) === shopName)
       : autoPickOrdersInRange;
@@ -724,12 +730,15 @@ export async function GET(request: NextRequest) {
         const expectedIncomeYuan = adjustedMetrics.expectedIncome;
 
         const isBrush = readMainSystemSelfDeliveryFlag(order.rawPayload);
-        const orderBrushCommission = resolveShopBrushCommission(integrationConfig, {
-          maiyatianShopId: readShopIdFromRawPayload(order.rawPayload),
-          shopName: readShopNameFromRawPayload(order.rawPayload) || order.shopId,
-          shopAddress: readShopAddressFromRawPayload(order.rawPayload) || order.shopAddress,
-          rawPayload: order.rawPayload,
-        });
+        const customCommission = order.orderNo ? customBrushCommissionMap.get(order.orderNo) : undefined;
+        const orderBrushCommission = typeof customCommission === "number" && customCommission >= 0
+          ? customCommission
+          : resolveShopBrushCommission(integrationConfig, {
+              maiyatianShopId: readShopIdFromRawPayload(order.rawPayload),
+              shopName: readShopNameFromRawPayload(order.rawPayload) || order.shopId,
+              shopAddress: readShopAddressFromRawPayload(order.rawPayload) || order.shopAddress,
+              rawPayload: order.rawPayload,
+            });
         if (!isBrush) {
           userPaid = FinanceMath.add(userPaid, adjustedPaidYuan);
           productCost = FinanceMath.add(productCost, orderCostYuan);
@@ -906,12 +915,15 @@ export async function GET(request: NextRequest) {
         }
 
         if (isBrush) {
-          const orderBrushCommission = resolveShopBrushCommission(integrationConfig, {
-            maiyatianShopId: readShopIdFromRawPayload(order.rawPayload),
-            shopName: readShopNameFromRawPayload(order.rawPayload) || order.shopId,
-            shopAddress: readShopAddressFromRawPayload(order.rawPayload) || order.shopAddress,
-            rawPayload: order.rawPayload,
-          });
+          const customCommission = order.orderNo ? customBrushCommissionMap.get(order.orderNo) : undefined;
+          const orderBrushCommission = typeof customCommission === "number" && customCommission >= 0
+            ? customCommission
+            : resolveShopBrushCommission(integrationConfig, {
+                maiyatianShopId: readShopIdFromRawPayload(order.rawPayload),
+                shopName: readShopNameFromRawPayload(order.rawPayload) || order.shopId,
+                shopAddress: readShopAddressFromRawPayload(order.rawPayload) || order.shopAddress,
+                rawPayload: order.rawPayload,
+              });
           const brushPureProfit = -commissionYuan - deliveryYuan - orderBrushCommission - returnExtraExpenseYuan;
           if (point) {
             point.brushPaid = FinanceMath.add(point.brushPaid, adjustedPaidYuan);

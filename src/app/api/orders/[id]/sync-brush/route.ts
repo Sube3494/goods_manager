@@ -4,7 +4,7 @@ import { syncBrushOrderFromCompletedAutoPickOrder } from "@/lib/autoPickOrders";
 
 export const dynamic = "force-dynamic";
 
-export async function POST(_: NextRequest, context: { params: Promise<{ id: string }> }) {
+export async function POST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   const session = await getAuthorizedUser("order:manage");
   if (!session) {
     return NextResponse.json({ error: "Permission denied" }, { status: 403 });
@@ -12,9 +12,22 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
 
   try {
     const { id } = await context.params;
+    const body = await request.json().catch(() => ({}));
+    const rawCommission = body?.commission;
+    const parsedCommission = typeof rawCommission === "number"
+      ? rawCommission
+      : typeof rawCommission === "string" && rawCommission.trim() !== ""
+        ? parseFloat(rawCommission)
+        : undefined;
+    const commission = Number.isFinite(parsedCommission) && (parsedCommission as number) >= 0
+      ? (parsedCommission as number)
+      : undefined;
+
     const result = await syncBrushOrderFromCompletedAutoPickOrder(session.id, id, {
       allowSelfDeliveryFallback: true,
       forceInclude: true,
+      overwriteExisting: true,
+      commission,
     });
 
     if (result.ok) {

@@ -1412,6 +1412,9 @@ export function OrderCard({
   const [isSavingOfflineEdit, setIsSavingOfflineEdit] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [isDeletingOffline, setIsDeletingOffline] = useState(false);
+  const [isCommissionEditorOpen, setIsCommissionEditorOpen] = useState(false);
+  const [editCommissionValue, setEditCommissionValue] = useState("");
+  const [isSavingCommission, setIsSavingCommission] = useState(false);
   const { showToast } = useToast();
   const profitTooltipHoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -1635,7 +1638,7 @@ export function OrderCard({
   const canEditProductCost = order.productCostStatus === "pending-backfill" || productCostBreakdown.length > 0;
   const settlementAfterRate = Math.round(expectedIncome * (1 - serviceFeeRate));
   const isJdOrder = String(order.platform || "").includes("京东");
-  const pureProfitTooltipRows = hasPureProfit
+  const pureProfitTooltipRows: Array<{ label: string; value: string; editable?: boolean; onEdit?: () => void }> = hasPureProfit
     ? (showManualDeliveryMarker
       ? [
           { label: "订单收入", value: toCurrency(expectedIncome) },
@@ -1644,7 +1647,19 @@ export function OrderCard({
       : order.isMainSystemSelfDelivery
       ? [
           { label: "扣平台佣金", value: toCurrency(order.platformCommission) },
-          { label: "扣刷单佣金", value: toCurrency(- (Math.abs(pureProfit) - Math.abs(Number(order.platformCommission || 0)))) },
+          {
+            label: "扣刷单佣金",
+            value: toCurrency(- (typeof order.brushCommission === "number" ? Math.round(order.brushCommission * 100) : Math.abs(pureProfit) - Math.abs(Number(order.platformCommission || 0)))),
+            editable: true,
+            onEdit: () => {
+              const currentVal = typeof order.brushCommission === "number"
+                ? order.brushCommission
+                : (Math.abs(pureProfit) - Math.abs(Number(order.platformCommission || 0))) / 100;
+              setEditCommissionValue(String(currentVal > 0 ? currentVal : ""));
+              setIsProfitTooltipOpen(false);
+              setIsCommissionEditorOpen(true);
+            },
+          },
         ]
         : [
             { label: "预计到手", value: toCurrency(expectedIncome) },
@@ -1888,11 +1903,15 @@ export function OrderCard({
                                     {row.editable ? (
                                       <button
                                         type="button"
-                                        aria-label="修改货品成本"
-                                        title="修改货品成本"
+                                        aria-label={row.onEdit ? "修改刷单佣金" : "修改货品成本"}
+                                        title={row.onEdit ? "修改刷单佣金" : "修改货品成本"}
                                         onClick={() => {
                                           setIsProfitTooltipOpen(false);
-                                          onOpenCostBackfill(order);
+                                          if (row.onEdit) {
+                                            row.onEdit();
+                                          } else {
+                                            onOpenCostBackfill(order);
+                                          }
                                         }}
                                         className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-sky-500/22 bg-sky-500/10 text-sky-700 transition-all hover:border-sky-500/38 hover:bg-sky-500/16 dark:text-sky-300"
                                       >
@@ -2472,6 +2491,87 @@ export function OrderCard({
         cancelLabel="取消"
         variant="danger"
       />
+
+      {isCommissionEditorOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-sm rounded-2xl border border-black/8 bg-white p-5 shadow-2xl dark:border-white/10 dark:bg-[#171b22]">
+            <div className="flex items-center justify-between border-b border-black/5 pb-3 dark:border-white/5">
+              <h3 className="text-sm font-bold text-foreground">修改刷单佣金</h3>
+              <button
+                type="button"
+                onClick={() => setIsCommissionEditorOpen(false)}
+                className="rounded-full p-1 text-muted-foreground hover:bg-black/5 dark:hover:bg-white/5"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="mt-4">
+              <label className="text-xs text-muted-foreground">当前订单刷单佣金 (元/单)</label>
+              <div className="mt-1.5 flex items-center gap-2 rounded-xl border border-black/8 bg-white/80 px-3 dark:border-white/10 dark:bg-[#111827]">
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  value={editCommissionValue}
+                  onChange={(e) => setEditCommissionValue(e.target.value)}
+                  placeholder="例如 6.5"
+                  className="h-10 w-full bg-transparent text-sm font-medium outline-none"
+                  autoFocus
+                />
+                <span className="text-xs text-muted-foreground shrink-0">元</span>
+              </div>
+              <p className="mt-2 text-[11px] text-muted-foreground leading-normal">
+                修改后系统将以此佣金重新计算本单纯利润，并更新后台刷单费用统计。
+              </p>
+            </div>
+
+            <div className="mt-5 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setIsCommissionEditorOpen(false)}
+                className="h-9 rounded-xl border border-black/8 px-4 text-xs font-medium text-muted-foreground hover:bg-black/4 dark:border-white/10 dark:hover:bg-white/4"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                disabled={isSavingCommission}
+                onClick={async () => {
+                  const parsed = parseFloat(editCommissionValue);
+                  if (isNaN(parsed) || parsed < 0) {
+                    showToast("请输入有效的佣金金额", "error");
+                    return;
+                  }
+                  setIsSavingCommission(true);
+                  try {
+                    const res = await fetch(`/api/orders/${order.id}/sync-brush`, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ commission: parsed }),
+                    });
+                    const data = await res.json();
+                    if (!res.ok) {
+                      throw new Error(data.error || "修改失败");
+                    }
+                    showToast("刷单佣金已成功修改", "success");
+                    setIsCommissionEditorOpen(false);
+                    onRefresh?.();
+                  } catch (err) {
+                    showToast(err instanceof Error ? err.message : "修改失败", "error");
+                  } finally {
+                    setIsSavingCommission(false);
+                  }
+                }}
+                className="h-9 inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 text-xs font-medium text-primary-foreground shadow-xs transition-all hover:opacity-90 disabled:opacity-50"
+              >
+                {isSavingCommission ? <Loader2 size={13} className="animate-spin" /> : null}
+                保存修改
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </>
   );
 }

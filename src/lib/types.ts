@@ -216,6 +216,7 @@ export interface AutoPickOrder {
   actualPaid: number;
   expectedIncome?: number | null;
   platformCommission: number;
+  brushCommission?: number | null;
   delivery?: AutoPickDelivery | null;
   customerName?: string | null;
   customerPhone?: string | null;
