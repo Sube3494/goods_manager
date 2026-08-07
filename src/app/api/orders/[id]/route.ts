@@ -172,6 +172,7 @@ export async function PATCH(
         const localShopNameToMatch = matchedMapping?.localShopName || inputMaiyatianShopName;
 
         if (localShopNameToMatch) {
+          targetShopName = localShopNameToMatch;
           const matchedDbShop = await prisma.shop.findFirst({
             where: {
               userId: user.id,
@@ -183,8 +184,6 @@ export async function PATCH(
           if (matchedDbShop) {
             targetShopId = matchedDbShop.id;
             targetShopAddress = matchedDbShop.address || null;
-            // 保持展示名优先使用麦芽田门店名或本地店名
-            targetShopName = inputMaiyatianShopName || matchedDbShop.name;
           }
         }
       }

@@ -2610,6 +2610,7 @@ function OrderShopEditModal({
   onSaveSuccess: () => void;
 }) {
   const [shops, setShops] = useState<Array<{ id: string; name: string; address?: string | null; cityName?: string | null }>>([]);
+  const [mappings, setMappings] = useState<Array<{ maiyatianShopId?: string; maiyatianShopName?: string; localShopName?: string }>>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedShopName, setSelectedShopName] = useState<string>(order.matchedShopName || "");
   const [selectedShopId, setSelectedShopId] = useState<string>(order.shopId || "");
@@ -2623,9 +2624,11 @@ function OrderShopEditModal({
         const res = await fetch("/api/orders/integration/maiyatian-shops");
         const data = await res.json();
         if (isMounted) {
-          if (res.ok && Array.isArray(data.shops)) {
-            setShops(data.shops);
-            const matched = data.shops.find(
+          if (res.ok) {
+            if (Array.isArray(data.shops)) setShops(data.shops);
+            if (Array.isArray(data.maiyatianShopMappings)) setMappings(data.maiyatianShopMappings);
+
+            const matched = data.shops?.find(
               (s: { id: string; name: string }) =>
                 s.name === order.matchedShopName || (order.shopId && s.id === order.shopId)
             );
@@ -2694,7 +2697,7 @@ function OrderShopEditModal({
 
         <div className="mt-4 space-y-3">
           <p className="text-xs text-muted-foreground">
-            请从麦芽田读取到的门店列表中选择归属门店：
+            请从麦芽田门店列表中选择该订单对应的归属门店：
           </p>
 
           {isLoading ? (
@@ -2726,7 +2729,14 @@ function OrderShopEditModal({
                 </div>
               ) : (
                 shops.map((shop) => {
+                  const matchedMapping = mappings.find(
+                    (m) =>
+                      (shop.id && String(m.maiyatianShopId || "").trim() === shop.id) ||
+                      String(m.maiyatianShopName || "").trim() === shop.name
+                  );
+                  const displayLocalName = matchedMapping?.localShopName || shop.name;
                   const isSelected = selectedShopName === shop.name || (selectedShopId && selectedShopId === shop.id);
+
                   return (
                     <label
                       key={shop.id || shop.name}
@@ -2741,13 +2751,18 @@ function OrderShopEditModal({
                           : "border-black/5 bg-black/2 hover:bg-black/4 dark:border-white/5 dark:bg-white/2 dark:hover:bg-white/4 text-foreground"
                       )}
                     >
-                      <div className="flex flex-col min-w-0 pr-2">
-                        <span className="truncate">{shop.name}</span>
-                        {shop.address || shop.cityName ? (
-                          <span className="truncate text-[11px] text-muted-foreground font-normal mt-0.5">
-                            {shop.cityName ? `${shop.cityName} · ` : ""}{shop.address || ""}
-                          </span>
-                        ) : null}
+                      <div className="flex flex-col min-w-0 pr-2 text-left">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="truncate text-xs font-bold text-foreground">{displayLocalName}</span>
+                          {matchedMapping?.localShopName ? (
+                            <span className="shrink-0 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-500">
+                              已映射
+                            </span>
+                          ) : null}
+                        </div>
+                        <span className="truncate text-[11px] text-muted-foreground font-normal mt-0.5">
+                          {shop.name} {shop.cityName ? `(${shop.cityName})` : ""}
+                        </span>
                       </div>
                       {isSelected ? <Check size={14} className="shrink-0 text-sky-500" /> : null}
                     </label>
