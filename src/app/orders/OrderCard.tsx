@@ -1415,6 +1415,7 @@ export function OrderCard({
   const [isCommissionEditorOpen, setIsCommissionEditorOpen] = useState(false);
   const [editCommissionValue, setEditCommissionValue] = useState("");
   const [isSavingCommission, setIsSavingCommission] = useState(false);
+  const [isShopEditorOpen, setIsShopEditorOpen] = useState(false);
   const { showToast } = useToast();
   const profitTooltipHoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -1742,11 +1743,18 @@ export function OrderCard({
                     </span>
                     <span className="pr-0.5 text-[12px] font-semibold leading-none tracking-tight sm:text-[15px]">#{order.dailyPlatformSequence || 0}</span>
                   </span>
-                  {sourceLabel ? (
-                    <span className="inline-flex h-7 min-w-0 max-w-[calc(100vw-10rem)] items-center rounded-full border border-black/8 bg-black/3 px-1.5 text-[11px] font-medium leading-none text-muted-foreground dark:border-white/10 dark:bg-white/4 sm:h-8 sm:max-w-55 sm:px-2.5 sm:text-[13px]">
-                      <span className="truncate">{sourceLabel}</span>
-                    </span>
-                  ) : null}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsShopEditorOpen(true);
+                    }}
+                    title="点击修改订单归属门店"
+                    className="inline-flex h-7 min-w-0 max-w-[calc(100vw-10rem)] items-center gap-1 rounded-full border border-black/8 bg-black/3 px-2 text-[11px] font-medium leading-none text-muted-foreground transition-colors hover:border-sky-500/30 hover:bg-sky-500/10 hover:text-sky-600 dark:border-white/10 dark:bg-white/4 dark:hover:border-sky-400/30 dark:hover:bg-sky-500/15 dark:hover:text-sky-300 sm:h-8 sm:max-w-55 sm:px-2.5 sm:text-[13px]"
+                  >
+                    <span className="truncate">{sourceLabel || "+ 绑定门店"}</span>
+                    <Pencil size={11} className="shrink-0 opacity-60" />
+                  </button>
                   {orderTypeLabel ? (
                     <span className="inline-flex h-7 items-center rounded-full border border-violet-500/15 bg-violet-500/10 px-1.5 text-[11px] font-medium leading-none text-violet-700 dark:text-violet-400 sm:h-8 sm:px-2.5 sm:text-[13px]">
                       {orderTypeLabel}
@@ -2349,11 +2357,20 @@ export function OrderCard({
                 <div className="grid gap-2 sm:grid-cols-2 sm:gap-2.5">
                   <DetailBlock
                     label="门店地址"
-                    labelAccessory={order.matchedShopName ? (
-                      <span className="inline-flex max-w-[45%] items-center rounded-full border border-sky-400/20 bg-sky-500/12 px-2 py-0.5 text-[10px] font-medium leading-none text-sky-300">
-                        <span className="truncate">{order.matchedShopName}</span>
-                      </span>
-                    ) : null}
+                    labelAccessory={
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setIsShopEditorOpen(true);
+                        }}
+                        className="inline-flex max-w-[45%] items-center gap-1 rounded-full border border-sky-400/20 bg-sky-500/12 px-2 py-0.5 text-[10px] font-medium leading-none text-sky-300 hover:bg-sky-500/20 transition-colors"
+                        title="点击修改归属门店"
+                      >
+                        <span className="truncate">{order.matchedShopName || "未绑定门店"}</span>
+                        <Pencil size={10} className="shrink-0 opacity-70" />
+                      </button>
+                    }
                     value={order.rawShopAddress || order.shopAddress || "-"}
                     className="sm:col-span-2"
                   />
@@ -2572,6 +2589,182 @@ export function OrderCard({
           </div>
         </div>
       ) : null}
+      {isShopEditorOpen ? (
+        <OrderShopEditModal
+          order={order}
+          onClose={() => setIsShopEditorOpen(false)}
+          onSaveSuccess={() => {
+            onRefresh?.();
+          }}
+        />
+      ) : null}
     </>
+  );
+}
+
+function OrderShopEditModal({
+  order,
+  onClose,
+  onSaveSuccess,
+}: {
+  order: AutoPickOrder;
+  onClose: () => void;
+  onSaveSuccess: () => void;
+}) {
+  const [shops, setShops] = useState<Array<{ id: string; name: string; address?: string | null }>>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [selectedShopId, setSelectedShopId] = useState<string>(order.shopId || "");
+  const [isSaving, setIsSaving] = useState(false);
+  const { showToast } = useToast();
+
+  useEffect(() => {
+    let isMounted = true;
+    async function loadShops() {
+      try {
+        const res = await fetch("/api/shops");
+        const data = await res.json();
+        if (isMounted) {
+          if (res.ok && Array.isArray(data.shops)) {
+            setShops(data.shops);
+            if (!order.shopId && order.matchedShopName) {
+              const matched = data.shops.find((s: { id: string; name: string }) => s.name === order.matchedShopName);
+              if (matched) {
+                setSelectedShopId(matched.id);
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.error("加载店铺列表失败", err);
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    }
+    void loadShops();
+    return () => {
+      isMounted = false;
+    };
+  }, [order.shopId, order.matchedShopName]);
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      const res = await fetch(`/api/orders/${order.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          shopId: selectedShopId || null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "修改归属门店失败");
+      }
+      showToast("已成功更新订单归属门店", "success");
+      onSaveSuccess();
+      onClose();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "修改失败", "error");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+      <div className="w-full max-w-sm rounded-2xl border border-black/8 bg-white p-5 shadow-2xl dark:border-white/10 dark:bg-[#171b22]">
+        <div className="flex items-center justify-between border-b border-black/5 pb-3 dark:border-white/5">
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-bold text-foreground">修改订单归属门店</h3>
+            <span className="rounded-md bg-black/5 px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground dark:bg-white/10">
+              #{order.dailyPlatformSequence || 0}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full p-1 text-muted-foreground hover:bg-black/5 dark:hover:bg-white/5"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="mt-4 space-y-3">
+          <p className="text-xs text-muted-foreground">
+            请从您已有的门店列表中选择该订单的归属门店：
+          </p>
+
+          {isLoading ? (
+            <div className="flex h-32 items-center justify-center text-muted-foreground">
+              <Loader2 size={20} className="animate-spin mr-2" />
+              <span className="text-xs">加载门店列表中...</span>
+            </div>
+          ) : (
+            <div className="max-h-60 overflow-y-auto space-y-1.5 pr-1">
+              <label
+                onClick={() => setSelectedShopId("")}
+                className={cn(
+                  "flex items-center justify-between rounded-xl border p-3 text-xs font-medium cursor-pointer transition-all",
+                  selectedShopId === ""
+                    ? "border-sky-500 bg-sky-500/10 text-sky-600 dark:text-sky-300"
+                    : "border-black/5 bg-black/2 hover:bg-black/4 dark:border-white/5 dark:bg-white/2 dark:hover:bg-white/4 text-muted-foreground"
+                )}
+              >
+                <span>不绑定门店（未指定）</span>
+                {selectedShopId === "" ? <Check size={14} className="text-sky-500" /> : null}
+              </label>
+
+              {shops.length === 0 ? (
+                <div className="py-4 text-center text-xs text-muted-foreground">
+                  暂无可用门店，请先在系统设置中添加门店。
+                </div>
+              ) : (
+                shops.map((shop) => (
+                  <label
+                    key={shop.id}
+                    onClick={() => setSelectedShopId(shop.id)}
+                    className={cn(
+                      "flex items-center justify-between rounded-xl border p-3 text-xs font-medium cursor-pointer transition-all",
+                      selectedShopId === shop.id
+                        ? "border-sky-500 bg-sky-500/10 text-sky-600 dark:text-sky-300 font-semibold"
+                        : "border-black/5 bg-black/2 hover:bg-black/4 dark:border-white/5 dark:bg-white/2 dark:hover:bg-white/4 text-foreground"
+                    )}
+                  >
+                    <div className="flex flex-col min-w-0 pr-2">
+                      <span className="truncate">{shop.name}</span>
+                      {shop.address ? (
+                        <span className="truncate text-[11px] text-muted-foreground font-normal mt-0.5">
+                          {shop.address}
+                        </span>
+                      ) : null}
+                    </div>
+                    {selectedShopId === shop.id ? <Check size={14} className="shrink-0 text-sky-500" /> : null}
+                  </label>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="mt-5 flex items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="h-9 rounded-xl border border-black/8 px-4 text-xs font-medium text-muted-foreground hover:bg-black/4 dark:border-white/10 dark:hover:bg-white/4"
+          >
+            取消
+          </button>
+          <button
+            type="button"
+            disabled={isSaving || isLoading}
+            onClick={() => void handleSave()}
+            className="h-9 inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 text-xs font-medium text-primary-foreground shadow-xs transition-all hover:opacity-90 disabled:opacity-50"
+          >
+            {isSaving ? <Loader2 size={13} className="animate-spin" /> : null}
+            保存修改
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

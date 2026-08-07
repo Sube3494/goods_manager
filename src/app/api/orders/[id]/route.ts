@@ -91,8 +91,9 @@ export async function PATCH(
     const hasExpectedIncome = Number.isFinite(nextExpectedIncome);
     const hasOfflineEdit = body.offlineEdit && typeof body.offlineEdit === "object";
     const hasAmountEdit = hasExpectedIncome;
+    const hasShopEdit = body.shopId !== undefined;
 
-    if (!hasBrushToggle && !hasAmountEdit && !hasOfflineEdit) {
+    if (!hasBrushToggle && !hasAmountEdit && !hasOfflineEdit && !hasShopEdit) {
       return NextResponse.json({ error: "参数错误" }, { status: 400 });
     }
 
@@ -130,6 +131,7 @@ export async function PATCH(
         platformCommission: true,
         delivery: true,
         rawPayload: true,
+        shopAddress: true,
       },
     });
 
@@ -139,6 +141,25 @@ export async function PATCH(
 
     if (offlineEdit && order.platform !== "线下交易") {
       return NextResponse.json({ error: "当前只支持修改线下订单" }, { status: 400 });
+    }
+
+    let targetShopId: string | null = null;
+    let targetShopName: string | null = null;
+    let targetShopAddress: string | null = null;
+
+    if (hasShopEdit) {
+      targetShopId = body.shopId ? String(body.shopId).trim() : null;
+      if (targetShopId) {
+        const matchedShop = await prisma.shop.findFirst({
+          where: { id: targetShopId, userId: user.id },
+          select: { id: true, name: true, address: true },
+        });
+        if (!matchedShop) {
+          return NextResponse.json({ error: "指定的门店不存在" }, { status: 404 });
+        }
+        targetShopName = matchedShop.name;
+        targetShopAddress = matchedShop.address || null;
+      }
     }
 
     const rawPayload = order.rawPayload && typeof order.rawPayload === "object" && !Array.isArray(order.rawPayload)
@@ -185,6 +206,12 @@ export async function PATCH(
               platformCommission,
             }
           : {}),
+        ...(hasShopEdit
+          ? {
+              shopId: targetShopId,
+              ...(targetShopAddress !== null ? { shopAddress: targetShopAddress } : {}),
+            }
+          : {}),
         ...(offlineEdit
           ? {
               actualPaid,
@@ -223,6 +250,20 @@ export async function PATCH(
                   },
                 }
               : {}),
+            ...(hasShopEdit
+              ? {
+                  resolvedShop: {
+                    id: targetShopId,
+                    name: targetShopName,
+                  },
+                  manualShopOverride: {
+                    shopId: targetShopId,
+                    shopName: targetShopName,
+                    updatedAt: new Date().toISOString(),
+                    updatedBy: String(user.name || user.email || user.id),
+                  },
+                }
+              : {}),
             ...(offlineEdit
               ? {
                   manualOfflineEdit: {
@@ -247,6 +288,7 @@ export async function PATCH(
       actualPaid,
       expectedIncome,
       platformCommission,
+      ...(hasShopEdit ? { shopId: targetShopId, matchedShopName: targetShopName } : {}),
     });
   } catch (error) {
     console.error("Failed to patch order:", error);
