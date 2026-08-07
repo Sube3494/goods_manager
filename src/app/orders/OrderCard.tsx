@@ -1750,10 +1750,9 @@ export function OrderCard({
                       setIsShopEditorOpen(true);
                     }}
                     title="点击修改订单归属门店"
-                    className="inline-flex h-7 min-w-0 max-w-[calc(100vw-10rem)] items-center gap-1 rounded-full border border-black/8 bg-black/3 px-2 text-[11px] font-medium leading-none text-muted-foreground transition-colors hover:border-sky-500/30 hover:bg-sky-500/10 hover:text-sky-600 dark:border-white/10 dark:bg-white/4 dark:hover:border-sky-400/30 dark:hover:bg-sky-500/15 dark:hover:text-sky-300 sm:h-8 sm:max-w-55 sm:px-2.5 sm:text-[13px]"
+                    className="inline-flex h-7 min-w-0 max-w-[calc(100vw-10rem)] items-center rounded-full border border-black/8 bg-black/3 px-1.5 text-[11px] font-medium leading-none text-muted-foreground transition-colors hover:border-sky-500/30 hover:bg-sky-500/10 hover:text-sky-600 dark:border-white/10 dark:bg-white/4 dark:hover:border-sky-400/30 dark:hover:bg-sky-500/15 dark:hover:text-sky-300 sm:h-8 sm:max-w-55 sm:px-2.5 sm:text-[13px]"
                   >
                     <span className="truncate">{sourceLabel || "+ 绑定门店"}</span>
-                    <Pencil size={11} className="shrink-0 opacity-60" />
                   </button>
                   {orderTypeLabel ? (
                     <span className="inline-flex h-7 items-center rounded-full border border-violet-500/15 bg-violet-500/10 px-1.5 text-[11px] font-medium leading-none text-violet-700 dark:text-violet-400 sm:h-8 sm:px-2.5 sm:text-[13px]">
@@ -2364,11 +2363,10 @@ export function OrderCard({
                           e.stopPropagation();
                           setIsShopEditorOpen(true);
                         }}
-                        className="inline-flex max-w-[45%] items-center gap-1 rounded-full border border-sky-400/20 bg-sky-500/12 px-2 py-0.5 text-[10px] font-medium leading-none text-sky-300 hover:bg-sky-500/20 transition-colors"
+                        className="inline-flex max-w-[45%] items-center rounded-full border border-sky-400/20 bg-sky-500/12 px-2 py-0.5 text-[10px] font-medium leading-none text-sky-300 hover:bg-sky-500/20 transition-colors"
                         title="点击修改归属门店"
                       >
                         <span className="truncate">{order.matchedShopName || "未绑定门店"}</span>
-                        <Pencil size={10} className="shrink-0 opacity-70" />
                       </button>
                     }
                     value={order.rawShopAddress || order.shopAddress || "-"}
