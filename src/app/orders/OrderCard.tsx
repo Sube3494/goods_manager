@@ -2611,36 +2611,39 @@ function OrderShopEditModal({
   onClose: () => void;
   onSaveSuccess: () => void;
 }) {
-  const [shops, setShops] = useState<Array<{ id: string; name: string; address?: string | null }>>([]);
+  const [shops, setShops] = useState<Array<{ id: string; name: string; address?: string | null; cityName?: string | null }>>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedShopName, setSelectedShopName] = useState<string>(order.matchedShopName || "");
   const [selectedShopId, setSelectedShopId] = useState<string>(order.shopId || "");
   const [isSaving, setIsSaving] = useState(false);
   const { showToast } = useToast();
 
   useEffect(() => {
     let isMounted = true;
-    async function loadShops() {
+    async function loadMaiyatianShops() {
       try {
-        const res = await fetch("/api/shops");
+        const res = await fetch("/api/orders/integration/maiyatian-shops");
         const data = await res.json();
         if (isMounted) {
           if (res.ok && Array.isArray(data.shops)) {
             setShops(data.shops);
-            if (!order.shopId && order.matchedShopName) {
-              const matched = data.shops.find((s: { id: string; name: string }) => s.name === order.matchedShopName);
-              if (matched) {
-                setSelectedShopId(matched.id);
-              }
+            const matched = data.shops.find(
+              (s: { id: string; name: string }) =>
+                s.name === order.matchedShopName || (order.shopId && s.id === order.shopId)
+            );
+            if (matched) {
+              setSelectedShopName(matched.name);
+              setSelectedShopId(matched.id);
             }
           }
         }
       } catch (err) {
-        console.error("加载店铺列表失败", err);
+        console.error("加载麦芽田门店列表失败", err);
       } finally {
         if (isMounted) setIsLoading(false);
       }
     }
-    void loadShops();
+    void loadMaiyatianShops();
     return () => {
       isMounted = false;
     };
@@ -2649,11 +2652,13 @@ function OrderShopEditModal({
   const handleSave = async () => {
     setIsSaving(true);
     try {
+      const targetShop = shops.find((s) => s.name === selectedShopName || s.id === selectedShopId);
       const res = await fetch(`/api/orders/${order.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          shopId: selectedShopId || null,
+          shopId: targetShop?.id || selectedShopId || null,
+          maiyatianShopName: targetShop?.name || selectedShopName || null,
         }),
       });
       const data = await res.json();
@@ -2691,56 +2696,65 @@ function OrderShopEditModal({
 
         <div className="mt-4 space-y-3">
           <p className="text-xs text-muted-foreground">
-            请从您已有的门店列表中选择该订单的归属门店：
+            请从麦芽田读取到的门店列表中选择归属门店：
           </p>
 
           {isLoading ? (
             <div className="flex h-32 items-center justify-center text-muted-foreground">
               <Loader2 size={20} className="animate-spin mr-2" />
-              <span className="text-xs">加载门店列表中...</span>
+              <span className="text-xs">正在读取麦芽田门店列表...</span>
             </div>
           ) : (
             <div className="max-h-60 overflow-y-auto space-y-1.5 pr-1">
               <label
-                onClick={() => setSelectedShopId("")}
+                onClick={() => {
+                  setSelectedShopName("");
+                  setSelectedShopId("");
+                }}
                 className={cn(
                   "flex items-center justify-between rounded-xl border p-3 text-xs font-medium cursor-pointer transition-all",
-                  selectedShopId === ""
-                    ? "border-sky-500 bg-sky-500/10 text-sky-600 dark:text-sky-300"
+                  selectedShopName === "" && selectedShopId === ""
+                    ? "border-sky-500 bg-sky-500/10 text-sky-600 dark:text-sky-300 font-semibold"
                     : "border-black/5 bg-black/2 hover:bg-black/4 dark:border-white/5 dark:bg-white/2 dark:hover:bg-white/4 text-muted-foreground"
                 )}
               >
-                <span>不绑定门店（未指定）</span>
-                {selectedShopId === "" ? <Check size={14} className="text-sky-500" /> : null}
+                <span>未指定（不绑定门店）</span>
+                {selectedShopName === "" && selectedShopId === "" ? <Check size={14} className="text-sky-500" /> : null}
               </label>
 
               {shops.length === 0 ? (
-                <div className="py-4 text-center text-xs text-muted-foreground">
-                  暂无可用门店，请先在系统设置中添加门店。
+                <div className="py-4 text-center text-xs text-muted-foreground leading-relaxed">
+                  暂未读取到麦芽田门店，请先在系统设置中配置或检查麦芽田连接状态。
                 </div>
               ) : (
-                shops.map((shop) => (
-                  <label
-                    key={shop.id}
-                    onClick={() => setSelectedShopId(shop.id)}
-                    className={cn(
-                      "flex items-center justify-between rounded-xl border p-3 text-xs font-medium cursor-pointer transition-all",
-                      selectedShopId === shop.id
-                        ? "border-sky-500 bg-sky-500/10 text-sky-600 dark:text-sky-300 font-semibold"
-                        : "border-black/5 bg-black/2 hover:bg-black/4 dark:border-white/5 dark:bg-white/2 dark:hover:bg-white/4 text-foreground"
-                    )}
-                  >
-                    <div className="flex flex-col min-w-0 pr-2">
-                      <span className="truncate">{shop.name}</span>
-                      {shop.address ? (
-                        <span className="truncate text-[11px] text-muted-foreground font-normal mt-0.5">
-                          {shop.address}
-                        </span>
-                      ) : null}
-                    </div>
-                    {selectedShopId === shop.id ? <Check size={14} className="shrink-0 text-sky-500" /> : null}
-                  </label>
-                ))
+                shops.map((shop) => {
+                  const isSelected = selectedShopName === shop.name || (selectedShopId && selectedShopId === shop.id);
+                  return (
+                    <label
+                      key={shop.id || shop.name}
+                      onClick={() => {
+                        setSelectedShopName(shop.name);
+                        setSelectedShopId(shop.id);
+                      }}
+                      className={cn(
+                        "flex items-center justify-between rounded-xl border p-3 text-xs font-medium cursor-pointer transition-all",
+                        isSelected
+                          ? "border-sky-500 bg-sky-500/10 text-sky-600 dark:text-sky-300 font-semibold"
+                          : "border-black/5 bg-black/2 hover:bg-black/4 dark:border-white/5 dark:bg-white/2 dark:hover:bg-white/4 text-foreground"
+                      )}
+                    >
+                      <div className="flex flex-col min-w-0 pr-2">
+                        <span className="truncate">{shop.name}</span>
+                        {shop.address || shop.cityName ? (
+                          <span className="truncate text-[11px] text-muted-foreground font-normal mt-0.5">
+                            {shop.cityName ? `${shop.cityName} · ` : ""}{shop.address || ""}
+                          </span>
+                        ) : null}
+                      </div>
+                      {isSelected ? <Check size={14} className="shrink-0 text-sky-500" /> : null}
+                    </label>
+                  );
+                })
               )}
             </div>
           )}

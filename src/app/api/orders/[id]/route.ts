@@ -4,6 +4,7 @@ import { getAuthorizedUser, getAuthorizedUserAny } from "@/lib/auth";
 import { Prisma } from "../../../../../prisma/generated-client";
 import { returnOutboundOrderById } from "@/lib/outboundReturns";
 import {
+  getAutoPickIntegrationConfigByUserId,
   readCustomerMaskedPhoneFromRawPayload,
   readCustomerNameFromRawPayload,
   readCustomerPhoneFromRawPayload,
@@ -148,17 +149,44 @@ export async function PATCH(
     let targetShopAddress: string | null = null;
 
     if (hasShopEdit) {
-      targetShopId = body.shopId ? String(body.shopId).trim() : null;
-      if (targetShopId) {
-        const matchedShop = await prisma.shop.findFirst({
-          where: { id: targetShopId, userId: user.id },
-          select: { id: true, name: true, address: true },
-        });
-        if (!matchedShop) {
-          return NextResponse.json({ error: "指定的门店不存在" }, { status: 404 });
+      const inputMaiyatianShopName = String(body.maiyatianShopName || body.shopName || "").trim();
+      const inputShopId = body.shopId ? String(body.shopId).trim() : null;
+
+      if (inputMaiyatianShopName || inputShopId) {
+        targetShopName = inputMaiyatianShopName;
+        targetShopId = inputShopId;
+
+        // 尝试从用户的麦芽田映射配置中反查绑定的系统本地门店
+        const userConfig = await getAutoPickIntegrationConfigByUserId(user.id);
+
+        const mappings = Array.isArray(userConfig?.maiyatianShopMappings)
+          ? (userConfig.maiyatianShopMappings as Array<{ maiyatianShopId?: string; maiyatianShopName?: string; localShopName?: string }>)
+          : [];
+
+        const matchedMapping = mappings.find(
+          (m) =>
+            (inputShopId && String(m.maiyatianShopId || "").trim() === inputShopId) ||
+            (inputMaiyatianShopName && String(m.maiyatianShopName || "").trim() === inputMaiyatianShopName)
+        );
+
+        const localShopNameToMatch = matchedMapping?.localShopName || inputMaiyatianShopName;
+
+        if (localShopNameToMatch) {
+          const matchedDbShop = await prisma.shop.findFirst({
+            where: {
+              userId: user.id,
+              name: localShopNameToMatch,
+            },
+            select: { id: true, name: true, address: true },
+          });
+
+          if (matchedDbShop) {
+            targetShopId = matchedDbShop.id;
+            targetShopAddress = matchedDbShop.address || null;
+            // 保持展示名优先使用麦芽田门店名或本地店名
+            targetShopName = inputMaiyatianShopName || matchedDbShop.name;
+          }
         }
-        targetShopName = matchedShop.name;
-        targetShopAddress = matchedShop.address || null;
       }
     }
 
