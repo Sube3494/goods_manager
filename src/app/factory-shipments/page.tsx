@@ -3758,6 +3758,12 @@ export default function FactoryShipmentsPage() {
       const parsed = parseFactoryShipmentNote(order.note);
       return parsed.paymentStatus !== "已支付";
     }).length;
+    const unpaidAmount = shipmentOrders
+      .filter((order) => {
+        const parsed = parseFactoryShipmentNote(order.note);
+        return parsed.paymentStatus !== "已支付";
+      })
+      .reduce((sum, order) => sum + getOrderTotalAmount(order), 0);
     const pendingCompensation = shipmentOrders.filter((order) => {
       const parsed = parseFactoryShipmentNote(order.note);
       return parsed.compensationStatus === "待补偿";
@@ -3771,6 +3777,7 @@ export default function FactoryShipmentsPage() {
       totalQuantity,
       totalAmount,
       unpaidCount,
+      unpaidAmount,
       pendingCompensation,
       recipientCount,
     };
@@ -4579,7 +4586,7 @@ export default function FactoryShipmentsPage() {
           <FactoryMetricCard
             label="待收货款"
             value={`${stats.unpaidCount}`}
-            hint="未支付和部分支付单据"
+            hint={`待收金额 ￥${stats.unpaidAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
             icon={<Wallet size={18} className="text-amber-600 dark:text-amber-400" />}
             accentClassName="border-amber-500/15 bg-amber-500/10"
           />
