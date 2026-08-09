@@ -1107,6 +1107,15 @@ function getAutoPickPlatformAliases(platform?: string | null) {
   return Array.from(aliases).filter(Boolean);
 }
 
+function isSameAutoPickPlatform(left?: string | null, right?: string | null) {
+  const leftValue = String(left || "").trim();
+  const rightValue = String(right || "").trim();
+  if (!leftValue || !rightValue) return leftValue === rightValue;
+  return getAutoPickPlatformAliases(leftValue).some((value) =>
+    getAutoPickPlatformAliases(rightValue).includes(value)
+  );
+}
+
 const MANUAL_DELIVERY_PLACEHOLDER_PRODUCT_NO = "__manual_delivery_placeholder__";
 const MANUAL_DELIVERY_PLACEHOLDER_PRODUCT_NAME = "手工配送占位商品";
 
@@ -2036,7 +2045,7 @@ async function findAutoPickOrderFromRawActiveStatusLists(
         if (!canTrustLookupPlatform) {
           return true;
         }
-        return order.platform === fallbackPlatform;
+        return isSameAutoPickPlatform(order.platform, fallbackPlatform);
       });
 
     if (matched) {
@@ -4344,7 +4353,7 @@ export async function refreshAutoPickOrderFromPlugin(
               if (!canTrustLookupPlatform) {
                 return true;
               }
-              return order.platform === fallbackLookup.platform;
+              return isSameAutoPickPlatform(order.platform, fallbackLookup.platform);
             });
           const fallbackMatched = fallbackMatchedFromRawActive || fallbackMatchedFromDate || await findAutoPickOrderFromActiveStatusLists(cookie, fallbackLookup);
 
@@ -4396,7 +4405,7 @@ export async function refreshAutoPickOrderFromPlugin(
       if (!canTrustLookupPlatform) {
         return true;
       }
-      return order.platform === fallbackPlatform;
+      return isSameAutoPickPlatform(order.platform, fallbackPlatform);
     });
 
   if (!matched) {
@@ -4474,7 +4483,7 @@ async function findAutoPickOrderFromActiveStatusLists(
       if (!canTrustLookupPlatform) {
         return true;
       }
-      return order.platform === fallbackPlatform;
+      return isSameAutoPickPlatform(order.platform, fallbackPlatform);
     });
 
     if (matched) {
