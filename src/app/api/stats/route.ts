@@ -965,11 +965,19 @@ export async function GET(request: NextRequest) {
             platformPoint.productCost = FinanceMath.add(platformPoint.productCost, orderCostYuan);
           }
 
+           const isOffline = order.platform === "线下交易";
+           const rate = isOffline ? 0 : (shopRateMap.get(matchedShopName) ?? 0.06);
            const deliveryYuan = getDeliveryFee(order.delivery) / 100;
-           const pureProfit = FinanceMath.add(
-             expectedIncomeYuan,
-             -commissionYuan - deliveryYuan - orderCostYuan - returnExtraExpenseYuan
-           );
+           const isManualDeliveryLoss = isOffline && deliveryYuan > 0 && paidYuan <= 0 && expectedIncomeYuan <= 0;
+           const hasReadyCost = isManualDeliveryLoss || (Boolean(orderCostMeta) && (orderCostMeta?.missingCostItemCount || 0) <= 0);
+           const pureProfit = isManualDeliveryLoss
+             ? -deliveryYuan
+             : hasReadyCost
+             ? FinanceMath.add(
+                 Math.round(expectedIncomeYuan * (1 - rate)),
+                 -deliveryYuan - orderCostYuan - returnExtraExpenseYuan
+               )
+             : 0;
 
           if (point) {
             point.pureProfit = FinanceMath.add(point.pureProfit, pureProfit);
