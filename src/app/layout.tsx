@@ -9,6 +9,10 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { Geist } from "next/font/google";
+import { cn } from "@/lib/utils";
+
+const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 export const metadata: Metadata = {
   title: "PickNote",
@@ -27,7 +31,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="zh-CN" suppressHydrationWarning>
+    <html lang="zh-CN" suppressHydrationWarning className={cn("font-sans", geist.variable)}>
       <body
         className={`font-sans antialiased`}
       >

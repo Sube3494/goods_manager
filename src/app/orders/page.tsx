@@ -93,6 +93,8 @@ type OrderResponse = {
   };
   summary?: {
     receivedAmount: number;
+    realReceivedAmount?: number;
+    brushReceivedAmount?: number;
     platformCommission: number;
     validOrderCount: number;
     itemCount: number;
@@ -1227,6 +1229,8 @@ export default function OrdersPage() {
   const [tabData, setTabData] = useState<Record<OrdersTab, {
     summary: {
       receivedAmount: number;
+      realReceivedAmount?: number;
+      brushReceivedAmount?: number;
       platformCommission: number;
       validOrderCount: number;
       itemCount: number;
@@ -2103,9 +2107,8 @@ export default function OrdersPage() {
                     </div>
                     <div className="text-right">
                       <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">商家实收</div>
-                      <div className="mt-2 text-[30px] font-black leading-none tracking-tight text-emerald-600 dark:text-emerald-400">
-                        {toCurrency(activeSummary.receivedAmount - (activeTab === "today" ? promotionAmount : 0))}
-                      </div>
+                      <div className="mt-2 text-[30px] font-black leading-none tracking-tight text-emerald-600 dark:text-emerald-400">{toCurrency(activeSummary.receivedAmount - (activeTab === "today" ? promotionAmount : 0))}</div>
+                      <div className="mt-2 flex flex-wrap items-center justify-end gap-x-2 text-[11px] font-semibold"><span className="text-sky-600 dark:text-sky-400">真实收入 {toCurrency(activeSummary.realReceivedAmount || 0)}</span><span className="text-muted-foreground">·</span><span className="text-rose-500">刷单收入 {toCurrency(activeSummary.brushReceivedAmount || 0)}</span></div>
                     </div>
                   </div>
 

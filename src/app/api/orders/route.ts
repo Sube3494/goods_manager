@@ -1505,6 +1505,7 @@ export async function GET(request: NextRequest) {
             shopProfit.deliveryFee += deliveryFee;
           }
           if (!cancelled && !deleted) {
+            const isBrush = readMainSystemSelfDeliveryFlag(order.rawPayload);
             const refundAmount = outboundMeta?.refundAmount || 0;
             const adjustedMetrics = resolveRefundAdjustedIncomeMetrics({
               expectedIncome: metrics.expectedIncome,
@@ -1514,6 +1515,8 @@ export async function GET(request: NextRequest) {
             });
             const expected = Math.max(0, Number(adjustedMetrics.expectedIncome || 0));
             acc.receivedAmount += expected;
+            if (isBrush) acc.brushReceivedAmount += expected;
+            else acc.realReceivedAmount += expected;
             acc.platformCommission += adjustedMetrics.platformCommission;
             acc.validOrderCount += 1;
 
@@ -1553,7 +1556,6 @@ export async function GET(request: NextRequest) {
               : missingCostItemCount > 0
                 ? "pending-backfill" as const
                 : "ready" as const;
-            const isBrush = readMainSystemSelfDeliveryFlag(order.rawPayload);
             const customCommission = order.orderNo ? customBrushCommissionMap.get(order.orderNo) : undefined;
             const orderBrushCommissionYuan = typeof customCommission === "number" && customCommission >= 0
               ? customCommission
@@ -1593,6 +1595,8 @@ export async function GET(request: NextRequest) {
           return acc;
         }, {
           receivedAmount: 0,
+          realReceivedAmount: 0,
+          brushReceivedAmount: 0,
           platformCommission: 0,
           validOrderCount: 0,
           itemCount: 0,

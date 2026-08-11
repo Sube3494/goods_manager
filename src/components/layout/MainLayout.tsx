@@ -7,7 +7,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { ToastProvider } from "@/components/ui/Toast";
 import { cn } from "@/lib/utils";
 import { useUser } from "@/hooks/useUser";
-import { LogIn, LogOut } from "lucide-react";
+import { Bot, LogIn, LogOut } from "lucide-react";
 import { useState, useEffect } from "react";
 import { MobileHeader } from "./MobileHeader";
 import { PageGuard } from "./PageGuard";
@@ -147,6 +147,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
                                 <LogOut size={16} />
                             </button>
                         )}
+                        {pathname === "/" && <button onClick={() => window.dispatchEvent(new Event("overview-ai-open"))} className="flex h-9 w-9 items-center justify-center rounded-full border border-border bg-white text-sky-600 shadow-sm transition hover:scale-105 dark:border-white/10 dark:bg-white/5" title="经营数据 AI 助手"><Bot size={20} strokeWidth={2} /></button>}
                         <ThemeToggle className="h-9 w-9" />
                     </div>
                 </header>

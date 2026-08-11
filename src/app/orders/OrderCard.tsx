@@ -172,6 +172,8 @@ export function summarizeOrders(orders: AutoPickOrder[]) {
     if (!isCancelledStatus(order.status) && !isDeletedStatus(order.status)) {
       const expectedIncome = Math.max(0, getExpectedIncome(order.expectedIncome, order.actualPaid, order.platformCommission));
       acc.receivedAmount += expectedIncome;
+      if (order.isMainSystemSelfDelivery) acc.brushReceivedAmount += expectedIncome;
+      else acc.realReceivedAmount += expectedIncome;
       acc.platformCommission += Math.max(0, Number(order.platformCommission || 0));
       acc.validOrderCount += 1;
       const deliveryFee = getDeliveryFee(order.delivery);
@@ -230,6 +232,8 @@ export function summarizeOrders(orders: AutoPickOrder[]) {
     return acc;
   }, {
     receivedAmount: 0,
+    realReceivedAmount: 0,
+    brushReceivedAmount: 0,
     platformCommission: 0,
     validOrderCount: 0,
     itemCount: 0,

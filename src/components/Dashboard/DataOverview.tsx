@@ -10,6 +10,7 @@ import { DatePicker } from "@/components/ui/DatePicker";
 import { RefreshCw } from "lucide-react";
 import { format } from "date-fns";
 import { cn, getPlatformMeta } from "@/lib/utils";
+import { OverviewAiPanel } from "@/components/Dashboard/OverviewAiPanel";
 
 function Panel({
   title,
@@ -138,6 +139,7 @@ function ChartTooltip({
       pureProfit?: number;
       platformPureProfit?: Record<string, number>;
       shopPureProfit?: Record<string, number>;
+      shopPlatformPureProfit?: Record<string, Record<string, number>>;
       promotionExpense?: number;
       brushExpense?: number;
       netProfit?: number;
@@ -155,6 +157,7 @@ function ChartTooltip({
     .filter(([, val]) => val !== 0 || Object.keys(platformProfits).length <= 1)
     .sort(([, a], [, b]) => (b as number) - (a as number));
   const shopProfits = dataPoint?.shopPureProfit || {};
+  const shopPlatformProfits = dataPoint?.shopPlatformPureProfit || {};
   const shopEntries = Object.entries(shopProfits)
     .filter(([, val]) => val !== 0 || Object.keys(shopProfits).length <= 1)
     .sort(([, a], [, b]) => (b as number) - (a as number));
@@ -193,11 +196,26 @@ function ChartTooltip({
           <div className="space-y-1.5 rounded-2xl bg-slate-100/70 p-2 dark:bg-white/5">
             <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">店铺利润</div>
             {shopEntries.map(([shop, amount]) => (
-              <div key={shop} className="flex items-center justify-between gap-4 text-xs font-normal">
-                <span className="max-w-[130px] truncate text-slate-700 dark:text-slate-300 font-normal">{shop}</span>
-                <span className={cn("font-normal tabular-nums", (amount as number) < 0 ? "text-rose-500" : "text-emerald-600 dark:text-emerald-400")}>
-                  {money(amount as number)}
-                </span>
+              <div key={shop} className="rounded-xl bg-white/60 px-2 py-1.5 dark:bg-slate-950/30">
+                <div className="flex items-center justify-between gap-4 text-xs font-normal">
+                  <span className="max-w-[130px] truncate text-slate-700 dark:text-slate-300 font-normal">{shop}</span>
+                  <span className={cn("font-normal tabular-nums", (amount as number) < 0 ? "text-rose-500" : "text-emerald-600 dark:text-emerald-400")}>
+                    {money(amount as number)}
+                  </span>
+                </div>
+                <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] text-slate-500 dark:text-slate-400">
+                  {["美团", "京东", "淘宝", "线下交易"].map((platform) => {
+                    const platformAmount = shopPlatformProfits[shop]?.[platform] || 0;
+                    return (
+                      <span key={platform} className="flex items-center justify-between gap-1">
+                        <span>{platform}</span>
+                        <span className={cn("tabular-nums", platformAmount < 0 ? "text-rose-500" : "text-slate-600 dark:text-slate-300")}>
+                          {money(platformAmount)}
+                        </span>
+                      </span>
+                    );
+                  })}
+                </div>
               </div>
             ))}
           </div>
@@ -437,6 +455,7 @@ export function DataOverview({
 
   return (
     <div className="space-y-5 sm:space-y-8">
+      <OverviewAiPanel />
       <section className="overflow-hidden rounded-[28px] border border-black/8 bg-white/75 p-4 shadow-xs backdrop-blur-sm dark:border-white/10 dark:bg-white/4 sm:p-5 space-y-4">
         <div className="flex items-center justify-between gap-3 border-b border-black/6 pb-3.5 dark:border-white/8">
           <div className="min-w-0 flex-1">

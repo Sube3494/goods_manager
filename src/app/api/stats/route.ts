@@ -809,6 +809,7 @@ export async function GET(request: NextRequest) {
       pureProfit: 0,
       platformPureProfit: {} as Record<string, number>,
       shopPureProfit: {} as Record<string, number>,
+      shopPlatformPureProfit: {} as Record<string, Record<string, number>>,
       platformOrderCount: {} as Record<string, number>,
     });
 
@@ -865,6 +866,9 @@ export async function GET(request: NextRequest) {
       const addShopPureProfit = (target: ReturnType<typeof createTrendBucket> | undefined, amount: number) => {
         if (!target || amount === 0) return;
         target.shopPureProfit[matchedShopName] = FinanceMath.add(target.shopPureProfit[matchedShopName] || 0, amount);
+        const shopPlatformProfit = target.shopPlatformPureProfit[matchedShopName] || {};
+        shopPlatformProfit[platform] = FinanceMath.add(shopPlatformProfit[platform] || 0, amount);
+        target.shopPlatformPureProfit[matchedShopName] = shopPlatformProfit;
       };
 
       if (point) {
@@ -1076,6 +1080,7 @@ export async function GET(request: NextRequest) {
           pureProfit: point?.pureProfit || 0,
           platformPureProfit: point?.platformPureProfit || {},
           shopPureProfit: point?.shopPureProfit || {},
+          shopPlatformPureProfit: point?.shopPlatformPureProfit || {},
           platformOrderCount: point?.platformOrderCount || {},
           netProfit: profit,
         };

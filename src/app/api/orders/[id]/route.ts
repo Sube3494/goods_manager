@@ -265,6 +265,15 @@ export async function PATCH(
                     ...mainSystemSelfDelivery,
                     triggered: Boolean(body.isMainSystemSelfDelivery),
                   },
+                  ...(Boolean(body.isMainSystemSelfDelivery)
+                    ? {
+                        autoOutbound: {
+                          status: "skipped",
+                          error: "brush-order-no-auto-outbound",
+                          resolvedAt: new Date().toISOString(),
+                        },
+                      }
+                    : {}),
                 }
               : {}),
             ...(hasAmountEdit
