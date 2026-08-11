@@ -691,7 +691,8 @@ export async function GET(request: NextRequest) {
         const unitCost = snapshot
           ? Number(snapshot.averageUnitCost || 0)
           : (Number(item.shopProduct?.costPrice) || 0);
-        if (unitCost <= 0) {
+        const hasCostSnapshot = item.costSnapshot !== null && item.costSnapshot !== undefined;
+        if (!hasCostSnapshot && unitCost <= 0) {
           missingCostItemCount += 1;
         }
         return snapshot
