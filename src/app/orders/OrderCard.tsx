@@ -168,6 +168,14 @@ export function getDeliveryFee(delivery: unknown) {
 }
 
 export function summarizeOrders(orders: AutoPickOrder[]) {
+  const normalizeProfitPlatform = (value?: string | null) => {
+    const raw = String(value || "").trim();
+    const lower = raw.toLowerCase();
+    if (raw.includes("美团") || lower.includes("meituan") || lower === "shangou") return "美团";
+    if (raw.includes("京东") || lower.includes("jd") || lower === "daojia") return "京东";
+    if (raw.includes("淘宝") || raw.includes("天猫") || lower === "taobao" || lower === "ebai") return "淘宝";
+    return "线下交易";
+  };
   return orders.reduce((acc, order) => {
     if (!isCancelledStatus(order.status) && !isDeletedStatus(order.status)) {
       const expectedIncome = Math.max(0, getExpectedIncome(order.expectedIncome, order.actualPaid, order.platformCommission));
@@ -205,6 +213,7 @@ export function summarizeOrders(orders: AutoPickOrder[]) {
           deliveryFee: 0,
           productCost: 0,
           platformCommission: 0,
+          platformProfit: {},
         };
       }
       acc.shopProfit[shopKey].amount += orderPureProfit;
@@ -212,6 +221,8 @@ export function summarizeOrders(orders: AutoPickOrder[]) {
       acc.shopProfit[shopKey].deliveryFee += deliveryFee;
       acc.shopProfit[shopKey].productCost += Math.max(0, Number(order.productCost || 0));
       acc.shopProfit[shopKey].platformCommission += Math.max(0, Number(order.platformCommission || 0));
+      const profitPlatform = normalizeProfitPlatform(order.platform);
+      acc.shopProfit[shopKey].platformProfit[profitPlatform] = (acc.shopProfit[shopKey].platformProfit[profitPlatform] || 0) + orderPureProfit;
 
       if (deliveryFee > 0) {
         acc.platformDelivery[platform] = (acc.platformDelivery[platform] || 0) + deliveryFee;
@@ -242,7 +253,7 @@ export function summarizeOrders(orders: AutoPickOrder[]) {
     platformDelivery: {} as Record<string, number>,
     pureProfit: 0,
     platformProfit: {} as Record<string, { amount: number; count: number }>,
-    shopProfit: {} as Record<string, { id: string | null; name: string; amount: number; count: number; deliveryFee: number; productCost: number; platformCommission: number }>,
+     shopProfit: {} as Record<string, { id: string | null; name: string; amount: number; count: number; deliveryFee: number; productCost: number; platformCommission: number; platformProfit: Record<string, number> }>,
   });
 }
 
