@@ -1,6 +1,6 @@
 "use client";
 
-import { Menu, X, LogIn, LogOut } from "lucide-react";
+import { Menu, X, LogIn, LogOut, Bot } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useUser } from "@/hooks/useUser";
 import Link from "next/link";
@@ -11,9 +11,10 @@ interface MobileHeaderProps {
   onToggleSidebar: () => void;
   isOpen: boolean;
   showMenu?: boolean;
+  showAi?: boolean;
 }
 
-export function MobileHeader({ onToggleSidebar, isOpen, showMenu = true }: MobileHeaderProps) {
+export function MobileHeader({ onToggleSidebar, isOpen, showMenu = true, showAi = false }: MobileHeaderProps) {
   const { user, isLoading } = useUser();
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
 
@@ -50,6 +51,7 @@ export function MobileHeader({ onToggleSidebar, isOpen, showMenu = true }: Mobil
                 <LogOut size={16} />
             </button>
         )}
+        {showAi && <button onClick={() => window.dispatchEvent(new Event("overview-ai-open"))} className="flex h-9 w-9 items-center justify-center rounded-full border border-border bg-white text-sky-600 shadow-sm transition hover:scale-105 dark:border-white/10 dark:bg-white/5" title="经营数据 AI 助手" aria-label="打开经营数据 AI 助手"><Bot size={19} /></button>}
         <ThemeToggle />
       </div>
       <ConfirmModal

@@ -122,9 +122,10 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
             {!isFullScreenPage && (
               <MobileHeader 
                 isOpen={isSidebarOpen} 
-                onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} 
-                showMenu={showSidebar}
-              />
+                 onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} 
+                 showMenu={showSidebar}
+                 showAi={pathname === "/"}
+               />
             )}
             {!isFullScreenPage && (
                 <header className="hidden lg:flex h-14 px-6 items-center justify-end gap-3">

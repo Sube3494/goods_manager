@@ -82,11 +82,19 @@ export async function PUT(request: Request) {
   if (!apiKey) return NextResponse.json({ error: "请先配置 DeepSeek API Key" }, { status: 400 });
   if (!question) return NextResponse.json({ error: "请输入问题" }, { status: 400 });
 
-  const [orders, promotions, shops, products] = await Promise.all([
+  const [orders, promotions, shops, products, purchases, outbounds, brushOrders, brushPlans, settlements, operatingProfiles, operatingBills, batches] = await Promise.all([
     prisma.autoPickOrder.findMany({ where: { userId: user.id }, select: { platform: true, orderNo: true, orderTime: true, actualPaid: true, expectedIncome: true, platformCommission: true, status: true, shopId: true, shopAddress: true, rawPayload: true } }),
     prisma.dailyPromotionExpense.findMany({ where: { userId: user.id }, select: { date: true, amount: true, amountMeituan: true, amountJingdong: true, amountTaobao: true } }),
     prisma.shop.findMany({ where: { userId: user.id }, select: { name: true, address: true } }),
     prisma.shopProduct.findMany({ where: { shop: { userId: user.id } }, select: { productName: true, sku: true, stock: true, costPrice: true, shop: { select: { name: true } } } }),
+    prisma.purchaseOrder.findMany({ where: { userId: user.id }, select: { type: true, status: true, totalAmount: true, date: true, shippingFees: true, extraFees: true, discountAmount: true, shopName: true, items: { select: { quantity: true, remainingQuantity: true, costPrice: true, productId: true, shopProductId: true, supplierId: true } } } }),
+    prisma.outboundOrder.findMany({ where: { userId: user.id }, select: { type: true, status: true, date: true, items: { select: { productId: true, shopProductId: true, quantity: true, price: true, costSnapshot: true } } } }),
+    prisma.brushOrder.findMany({ where: { userId: user.id }, select: { date: true, type: true, status: true, paymentAmount: true, receivedAmount: true, commission: true, shopName: true, platformOrderId: true, items: { select: { productId: true, quantity: true } } } }),
+    prisma.brushOrderPlan.findMany({ where: { userId: user.id }, select: { date: true, title: true, shopName: true, status: true, items: { select: { productName: true, quantity: true, platform: true, principal: true, done: true } } } }),
+    prisma.settlement.findMany({ where: { userId: user.id }, select: { date: true, totalNet: true, serviceFeeRate: true, serviceFee: true, totalAlreadyReceived: true, finalBalance: true, shopName: true, items: { select: { platformName: true, received: true, brushing: true, receivedToCard: true, net: true, shopName: true } } } }),
+    prisma.operatingCostProfile.findMany({ where: { userId: user.id }, select: { shopName: true, monthlyRent: true, monthlyLabor: true, allocationBaseDays: true } }),
+    prisma.operatingCostMonthlyBill.findMany({ where: { userId: user.id }, select: { shopName: true, monthKey: true, waterAmount: true, electricAmount: true, sharedElectricAmount: true, propertyFeeAmount: true } }),
+    prisma.productBatch.findMany({ where: { userId: user.id }, select: { productId: true, shopProductId: true, batchNo: true, expirationDate: true, quantity: true, remainingStock: true, purchaseOrderItemId: true, remark: true } }),
   ]);
   const context = {
     orders: orders.map((order) => ({
@@ -97,6 +105,14 @@ export async function PUT(request: Request) {
     promotions,
     shops,
     products,
+    purchases,
+    outbounds,
+    brushOrders,
+    brushPlans,
+    settlements,
+    operatingProfiles,
+    operatingBills,
+    batches,
     note: "订单为账号下全量数据；isBrushOrder=true 表示刷单/手动标记刷单。订单时间按 orderTime 归属；金额字段按系统原始单位提供，请结合字段名理解。",
   };
   const permissions = user.permissions && typeof user.permissions === "object" && !Array.isArray(user.permissions) ? user.permissions as Record<string, unknown> : {};
