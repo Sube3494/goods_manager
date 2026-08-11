@@ -30,6 +30,23 @@ function formatDateLabel(date: Date | string) {
   return key.slice(5);
 }
 
+function resolveAutoPickOrderDateKey(order: {
+  orderTime: Date;
+  rawPayload?: unknown;
+}) {
+  const payload = order.rawPayload && typeof order.rawPayload === "object" && !Array.isArray(order.rawPayload)
+    ? order.rawPayload as Record<string, unknown>
+    : null;
+  const rawOrderTime = payload?.order_time ?? payload?.orderTime;
+  if (rawOrderTime !== undefined && rawOrderTime !== null && String(rawOrderTime).trim()) {
+    const parsed = parseAsShanghaiTime(String(rawOrderTime));
+    if (!Number.isNaN(parsed.getTime())) {
+      return formatDateKey(parsed);
+    }
+  }
+  return formatDateKey(order.orderTime);
+}
+
 function buildDateSeries(start: Date, end: Date) {
   const list: Array<{ date: string; label: string }> = [];
   let cursorMs = parseAsShanghaiTime(formatDateKey(start)).getTime();
@@ -814,7 +831,7 @@ export async function GET(request: NextRequest) {
     });
 
     filteredAutoPickOrdersInRange.forEach((order) => {
-      const key = formatDateKey(new Date(order.orderTime));
+      const key = resolveAutoPickOrderDateKey(order);
       const point = businessTrendMap.get(key);
       const platform = normalizePlatform(order.platform);
       const platformPoint = platformTrendMaps.get(platform)?.get(key);
