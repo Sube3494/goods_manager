@@ -33,18 +33,7 @@ function formatDateLabel(date: Date | string) {
 
 function resolveAutoPickOrderDateKey(order: {
   orderTime: Date;
-  rawPayload?: unknown;
 }) {
-  const payload = order.rawPayload && typeof order.rawPayload === "object" && !Array.isArray(order.rawPayload)
-    ? order.rawPayload as Record<string, unknown>
-    : null;
-  const rawOrderTime = payload?.order_time ?? payload?.orderTime;
-  if (rawOrderTime !== undefined && rawOrderTime !== null && String(rawOrderTime).trim()) {
-    const parsed = parseAsShanghaiTime(String(rawOrderTime));
-    if (!Number.isNaN(parsed.getTime())) {
-      return formatDateKey(parsed);
-    }
-  }
   return formatDateKey(order.orderTime);
 }
 
