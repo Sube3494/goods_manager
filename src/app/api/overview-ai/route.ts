@@ -16,6 +16,20 @@ function isBrushOrder(rawPayload: unknown) {
   return Boolean(marker && typeof marker === "object" && !Array.isArray(marker) && (marker as Record<string, unknown>).triggered);
 }
 
+function readMatchedProduct(rawPayload: unknown) {
+  if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) return null;
+  const matched = (rawPayload as Record<string, unknown>).matchedProduct;
+  if (!matched || typeof matched !== "object" || Array.isArray(matched)) return null;
+  const record = matched as Record<string, unknown>;
+  const id = typeof record.id === "string" ? record.id : "";
+  const productId = typeof record.productId === "string" ? record.productId : "";
+  const shopProductId = typeof record.shopProductId === "string" ? record.shopProductId : "";
+  const sourceProductId = typeof record.sourceProductId === "string" ? record.sourceProductId : "";
+  const name = typeof record.name === "string" ? record.name : typeof record.productName === "string" ? record.productName : "";
+  const sku = typeof record.sku === "string" ? record.sku : "";
+  return { id, productId, shopProductId, sourceProductId, name, sku };
+}
+
 function cipherKey() {
   return crypto.createHash("sha256").update(process.env.AI_KEY_ENCRYPTION_SECRET || process.env.AUTH_SECRET || "change-this-secret").digest();
 }
@@ -82,38 +96,140 @@ export async function PUT(request: Request) {
   if (!apiKey) return NextResponse.json({ error: "请先配置 DeepSeek API Key" }, { status: 400 });
   if (!question) return NextResponse.json({ error: "请输入问题" }, { status: 400 });
 
-  const [orders, promotions, shops, products, purchases, outbounds, brushOrders, brushPlans, settlements, operatingProfiles, operatingBills, batches] = await Promise.all([
-    prisma.autoPickOrder.findMany({ where: { userId: user.id }, select: { platform: true, orderNo: true, orderTime: true, actualPaid: true, expectedIncome: true, platformCommission: true, status: true, shopId: true, shopAddress: true, rawPayload: true } }),
-    prisma.dailyPromotionExpense.findMany({ where: { userId: user.id }, select: { date: true, amount: true, amountMeituan: true, amountJingdong: true, amountTaobao: true } }),
-    prisma.shop.findMany({ where: { userId: user.id }, select: { name: true, address: true } }),
-    prisma.shopProduct.findMany({ where: { shop: { userId: user.id } }, select: { productName: true, sku: true, stock: true, costPrice: true, shop: { select: { name: true } } } }),
-    prisma.purchaseOrder.findMany({ where: { userId: user.id }, select: { type: true, status: true, totalAmount: true, date: true, shippingFees: true, extraFees: true, discountAmount: true, shopName: true, items: { select: { quantity: true, remainingQuantity: true, costPrice: true, productId: true, shopProductId: true, supplierId: true } } } }),
-    prisma.outboundOrder.findMany({ where: { userId: user.id }, select: { type: true, status: true, date: true, items: { select: { productId: true, shopProductId: true, quantity: true, price: true, costSnapshot: true } } } }),
-    prisma.brushOrder.findMany({ where: { userId: user.id }, select: { date: true, type: true, status: true, paymentAmount: true, receivedAmount: true, commission: true, shopName: true, platformOrderId: true, items: { select: { productId: true, quantity: true } } } }),
-    prisma.brushOrderPlan.findMany({ where: { userId: user.id }, select: { date: true, title: true, shopName: true, status: true, items: { select: { productName: true, quantity: true, platform: true, principal: true, done: true } } } }),
-    prisma.settlement.findMany({ where: { userId: user.id }, select: { date: true, totalNet: true, serviceFeeRate: true, serviceFee: true, totalAlreadyReceived: true, finalBalance: true, shopName: true, items: { select: { platformName: true, received: true, brushing: true, receivedToCard: true, net: true, shopName: true } } } }),
-    prisma.operatingCostProfile.findMany({ where: { userId: user.id }, select: { shopName: true, monthlyRent: true, monthlyLabor: true, allocationBaseDays: true } }),
-    prisma.operatingCostMonthlyBill.findMany({ where: { userId: user.id }, select: { shopName: true, monthKey: true, waterAmount: true, electricAmount: true, sharedElectricAmount: true, propertyFeeAmount: true } }),
-    prisma.productBatch.findMany({ where: { userId: user.id }, select: { productId: true, shopProductId: true, batchNo: true, expirationDate: true, quantity: true, remainingStock: true, purchaseOrderItemId: true, remark: true } }),
-  ]);
-  const context = {
-    orders: orders.map((order) => ({
-      ...order,
-      isBrushOrder: isBrushOrder(order.rawPayload),
-      rawPayload: undefined,
-    })),
+  const [
+    orders,
     promotions,
     shops,
-    products,
+    shopProducts,
+    catalogProducts,
+    categories,
+    suppliers,
+    productJdSkus,
     purchases,
     outbounds,
     brushOrders,
     brushPlans,
+    brushProducts,
     settlements,
     operatingProfiles,
     operatingBills,
     batches,
-    note: "订单为账号下全量数据；isBrushOrder=true 表示刷单/手动标记刷单。订单时间按 orderTime 归属；金额字段按系统原始单位提供，请结合字段名理解。",
+    galleryItems,
+    galleryFaqs,
+    storeOpeningBatches,
+    systemSettings,
+    autoCompleteJobs,
+  ] = await Promise.all([
+    prisma.autoPickOrder.findMany({ where: { userId: user.id }, include: { items: { orderBy: { createdAt: "asc" } }, autoCompleteJob: true }, orderBy: { orderTime: "desc" } }),
+    prisma.dailyPromotionExpense.findMany({ where: { userId: user.id }, orderBy: { date: "desc" } }),
+    prisma.shop.findMany({ where: { userId: user.id }, orderBy: { createdAt: "desc" } }),
+    prisma.shopProduct.findMany({ where: { shop: { userId: user.id } }, include: { shop: true, product: true }, orderBy: { createdAt: "desc" } }),
+    prisma.product.findMany({ where: { userId: user.id }, include: { category: true, supplier: true, jdSkuMappings: true }, orderBy: { createdAt: "desc" } }),
+    prisma.category.findMany({ where: { userId: user.id }, orderBy: { name: "asc" } }),
+    prisma.supplier.findMany({ where: { userId: user.id }, orderBy: { name: "asc" } }),
+    prisma.productJdSku.findMany({ where: { userId: user.id }, include: { product: true }, orderBy: { createdAt: "desc" } }),
+    prisma.purchaseOrder.findMany({ where: { userId: user.id }, include: { items: { include: { product: true, shopProduct: true, supplier: true } } }, orderBy: { date: "desc" } }),
+    prisma.outboundOrder.findMany({ where: { userId: user.id }, include: { items: { include: { product: true, shopProduct: true } } }, orderBy: { date: "desc" } }),
+    prisma.brushOrder.findMany({ where: { userId: user.id }, include: { items: { include: { product: true } } }, orderBy: { date: "desc" } }),
+    prisma.brushOrderPlan.findMany({ where: { userId: user.id }, include: { items: { include: { product: true } } }, orderBy: { date: "desc" } }),
+    prisma.brushProduct.findMany({ where: { userId: user.id }, include: { product: true, shop: true, shopProduct: true }, orderBy: { createdAt: "desc" } }),
+    prisma.settlement.findMany({ where: { userId: user.id }, include: { items: true }, orderBy: { date: "desc" } }),
+    prisma.operatingCostProfile.findMany({ where: { userId: user.id }, orderBy: { shopName: "asc" } }),
+    prisma.operatingCostMonthlyBill.findMany({ where: { userId: user.id }, orderBy: { monthKey: "desc" } }),
+    prisma.productBatch.findMany({ where: { userId: user.id }, include: { product: true, shopProduct: true, purchaseOrderItem: true }, orderBy: { createdAt: "desc" } }),
+    prisma.galleryItem.findMany({ where: { userId: user.id }, orderBy: { createdAt: "desc" } }),
+    prisma.galleryFaq.findMany({ where: { userId: user.id }, orderBy: { updatedAt: "desc" } }),
+    prisma.storeOpeningBatch.findMany({ where: { userId: user.id }, include: { items: { include: { product: true } } }, orderBy: { createdAt: "desc" } }),
+    prisma.systemSetting.findMany({ where: { userId: user.id }, select: { lowStockThreshold: true, allowDataImport: true, allowGalleryUpload: true, requireLoginForLightbox: true, gallerySortDesc: true, uploadConflictStrategy: true, shareExpireDuration: true, shareExpireUnit: true, backupEnabled: true, backupIntervalUnit: true, backupIntervalValue: true, backupRetention: true, lastBackup: true, updatedAt: true } }),
+    prisma.autoPickAutoCompleteJob.findMany({ where: { userId: user.id }, orderBy: { dueAt: "desc" } }),
+  ]);
+  type ShopProductContext = (typeof shopProducts)[number];
+  type SalesProductSummary = {
+    productKey: string;
+    productName: string;
+    sku: string | null;
+    platformCounts: Record<string, number>;
+    totalQuantity: number;
+    orderCount: number;
+    brushQuantity: number;
+  };
+  const shopProductMap = new Map<string, ShopProductContext>(shopProducts.map((item) => [item.id, item]));
+  const productIdEntries: Array<[string, ShopProductContext]> = [];
+  for (const item of shopProducts) {
+    const productId = item.productId || item.sourceProductId || "";
+    if (productId) productIdEntries.push([productId, item]);
+  }
+  const productIdToShopProduct = new Map<string, ShopProductContext>(productIdEntries);
+  const salesMap = new Map<string, SalesProductSummary>();
+  for (const order of orders) {
+    const brush = isBrushOrder(order.rawPayload);
+    const valid = !brush && !["cancel", "cancelled", "canceled", "deleted"].includes(String(order.status || "").toLowerCase());
+    for (const item of order.items) {
+      const matched = readMatchedProduct(item.rawPayload);
+      const matchedShopProduct = matched?.shopProductId
+        ? shopProductMap.get(matched.shopProductId)
+        : matched?.id
+          ? shopProductMap.get(matched.id)
+          : matched?.productId || matched?.sourceProductId
+            ? productIdToShopProduct.get(matched.productId || matched.sourceProductId)
+            : null;
+      const productKey = matchedShopProduct?.id || matched?.shopProductId || matched?.productId || matched?.id || item.productNo || item.productName;
+      const current: SalesProductSummary = salesMap.get(productKey) || {
+        productKey,
+        productName: matchedShopProduct?.productName || matchedShopProduct?.product?.name || matched?.name || item.productName,
+        sku: matchedShopProduct?.sku || matched?.sku || item.productNo || null,
+        platformCounts: {},
+        totalQuantity: 0,
+        orderCount: 0,
+        brushQuantity: 0,
+      };
+      const quantity = Math.max(1, Number(item.quantity || 1) || 1);
+      if (valid) {
+        current.totalQuantity += quantity;
+        current.orderCount += 1;
+        const platform = order.platform || "未知平台";
+        current.platformCounts[platform] = (current.platformCounts[platform] || 0) + quantity;
+      } else if (brush) {
+        current.brushQuantity += quantity;
+      }
+      salesMap.set(productKey, current);
+    }
+  }
+  const context = {
+    orders: orders.map((order) => ({
+      ...order,
+      isBrushOrder: isBrushOrder(order.rawPayload),
+      items: order.items.map((item) => ({
+        productName: item.productName,
+        productNo: item.productNo,
+        quantity: item.quantity,
+        matchedProduct: readMatchedProduct(item.rawPayload),
+      })),
+      rawPayload: undefined,
+    })),
+    promotions,
+    shops,
+    products: catalogProducts,
+    shopProducts,
+    categories,
+    suppliers,
+    productJdSkus,
+    purchases,
+    outbounds,
+    brushOrders,
+    brushPlans,
+    brushProducts,
+    settlements,
+    operatingProfiles,
+    operatingBills,
+    batches,
+    galleryItems,
+    galleryFaqs,
+    storeOpeningBatches,
+    systemSettings,
+    autoCompleteJobs,
+    salesByProduct: Array.from(salesMap.values()).sort((a, b) => b.totalQuantity - a.totalQuantity),
+    note: "这里尽量提供账号下可用于经营分析的全部业务数据：订单、订单商品明细、商品主库、店铺商品、分类、供应商、采购、出库、刷单、结算、推广、经营成本、库存批次、图库、开店进货、系统设置、自动补全任务等。未提供登录会话、API Key、用户权限等账号安全数据。orders.items 是订单商品明细；orders.items.matchedProduct 来自人工/自动匹配的商品关系。salesByProduct 已按非刷单、非取消订单汇总商品销量；totalQuantity 越大表示真实销量越高，brushQuantity 表示刷单数量不计入真实销量。isBrushOrder=true 表示刷单/手动标记刷单。订单时间按 orderTime 归属；金额字段按系统原始单位提供，请结合字段名理解。",
   };
   const permissions = user.permissions && typeof user.permissions === "object" && !Array.isArray(user.permissions) ? user.permissions as Record<string, unknown> : {};
   const model = permissions[MODEL_NAME] === "deepseek-v4-pro" ? "deepseek-v4-pro" : "deepseek-v4-flash";
@@ -122,7 +238,7 @@ export async function PUT(request: Request) {
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
     signal: AbortSignal.timeout(90_000),
     body: JSON.stringify({ model, stream: true, temperature: 0.2, thinking: { type: "enabled" }, messages: [
-      { role: "system", content: "你是经营数据分析助手。只能根据提供的用户经营数据回答；数字不确定时明确说明，不要编造。使用简洁中文，给出结论和关键依据。" },
+      { role: "system", content: "你是经营数据分析助手。只能根据提供的用户经营数据回答；数字不确定时明确说明，不要编造。你拿到的是账号下尽量完整的业务数据，不要轻易说缺少数据；先检查对应数据表和汇总字段。回答销量、商品排行时优先使用 salesByProduct，再核对 orders.items、shopProducts、products；回答利润时优先使用订单利润/结算/出库成本/推广/经营成本等字段。使用简洁中文，给出结论和关键依据。" },
       { role: "user", content: `用户问题：${question}\n\n全量经营数据：${JSON.stringify(context)}` },
     ] }),
   });
