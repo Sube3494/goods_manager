@@ -8,6 +8,14 @@ const KEY_NAME = "deepseekApiKey";
 const MODEL_NAME = "deepseekModel";
 const CIPHER_PREFIX = "enc:v1:";
 
+function isBrushOrder(rawPayload: unknown) {
+  if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) return false;
+  const systemMeta = (rawPayload as Record<string, unknown>).systemMeta;
+  if (!systemMeta || typeof systemMeta !== "object" || Array.isArray(systemMeta)) return false;
+  const marker = (systemMeta as Record<string, unknown>).mainSystemSelfDelivery;
+  return Boolean(marker && typeof marker === "object" && !Array.isArray(marker) && (marker as Record<string, unknown>).triggered);
+}
+
 function cipherKey() {
   return crypto.createHash("sha256").update(process.env.AI_KEY_ENCRYPTION_SECRET || process.env.AUTH_SECRET || "change-this-secret").digest();
 }
@@ -75,12 +83,22 @@ export async function PUT(request: Request) {
   if (!question) return NextResponse.json({ error: "请输入问题" }, { status: 400 });
 
   const [orders, promotions, shops, products] = await Promise.all([
-    prisma.autoPickOrder.findMany({ where: { userId: user.id }, select: { platform: true, orderTime: true, actualPaid: true, expectedIncome: true, platformCommission: true, status: true, shopId: true } }),
+    prisma.autoPickOrder.findMany({ where: { userId: user.id }, select: { platform: true, orderNo: true, orderTime: true, actualPaid: true, expectedIncome: true, platformCommission: true, status: true, shopId: true, shopAddress: true, rawPayload: true } }),
     prisma.dailyPromotionExpense.findMany({ where: { userId: user.id }, select: { date: true, amount: true, amountMeituan: true, amountJingdong: true, amountTaobao: true } }),
     prisma.shop.findMany({ where: { userId: user.id }, select: { name: true, address: true } }),
     prisma.shopProduct.findMany({ where: { shop: { userId: user.id } }, select: { productName: true, sku: true, stock: true, costPrice: true, shop: { select: { name: true } } } }),
   ]);
-  const context = { orders, promotions, shops, products, note: "订单时间按 orderTime 归属；金额字段按系统原始单位提供，请结合字段名理解。" };
+  const context = {
+    orders: orders.map((order) => ({
+      ...order,
+      isBrushOrder: isBrushOrder(order.rawPayload),
+      rawPayload: undefined,
+    })),
+    promotions,
+    shops,
+    products,
+    note: "订单为账号下全量数据；isBrushOrder=true 表示刷单/手动标记刷单。订单时间按 orderTime 归属；金额字段按系统原始单位提供，请结合字段名理解。",
+  };
   const permissions = user.permissions && typeof user.permissions === "object" && !Array.isArray(user.permissions) ? user.permissions as Record<string, unknown> : {};
   const model = permissions[MODEL_NAME] === "deepseek-v4-pro" ? "deepseek-v4-pro" : "deepseek-v4-flash";
   const response = await fetch("https://api.deepseek.com/chat/completions", {
