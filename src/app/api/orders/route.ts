@@ -1483,6 +1483,7 @@ export async function GET(request: NextRequest) {
                 deliveryFee: 0,
                 productCost: 0,
                 platformCommission: 0,
+                platformProfit: {} as Record<string, number>,
               };
             }
             return acc.shopProfit[shopProfitKey];
@@ -1503,6 +1504,7 @@ export async function GET(request: NextRequest) {
             const shopProfit = ensureShopProfit();
             shopProfit.amount -= deliveryFee;
             shopProfit.deliveryFee += deliveryFee;
+            shopProfit.platformProfit[platform] = (shopProfit.platformProfit[platform] || 0) - deliveryFee;
           }
           if (!cancelled && !deleted) {
             const isBrush = readMainSystemSelfDeliveryFlag(order.rawPayload);
@@ -1590,6 +1592,7 @@ export async function GET(request: NextRequest) {
             shopProfit.deliveryFee += deliveryFee;
             shopProfit.productCost += productCost;
             shopProfit.platformCommission += adjustedMetrics.platformCommission;
+            shopProfit.platformProfit[platform] = (shopProfit.platformProfit[platform] || 0) + profitValue;
           }
           acc.itemCount += order.items.reduce((sum: number, item) => sum + item.quantity, 0);
           return acc;
@@ -1605,7 +1608,7 @@ export async function GET(request: NextRequest) {
           platformDelivery: {} as Record<string, number>,
           pureProfit: 0,
           platformProfit: {} as Record<string, { amount: number; count: number }>,
-          shopProfit: {} as Record<string, { id: string | null; name: string; amount: number; count: number; deliveryFee: number; productCost: number; platformCommission: number }>,
+          shopProfit: {} as Record<string, { id: string | null; name: string; amount: number; count: number; deliveryFee: number; productCost: number; platformCommission: number; platformProfit: Record<string, number> }>,
         });
 
     const truePlatformCounts: Record<string, number> = {};

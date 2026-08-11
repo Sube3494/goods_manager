@@ -69,6 +69,7 @@ type ShopProfitInfo = {
   deliveryFee: number;
   productCost: number;
   platformCommission: number;
+  platformProfit?: Record<string, number>;
 };
 
 function normalizeDisplayPlatform(platform?: string | null) {
@@ -2438,7 +2439,8 @@ export default function OrdersPage() {
                       </div>
                       <div className="divide-y divide-black/6 dark:divide-white/8">
                         {shopProfitEntries.map((shop) => (
-                          <div key={shop.key} className="grid grid-cols-[minmax(0,1.5fr)_0.8fr_0.8fr_0.8fr_0.8fr_0.8fr] items-center gap-3 px-4 py-3 text-sm">
+                          <div key={shop.key} className="px-4 py-3 text-sm">
+                            <div className="grid grid-cols-[minmax(0,1.5fr)_0.8fr_0.8fr_0.8fr_0.8fr_0.8fr] items-center gap-3">
                             <div className="min-w-0">
                               <div className="truncate font-semibold">{shop.name}</div>
                               {shop.id ? <div className="mt-0.5 truncate text-xs text-muted-foreground">{shop.id}</div> : null}
@@ -2448,6 +2450,18 @@ export default function OrdersPage() {
                             <div className="text-right tabular-nums">{toCurrency(shop.deliveryFee)}</div>
                             <div className="text-right tabular-nums">{toCurrency(shop.productCost)}</div>
                             <div className="text-right tabular-nums">{toCurrency(shop.platformCommission)}</div>
+                            </div>
+                            <div className="mt-3 grid grid-cols-2 gap-2 rounded-xl bg-slate-100/70 p-2.5 text-xs dark:bg-white/5 sm:grid-cols-4">
+                              {["美团", "京东", "淘宝", "线下交易"].map((platform) => {
+                                const amount = shop.platformProfit?.[platform] || 0;
+                                return (
+                                  <div key={platform} className="flex items-center justify-between gap-2 rounded-lg bg-white/60 px-2 py-1.5 dark:bg-white/5">
+                                    <span className="text-muted-foreground">{platform}</span>
+                                    <span className={cn("font-semibold tabular-nums", amount < 0 ? "text-rose-500" : "text-emerald-500")}>{toCurrency(amount)}</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
                           </div>
                         ))}
                       </div>
