@@ -18,6 +18,7 @@ import { getStorageStrategy } from "@/lib/storage";
 import { formatLocalDate, parseAsShanghaiTime } from "@/lib/dateUtils";
 import { isPrismaMissingColumnError } from "@/lib/prismaSchemaCompat";
 import { getOutboundReturnTotals, parseOutboundReturnMeta } from "@/lib/outboundReturnMeta";
+import { getDailyFixedOperatingCost, getDailyUtilityCost, normalizeMonthKey } from "@/lib/operatingCosts";
 
 const SHANGHAI_DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -501,6 +502,12 @@ export async function GET(request: NextRequest) {
         },
       }),
     ]);
+    const operatingCostProfiles = await prisma.operatingCostProfile.findMany({
+      where: { userId: user.id, ...(shopName ? { shopName } : {}) },
+    });
+    const operatingCostBills = await prisma.operatingCostMonthlyBill.findMany({
+      where: { userId: user.id, ...(shopName ? { shopName } : {}) },
+    });
     perf.lap("secondary-queries");
 
     const customBrushCommissionMap = new Map<string, number>(
@@ -798,6 +805,7 @@ export async function GET(request: NextRequest) {
       productCost: 0,
       brushExpense: 0,
       promotionExpense: 0,
+      operatingExpense: 0,
       pureProfit: 0,
       platformPureProfit: {} as Record<string, number>,
       shopPureProfit: {} as Record<string, number>,
@@ -807,6 +815,18 @@ export async function GET(request: NextRequest) {
     const businessTrendMap = new Map<string, ReturnType<typeof createTrendBucket>>();
     dateSeries.forEach((item) => {
       businessTrendMap.set(item.date, createTrendBucket());
+    });
+
+    dateSeries.forEach((item) => {
+      const point = businessTrendMap.get(item.date);
+      if (!point) return;
+      const monthKey = normalizeMonthKey(item.date);
+      const operatingExpense = operatingCostProfiles.reduce((sum, profile) =>
+        FinanceMath.add(sum, getDailyFixedOperatingCost(profile)), 0
+      ) + operatingCostBills
+        .filter((bill) => normalizeMonthKey(bill.monthKey) === monthKey)
+        .reduce((sum, bill) => FinanceMath.add(sum, getDailyUtilityCost(bill)), 0);
+      point.operatingExpense = operatingExpense;
     });
 
     const normalizePlatform = (value: string | null | undefined) => {
@@ -1039,6 +1059,7 @@ export async function GET(request: NextRequest) {
         const profit = FinanceMath.add(
           point?.pureProfit || 0,
           -(point?.promotionExpense || 0) - (point?.brushExpense || 0)
+          - (point?.operatingExpense || 0)
         );
 
         return {
@@ -1051,6 +1072,7 @@ export async function GET(request: NextRequest) {
           productCost: point?.productCost || 0,
           brushExpense: point?.brushExpense || 0,
           promotionExpense: point?.promotionExpense || 0,
+          operatingExpense: point?.operatingExpense || 0,
           pureProfit: point?.pureProfit || 0,
           platformPureProfit: point?.platformPureProfit || {},
           shopPureProfit: point?.shopPureProfit || {},
