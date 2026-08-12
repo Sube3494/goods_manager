@@ -1711,6 +1711,7 @@ export function OrderCard({
   const deadlineDisplay = getDeadlineDisplay(order);
   const autoCompleteFailed = hasAutoCompleteFailure(order);
   const autoOutboundFailed = hasAutoOutboundFailure(order);
+  const needsManualOutbound = order.productCostStatus === "pending-outbound" && !hasOutbound;
   const compactCompletedAt = formatCompactDateTime(order.completedAt);
   const compactAutoCompleteAt = formatCompactDateTime(order.autoCompleteAt);
   const compactDeadlineDisplay = formatCompactDateTime(deadlineDisplay);
@@ -1803,7 +1804,7 @@ export function OrderCard({
                       刷单
                     </span>
                   ) : null}
-                  {autoOutboundFailed && !deleted && !cancelled ? (
+                  {(autoOutboundFailed || needsManualOutbound) && !deleted && !cancelled ? (
                     <div className="group/outbound relative">
                       <button
                         type="button"
@@ -1812,9 +1813,9 @@ export function OrderCard({
                           void onRunAction(order.id, "outbound");
                         }}
                         disabled={actingId === `${order.id}:outbound`}
-                        className="inline-flex h-7 items-center gap-0.5 rounded-full border border-rose-500/15 bg-rose-500/10 px-1.5 text-[11px] font-medium leading-none text-rose-700 transition-all hover:border-rose-500/30 hover:bg-rose-500/15 disabled:cursor-not-allowed disabled:opacity-60 dark:text-rose-400 sm:h-8 sm:gap-1.5 sm:px-2.5 sm:text-[13px]"
+                        className="inline-flex h-7 items-center gap-0.5 rounded-full border border-amber-500/15 bg-amber-500/10 px-1.5 text-[11px] font-medium leading-none text-amber-700 transition-all hover:border-amber-500/30 hover:bg-amber-500/15 disabled:cursor-not-allowed disabled:opacity-60 dark:text-amber-300 sm:h-8 sm:gap-1.5 sm:px-2.5 sm:text-[13px]"
                       >
-                        <TriangleAlert size={10} className="sm:h-3 sm:w-3" />
+                        {needsManualOutbound ? <Package2 size={10} className="sm:h-3 sm:w-3" /> : <TriangleAlert size={10} className="sm:h-3 sm:w-3" />}
                         {actingId === `${order.id}:outbound` ? "处理中..." : "出库待处理"}
                       </button>
                       
@@ -1824,11 +1825,11 @@ export function OrderCard({
                           {/* 小三角 */}
                           <div className="absolute top-full left-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1 rotate-45 border-r border-b border-slate-200/90 bg-white dark:border-white/12 dark:bg-[#171b22]" />
                           <div className="font-semibold text-rose-600 dark:text-rose-400 mb-1 flex items-center gap-1.5">
-                            <TriangleAlert size={12} className="shrink-0" />
-                            <span>自动出库失败原因</span>
+                            {needsManualOutbound ? <Package2 size={12} className="shrink-0" /> : <TriangleAlert size={12} className="shrink-0" />}
+                            <span>{needsManualOutbound ? "生成出库后计算利润" : "自动出库失败原因"}</span>
                           </div>
                           <div className="text-[11px] leading-relaxed text-zinc-600 dark:text-zinc-300 wrap-break-word font-normal text-left">
-                            {order.autoOutboundError || "未知异常，请检查库存或点击重试。"}
+                            {needsManualOutbound ? "当前订单已经匹配货品，但还没有出库成本快照。点击按钮生成出库单后，系统会扣减库存并显示货品成本与纯利润。" : (order.autoOutboundError || "未知异常，请检查库存或点击重试。")}
                           </div>
                         </div>
                       </div>
