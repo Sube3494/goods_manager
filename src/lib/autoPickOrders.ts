@@ -2760,6 +2760,7 @@ export function normalizeAutoPickOrderPayload(payload: unknown): AutoPickInbound
   const platform = String(input.platform || "").trim();
   const channelTag = String(input.channelTag || input.channel_tag || "").trim();
   const isJD = platform === "京东" || channelTag === "daojia" || String(input.source_tag || "").trim().toLowerCase() === "daojia" || String(input.goods_channel_tag || "").trim().toLowerCase() === "daojia";
+  const inferredPlatform = inferPlatformNameFromChannelTag(channelTag);
 
   const shopIdValue = isJD
     ? (input.shop_id || input.shopId)
@@ -2801,7 +2802,7 @@ export function normalizeAutoPickOrderPayload(payload: unknown): AutoPickInbound
     deliveryId: normalizeAutoPickDeliveryId(input.deliveryId),
     city: Number.isFinite(Number(input.city)) ? Number(input.city) : undefined,
     channelTag: channelTag || undefined,
-    platform: platform || (isJD ? "京东" : ""),
+    platform: normalizePlatformName(platform || inferredPlatform || (isJD ? "京东" : "")),
     dailyPlatformSequence: Number(input.dailyPlatformSequence || 0),
     orderNo: String(input.orderNo || "").trim(),
     orderTime: String(input.orderTime || "").trim(),
@@ -3005,7 +3006,8 @@ function getInvalidAutoPickOrderPayloadReason(payload: unknown) {
     .filter((item) => item.productName && item.quantity > 0);
 
   const missingFields: string[] = [];
-  if (!String(input.platform || "").trim()) missingFields.push("platform");
+  const inferredPlatform = inferPlatformNameFromChannelTag(input.channelTag || input.channel_tag);
+  if (!String(input.platform || inferredPlatform || "").trim()) missingFields.push("platform");
   if (!String(input.orderNo || "").trim()) missingFields.push("orderNo");
   if (!String(input.orderTime || "").trim()) missingFields.push("orderTime");
   if (!String(input.userAddress || "").trim()) missingFields.push("userAddress");
