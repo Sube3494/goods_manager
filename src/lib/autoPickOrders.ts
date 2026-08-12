@@ -520,6 +520,46 @@ function readTrimmedCandidateValue(candidates: unknown[]) {
   return null;
 }
 
+function readMaiyatianOrderNo(rawOrder: Record<string, unknown>) {
+  return readTrimmedCandidateValue([
+    rawOrder.source_id,
+    rawOrder.sourceId,
+    rawOrder.order_no,
+    rawOrder.orderNo,
+    rawOrder.order_id,
+    rawOrder.orderId,
+    rawOrder.id,
+  ]) || "";
+}
+
+function readMaiyatianUserAddress(rawOrder: Record<string, unknown>) {
+  const userInfo = rawOrder.user_info && typeof rawOrder.user_info === "object" && !Array.isArray(rawOrder.user_info)
+    ? rawOrder.user_info as Record<string, unknown>
+    : (rawOrder.userInfo && typeof rawOrder.userInfo === "object" && !Array.isArray(rawOrder.userInfo)
+        ? rawOrder.userInfo as Record<string, unknown>
+        : null);
+
+  return readTrimmedCandidateValue([
+    rawOrder.map_address,
+    rawOrder.mapAddress,
+    rawOrder.address,
+    rawOrder.userAddress,
+    rawOrder.user_address,
+    rawOrder.unencrypted_map_address,
+    rawOrder.unencryptedMapAddress,
+    rawOrder.unencrypted_address,
+    rawOrder.unencryptedAddress,
+    userInfo?.map_address,
+    userInfo?.mapAddress,
+    userInfo?.address,
+    userInfo?.userAddress,
+    userInfo?.unencrypted_map_address,
+    userInfo?.unencryptedMapAddress,
+    userInfo?.unencrypted_address,
+    userInfo?.unencryptedAddress,
+  ]) || "";
+}
+
 function splitPrivacyPhoneValue(value: unknown) {
   const text = String(value || "").trim();
   if (!text) {
@@ -1460,7 +1500,7 @@ function readMaiyatianCompletedAt(rawOrder: Record<string, unknown>) {
 }
 
 function buildListenedOrderFromRawOrder(rawOrder: MaiyatianRawOrder): AutoPickInboundOrder | null {
-  const orderNo = String(rawOrder.source_id || "").trim();
+  const orderNo = readMaiyatianOrderNo(rawOrder as Record<string, unknown>);
   if (!orderNo) return null;
   const channelTag = String((rawOrder as Record<string, unknown>).channel_tag || "").trim();
   const platform = readPreferredMaiyatianPlatform(rawOrder as Record<string, unknown>);
@@ -1482,7 +1522,7 @@ function buildListenedOrderFromRawOrder(rawOrder: MaiyatianRawOrder): AutoPickIn
     dailyPlatformSequence: Number(rawOrder.source_sn || 0) || 0,
     orderNo,
     orderTime: parseUnixTimestampToOrderTime(rawOrder.order_time),
-    userAddress: String(rawOrder.map_address || rawOrder.address || "").trim(),
+    userAddress: readMaiyatianUserAddress(rawOrder as Record<string, unknown>),
     rawShopName: readPreferredMaiyatianShopName(rawOrder as Record<string, unknown>),
     shopAddress: readPreferredMaiyatianShopAddress(rawOrder as Record<string, unknown>),
     rawShopAddress: readPreferredMaiyatianShopAddress(rawOrder as Record<string, unknown>),
@@ -1503,7 +1543,7 @@ function buildListenedOrderFromRawOrder(rawOrder: MaiyatianRawOrder): AutoPickIn
 }
 
 function buildListenedOrderFromQueryOrder(rawOrder: MaiyatianQueryOrder): AutoPickInboundOrder | null {
-  const orderNo = String(rawOrder.source_id || "").trim();
+  const orderNo = readMaiyatianOrderNo(rawOrder);
   if (!orderNo) return null;
   const channelTag = String(rawOrder.channel_tag || "").trim();
   const platform = readPreferredMaiyatianPlatform(rawOrder);
@@ -1530,7 +1570,7 @@ function buildListenedOrderFromQueryOrder(rawOrder: MaiyatianQueryOrder): AutoPi
     orderTime: typeof rawOrder.order_time === "string"
       ? String(rawOrder.order_time).trim()
       : parseUnixTimestampToOrderTime(rawOrder.order_time as string | number | undefined),
-    userAddress: String(rawOrder.map_address || rawOrder.address || "").trim(),
+    userAddress: readMaiyatianUserAddress(rawOrder),
     rawShopName: readPreferredMaiyatianShopName(rawOrder),
     shopAddress: readPreferredMaiyatianShopAddress(rawOrder),
     rawShopAddress: readPreferredMaiyatianShopAddress(rawOrder),
@@ -2661,6 +2701,7 @@ export async function deleteAutoPickOrderByIdentity(
     throw new Error("sourceId or platform and orderNo are required");
   }
 
+  const platformAliases = platform ? getAutoPickPlatformAliases(platform) : [];
   const existing = sourceId
     ? await prisma.autoPickOrder.findFirst({
       where: {
@@ -2674,13 +2715,11 @@ export async function deleteAutoPickOrderByIdentity(
         status: true,
       },
     })
-    : await prisma.autoPickOrder.findUnique({
+    : await prisma.autoPickOrder.findFirst({
       where: {
-        userId_platform_orderNo: {
-          userId,
-          platform,
-          orderNo,
-        },
+        userId,
+        orderNo,
+        platform: { in: platformAliases.length ? platformAliases : [platform] },
       },
       select: {
         id: true,

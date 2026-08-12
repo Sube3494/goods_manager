@@ -931,9 +931,15 @@ export async function GET(request: NextRequest) {
       } : {}),
     };
 
+    const platformWhere: Prisma.AutoPickOrderWhereInput | undefined = platform
+      ? platform === "线下交易" || platform.toLowerCase() === "other"
+        ? { platform: { in: ["线下交易", "other"] } }
+        : { platform }
+      : undefined;
+
     const where: Prisma.AutoPickOrderWhereInput = {
       ...baseWhere,
-      ...(platform ? { platform } : {}),
+      ...(platformWhere || {}),
       ...(buildStatusWhere(status) || {}),
     };
 
@@ -944,7 +950,7 @@ export async function GET(request: NextRequest) {
 
     const statusFilterWhere: Prisma.AutoPickOrderWhereInput = {
       ...baseWhere,
-      ...(platform ? { platform } : {}),
+      ...(platformWhere || {}),
     };
 
     const cancelledWhere = buildStatusWhere("已取消");
