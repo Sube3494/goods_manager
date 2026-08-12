@@ -4,6 +4,7 @@ import { getAuthorizedUser } from "@/lib/auth";
 import { getStorageStrategy } from "@/lib/storage";
 import { normalizeJdSkuIds, replaceProductJdSkuMappings } from "@/lib/productJdSku";
 import { Prisma } from "../../../../../../../../prisma/generated-client";
+import { syncAutoOutboundFromCompletedAutoPickOrder } from "@/lib/autoPickOrders";
 
 function readRawPayloadRecord(rawPayload: unknown) {
   return rawPayload && typeof rawPayload === "object" && !Array.isArray(rawPayload)
@@ -215,6 +216,10 @@ export async function PATCH(
         await deleteLegacyOutbound(tx, orderItem.order.orderNo);
       });
 
+      await syncAutoOutboundFromCompletedAutoPickOrder(user.id, id).catch((error) => {
+        console.error("Failed to auto-create outbound after manual product match:", error);
+      });
+
       return NextResponse.json({ ok: true, matchedProduct });
     }
 
@@ -348,6 +353,10 @@ export async function PATCH(
         },
       });
       await deleteLegacyOutbound(tx, orderItem.order.orderNo);
+    });
+
+    await syncAutoOutboundFromCompletedAutoPickOrder(user.id, id).catch((error) => {
+      console.error("Failed to auto-create outbound after manual product match:", error);
     });
 
     return NextResponse.json({ ok: true, matchedProduct });

@@ -12,6 +12,7 @@ import {
   readCustomerRemarkFromRawPayload,
   readRiderPhoneFromDelivery,
   readRiderPhoneFromRawPayload,
+  syncAutoOutboundFromCompletedAutoPickOrder,
 } from "@/lib/autoPickOrders";
 
 export async function GET(
@@ -336,6 +337,12 @@ export async function PATCH(
         } as Prisma.InputJsonValue,
       },
     });
+
+    if (hasAmountEdit || offlineEdit) {
+      await syncAutoOutboundFromCompletedAutoPickOrder(user.id, order.id).catch((error) => {
+        console.error("Failed to auto-create outbound after order amount edit:", error);
+      });
+    }
 
     return NextResponse.json({
       ok: true,

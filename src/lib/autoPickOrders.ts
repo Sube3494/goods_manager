@@ -5749,8 +5749,14 @@ export async function syncAutoOutboundFromCompletedAutoPickOrder(userId: string,
       id: orderId,
       userId,
     },
-    select: {
-      rawPayload: true,
+    include: {
+      items: {
+        select: {
+          productName: true,
+          productNo: true,
+          rawPayload: true,
+        },
+      },
     },
   });
 
@@ -5759,7 +5765,8 @@ export async function syncAutoOutboundFromCompletedAutoPickOrder(userId: string,
   }
 
   const systemMeta = readAutoPickSystemMeta(order.rawPayload);
-  if (systemMeta?.mainSystemSelfDelivery?.triggered) {
+  const isManualDeliveryPlaceholderOrder = order.items.some(isManualDeliveryPlaceholderOrderItem);
+  if (systemMeta?.mainSystemSelfDelivery?.triggered && !isManualDeliveryPlaceholderOrder) {
     return { ok: false, skipped: true, reason: "brush-order-no-auto-outbound" as const };
   }
 
