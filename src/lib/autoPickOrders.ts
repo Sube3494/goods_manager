@@ -5507,10 +5507,6 @@ export async function createOutboundFromAutoPickOrder(
     return { ok: false, skipped: true, reason: "order-not-completed" as const };
   }
 
-  if (isAutoPickOtherPickupOrder(order.rawPayload)) {
-    return { ok: false, skipped: true, reason: "other-pickup-no-outbound" as const };
-  }
-
   const existingOutbound = await prisma.outboundOrder.findFirst({
     where: {
       userId,
@@ -5768,10 +5764,6 @@ export async function syncAutoOutboundFromCompletedAutoPickOrder(userId: string,
   const isManualDeliveryPlaceholderOrder = order.items.some(isManualDeliveryPlaceholderOrderItem);
   if (systemMeta?.mainSystemSelfDelivery?.triggered && !isManualDeliveryPlaceholderOrder) {
     return { ok: false, skipped: true, reason: "brush-order-no-auto-outbound" as const };
-  }
-
-  if (isAutoPickOtherPickupOrder(order.rawPayload)) {
-    return { ok: false, skipped: true, reason: "other-pickup-no-outbound" as const };
   }
 
   try {
