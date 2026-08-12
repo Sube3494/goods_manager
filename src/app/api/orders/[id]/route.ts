@@ -133,6 +133,13 @@ export async function PATCH(
         delivery: true,
         rawPayload: true,
         shopAddress: true,
+        items: {
+          select: {
+            productName: true,
+            productNo: true,
+            rawPayload: true,
+          },
+        },
       },
     });
 
@@ -204,11 +211,21 @@ export async function PATCH(
     const manualAmountOverride = systemMeta.manualAmountOverride && typeof systemMeta.manualAmountOverride === "object" && !Array.isArray(systemMeta.manualAmountOverride)
       ? systemMeta.manualAmountOverride as Record<string, any>
       : {};
+    const isManualDeliveryPlaceholderOrder =
+      order.platform === "线下交易"
+      && order.items.some((item) => {
+        const itemRawPayload = item.rawPayload && typeof item.rawPayload === "object" && !Array.isArray(item.rawPayload)
+          ? item.rawPayload as Record<string, unknown>
+          : {};
+        return String(item.productNo || "").trim() === "__manual_delivery_placeholder__"
+          || itemRawPayload.isManualDeliveryPlaceholder === true
+          || String(item.productName || "").trim() === "手工配送占位商品";
+      });
 
     const actualPaid = offlineEdit ? Math.round(offlineActualPaid) : order.actualPaid;
     const expectedIncome = offlineEdit ? Math.round(offlineActualPaid) : (hasExpectedIncome ? Math.round(nextExpectedIncome) : order.expectedIncome);
     const platformCommission = hasAmountEdit
-      ? Math.max(0, Math.round(Number(actualPaid || 0) - Number(expectedIncome || 0)))
+      ? (isManualDeliveryPlaceholderOrder ? 0 : Math.max(0, Math.round(Number(actualPaid || 0) - Number(expectedIncome || 0))))
       : offlineEdit
         ? 0
         : order.platformCommission;
@@ -281,6 +298,8 @@ export async function PATCH(
                   manualAmountOverride: {
                     ...manualAmountOverride,
                     expectedIncome,
+                    platformCommission,
+                    onlyExpectedIncome: isManualDeliveryPlaceholderOrder || manualAmountOverride.onlyExpectedIncome === true,
                     updatedAt: new Date().toISOString(),
                     updatedBy: String(user.name || user.email || user.id),
                   },

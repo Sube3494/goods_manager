@@ -175,6 +175,8 @@ type AutoPickSystemMeta = {
   };
   manualAmountOverride?: {
     expectedIncome?: number | null;
+    platformCommission?: number | null;
+    onlyExpectedIncome?: boolean;
     updatedAt?: string;
     updatedBy?: string;
   };
@@ -273,6 +275,7 @@ function readManualAmountOverride(rawPayload: unknown) {
   }
 
   const expectedIncome = Number(candidate.expectedIncome);
+  const platformCommission = Number(candidate.platformCommission);
   const updatedAt = String(candidate.updatedAt || "").trim() || null;
   const updatedBy = String(candidate.updatedBy || "").trim() || null;
 
@@ -282,6 +285,8 @@ function readManualAmountOverride(rawPayload: unknown) {
 
   return {
     expectedIncome: Math.round(expectedIncome),
+    platformCommission: Number.isFinite(platformCommission) ? Math.round(platformCommission) : null,
+    onlyExpectedIncome: candidate.onlyExpectedIncome === true,
     updatedAt,
     updatedBy,
   };
@@ -1712,7 +1717,11 @@ export async function GET(request: NextRequest) {
         order.platform,
         expectedIncome,
         actualPaid,
-        manualAmountOverride
+        manualAmountOverride && Number.isFinite(Number(manualAmountOverride.platformCommission))
+          ? Number(manualAmountOverride.platformCommission)
+          : manualAmountOverride?.onlyExpectedIncome
+            ? 0
+            : manualAmountOverride
           ? Math.round(Number(expectedIncome || 0) - Number(actualPaid || 0))
           : order.platformCommission,
         { preferExplicitExpectedIncome: Boolean(manualAmountOverride) }
