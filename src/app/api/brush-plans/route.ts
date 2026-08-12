@@ -141,7 +141,9 @@ async function resolvePlanProductImages<T extends {
       ...plan,
       items: plan.items.map((item) => {
         const productId = String(item.productId || "").trim();
-        const image = shopId && productId ? imageMap.get(`${shopId}::${productId}`) || null : null;
+        const shopImage = shopId && productId ? imageMap.get(`${shopId}::${productId}`) || null : null;
+        const productImage = typeof item.product?.image === "string" ? item.product.image : null;
+        const image = shopImage || productImage;
         return {
           ...item,
           product: item.product ? {

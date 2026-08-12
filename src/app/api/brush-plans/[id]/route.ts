@@ -41,7 +41,12 @@ async function resolvePlanProductImages<T extends {
       ...plan,
       items: plan.items.map((item) => ({
         ...item,
-        product: item.product ? { ...item.product, image: null } : null,
+        product: item.product ? {
+          ...item.product,
+          image: typeof item.product.image === "string" && item.product.image
+            ? storage.resolveUrl(item.product.image)
+            : null,
+        } : null,
       })),
     }));
   }
@@ -96,7 +101,9 @@ async function resolvePlanProductImages<T extends {
       ...plan,
       items: plan.items.map((item) => {
         const productId = String(item.productId || "").trim();
-        const image = shopId && productId ? imageMap.get(`${shopId}::${productId}`) || null : null;
+        const shopImage = shopId && productId ? imageMap.get(`${shopId}::${productId}`) || null : null;
+        const productImage = typeof item.product?.image === "string" ? item.product.image : null;
+        const image = shopImage || productImage;
         return {
           ...item,
           product: item.product ? {

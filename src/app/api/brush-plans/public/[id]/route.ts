@@ -89,6 +89,8 @@ export async function GET(
       shopName: plan.shopName,
       items: await Promise.all(plan.items.map(async (item) => {
         const image = await resolvePlanProductImage(plan.userId, plan.shopName, item.productId);
+        const productImage = item.product?.image || null;
+        const resolvedImage = image || productImage;
         return ({
         id: item.id,
         quantity: item.quantity,
@@ -99,7 +101,7 @@ export async function GET(
         done: item.done,
         product: item.product ? {
           name: item.product.name,
-          image: image ? storage.resolveUrl(image) : null
+          image: resolvedImage ? storage.resolveUrl(resolvedImage) : null
         } : null
       });
       }))
