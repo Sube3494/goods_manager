@@ -1144,6 +1144,40 @@ function createManualDeliveryPlaceholderItem() {
   };
 }
 
+function isManualDeliveryPlaceholderOrderItem(item: {
+  productName?: string | null;
+  productNo?: string | null;
+  rawPayload?: unknown;
+}) {
+  const rawPayload = item.rawPayload && typeof item.rawPayload === "object" && !Array.isArray(item.rawPayload)
+    ? item.rawPayload as Record<string, unknown>
+    : null;
+  return String(item.productNo || "").trim() === MANUAL_DELIVERY_PLACEHOLDER_PRODUCT_NO
+    || rawPayload?.isManualDeliveryPlaceholder === true
+    || String(item.productName || "").trim() === MANUAL_DELIVERY_PLACEHOLDER_PRODUCT_NAME;
+}
+
+function shouldUseLegacyOfflineManualDeliveryOrderMatch(
+  normalized: AutoPickInboundOrder,
+  order: {
+    platform?: string | null;
+    orderNo?: string | null;
+    items?: Array<{
+      productName?: string | null;
+      productNo?: string | null;
+      rawPayload?: unknown;
+    }>;
+  }
+) {
+  if (String(order.platform || "").trim() !== "线下交易") {
+    return false;
+  }
+  if (String(order.orderNo || "").trim() !== String(normalized.orderNo || "").trim()) {
+    return false;
+  }
+  return (order.items || []).some(isManualDeliveryPlaceholderOrderItem);
+}
+
 function inferPlatformNameFromChannelTag(channelTag: unknown) {
   const normalizedTag = String(channelTag || "").trim().toLowerCase();
   if (!normalizedTag) {
@@ -3038,6 +3072,7 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
             OR: [
               { platform: "" },
               { platform: "未知" },
+              { platform: "线下交易" },
             ],
           },
           ...(normalized.id ? [{ sourceId: normalized.id }] : []),
@@ -3049,6 +3084,8 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
       ],
       select: {
         id: true,
+        platform: true,
+        orderNo: true,
         sourceId: true,
         deliveryId: true,
         shopId: true,
@@ -3073,7 +3110,18 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
       },
     });
 
-    const existingCandidatesSorted = [...existingCandidates].sort((left, right) => (
+    const existingCandidatesSorted = [...existingCandidates]
+      .filter((candidate) => {
+        const candidatePlatform = String(candidate.platform || "").trim();
+        if (candidatePlatform !== "线下交易") {
+          return true;
+        }
+        if (normalized.platform === "线下交易" || getAutoPickPlatformAliases(normalized.platform).includes("线下交易")) {
+          return true;
+        }
+        return shouldUseLegacyOfflineManualDeliveryOrderMatch(normalized, candidate);
+      })
+      .sort((left, right) => (
       getAutoPickOrderRecencyTimestamp(right) - getAutoPickOrderRecencyTimestamp(left)
     ));
 

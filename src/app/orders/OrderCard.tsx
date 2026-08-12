@@ -518,6 +518,10 @@ export function getOrderItemDisplay(item: AutoPickOrderItem) {
   const rawPayload = item.rawPayload && typeof item.rawPayload === "object" && !Array.isArray(item.rawPayload)
     ? item.rawPayload as Record<string, unknown>
     : {};
+  const isManualDeliveryPlaceholder =
+    String(item.productNo || "").trim() === MANUAL_DELIVERY_PLACEHOLDER_PRODUCT_NO
+    || rawPayload.isManualDeliveryPlaceholder === true
+    || String(item.productName || "").trim() === MANUAL_DELIVERY_PLACEHOLDER_PRODUCT_NAME;
   const sourceId = String(
     item.productNo
     || rawPayload.source_id
@@ -526,11 +530,11 @@ export function getOrderItemDisplay(item: AutoPickOrderItem) {
   ).trim();
 
   return {
-    name: matchedProduct?.name || item.productName || "未命名商品",
-    sku: matchedProduct?.sku || item.productNo || "-",
+    name: matchedProduct?.name || (isManualDeliveryPlaceholder ? "请选择发货货品" : item.productName) || "未命名商品",
+    sku: matchedProduct?.sku || (isManualDeliveryPlaceholder ? "待匹配" : item.productNo) || "-",
     image: matchedProduct?.image || item.thumb || null,
     quantity: item.quantity,
-    sourceId: sourceId || undefined,
+    sourceId: isManualDeliveryPlaceholder ? undefined : sourceId || undefined,
   };
 }
 
@@ -560,6 +564,7 @@ export function getExpandedOrderItemDisplays(item: AutoPickOrderItem) {
 }
 
 const MANUAL_DELIVERY_PLACEHOLDER_PRODUCT_NO = "__manual_delivery_placeholder__";
+const MANUAL_DELIVERY_PLACEHOLDER_PRODUCT_NAME = "手工配送占位商品";
 
 function isManualDeliveryPlaceholderItem(item: AutoPickOrderItem) {
   const rawPayload = item.rawPayload && typeof item.rawPayload === "object" && !Array.isArray(item.rawPayload)
@@ -567,11 +572,16 @@ function isManualDeliveryPlaceholderItem(item: AutoPickOrderItem) {
     : {};
 
   return String(item.productNo || "").trim() === MANUAL_DELIVERY_PLACEHOLDER_PRODUCT_NO
-    || rawPayload.isManualDeliveryPlaceholder === true;
+    || rawPayload.isManualDeliveryPlaceholder === true
+    || String(item.productName || "").trim() === MANUAL_DELIVERY_PLACEHOLDER_PRODUCT_NAME;
 }
 
 function getVisibleOrderItems(items: AutoPickOrderItem[]) {
   return items.filter((item) => !isManualDeliveryPlaceholderItem(item));
+}
+
+function isLegacyManualDeliveryPlaceholderOrder(order: AutoPickOrder) {
+  return order.platform === "线下交易" && order.items.some(isManualDeliveryPlaceholderItem);
 }
 
 function getMatchedProductIds(item: AutoPickOrderItem) {
@@ -955,6 +965,7 @@ function OrderAmountEditModal({
   const { showToast } = useToast();
   const [expectedIncome, setExpectedIncome] = useState(() => formatCurrencyInputFromCents(getExpectedIncome(order.expectedIncome, order.actualPaid, order.platformCommission)));
   const [isSaving, setIsSaving] = useState(false);
+  const isJd = String(order.platform || "").includes("京东");
 
   const handleSave = async () => {
     const nextExpectedIncome = parseCurrencyInputToCents(expectedIncome);
@@ -981,7 +992,7 @@ function OrderAmountEditModal({
         <div className="flex items-start justify-between gap-3 px-6 pb-4 pt-6">
           <div>
             <h3 className="text-xl font-semibold tracking-tight text-foreground">修改商家到手</h3>
-            <p className="mt-2 text-xs leading-5 text-muted-foreground">只覆盖京东订单的到手金额，实付保持系统原值不变。</p>
+            <p className="mt-2 text-xs leading-5 text-muted-foreground">{isJd ? "只覆盖京东订单的到手金额，实付保持系统原值不变。" : "手动记录这张手工配送单的商家到手金额，实付保持系统原值不变。"}</p>
           </div>
           <button
             type="button"
@@ -1009,7 +1020,7 @@ function OrderAmountEditModal({
           </label>
 
           <p className="rounded-2xl border border-amber-500/15 bg-amber-500/8 px-4 py-3 text-xs leading-5 text-amber-800 dark:text-amber-300">
-            适合修正京东订单智能抓取错误的到手金额，保存后统计也会按这个值走。
+            保存后统计会按这个到手金额计算。
           </p>
 
           <div className="flex gap-3">
@@ -1569,7 +1580,8 @@ export function OrderCard({
   }, [order.id, showToast, onRefresh]);
 
   const profitTooltipRef = useRef<HTMLDivElement | null>(null);
-  const visibleItems = getVisibleOrderItems(order.items);
+  const legacyManualDeliveryPlaceholderOrder = isLegacyManualDeliveryPlaceholderOrder(order);
+  const visibleItems = legacyManualDeliveryPlaceholderOrder ? order.items : getVisibleOrderItems(order.items);
   const itemCount = getItemCount(visibleItems);
   const completed = isCompletedStatus(order.status);
   const cancelled = isCancelledStatus(order.status);
@@ -1578,10 +1590,11 @@ export function OrderCard({
   const abnormal = isAbnormalStatus(order.status);
   const deliveryFee = getDeliveryFee(order.delivery);
   const hasDeliveryAddress = Boolean(String(order.userAddress || "").trim());
-  const pickup = Boolean(order.isPickup) || (order.platform === "线下交易" && deliveryFee <= 0 && !hasDeliveryAddress);
-  const showManualDeliveryMarker = order.platform === "线下交易" && !pickup;
-  const showPlatformActions = order.platform !== "线下交易";
-  const hideDeletedOfflineIncome = deleted && order.platform === "线下交易";
+  const displayAsOfflineOrder = order.platform === "线下交易" && !legacyManualDeliveryPlaceholderOrder;
+  const pickup = Boolean(order.isPickup) || (displayAsOfflineOrder && deliveryFee <= 0 && !hasDeliveryAddress);
+  const showManualDeliveryMarker = displayAsOfflineOrder && !pickup;
+  const showPlatformActions = !displayAsOfflineOrder;
+  const hideDeletedOfflineIncome = deleted && displayAsOfflineOrder;
   const delivering = !pickup && isDeliveringStatus(order.status);
   const hasOutbound = Boolean(order.hasOutbound);
   const showBrushMarker = !pickup && !showManualDeliveryMarker && order.isMainSystemSelfDelivery;
@@ -1654,6 +1667,7 @@ export function OrderCard({
   const canEditProductCost = order.productCostStatus === "pending-backfill" || productCostBreakdown.length > 0;
   const settlementAfterRate = Math.round(expectedIncome * (1 - serviceFeeRate));
   const isJdOrder = String(order.platform || "").includes("京东");
+  const canEditExpectedIncome = isJdOrder || legacyManualDeliveryPlaceholderOrder;
   const pureProfitTooltipRows: Array<{ label: string; value: string; editable?: boolean; onEdit?: () => void }> = hasPureProfit
     ? (showManualDeliveryMarker
       ? [
@@ -1774,7 +1788,7 @@ export function OrderCard({
                       {orderTypeLabel}
                     </span>
                   ) : null}
-                  {pickup && order.platform !== "线下交易" ? (
+                  {pickup && !displayAsOfflineOrder ? (
                     <span className="inline-flex h-7 items-center rounded-full border border-sky-500/15 bg-sky-500/10 px-1.5 text-[11px] font-medium leading-none text-sky-700 dark:text-sky-400 sm:h-8 sm:px-2.5 sm:text-[13px]">
                       到店自取
                     </span>
@@ -2004,7 +2018,7 @@ export function OrderCard({
                       <div className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">实付</div>
                       <div className="mt-0.5 truncate text-sm font-semibold text-foreground">{toCurrency(order.actualPaid)}</div>
                     </div>
-                    {isJdOrder ? (
+                    {canEditExpectedIncome ? (
                       <div className="min-w-0 text-right">
                         <button
                           type="button"
@@ -2037,7 +2051,7 @@ export function OrderCard({
                     <span className="shrink-0 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">实付</span>
                     <span className="truncate text-sm font-semibold text-foreground">{toCurrency(order.actualPaid)}</span>
                   </div>
-                  {isJdOrder ? (
+                  {canEditExpectedIncome ? (
                     <button
                       type="button"
                       onClick={() => setIsAmountEditorOpen(true)}
@@ -2177,10 +2191,10 @@ export function OrderCard({
                 <CheckCheck size={12} />
                 {order.completedAt ? (
                   <>
-                    <span className="truncate sm:hidden">{`${compactCompletedAt} ${pickup && order.platform !== "线下交易" ? "自提" : "完成"}`}</span>
-                    <span className="hidden sm:inline">{`${formatLocalDateTime(order.completedAt)} ${pickup && order.platform !== "线下交易" ? "已取货" : "已完成"}`}</span>
+                    <span className="truncate sm:hidden">{`${compactCompletedAt} ${pickup && !displayAsOfflineOrder ? "自提" : "完成"}`}</span>
+                    <span className="hidden sm:inline">{`${formatLocalDateTime(order.completedAt)} ${pickup && !displayAsOfflineOrder ? "已取货" : "已完成"}`}</span>
                   </>
-                ) : pickup && order.platform !== "线下交易" ? "已取货" : "订单已完成"}
+                ) : pickup && !displayAsOfflineOrder ? "已取货" : "订单已完成"}
               </span>
             ) : null}
             {cancelled ? (
@@ -2225,7 +2239,7 @@ export function OrderCard({
             "grid gap-2 lg:min-w-110",
             showManualDeliveryMarker
               ? "grid-cols-3 sm:grid-cols-3 lg:min-w-0 lg:w-96 ml-auto"
-              : order.platform === "线下交易"
+              : displayAsOfflineOrder
               ? deleted
                 ? "grid-cols-1 sm:grid-cols-1 lg:min-w-0 lg:w-32 ml-auto"
                 : "grid-cols-3 sm:grid-cols-3 lg:min-w-0 lg:w-96 ml-auto"
@@ -2235,10 +2249,10 @@ export function OrderCard({
               label={expanded ? "收起详情" : "展开详情"}
               icon={expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
               onClick={() => onToggleExpanded(order.id)}
-              mobileIconOnly={order.platform !== "线下交易"}
+              mobileIconOnly={!displayAsOfflineOrder}
               title={expanded ? "收起详情" : "展开详情"}
             />
-            {order.platform === "线下交易" && !deleted ? (
+            {displayAsOfflineOrder && !deleted ? (
               <ActionButton
                 label={isSavingOfflineEdit ? "保存中" : "修改"}
                 icon={isSavingOfflineEdit ? <Loader2 size={14} className="animate-spin" /> : <Pencil size={14} />}
@@ -2247,7 +2261,7 @@ export function OrderCard({
                 title="修改这张线下订单的金额、配送支出、地址和备注"
               />
             ) : null}
-            {order.platform === "线下交易" && !deleted ? (
+            {displayAsOfflineOrder && !deleted ? (
               <ActionButton
                 label={isDeletingOffline ? "作废中" : "作废"}
                 icon={isDeletingOffline ? <Loader2 size={14} className="animate-spin" /> : <X size={14} />}
@@ -2483,7 +2497,7 @@ export function OrderCard({
         </div>
       ) : null}
       </article>
-      {isAmountEditorOpen && isJdOrder ? (
+      {isAmountEditorOpen && canEditExpectedIncome ? (
         <OrderAmountEditModal
           order={order}
           onClose={() => {
