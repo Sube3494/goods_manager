@@ -119,6 +119,7 @@ export async function PUT(request: Request) {
     storeOpeningBatches,
     systemSettings,
     autoCompleteJobs,
+    userBusinessProfile,
   ] = await Promise.all([
     prisma.autoPickOrder.findMany({ where: { userId: user.id }, include: { items: { orderBy: { createdAt: "asc" } }, autoCompleteJob: true }, orderBy: { orderTime: "desc" } }),
     prisma.dailyPromotionExpense.findMany({ where: { userId: user.id }, orderBy: { date: "desc" } }),
@@ -142,6 +143,7 @@ export async function PUT(request: Request) {
     prisma.storeOpeningBatch.findMany({ where: { userId: user.id }, include: { items: { include: { product: true } } }, orderBy: { createdAt: "desc" } }),
     prisma.systemSetting.findMany({ where: { userId: user.id }, select: { lowStockThreshold: true, allowDataImport: true, allowGalleryUpload: true, requireLoginForLightbox: true, gallerySortDesc: true, uploadConflictStrategy: true, shareExpireDuration: true, shareExpireUnit: true, backupEnabled: true, backupIntervalUnit: true, backupIntervalValue: true, backupRetention: true, lastBackup: true, updatedAt: true } }),
     prisma.autoPickAutoCompleteJob.findMany({ where: { userId: user.id }, orderBy: { dueAt: "desc" } }),
+    prisma.user.findUnique({ where: { id: user.id }, select: { name: true, shippingAddresses: true, brushShops: true, brushCommissionBoostEnabled: true, createdAt: true, updatedAt: true } }),
   ]);
   type ShopProductContext = (typeof shopProducts)[number];
   type SalesProductSummary = {
@@ -196,16 +198,17 @@ export async function PUT(request: Request) {
     }
   }
   const context = {
+    userBusinessProfile,
     orders: orders.map((order) => ({
       ...order,
       isBrushOrder: isBrushOrder(order.rawPayload),
       items: order.items.map((item) => ({
+        ...item,
         productName: item.productName,
         productNo: item.productNo,
         quantity: item.quantity,
         matchedProduct: readMatchedProduct(item.rawPayload),
       })),
-      rawPayload: undefined,
     })),
     promotions,
     shops,
@@ -229,7 +232,7 @@ export async function PUT(request: Request) {
     systemSettings,
     autoCompleteJobs,
     salesByProduct: Array.from(salesMap.values()).sort((a, b) => b.totalQuantity - a.totalQuantity),
-    note: "这里尽量提供账号下可用于经营分析的全部业务数据：订单、订单商品明细、商品主库、店铺商品、分类、供应商、采购、出库、刷单、结算、推广、经营成本、库存批次、图库、开店进货、系统设置、自动补全任务等。未提供登录会话、API Key、用户权限等账号安全数据。orders.items 是订单商品明细；orders.items.matchedProduct 来自人工/自动匹配的商品关系。salesByProduct 已按非刷单、非取消订单汇总商品销量；totalQuantity 越大表示真实销量越高，brushQuantity 表示刷单数量不计入真实销量。isBrushOrder=true 表示刷单/手动标记刷单。订单时间按 orderTime 归属；金额字段按系统原始单位提供，请结合字段名理解。",
+    note: "这里尽量提供账号下可用于经营分析的全部业务数据：用户经营资料、收货/店铺映射配置、订单、订单商品明细、订单原始业务 payload、商品主库、店铺商品、分类、供应商、采购、出库、刷单、结算、推广、经营成本、库存批次、图库、开店进货、系统设置、自动补全任务等。未提供登录会话、API Key、用户权限、第三方密钥等账号安全数据。orders.items 是订单商品明细；orders.items.rawPayload 保留平台/系统原始业务信息；orders.items.matchedProduct 来自人工/自动匹配的商品关系。salesByProduct 已按非刷单、非取消订单汇总商品销量；totalQuantity 越大表示真实销量越高，brushQuantity 表示刷单数量不计入真实销量。isBrushOrder=true 表示刷单/手动标记刷单。订单时间按 orderTime 归属；金额字段按系统原始单位提供，请结合字段名理解。",
   };
   const permissions = user.permissions && typeof user.permissions === "object" && !Array.isArray(user.permissions) ? user.permissions as Record<string, unknown> : {};
   const model = permissions[MODEL_NAME] === "deepseek-v4-pro" ? "deepseek-v4-pro" : "deepseek-v4-flash";
@@ -238,7 +241,7 @@ export async function PUT(request: Request) {
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
     signal: AbortSignal.timeout(90_000),
     body: JSON.stringify({ model, stream: true, temperature: 0.2, thinking: { type: "enabled" }, messages: [
-      { role: "system", content: "你是经营数据分析助手。只能根据提供的用户经营数据回答；数字不确定时明确说明，不要编造。你拿到的是账号下尽量完整的业务数据，不要轻易说缺少数据；先检查对应数据表和汇总字段。回答销量、商品排行时优先使用 salesByProduct，再核对 orders.items、shopProducts、products；回答利润时优先使用订单利润/结算/出库成本/推广/经营成本等字段。使用简洁中文，给出结论和关键依据。" },
+      { role: "system", content: "你是经营数据分析助手。只能根据提供的用户经营数据回答；数字不确定时明确说明，不要编造。你拿到的是账号下尽量完整的业务数据，包括部分原始业务 payload，不要轻易说缺少数据；先检查对应数据表、rawPayload 和汇总字段。回答销量、商品排行时优先使用 salesByProduct，再核对 orders.items、shopProducts、products；回答利润时优先使用订单利润/结算/出库成本/推广/经营成本等字段。使用简洁中文，给出结论和关键依据。" },
       { role: "user", content: `用户问题：${question}\n\n全量经营数据：${JSON.stringify(context)}` },
     ] }),
   });
