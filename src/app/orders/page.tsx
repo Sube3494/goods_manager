@@ -294,6 +294,7 @@ function IntegrationModal({
   onFetchMaiyatianShops,
   onTestPlugin,
   onTestCookie,
+  onSaveConfig,
   libraries,
 }: {
   integrationConfig: AutoPickIntegrationConfig;
@@ -308,12 +309,20 @@ function IntegrationModal({
   onFetchMaiyatianShops: () => void;
   onTestPlugin: () => void;
   onTestCookie: () => void;
+  onSaveConfig: (value: AutoPickIntegrationConfig) => Promise<void>;
   libraries: any[];
 }) {
   const hasCookie = Boolean(integrationConfig.maiyatianCookie.trim());
   const [isEditingCookie, setIsEditingCookie] = useState(!hasCookie);
   const [showInboundApiKey, setShowInboundApiKey] = useState(false);
   const [copiedCallback, setCopiedCallback] = useState(false);
+  const [timingDraft, setTimingDraft] = useState<Record<TimingFieldKey, string>>({
+    pickupMinutes: String(integrationConfig.selfDeliveryTiming.pickupMinutes),
+    minutesPerKm: String(integrationConfig.selfDeliveryTiming.minutesPerKm),
+    riderUpstairsMinutes: String(integrationConfig.selfDeliveryTiming.riderUpstairsMinutes),
+    deadlineLeadMinutes: String(integrationConfig.selfDeliveryTiming.deadlineLeadMinutes),
+  });
+  const [isSavingTiming, setIsSavingTiming] = useState(false);
   const pillButtonClass = "inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-black/8 bg-white/85 px-3 py-2 text-[11px] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.45)] transition-all duration-150 hover:-translate-y-px hover:border-black/12 hover:bg-white hover:shadow-[0_8px_20px_rgba(15,23,42,0.08)] active:translate-y-0 active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/15 sm:min-h-9 sm:rounded-full sm:px-3 sm:py-1.5 dark:border-white/10 dark:bg-white/5 dark:text-white/92 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] dark:hover:border-white/18 dark:hover:bg-white/[0.09] dark:hover:text-white dark:hover:shadow-[0_10px_24px_rgba(0,0,0,0.28)]";
   const localShopOptions = localShops.map((item) => ({
     value: item.name,
@@ -329,18 +338,36 @@ function IntegrationModal({
   const callbackOrderUrl = callbackBaseUrl ? `${callbackBaseUrl}/api/v1/api-key/listened-orders` : "/api/v1/api-key/listened-orders";
   const showCookieEditor = !integrationConfig.maiyatianCookie.trim() || isEditingCookie;
   const timing = integrationConfig.selfDeliveryTiming;
-  const timingTotalLabel = `${formatTimingNumber(timing.pickupMinutes)} + 距离 × ${formatTimingNumber(timing.minutesPerKm)} + ${formatTimingNumber(timing.riderUpstairsMinutes)}`;
+  const timingTotalLabel = `${formatTimingNumber(Number(timingDraft.pickupMinutes || 0))} + 距离 × ${formatTimingNumber(Number(timingDraft.minutesPerKm || 0))} + ${formatTimingNumber(Number(timingDraft.riderUpstairsMinutes || 0))}`;
 
-  const updateTimingField = useCallback((field: TimingFieldKey, rawValue: string) => {
-    const numeric = Number(rawValue);
-    onChange({
-      ...integrationConfig,
-      selfDeliveryTiming: {
-        ...integrationConfig.selfDeliveryTiming,
-        [field]: Number.isFinite(numeric) ? numeric : 0,
-      },
+  useEffect(() => {
+    setTimingDraft({
+      pickupMinutes: String(integrationConfig.selfDeliveryTiming.pickupMinutes),
+      minutesPerKm: String(integrationConfig.selfDeliveryTiming.minutesPerKm),
+      riderUpstairsMinutes: String(integrationConfig.selfDeliveryTiming.riderUpstairsMinutes),
+      deadlineLeadMinutes: String(integrationConfig.selfDeliveryTiming.deadlineLeadMinutes),
     });
-  }, [integrationConfig, onChange]);
+  }, [integrationConfig.selfDeliveryTiming]);
+
+  const saveTimingConfig = useCallback(async () => {
+    const nextTiming = {
+      pickupMinutes: Number(timingDraft.pickupMinutes || 0),
+      minutesPerKm: Number(timingDraft.minutesPerKm || 0),
+      riderUpstairsMinutes: Number(timingDraft.riderUpstairsMinutes || 0),
+      deadlineLeadMinutes: Number(timingDraft.deadlineLeadMinutes || 0),
+    };
+    const nextConfig = {
+      ...integrationConfig,
+      selfDeliveryTiming: nextTiming,
+    };
+    setIsSavingTiming(true);
+    try {
+      onChange(nextConfig);
+      await onSaveConfig(nextConfig);
+    } finally {
+      setIsSavingTiming(false);
+    }
+  }, [integrationConfig, onChange, onSaveConfig, timingDraft]);
 
   const copyCallbackUrl = useCallback(async () => {
     if (!callbackOrderUrl || typeof navigator === "undefined" || !navigator.clipboard?.writeText) {
@@ -619,37 +646,47 @@ function IntegrationModal({
             </div>
 
             <div className="rounded-[18px] border border-black/8 bg-black/2 p-3 dark:border-white/10 dark:bg-white/3">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 min-w-0">
+              <div className="flex items-start justify-between gap-3 min-w-0">
                 <div className="min-w-0 flex-1">
                   <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">自配完成时间</div>
                   <p className="mt-0.5 text-[11px] text-muted-foreground">按环节输入分钟数。</p>
                 </div>
-                <div className="min-w-0 shrink-0 rounded-full border border-black/8 bg-white/70 px-2.5 py-1 text-[10px] text-foreground dark:border-white/10 dark:bg-white/6 truncate max-w-full">
-                  公式: {timingTotalLabel}
-                </div>
+                <button
+                  type="button"
+                  onClick={() => void saveTimingConfig()}
+                  disabled={isSavingTiming}
+                  className={cn(pillButtonClass, "h-8 shrink-0 px-3 text-[11px]")}
+                >
+                  {isSavingTiming ? <Loader2 size={12} className="animate-spin" /> : <CheckCheck size={12} />}
+                  {isSavingTiming ? "保存中" : "保存"}
+                </button>
               </div>
 
-              <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+              <div className="mt-3 w-fit max-w-full rounded-full border border-black/8 bg-white/70 px-2.5 py-1 text-[10px] text-foreground dark:border-white/10 dark:bg-white/6">
+                公式: {timingTotalLabel}
+              </div>
+
+              <div className="mt-3 grid grid-cols-2 gap-1.5 xl:grid-cols-4">
                 {[
                   { key: "pickupMinutes", label: "到店取货", step: "1" },
                   { key: "minutesPerKm", label: "每公里配送", step: "0.5" },
                   { key: "riderUpstairsMinutes", label: "送达收尾", step: "1" },
                   { key: "deadlineLeadMinutes", label: "提前量", step: "1" },
                 ].map((item) => (
-                  <label key={item.key} className="rounded-xl border border-black/8 bg-white/78 px-3 py-2.5 dark:border-white/10 dark:bg-white/4">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="text-xs text-foreground">{item.label}</div>
-                      <div className="flex items-center gap-2">
+                  <label key={item.key} className="rounded-xl border border-black/8 bg-white/78 px-2.5 py-2 dark:border-white/10 dark:bg-white/4">
+                    <div className="grid grid-cols-[64px_minmax(0,1fr)_28px] items-center gap-2">
+                      <div className="min-w-0 truncate text-xs font-medium text-foreground">{item.label}</div>
+                      <div className="min-w-0">
                         <input
                           type="number"
                           min="0"
                           step={item.step}
-                          value={integrationConfig.selfDeliveryTiming[item.key as TimingFieldKey]}
-                          onChange={(event) => updateTimingField(item.key as TimingFieldKey, event.target.value)}
-                          className="h-9 w-20 rounded-lg border border-black/8 bg-white/88 px-2.5 text-sm font-medium outline-none transition-all focus:border-primary/30 focus:ring-2 focus:ring-primary/10 dark:border-white/10 dark:bg-[#111827]"
+                          value={timingDraft[item.key as TimingFieldKey]}
+                          onChange={(event) => setTimingDraft((current) => ({ ...current, [item.key]: event.target.value }))}
+                          className="h-8 w-full rounded-lg border border-black/8 bg-white/88 px-2.5 text-sm font-medium outline-none transition-all focus:border-primary/30 focus:ring-2 focus:ring-primary/10 dark:border-white/10 dark:bg-[#111827]"
                         />
-                        <span className="text-[11px] text-muted-foreground">分钟</span>
                       </div>
+                      <span className="text-[11px] text-muted-foreground">分钟</span>
                     </div>
                   </label>
                 ))}
@@ -2549,6 +2586,7 @@ export default function OrdersPage() {
                 onFetchMaiyatianShops={fetchMaiyatianShops}
                 onTestPlugin={() => void testIntegrationConfig("plugin")}
                 onTestCookie={() => void testIntegrationConfig("cookie")}
+                onSaveConfig={async (nextConfig) => { await saveIntegrationConfig(nextConfig); }}
                 libraries={libraries}
               />,
             document.body
