@@ -38,9 +38,15 @@ const PurchaseItemRow = memo(({
     suppliers, 
     onUpdate, 
     onRemove,
+    quantityInput,
+    onQuantityInputChange,
+    onQuantityInputBlur,
     costPriceInput,
     onCostPriceInputChange,
     onCostPriceInputBlur,
+    lineTotalInput,
+    onLineTotalInputChange,
+    onLineTotalInputBlur,
     allowCostEdit,
     isChecked,
     onToggle,
@@ -52,9 +58,15 @@ const PurchaseItemRow = memo(({
     suppliers: Supplier[];
     onUpdate: (productId: string, field: keyof PurchaseOrderItem | "lineTotal", value: string | number) => void;
     onRemove: (productId: string) => void;
+    quantityInput?: string;
+    onQuantityInputChange?: (productId: string, value: string) => void;
+    onQuantityInputBlur?: (productId: string) => void;
     costPriceInput?: string;
     onCostPriceInputChange?: (productId: string, value: string) => void;
     onCostPriceInputBlur?: (productId: string) => void;
+    lineTotalInput?: string;
+    onLineTotalInputChange?: (productId: string, value: string) => void;
+    onLineTotalInputBlur?: (productId: string) => void;
     allowCostEdit?: boolean;
     isChecked?: boolean;
     onToggle?: (productId: string) => void;
@@ -209,8 +221,9 @@ const PurchaseItemRow = memo(({
                         <input 
                             type="number" 
                             min="1"
-                            value={item.quantity || ""}
-                            onChange={(e) => onUpdate(itemKey, "quantity", e.target.value)}
+                            value={quantityInput ?? ""}
+                            onChange={(e) => onQuantityInputChange?.(itemKey, e.target.value)}
+                            onBlur={() => onQuantityInputBlur?.(itemKey)}
                             className="w-full h-[34px] rounded-lg bg-white dark:bg-white/5 border border-border dark:border-white/10 px-2 py-1.5 text-foreground outline-none ring-1 ring-transparent text-center focus:ring-2 focus:ring-primary/20 transition-all font-mono text-xs no-spinner"
                         />
                     )}
@@ -254,8 +267,9 @@ const PurchaseItemRow = memo(({
                                 type="number"
                                 step="0.01"
                                 min="0"
-                                value={item.quantity ? Number((item.quantity * (item.costPrice ?? 0)).toFixed(2)) : ""}
-                                onChange={(e) => onUpdate(itemKey, "lineTotal", e.target.value)}
+                                value={lineTotalInput ?? ""}
+                                onChange={(e) => onLineTotalInputChange?.(itemKey, e.target.value)}
+                                onBlur={() => onLineTotalInputBlur?.(itemKey)}
                                 className="w-full h-[34px] rounded-lg bg-white dark:bg-white/5 border border-border dark:border-white/10 pl-5 pr-1 py-1.5 text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all font-mono text-xs text-right no-spinner"
                             />
                         </div>
@@ -303,6 +317,7 @@ const FeePill = memo(({
     value, 
     inputValue, 
     onChange, 
+    onBlur,
     readOnly, 
     colorClass, 
     prefix = "￥" 
@@ -312,6 +327,7 @@ const FeePill = memo(({
     value: number; 
     inputValue: string; 
     onChange: (val: string) => void; 
+    onBlur?: () => void;
     readOnly: boolean; 
     colorClass: string;
     prefix?: string;
@@ -330,6 +346,7 @@ const FeePill = memo(({
                     type="number" 
                     value={inputValue}
                     onChange={(e) => onChange(e.target.value)}
+                    onBlur={onBlur}
                     className="w-10 sm:w-12 bg-transparent text-foreground outline-none no-spinner p-0 h-auto"
                 />
             </div>
@@ -401,7 +418,9 @@ export function PurchaseOrderModal({
   const [shippingFeeInput, setShippingFeeInput] = useState(initialData?.shippingFees?.toString() || "0");
   const [extraFeeInput, setExtraFeeInput] = useState(initialData?.extraFees?.toString() || "0");
   const [discountInput, setDiscountInput] = useState(initialData?.discountAmount?.toString() || "0");
+  const [quantityDrafts, setQuantityDrafts] = useState<Record<string, string>>({});
   const [costPriceDrafts, setCostPriceDrafts] = useState<Record<string, string>>({});
+  const [lineTotalDrafts, setLineTotalDrafts] = useState<Record<string, string>>({});
 
 
   const [isSelectionModalOpen, setIsSelectionModalOpen] = useState(false);
@@ -421,6 +440,13 @@ export function PurchaseOrderModal({
   const [selectedProductionDate, setSelectedProductionDate] = useState("");
   const [shelfLifeRemark, setShelfLifeRemark] = useState("");
   const [isSavingShelfLife, setIsSavingShelfLife] = useState(false);
+
+  const parseDraftNumber = useCallback((value: string) => {
+    const trimmed = value.trim();
+    if (trimmed === "") return null;
+    const numeric = Number(trimmed);
+    return Number.isFinite(numeric) ? numeric : null;
+  }, []);
   
   const handleOpenShelfLifeModal = useCallback((item: PurchaseOrderItem) => {
     setActiveShelfLifeItem(item);
@@ -732,7 +758,19 @@ export function PurchaseOrderModal({
   };
 
   const removeItem = useCallback((itemKey: string) => {
+    setQuantityDrafts((prev) => {
+      if (!(itemKey in prev)) return prev;
+      const next = { ...prev };
+      delete next[itemKey];
+      return next;
+    });
     setCostPriceDrafts((prev) => {
+      if (!(itemKey in prev)) return prev;
+      const next = { ...prev };
+      delete next[itemKey];
+      return next;
+    });
+    setLineTotalDrafts((prev) => {
       if (!(itemKey in prev)) return prev;
       const next = { ...prev };
       delete next[itemKey];
@@ -769,44 +807,87 @@ export function PurchaseOrderModal({
       
       let processedValue: string | number = value;
       if (field === "lineTotal") {
-          const subtotal = value === "" ? 0 : parseFloat(value as string);
-          const safeSubtotal = Number.isNaN(subtotal) ? 0 : subtotal;
+          const subtotal = typeof value === "number" ? value : parseDraftNumber(value);
+          if (subtotal === null) return prev;
           const quantity = Math.max(0, Number(newItems[index].quantity) || 0);
-          const nextCostPrice = quantity > 0 ? Number((safeSubtotal / quantity).toFixed(4)) : 0;
+          const nextCostPrice = quantity > 0 ? Number((subtotal / quantity).toFixed(4)) : 0;
           newItems[index] = { ...newItems[index], costPrice: nextCostPrice };
           return { ...prev, items: newItems };
       }
       if (field === "quantity" || field === "costPrice") {
-          if (value === "") {
-              processedValue = 0;
-          } else {
-              processedValue = field === "quantity" ? parseInt(value as string) : parseFloat(value as string);
-              if (isNaN(processedValue as number)) processedValue = 0;
-          }
+          const numeric = typeof value === "number" ? value : parseDraftNumber(value);
+          if (numeric === null) return prev;
+          processedValue = field === "quantity" ? Math.trunc(numeric) : numeric;
       }
 
       newItems[index] = { ...newItems[index], [field]: processedValue };
       return { ...prev, items: newItems };
     });
-  }, [getPurchaseItemKey]);
+  }, [getPurchaseItemKey, parseDraftNumber]);
+
+  const handleQuantityInputChange = useCallback((itemKey: string, value: string) => {
+    setQuantityDrafts((prev) => ({ ...prev, [itemKey]: value }));
+    if (parseDraftNumber(value) !== null) {
+      updateItem(itemKey, "quantity", value);
+    }
+  }, [parseDraftNumber, updateItem]);
+
+  const handleQuantityInputBlur = useCallback((itemKey: string) => {
+    setQuantityDrafts((prev) => {
+      if (!(itemKey in prev)) return prev;
+      const next = { ...prev };
+      delete next[itemKey];
+      return next;
+    });
+  }, []);
 
   const handleCostPriceInputChange = useCallback((itemKey: string, value: string) => {
     setCostPriceDrafts((prev) => ({ ...prev, [itemKey]: value }));
-    updateItem(itemKey, "costPrice", value);
-  }, [updateItem]);
+    if (parseDraftNumber(value) !== null) {
+      updateItem(itemKey, "costPrice", value);
+    }
+  }, [parseDraftNumber, updateItem]);
 
   const handleCostPriceInputBlur = useCallback((itemKey: string) => {
     setCostPriceDrafts((prev) => {
       if (!(itemKey in prev)) return prev;
       const next = { ...prev };
-      const draftValue = next[itemKey];
       delete next[itemKey];
-      if (draftValue === "") {
-        updateItem(itemKey, "costPrice", 0);
-      }
       return next;
     });
-  }, [updateItem]);
+  }, []);
+
+  const handleLineTotalInputChange = useCallback((itemKey: string, value: string) => {
+    setLineTotalDrafts((prev) => ({ ...prev, [itemKey]: value }));
+    if (parseDraftNumber(value) !== null) {
+      updateItem(itemKey, "lineTotal", value);
+    }
+  }, [parseDraftNumber, updateItem]);
+
+  const handleLineTotalInputBlur = useCallback((itemKey: string) => {
+    setLineTotalDrafts((prev) => {
+      if (!(itemKey in prev)) return prev;
+      const next = { ...prev };
+      delete next[itemKey];
+      return next;
+    });
+  }, []);
+
+  const commitFeeInput = useCallback((
+    field: "shippingFees" | "extraFees" | "discountAmount",
+    value: string,
+    resetInput: (value: string) => void
+  ) => {
+    const numeric = parseDraftNumber(value);
+    if (numeric === null) {
+      const currentValue = formData[field] ?? 0;
+      resetInput(String(currentValue));
+      return;
+    }
+
+    setFormData((prev) => ({ ...prev, [field]: numeric }));
+    resetInput(String(numeric));
+  }, [formData, parseDraftNumber]);
 
   const inferStatus = (currentData: PurchaseOrder): PurchaseStatus => {
     if (currentData.status === "Received") return "Received";
@@ -1277,9 +1358,18 @@ export function PurchaseOrderModal({
                                     suppliers={suppliers}
                                     onUpdate={updateItem}
                                     onRemove={removeItem}
+                                    quantityInput={quantityDrafts[getPurchaseItemKey(item)] ?? (item.quantity ? String(item.quantity) : "")}
+                                    onQuantityInputChange={handleQuantityInputChange}
+                                    onQuantityInputBlur={handleQuantityInputBlur}
                                     costPriceInput={costPriceDrafts[getPurchaseItemKey(item)] ?? (item.costPrice ? String(item.costPrice) : "")}
                                     onCostPriceInputChange={handleCostPriceInputChange}
                                     onCostPriceInputBlur={handleCostPriceInputBlur}
+                                    lineTotalInput={
+                                        lineTotalDrafts[getPurchaseItemKey(item)] ??
+                                        (item.quantity ? String(Number((item.quantity * (item.costPrice ?? 0)).toFixed(2))) : "")
+                                    }
+                                    onLineTotalInputChange={handleLineTotalInputChange}
+                                    onLineTotalInputBlur={handleLineTotalInputBlur}
                                     allowCostEdit={canBackfillReceivedCosts}
                                     isChecked={batchMode ? batchSelected.has(getPurchaseItemKey(item)) : undefined}
                                     onToggle={batchMode && !effectiveReadOnly ? toggleBatchSelect : undefined}
@@ -1347,10 +1437,8 @@ export function PurchaseOrderModal({
                                         label="运费"
                                         value={formData.shippingFees}
                                         inputValue={shippingFeeInput}
-                                        onChange={(val: string) => {
-                                            setShippingFeeInput(val);
-                                            setFormData(prev => ({...prev, shippingFees: parseFloat(val) || 0}));
-                                        }}
+                                        onChange={setShippingFeeInput}
+                                        onBlur={() => commitFeeInput("shippingFees", shippingFeeInput, setShippingFeeInput)}
                                         readOnly={effectiveReadOnly}
                                         colorClass="hover:border-orange-500/30"
                                     />
@@ -1359,10 +1447,8 @@ export function PurchaseOrderModal({
                                         label="其它"
                                         value={formData.extraFees}
                                         inputValue={extraFeeInput}
-                                        onChange={(val: string) => {
-                                            setExtraFeeInput(val);
-                                            setFormData(prev => ({...prev, extraFees: parseFloat(val) || 0}));
-                                        }}
+                                        onChange={setExtraFeeInput}
+                                        onBlur={() => commitFeeInput("extraFees", extraFeeInput, setExtraFeeInput)}
                                         readOnly={effectiveReadOnly}
                                         colorClass="hover:border-blue-500/30"
                                     />
@@ -1371,10 +1457,8 @@ export function PurchaseOrderModal({
                                         label="折扣"
                                         value={formData.discountAmount || 0}
                                         inputValue={discountInput}
-                                        onChange={(val: string) => {
-                                            setDiscountInput(val);
-                                            setFormData(prev => ({...prev, discountAmount: parseFloat(val) || 0}));
-                                        }}
+                                        onChange={setDiscountInput}
+                                        onBlur={() => commitFeeInput("discountAmount", discountInput, setDiscountInput)}
                                         readOnly={effectiveReadOnly}
                                         colorClass="bg-amber-500/5 border-amber-500/20 hover:border-amber-500/40"
                                     />
