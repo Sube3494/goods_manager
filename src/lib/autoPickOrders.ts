@@ -1197,6 +1197,39 @@ function isManualDeliveryPlaceholderOrderItem(item: {
     || String(item.productName || "").trim() === MANUAL_DELIVERY_PLACEHOLDER_PRODUCT_NAME;
 }
 
+function readDeliveryFeeFromValue(delivery: unknown) {
+  if (!delivery || typeof delivery !== "object" || Array.isArray(delivery)) {
+    return 0;
+  }
+  const value = Number((delivery as Record<string, unknown>).sendFee || (delivery as Record<string, unknown>).send_fee || 0);
+  return Number.isFinite(value) ? Math.max(0, value) : 0;
+}
+
+function isOfflineDeliveryFeeOnlyOrder(input: {
+  platform?: string | null;
+  actualPaid?: number | null;
+  expectedIncome?: number | null;
+  delivery?: unknown;
+}) {
+  return String(input.platform || "").trim() === "线下交易"
+    && readDeliveryFeeFromValue(input.delivery) > 0
+    && Number(input.actualPaid || 0) <= 0
+    && Number(input.expectedIncome || 0) <= 0;
+}
+
+function hasAutoPickFulfillmentItems(items: Array<{
+  productName?: string | null;
+  productNo?: string | null;
+  rawPayload?: unknown;
+}>) {
+  return items.some((item) => {
+    if (!isManualDeliveryPlaceholderOrderItem(item)) {
+      return true;
+    }
+    return Boolean(readManualMatchedProductFromOrderItemRawPayload(item.rawPayload));
+  });
+}
+
 function shouldUseLegacyOfflineManualDeliveryOrderMatch(
   normalized: AutoPickInboundOrder,
   order: {
@@ -5566,6 +5599,10 @@ export async function createOutboundFromAutoPickOrder(
 
   if (existingOutbound) {
     return { ok: true, duplicated: true, outboundOrderId: existingOutbound.id };
+  }
+
+  if (isOfflineDeliveryFeeOnlyOrder(order) && !hasAutoPickFulfillmentItems(order.items)) {
+    return { ok: true, skipped: true, reason: "delivery-fee-only" as const };
   }
 
   if (order.items.length === 0) {

@@ -530,11 +530,12 @@ export function getOrderItemDisplay(item: AutoPickOrderItem) {
   ).trim();
 
   return {
-    name: matchedProduct?.name || (isManualDeliveryPlaceholder ? "请选择发货货品" : item.productName) || "未命名商品",
-    sku: matchedProduct?.sku || (isManualDeliveryPlaceholder ? "待匹配" : item.productNo) || "-",
+    name: matchedProduct?.name || (isManualDeliveryPlaceholder ? "可添加发货货品" : item.productName) || "未命名商品",
+    sku: matchedProduct?.sku || (isManualDeliveryPlaceholder ? "不加则只记配送费" : item.productNo) || "-",
     image: matchedProduct?.image || item.thumb || null,
     quantity: item.quantity,
     sourceId: isManualDeliveryPlaceholder ? undefined : sourceId || undefined,
+    optionalMatch: isManualDeliveryPlaceholder,
   };
 }
 
@@ -1221,7 +1222,7 @@ export function ProductStripItem({
   returnedDetails = [],
   isJdOrder = false,
 }: {
-  display: { name: string; sku: string; image: string | null; quantity: number; sourceId?: string };
+  display: { name: string; sku: string; image: string | null; quantity: number; sourceId?: string; optionalMatch?: boolean };
   onEditMatch?: () => void;
   showEditMatch?: boolean;
   matchedProduct?: AutoPickOrderItem['matchedProduct'];
@@ -1268,7 +1269,7 @@ export function ProductStripItem({
                 ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
                 : "bg-rose-500/10 text-rose-700 dark:text-rose-400"
             )}>
-              {matchedProduct ? (matchedProduct.isManual ? "手动" : "自动") : "未匹配"}
+              {matchedProduct ? (matchedProduct.isManual ? "手动" : "自动") : (display.optionalMatch ? "可选" : "未匹配")}
             </span>
           ) : null}
           {isJdOrder && display.sourceId ? (

@@ -752,6 +752,32 @@ function isOfflineManualDeliveryLossOrder(input: {
     && Number(input.expectedIncome || 0) <= 0;
 }
 
+function isManualDeliveryPlaceholderOrderItem(item: {
+  productName?: string | null;
+  productNo?: string | null;
+  rawPayload?: unknown;
+}) {
+  const rawPayload = item.rawPayload && typeof item.rawPayload === "object" && !Array.isArray(item.rawPayload)
+    ? item.rawPayload as Record<string, unknown>
+    : null;
+  return String(item.productNo || "").trim() === "__manual_delivery_placeholder__"
+    || rawPayload?.isManualDeliveryPlaceholder === true
+    || String(item.productName || "").trim() === "手工配送占位商品";
+}
+
+function hasAutoPickFulfillmentItems(items: Array<{
+  productName?: string | null;
+  productNo?: string | null;
+  rawPayload?: unknown;
+}>) {
+  return items.some((item) => {
+    if (!isManualDeliveryPlaceholderOrderItem(item)) {
+      return true;
+    }
+    return Boolean(readManualMatchedProduct(item.rawPayload));
+  });
+}
+
 function normalizeOrderPlatformForSummary(platform?: string | null) {
   const raw = String(platform || "").trim();
   const lower = raw.toLowerCase();
@@ -1082,7 +1108,10 @@ export async function GET(request: NextRequest) {
               shopAddress: true,
               items: {
                 select: {
+                  productName: true,
+                  productNo: true,
                   quantity: true,
+                  rawPayload: true,
                 },
               },
             },
@@ -1556,12 +1585,13 @@ export async function GET(request: NextRequest) {
             const returnExtraExpense = outboundMeta?.extraExpense || 0;
             const missingCostItemCount = outboundMeta?.missingCostItemCount || 0;
             const hasOutbound = Boolean(outboundMeta);
+            const hasFulfillmentItems = hasAutoPickFulfillmentItems(order.items);
             const isManualDeliveryLoss = isOfflineManualDeliveryLossOrder({
               platform: order.platform,
               actualPaid: order.actualPaid,
               expectedIncome: adjustedMetrics.expectedIncome,
               deliveryFee,
-            });
+            }) && !hasFulfillmentItems;
             const productCostStatus = isManualDeliveryLoss
               ? "ready" as const
               : !hasOutbound
@@ -1803,6 +1833,7 @@ export async function GET(request: NextRequest) {
       const productCost = outboundMeta?.productCost || 0;
       const deliveryFee = readDeliveryFee(order.delivery);
       const hasOutbound = Boolean(outboundMeta);
+      const hasFulfillmentItems = hasAutoPickFulfillmentItems(order.items);
       const cancelledDeliveryLoss = (isAutoPickOrderCancelledStatus(order.status) || isAutoPickOrderDeletedStatus(order.status))
         && hasRealizedCancelledDeliveryCost({
           deliveryFee,
@@ -1815,7 +1846,7 @@ export async function GET(request: NextRequest) {
         actualPaid: order.actualPaid,
         expectedIncome: adjustedMetrics.expectedIncome,
         deliveryFee,
-      });
+      }) && !hasFulfillmentItems;
       const missingCostItemCount = outboundMeta?.missingCostItemCount || 0;
       const productCostStatus = cancelledDeliveryLoss || manualDeliveryLoss
         ? "ready" as const
