@@ -187,7 +187,9 @@ function ShopSortWorkbench({
   const [draggingCategoryId, setDraggingCategoryId] = useState<string | null>(null);
   const [hasRestoredDraft, setHasRestoredDraft] = useState(false);
   const [isDraftReady, setIsDraftReady] = useState(false);
+  const [draftShopId, setDraftShopId] = useState("");
   const [deleteCategoryTarget, setDeleteCategoryTarget] = useState<SortWorkbenchCategory | null>(null);
+  const activeShopIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!isOpen || typeof document === "undefined") return;
@@ -203,10 +205,14 @@ function ShopSortWorkbench({
 
   const loadRows = useCallback(async () => {
     if (!shop?.id) return;
+    const currentShopId = shop.id;
+    activeShopIdRef.current = currentShopId;
+    setIsDraftReady(false);
+    setDraftShopId("");
     setIsLoading(true);
     try {
       const query = new URLSearchParams({
-        shopId: shop.id,
+        shopId: currentShopId,
         all: "true",
         sortBy: "sortNumber-asc",
       });
@@ -243,7 +249,7 @@ function ShopSortWorkbench({
       let restoredDraft = false;
 
       try {
-        const draftRaw = localStorage.getItem(getShopSortDraftKey(shop.id));
+        const draftRaw = localStorage.getItem(getShopSortDraftKey(currentShopId));
         const draft = draftRaw ? JSON.parse(draftRaw) as ShopSortDraft : null;
         if (draft && Array.isArray(draft.rows) && Array.isArray(draft.categories)) {
           const draftRowsById = new Map(draft.rows.map((row) => [row.id, row]));
@@ -266,6 +272,7 @@ function ShopSortWorkbench({
         console.warn("Failed to restore shop sort draft:", error);
       }
 
+      if (activeShopIdRef.current !== currentShopId) return;
       setStartNumber(nextStartNumber);
       setRows(nextRows);
       setSelectedRowIds([]);
@@ -273,6 +280,7 @@ function ShopSortWorkbench({
       setBatchTargetCategoryName("");
       setCategories(nextCategories);
       setHasRestoredDraft(restoredDraft);
+      setDraftShopId(currentShopId);
       setIsDraftReady(true);
       if (restoredDraft) {
         showToast("已恢复上次未保存的排序草稿", "info");
@@ -281,7 +289,9 @@ function ShopSortWorkbench({
       console.error("Failed to load shop sort rows:", error);
       showToast("加载排序商品失败", "error");
     } finally {
-      setIsLoading(false);
+      if (activeShopIdRef.current === currentShopId) {
+        setIsLoading(false);
+      }
     }
   }, [shop?.id, showToast]);
 
@@ -290,7 +300,7 @@ function ShopSortWorkbench({
   }, [isOpen, loadRows]);
 
   useEffect(() => {
-    if (!isOpen || !isDraftReady || !shop?.id) return;
+    if (!isOpen || !isDraftReady || !shop?.id || draftShopId !== shop.id) return;
     const draft: ShopSortDraft = {
       startNumber,
       categories,
@@ -303,7 +313,7 @@ function ShopSortWorkbench({
       updatedAt: Date.now(),
     };
     localStorage.setItem(getShopSortDraftKey(shop.id), JSON.stringify(draft));
-  }, [categories, isDraftReady, isOpen, rows, shop?.id, startNumber]);
+  }, [categories, draftShopId, isDraftReady, isOpen, rows, shop?.id, startNumber]);
 
   const updateRow = useCallback((id: string, field: "skuInput" | "sortGroupNameInput", value: string) => {
     setRows((prev) =>
