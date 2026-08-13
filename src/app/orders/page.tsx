@@ -162,13 +162,18 @@ function MappingSelect({
   const [isOpen, setIsOpen] = useState(false);
   const [menuRect, setMenuRect] = useState<{ top: number; left: number; width: number } | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
   const selected = options.find((item) => item.value === value);
 
   useEffect(() => {
     if (!isOpen) return;
 
     const handlePointerDown = (event: MouseEvent) => {
-      if (!containerRef.current?.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (
+        !containerRef.current?.contains(target) &&
+        !menuRef.current?.contains(target)
+      ) {
         setIsOpen(false);
       }
     };
@@ -216,6 +221,10 @@ function MappingSelect({
 
       {isOpen && menuRect && typeof document !== "undefined" ? createPortal(
         <div
+          ref={menuRef}
+          data-mapping-select-menu="true"
+          onMouseDown={(event) => event.stopPropagation()}
+          onClick={(event) => event.stopPropagation()}
           className="fixed z-[100200] overflow-hidden rounded-xl border border-black/8 bg-white/95 shadow-[0_18px_40px_rgba(15,23,42,0.16)] backdrop-blur dark:border-white/10 dark:bg-[#111827]/96"
           style={{ top: menuRect.top, left: menuRect.left, width: menuRect.width }}
         >
@@ -226,7 +235,8 @@ function MappingSelect({
                   <button
                     key={option.value || "__empty__"}
                     type="button"
-                    onClick={() => {
+                    onClick={(event) => {
+                      event.stopPropagation();
                       onChange(option.value);
                       setIsOpen(false);
                     }}
@@ -380,7 +390,14 @@ function IntegrationModal({
 
   return (
     <div className="fixed inset-0 z-[100000] flex items-center justify-center p-3 sm:p-5">
-      <div className="absolute inset-0 bg-slate-950/42 backdrop-blur-sm" onClick={onClose} />
+      <div
+        className="absolute inset-0 bg-slate-950/42 backdrop-blur-sm"
+        onMouseDown={(event) => {
+          const target = event.target as HTMLElement | null;
+          if (target?.closest("[data-mapping-select-menu='true']")) return;
+          onClose();
+        }}
+      />
       <div
         ref={modalRef}
         className="relative flex max-h-[calc(100vh-1.5rem)] w-full max-w-4xl flex-col overflow-hidden rounded-[24px] border border-black/8 bg-white/95 shadow-[0_30px_80px_rgba(15,23,42,0.22)] dark:border-white/10 dark:bg-[#0b111e]/98 sm:rounded-4xl"
