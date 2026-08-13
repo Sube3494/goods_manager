@@ -185,6 +185,7 @@ function ShopSortWorkbench({
   const [batchTargetCategoryName, setBatchTargetCategoryName] = useState("");
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
   const [draggingCategoryId, setDraggingCategoryId] = useState<string | null>(null);
+  const [draggingRowId, setDraggingRowId] = useState<string | null>(null);
   const [hasRestoredDraft, setHasRestoredDraft] = useState(false);
   const [isDraftReady, setIsDraftReady] = useState(false);
   const [draftShopId, setDraftShopId] = useState("");
@@ -337,6 +338,7 @@ function ShopSortWorkbench({
       const groupName = (row.sortGroupNameInput || row.categoryName || "未分组").trim();
       rowCountByName.set(groupName, (rowCountByName.get(groupName) || 0) + 1);
     });
+    const sourceOrderById = new Map(sourceRows.map((row, index) => [row.id, index]));
     const categoryMetaByName = new Map(orderedCategories.map((category) => [category.name.trim(), category]));
     const categoryStartByName = new Map<string, number>();
     let cursor = safeBase;
@@ -356,9 +358,9 @@ function ShopSortWorkbench({
       const orderB = orderByName.has(groupB) ? orderByName.get(groupB)! : Number.MAX_SAFE_INTEGER;
       if (orderA !== orderB) return orderA - orderB;
       if (groupA !== groupB) return groupA.localeCompare(groupB, "zh-CN");
-      const numberA = getIncrementingCodeNumber(a.skuInput);
-      const numberB = getIncrementingCodeNumber(b.skuInput);
-      if (numberA !== numberB) return numberA - numberB;
+      const sourceOrderA = sourceOrderById.get(a.id) ?? Number.MAX_SAFE_INTEGER;
+      const sourceOrderB = sourceOrderById.get(b.id) ?? Number.MAX_SAFE_INTEGER;
+      if (sourceOrderA !== sourceOrderB) return sourceOrderA - sourceOrderB;
       return (a.sku || "").localeCompare(b.sku || "", "zh-CN", { numeric: true, sensitivity: "base" });
     });
 
@@ -560,6 +562,41 @@ function ShopSortWorkbench({
     },
     [categories, rows, selectedCategoryName]
   );
+
+  const handleRowDrop = useCallback((targetId: string) => {
+    if (!draggingRowId || draggingRowId === targetId) return;
+    let blockedByCategory = false;
+    setRows((prev) => {
+      const fromRow = prev.find((row) => row.id === draggingRowId);
+      const targetRow = prev.find((row) => row.id === targetId);
+      if (!fromRow || !targetRow) return prev;
+      const fromGroup = (fromRow.sortGroupNameInput || fromRow.categoryName || "未分组").trim();
+      const targetGroup = (targetRow.sortGroupNameInput || targetRow.categoryName || "未分组").trim();
+      if (fromGroup !== targetGroup) {
+        blockedByCategory = true;
+        return prev;
+      }
+      const orderedIds = sortedPreview.map((row) => row.id);
+      const fromIndex = orderedIds.indexOf(draggingRowId);
+      const toIndex = orderedIds.indexOf(targetId);
+      if (fromIndex < 0 || toIndex < 0) return prev;
+      const nextIds = [...orderedIds];
+      const [movedId] = nextIds.splice(fromIndex, 1);
+      nextIds.splice(toIndex, 0, movedId);
+      const visibleOrderById = new Map(nextIds.map((id, index) => [id, index]));
+      const nextRows = [...prev].sort((a, b) => {
+        const orderA = visibleOrderById.has(a.id) ? visibleOrderById.get(a.id)! : Number.MAX_SAFE_INTEGER;
+        const orderB = visibleOrderById.has(b.id) ? visibleOrderById.get(b.id)! : Number.MAX_SAFE_INTEGER;
+        if (orderA !== orderB) return orderA - orderB;
+        return 0;
+      });
+      return renumberRowsByCategoryOrder(nextRows, categories);
+    });
+    if (blockedByCategory) {
+      showToast("只能在同一个临时分类内调整商品顺序", "error");
+    }
+    setDraggingRowId(null);
+  }, [categories, draggingRowId, renumberRowsByCategoryOrder, showToast, sortedPreview]);
 
   const changedCount = useMemo(
     () =>
@@ -777,8 +814,30 @@ function ShopSortWorkbench({
             </div>
             <div className="space-y-2 p-3 md:hidden">
               {sortedPreview.map((row, index) => (
-                <div key={row.id} className="rounded-xl border border-border bg-background p-3">
+                <div
+                  key={row.id}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={() => handleRowDrop(row.id)}
+                  className={cn(
+                    "rounded-xl border border-border bg-background p-3 transition-colors",
+                    draggingRowId === row.id && "opacity-60"
+                  )}
+                >
                   <div className="mb-3 flex items-center gap-3">
+                    <button
+                      type="button"
+                      draggable
+                      onDragStart={(e) => {
+                        e.dataTransfer.effectAllowed = "move";
+                        e.dataTransfer.setData("text/plain", row.id);
+                        setDraggingRowId(row.id);
+                      }}
+                      onDragEnd={() => setDraggingRowId(null)}
+                      className="h-8 w-6 shrink-0 cursor-grab rounded-lg text-muted-foreground active:cursor-grabbing"
+                      title="拖动调整商品顺序"
+                    >
+                      ::
+                    </button>
                     <button
                       type="button"
                       onClick={() => toggleRowSelection(row.id)}
@@ -833,13 +892,33 @@ function ShopSortWorkbench({
               </thead>
               <tbody className="divide-y divide-border">
                 {sortedPreview.map((row, index) => (
-                  <tr key={row.id} className="hover:bg-muted/30">
+                  <tr
+                    key={row.id}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={() => handleRowDrop(row.id)}
+                    className={cn("hover:bg-muted/30", draggingRowId === row.id && "opacity-60")}
+                  >
                     <td className="px-3 py-2 text-center">
+                      <div className="flex items-center justify-center gap-2">
+                      <button
+                        type="button"
+                        draggable
+                        onDragStart={(e) => {
+                          e.dataTransfer.effectAllowed = "move";
+                          e.dataTransfer.setData("text/plain", row.id);
+                          setDraggingRowId(row.id);
+                        }}
+                        onDragEnd={() => setDraggingRowId(null)}
+                        className="h-7 w-5 cursor-grab rounded text-muted-foreground active:cursor-grabbing"
+                        title="拖动调整商品顺序"
+                      >
+                        ::
+                      </button>
                       <button
                         type="button"
                         onClick={() => toggleRowSelection(row.id)}
                         className={cn(
-                          "mx-auto flex h-5 w-5 items-center justify-center rounded-full border-2 transition-all",
+                          "flex h-5 w-5 items-center justify-center rounded-full border-2 transition-all",
                           selectedRowIds.includes(row.id)
                             ? "border-primary bg-primary text-primary-foreground"
                             : "border-border bg-muted/20 hover:border-primary/60"
@@ -848,6 +927,7 @@ function ShopSortWorkbench({
                       >
                         {selectedRowIds.includes(row.id) && <Check size={12} strokeWidth={4} />}
                       </button>
+                      </div>
                     </td>
                     <td className="px-3 py-2 text-center text-xs font-bold text-muted-foreground">{index + 1}</td>
                     <td className="px-3 py-2">
