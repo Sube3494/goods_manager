@@ -898,11 +898,19 @@ export default function ShopGoodsPage() {
   const handleExport = useCallback(async () => {
     exportCancelledRef.current = false;
     try {
-      showToast("正在获取店铺商品数据...", "info");
-      const queryParams = buildAggregateQuery(1, { pageSize: "2000" });
-      const res = await fetch(`/api/shop-products?${queryParams.toString()}`);
-      const data: ShopProductsResponse = await res.json().catch(() => ({}));
-      const exportItems = Array.isArray(data.items) ? data.items : [];
+      let exportItems: ShopCatalogItem[];
+
+      if (selectedIds.length > 0) {
+        showToast(`正在导出 ${selectedIds.length} 件选中店铺商品...`, "info");
+        exportItems = await fetchSelectedItems();
+      } else {
+        showToast("正在获取店铺商品数据...", "info");
+        const queryParams = buildAggregateQuery(1, { pageSize: "2000" });
+        const res = await fetch(`/api/shop-products?${queryParams.toString()}`);
+        const data: ShopProductsResponse = await res.json().catch(() => ({}));
+        exportItems = Array.isArray(data.items) ? data.items : [];
+      }
+
       if (exportItems.length === 0) {
         showToast("没有可导出的店铺商品", "error");
         return;
@@ -1079,7 +1087,7 @@ export default function ShopGoodsPage() {
     } finally {
       setExportProgress(null);
     }
-  }, [buildAggregateQuery, selectedShop, showToast, suppliers]);
+  }, [buildAggregateQuery, fetchSelectedItems, selectedIds.length, selectedShop, showToast, suppliers]);
 
   const handleImport = useCallback(async (rows: Record<string, unknown>[] | Record<string, unknown[]>) => {
     if (!selectedShop) {
