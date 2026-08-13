@@ -128,6 +128,9 @@ export interface ShopCatalogItem {
   specs?: Record<string, string> | null;
   isShelfLife?: boolean;
   shelfLifeDays?: number | null;
+  sortNumber?: number | null;
+  sortGroupName?: string | null;
+  sortCategoryName?: string | null;
   createdAt?: string;
   updatedAt?: string;
 }

@@ -11,6 +11,8 @@ function buildOrderBy(sortBy: string) {
   if (sortBy === "name-asc") return [{ productName: "asc" as const }, { id: "asc" as const }];
   if (sortBy === "shop-asc") return [{ shop: { name: "asc" as const } }, { id: "asc" as const }];
   if (sortBy === "shop-desc") return [{ shop: { name: "desc" as const } }, { id: "asc" as const }];
+  if (sortBy === "sortNumber-asc") return [{ sortNumber: { sort: "asc" as const, nulls: "last" as const } }, { sku: "asc" as const }, { id: "asc" as const }];
+  if (sortBy === "sortNumber-desc") return [{ sortNumber: { sort: "desc" as const, nulls: "last" as const } }, { sku: "asc" as const }, { id: "asc" as const }];
   if (sortBy === "sku-desc") return [{ sku: "desc" as const }, { id: "asc" as const }];
   return [{ sku: "desc" as const }, { id: "asc" as const }];
 }
@@ -173,6 +175,9 @@ export async function GET(request: NextRequest) {
             isDiscontinued: item.isDiscontinued ?? false,
             isShelfLife: item.isShelfLife ?? false,
             shelfLifeDays: item.shelfLifeDays ?? null,
+            sortNumber: item.sortNumber ?? null,
+            sortGroupName: item.sortGroupName || null,
+            sortCategoryName: item.sortCategoryName || null,
             sourceType: "shopProduct" as const,
             shopProductId: item.id,
             isStandaloneShopProduct: !item.productId,
@@ -239,6 +244,9 @@ export async function GET(request: NextRequest) {
           isDiscontinued: item.isDiscontinued ?? false,
           isShelfLife: item.isShelfLife ?? false,
           shelfLifeDays: item.shelfLifeDays ?? null,
+          sortNumber: item.sortNumber ?? null,
+          sortGroupName: item.sortGroupName || null,
+          sortCategoryName: item.sortCategoryName || null,
           sourceType: "shopProduct" as const,
           shopProductId: item.id,
           isStandaloneShopProduct: !item.productId,
@@ -339,6 +347,9 @@ export async function GET(request: NextRequest) {
           isDiscontinued: item.isDiscontinued ?? false,
           isShelfLife: item.isShelfLife ?? false,
           shelfLifeDays: item.shelfLifeDays ?? null,
+          sortNumber: item.sortNumber ?? null,
+          sortGroupName: item.sortGroupName || null,
+          sortCategoryName: item.sortCategoryName || null,
           sourceType: "shopProduct" as const,
           shopProductId: item.id,
           isStandaloneShopProduct: !item.productId,
@@ -424,6 +435,9 @@ export async function GET(request: NextRequest) {
       isDiscontinued: item.isDiscontinued ?? false,
       isShelfLife: item.isShelfLife ?? false,
       shelfLifeDays: item.shelfLifeDays ?? null,
+      sortNumber: item.sortNumber ?? null,
+      sortGroupName: item.sortGroupName || null,
+      sortCategoryName: item.sortCategoryName || null,
       sourceType: "shopProduct" as const,
       shopProductId: item.id,
       isStandaloneShopProduct: !item.productId,

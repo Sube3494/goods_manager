@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { Search, Plus, Store, X, ArrowUp, Trash2, AlertCircle, Zap } from "lucide-react";
+import { Search, Plus, Store, X, ArrowUp, Trash2, AlertCircle, Zap, ListOrdered, Save, Check } from "lucide-react";
 import Link from "next/link";
 import { ImportModal } from "@/components/Goods/ImportModal";
 import { GoodsCard } from "@/components/Goods/GoodsCard";
@@ -25,6 +25,63 @@ interface ShopProductsResponse {
   items?: ShopCatalogItem[];
   total?: number;
   hasMore?: boolean;
+}
+
+type SortWorkbenchRow = ShopCatalogItem & {
+  skuInput: string;
+  sortGroupNameInput: string;
+  sortCategoryNameInput: string;
+};
+
+type SortWorkbenchCategory = {
+  id: string;
+  name: string;
+  rangeSize: string;
+};
+
+type ShopSortDraft = {
+  startNumber: string;
+  categories: SortWorkbenchCategory[];
+  rows: Array<{
+    id: string;
+    skuInput: string;
+    sortGroupNameInput: string;
+    sortCategoryNameInput: string;
+  }>;
+  updatedAt: number;
+};
+
+function getShopSortDraftKey(shopId: string) {
+  return `shop-sort-draft:${shopId}`;
+}
+
+function parseIncrementingCode(value: string) {
+  const trimmed = value.trim();
+  const match = trimmed.match(/^(.*?)(\d+)(\D*)$/);
+  if (!match) {
+    return {
+      prefix: "",
+      number: Number(trimmed) || 1,
+      suffix: "",
+      width: 0,
+    };
+  }
+  return {
+    prefix: match[1] || "",
+    number: Number(match[2]) || 1,
+    suffix: match[3] || "",
+    width: match[2].length,
+  };
+}
+
+function formatIncrementingCode(template: ReturnType<typeof parseIncrementingCode>, number: number) {
+  const numericPart = template.width > 0 ? String(number).padStart(template.width, "0") : String(number);
+  return `${template.prefix}${numericPart}${template.suffix}`;
+}
+
+function getIncrementingCodeNumber(value: string | null | undefined) {
+  const match = String(value || "").trim().match(/(\d+)(\D*)$/);
+  return match ? Number(match[1]) : Number.POSITIVE_INFINITY;
 }
 
 async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: ArrayBuffer; width?: number; height?: number; extension: "jpeg" | "png" } | null> {
@@ -104,6 +161,808 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
   } catch {
     return null;
   }
+}
+
+function ShopSortWorkbench({
+  isOpen,
+  shop,
+  onClose,
+  onSaved,
+}: {
+  isOpen: boolean;
+  shop: Shop | null;
+  onClose: () => void;
+  onSaved: () => Promise<void>;
+}) {
+  const { showToast } = useToast();
+  const [rows, setRows] = useState<SortWorkbenchRow[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [startNumber, setStartNumber] = useState("1001");
+  const [categories, setCategories] = useState<SortWorkbenchCategory[]>([]);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [selectedCategoryName, setSelectedCategoryName] = useState("all");
+  const [batchTargetCategoryName, setBatchTargetCategoryName] = useState("");
+  const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
+  const [draggingCategoryId, setDraggingCategoryId] = useState<string | null>(null);
+  const [hasRestoredDraft, setHasRestoredDraft] = useState(false);
+  const [isDraftReady, setIsDraftReady] = useState(false);
+  const [deleteCategoryTarget, setDeleteCategoryTarget] = useState<SortWorkbenchCategory | null>(null);
+
+  const loadRows = useCallback(async () => {
+    if (!shop?.id) return;
+    setIsLoading(true);
+    try {
+      const query = new URLSearchParams({
+        shopId: shop.id,
+        all: "true",
+        sortBy: "sortNumber-asc",
+      });
+      const [productsRes, categoriesRes] = await Promise.all([
+        fetch(`/api/shop-products?${query.toString()}`, { cache: "no-store" }),
+        fetch("/api/categories", { cache: "no-store" }),
+      ]);
+      const data: ShopProductsResponse = await productsRes.json().catch(() => ({}));
+      const categoryData: Category[] = await categoriesRes.json().catch(() => []);
+      if (!productsRes.ok) {
+        throw new Error("加载排序商品失败");
+      }
+      const fetchedOriginalNames = Array.isArray(categoryData)
+        ? categoryData.map((category) => String(category.name || "").trim()).filter(Boolean)
+        : [];
+      const loadedRows = (Array.isArray(data.items) ? data.items : []).map((item) => ({
+        ...item,
+        skuInput: item.sku || "",
+        sortGroupNameInput: item.sortGroupName || "",
+        sortCategoryNameInput: item.sortCategoryName || item.categoryName || "",
+      }));
+      let nextRows = loadedRows;
+      let nextStartNumber = "1001";
+      let nextCategories = Array.from(
+        new Set(
+          [
+            ...loadedRows
+              .map((row) => (row.sortGroupNameInput || row.categoryName || "未分组").trim())
+              .filter(Boolean),
+            ...fetchedOriginalNames,
+          ]
+        )
+      ).map((name) => ({ id: `${name}-${crypto.randomUUID()}`, name, rangeSize: "1000" }));
+      let restoredDraft = false;
+
+      try {
+        const draftRaw = localStorage.getItem(getShopSortDraftKey(shop.id));
+        const draft = draftRaw ? JSON.parse(draftRaw) as ShopSortDraft : null;
+        if (draft && Array.isArray(draft.rows) && Array.isArray(draft.categories)) {
+          const draftRowsById = new Map(draft.rows.map((row) => [row.id, row]));
+          nextRows = loadedRows.map((row) => {
+            const draftRow = draftRowsById.get(row.id);
+            return draftRow
+              ? {
+                  ...row,
+                  skuInput: draftRow.skuInput,
+                  sortGroupNameInput: draftRow.sortGroupNameInput,
+                  sortCategoryNameInput: draftRow.sortCategoryNameInput,
+                }
+              : row;
+          });
+          nextStartNumber = draft.startNumber || nextStartNumber;
+          nextCategories = draft.categories.length > 0 ? draft.categories : nextCategories;
+          restoredDraft = true;
+        }
+      } catch (error) {
+        console.warn("Failed to restore shop sort draft:", error);
+      }
+
+      setStartNumber(nextStartNumber);
+      setRows(nextRows);
+      setSelectedRowIds([]);
+      setSelectedCategoryName("all");
+      setBatchTargetCategoryName("");
+      setCategories(nextCategories);
+      setHasRestoredDraft(restoredDraft);
+      setIsDraftReady(true);
+      if (restoredDraft) {
+        showToast("已恢复上次未保存的排序草稿", "info");
+      }
+    } catch (error) {
+      console.error("Failed to load shop sort rows:", error);
+      showToast("加载排序商品失败", "error");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [shop?.id, showToast]);
+
+  useEffect(() => {
+    if (isOpen) void loadRows();
+  }, [isOpen, loadRows]);
+
+  useEffect(() => {
+    if (!isOpen || !isDraftReady || !shop?.id) return;
+    const draft: ShopSortDraft = {
+      startNumber,
+      categories,
+      rows: rows.map((row) => ({
+        id: row.id,
+        skuInput: row.skuInput,
+        sortGroupNameInput: row.sortGroupNameInput,
+        sortCategoryNameInput: row.sortCategoryNameInput,
+      })),
+      updatedAt: Date.now(),
+    };
+    localStorage.setItem(getShopSortDraftKey(shop.id), JSON.stringify(draft));
+  }, [categories, isDraftReady, isOpen, rows, shop?.id, startNumber]);
+
+  const updateRow = useCallback((id: string, field: "skuInput" | "sortGroupNameInput", value: string) => {
+    setRows((prev) =>
+      prev.map((row) =>
+        row.id === id
+          ? {
+              ...row,
+              [field]: value,
+              ...(field === "sortGroupNameInput" ? { sortCategoryNameInput: value } : {}),
+            }
+          : row
+      )
+    );
+  }, []);
+
+  const renumberRowsByCategoryOrder = useCallback((sourceRows: SortWorkbenchRow[], orderedCategories: SortWorkbenchCategory[]) => {
+    const template = parseIncrementingCode(startNumber);
+    const safeBase = template.number;
+    const safeStep = 1000;
+    const categoryMetaByName = new Map(orderedCategories.map((category) => [category.name.trim(), category]));
+    const categoryStartByName = new Map<string, number>();
+    let cursor = safeBase;
+    orderedCategories.forEach((category) => {
+      const name = category.name.trim();
+      categoryStartByName.set(name, cursor);
+      const numericRange = Number(category.rangeSize);
+      const safeCategoryRange = Number.isFinite(numericRange) && numericRange > 0 ? Math.trunc(numericRange) : safeStep;
+      cursor += safeCategoryRange;
+    });
+    const orderByName = new Map(orderedCategories.map((category, index) => [category.name.trim(), index]));
+    const sorted = [...sourceRows].sort((a, b) => {
+      const groupA = (a.sortGroupNameInput || a.categoryName || "未分组").trim();
+      const groupB = (b.sortGroupNameInput || b.categoryName || "未分组").trim();
+      const orderA = orderByName.has(groupA) ? orderByName.get(groupA)! : Number.MAX_SAFE_INTEGER;
+      const orderB = orderByName.has(groupB) ? orderByName.get(groupB)! : Number.MAX_SAFE_INTEGER;
+      if (orderA !== orderB) return orderA - orderB;
+      if (groupA !== groupB) return groupA.localeCompare(groupB, "zh-CN");
+      const numberA = getIncrementingCodeNumber(a.skuInput);
+      const numberB = getIncrementingCodeNumber(b.skuInput);
+      if (numberA !== numberB) return numberA - numberB;
+      return (a.sku || "").localeCompare(b.sku || "", "zh-CN", { numeric: true, sensitivity: "base" });
+    });
+
+    const groupIndexByName = new Map<string, number>();
+    const offsetByName = new Map<string, number>();
+    const numbered = new Map<string, string>();
+
+    for (const row of sorted) {
+      const groupName = (row.sortGroupNameInput || row.categoryName || "未分组").trim();
+      const groupIndex = orderByName.has(groupName)
+        ? orderByName.get(groupName)!
+        : groupIndexByName.has(groupName)
+        ? groupIndexByName.get(groupName)!
+        : orderedCategories.length + groupIndexByName.size;
+      if (!groupIndexByName.has(groupName)) groupIndexByName.set(groupName, groupIndex);
+      const offset = offsetByName.get(groupName) || 0;
+      const fallbackStart = safeBase + groupIndex * safeStep;
+      const categoryStart = categoryMetaByName.has(groupName) ? categoryStartByName.get(groupName) ?? fallbackStart : fallbackStart;
+      numbered.set(row.id, formatIncrementingCode(template, categoryStart + offset));
+      offsetByName.set(groupName, offset + 1);
+    }
+
+    return sourceRows.map((row) => {
+      const groupName = (row.sortGroupNameInput || row.categoryName || "未分组").trim();
+      return {
+        ...row,
+        skuInput: numbered.get(row.id) || "",
+        sortGroupNameInput: groupName,
+        sortCategoryNameInput: groupName,
+      };
+    });
+  }, [startNumber]);
+
+  const syncCategoriesFromRows = useCallback((nextRows: SortWorkbenchRow[], preferredOrder = categories) => {
+    const names = Array.from(
+      new Set(nextRows.map((row) => (row.sortGroupNameInput || row.categoryName || "未分组").trim()).filter(Boolean))
+    );
+    const existingByName = new Map(preferredOrder.map((category) => [category.name, category]));
+    return [
+      ...preferredOrder.filter((category) => names.includes(category.name)),
+      ...names
+        .filter((name) => !existingByName.has(name))
+        .map((name) => ({ id: `${name}-${crypto.randomUUID()}`, name, rangeSize: "1000" })),
+    ];
+  }, [categories]);
+
+  const addCategory = useCallback(() => {
+    const name = newCategoryName.trim();
+    if (!name) {
+      showToast("请输入临时分类名称", "error");
+      return;
+    }
+    if (categories.some((category) => category.name === name)) {
+      showToast("这个临时分类已存在", "error");
+      return;
+    }
+    setCategories((prev) => [...prev, { id: `${name}-${crypto.randomUUID()}`, name, rangeSize: "1000" }]);
+    setSelectedCategoryName(name);
+    setNewCategoryName("");
+  }, [categories, newCategoryName, showToast]);
+
+  const pinCategoryToTop = useCallback((id: string) => {
+    setCategories((prev) => {
+      const index = prev.findIndex((category) => category.id === id);
+      if (index <= 0) return prev;
+      const next = [...prev];
+      const [item] = next.splice(index, 1);
+      next.unshift(item);
+      setRows((prevRows) => renumberRowsByCategoryOrder(prevRows, next));
+      return next;
+    });
+  }, [renumberRowsByCategoryOrder]);
+
+  const deleteCategory = useCallback((category: SortWorkbenchCategory) => {
+    if (!category) return;
+    const productCount = rows.filter((row) => row.sortGroupNameInput === category.name).length;
+
+    setCategories((prev) => {
+      const nextBase = prev.filter((item) => item.id !== category.id);
+      const needsUngrouped = productCount > 0 && !nextBase.some((item) => item.name === "未分组");
+      const next = needsUngrouped
+        ? [...nextBase, { id: `未分组-${crypto.randomUUID()}`, name: "未分组", rangeSize: category.rangeSize || "1000" }]
+        : nextBase;
+      setRows((prevRows) => {
+        const movedRows = prevRows.map((row) =>
+          row.sortGroupNameInput === category.name
+            ? { ...row, sortGroupNameInput: "未分组", sortCategoryNameInput: "未分组" }
+            : row
+        );
+        return renumberRowsByCategoryOrder(movedRows, next);
+      });
+      return next;
+    });
+    setSelectedCategoryName((current) => (current === category.name ? "all" : current));
+    setBatchTargetCategoryName((current) => (current === category.name ? "" : current));
+    setDeleteCategoryTarget(null);
+  }, [categories, renumberRowsByCategoryOrder, rows]);
+
+  const renameCategory = useCallback((id: string, value: string) => {
+    const nextName = value.trim();
+    setCategories((prev) => prev.map((category) => (category.id === id ? { ...category, name: value } : category)));
+    if (!nextName) return;
+    const oldName = categories.find((category) => category.id === id)?.name;
+    if (!oldName || oldName === nextName) return;
+    setRows((prev) =>
+      prev.map((row) =>
+        row.sortGroupNameInput === oldName
+          ? { ...row, sortGroupNameInput: nextName, sortCategoryNameInput: row.sortCategoryNameInput === oldName ? nextName : row.sortCategoryNameInput }
+          : row
+      )
+    );
+    setSelectedCategoryName((current) => (current === oldName ? nextName : current));
+  }, [categories]);
+
+  const updateCategoryRange = useCallback((id: string, value: string) => {
+    setCategories((prev) => {
+      const next = prev.map((category) => (category.id === id ? { ...category, rangeSize: value } : category));
+      setRows((prevRows) => renumberRowsByCategoryOrder(prevRows, next));
+      return next;
+    });
+  }, [renumberRowsByCategoryOrder]);
+
+  const handleCategoryDrop = useCallback((targetId: string) => {
+    if (!draggingCategoryId || draggingCategoryId === targetId) return;
+    setCategories((prev) => {
+      const fromIndex = prev.findIndex((category) => category.id === draggingCategoryId);
+      const toIndex = prev.findIndex((category) => category.id === targetId);
+      if (fromIndex < 0 || toIndex < 0) return prev;
+      const next = [...prev];
+      const [item] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, item);
+      setRows((prevRows) => renumberRowsByCategoryOrder(prevRows, next));
+      return next;
+    });
+    setDraggingCategoryId(null);
+  }, [draggingCategoryId, renumberRowsByCategoryOrder]);
+
+  const applyCategoryToSelected = useCallback((categoryName: string) => {
+    if (selectedRowIds.length === 0) {
+      showToast("请先勾选商品", "error");
+      return;
+    }
+    setRows((prev) => {
+      const nextRows = prev.map((row) =>
+        selectedRowIds.includes(row.id)
+          ? { ...row, sortGroupNameInput: categoryName, sortCategoryNameInput: categoryName }
+          : row
+      );
+      return renumberRowsByCategoryOrder(nextRows, categories);
+    });
+    showToast(`已把 ${selectedRowIds.length} 件商品改到「${categoryName}」`, "success");
+  }, [categories, renumberRowsByCategoryOrder, selectedRowIds, showToast]);
+
+  const applyBatchTargetCategory = useCallback(() => {
+    if (!batchTargetCategoryName) {
+      showToast("请选择要转移到的临时分类", "error");
+      return;
+    }
+    applyCategoryToSelected(batchTargetCategoryName);
+  }, [applyCategoryToSelected, batchTargetCategoryName, showToast]);
+
+  const fillGroupsFromOriginalCategory = useCallback(() => {
+    setRows((prev) => {
+      const nextRows = prev.map((row) => {
+        const groupName = row.categoryName || "未分类";
+        return {
+          ...row,
+          sortGroupNameInput: groupName,
+          sortCategoryNameInput: groupName,
+        };
+      });
+      setCategories(syncCategoriesFromRows(nextRows, []));
+      return nextRows;
+    });
+    showToast("已用原分类初始化临时分类", "success");
+  }, [showToast, syncCategoriesFromRows]);
+
+  const autoNumberByGroup = useCallback(() => {
+    setRows((prev) => renumberRowsByCategoryOrder(prev, categories));
+    showToast("已按临时分类生成店内码", "success");
+  }, [categories, renumberRowsByCategoryOrder, showToast]);
+
+  const sortedPreview = useMemo(
+    () => {
+      const orderByName = new Map(categories.map((category, index) => [category.name.trim(), index]));
+      return [...rows]
+        .filter((row) => selectedCategoryName === "all" || row.sortGroupNameInput === selectedCategoryName)
+        .sort((a, b) => {
+          const groupA = (a.sortGroupNameInput || a.categoryName || "未分组").trim();
+          const groupB = (b.sortGroupNameInput || b.categoryName || "未分组").trim();
+          const orderA = orderByName.has(groupA) ? orderByName.get(groupA)! : Number.MAX_SAFE_INTEGER;
+          const orderB = orderByName.has(groupB) ? orderByName.get(groupB)! : Number.MAX_SAFE_INTEGER;
+          if (orderA !== orderB) return orderA - orderB;
+        const numberA = getIncrementingCodeNumber(a.skuInput);
+        const numberB = getIncrementingCodeNumber(b.skuInput);
+        if (numberA !== numberB) return numberA - numberB;
+        return a.name.localeCompare(b.name, "zh-CN");
+      });
+    },
+    [categories, rows, selectedCategoryName]
+  );
+
+  const changedCount = useMemo(
+    () =>
+      rows.filter((row) =>
+        (row.skuInput || "") !== (row.sku || "") ||
+        (row.sortGroupNameInput || "") !== (row.sortGroupName || "") ||
+        (row.sortCategoryNameInput || "") !== (row.sortCategoryName || row.categoryName || "")
+      ).length,
+    [rows]
+  );
+
+  const categoryCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    rows.forEach((row) => {
+      const name = (row.sortGroupNameInput || row.categoryName || "未分组").trim();
+      counts.set(name, (counts.get(name) || 0) + 1);
+    });
+    return counts;
+  }, [rows]);
+
+  const visibleRowIds = useMemo(() => sortedPreview.map((row) => row.id), [sortedPreview]);
+  const allVisibleSelected = visibleRowIds.length > 0 && visibleRowIds.every((id) => selectedRowIds.includes(id));
+
+  const toggleRowSelection = useCallback((id: string) => {
+    setSelectedRowIds((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]));
+  }, []);
+
+  const toggleVisibleSelection = useCallback(() => {
+    setSelectedRowIds((prev) => {
+      if (allVisibleSelected) {
+        return prev.filter((id) => !visibleRowIds.includes(id));
+      }
+      return Array.from(new Set([...prev, ...visibleRowIds]));
+    });
+  }, [allVisibleSelected, visibleRowIds]);
+
+  const saveRows = useCallback(async () => {
+    if (!shop?.id) return;
+    setIsSaving(true);
+    try {
+      const updates = rows.map((row) => ({
+        id: row.id,
+        sku: row.skuInput.trim(),
+        costPrice: Number(row.costPrice || 0),
+        sortGroupName: row.sortGroupNameInput.trim(),
+        sortCategoryName: row.sortGroupNameInput.trim(),
+      }));
+      const res = await fetch(`/api/shops/${shop.id}/products/batch`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ updates }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showToast(data?.error || "应用排序失败", "error");
+        return;
+      }
+      localStorage.removeItem(getShopSortDraftKey(shop.id));
+      setHasRestoredDraft(false);
+      showToast(`已应用 ${updates.length} 件店铺商品排序`, "success");
+      await onSaved();
+      onClose();
+    } catch (error) {
+      console.error("Failed to save shop sort rows:", error);
+      showToast("应用排序失败", "error");
+    } finally {
+      setIsSaving(false);
+    }
+  }, [onClose, onSaved, rows, shop?.id, showToast]);
+
+  if (!isOpen || typeof document === "undefined") return null;
+
+  return createPortal(
+    <AnimatePresence>
+      <motion.div
+        key="shop-sort-backdrop"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-9998 bg-black/45 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      <motion.div
+        key="shop-sort-panel"
+        initial={{ opacity: 0, y: 24, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 24, scale: 0.98 }}
+        className="fixed inset-0 z-9999 mx-auto flex max-w-7xl flex-col overflow-hidden border border-border bg-background shadow-2xl sm:inset-x-6 sm:top-4 sm:bottom-4 sm:rounded-2xl"
+      >
+        <div className="flex flex-col gap-3 border-b border-border p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-lg font-bold text-foreground">店铺商品排序</h2>
+              <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+                草稿自动保存
+              </span>
+              {hasRestoredDraft && (
+                <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[11px] font-bold text-amber-600 dark:text-amber-400">
+                  已恢复草稿
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">{shop?.name || "当前店铺"} · 只有点击“应用到店铺”才会改正式店内码</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <button type="button" onClick={fillGroupsFromOriginalCategory} className="h-9 rounded-xl border border-border px-3 text-xs font-bold text-foreground hover:bg-muted/60">用原分类初始化</button>
+            <button type="button" onClick={autoNumberByGroup} className="inline-flex h-9 items-center gap-2 rounded-xl bg-primary px-3 text-xs font-bold text-primary-foreground hover:opacity-90"><ListOrdered size={15} />生成店内码</button>
+            <button type="button" onClick={() => { void saveRows(); }} disabled={isSaving || rows.length === 0} className="inline-flex h-9 items-center gap-2 rounded-xl bg-emerald-600 px-3 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"><Save size={15} />{isSaving ? "应用中" : `应用到店铺${changedCount ? ` ${changedCount}` : ""}`}</button>
+            <button type="button" onClick={onClose} className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border text-muted-foreground hover:bg-muted/60" title="关闭"><X size={16} /></button>
+          </div>
+        </div>
+
+        <div className="grid gap-3 border-b border-border p-3 sm:p-4 lg:grid-cols-[180px_1fr_260px]">
+          <label className="text-xs font-medium text-muted-foreground">
+            起始店内码
+            <input value={startNumber} onChange={(e) => setStartNumber(e.target.value)} placeholder="如 1001 / N1 / A001" className="mt-1 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-primary" />
+          </label>
+          <div className="flex items-end text-xs text-muted-foreground">
+            支持 N1、A001；每个临时分类单独设置占位数。
+          </div>
+          <div className="flex items-end gap-2">
+            <input value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addCategory(); }} placeholder="新建临时分类" className="h-10 min-w-0 flex-1 rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-primary" />
+            <button type="button" onClick={addCategory} className="h-10 rounded-xl bg-primary px-3 text-xs font-bold text-primary-foreground">新建</button>
+          </div>
+        </div>
+
+        <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[300px_1fr]">
+          <aside className="max-h-[42vh] min-h-0 overflow-auto border-b border-border bg-muted/20 p-3 lg:max-h-none lg:border-b-0 lg:border-r">
+            <button
+              type="button"
+              onClick={() => setSelectedCategoryName("all")}
+              className={cn(
+                "mb-2 flex h-10 w-full items-center justify-between rounded-xl px-3 text-left text-sm font-bold transition-colors",
+                selectedCategoryName === "all" ? "bg-primary text-primary-foreground" : "hover:bg-muted"
+              )}
+            >
+              <span>全部临时分类</span>
+              <span>{rows.length}</span>
+            </button>
+            <div className="space-y-2">
+              {categories.map((category, index) => (
+                <div
+                  key={category.id}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={() => handleCategoryDrop(category.id)}
+                  className={cn(
+                    "rounded-xl border border-border bg-background p-2 transition-colors",
+                    selectedCategoryName === category.name && "border-primary bg-primary/5",
+                    draggingCategoryId === category.id && "opacity-60"
+                  )}
+                >
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      draggable
+                      onDragStart={(e) => {
+                        e.dataTransfer.effectAllowed = "move";
+                        e.dataTransfer.setData("text/plain", category.id);
+                        setDraggingCategoryId(category.id);
+                      }}
+                      onDragEnd={() => setDraggingCategoryId(null)}
+                      onClick={() => setSelectedCategoryName(category.name)}
+                      className="h-8 w-7 cursor-grab rounded-lg text-muted-foreground hover:bg-muted active:cursor-grabbing"
+                      title="拖动分类排序"
+                    >
+                      ::
+                    </button>
+                    <div className="flex min-w-0 flex-1 items-center">
+                      <div className="relative h-8 max-w-[120px] shrink-0">
+                        <span aria-hidden className="invisible block whitespace-pre pr-1 text-sm font-semibold">
+                          {category.name || " "}
+                        </span>
+                        <input
+                          value={category.name}
+                          onChange={(e) => renameCategory(category.id, e.target.value)}
+                          className="absolute inset-0 h-8 w-full bg-transparent text-sm font-semibold text-foreground outline-none"
+                        />
+                      </div>
+                      <span className="shrink-0 rounded-lg bg-muted px-2 py-1 text-xs font-bold text-muted-foreground">{categoryCounts.get(category.name) || 0}</span>
+                    </div>
+                    <label className="flex h-8 w-24 shrink-0 items-center gap-1 rounded-lg border border-border bg-background px-2 text-[10px] font-bold text-muted-foreground">
+                      <span>占</span>
+                      <input
+                        value={category.rangeSize}
+                        onChange={(e) => updateCategoryRange(category.id, e.target.value)}
+                        type="number"
+                        step="1"
+                        min="1"
+                        className="min-w-0 flex-1 bg-transparent font-mono text-xs text-foreground outline-none"
+                      />
+                    </label>
+                  </div>
+                  <div className="mt-2 grid grid-cols-2 gap-1">
+                    <button type="button" onClick={() => pinCategoryToTop(category.id)} disabled={index === 0} className="h-8 rounded-lg border border-border text-xs font-bold text-muted-foreground disabled:opacity-40">置顶</button>
+                    <button type="button" onClick={() => setDeleteCategoryTarget(category)} className="h-8 rounded-lg border border-rose-500/20 text-xs font-bold text-rose-500 hover:bg-rose-500/10">删除</button>
+                  </div>
+                </div>
+              ))}
+              {categories.length === 0 && (
+                <div className="rounded-xl border border-dashed border-border p-4 text-center text-xs text-muted-foreground">还没有可用分类</div>
+              )}
+            </div>
+          </aside>
+
+          <div className="min-h-0 overflow-auto">
+          {isLoading ? (
+            <div className="flex h-full items-center justify-center text-sm text-muted-foreground">正在加载排序商品...</div>
+          ) : (
+            <>
+            <div className="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-2 border-b border-border bg-background/95 px-3 py-2 backdrop-blur">
+              <div className="text-xs font-medium text-muted-foreground">
+                已选 <strong className="text-foreground">{selectedRowIds.length}</strong> 件，当前显示 <strong className="text-foreground">{sortedPreview.length}</strong> 件
+              </div>
+            </div>
+            <div className="space-y-2 p-3 md:hidden">
+              {sortedPreview.map((row, index) => (
+                <div key={row.id} className="rounded-xl border border-border bg-background p-3">
+                  <div className="mb-3 flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => toggleRowSelection(row.id)}
+                      className={cn(
+                        "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-all",
+                        selectedRowIds.includes(row.id)
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-border bg-muted/20"
+                      )}
+                      title="选择商品"
+                    >
+                      {selectedRowIds.includes(row.id) && <Check size={12} strokeWidth={4} />}
+                    </button>
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-muted/50">
+                      {row.image ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={row.image} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <Store size={16} className="text-muted-foreground/40" />
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="line-clamp-1 text-sm font-bold text-foreground">{row.name}</div>
+                      <div className="mt-1 text-xs font-bold text-muted-foreground">顺序 {index + 1}</div>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <label className="text-[11px] font-bold text-muted-foreground">
+                      店内码
+                      <input value={row.skuInput} onChange={(e) => updateRow(row.id, "skuInput", e.target.value)} placeholder="店内码" className="mt-1 h-10 w-full rounded-xl border border-border bg-background px-3 font-mono text-sm text-foreground outline-none focus:border-primary" />
+                    </label>
+                    <label className="text-[11px] font-bold text-muted-foreground">
+                      临时分类
+                      <input value={row.sortGroupNameInput} onChange={(e) => updateRow(row.id, "sortGroupNameInput", e.target.value)} placeholder="临时分类" className="mt-1 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-primary" />
+                    </label>
+                  </div>
+                </div>
+              ))}
+              {rows.length === 0 && (
+                <div className="py-16 text-center text-sm text-muted-foreground">当前店铺还没有商品可排序</div>
+              )}
+            </div>
+            <table className="hidden w-full min-w-[760px] text-left text-sm md:table">
+              <thead className="sticky top-0 z-10 bg-muted/80 text-center text-xs text-muted-foreground backdrop-blur">
+                <tr>
+                  <th className="w-12 px-3 py-3"></th>
+                  <th className="w-20 px-3 py-3 text-center">顺序</th>
+                  <th className="w-32 px-3 py-3 text-center">店内码</th>
+                  <th className="w-44 px-3 py-3 text-center">临时分类</th>
+                  <th className="px-3 py-3 text-center">商品</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {sortedPreview.map((row, index) => (
+                  <tr key={row.id} className="hover:bg-muted/30">
+                    <td className="px-3 py-2 text-center">
+                      <button
+                        type="button"
+                        onClick={() => toggleRowSelection(row.id)}
+                        className={cn(
+                          "mx-auto flex h-5 w-5 items-center justify-center rounded-full border-2 transition-all",
+                          selectedRowIds.includes(row.id)
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : "border-border bg-muted/20 hover:border-primary/60"
+                        )}
+                        title="选择商品"
+                      >
+                        {selectedRowIds.includes(row.id) && <Check size={12} strokeWidth={4} />}
+                      </button>
+                    </td>
+                    <td className="px-3 py-2 text-center text-xs font-bold text-muted-foreground">{index + 1}</td>
+                    <td className="px-3 py-2">
+                      <input value={row.skuInput} onChange={(e) => updateRow(row.id, "skuInput", e.target.value)} placeholder="店内码" className="h-9 w-full rounded-xl border border-border bg-background px-3 font-mono text-sm outline-none focus:border-primary" />
+                    </td>
+                    <td className="px-3 py-2">
+                      <input value={row.sortGroupNameInput} onChange={(e) => updateRow(row.id, "sortGroupNameInput", e.target.value)} placeholder="临时分类" className="h-9 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-primary" />
+                    </td>
+                    <td className="px-3 py-2">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-muted/50">
+                          {row.image ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={row.image} alt="" className="h-full w-full object-cover" />
+                          ) : (
+                            <Store size={16} className="text-muted-foreground/40" />
+                          )}
+                        </div>
+                        <div className="min-w-0 font-medium text-foreground line-clamp-1">{row.name}</div>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {rows.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="py-16 text-center text-sm text-muted-foreground">当前店铺还没有商品可排序</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+            </>
+          )}
+          </div>
+        </div>
+        <AnimatePresence>
+          {selectedRowIds.length > 0 && (
+            <motion.div
+              key="shop-sort-batch-bar"
+              initial={{ y: 80, x: "-50%", opacity: 0 }}
+              animate={{ y: 0, x: "-50%", opacity: 1 }}
+              exit={{ y: 80, x: "-50%", opacity: 0 }}
+              transition={{ type: "spring", stiffness: 400, damping: 30 }}
+              className="absolute bottom-4 left-1/2 z-30 w-[calc(100%-1rem)] pointer-events-none sm:w-fit sm:max-w-[calc(100%-2rem)]"
+            >
+              <div className="pointer-events-auto flex flex-wrap items-center gap-x-3 gap-y-2 rounded-[24px] glass-panel px-3 py-2 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.5)] sm:h-12 sm:flex-nowrap sm:gap-5 sm:rounded-full sm:px-6 sm:py-0">
+                <button
+                  type="button"
+                  onClick={toggleVisibleSelection}
+                  className={cn(
+                    "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-all",
+                    allVisibleSelected
+                      ? "border-foreground bg-foreground text-background dark:text-black"
+                      : "border-black/10 dark:border-white/10 hover:border-black/20 dark:hover:border-white/20"
+                  )}
+                  title={allVisibleSelected ? "取消当前显示" : "全选当前显示"}
+                >
+                  {allVisibleSelected && <Check size={12} strokeWidth={4} />}
+                </button>
+                <div className="flex min-w-0 flex-1 items-center gap-2 sm:flex-none sm:gap-3">
+                  <span className="truncate whitespace-nowrap text-[13px] font-black text-black dark:text-white sm:text-sm">
+                    已选 <span className="font-number">{selectedRowIds.length}</span> 件商品
+                  </span>
+                  <span className="hidden text-[10px] font-bold uppercase tracking-widest text-black/40 dark:text-white/40 md:inline">批量转移</span>
+                </div>
+                <div className="h-9 w-44 sm:h-8 sm:w-52">
+                  <CustomSelect
+                    value={batchTargetCategoryName}
+                    onChange={setBatchTargetCategoryName}
+                    options={[
+                      { value: "", label: "选择临时分类" },
+                      ...categories.map((category) => ({ value: category.name, label: category.name })),
+                    ]}
+                    className="h-full"
+                    triggerClassName="h-full rounded-full border border-border bg-background/90 px-3 text-xs font-bold text-foreground hover:bg-muted/40"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={applyBatchTargetCategory}
+                  className="h-9 rounded-full bg-primary px-5 text-xs font-black text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 active:scale-[0.98] sm:h-8"
+                >
+                  转移选中
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedRowIds([])}
+                  className="h-9 w-9 shrink-0 rounded-full text-black/40 transition-all hover:bg-black/5 hover:text-black dark:text-white/40 dark:hover:bg-white/5 dark:hover:text-white sm:h-auto sm:w-auto sm:p-2"
+                  title="清空选择"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+        <AnimatePresence>
+          {deleteCategoryTarget && (
+            <motion.div
+              key="delete-category-confirm"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 z-40 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm"
+              onClick={() => setDeleteCategoryTarget(null)}
+            >
+              <motion.div
+                initial={{ opacity: 0, y: 18, scale: 0.96 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 18, scale: 0.96 }}
+                className="w-full max-w-sm rounded-2xl border border-border bg-background p-5 shadow-2xl"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <div className="text-base font-bold text-foreground">删除临时分类</div>
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                  确定删除「{deleteCategoryTarget.name}」吗？
+                  {(categoryCounts.get(deleteCategoryTarget.name) || 0) > 0
+                    ? ` 该分类下 ${categoryCounts.get(deleteCategoryTarget.name) || 0} 件商品会移到「未分组」。`
+                    : ""}
+                </p>
+                <div className="mt-5 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setDeleteCategoryTarget(null)}
+                    className="h-10 rounded-xl border border-border px-4 text-sm font-bold text-foreground hover:bg-muted/60"
+                  >
+                    取消
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => deleteCategory(deleteCategoryTarget)}
+                    className="h-10 rounded-xl bg-rose-500 px-4 text-sm font-bold text-white hover:bg-rose-600"
+                  >
+                    删除
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
+    </AnimatePresence>,
+    document.body
+  );
 }
 
 export default function ShopGoodsPage() {
@@ -232,6 +1091,7 @@ export default function ShopGoodsPage() {
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isSortOpen, setIsSortOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingItemId, setEditingItemId] = useState("");
   const [editingShopId, setEditingShopId] = useState("");
@@ -1136,6 +1996,7 @@ export default function ShopGoodsPage() {
           <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
             <button onClick={() => selectedShop ? setIsImportOpen(true) : showToast("先选择一个目标店铺再导入", "error")} className={cn("flex min-w-0 items-center justify-center gap-2 rounded-full border border-border/60 px-3 h-10 sm:h-11 text-sm font-bold transition-all", selectedShop ? "bg-white dark:bg-white/5 text-foreground hover:bg-white/80 dark:hover:bg-white/10" : "bg-muted/60 text-muted-foreground cursor-not-allowed")}><span className="truncate">导入</span></button>
             <button onClick={handleExport} className="flex min-w-0 items-center justify-center gap-2 rounded-full border border-border/60 bg-white dark:bg-white/5 px-3 h-10 sm:h-11 text-sm font-bold text-foreground hover:bg-white/80 dark:hover:bg-white/10 transition-all"><span className="truncate">导出</span></button>
+            <button onClick={() => selectedShop ? setIsSortOpen(true) : showToast("先选择一个目标店铺再排序", "error")} className={cn("flex min-w-0 items-center justify-center gap-2 rounded-full border border-border/60 px-3 sm:px-5 h-10 sm:h-11 text-sm font-bold transition-all", selectedShop ? "bg-white dark:bg-white/5 text-foreground hover:bg-white/80 dark:hover:bg-white/10" : "bg-muted/60 text-muted-foreground cursor-not-allowed")}><ListOrdered size={18} className="shrink-0" /><span className="truncate">排序</span></button>
             <button onClick={() => selectedShop ? setIsCreateOpen(true) : showToast("先选择一个目标店铺再新建商品", "error")} className={cn("flex min-w-0 items-center justify-center gap-2 rounded-full border border-border/60 px-3 sm:px-6 h-10 sm:h-11 text-sm font-bold transition-all", selectedShop ? "bg-white dark:bg-white/5 text-foreground hover:bg-white/80 dark:hover:bg-white/10" : "bg-muted/60 text-muted-foreground cursor-not-allowed")}><Plus size={18} className="shrink-0" /><span className="truncate">新建店铺商品</span></button>
             <button onClick={() => selectedShop ? setIsPickerOpen(true) : showToast("先选择一个目标店铺再从主库复制", "error")} className={cn("flex min-w-0 items-center justify-center gap-2 rounded-full border border-border/60 px-3 sm:px-6 h-10 sm:h-11 text-sm font-bold transition-all", selectedShop ? "bg-white dark:bg-white/5 text-foreground hover:bg-white/80 dark:hover:bg-white/10" : "bg-muted/60 text-muted-foreground cursor-not-allowed")}><Plus size={18} className="shrink-0" /><span className="truncate">从主库复制</span></button>
           </div>
@@ -1183,7 +2044,7 @@ export default function ShopGoodsPage() {
             <CustomSelect value={selectedSupplier} onChange={setSelectedSupplier} options={[{ value: "all", label: "所有供应商" }, { value: "unknown", label: "未知供应商" }, ...suppliers.map((supplier) => ({ value: supplier.id, label: supplier.name }))]} placeholder="所有供应商" className="h-full" triggerClassName="h-full rounded-full border text-xs sm:text-sm py-0 px-2 sm:px-5 transition-all truncate bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5" />
           </div>
           <div className="xl:w-48 h-10 sm:h-11">
-            <CustomSelect value={sortBy} onChange={setSortBy} options={[{ value: "sku-asc", label: "编号从小到大" }, { value: "sku-desc", label: "编号从大到小" }, { value: "createdAt-desc", label: "最新创建" }, { value: "createdAt-asc", label: "最早创建" }, { value: "stock-desc", label: "库存从高到低" }, { value: "stock-asc", label: "库存从低到高" }, { value: "shop-asc", label: "店铺 A-Z" }, { value: "shop-desc", label: "店铺 Z-A" }, { value: "name-asc", label: "名称 A-Z" }]} className="h-full" triggerClassName="h-full rounded-full border text-xs sm:text-sm py-0 px-2 sm:px-5 transition-all truncate bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5" />
+            <CustomSelect value={sortBy} onChange={setSortBy} options={[{ value: "sku-asc", label: "店内码从小到大" }, { value: "sku-desc", label: "店内码从大到小" }, { value: "createdAt-desc", label: "最新创建" }, { value: "createdAt-asc", label: "最早创建" }, { value: "stock-desc", label: "库存从高到低" }, { value: "stock-asc", label: "库存从低到高" }, { value: "shop-asc", label: "店铺 A-Z" }, { value: "shop-desc", label: "店铺 Z-A" }, { value: "name-asc", label: "名称 A-Z" }]} className="h-full" triggerClassName="h-full rounded-full border text-xs sm:text-sm py-0 px-2 sm:px-5 transition-all truncate bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5" />
           </div>
         </div>
       </div>
@@ -1263,6 +2124,7 @@ export default function ShopGoodsPage() {
       ) : null}
 
       <ActionBar selectedCount={selectedIds.length} totalCount={totalResults} onToggleSelectAll={handleToggleSelectAll} onClear={() => setSelectedIds([])} onEdit={() => { if (selectedIds.length === 1) { handleEditSelected(); return; } setIsBatchEditOpen(true); }} label="个商品" extraActions={[{ label: "删除商品", icon: <Trash2 size={16} />, onClick: handleRemoveSelected, variant: "danger" }]} />
+      <ShopSortWorkbench isOpen={isSortOpen} shop={selectedShop} onClose={() => setIsSortOpen(false)} onSaved={async () => { await fetchShopProducts(true); }} />
       <ProductSelectionModal isOpen={isPickerOpen} onClose={() => setIsPickerOpen(false)} onSelect={(products) => { void handleAssignProducts(products); }} selectedIds={assignedTemplateIds} selectedBadgeLabel="当前店铺已复制" title={selectedShop ? `复制到 ${selectedShop.name}` : "复制商品"} showPlatformSelector={false} minimalView={true} query={templateCatalogQuery} emptyStateText="主库里还没有商品" loadAllOnOpen={true} respectPublicVisibility={false} defaultViewMode="list" />
       <ImportModal isOpen={isImportOpen} onClose={() => setIsImportOpen(false)} onImport={handleImport} title={selectedShop ? `导入到 ${selectedShop.name}` : "导入店铺商品"} description="导入结果只会落到当前选中的目标店铺。已存在的店铺商品会更新，未存在的会按公开商品匹配后加入该店铺。" templateFileName="店铺商品导入模板.xlsx" templateData={[{ "*商品名称": "示例商品", "SKU/店内码": "SHOP-001", "*分类": "默认分类", 供应商: "默认供应商", 进货单价: 19.9, 库存: 12, 主图: "https://example.com/cover.jpg", 备注: "店铺自定义备注" }]} />
       <ProductFormModal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} onSubmit={async (data) => { await handleCreateStandaloneProduct(data); }} title={selectedShop ? `新建 ${selectedShop.name} 商品` : "新建店铺商品"} hideVisibilityControl={true} hideProductionControl={true} hideGallerySection={true} hideSpecsSection={true} disableHistorySection={true} showCoverSection={true} showJdSkuField={true} mainImageUploadEndpoint={selectedShopId ? `/api/shops/${selectedShopId}/products/cover-upload` : undefined} />

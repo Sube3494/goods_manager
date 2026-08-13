@@ -412,6 +412,9 @@ export async function PUT(
         productId: true,
         sourceProductId: true,
         productImage: true,
+        sortNumber: true,
+        sortGroupName: true,
+        sortCategoryName: true,
         shopId: true,
         shop: {
           select: {
@@ -456,6 +459,9 @@ export async function PUT(
     const remark = typeof body?.remark === "string" ? body.remark.trim() : "";
     const isShelfLife = Boolean(body?.isShelfLife ?? false);
     const shelfLifeDays = body?.shelfLifeDays !== undefined && body.shelfLifeDays !== null ? Number(body.shelfLifeDays) : null;
+    const sortNumber = body?.sortNumber !== undefined && body.sortNumber !== null && body.sortNumber !== "" ? Number(body.sortNumber) : null;
+    const sortGroupName = typeof body?.sortGroupName === "string" ? body.sortGroupName.trim() : "";
+    const sortCategoryName = typeof body?.sortCategoryName === "string" ? body.sortCategoryName.trim() : "";
     if (!productName) {
       return NextResponse.json({ error: "商品名称不能为空" }, { status: 400 });
     }
@@ -518,6 +524,9 @@ export async function PUT(
         specs: Prisma.JsonNull,
         isShelfLife,
         shelfLifeDays: Number.isFinite(shelfLifeDays) ? shelfLifeDays : null,
+        sortNumber: "sortNumber" in body ? (sortNumber !== null && Number.isFinite(sortNumber) ? Math.trunc(sortNumber) : null) : existing.sortNumber,
+        sortGroupName: "sortGroupName" in body ? sortGroupName || null : existing.sortGroupName,
+        sortCategoryName: "sortCategoryName" in body ? sortCategoryName || null : existing.sortCategoryName,
       },
       select: {
         id: true,
@@ -536,6 +545,9 @@ export async function PUT(
         isDiscontinued: true,
         isShelfLife: true,
         shelfLifeDays: true,
+        sortNumber: true,
+        sortGroupName: true,
+        sortCategoryName: true,
         remark: true,
         specs: true,
         createdAt: true,
@@ -568,6 +580,9 @@ export async function PUT(
       isDiscontinued: updated.isDiscontinued ?? false,
       isShelfLife: updated.isShelfLife ?? false,
       shelfLifeDays: updated.shelfLifeDays ?? null,
+      sortNumber: updated.sortNumber ?? null,
+      sortGroupName: updated.sortGroupName || null,
+      sortCategoryName: updated.sortCategoryName || null,
       remark: updated.remark || null,
       specs: null,
       createdAt: updated.createdAt,

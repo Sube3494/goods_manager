@@ -620,6 +620,9 @@ model ShopProduct {
   updatedAt       DateTime @updatedAt
   isShelfLife     Boolean  @default(false)
   shelfLifeDays   Int?
+  sortNumber      Int?
+  sortGroupName   String?
+  sortCategoryName String?
   batches         ProductBatch[]
 
   shop      Shop    @relation(fields: [shopId], references: [id], onDelete: Cascade)
@@ -633,6 +636,8 @@ model ShopProduct {
   @@unique([shopId, jdSkuId])
   @@index([productId])
   @@index([shopId, createdAt])
+  @@index([shopId, sortNumber])
+  @@index([shopId, sortGroupName])
   @@index([shopId, pinyin])
 }
 
