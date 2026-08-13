@@ -189,6 +189,18 @@ function ShopSortWorkbench({
   const [isDraftReady, setIsDraftReady] = useState(false);
   const [deleteCategoryTarget, setDeleteCategoryTarget] = useState<SortWorkbenchCategory | null>(null);
 
+  useEffect(() => {
+    if (!isOpen || typeof document === "undefined") return;
+    const previousOverflow = document.body.style.overflow;
+    const previousOverscrollBehavior = document.body.style.overscrollBehavior;
+    document.body.style.overflow = "hidden";
+    document.body.style.overscrollBehavior = "contain";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.body.style.overscrollBehavior = previousOverscrollBehavior;
+    };
+  }, [isOpen]);
+
   const loadRows = useCallback(async () => {
     if (!shop?.id) return;
     setIsLoading(true);
