@@ -239,7 +239,7 @@ function ShopSortWorkbench({
             ...fetchedOriginalNames,
           ]
         )
-      ).map((name) => ({ id: `${name}-${crypto.randomUUID()}`, name, rangeSize: "1000" }));
+      ).map((name) => ({ id: `${name}-${crypto.randomUUID()}`, name, rangeSize: "" }));
       let restoredDraft = false;
 
       try {
@@ -322,7 +322,11 @@ function ShopSortWorkbench({
   const renumberRowsByCategoryOrder = useCallback((sourceRows: SortWorkbenchRow[], orderedCategories: SortWorkbenchCategory[]) => {
     const template = parseIncrementingCode(startNumber);
     const safeBase = template.number;
-    const safeStep = 1000;
+    const rowCountByName = new Map<string, number>();
+    sourceRows.forEach((row) => {
+      const groupName = (row.sortGroupNameInput || row.categoryName || "未分组").trim();
+      rowCountByName.set(groupName, (rowCountByName.get(groupName) || 0) + 1);
+    });
     const categoryMetaByName = new Map(orderedCategories.map((category) => [category.name.trim(), category]));
     const categoryStartByName = new Map<string, number>();
     let cursor = safeBase;
@@ -330,7 +334,8 @@ function ShopSortWorkbench({
       const name = category.name.trim();
       categoryStartByName.set(name, cursor);
       const numericRange = Number(category.rangeSize);
-      const safeCategoryRange = Number.isFinite(numericRange) && numericRange > 0 ? Math.trunc(numericRange) : safeStep;
+      const actualCount = rowCountByName.get(name) || 0;
+      const safeCategoryRange = Number.isFinite(numericRange) && numericRange > 0 ? Math.trunc(numericRange) : actualCount;
       cursor += safeCategoryRange;
     });
     const orderByName = new Map(orderedCategories.map((category, index) => [category.name.trim(), index]));
@@ -360,7 +365,7 @@ function ShopSortWorkbench({
         : orderedCategories.length + groupIndexByName.size;
       if (!groupIndexByName.has(groupName)) groupIndexByName.set(groupName, groupIndex);
       const offset = offsetByName.get(groupName) || 0;
-      const fallbackStart = safeBase + groupIndex * safeStep;
+      const fallbackStart = cursor + groupIndex;
       const categoryStart = categoryMetaByName.has(groupName) ? categoryStartByName.get(groupName) ?? fallbackStart : fallbackStart;
       numbered.set(row.id, formatIncrementingCode(template, categoryStart + offset));
       offsetByName.set(groupName, offset + 1);
@@ -386,7 +391,7 @@ function ShopSortWorkbench({
       ...preferredOrder.filter((category) => names.includes(category.name)),
       ...names
         .filter((name) => !existingByName.has(name))
-        .map((name) => ({ id: `${name}-${crypto.randomUUID()}`, name, rangeSize: "1000" })),
+        .map((name) => ({ id: `${name}-${crypto.randomUUID()}`, name, rangeSize: "" })),
     ];
   }, [categories]);
 
@@ -400,7 +405,7 @@ function ShopSortWorkbench({
       showToast("这个临时分类已存在", "error");
       return;
     }
-    setCategories((prev) => [...prev, { id: `${name}-${crypto.randomUUID()}`, name, rangeSize: "1000" }]);
+    setCategories((prev) => [...prev, { id: `${name}-${crypto.randomUUID()}`, name, rangeSize: "" }]);
     setSelectedCategoryName(name);
     setNewCategoryName("");
   }, [categories, newCategoryName, showToast]);
@@ -425,7 +430,7 @@ function ShopSortWorkbench({
       const nextBase = prev.filter((item) => item.id !== category.id);
       const needsUngrouped = productCount > 0 && !nextBase.some((item) => item.name === "未分组");
       const next = needsUngrouped
-        ? [...nextBase, { id: `未分组-${crypto.randomUUID()}`, name: "未分组", rangeSize: category.rangeSize || "1000" }]
+        ? [...nextBase, { id: `未分组-${crypto.randomUUID()}`, name: "未分组", rangeSize: category.rangeSize || "" }]
         : nextBase;
       setRows((prevRows) => {
         const movedRows = prevRows.map((row) =>
@@ -733,6 +738,7 @@ function ShopSortWorkbench({
                         type="number"
                         step="1"
                         min="1"
+                        placeholder="自动"
                         className="min-w-0 flex-1 bg-transparent font-mono text-xs text-foreground outline-none"
                       />
                     </label>
