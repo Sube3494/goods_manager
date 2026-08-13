@@ -264,6 +264,31 @@
     scrollbar-color: rgba(255, 255, 255, 0.05) transparent;
   }
 
+  .shop-sort-scrollbar::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+    display: block;
+  }
+
+  .shop-sort-scrollbar::-webkit-scrollbar-track {
+    background: rgba(148, 163, 184, 0.08);
+    border-radius: 999px;
+  }
+
+  .shop-sort-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(148, 163, 184, 0.38);
+    border-radius: 999px;
+  }
+
+  .shop-sort-scrollbar:hover::-webkit-scrollbar-thumb {
+    background: rgba(148, 163, 184, 0.58);
+  }
+
+  .shop-sort-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(148, 163, 184, 0.38) rgba(148, 163, 184, 0.08);
+  }
+
   /* 扫光效果 (Shimmer Effect) */
   .shimmer {
     background: linear-gradient(

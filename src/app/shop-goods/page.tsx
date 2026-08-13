@@ -687,7 +687,7 @@ function ShopSortWorkbench({
         </div>
 
         <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[300px_1fr]">
-          <aside className="max-h-[42vh] min-h-0 overflow-auto border-b border-border bg-muted/20 p-3 lg:max-h-none lg:border-b-0 lg:border-r">
+          <aside className="custom-scrollbar shop-sort-scrollbar max-h-[42vh] min-h-0 overflow-y-auto border-b border-border bg-muted/20 p-3 lg:max-h-none lg:border-b-0 lg:border-r">
             <button
               type="button"
               onClick={() => setSelectedCategoryName("all")}
@@ -765,7 +765,7 @@ function ShopSortWorkbench({
             </div>
           </aside>
 
-          <div className="min-h-0 overflow-auto">
+          <div className="custom-scrollbar shop-sort-scrollbar min-h-0 overflow-auto">
           {isLoading ? (
             <div className="flex h-full items-center justify-center text-sm text-muted-foreground">正在加载排序商品...</div>
           ) : (
