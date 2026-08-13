@@ -160,6 +160,7 @@ function MappingSelect({
   onChange: (value: string) => void;
 }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [menuRect, setMenuRect] = useState<{ top: number; left: number; width: number } | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const selected = options.find((item) => item.value === value);
 
@@ -174,6 +175,26 @@ function MappingSelect({
 
     document.addEventListener("mousedown", handlePointerDown);
     return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen || typeof window === "undefined") return;
+    const updateMenuRect = () => {
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      setMenuRect({
+        top: rect.bottom + 8,
+        left: rect.left,
+        width: rect.width,
+      });
+    };
+    updateMenuRect();
+    window.addEventListener("resize", updateMenuRect);
+    window.addEventListener("scroll", updateMenuRect, true);
+    return () => {
+      window.removeEventListener("resize", updateMenuRect);
+      window.removeEventListener("scroll", updateMenuRect, true);
+    };
   }, [isOpen]);
 
   return (
@@ -193,40 +214,44 @@ function MappingSelect({
         <ChevronDown size={15} className={cn("shrink-0 text-muted-foreground transition-transform", isOpen && "rotate-180")} />
       </button>
 
-      {isOpen ? (
-        <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-30 overflow-hidden rounded-xl border border-black/8 bg-white/95 shadow-[0_18px_40px_rgba(15,23,42,0.16)] backdrop-blur dark:border-white/10 dark:bg-[#111827]/96">
-          <div className="max-h-64 overflow-y-auto p-1.5">
+      {isOpen && menuRect && typeof document !== "undefined" ? createPortal(
+        <div
+          className="fixed z-[100200] overflow-hidden rounded-xl border border-black/8 bg-white/95 shadow-[0_18px_40px_rgba(15,23,42,0.16)] backdrop-blur dark:border-white/10 dark:bg-[#111827]/96"
+          style={{ top: menuRect.top, left: menuRect.left, width: menuRect.width }}
+        >
+          <div className="custom-scrollbar max-h-64 overflow-y-auto p-1.5">
             {options.map((option) => {
-              const active = option.value === value;
-              return (
-                <button
-                  key={option.value || "__empty__"}
-                  type="button"
-                  onClick={() => {
-                    onChange(option.value);
-                    setIsOpen(false);
-                  }}
-                  className={cn(
-                    "flex w-full items-start justify-between gap-3 rounded-lg px-3 py-2.5 text-left transition-colors",
-                    active
-                      ? "bg-primary/12 text-foreground"
-                      : "text-foreground hover:bg-black/[0.035] dark:hover:bg-white/5"
-                  )}
-                >
-                  <div className="min-w-0">
-                    <div className="truncate text-sm font-medium">{option.label}</div>
-                    {option.hint ? (
-                      <div className={cn("mt-1 line-clamp-2 text-[11px] leading-4", active ? "text-foreground/70" : "text-muted-foreground")}>
-                        {option.hint}
-                      </div>
-                    ) : null}
-                  </div>
-                  {active ? <Check size={14} className="mt-0.5 shrink-0 text-primary" /> : null}
-                </button>
-              );
-            })}
+                const active = option.value === value;
+                return (
+                  <button
+                    key={option.value || "__empty__"}
+                    type="button"
+                    onClick={() => {
+                      onChange(option.value);
+                      setIsOpen(false);
+                    }}
+                    className={cn(
+                      "flex w-full items-start justify-between gap-3 rounded-lg px-3 py-2.5 text-left transition-colors",
+                      active
+                        ? "bg-primary/12 text-foreground"
+                        : "text-foreground hover:bg-black/[0.035] dark:hover:bg-white/5"
+                    )}
+                  >
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-medium">{option.label}</div>
+                      {option.hint ? (
+                        <div className={cn("mt-1 line-clamp-2 text-[11px] leading-4", active ? "text-foreground/70" : "text-muted-foreground")}>
+                          {option.hint}
+                        </div>
+                      ) : null}
+                    </div>
+                    {active ? <Check size={14} className="mt-0.5 shrink-0 text-primary" /> : null}
+                  </button>
+                );
+              })}
           </div>
-        </div>
+        </div>,
+        document.body
       ) : null}
     </div>
   );
@@ -352,48 +377,83 @@ function IntegrationModal({
         </div>
 
         <div className="mt-5 flex-1 overflow-y-auto px-5 pb-5 sm:mt-6 sm:px-7 sm:pb-7">
-          <div className="grid gap-4 sm:gap-5 grid-cols-1 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)] min-w-0">
-            <div className="rounded-[20px] border border-black/8 bg-black/2 p-4 dark:border-white/10 dark:bg-white/3 sm:p-5 lg:col-start-1 lg:row-start-1">
-              <div className="flex items-center justify-between gap-3 min-w-0">
-                <div className="min-w-0 flex-1 truncate text-[11px] uppercase tracking-[0.16em] text-muted-foreground font-bold">系统回调地址</div>
-                <button
-                  type="button"
-                  onClick={() => void copyCallbackUrl()}
-                  className={cn(pillButtonClass, "shrink-0 -mr-1")}
-                >
-                  <CheckCheck size={12} />
-                  {copiedCallback ? "已复制" : "复制"}
-                </button>
+          <div className="flex min-w-0 flex-col gap-4 sm:gap-5">
+            <div className="rounded-[20px] border border-black/8 bg-black/2 p-4 dark:border-white/10 dark:bg-white/3 sm:p-5">
+              <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground font-bold">连接信息</div>
+              <div className="mt-3 grid gap-3">
+                <div className="min-w-0 rounded-xl border border-black/8 bg-white/72 px-4 py-3 dark:border-white/10 dark:bg-[#111827]">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">系统回调地址</div>
+                    <button type="button" onClick={() => void copyCallbackUrl()} className={cn(pillButtonClass, "h-8 shrink-0 px-3 text-[11px]")}>
+                      <CheckCheck size={12} />
+                      {copiedCallback ? "已复制" : "复制"}
+                    </button>
+                  </div>
+                  <div className="mt-2 min-w-0 truncate font-mono text-xs leading-5 text-foreground" title={callbackOrderUrl}>{callbackOrderUrl}</div>
+                </div>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <label className="min-w-0 rounded-xl border border-black/8 bg-white/72 px-4 py-3 dark:border-white/10 dark:bg-[#111827]">
+                    <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">脚本地址</div>
+                    <input
+                      value={integrationConfig.pluginBaseUrl}
+                      onChange={(event) => onChange({ ...integrationConfig, pluginBaseUrl: event.target.value })}
+                      placeholder="例如 http://127.0.0.1:22800"
+                      className="mt-2 h-9 min-w-0 w-full rounded-lg border border-black/8 bg-white/70 px-3 text-sm font-medium text-foreground outline-none focus:border-primary/30 focus:ring-2 focus:ring-primary/10 dark:border-white/10 dark:bg-white/4"
+                    />
+                  </label>
+                  <div className="min-w-0 rounded-xl border border-black/8 bg-white/72 px-4 py-3 dark:border-white/10 dark:bg-[#111827]">
+                    <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">回调密钥</div>
+                    <div className="mt-2 flex min-w-0 items-center gap-2 rounded-lg border border-black/8 bg-white/70 px-3 dark:border-white/10 dark:bg-white/4">
+                      <input
+                        type={showInboundApiKey ? "text" : "password"}
+                        value={integrationConfig.inboundApiKey}
+                        onChange={(event) => onChange({ ...integrationConfig, inboundApiKey: event.target.value })}
+                        placeholder="输入或粘贴回调密钥"
+                        className="h-9 min-w-0 flex-1 bg-transparent font-mono text-sm font-medium text-foreground outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowInboundApiKey((current) => !current)}
+                        className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-all hover:bg-black/5 hover:text-foreground dark:hover:bg-white/6"
+                        title={showInboundApiKey ? "隐藏回调密钥" : "显示回调密钥"}
+                      >
+                        {showInboundApiKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div className="mt-3 rounded-xl border border-black/8 bg-white/72 px-3.5 py-3 dark:border-white/10 dark:bg-[#111827]">
-                <div className="break-all font-mono text-xs leading-5 text-foreground">{callbackOrderUrl}</div>
-              </div>
-              <p className="mt-2.5 text-xs leading-5 text-muted-foreground">脚本里的上报地址填这里，`MYSHOP_API_KEY` 填下面的回调密钥。</p>
             </div>
 
-            <div className="rounded-[20px] border border-black/8 bg-black/2 p-4 dark:border-white/10 dark:bg-white/3 sm:p-5 lg:col-start-2 lg:row-start-1">
-              <div className="flex items-start justify-between gap-3 sm:items-center min-w-0">
+            <div className="rounded-[20px] border border-black/8 bg-black/2 p-4 dark:border-white/10 dark:bg-white/3 sm:p-5">
+              <div className="flex flex-col gap-3 border-b border-black/8 pb-3 dark:border-white/10 lg:flex-row lg:items-center lg:justify-between">
                 <div className="min-w-0 flex-1">
                   <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground font-bold">麦芽田 Cookie</div>
-                  <p className="mt-1 text-xs text-muted-foreground">这里只用于读取麦芽田门店，方便你做门店映射。</p>
+                  <p className="mt-1 text-xs text-muted-foreground">用于读取麦芽田发货门店。</p>
                 </div>
-                <div className="flex shrink-0 items-center gap-2 -mr-1">
-                  {hasCookie ? (
-                    <button
-                      type="button"
-                      onClick={() => setIsEditingCookie((current) => !current)}
-                      className={cn(pillButtonClass, "px-3 py-1.5 text-[11px]")}
-                    >
-                      {showCookieEditor ? "取消" : "编辑"}
-                    </button>
-                  ) : null}
+                <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+                  <span className={cn(
+                    "inline-flex h-9 items-center rounded-full border px-3 text-xs font-bold",
+                    hasCookie
+                      ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-500"
+                      : "border-amber-500/20 bg-amber-500/10 text-amber-500"
+                  )}>
+                    {hasCookie ? "Cookie 已保存" : "未填 Cookie"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingCookie((current) => !current)}
+                    className={cn(pillButtonClass, "px-3.5 text-center leading-4 bg-white/88 dark:bg-white/5")}
+                  >
+                    {showCookieEditor ? "收起 Cookie" : hasCookie ? "编辑 Cookie" : "填写 Cookie"}
+                  </button>
                   {hasCookie ? (
                     <button
                       type="button"
                       onClick={() => onChange({ ...integrationConfig, maiyatianCookie: "" })}
-                      className={cn(pillButtonClass, "px-3 py-1.5 text-[11px]")}
+                      className={cn(pillButtonClass, "px-3.5 text-center leading-4 bg-white/88 dark:bg-white/5")}
                     >
-                      删除
+                      删除 Cookie
                     </button>
                   ) : null}
                 </div>
@@ -404,62 +464,14 @@ function IntegrationModal({
                   value={integrationConfig.maiyatianCookie}
                   onChange={(event) => onChange({ ...integrationConfig, maiyatianCookie: event.target.value })}
                   placeholder="粘贴麦芽田 cookie，用于读取发货门店"
-                  className="mt-3 min-h-23 w-full rounded-xl border border-black/8 bg-white/80 px-3.5 py-2.5 text-sm font-medium outline-none transition-all focus:border-primary/30 focus:ring-2 focus:ring-primary/10 dark:border-white/10 dark:bg-[#111827]"
+                  className="mt-3 min-h-20 w-full rounded-xl border border-black/8 bg-white/80 px-3.5 py-2.5 text-sm font-medium outline-none transition-all focus:border-primary/30 focus:ring-2 focus:ring-primary/10 dark:border-white/10 dark:bg-[#111827]"
                 />
-              ) : (
-                <div
-                  onCopy={(event) => event.preventDefault()}
-                  onCut={(event) => event.preventDefault()}
-                  className="mt-3 select-none rounded-xl border border-black/8 bg-white/70 px-3.5 py-2.5 dark:border-white/10 dark:bg-[#111827]"
-                >
-                  <div className="text-sm font-medium text-foreground">已保存 Cookie</div>
-                  <div className="mt-1 text-xs text-muted-foreground">默认隐藏，当前界面不展示明文。</div>
-                  <div className="mt-2 font-mono text-xs tracking-[0.18em] text-muted-foreground">
-                    {"•".repeat(28)}
-                  </div>
-                </div>
-              )}
-            </div>
+              ) : null}
 
-            <div className="rounded-[20px] border border-black/8 bg-black/2 p-4 dark:border-white/10 dark:bg-white/3 sm:p-5 lg:col-start-1 lg:row-start-2">
-              <div className="min-w-0">
-                <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground font-bold">脚本地址</div>
-                <input
-                  value={integrationConfig.pluginBaseUrl}
-                  onChange={(event) => onChange({ ...integrationConfig, pluginBaseUrl: event.target.value })}
-                  placeholder="例如 http://127.0.0.1:22800"
-                  className="mt-3 h-11 w-full rounded-xl border border-black/8 bg-white/80 px-3.5 text-sm font-medium outline-none transition-all focus:border-primary/30 focus:ring-2 focus:ring-primary/10 dark:border-white/10 dark:bg-[#111827]"
-                />
-                <p className="mt-2.5 text-xs leading-5 text-muted-foreground">主系统通过这个地址调用 `auto-pick` 脚本。</p>
-              </div>
-              <div className="mt-4 min-w-0 border-t border-black/8 pt-4 dark:border-white/10">
-                <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground font-bold">回调密钥</div>
-                <div className="mt-3 flex items-center gap-2 rounded-xl border border-black/8 bg-white/80 px-3.5 dark:border-white/10 dark:bg-[#111827] min-w-0">
-                  <input
-                    type={showInboundApiKey ? "text" : "password"}
-                    value={integrationConfig.inboundApiKey}
-                    onChange={(event) => onChange({ ...integrationConfig, inboundApiKey: event.target.value })}
-                    placeholder="输入或粘贴回调密钥"
-                    className="h-11 min-w-0 flex-1 bg-transparent font-mono text-sm font-medium outline-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowInboundApiKey((current) => !current)}
-                    className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-all hover:bg-black/5 hover:text-foreground dark:hover:bg-white/6"
-                    title={showInboundApiKey ? "隐藏回调密钥" : "显示回调密钥"}
-                  >
-                    {showInboundApiKey ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
-                </div>
-                <p className="mt-2.5 text-xs leading-5 text-muted-foreground">这里填写外部系统分配给你的回调密钥。脚本上报订单时会使用这个值做校验。</p>
-              </div>
-            </div>
-
-            <div className="rounded-[20px] border border-black/8 bg-black/2 p-4 dark:border-white/10 dark:bg-white/3 sm:p-5 lg:col-start-2 lg:row-start-2">
-              <div className="flex items-start justify-between gap-3 sm:items-center min-w-0">
+              <div className="mt-3 flex flex-col gap-3 min-w-0 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0 flex-1">
                   <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground font-bold">麦芽田门店绑定</div>
-                  <p className="mt-1 text-xs text-muted-foreground">读取麦芽田发货门店后，在这里手动映射到系统门店。</p>
+                  <p className="mt-1 text-xs text-muted-foreground">读取发货门店后，在这里手动映射到系统门店。</p>
                 </div>
                 <button
                   type="button"
@@ -467,8 +479,7 @@ function IntegrationModal({
                   disabled={isFetchingMaiyatianShops}
                   className={cn(
                     pillButtonClass,
-                    "shrink-0 self-start px-3.5 text-center leading-4 -mr-1",
-                    "bg-white/88 dark:bg-white/5",
+                    "shrink-0 px-3.5 text-center leading-4 bg-white/88 dark:bg-white/5",
                     "disabled:translate-y-0 disabled:cursor-not-allowed disabled:border-black/6 disabled:bg-black/4 disabled:text-muted-foreground disabled:shadow-none",
                     "dark:disabled:border-white/10 dark:disabled:bg-white/4 dark:disabled:text-white/45"
                   )}
@@ -484,20 +495,12 @@ function IntegrationModal({
                 </div>
               ) : null}
 
-              <div className="mt-3 space-y-2 min-w-0">
-                {maiyatianShops.length > 0 && (
-                  <div className="hidden md:grid md:grid-cols-[1fr_140px_140px] gap-3 px-3 py-1.5 text-[10px] uppercase tracking-[0.16em] text-muted-foreground font-bold border-b border-black/5 dark:border-white/5 pb-2 select-none">
-                    <div>麦芽田发货门店</div>
-                    <div className="text-center">绑定系统门店</div>
-                    <div className="text-center">对应商品库</div>
-                  </div>
-                )}
-
+              <div className="mt-3 min-w-0 space-y-2">
                 {maiyatianShops.length > 0 ? maiyatianShops.map((shop) => {
                   const mapped = integrationConfig.maiyatianShopMappings.find((item) => item.maiyatianShopId === shop.id);
                   const isMappingInvalid = mapped && !localShops.some(s => s.name === mapped.localShopName);
                   return (
-                    <div key={shop.id} className="group rounded-2xl border border-black/8 bg-white/80 p-3 transition-all hover:bg-white dark:hover:bg-white/8 dark:border-white/10 dark:bg-white/4 md:grid md:grid-cols-[1fr_140px_140px] md:items-center gap-3 min-w-0">
+                    <div key={shop.id} className="group rounded-2xl border border-black/8 bg-white/80 p-3 transition-all hover:bg-white dark:hover:bg-white/8 dark:border-white/10 dark:bg-white/4 min-w-0">
                       {/* 第一列：麦芽田门店信息 + 状态 */}
                       <div className="min-w-0 flex flex-col gap-1 text-left">
                         <div className="text-sm font-bold text-foreground truncate" title={shop.name}>{shop.name}</div>
@@ -519,75 +522,39 @@ function IntegrationModal({
                         </div>
                       </div>
 
-                      {/* 第二列：系统门店 */}
-                      <div className="mt-3 md:mt-0 flex md:justify-center min-w-0 w-full">
-                        <div className="w-full md:w-[140px] text-left min-w-0">
-                          <div className="md:hidden text-[10px] uppercase tracking-[0.16em] text-muted-foreground mb-1">系统门店</div>
-                          {(() => {
-                            const finalOptions = [{ value: "", label: "暂不映射" }, ...localShopOptions];
-                            if (mapped?.localShopName && !localShopOptions.some(opt => opt.value === mapped.localShopName)) {
-                              finalOptions.push({
-                                value: mapped.localShopName,
-                                label: `已失效 (${mapped.localShopName})`,
-                                hint: "原绑定的系统门店在管理中已被删除或重命名。"
-                              });
-                            }
-                            return (
-                              <MappingSelect
-                                value={mapped?.localShopName || ""}
-                                options={finalOptions}
-                                onChange={(localShopName) => {
-                                  const nextMappings = integrationConfig.maiyatianShopMappings.filter((item) => item.maiyatianShopId !== shop.id);
-                                  if (localShopName) {
-                                    const defaultLib = libraries[0] || null;
-                                    nextMappings.push({
-                                      maiyatianShopId: shop.id,
-                                      maiyatianShopName: shop.name,
-                                      maiyatianShopAddress: shop.address,
-                                      localShopName,
-                                      cityCode: shop.cityCode || undefined,
-                                      cityName: shop.cityName || undefined,
-                                      libraryId: defaultLib ? defaultLib.id : undefined,
-                                      libraryName: defaultLib ? defaultLib.name : undefined,
-                                    });
-                                  }
-                                  onChange({
-                                    ...integrationConfig,
-                                    maiyatianShopMappings: nextMappings,
-                                  });
-                                }}
-                              />
-                            );
-                          })()}
-                          {isMappingInvalid && (
-                            <div className="mt-1 text-[10px] text-rose-500">⚠️ 系统门店已被删除，请重新绑定</div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* 第三列：绑定商品库 */}
-                      <div className="mt-3 md:mt-0 flex md:justify-center min-w-0 w-full">
-                        <div className="w-full md:w-[140px] text-left min-w-0">
-                          <div className="md:hidden text-[10px] uppercase tracking-[0.16em] text-muted-foreground mb-1">绑定商品库</div>
-                          {mapped?.localShopName && !isMappingInvalid ? (
-                            (() => {
-                              const currentLibId = mapped.libraryId || libraries[0]?.id || "";
+                      <div className="mt-3 grid min-w-0 grid-cols-1 gap-3 md:grid-cols-[minmax(220px,1fr)_minmax(180px,220px)]">
+                        {/* 第二列：系统门店 */}
+                        <div className="min-w-0 text-left">
+                          <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">系统门店</div>
+                          <div className="min-w-0">
+                            {(() => {
+                              const finalOptions = [{ value: "", label: "暂不映射" }, ...localShopOptions];
+                              if (mapped?.localShopName && !localShopOptions.some(opt => opt.value === mapped.localShopName)) {
+                                finalOptions.push({
+                                  value: mapped.localShopName,
+                                  label: `已失效 (${mapped.localShopName})`,
+                                  hint: "原绑定的系统门店在管理中已被删除或重命名。"
+                                });
+                              }
                               return (
                                 <MappingSelect
-                                  value={currentLibId}
-                                  options={libraries.map(lib => ({ value: lib.id, label: lib.name }))}
-                                  onChange={(libraryId) => {
-                                    const nextMappings = integrationConfig.maiyatianShopMappings.map((item) => {
-                                      if (item.maiyatianShopId === shop.id) {
-                                        const selectedLib = libraries.find(l => l.id === libraryId);
-                                        return {
-                                          ...item,
-                                          libraryId: libraryId,
-                                          libraryName: selectedLib ? selectedLib.name : null,
-                                        };
-                                      }
-                                      return item;
-                                    });
+                                  value={mapped?.localShopName || ""}
+                                  options={finalOptions}
+                                  onChange={(localShopName) => {
+                                    const nextMappings = integrationConfig.maiyatianShopMappings.filter((item) => item.maiyatianShopId !== shop.id);
+                                    if (localShopName) {
+                                      const defaultLib = libraries[0] || null;
+                                      nextMappings.push({
+                                        maiyatianShopId: shop.id,
+                                        maiyatianShopName: shop.name,
+                                        maiyatianShopAddress: shop.address,
+                                        localShopName,
+                                        cityCode: shop.cityCode || undefined,
+                                        cityName: shop.cityName || undefined,
+                                        libraryId: defaultLib ? defaultLib.id : undefined,
+                                        libraryName: defaultLib ? defaultLib.name : undefined,
+                                      });
+                                    }
                                     onChange({
                                       ...integrationConfig,
                                       maiyatianShopMappings: nextMappings,
@@ -595,12 +562,50 @@ function IntegrationModal({
                                   }}
                                 />
                               );
-                            })()
-                          ) : (
-                            <div className="h-10 rounded-xl border border-dashed border-black/5 dark:border-white/5 flex items-center justify-center text-xs text-muted-foreground/30 bg-black/1 dark:bg-white/1 select-none">
-                              请先绑定门店
-                            </div>
-                          )}
+                            })()}
+                            {isMappingInvalid && (
+                              <div className="mt-1 text-[10px] text-rose-500">系统门店已被删除，请重新绑定</div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* 第三列：绑定商品库 */}
+                        <div className="min-w-0 text-left">
+                          <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">绑定商品库</div>
+                          <div className="min-w-0">
+                            {mapped?.localShopName && !isMappingInvalid ? (
+                              (() => {
+                                const currentLibId = mapped.libraryId || libraries[0]?.id || "";
+                                return (
+                                  <MappingSelect
+                                    value={currentLibId}
+                                    options={libraries.map(lib => ({ value: lib.id, label: lib.name }))}
+                                    onChange={(libraryId) => {
+                                      const nextMappings = integrationConfig.maiyatianShopMappings.map((item) => {
+                                        if (item.maiyatianShopId === shop.id) {
+                                          const selectedLib = libraries.find(l => l.id === libraryId);
+                                          return {
+                                            ...item,
+                                            libraryId: libraryId,
+                                            libraryName: selectedLib ? selectedLib.name : null,
+                                          };
+                                        }
+                                        return item;
+                                      });
+                                      onChange({
+                                        ...integrationConfig,
+                                        maiyatianShopMappings: nextMappings,
+                                      });
+                                    }}
+                                  />
+                                );
+                              })()
+                            ) : (
+                              <div className="mt-2.5 flex h-10 items-center justify-center rounded-xl border border-dashed border-black/5 bg-black/1 text-xs text-muted-foreground/30 dark:border-white/5 dark:bg-white/1 select-none">
+                                请先绑定门店
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -613,7 +618,7 @@ function IntegrationModal({
               </div>
             </div>
 
-            <div className="rounded-[18px] border border-black/8 bg-black/2 p-3 dark:border-white/10 dark:bg-white/3 lg:col-start-1 lg:row-start-3 lg:col-span-2">
+            <div className="rounded-[18px] border border-black/8 bg-black/2 p-3 dark:border-white/10 dark:bg-white/3">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 min-w-0">
                 <div className="min-w-0 flex-1">
                   <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">自配完成时间</div>
@@ -655,7 +660,7 @@ function IntegrationModal({
               </div>
             </div>
 
-            <div className="rounded-[18px] border border-black/8 bg-black/2 p-3.5 dark:border-white/10 dark:bg-white/3 lg:col-start-1 lg:row-start-4 lg:col-span-2">
+            <div className="rounded-[18px] border border-black/8 bg-black/2 p-3.5 dark:border-white/10 dark:bg-white/3">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">自动推送刷单佣金</div>
@@ -741,22 +746,24 @@ function IntegrationModal({
               <p className="mt-3 text-xs leading-5 text-muted-foreground">同步时手动挑单的初始佣金也将读取对应店铺的设定金额。</p>
             </div>
 
-            <div className="lg:col-start-1 lg:row-start-5">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
               <ActionButton
                 label={isTestingPlugin ? "测试中..." : "测试脚本"}
                 icon={isTestingPlugin ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
                 onClick={() => onTestPlugin()}
                 disabled={isTestingPlugin}
               />
-            </div>
+              </div>
 
-            <div className="lg:col-start-2 lg:row-start-5">
+              <div>
               <ActionButton
                 label={isTestingCookie ? "测试中..." : "测试 Cookie"}
                 icon={isTestingCookie ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
                 onClick={() => onTestCookie()}
                 disabled={isTestingCookie}
               />
+              </div>
             </div>
 
 
