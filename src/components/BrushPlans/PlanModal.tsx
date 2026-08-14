@@ -104,6 +104,11 @@ export function PlanModal({ isOpen, onClose, onSubmit, initialData, readOnly = f
         setFormData({ ...formData, items: newItems });
     };
 
+    const normalizeQuantity = (value: unknown) => {
+        const parsed = Number(value);
+        return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+    };
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (readOnly) return;
@@ -119,7 +124,22 @@ export function PlanModal({ isOpen, onClose, onSubmit, initialData, readOnly = f
             return;
         }
 
-        onSubmit(formData);
+        const normalizedItems = (formData.items || []).map((item: BrushOrderPlanItem) => ({
+            ...item,
+            quantity: normalizeQuantity(item.quantity),
+        }));
+        if (normalizedItems.some((item) => item.quantity === null)) {
+            showToast("请填写有效的商品份数", "error");
+            return;
+        }
+
+        onSubmit({
+            ...formData,
+            items: normalizedItems.map((item) => ({
+                ...item,
+                quantity: item.quantity as number,
+            })),
+        });
     };
 
     if (!mounted || !isOpen) return null;
@@ -263,9 +283,12 @@ export function PlanModal({ isOpen, onClose, onSubmit, initialData, readOnly = f
                                                                                         <input
                                                                                             type="number"
                                                                                             className="w-full bg-transparent text-xs text-center outline-none font-black text-foreground [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                                                                            value={item.quantity}
+                                                                                            value={item.quantity ?? ""}
                                                                                             min="1"
-                                                                                            onChange={e => updateItem(originalIndex, 'quantity', parseInt(e.target.value) || 1)}
+                                                                                            onChange={e => {
+                                                                                                const value = e.target.value;
+                                                                                                updateItem(originalIndex, 'quantity', value === "" ? "" : Math.max(1, parseInt(value, 10) || 1));
+                                                                                            }}
                                                                                         />
                                                                                     </div>
  

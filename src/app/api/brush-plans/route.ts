@@ -15,6 +15,11 @@ interface BrushPlanItemInput {
   sortOrder?: number;
 }
 
+function normalizePlanItemQuantity(value: unknown) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : 1;
+}
+
 type PlanWithItems = {
   userId?: string | null;
   shopName?: string | null;
@@ -259,7 +264,7 @@ export async function POST(req: NextRequest) {
           create: (items as BrushPlanItemInput[]).map((item, index) => ({
             productId: item.productId || null,
             productName: item.productName || null,
-            quantity: parseInt(String(item.quantity || 1)),
+            quantity: normalizePlanItemQuantity(item.quantity),
             searchKeyword: item.searchKeyword || null,
             platform: item.platform || null,
             note: item.note || null,
