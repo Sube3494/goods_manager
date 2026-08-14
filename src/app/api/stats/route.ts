@@ -1005,7 +1005,7 @@ export async function GET(request: NextRequest) {
                 shopAddress: readShopAddressFromRawPayload(order.rawPayload) || order.shopAddress,
                 rawPayload: order.rawPayload,
               });
-          const brushPureProfit = -commissionYuan - deliveryYuan - orderBrushCommission - returnExtraExpenseYuan;
+          const brushPureProfit = -commissionYuan - orderBrushCommission - returnExtraExpenseYuan;
           if (point) {
             point.brushPaid = FinanceMath.add(point.brushPaid, adjustedPaidYuan);
             point.pureProfit = FinanceMath.add(point.pureProfit, brushPureProfit);
@@ -1037,10 +1037,10 @@ export async function GET(request: NextRequest) {
            const pureProfit = isManualDeliveryLoss
              ? -deliveryYuan
              : hasReadyCost
-             ? FinanceMath.add(
-                 Math.round(expectedIncomeYuan * (1 - rate)),
-                 -deliveryYuan - orderCostYuan - returnExtraExpenseYuan
-               )
+              ? FinanceMath.add(
+                  FinanceMath.multiply(expectedIncomeYuan, 1 - rate),
+                  -deliveryYuan - orderCostYuan - returnExtraExpenseYuan
+                )
              : 0;
 
           if (point) {
