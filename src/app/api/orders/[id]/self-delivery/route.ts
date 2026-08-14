@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
-import { callAutoPickCommand, getAutoPickIntegrationConfigByUserId, markAutoPickOrderMainSystemSelfDelivery, refreshAutoPickOrderFromPlugin, resolveAutoPickCommandPlatform } from "@/lib/autoPickOrders";
+import { callAutoPickCommand, getAutoPickIntegrationConfigByUserId, markAutoPickOrderMainSystemSelfDelivery, readShopAddressFromRawPayload, readShopIdFromRawPayload, readShopNameFromRawPayload, refreshAutoPickOrderFromPlugin, resolveAutoPickCommandPlatform, resolveShopSelfDeliveryTiming } from "@/lib/autoPickOrders";
 import { cancelAutoCompleteJob, ensureAutoCompleteJob } from "@/lib/autoPickAutoComplete";
 import {
   isAutoPickOrderAbnormalStatus,
@@ -128,7 +128,12 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
         : null;
       const autoCompleteBlocked = isAutoPickOrderAbnormalStatus(schedulingOrder.status);
       const autoCompleteAt = confirmedDelivering && !autoCompleteBlocked && integrationConfig
-        ? getEstimatedAutoCompleteAt(schedulingOrder, integrationConfig.selfDeliveryTiming)
+        ? getEstimatedAutoCompleteAt(schedulingOrder, resolveShopSelfDeliveryTiming(integrationConfig, {
+            maiyatianShopId: readShopIdFromRawPayload(schedulingOrder.rawPayload),
+            shopName: readShopNameFromRawPayload(schedulingOrder.rawPayload),
+            shopAddress: readShopAddressFromRawPayload(schedulingOrder.rawPayload) || schedulingOrder.shopAddress,
+            rawPayload: schedulingOrder.rawPayload,
+          }))
         : null;
       await prisma.autoPickOrder.update({
         where: { id },

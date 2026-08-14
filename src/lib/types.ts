@@ -336,6 +336,7 @@ export interface AutoPickMaiyatianShopMapping {
   libraryId?: string | null;
   libraryName?: string | null;
   brushCommission?: number | null;
+  selfDeliveryTiming?: AutoPickSelfDeliveryTimingConfig | null;
 }
 
 export type TTLockRegion = "cn" | "global";

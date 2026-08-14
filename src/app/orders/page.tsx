@@ -53,7 +53,7 @@ import {
   readShopNameFromRawPayload,
   readShopAddressFromRawPayload,
 } from "@/lib/shopCommission";
-import { AutoPickIntegrationConfig, AutoPickMaiyatianShop, AutoPickOrder, AutoPickOrderItem, PurchaseOrder, PurchaseOrderItem } from "@/lib/types";
+import { AutoPickIntegrationConfig, AutoPickMaiyatianShop, AutoPickOrder, AutoPickOrderItem, AutoPickSelfDeliveryTimingConfig, PurchaseOrder, PurchaseOrderItem } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { formatLocalDate, formatLocalDateTime } from "@/lib/dateUtils";
 import { ORDER_SHORTAGE_PURCHASE_NOTE_KEYWORD } from "@/lib/purchaseOrderTypes";
@@ -146,6 +146,7 @@ import {
   serializeMaiyatianMappings,
   readIntegrationConfigResponse,
   createDefaultSelfDeliveryTiming,
+  formatSelfDeliveryTimingLabel,
   formatTimingNumber,
   getFilterDateValue,
   getPlatformBadgeMeta
@@ -379,6 +380,25 @@ function IntegrationModal({
     }
   }, [integrationConfig, onChange, onSaveConfig, timingDraft]);
 
+  const updateShopTiming = useCallback((shopId: string, timing: AutoPickSelfDeliveryTimingConfig | null) => {
+    onChange({
+      ...integrationConfig,
+      maiyatianShopMappings: integrationConfig.maiyatianShopMappings.map((item) =>
+        item.maiyatianShopId === shopId
+          ? { ...item, selfDeliveryTiming: timing }
+          : item
+      ),
+    });
+  }, [integrationConfig, onChange]);
+
+  const updateShopTimingField = useCallback((shopId: string, key: TimingFieldKey, value: string) => {
+    const numeric = Number(value || 0);
+    updateShopTiming(shopId, {
+      ...(integrationConfig.maiyatianShopMappings.find((item) => item.maiyatianShopId === shopId)?.selfDeliveryTiming || integrationConfig.selfDeliveryTiming),
+      [key]: Number.isFinite(numeric) ? numeric : 0,
+    });
+  }, [integrationConfig.maiyatianShopMappings, integrationConfig.selfDeliveryTiming, updateShopTiming]);
+
   const copyCallbackUrl = useCallback(async () => {
     if (!callbackOrderUrl || typeof navigator === "undefined" || !navigator.clipboard?.writeText) {
       return;
@@ -585,6 +605,7 @@ function IntegrationModal({
                                   value={mapped?.localShopName || ""}
                                   options={finalOptions}
                                   onChange={(localShopName) => {
+                                    const previousMapping = integrationConfig.maiyatianShopMappings.find((item) => item.maiyatianShopId === shop.id);
                                     const nextMappings = integrationConfig.maiyatianShopMappings.filter((item) => item.maiyatianShopId !== shop.id);
                                     if (localShopName) {
                                       const defaultLib = libraries[0] || null;
@@ -597,6 +618,7 @@ function IntegrationModal({
                                         cityName: shop.cityName || undefined,
                                         libraryId: defaultLib ? defaultLib.id : undefined,
                                         libraryName: defaultLib ? defaultLib.name : undefined,
+                                        selfDeliveryTiming: previousMapping?.selfDeliveryTiming || undefined,
                                       });
                                     }
                                     onChange({
@@ -652,6 +674,54 @@ function IntegrationModal({
                           </div>
                         </div>
                       </div>
+
+                      {mapped?.localShopName && !isMappingInvalid ? (
+                        <div className="mt-3 rounded-xl border border-black/6 bg-black/[0.018] p-2.5 dark:border-white/8 dark:bg-white/[0.025]">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="min-w-0">
+                              <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">自配时间</div>
+                              <div className="mt-0.5 truncate text-[11px] text-muted-foreground">
+                                {mapped.selfDeliveryTiming
+                                  ? `独立: ${formatSelfDeliveryTimingLabel(mapped.selfDeliveryTiming)}`
+                                  : `继承默认: ${formatSelfDeliveryTimingLabel(integrationConfig.selfDeliveryTiming)}`}
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => updateShopTiming(
+                                shop.id,
+                                mapped.selfDeliveryTiming ? null : { ...integrationConfig.selfDeliveryTiming }
+                              )}
+                              className={cn(pillButtonClass, "min-h-8 px-2.5 py-1 text-[10px]")}
+                            >
+                              {mapped.selfDeliveryTiming ? "改为继承" : "设为独立"}
+                            </button>
+                          </div>
+
+                          {mapped.selfDeliveryTiming ? (
+                            <div className="mt-2 grid grid-cols-2 gap-1.5 xl:grid-cols-4">
+                              {[
+                                { key: "pickupMinutes", label: "取货", step: "1" },
+                                { key: "minutesPerKm", label: "每公里", step: "0.5" },
+                                { key: "riderUpstairsMinutes", label: "收尾", step: "1" },
+                                { key: "deadlineLeadMinutes", label: "提前", step: "1" },
+                              ].map((item) => (
+                                <label key={item.key} className="min-w-0">
+                                  <div className="mb-1 text-[10px] text-muted-foreground">{item.label}</div>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    step={item.step}
+                                    value={mapped.selfDeliveryTiming?.[item.key as TimingFieldKey] ?? 0}
+                                    onChange={(event) => updateShopTimingField(shop.id, item.key as TimingFieldKey, event.target.value)}
+                                    className="h-8 w-full rounded-lg border border-black/8 bg-white/88 px-2 text-xs font-medium outline-none transition-all focus:border-primary/30 focus:ring-2 focus:ring-primary/10 dark:border-white/10 dark:bg-[#111827]"
+                                  />
+                                </label>
+                              ))}
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
                     </div>
                   );
                 }) : (

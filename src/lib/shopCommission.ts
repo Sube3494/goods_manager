@@ -1,4 +1,4 @@
-import { AutoPickIntegrationConfig } from "@/lib/types";
+import { AutoPickIntegrationConfig, AutoPickSelfDeliveryTimingConfig } from "@/lib/types";
 import { buildShopDedupeKey, normalizeExternalId, normalizeShopNameKey } from "@/lib/shopIdentity";
 
 export function readShopNameFromRawPayload(rawPayload: unknown) {
@@ -138,4 +138,58 @@ export function resolveShopBrushCommission(
   }
 
   return defaultCommission;
+}
+
+export function resolveShopSelfDeliveryTiming(
+  config: AutoPickIntegrationConfig,
+  shopInfo?: {
+    maiyatianShopId?: string | null;
+    shopName?: string | null;
+    shopAddress?: string | null;
+    localShopName?: string | null;
+    rawPayload?: unknown;
+  }
+): AutoPickSelfDeliveryTimingConfig {
+  const defaultTiming = config.selfDeliveryTiming;
+  if (!config.maiyatianShopMappings || config.maiyatianShopMappings.length === 0) {
+    return defaultTiming;
+  }
+
+  let maiyatianShopId = shopInfo?.maiyatianShopId || null;
+  let shopName = shopInfo?.shopName || null;
+  let shopAddress = shopInfo?.shopAddress || null;
+
+  if (shopInfo?.rawPayload) {
+    maiyatianShopId ||= readShopIdFromRawPayload(shopInfo.rawPayload);
+    shopName ||= readShopNameFromRawPayload(shopInfo.rawPayload);
+    shopAddress ||= readShopAddressFromRawPayload(shopInfo.rawPayload);
+  }
+
+  const hasTiming = (mapping: AutoPickIntegrationConfig["maiyatianShopMappings"][number] | undefined) =>
+    mapping?.selfDeliveryTiming ? mapping.selfDeliveryTiming : null;
+
+  const normalizedShopId = normalizeExternalId(maiyatianShopId);
+  if (normalizedShopId) {
+    const timing = hasTiming(config.maiyatianShopMappings.find(
+      (item) => String(item.maiyatianShopId || "").trim() === normalizedShopId
+    ));
+    if (timing) return timing;
+  }
+
+  const timingByIdentity = hasTiming(config.maiyatianShopMappings.find((item) => {
+    const mappedKey = buildShopDedupeKey({
+      name: item.maiyatianShopName,
+      address: item.maiyatianShopAddress,
+    });
+    if (mappedKey && mappedKey === buildShopDedupeKey({ name: shopName, address: shopAddress })) {
+      return true;
+    }
+    return normalizeShopNameKey(item.maiyatianShopName) === normalizeShopNameKey(shopName);
+  }));
+  if (timingByIdentity) return timingByIdentity;
+
+  const timingByLocal = hasTiming(config.maiyatianShopMappings.find(
+    (item) => item.localShopName === shopInfo?.localShopName
+  ));
+  return timingByLocal || defaultTiming;
 }

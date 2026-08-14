@@ -14,12 +14,14 @@ import { returnOutboundOrderById } from "@/lib/outboundReturns";
 import { normalizeJdSkuIds, replaceProductJdSkuMappings } from "@/lib/productJdSku";
 import {
   resolveShopBrushCommission,
+  resolveShopSelfDeliveryTiming,
   readShopIdFromRawPayload,
   readShopNameFromRawPayload,
   readShopAddressFromRawPayload,
 } from "./shopCommission";
 export {
   resolveShopBrushCommission,
+  resolveShopSelfDeliveryTiming,
   readShopIdFromRawPayload,
   readShopNameFromRawPayload,
   readShopAddressFromRawPayload,
@@ -974,6 +976,9 @@ function normalizeMaiyatianShopMapping(input: unknown): AutoPickMaiyatianShopMap
     libraryId: libraryId || undefined,
     libraryName: libraryName || undefined,
     brushCommission: brushCommission ?? undefined,
+    selfDeliveryTiming: record.selfDeliveryTiming && typeof record.selfDeliveryTiming === "object" && !Array.isArray(record.selfDeliveryTiming)
+      ? normalizeAutoPickSelfDeliveryTimingConfig(record.selfDeliveryTiming)
+      : undefined,
   };
 }
 
@@ -3420,7 +3425,13 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
 
   if (isDeliveringSelfDelivery && triggeredByMainSystem && !order.autoCompleteAt) {
     const integrationConfig = await getAutoPickIntegrationConfigByUserId(userId);
-    const autoCompleteAt = estimateAutoCompleteAtForOrder(order, integrationConfig.selfDeliveryTiming);
+    const timing = resolveShopSelfDeliveryTiming(integrationConfig, {
+      maiyatianShopId: readShopIdFromRawPayload(order.rawPayload),
+      shopName: readShopNameFromRawPayload(order.rawPayload),
+      shopAddress: readShopAddressFromRawPayload(order.rawPayload) || order.shopAddress,
+      rawPayload: order.rawPayload,
+    });
+    const autoCompleteAt = estimateAutoCompleteAtForOrder(order, timing);
 
     if (autoCompleteAt) {
       order = await prisma.autoPickOrder.update({

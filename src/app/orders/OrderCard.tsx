@@ -60,13 +60,32 @@ export function normalizeSelfDeliveryTiming(input: unknown) {
   };
 }
 
+export function normalizeOptionalSelfDeliveryTiming(input: unknown) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return null;
+  return normalizeSelfDeliveryTiming(input);
+}
+
 export function readIntegrationConfigResponse(data: unknown): AutoPickIntegrationConfig {
   const payload = data && typeof data === "object" ? data as Record<string, unknown> : {};
   return {
     pluginBaseUrl: String(payload.pluginBaseUrl || ""),
     inboundApiKey: String(payload.inboundApiKey || ""),
     maiyatianCookie: String(payload.maiyatianCookie || ""),
-    maiyatianShopMappings: Array.isArray(payload.maiyatianShopMappings) ? payload.maiyatianShopMappings : [],
+    maiyatianShopMappings: Array.isArray(payload.maiyatianShopMappings) ? payload.maiyatianShopMappings.map((item) => {
+      const record = item && typeof item === "object" && !Array.isArray(item) ? item as Record<string, unknown> : {};
+      return {
+        maiyatianShopId: String(record.maiyatianShopId || ""),
+        maiyatianShopName: String(record.maiyatianShopName || ""),
+        maiyatianShopAddress: String(record.maiyatianShopAddress || ""),
+        localShopName: String(record.localShopName || ""),
+        cityCode: record.cityCode ? String(record.cityCode) : undefined,
+        cityName: record.cityName ? String(record.cityName) : undefined,
+        libraryId: record.libraryId ? String(record.libraryId) : undefined,
+        libraryName: record.libraryName ? String(record.libraryName) : undefined,
+        brushCommission: typeof record.brushCommission === "number" ? record.brushCommission : null,
+        selfDeliveryTiming: normalizeOptionalSelfDeliveryTiming(record.selfDeliveryTiming),
+      };
+    }) : [],
     selfDeliveryTiming: normalizeSelfDeliveryTiming(payload.selfDeliveryTiming),
     defaultBrushCommission: typeof payload.defaultBrushCommission === "number" ? payload.defaultBrushCommission : 0,
   };
@@ -77,7 +96,10 @@ export function serializeIntegrationConfig(config: Pick<AutoPickIntegrationConfi
     pluginBaseUrl: String(config.pluginBaseUrl || ""),
     inboundApiKey: String(config.inboundApiKey || ""),
     maiyatianCookie: String(config.maiyatianCookie || ""),
-    maiyatianShopMappings: Array.isArray(config.maiyatianShopMappings) ? config.maiyatianShopMappings : [],
+    maiyatianShopMappings: Array.isArray(config.maiyatianShopMappings) ? config.maiyatianShopMappings.map((item) => ({
+      ...item,
+      selfDeliveryTiming: normalizeOptionalSelfDeliveryTiming(item.selfDeliveryTiming),
+    })) : [],
     selfDeliveryTiming: normalizeSelfDeliveryTiming(config.selfDeliveryTiming),
     defaultBrushCommission: typeof config.defaultBrushCommission === "number" ? config.defaultBrushCommission : 0,
   });
@@ -108,6 +130,10 @@ export function getSyncErrorMessage(error: unknown) {
 
 export function formatTimingNumber(value: number) {
   return Number.isInteger(value) ? `${value}` : value.toFixed(1);
+}
+
+export function formatSelfDeliveryTimingLabel(timing: ReturnType<typeof createDefaultSelfDeliveryTiming>) {
+  return `${formatTimingNumber(timing.pickupMinutes)} + 距离 × ${formatTimingNumber(timing.minutesPerKm)} + ${formatTimingNumber(timing.riderUpstairsMinutes)}`;
 }
 
 export function removeYear(timeStr?: string | null) {
