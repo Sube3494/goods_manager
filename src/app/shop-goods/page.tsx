@@ -598,6 +598,30 @@ function ShopSortWorkbench({
     setDraggingRowId(null);
   }, [categories, draggingRowId, renumberRowsByCategoryOrder, showToast, sortedPreview]);
 
+  const pinRowToCategoryTop = useCallback((rowId: string) => {
+    const targetRow = rows.find((row) => row.id === rowId);
+    if (!targetRow) return;
+    const targetGroup = (targetRow.sortGroupNameInput || targetRow.categoryName || "未分组").trim();
+    const groupRows = sortedPreview.filter((row) => (row.sortGroupNameInput || row.categoryName || "未分组").trim() === targetGroup);
+    if (groupRows[0]?.id === rowId) return;
+
+    const nextGroupIds = [rowId, ...groupRows.map((row) => row.id).filter((id) => id !== rowId)];
+    const groupOrderById = new Map(nextGroupIds.map((id, index) => [id, index]));
+
+    setRows((prev) => {
+      const sourceOrderById = new Map(prev.map((row, index) => [row.id, index]));
+      const nextRows = [...prev].sort((a, b) => {
+        const groupA = (a.sortGroupNameInput || a.categoryName || "未分组").trim();
+        const groupB = (b.sortGroupNameInput || b.categoryName || "未分组").trim();
+        if (groupA === targetGroup && groupB === targetGroup) {
+          return (groupOrderById.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (groupOrderById.get(b.id) ?? Number.MAX_SAFE_INTEGER);
+        }
+        return (sourceOrderById.get(a.id) ?? 0) - (sourceOrderById.get(b.id) ?? 0);
+      });
+      return renumberRowsByCategoryOrder(nextRows, categories);
+    });
+  }, [categories, renumberRowsByCategoryOrder, rows, sortedPreview]);
+
   const changedCount = useMemo(
     () =>
       rows.filter((row) =>
@@ -618,6 +642,14 @@ function ShopSortWorkbench({
   }, [rows]);
 
   const visibleRowIds = useMemo(() => sortedPreview.map((row) => row.id), [sortedPreview]);
+  const firstRowIdByGroup = useMemo(() => {
+    const next = new Map<string, string>();
+    sortedPreview.forEach((row) => {
+      const groupName = (row.sortGroupNameInput || row.categoryName || "未分组").trim();
+      if (!next.has(groupName)) next.set(groupName, row.id);
+    });
+    return next;
+  }, [sortedPreview]);
   const allVisibleSelected = visibleRowIds.length > 0 && visibleRowIds.every((id) => selectedRowIds.includes(id));
 
   const toggleRowSelection = useCallback((id: string) => {
@@ -863,6 +895,15 @@ function ShopSortWorkbench({
                       <div className="line-clamp-1 text-sm font-bold text-foreground">{row.name}</div>
                       <div className="mt-1 text-xs font-bold text-muted-foreground">顺序 {index + 1}</div>
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => pinRowToCategoryTop(row.id)}
+                      disabled={firstRowIdByGroup.get((row.sortGroupNameInput || row.categoryName || "未分组").trim()) === row.id}
+                      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-35"
+                      title="置顶到当前分类"
+                    >
+                      <ArrowUp size={14} />
+                    </button>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <label className="text-[11px] font-bold text-muted-foreground">
@@ -883,7 +924,7 @@ function ShopSortWorkbench({
             <table className="hidden w-full min-w-[760px] text-left text-sm md:table">
               <thead className="sticky top-0 z-10 bg-muted/80 text-center text-xs text-muted-foreground backdrop-blur">
                 <tr>
-                  <th className="w-12 px-3 py-3"></th>
+                  <th className="w-24 px-3 py-3"></th>
                   <th className="w-20 px-3 py-3 text-center">顺序</th>
                   <th className="w-32 px-3 py-3 text-center">店内码</th>
                   <th className="w-44 px-3 py-3 text-center">临时分类</th>
@@ -900,6 +941,15 @@ function ShopSortWorkbench({
                   >
                     <td className="px-3 py-2 text-center">
                       <div className="flex items-center justify-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => pinRowToCategoryTop(row.id)}
+                        disabled={firstRowIdByGroup.get((row.sortGroupNameInput || row.categoryName || "未分组").trim()) === row.id}
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-35"
+                        title="置顶到当前分类"
+                      >
+                        <ArrowUp size={13} />
+                      </button>
                       <button
                         type="button"
                         draggable
