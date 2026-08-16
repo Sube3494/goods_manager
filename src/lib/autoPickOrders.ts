@@ -158,6 +158,7 @@ const MAIYATIAN_ORDER_LIST_PATH = "/order/list/?&";
 const MAIYATIAN_QUERY_LIST_PATH = "/query/list/?&";
 const MAIYATIAN_REAL_USER_INFO_PATH = "/order/getRealUserInfo/?f=json&id=";
 const MAIYATIAN_ORDER_DETAIL_PATH = "/order/detail/?detail=1&f=json&id=";
+const MAIYATIAN_CANCEL_DETAIL_PATH = "/cancel/detail/?f=json&id=";
 
 const MAIYATIAN_MEAL_COMPLETE_PATH = "/order/mealComplete/?f=json";
 const AUTO_PICK_CONFIRM_LISTEN_INTERVAL_MS = 1500;
@@ -1929,15 +1930,28 @@ async function fetchMaiyatianRealUserInfoByCookie(cookie: string, orderId: strin
   return response.data;
 }
 
+async function fetchMaiyatianCancelDetailByCookie(cookie: string, orderId: string) {
+  if (!orderId) return [];
+  const response = await fetchMaiyatianJson<{ errno?: number; message?: string; data?: Array<Record<string, unknown>> }>(
+    `${MAIYATIAN_CANCEL_DETAIL_PATH}${encodeURIComponent(orderId)}`,
+    cookie,
+  ).catch(() => null);
+  if (response && response.errno === 1 && Array.isArray(response.data)) {
+    return response.data;
+  }
+  return [];
+}
+
 async function enrichMaiyatianOrderByCookie(cookie: string, order: AutoPickInboundOrder) {
   const rawOrderId = String(order.id || "").trim();
   if (!rawOrderId) {
     return order;
   }
 
-  const [userInfo, detailData] = await Promise.all([
+  const [userInfo, detailData, cancelDetails] = await Promise.all([
     fetchMaiyatianRealUserInfoByCookie(cookie, rawOrderId).catch(() => null),
     fetchMaiyatianOrderDetailByCookie(cookie, rawOrderId).catch(() => null),
+    fetchMaiyatianCancelDetailByCookie(cookie, rawOrderId).catch(() => []),
   ]);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -2110,7 +2124,48 @@ async function enrichMaiyatianOrderByCookie(cookie: string, order: AutoPickInbou
   if (!order.deliveryTimeRange) {
     order.deliveryTimeRange = parseDeliveryTimeRange(detailData.delivery_time_format);
   }
-  const detailStatus = resolveMaiyatianOrderStatus((detailData || {}) as Record<string, unknown>);
+  let detailStatus = resolveMaiyatianOrderStatus((detailData || {}) as Record<string, unknown>);
+
+  // 根据麦芽田真实退款详情 /cancel/detail 判定退款性质
+  if (Array.isArray(cancelDetails) && cancelDetails.length > 0) {
+    let refundAmountYuan = 0;
+    let returnedCount = 0;
+    for (const cancelItem of cancelDetails) {
+      refundAmountYuan += Number(cancelItem.total_price || 0) || 0;
+      if (cancelItem.goods_format && typeof cancelItem.goods_format === "string") {
+        try {
+          const parsed = JSON.parse(cancelItem.goods_format);
+          if (Array.isArray(parsed)) {
+            for (const g of parsed) {
+              returnedCount += Number(g.number || 0) || 0;
+            }
+          }
+        } catch {}
+      }
+    }
+
+    const orderActualPaidYuan = (Number(order.actualPaid || 0) || 0) / 100;
+    const isPartialRefund = refundAmountYuan > 0 && (
+      (orderActualPaidYuan > 0 && refundAmountYuan < orderActualPaidYuan)
+      || returnedCount === 0
+    );
+
+    if (isPartialRefund) {
+      // 确凿的部分退款：主订单未被取消
+      const deliveryTrack = String(order.delivery?.track || "").trim();
+      const isDelivered = deliveryTrack === "配送完成" || Boolean(order.completedAt) || Boolean(detailDataObj?.finished_time);
+      if (isDelivered) {
+        detailStatus = "已完成";
+      } else if (deliveryTrack.includes("配送中") || deliveryTrack.includes("派送中")) {
+        detailStatus = "配送中";
+      } else {
+        detailStatus = "待配送";
+      }
+    } else if (refundAmountYuan >= orderActualPaidYuan && returnedCount > 0) {
+      detailStatus = "已取消";
+    }
+  }
+
   if (detailStatus) {
     const shouldKeepListStatus = !isAutoPickOrderAbnormalStatus(order.status)
       && isAutoPickOrderAbnormalStatus(detailStatus);

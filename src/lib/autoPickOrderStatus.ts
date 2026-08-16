@@ -303,33 +303,11 @@ export function resolveAutoPickBusinessStatus(
   shopAddress?: string | null,
 ) {
   const baseStatus = getBaseAutoPickStatusDisplay(status);
-  const record = rawPayload && typeof rawPayload === "object" && !Array.isArray(rawPayload)
-    ? rawPayload as Record<string, unknown>
-    : null;
-  const delivery = record?.delivery && typeof record.delivery === "object" && !Array.isArray(record.delivery)
-    ? record.delivery as Record<string, unknown>
-    : null;
-  const hasCompletionProof = Boolean(
-    record?.completedAt
-    || record?.finishedTime
-    || record?.finished_time
-    || delivery?.completedTime
-    || delivery?.completed_time
-    || String(delivery?.track || "").trim() === "配送完成"
-  );
-
-  if (hasCompletionProof && baseStatus === "已取消") {
-    return "已完成";
-  }
 
   if (isAutoPickOtherPickupOrder(rawPayload) && !isAutoPickPickupOrder(rawPayload, userAddress, shopAddress)) {
     if (baseStatus === "同步中" || baseStatus === "待处理" || baseStatus === "已拣货") {
       return "待配送";
     }
-  }
-
-  if (hasCompletionProof && (baseStatus === "同步中" || baseStatus === "待配送" || baseStatus === "配送中" || baseStatus === "已拣货")) {
-    return "已完成";
   }
 
   return String(status || "").trim() || undefined;
