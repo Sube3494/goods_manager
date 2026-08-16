@@ -3241,17 +3241,22 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
     const deliveryId = normalized.deliveryId || existing?.deliveryId || null;
     const shopId = normalized.shopId || existing?.shopId || null;
     const shopAddress = normalized.shopAddress || existing?.shopAddress || null;
-    const shouldKeepTerminalStatus = isAutoPickOrderTerminalStatus(existing?.status) && !isAutoPickOrderTerminalStatus(normalized.status);
-    const status = shouldKeepTerminalStatus
+    const isExistingCompleted = isAutoPickOrderCompletedStatus(existing?.status);
+    const isIncomingTerminal = isAutoPickOrderTerminalStatus(normalized.status);
+    const shouldKeepCompletedStatus = isExistingCompleted && !isIncomingTerminal;
+    const isExistingCancelled = isAutoPickOrderCancelledStatus(existing?.status);
+    const status = shouldKeepCompletedStatus
       ? existing?.status || null
-      : (shouldPreservePickingStatus(existing || {}, normalized.status)
-        || shouldPreserveRealtimeStatus(existing || {}, normalized.status))
-        ? existing?.status || null
-        : normalized.status || existing?.status || null;
-    const deliveryDeadline = shouldKeepTerminalStatus
+      : isExistingCancelled && normalized.status && !isAutoPickOrderCancelledStatus(normalized.status)
+        ? normalized.status
+        : (shouldPreservePickingStatus(existing || {}, normalized.status)
+          || shouldPreserveRealtimeStatus(existing || {}, normalized.status))
+          ? existing?.status || null
+          : normalized.status || existing?.status || null;
+    const deliveryDeadline = shouldKeepCompletedStatus
       ? existing?.deliveryDeadline || normalized.deliveryDeadline || null
       : normalized.deliveryDeadline || existing?.deliveryDeadline || null;
-    const deliveryTimeRange = shouldKeepTerminalStatus
+    const deliveryTimeRange = shouldKeepCompletedStatus
       ? existing?.deliveryTimeRange || normalized.deliveryTimeRange || null
       : normalized.deliveryTimeRange || existing?.deliveryTimeRange || null;
     const mergedDelivery = mergeAutoPickDeliveryValue(normalized.delivery, existing?.delivery);
@@ -4512,7 +4517,8 @@ export async function refreshAutoPickOrderFromPlugin(
             normalizedDetailOrder.deliveryTimeRange = normalizedDetailOrder.deliveryTimeRange || fallbackMatched.deliveryTimeRange;
             normalizedDetailOrder.delivery = normalizedDetailOrder.delivery || fallbackMatched.delivery;
             if (
-              isAutoPickOrderAbnormalStatus(normalizedDetailOrder.status)
+              (isAutoPickOrderAbnormalStatus(normalizedDetailOrder.status) || isAutoPickOrderCancelledStatus(normalizedDetailOrder.status))
+              && !isAutoPickOrderCancelledStatus(fallbackMatched.status)
               && !isAutoPickOrderAbnormalStatus(fallbackMatched.status)
             ) {
               normalizedDetailOrder.status = fallbackMatched.status;
