@@ -206,8 +206,13 @@ export function summarizeOrders(orders: AutoPickOrder[]) {
     if (!isCancelledStatus(order.status) && !isDeletedStatus(order.status)) {
       const expectedIncome = Math.max(0, getExpectedIncome(order.expectedIncome, order.actualPaid, order.platformCommission));
       acc.receivedAmount += expectedIncome;
-      if (order.isMainSystemSelfDelivery) acc.brushReceivedAmount += expectedIncome;
-      else acc.realReceivedAmount += expectedIncome;
+      if (order.isMainSystemSelfDelivery) {
+        acc.brushReceivedAmount += expectedIncome;
+        acc.brushPaidAmount += Math.max(0, Number(order.actualPaid || 0));
+      } else {
+        acc.realReceivedAmount += expectedIncome;
+        acc.realPaidAmount += Math.max(0, Number(order.actualPaid || 0));
+      }
       acc.platformCommission += Math.max(0, Number(order.platformCommission || 0));
       acc.validOrderCount += 1;
       const deliveryFee = getDeliveryFee(order.delivery);
@@ -271,6 +276,8 @@ export function summarizeOrders(orders: AutoPickOrder[]) {
     receivedAmount: 0,
     realReceivedAmount: 0,
     brushReceivedAmount: 0,
+    realPaidAmount: 0,
+    brushPaidAmount: 0,
     platformCommission: 0,
     validOrderCount: 0,
     itemCount: 0,
@@ -279,7 +286,7 @@ export function summarizeOrders(orders: AutoPickOrder[]) {
     platformDelivery: {} as Record<string, number>,
     pureProfit: 0,
     platformProfit: {} as Record<string, { amount: number; count: number }>,
-     shopProfit: {} as Record<string, { id: string | null; name: string; amount: number; count: number; deliveryFee: number; productCost: number; platformCommission: number; platformProfit: Record<string, number> }>,
+    shopProfit: {} as Record<string, { id: string | null; name: string; amount: number; count: number; deliveryFee: number; productCost: number; platformCommission: number; platformProfit: Record<string, number> }>,
   });
 }
 
