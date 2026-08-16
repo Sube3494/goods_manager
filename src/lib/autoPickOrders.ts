@@ -1326,11 +1326,11 @@ function parseUnixTimestampToOrderTime(rawValue: string | number | undefined) {
   } catch {
     const shifted = new Date(date.getTime() + 8 * 60 * 60 * 1000);
     const year = shifted.getUTCFullYear();
-    const month = `${shifted.getUTCMonth() + 1}`.padStart(2, "0");
-    const day = `${shifted.getUTCDate()}`.padStart(2, "0");
-    const hours = `${shifted.getUTCHours()}`.padStart(2, "0");
-    const minutes = `${shifted.getUTCMinutes()}`.padStart(2, "0");
-    const secondsPart = `${shifted.getUTCSeconds()}`.padStart(2, "0");
+    const month = String(shifted.getUTCMonth() + 1).padStart(2, "0");
+    const day = String(shifted.getUTCDate()).padStart(2, "0");
+    const hours = String(shifted.getUTCHours()).padStart(2, "0");
+    const minutes = String(shifted.getUTCMinutes()).padStart(2, "0");
+    const secondsPart = String(shifted.getUTCSeconds()).padStart(2, "0");
     return `${year}-${month}-${day} ${hours}:${minutes}:${secondsPart}`;
   }
 }
@@ -1360,8 +1360,13 @@ function parseMaiyatianStatusValue(rawValue: unknown) {
 }
 
 function resolveMaiyatianOrderStatus(rawOrder: Record<string, unknown>) {
+  const rawStatus = String(rawOrder.status || "").trim().toLowerCase();
   const isCancelled = rawOrder.is_cancel === true || rawOrder.is_cancel === 1 || rawOrder.is_cancel === "1"
-    || (String(rawOrder.cancel_status || "").trim() !== "" && String(rawOrder.cancel_status) !== "0");
+    || rawStatus === "cancel"
+    || rawStatus === "cancelled"
+    || rawStatus === "canceled"
+    || rawStatus === "close"
+    || rawStatus === "closed";
   if (isCancelled) {
     return "已取消";
   }

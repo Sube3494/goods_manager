@@ -41,7 +41,7 @@ export const GoodsCard = memo(function GoodsCard({
   lowStockThreshold?: number;
   isSelected?: boolean;
   anySelected?: boolean;
-  onToggleSelect?: (id: string) => void;
+  onToggleSelect?: (id: string, e?: React.MouseEvent) => void;
   priority?: boolean;
   hideDiscontinuedState?: boolean;
   stockTitle?: string;
@@ -61,9 +61,9 @@ export const GoodsCard = memo(function GoodsCard({
     });
   };
 
-  const handleCardClick = () => {
+  const handleCardClick = (e: React.MouseEvent) => {
     if (onToggleSelect) {
-      onToggleSelect(product.id);
+      onToggleSelect(product.id, e);
     }
   };
 
@@ -99,7 +99,7 @@ export const GoodsCard = memo(function GoodsCard({
           <button 
             onClick={(e) => { 
               e.stopPropagation(); 
-              onToggleSelect?.(product.id); 
+              onToggleSelect?.(product.id, e); 
             }}
             className={`relative h-6 w-6 rounded-full border-2 transition-all duration-300 flex items-center justify-center ${
                 isSelected 

@@ -158,6 +158,7 @@ export class ProductService {
           { sku: { contains: search, mode: "insensitive" } },
           { jdSkuId: { contains: search, mode: "insensitive" } },
           { jdSkuMappings: { some: { jdSkuId: { contains: search, mode: "insensitive" } } } },
+          { meituanSkuMappings: { some: { meituanSkuId: { contains: search, mode: "insensitive" } } } },
           { category: { name: { contains: search, mode: "insensitive" } } },
           { pinyin: { contains: search, mode: "insensitive" } }
         ]
@@ -241,6 +242,7 @@ export class ProductService {
                     gallery: { take: 1 },
                     shopProducts: { select: { shopId: true } },
                     jdSkuMappings: { select: { jdSkuId: true }, orderBy: { createdAt: "asc" } },
+                    meituanSkuMappings: { select: { meituanSkuId: true }, orderBy: { createdAt: "asc" } },
                   },
                 });
 
@@ -271,6 +273,7 @@ export class ProductService {
               gallery: { take: 1 },
               shopProducts: { select: { shopId: true } },
               jdSkuMappings: { select: { jdSkuId: true }, orderBy: { createdAt: "asc" } },
+              meituanSkuMappings: { select: { meituanSkuId: true }, orderBy: { createdAt: "asc" } },
             },
             orderBy: standardOrderBy,
             skip,
@@ -285,13 +288,18 @@ export class ProductService {
   static async formatResponse(products: unknown[], total: number, page: number, pageSize: number) {
     const storage = await getStorageStrategy();
     
-    const resolved = (products as Record<string, unknown>[]).map(p => ({
-      ...p,
-      image: p.image ? storage.resolveUrl(p.image as string) : null,
-      gallery: (p.gallery as Array<{ url: string }>)?.map((img) => ({ ...img, url: storage.resolveUrl(img.url) })) || [],
-      assignedShopIds: (p.shopProducts as Array<{ shopId: string }> | undefined)?.map((item) => item.shopId) || [],
-      jdSkuIds: (p.jdSkuMappings as Array<{ jdSkuId: string }> | undefined)?.map((item) => item.jdSkuId) || (p.jdSkuId ? [p.jdSkuId as string] : []),
-    }));
+    const resolved = (products as Record<string, unknown>[]).map(p => {
+      const meituanSkuIds = (p.meituanSkuMappings as Array<{ meituanSkuId: string }> | undefined)?.map((item) => item.meituanSkuId) || (p.meituanSkuId ? [p.meituanSkuId as string] : []);
+      return {
+        ...p,
+        image: p.image ? storage.resolveUrl(p.image as string) : null,
+        gallery: (p.gallery as Array<{ url: string }>)?.map((img) => ({ ...img, url: storage.resolveUrl(img.url) })) || [],
+        assignedShopIds: (p.shopProducts as Array<{ shopId: string }> | undefined)?.map((item) => item.shopId) || [],
+        jdSkuIds: (p.jdSkuMappings as Array<{ jdSkuId: string }> | undefined)?.map((item) => item.jdSkuId) || (p.jdSkuId ? [p.jdSkuId as string] : []),
+        meituanSkuIds,
+        meituanSkuId: meituanSkuIds.join(",") || null,
+      };
+    });
 
     return {
       items: resolved,

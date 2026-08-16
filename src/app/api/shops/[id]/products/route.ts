@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
 import { getStorageStrategy } from "@/lib/storage";
 import { normalizeJdSkuIds } from "@/lib/productJdSku";
+import { normalizeMeituanSkuIds, replaceProductMeituanSkuMappings } from "@/lib/productMeituanSku";
 import { Prisma } from "../../../../../../prisma/generated-client";
 import { pinyin } from "pinyin-pro";
 
@@ -311,6 +312,7 @@ export async function GET(
               supplierId: true,
               category: { select: { name: true } },
               jdSkuMappings: { select: { jdSkuId: true } },
+              meituanSkuMappings: { select: { meituanSkuId: true } },
             },
           },
         },
@@ -334,6 +336,9 @@ export async function GET(
         ...normalizeJdSkuIds(item.jdSkuId),
         ...(item.product?.jdSkuMappings?.map((mapping: any) => mapping.jdSkuId) || []),
       ]));
+      const aggregatedMeituanSkuIds = Array.from(new Set(
+        item.product?.meituanSkuMappings?.map((mapping: any) => mapping.meituanSkuId) || []
+      ));
       return {
         id: item.id,
         sourceProductId: item.sourceProductId || item.productId || item.id,
@@ -341,6 +346,8 @@ export async function GET(
         sku: item.sku || null,
         jdSkuId: aggregatedJdSkuIds.join(",") || item.jdSkuId || null,
         jdSkuIds: aggregatedJdSkuIds,
+        meituanSkuId: aggregatedMeituanSkuIds.join(",") || null,
+        meituanSkuIds: aggregatedMeituanSkuIds,
         name: item.productName || item.product?.name || "未命名商品",
         image: item.productImage
           ? storage.resolveUrl(item.productImage)
@@ -555,6 +562,13 @@ export async function PUT(
       },
     });
 
+    // 如果关联了主商品库商品，同步更新主商品的美团ID映射
+    const targetProductId = existing.productId || existing.sourceProductId;
+    const normalizedMeituanSkuIds = normalizeMeituanSkuIds(body?.meituanSkuIds ?? body?.meituanSkuId);
+    if (targetProductId) {
+      await replaceProductMeituanSkuMappings(prisma, targetProductId, user.id, normalizedMeituanSkuIds);
+    }
+
     const resolvedImage = updated.productImage
       ? storage.resolveUrl(updated.productImage)
       : existing.product?.image
@@ -569,6 +583,8 @@ export async function PUT(
       sourceProductId: updated.sourceProductId,
       sku: updated.sku || null,
       jdSkuId: updated.jdSkuId || null,
+      meituanSkuId: normalizedMeituanSkuIds.join(",") || null,
+      meituanSkuIds: normalizedMeituanSkuIds,
       name: updated.productName || "未命名商品",
       image: resolvedImage,
       categoryId: updated.categoryId || null,

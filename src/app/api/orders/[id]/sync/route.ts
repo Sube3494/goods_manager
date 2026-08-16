@@ -40,11 +40,7 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
 
-    if (isAutoPickOrderCancelledStatus(order.status)) {
-      return NextResponse.json({
-        error: "Order already cancelled",
-      }, { status: 409 });
-    }
+    // 允许对订单执行同步刷新，以便从平台获取最新真实状态并自动恢复误取消的订单
 
     const refreshedOrder = await refreshAutoPickOrderFromPlugin(session.id, {
       id: order.sourceId,

@@ -58,6 +58,25 @@ function formatInitialJdSkuValue(initialData?: Product | null) {
   return initialData?.jdSkuId || "";
 }
 
+function normalizeMeituanSkuPreview(value: string) {
+  return Array.from(
+    new Set(
+      String(value || "")
+        .split(/[，,]+/g)
+        .map((item) => item.trim())
+        .filter(Boolean)
+    )
+  );
+}
+
+function formatInitialMeituanSkuValue(initialData?: Product | null) {
+  const meituanSkuIds = initialData && Array.isArray(initialData.meituanSkuIds) ? initialData.meituanSkuIds.filter(Boolean) : [];
+  if (meituanSkuIds.length > 0) {
+    return meituanSkuIds.join("\n");
+  }
+  return initialData?.meituanSkuId || "";
+}
+
 function parseShelfLife(daysStr: string): { value: string; unit: "天" | "月" | "年" } {
   const days = parseInt(daysStr, 10);
   if (isNaN(days) || days <= 0) return { value: "", unit: "天" };
@@ -100,6 +119,7 @@ interface ProductFormModalProps {
   showCoverSection?: boolean;
   mainImageUploadEndpoint?: string;
   showJdSkuField?: boolean;
+  showMeituanSkuField?: boolean;
 }
 
 import { createPortal } from "react-dom";
@@ -126,6 +146,7 @@ export function ProductFormModal({
   showCoverSection = false,
   mainImageUploadEndpoint,
   showJdSkuField = false,
+  showMeituanSkuField = false,
 }: ProductFormModalProps) {
   const { user } = useUser();
   const [formData, setFormData] = useState({
@@ -137,6 +158,7 @@ export function ProductFormModal({
     supplierId: initialData?.supplierId || "",
     sku: initialData?.sku || "",
     jdSkuId: formatInitialJdSkuValue(initialData),
+    meituanSkuId: formatInitialMeituanSkuValue(initialData),
     isPublic: initialData?.isPublic ?? true,
     isDiscontinued: initialData?.isDiscontinued ?? false,
     specs: (initialData?.specs as Record<string, string>) || {},
@@ -228,7 +250,9 @@ export function ProductFormModal({
       setIsSavingCost(false);
     }
   };
+
   const jdSkuPreview = useMemo(() => normalizeJdSkuPreview(formData.jdSkuId), [formData.jdSkuId]);
+  const meituanSkuPreview = useMemo(() => normalizeMeituanSkuPreview(formData.meituanSkuId), [formData.meituanSkuId]);
 
   const [shelfLifeVal, setShelfLifeVal] = useState("");
   const [shelfLifeUnit, setShelfLifeUnit] = useState<"天" | "月" | "年">("天");
@@ -380,6 +404,7 @@ export function ProductFormModal({
         setFormData({
           sku: initialData.sku || "",
           jdSkuId: formatInitialJdSkuValue(initialData),
+          meituanSkuId: formatInitialMeituanSkuValue(initialData),
           name: initialData.name,
           costPrice: String(initialData.costPrice || ""),
           stock: String(initialData.stock || ""),
@@ -403,6 +428,7 @@ export function ProductFormModal({
         setFormData({
           sku: "",
           jdSkuId: "",
+          meituanSkuId: "",
           name: "",
           costPrice: "",
           stock: "",
@@ -890,6 +916,9 @@ export function ProductFormModal({
 
     await onSubmit({
       ...formData,
+      jdSkuIds: jdSkuPreview,
+      meituanSkuId: formData.meituanSkuId,
+      meituanSkuIds: meituanSkuPreview,
       costPrice: Number(formData.costPrice),
       stock: hideStockField ? 0 : Number(formData.stock),
       specs: Object.keys(cleanedSpecs).length > 0 ? cleanedSpecs : undefined,
@@ -1160,6 +1189,25 @@ export function ProductFormModal({
                           <div className="flex items-start justify-between gap-3 text-[11px] text-muted-foreground">
                             <span>只支持逗号分隔多个 JD SKU，保存时会自动去重。</span>
                             <span className="shrink-0 font-mono">{jdSkuPreview.length} 条</span>
+                          </div>
+                      </div>
+                    )}
+
+                    {showMeituanSkuField && (
+                      <div className="space-y-2">
+                          <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                              <Tag size={16} className="text-amber-500" /> 美团商品 ID (Meituan SKU ID)
+                          </label>
+                          <input
+                              type="text"
+                              value={formData.meituanSkuId}
+                              onChange={(e) => setFormData({ ...formData, meituanSkuId: e.target.value.replace(/[\r\n]+/g, ",") })}
+                              className="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all font-mono dark:hover:bg-white/10"
+                              placeholder="用逗号分隔多个美团商品 ID，例如：100234,100235"
+                          />
+                          <div className="flex items-start justify-between gap-3 text-[11px] text-muted-foreground">
+                            <span>支持逗号分隔多个美团 ID，保存时将与美团配对池联动更新。</span>
+                            <span className="shrink-0 font-mono text-amber-500 font-bold">{meituanSkuPreview.length} 条</span>
                           </div>
                       </div>
                     )}

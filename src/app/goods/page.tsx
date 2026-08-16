@@ -447,12 +447,44 @@ export default function GoodsPage() {
     });
   };
 
-  // Batch selection handlers
-  const toggleSelectProduct = useCallback((id: string) => {
-    setSelectedIds(prev => 
-      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
-    );
-  }, []);
+  const lastSelectedIdRef = useRef<string | null>(null);
+
+  // Batch selection handlers with Shift range selection
+  const toggleSelectProduct = useCallback((id: string, e?: React.MouseEvent) => {
+    if (e?.shiftKey && lastSelectedIdRef.current) {
+      if (typeof window !== "undefined") {
+        window.getSelection()?.removeAllRanges();
+      }
+      const allIds = items.map((p) => p.id);
+      const lastIndex = allIds.indexOf(lastSelectedIdRef.current);
+      const currentIndex = allIds.indexOf(id);
+
+      if (lastIndex !== -1 && currentIndex !== -1) {
+        const start = Math.min(lastIndex, currentIndex);
+        const end = Math.max(lastIndex, currentIndex);
+        const rangeIds = allIds.slice(start, end + 1);
+
+        setSelectedIds((prev) => {
+          const nextSet = new Set(prev);
+          rangeIds.forEach((rangeId) => nextSet.add(rangeId));
+          return Array.from(nextSet);
+        });
+        lastSelectedIdRef.current = id;
+        return;
+      }
+    }
+
+    setSelectedIds((prev) => {
+      const isSelecting = !prev.includes(id);
+      if (isSelecting) {
+        lastSelectedIdRef.current = id;
+        return [...prev, id];
+      } else {
+        lastSelectedIdRef.current = null;
+        return prev.filter((item) => item !== id);
+      }
+    });
+  }, [items]);
 
   const handleToggleSelectAll = useCallback(async () => {
     // If all possible matches are already selected, clear all
@@ -725,6 +757,8 @@ export default function GoodsPage() {
         { header: "商品名称", key: "name", width: 36, align: "left" as const },
         { header: "主图", key: "image", width: 22, align: "center" as const },
         { header: "SKU/店内码", key: "sku", width: 22, align: "center" as const },
+        { header: "JD SKU ID", key: "jdSkuId", width: 22, align: "center" as const },
+        { header: "美团商品 ID", key: "meituanSkuId", width: 24, align: "center" as const },
         { header: "分类", key: "category", width: 18, align: "center" as const },
         { header: "进货单价", key: "costPrice", width: 16, align: "center" as const, numFmt: "￥#,##0.00" },
         { header: "供应商", key: "supplier", width: 20, align: "center" as const },
@@ -765,6 +799,8 @@ export default function GoodsPage() {
         const costPrice = typeof g.costPrice === "number" ? g.costPrice : 0;
         const shopCount = g.assignedShopIds?.length || 0;
         const createdAt = g.createdAt ? new Date(g.createdAt).toLocaleString() : "";
+        const jdSkuText = (Array.isArray(g.jdSkuIds) && g.jdSkuIds.length > 0 ? g.jdSkuIds.join(",") : g.jdSkuId) || "";
+        const meituanSkuText = (Array.isArray(g.meituanSkuIds) && g.meituanSkuIds.length > 0 ? g.meituanSkuIds.join(",") : g.meituanSkuId) || "";
         let specString = "";
         if (g.specs && typeof g.specs === "object") {
           specString = Object.entries(g.specs)
@@ -776,6 +812,8 @@ export default function GoodsPage() {
           name: g.name || "",
           image: "",
           sku: g.sku || "",
+          jdSkuId: jdSkuText,
+          meituanSkuId: meituanSkuText,
           category: categoryName,
           costPrice,
           supplier: supplierName,
@@ -1275,6 +1313,8 @@ export default function GoodsPage() {
           {
             "*商品名称": "示例商品1",
             "SKU/店内码": "EXAMPLE-001 (选填，留空自动生成)",
+            "JD SKU ID": "100234,100235 (选填)",
+            "美团商品 ID": "MT-001,MT-002 (选填)",
             "分类": "默认分类 (选填，留空归为其他分类)",
             "进货单价": 99.00,
             "供应商": "默认供应商",
@@ -1296,6 +1336,7 @@ export default function GoodsPage() {
         disableHistorySection={true}
         hideStockField={true}
         showJdSkuField={true}
+        showMeituanSkuField={true}
       />
 
       <BatchEditModal 

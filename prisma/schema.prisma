@@ -58,6 +58,9 @@ model Product {
   shopProducts    ShopProduct[]
   storeOpeningItems StoreOpeningItem[]
   jdSkuMappings   ProductJdSku[]
+  meituanSkuMappings ProductMeituanSku[]
+  meituanBoundItems MeituanImportItem[] @relation("MeituanBoundProduct")
+  meituanSuggestedItems MeituanImportItem[] @relation("MeituanSuggestedProduct")
   batches         ProductBatch[]
   library         ProductLibrary?     @relation(fields: [libraryId], references: [id])
 
@@ -256,6 +259,9 @@ model User {
   dailyPromotionExpenses DailyPromotionExpense[]
   operatingCostProfiles OperatingCostProfile[]
   operatingCostMonthlyBills OperatingCostMonthlyBill[]
+  meituanSkuMappings    ProductMeituanSku[]
+  meituanImportBatches  MeituanImportBatch[]
+  meituanImportItems    MeituanImportItem[]
 }
 
 model UserDeviceSession {
@@ -829,6 +835,71 @@ model ProductLibrary {
   authorizedUsers User[]    @relation("UserLibraries")
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
+}
+
+model ProductMeituanSku {
+  id           String   @id @default(cuid())
+  productId    String
+  userId       String?
+  meituanSkuId String
+  meituanSpuId String?
+  meituanName  String?
+  meituanSpec  String?
+  createdAt    DateTime @default(now())
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user    User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, meituanSkuId])
+  @@unique([userId, meituanSkuId])
+  @@index([productId])
+  @@index([userId, meituanSkuId])
+}
+
+model MeituanImportBatch {
+  id           String   @id @default(cuid())
+  userId       String?
+  fileName     String
+  totalCount   Int      @default(0)
+  matchedCount Int      @default(0)
+  status       String   @default("PENDING") // PENDING, PARTIAL, COMPLETED
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user  User?               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items MeituanImportItem[]
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model MeituanImportItem {
+  id                 String   @id @default(cuid())
+  batchId            String
+  userId             String?
+  meituanSkuId       String
+  meituanSpuId       String?
+  name               String
+  spec               String?
+  barcode            String?
+  price              Float?
+  imageUrl           String?
+  rawData            Json?
+  suggestedProductId String?
+  suggestedReason    String?
+  bindProductId      String?
+  status             String   @default("UNMATCHED") // UNMATCHED, SUGGESTED, BOUND, IGNORED
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  batch            MeituanImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  user             User?              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bindProduct      Product?           @relation("MeituanBoundProduct", fields: [bindProductId], references: [id], onDelete: SetNull)
+  suggestedProduct Product?           @relation("MeituanSuggestedProduct", fields: [suggestedProductId], references: [id], onDelete: SetNull)
+
+  @@index([batchId])
+  @@index([userId, meituanSkuId])
+  @@index([status])
 }
 
 

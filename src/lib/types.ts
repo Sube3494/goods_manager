@@ -58,6 +58,8 @@ export interface Product {
   sku?: string;
   jdSkuId?: string;
   jdSkuIds?: string[];
+  meituanSkuId?: string;
+  meituanSkuIds?: string[];
   name: string;
   productId?: string | null;
   sourceProductId?: string | null;
@@ -111,6 +113,9 @@ export interface ShopCatalogItem {
   productId?: string | null;
   sku?: string | null;
   jdSkuId?: string | null;
+  jdSkuIds?: string[];
+  meituanSkuId?: string | null;
+  meituanSkuIds?: string[];
   name: string;
   productName?: string | null;
   image?: string | null;

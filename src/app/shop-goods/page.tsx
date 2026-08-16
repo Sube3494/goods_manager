@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { Search, Plus, Store, X, ArrowUp, Trash2, AlertCircle, Zap, ListOrdered, Save, Check } from "lucide-react";
+import { Search, Plus, Store, X, ArrowUp, Trash2, AlertCircle, Zap, ListOrdered, Save, Check, Link2 } from "lucide-react";
 import Link from "next/link";
 import { ImportModal } from "@/components/Goods/ImportModal";
 import { GoodsCard } from "@/components/Goods/GoodsCard";
@@ -13,6 +13,7 @@ import { BatchEditModal } from "@/components/Goods/BatchEditModal";
 import { GoodsCardSkeleton } from "@/components/Goods/GoodsCardSkeleton";
 import { ProductFormModal } from "@/components/Goods/ProductFormModal";
 import { ProductSelectionModal } from "@/components/Purchases/ProductSelectionModal";
+import { MeituanMappingModal } from "@/components/ShopGoods/MeituanMappingModal";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { ActionBar } from "@/components/ui/ActionBar";
 import { useToast } from "@/components/ui/Toast";
@@ -1250,6 +1251,7 @@ export default function ShopGoodsPage() {
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isSortOpen, setIsSortOpen] = useState(false);
+  const [isMeituanMappingOpen, setIsMeituanMappingOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingItemId, setEditingItemId] = useState("");
   const [editingShopId, setEditingShopId] = useState("");
@@ -1522,9 +1524,43 @@ export default function ShopGoodsPage() {
     return () => observer.disconnect();
   }, [fetchShopProducts, hasMore, isLoading, isNextPageLoading]);
 
-  const handleToggleSelect = useCallback((id: string) => {
-    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]));
-  }, []);
+  const lastSelectedIdRef = useRef<string | null>(null);
+
+  const handleToggleSelect = useCallback((id: string, e?: React.MouseEvent) => {
+    if (e?.shiftKey && lastSelectedIdRef.current) {
+      if (typeof window !== "undefined") {
+        window.getSelection()?.removeAllRanges();
+      }
+      const allIds = displayedItems.map((p) => p.displayId);
+      const lastIndex = allIds.indexOf(lastSelectedIdRef.current);
+      const currentIndex = allIds.indexOf(id);
+
+      if (lastIndex !== -1 && currentIndex !== -1) {
+        const start = Math.min(lastIndex, currentIndex);
+        const end = Math.max(lastIndex, currentIndex);
+        const rangeIds = allIds.slice(start, end + 1);
+
+        setSelectedIds((prev) => {
+          const nextSet = new Set(prev);
+          rangeIds.forEach((rangeId) => nextSet.add(rangeId));
+          return Array.from(nextSet);
+        });
+        lastSelectedIdRef.current = id;
+        return;
+      }
+    }
+
+    setSelectedIds((prev) => {
+      const isSelecting = !prev.includes(id);
+      if (isSelecting) {
+        lastSelectedIdRef.current = id;
+        return [...prev, id];
+      } else {
+        lastSelectedIdRef.current = null;
+        return prev.filter((item) => item !== id);
+      }
+    });
+  }, [displayedItems]);
 
   const handleToggleSelectAll = useCallback(async () => {
     if (selectedIds.length === displayedItems.length && displayedItems.length > 0) {
@@ -1969,6 +2005,8 @@ export default function ShopGoodsPage() {
         { header: "主图", key: "image", width: 22, align: "center" as const },
         { header: "商品名称", key: "name", width: 36, align: "left" as const },
         { header: "SKU/店内码", key: "sku", width: 22, align: "center" as const },
+        { header: "JD SKU ID", key: "jdSkuId", width: 22, align: "center" as const },
+        { header: "美团商品 ID", key: "meituanSkuId", width: 24, align: "center" as const },
         { header: "分类", key: "categoryName", width: 18, align: "center" as const },
         { header: "供应商", key: "supplierName", width: 20, align: "center" as const },
         { header: "进货单价", key: "costPrice", width: 16, align: "center" as const, numFmt: "￥#,##0.00" },
@@ -2008,12 +2046,16 @@ export default function ShopGoodsPage() {
         const supplierName = suppliers.find((supplier) => supplier.id === item.supplierId)?.name || "";
         const costPrice = typeof item.costPrice === "number" ? item.costPrice : 0;
         const stock = typeof item.stock === "number" ? item.stock : 0;
+        const jdSkuText = (Array.isArray(item.jdSkuIds) && item.jdSkuIds.length > 0 ? item.jdSkuIds.join(",") : item.jdSkuId) || "";
+        const meituanSkuText = (Array.isArray(item.meituanSkuIds) && item.meituanSkuIds.length > 0 ? item.meituanSkuIds.join(",") : item.meituanSkuId) || "";
 
         const row = worksheet.addRow({
           shopName: item.shopName || "",
           image: "", // 图片列稍后嵌入
           name: item.name || "",
           sku: item.sku || "",
+          jdSkuId: jdSkuText,
+          meituanSkuId: meituanSkuText,
           categoryName: item.categoryName || "未分类",
           supplierName,
           costPrice,
@@ -2152,6 +2194,7 @@ export default function ShopGoodsPage() {
         </div>
         {filteredShops.length > 0 && (
           <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
+            <button onClick={() => setIsMeituanMappingOpen(true)} className="flex min-w-0 items-center justify-center gap-2 rounded-full border border-border/60 bg-white dark:bg-white/5 px-3 sm:px-5 h-10 sm:h-11 text-sm font-bold text-foreground hover:bg-white/80 dark:hover:bg-white/10 transition-all"><Link2 size={18} className="shrink-0 text-amber-500" /><span className="truncate">美团配对</span></button>
             <button onClick={() => selectedShop ? setIsImportOpen(true) : showToast("先选择一个目标店铺再导入", "error")} className={cn("flex min-w-0 items-center justify-center gap-2 rounded-full border border-border/60 px-3 h-10 sm:h-11 text-sm font-bold transition-all", selectedShop ? "bg-white dark:bg-white/5 text-foreground hover:bg-white/80 dark:hover:bg-white/10" : "bg-muted/60 text-muted-foreground cursor-not-allowed")}><span className="truncate">导入</span></button>
             <button onClick={handleExport} className="flex min-w-0 items-center justify-center gap-2 rounded-full border border-border/60 bg-white dark:bg-white/5 px-3 h-10 sm:h-11 text-sm font-bold text-foreground hover:bg-white/80 dark:hover:bg-white/10 transition-all"><span className="truncate">导出</span></button>
             <button onClick={() => selectedShop ? setIsSortOpen(true) : showToast("先选择一个目标店铺再排序", "error")} className={cn("flex min-w-0 items-center justify-center gap-2 rounded-full border border-border/60 px-3 sm:px-5 h-10 sm:h-11 text-sm font-bold transition-all", selectedShop ? "bg-white dark:bg-white/5 text-foreground hover:bg-white/80 dark:hover:bg-white/10" : "bg-muted/60 text-muted-foreground cursor-not-allowed")}><ListOrdered size={18} className="shrink-0" /><span className="truncate">排序</span></button>
@@ -2284,10 +2327,17 @@ export default function ShopGoodsPage() {
       <ActionBar selectedCount={selectedIds.length} totalCount={totalResults} onToggleSelectAll={handleToggleSelectAll} onClear={() => setSelectedIds([])} onEdit={() => { if (selectedIds.length === 1) { handleEditSelected(); return; } setIsBatchEditOpen(true); }} label="个商品" extraActions={[{ label: "删除商品", icon: <Trash2 size={16} />, onClick: handleRemoveSelected, variant: "danger" }]} />
       <ShopSortWorkbench isOpen={isSortOpen} shop={selectedShop} onClose={() => setIsSortOpen(false)} onSaved={async () => { await fetchShopProducts(true); }} />
       <ProductSelectionModal isOpen={isPickerOpen} onClose={() => setIsPickerOpen(false)} onSelect={(products) => { void handleAssignProducts(products); }} selectedIds={assignedTemplateIds} selectedBadgeLabel="当前店铺已复制" title={selectedShop ? `复制到 ${selectedShop.name}` : "复制商品"} showPlatformSelector={false} minimalView={true} query={templateCatalogQuery} emptyStateText="主库里还没有商品" loadAllOnOpen={true} respectPublicVisibility={false} defaultViewMode="list" />
-      <ImportModal isOpen={isImportOpen} onClose={() => setIsImportOpen(false)} onImport={handleImport} title={selectedShop ? `导入到 ${selectedShop.name}` : "导入店铺商品"} description="导入结果只会落到当前选中的目标店铺。已存在的店铺商品会更新，未存在的会按公开商品匹配后加入该店铺。" templateFileName="店铺商品导入模板.xlsx" templateData={[{ "*商品名称": "示例商品", "SKU/店内码": "SHOP-001", "*分类": "默认分类", 供应商: "默认供应商", 进货单价: 19.9, 库存: 12, 主图: "https://example.com/cover.jpg", 备注: "店铺自定义备注" }]} />
-      <ProductFormModal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} onSubmit={async (data) => { await handleCreateStandaloneProduct(data); }} title={selectedShop ? `新建 ${selectedShop.name} 商品` : "新建店铺商品"} hideVisibilityControl={true} hideProductionControl={true} hideGallerySection={true} hideSpecsSection={true} disableHistorySection={true} showCoverSection={true} showJdSkuField={true} mainImageUploadEndpoint={selectedShopId ? `/api/shops/${selectedShopId}/products/cover-upload` : undefined} />
-      <ProductFormModal isOpen={isEditOpen} onClose={closeEditModal} onSubmit={async (data) => { await handleSaveEdit(data); }} initialData={editingProduct} title="编辑店铺商品" hideVisibilityControl={true} hideProductionControl={true} hideGallerySection={true} hideSpecsSection={true} showCoverSection={true} showJdSkuField={true} mainImageUploadEndpoint={editingShopId ? `/api/shops/${editingShopId}/products/cover-upload` : undefined} />
+      <ImportModal isOpen={isImportOpen} onClose={() => setIsImportOpen(false)} onImport={handleImport} title={selectedShop ? `导入到 ${selectedShop.name}` : "导入店铺商品"} description="导入结果只会落到当前选中的目标店铺。已存在的店铺商品会更新，未存在的会按公开商品匹配后加入该店铺。" templateFileName="店铺商品导入模板.xlsx" templateData={[{ "*商品名称": "示例商品", "SKU/店内码": "SHOP-001", "JD SKU ID": "100234,100235 (选填)", "美团商品 ID": "MT-001,MT-002 (选填)", "*分类": "默认分类", 供应商: "默认供应商", 进货单价: 19.9, 主图: "https://example.com/cover.jpg", 备注: "店铺自定义备注" }]} />
+      <ProductFormModal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} onSubmit={async (data) => { await handleCreateStandaloneProduct(data); }} title={selectedShop ? `新建 ${selectedShop.name} 商品` : "新建店铺商品"} hideVisibilityControl={true} hideProductionControl={true} hideGallerySection={true} hideSpecsSection={true} disableHistorySection={true} showCoverSection={true} showJdSkuField={true} showMeituanSkuField={true} mainImageUploadEndpoint={selectedShopId ? `/api/shops/${selectedShopId}/products/cover-upload` : undefined} />
+      <ProductFormModal isOpen={isEditOpen} onClose={closeEditModal} onSubmit={async (data) => { await handleSaveEdit(data); }} initialData={editingProduct} title="编辑店铺商品" hideVisibilityControl={true} hideProductionControl={true} hideGallerySection={true} hideSpecsSection={true} showCoverSection={true} showJdSkuField={true} showMeituanSkuField={true} mainImageUploadEndpoint={editingShopId ? `/api/shops/${editingShopId}/products/cover-upload` : undefined} />
       <BatchEditModal isOpen={isBatchEditOpen} onClose={() => setIsBatchEditOpen(false)} onConfirm={handleBatchUpdate} categories={categories} suppliers={suppliers} selectedCount={selectedIds.length} hideProductionStatus={true} />
+      <MeituanMappingModal
+        isOpen={isMeituanMappingOpen}
+        onClose={() => setIsMeituanMappingOpen(false)}
+        currentShop={selectedShop}
+        shops={filteredShops.length > 0 ? filteredShops : shops}
+        onShopChange={(shop) => setSelectedShopId(shop.id)}
+      />
 
       {typeof document !== "undefined" && createPortal(
         <AnimatePresence>

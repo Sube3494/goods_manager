@@ -18,7 +18,9 @@ export async function GET() {
         where: { userId: session.id },
         include: {
           category: true,
-          supplier: true
+          supplier: true,
+          jdSkuMappings: { select: { jdSkuId: true } },
+          meituanSkuMappings: { select: { meituanSkuId: true } },
         }
       }),
       prisma.category.findMany({
@@ -62,6 +64,8 @@ export async function GET() {
     // 1. Products Sheet
     const productData = products.map(p => ({
       'SKU': p.sku || '',
+      'JD SKU ID': (p.jdSkuMappings && p.jdSkuMappings.length > 0 ? p.jdSkuMappings.map(m => m.jdSkuId).join(',') : p.jdSkuId) || '',
+      '美团商品 ID': (p.meituanSkuMappings && p.meituanSkuMappings.length > 0 ? p.meituanSkuMappings.map(m => m.meituanSkuId).join(',') : '') || '',
       '商品名称': p.name,
       '分类': p.category?.name || '未分类',
       '供应商': p.supplier?.name || '无',

@@ -1,4 +1,4 @@
-import { LayoutDashboard, Package, Settings, PlusCircle, Layers, Truck, ShoppingCart, Camera, Users, CreditCard, ArrowUpRight, ShieldAlert, LucideIcon, Store, PanelsTopLeft, Navigation2, Clock, WalletCards, KeyRound } from "lucide-react";
+import { LayoutDashboard, Package, Settings, PlusCircle, Layers, Truck, ShoppingCart, Camera, Users, CreditCard, ArrowUpRight, ShieldAlert, LucideIcon, Store, PanelsTopLeft, Navigation2, Clock, WalletCards, KeyRound, Link2 } from "lucide-react";
 import { AdminCapability, Permission, hasAdminAccess } from "./permissions";
 
 export interface NavItem {

@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
 import { getStorageStrategy } from "@/lib/storage";
+import { normalizeJdSkuIds, replaceProductJdSkuMappings } from "@/lib/productJdSku";
+import { normalizeMeituanSkuIds, replaceProductMeituanSkuMappings } from "@/lib/productMeituanSku";
 import { Prisma } from "../../../../../../../prisma/generated-client";
 import { pinyin } from "pinyin-pro";
 
@@ -119,7 +121,14 @@ export async function POST(
     for (let index = 0; index < rows.length; index += 1) {
       const row = rows[index] as Record<string, unknown>;
       const rowNumber = index + 1;
-      const sku = normalizeText(extractRowValue(row, ["SKU/店内码", "SKU", "sku", "编码"]));
+      const sku = normalizeText(extractRowValue(row, ["SKU/店内码", "SKU", "sku", "店内码", "店内编码", "商品编码", "编码", "货号"]));
+      const jdSkuText = normalizeText(extractRowValue(row, ["JD SKU ID", "JD SKU", "JDSKU", "jdSkuId", "jdSkuIds", "京东编码", "京东SKU", "京东商品ID", "京东ID"]));
+      const meituanSkuText = normalizeText(extractRowValue(row, [
+        "美团商品 ID", "美团商品ID", "美团商品Id", "美团商品id", 
+        "美团ID", "美团Id", "美团id", "美团编码", "美团sku", "美团SKU", 
+        "商品ID", "商品Id", "商品id", "平台商品ID", "平台商品id",
+        "meituanSkuId", "meituanSkuIds", "meituanId"
+      ]));
       const name = normalizeText(extractRowValue(row, ["商品名称", "name", "名称"]));
       const categoryName = normalizeText(extractRowValue(row, ["分类", "categoryName", "类目"])) || "未分类";
       const supplierName = normalizeText(extractRowValue(row, ["供应商", "supplierName"]));
@@ -142,7 +151,7 @@ export async function POST(
             ...(name ? [{ productName: name }] : []),
           ],
         },
-        select: { id: true },
+        select: { id: true, productId: true, sourceProductId: true },
       });
 
       const category = await ensureCategory(shop.userId, categoryName);
@@ -154,6 +163,7 @@ export async function POST(
           where: { id: existing.id },
           data: {
             sku: sku || null,
+            jdSkuId: jdSkuText || undefined,
             productName: name || undefined,
             pinyin: generatePinyinSearchText(name || ""),
             categoryId: category?.id || null,
@@ -165,6 +175,17 @@ export async function POST(
             remark: remark || null,
           },
         });
+
+        const targetProductId = existing.productId || existing.sourceProductId;
+        if (targetProductId) {
+          if (jdSkuText) {
+            await replaceProductJdSkuMappings(prisma, targetProductId, shop.userId || user.id, normalizeJdSkuIds(jdSkuText));
+          }
+          if (meituanSkuText) {
+            await replaceProductMeituanSkuMappings(prisma, targetProductId, shop.userId || user.id, normalizeMeituanSkuIds(meituanSkuText));
+          }
+        }
+
         results.updated += 1;
         continue;
       }
@@ -210,6 +231,7 @@ export async function POST(
         finalSourceProduct = await prisma.product.create({
           data: {
             sku: newSku,
+            jdSkuId: jdSkuText || null,
             name: name,
             pinyin: generatePinyinSearchText(name),
             categoryId: finalCategoryId,
@@ -231,12 +253,20 @@ export async function POST(
         });
       }
 
+      if (jdSkuText) {
+        await replaceProductJdSkuMappings(prisma, finalSourceProduct.id, shop.userId || user.id, normalizeJdSkuIds(jdSkuText));
+      }
+      if (meituanSkuText) {
+        await replaceProductMeituanSkuMappings(prisma, finalSourceProduct.id, shop.userId || user.id, normalizeMeituanSkuIds(meituanSkuText));
+      }
+
       await prisma.shopProduct.create({
         data: {
           shopId,
           productId: finalSourceProduct.id,
           sourceProductId: finalSourceProduct.id,
           sku: sku || null,
+          jdSkuId: jdSkuText || null,
           productName: name || finalSourceProduct.name,
           pinyin: generatePinyinSearchText(name || finalSourceProduct.name),
           productImage: normalizedImage || finalSourceProduct.image,

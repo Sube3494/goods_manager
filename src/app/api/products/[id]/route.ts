@@ -4,6 +4,7 @@ import { getLightSession } from "@/lib/auth";
 import { getStorageStrategy } from "@/lib/storage";
 import { handlePrismaError } from "@/lib/api-errors";
 import { findConflictingProductJdSkuIds, getPrimaryJdSkuId, normalizeJdSkuIds, replaceProductJdSkuMappings } from "@/lib/productJdSku";
+import { normalizeMeituanSkuIds, replaceProductMeituanSkuMappings } from "@/lib/productMeituanSku";
 
 function normalizeSku(sku: unknown) {
   if (typeof sku !== "string") {
@@ -31,6 +32,10 @@ export async function GET(
         },
         jdSkuMappings: {
           select: { jdSkuId: true },
+          orderBy: { createdAt: "asc" }
+        },
+        meituanSkuMappings: {
+          select: { meituanSkuId: true },
           orderBy: { createdAt: "asc" }
         },
         gallery: {
@@ -85,6 +90,7 @@ export async function GET(
       ...product,
       image: product.image ? storage.resolveUrl(product.image) : null,
       jdSkuIds: product.jdSkuMappings.map((item) => item.jdSkuId),
+      meituanSkuIds: product.meituanSkuMappings.map((item) => item.meituanSkuId),
       gallery: product.gallery.map(item => ({
         ...item,
         url: storage.resolveUrl(item.url),
@@ -121,10 +127,11 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { name, sku, jdSkuId, jdSkuIds, costPrice, categoryId, supplierId, image, isPublic, remark, isShelfLife, shelfLifeDays } = body;
+    const { name, sku, jdSkuId, jdSkuIds, meituanSkuId, meituanSkuIds, costPrice, categoryId, supplierId, image, isPublic, remark, isShelfLife, shelfLifeDays } = body;
     const normalizedSku = normalizeSku(sku);
     const normalizedJdSkuIds = normalizeJdSkuIds(jdSkuIds ?? jdSkuId);
     const normalizedJdSkuId = getPrimaryJdSkuId(normalizedJdSkuIds);
+    const normalizedMeituanSkuIds = normalizeMeituanSkuIds(meituanSkuIds ?? meituanSkuId);
 
     if (normalizedSku) {
       const conflict = await prisma.product.findFirst({
@@ -175,12 +182,17 @@ export async function PUT(
       });
 
       await replaceProductJdSkuMappings(tx, id, session.id, normalizedJdSkuIds);
+      await replaceProductMeituanSkuMappings(tx, id, session.id, normalizedMeituanSkuIds);
 
       return tx.product.findUniqueOrThrow({
         where: { id },
         include: {
           jdSkuMappings: {
             select: { jdSkuId: true },
+            orderBy: { createdAt: "asc" }
+          },
+          meituanSkuMappings: {
+            select: { meituanSkuId: true },
             orderBy: { createdAt: "asc" }
           },
         },
@@ -191,6 +203,7 @@ export async function PUT(
       ...product,
       image: product.image ? storage.resolveUrl(product.image) : null,
       jdSkuIds: product.jdSkuMappings.map((item) => item.jdSkuId),
+      meituanSkuIds: product.meituanSkuMappings.map((item) => item.meituanSkuId),
     });
   } catch (error: unknown) {
     return handlePrismaError(error, "商品", "Failed to update product");
