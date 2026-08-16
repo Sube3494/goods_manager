@@ -2301,10 +2301,10 @@ export function OrderCard({
               <>
                 <ActionButton
                   label="同步"
-                  title={cancelled ? "订单已取消，不需要再次同步" : deleted ? "订单已删除，不能同步" : undefined}
+                  title={deleted ? "订单已删除，不能同步" : "从平台重新同步最新订单状态"}
                   icon={actingId === `${order.id}:sync` ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
                   onClick={() => onRunAction(order.id, "sync")}
-                  disabled={Boolean(actingId) || cancelled || deleted}
+                  disabled={Boolean(actingId) || deleted}
                   mobileIconOnly
                 />
                 <ActionButton
