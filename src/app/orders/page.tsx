@@ -96,6 +96,8 @@ type OrderResponse = {
     receivedAmount: number;
     realReceivedAmount?: number;
     brushReceivedAmount?: number;
+    realPaidAmount?: number;
+    brushPaidAmount?: number;
     platformCommission: number;
     validOrderCount: number;
     itemCount: number;
@@ -1363,6 +1365,8 @@ export default function OrdersPage() {
       receivedAmount: number;
       realReceivedAmount?: number;
       brushReceivedAmount?: number;
+      realPaidAmount?: number;
+      brushPaidAmount?: number;
       platformCommission: number;
       validOrderCount: number;
       itemCount: number;
@@ -2233,14 +2237,27 @@ export default function OrdersPage() {
               <div className="min-w-0 rounded-[20px] border border-black/8 bg-white/76 px-4 py-3.5 shadow-xs dark:border-white/10 dark:bg-white/5 md:col-span-2 lg:col-span-2">
                 <div className="flex flex-col gap-2.5">
                   <div className="flex items-baseline justify-between gap-3">
-                    <div>
-                      <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">总订单</div>
-                      <div className="mt-2 text-[30px] font-black leading-none tracking-tight text-foreground">{activeOverview.totalCount}</div>
+                    <div className="shrink-0">
+                      <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground whitespace-nowrap">总订单</div>
+                      <div className="mt-2 text-2xl sm:text-[30px] font-black leading-none tracking-tight text-foreground">{activeOverview.totalCount}</div>
                     </div>
-                    <div className="text-right">
+                    <div className="min-w-0 text-right">
                       <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">商家实收</div>
-                      <div className="mt-2 text-[30px] font-black leading-none tracking-tight text-emerald-600 dark:text-emerald-400">{toCurrency(activeSummary.receivedAmount - (activeTab === "today" ? promotionAmount : 0))}</div>
-                      <div className="mt-2 flex flex-wrap items-center justify-end gap-x-2 text-[11px] font-semibold"><span className="text-sky-600 dark:text-sky-400">真实收入 {toCurrency(activeSummary.realReceivedAmount || 0)}</span><span className="text-muted-foreground">·</span><span className="text-rose-500">刷单收入 {toCurrency(activeSummary.brushReceivedAmount || 0)}</span></div>
+                      <div className="mt-2 text-2xl sm:text-[30px] font-black leading-none tracking-tight text-emerald-600 dark:text-emerald-400">{toCurrency(activeSummary.receivedAmount - (activeTab === "today" ? promotionAmount : 0))}</div>
+                      <div className="mt-1.5 flex flex-wrap items-center justify-end gap-x-1.5 gap-y-0.5 text-[11px] font-semibold">
+                        <span className="whitespace-nowrap text-sky-600 dark:text-sky-400">真实收入 {toCurrency(activeSummary.realReceivedAmount || 0)}</span>
+                        {(activeSummary.brushReceivedAmount || 0) > 0 || (activeSummary.brushPaidAmount || 0) > 0 ? (
+                          <>
+                            <span className="text-muted-foreground">·</span>
+                            <span className="whitespace-nowrap text-rose-500">刷单收入 {toCurrency(activeSummary.brushReceivedAmount || 0)} <span className="text-rose-500/80 dark:text-rose-400/80 font-normal">(实付 {toCurrency(activeSummary.brushPaidAmount || 0)})</span></span>
+                          </>
+                        ) : (
+                          <>
+                            <span className="text-muted-foreground">·</span>
+                            <span className="whitespace-nowrap text-rose-500/60 dark:text-rose-400/60 font-normal">无刷单</span>
+                          </>
+                        )}
+                      </div>
                     </div>
                   </div>
 

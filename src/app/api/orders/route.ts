@@ -1543,8 +1543,13 @@ export async function GET(request: NextRequest) {
             });
             const expected = Math.max(0, Number(adjustedMetrics.expectedIncome || 0));
             acc.receivedAmount += expected;
-            if (isBrush) acc.brushReceivedAmount += expected;
-            else acc.realReceivedAmount += expected;
+            if (isBrush) {
+              acc.brushReceivedAmount += expected;
+              acc.brushPaidAmount += Number(order.actualPaid || 0);
+            } else {
+              acc.realReceivedAmount += expected;
+              acc.realPaidAmount += Number(order.actualPaid || 0);
+            }
             acc.platformCommission += adjustedMetrics.platformCommission;
             acc.validOrderCount += 1;
 
@@ -1627,6 +1632,8 @@ export async function GET(request: NextRequest) {
           receivedAmount: 0,
           realReceivedAmount: 0,
           brushReceivedAmount: 0,
+          realPaidAmount: 0,
+          brushPaidAmount: 0,
           platformCommission: 0,
           validOrderCount: 0,
           itemCount: 0,
