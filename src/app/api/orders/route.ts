@@ -1351,7 +1351,10 @@ export async function GET(request: NextRequest) {
       const note = String(outbound.note || "");
       const match = note.match(/平台单号:\s*([^\s|]+)/);
       const orderNo = String(match?.[1] || "").trim();
-      if (orderNo && !outboundByOrderNo.has(orderNo)) {
+      const isCurrentReturned = outbound.status === "Returned";
+      const existing = outboundByOrderNo.get(orderNo);
+      const shouldSet = !existing || (!isCurrentReturned);
+      if (orderNo && shouldSet) {
         const returnMeta = parseOutboundReturnMeta(outbound.note);
         const returnTotals = getOutboundReturnTotals(returnMeta.returns);
         const returnedQuantityMap = getOutboundReturnedQuantityMap(returnMeta.returns);

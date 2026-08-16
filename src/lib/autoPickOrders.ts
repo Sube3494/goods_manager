@@ -5600,6 +5600,9 @@ export async function createOutboundFromAutoPickOrder(
   const existingOutbound = await prisma.outboundOrder.findFirst({
     where: {
       userId,
+      status: {
+        not: "Returned",
+      },
       note: {
         contains: `平台单号: ${order.orderNo}`,
         mode: "insensitive",
