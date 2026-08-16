@@ -49,44 +49,9 @@ export function getBaseAutoPickStatusDisplay(status?: string | null) {
   }
 
   if (
-    text.includes("部分退款")
-    || normalized.includes("part_refund")
-    || normalized.includes("partial_refund")
-  ) {
-    if (
-      text.includes("已完成")
-      || text.includes("配送完成")
-      || normalized.includes("done")
-      || normalized.includes("completed")
-      || normalized.includes("complete")
-      || normalized.includes("finish")
-    ) {
-      return "已完成";
-    }
-    if (text.includes("配送中") || text.includes("派送中") || normalized.includes("delivering")) {
-      return "配送中";
-    }
-    return "部分退款";
-  }
-
-  if (
-    text.includes("取消")
-    || text === "已退款"
-    || text === "全额退款"
-    || text.includes("退款成功")
-    || text.includes("关闭")
-    || normalized === "cancel"
-    || normalized === "cancelled"
-    || normalized === "canceled"
-    || normalized === "closed"
-    || normalized === "refund"
-  ) {
-    return "已取消";
-  }
-
-  if (
     text.includes("已完成")
     || text.includes("配送完成")
+    || text.includes("已送达")
     || normalized === "done"
     || normalized === "completed"
     || normalized === "complete"
@@ -94,6 +59,20 @@ export function getBaseAutoPickStatusDisplay(status?: string | null) {
     || normalized === "finish"
   ) {
     return "已完成";
+  }
+
+  if (
+    text.includes("取消")
+    || text === "已退款"
+    || text === "全额退款"
+    || text === "退款成功"
+    || text.includes("已关闭")
+    || normalized === "cancel"
+    || normalized === "cancelled"
+    || normalized === "canceled"
+    || normalized === "closed"
+  ) {
+    return "已取消";
   }
 
   if (text.includes("配送中") || text.includes("派送中") || normalized === "delivering") {

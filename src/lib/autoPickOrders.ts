@@ -1342,7 +1342,8 @@ function parseDeliveryDeadline(value: string | undefined) {
 }
 
 function parseMaiyatianStatusValue(rawValue: unknown) {
-  const normalized = String(rawValue || "").trim().toLowerCase();
+  const rawText = String(rawValue || "").trim();
+  const normalized = rawText.toLowerCase();
   if (!normalized) return "";
   if (normalized === "delete" || normalized === "deleted") {
     return "已删除";
@@ -1356,7 +1357,19 @@ function parseMaiyatianStatusValue(rawValue: unknown) {
   ) {
     return "已取消";
   }
-  return String(rawValue || "").trim();
+  if (normalized === "finished" || normalized === "completed" || normalized === "complete" || normalized === "done") {
+    return "已完成";
+  }
+  if (normalized === "delivering" || normalized === "shipping") {
+    return "配送中";
+  }
+  if (normalized === "delivery" || normalized === "pickup" || normalized === "pending_delivery") {
+    return "待配送";
+  }
+  if (normalized === "confirm" || normalized === "pending") {
+    return "待处理";
+  }
+  return rawText;
 }
 
 function resolveMaiyatianOrderStatus(rawOrder: Record<string, unknown>) {
@@ -1369,11 +1382,6 @@ function resolveMaiyatianOrderStatus(rawOrder: Record<string, unknown>) {
     || rawStatus === "closed";
   if (isCancelled) {
     return "已取消";
-  }
-
-  const tipStatus = parseDeliveryDeadline(String(rawOrder.tips || "").trim());
-  if (tipStatus) {
-    return tipStatus;
   }
 
   return parseMaiyatianStatusValue(rawOrder.status);
