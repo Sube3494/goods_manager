@@ -69,7 +69,6 @@ RUN chmod -R 777 /app/node_modules/@prisma
 # 自动建库脚本（shell 脚本，不依赖 npm 包）
 COPY --chmod=755 scripts/init-db.sh ./scripts/init-db.sh
 COPY --chmod=755 scripts/start-app.sh ./scripts/start-app.sh
-COPY --from=builder --chown=nextjs:nodejs /app/scripts/migrate-purchase-items.ts ./scripts/migrate-purchase-items.ts
 COPY --from=builder --chown=nextjs:nodejs /app/scripts/migrate-other-platform-to-offline.js ./scripts/migrate-other-platform-to-offline.js
 
 # 上传文件持久化目录（chmod 777 确保 volume 挂载时也能正常写入）

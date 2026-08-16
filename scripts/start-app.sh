@@ -13,12 +13,6 @@ else
   echo "! prisma db push failed, but service will continue to start."
 fi
 
-echo "→ Running purchase items data migration..."
-if bun scripts/migrate-purchase-items.ts; then
-  echo "✓ purchase items data migration completed."
-else
-  echo "! purchase items data migration failed, but service will continue to start."
-fi
 
 echo "→ Running other platform data migration..."
 if bun scripts/migrate-other-platform-to-offline.js; then
