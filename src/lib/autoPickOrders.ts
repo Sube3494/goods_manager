@@ -60,6 +60,8 @@ export type AutoPickInboundOrder = {
   actualPaid?: number;
   expectedIncome?: number;
   platformCommission?: number;
+  refundAmount?: number;
+  cancelDetails?: Array<Record<string, unknown>>;
   delivery?: {
     logisticName?: string;
     sendFee?: number;
@@ -2164,6 +2166,13 @@ async function enrichMaiyatianOrderByCookie(cookie: string, order: AutoPickInbou
     } else if (refundAmountYuan >= orderActualPaidYuan && returnedCount > 0) {
       detailStatus = "已取消";
     }
+
+    if (refundAmountYuan > 0) {
+      order.refundAmount = Math.round(refundAmountYuan * 100);
+      order.cancelDetails = cancelDetails;
+      orderObj.refundAmount = Math.round(refundAmountYuan * 100);
+      orderObj.cancelDetails = cancelDetails;
+    }
   }
 
   if (detailStatus) {
@@ -3020,6 +3029,8 @@ export function normalizeAutoPickOrderPayload(payload: unknown): AutoPickInbound
     actualPaid: Number.isFinite(Number(input.actualPaid)) ? Number(input.actualPaid) : 0,
     expectedIncome: Number.isFinite(Number(input.expectedIncome)) ? Number(input.expectedIncome) : undefined,
     platformCommission: Number.isFinite(Number(input.platformCommission)) ? Number(input.platformCommission) : 0,
+    refundAmount: Number.isFinite(Number(input.refundAmount ?? input.refund_amount)) ? Math.round(Number(input.refundAmount ?? input.refund_amount)) : undefined,
+    cancelDetails: Array.isArray(input.cancelDetails) ? input.cancelDetails as Array<Record<string, unknown>> : undefined,
     delivery: (() => {
       const deliveryRecord = input.delivery && typeof input.delivery === "object"
         ? input.delivery as Record<string, unknown>

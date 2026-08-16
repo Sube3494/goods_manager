@@ -171,46 +171,28 @@ function resolveRefundAdjustedIncomeMetrics(options: {
     };
   }
 
-  const grossBase = Math.max(actualPaid, expectedIncome + platformCommission);
-  if (grossBase <= 0) {
-    return {
-      actualPaid,
-      expectedIncome,
-      platformCommission,
-      refundedExpectedIncome: refundAmount,
-      refundedCommission: 0,
-    };
-  }
-
-  const commissionRatio = platformCommission > 0
-    ? Math.min(1, Math.max(0, platformCommission / grossBase))
-    : 0;
-  const refundedCommission = Math.min(
-    platformCommission,
-    Math.max(0, Math.round(refundAmount * commissionRatio))
-  );
-  const refundedExpectedIncome = Math.min(
-    expectedIncome,
-    Math.max(0, refundAmount - refundedCommission)
-  );
-
-  const adjustedPlatformCommission = Math.max(0, platformCommission - refundedCommission);
-  const adjustedExpectedIncome = Math.max(0, expectedIncome - refundedExpectedIncome);
+  // 退款全额直接从商家的到手金额中扣除
+  const adjustedExpectedIncome = Math.max(0, expectedIncome - refundAmount);
 
   return {
     actualPaid,
     expectedIncome: adjustedExpectedIncome,
-    platformCommission: adjustedPlatformCommission,
-    refundedExpectedIncome,
-    refundedCommission,
+    platformCommission,
+    refundedExpectedIncome: refundAmount,
+    refundedCommission: 0,
   };
+}
+
+function readRefundAmountFromRawPayload(rawPayload: unknown) {
+  if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) return 0;
+  const record = rawPayload as Record<string, unknown>;
+  return Number(record.refundAmount || record.refund_amount || 0) || 0;
 }
 
 function isJDPlatform(platform: string | null | undefined) {
   const normalized = String(platform || "").trim().toLowerCase();
   return normalized === "jd" || normalized.includes("jingdong") || normalized.includes("jddj") || normalized.includes("京东");
 }
-
 function resolveDashboardIncomeMetrics(
   platform: string | null | undefined,
   expectedIncome: number | null | undefined,
@@ -767,7 +749,7 @@ export async function GET(request: NextRequest) {
 
         const orderCostYuan = orderCostMeta?.productCost || 0;
         const returnExtraExpenseYuan = orderCostMeta?.extraExpense || 0;
-        const refundAmountYuan = orderCostMeta?.refundAmount || 0;
+        const refundAmountYuan = Math.max(orderCostMeta?.refundAmount || 0, readRefundAmountFromRawPayload(order.rawPayload) / 100);
         const adjustedMetrics = resolveRefundAdjustedIncomeMetrics({
           expectedIncome: metrics.expectedIncome,
           platformCommission: isOffline ? 0 : metrics.platformCommission,
@@ -965,7 +947,7 @@ export async function GET(request: NextRequest) {
           paidYuan,
           Number(commissionCents || 0) / 100
         );
-        const refundAmountYuan = orderCostMeta?.refundAmount || 0;
+        const refundAmountYuan = Math.max(orderCostMeta?.refundAmount || 0, readRefundAmountFromRawPayload(order.rawPayload) / 100);
         const returnExtraExpenseYuan = orderCostMeta?.extraExpense || 0;
         const adjustedMetrics = resolveRefundAdjustedIncomeMetrics({
           expectedIncome: metrics.expectedIncome,

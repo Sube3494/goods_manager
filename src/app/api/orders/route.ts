@@ -512,39 +512,22 @@ function resolveRefundAdjustedIncomeMetrics(options: {
     };
   }
 
-  const grossBase = Math.max(actualPaid, expectedIncome + platformCommission);
-  if (grossBase <= 0) {
-    return {
-      actualPaid,
-      expectedIncome,
-      platformCommission,
-      refundedExpectedIncome: refundAmount,
-      refundedCommission: 0,
-    };
-  }
-
-  const commissionRatio = platformCommission > 0
-    ? Math.min(1, Math.max(0, platformCommission / grossBase))
-    : 0;
-  const refundedCommission = Math.min(
-    platformCommission,
-    Math.max(0, Math.round(refundAmount * commissionRatio))
-  );
-  const refundedExpectedIncome = Math.min(
-    expectedIncome,
-    Math.max(0, refundAmount - refundedCommission)
-  );
-
-  const adjustedPlatformCommission = Math.max(0, platformCommission - refundedCommission);
-  const adjustedExpectedIncome = Math.max(0, expectedIncome - refundedExpectedIncome);
+  // 退款全额直接从商家的到手金额中扣除
+  const adjustedExpectedIncome = Math.max(0, expectedIncome - refundAmount);
 
   return {
     actualPaid,
     expectedIncome: adjustedExpectedIncome,
-    platformCommission: adjustedPlatformCommission,
-    refundedExpectedIncome,
-    refundedCommission,
+    platformCommission,
+    refundedExpectedIncome: refundAmount,
+    refundedCommission: 0,
   };
+}
+
+function readRefundAmountFromRawPayload(rawPayload: unknown) {
+  if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) return 0;
+  const record = rawPayload as Record<string, unknown>;
+  return Number(record.refundAmount || record.refund_amount || 0) || 0;
 }
 
 function readShopNameFromRawPayload(rawPayload: unknown) {
@@ -1551,7 +1534,7 @@ export async function GET(request: NextRequest) {
           }
           if (!cancelled && !deleted) {
             const isBrush = readMainSystemSelfDeliveryFlag(order.rawPayload);
-            const refundAmount = outboundMeta?.refundAmount || 0;
+            const refundAmount = Math.max(outboundMeta?.refundAmount || 0, readRefundAmountFromRawPayload(order.rawPayload));
             const adjustedMetrics = resolveRefundAdjustedIncomeMetrics({
               expectedIncome: metrics.expectedIncome,
               platformCommission: metrics.platformCommission,
@@ -1819,7 +1802,7 @@ export async function GET(request: NextRequest) {
       const autoOutboundMeta = readAutoOutboundMeta(order.rawPayload);
       const outboundMeta = outboundByOrderNo.get(order.orderNo) || null;
       const hiddenDeletedOfflineIncome = order.isDeleted && order.platform === "线下交易";
-      const refundAmount = outboundMeta?.refundAmount || 0;
+      const refundAmount = Math.max(outboundMeta?.refundAmount || 0, readRefundAmountFromRawPayload(order.rawPayload));
       const returnExtraExpense = outboundMeta?.extraExpense || 0;
       const adjustedMetrics = resolveRefundAdjustedIncomeMetrics({
         expectedIncome: order.expectedIncome,
