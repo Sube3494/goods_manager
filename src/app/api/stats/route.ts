@@ -138,6 +138,7 @@ const DASHBOARD_PLATFORMS = ["美团", "京东", "淘宝", "线下交易"] as co
 
 type OutboundCostLookupRow = {
   note: string | null;
+  status?: string | null;
   items: Array<{
     quantity: number;
     costSnapshot?: unknown;
@@ -622,6 +623,7 @@ export async function GET(request: NextRequest) {
           },
           select: {
             note: true,
+            status: true,
             items: {
               select: {
                 quantity: true,
@@ -657,6 +659,7 @@ export async function GET(request: NextRequest) {
           },
           select: {
             note: true,
+            status: true,
             items: {
               select: {
                 quantity: true,
@@ -686,8 +689,11 @@ export async function GET(request: NextRequest) {
     outboundOrdersForCost.forEach((outbound) => {
       const orderNo = extractOrderNoFromNote(outbound.note);
       if (!orderNo) return;
-      // 同一平台订单号只取第一笔出库单的成本，跳过重复录入的出库单，避免成本被累加多次
-      if (outboundMetaByOrderNo.has(orderNo)) return;
+      const isCurrentReturned = outbound.status === "Returned";
+      const existing = outboundMetaByOrderNo.get(orderNo);
+      // 优先采用有效出库单，避免已退货单覆盖有效单
+      if (existing && isCurrentReturned) return;
+
       let missingCostItemCount = 0;
       const returnTotals = getOutboundReturnTotals(parseOutboundReturnMeta(outbound.note).returns);
       const outboundCost = outbound.items.reduce((sum, item) => {
@@ -703,8 +709,9 @@ export async function GET(request: NextRequest) {
           ? FinanceMath.add(sum, Number(snapshot.totalCost || 0))
           : FinanceMath.add(sum, FinanceMath.multiply(unitCost, item.quantity || 0));
       }, 0);
+      const effectiveReturnedCost = isCurrentReturned ? returnTotals.returnedCost : 0;
       outboundMetaByOrderNo.set(orderNo, {
-        productCost: FinanceMath.add(outboundCost, -returnTotals.returnedCost),
+        productCost: FinanceMath.add(outboundCost, -effectiveReturnedCost),
         missingCostItemCount,
         refundAmount: returnTotals.refundAmount,
         extraExpense: returnTotals.extraExpense,
