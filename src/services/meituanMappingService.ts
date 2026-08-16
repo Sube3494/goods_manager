@@ -1,6 +1,7 @@
 import * as XLSX from "xlsx";
 import ExcelJS from "exceljs";
 import prisma from "@/lib/prisma";
+import { getStorageStrategy } from "@/lib/storage";
 
 export interface ParsedMeituanItem {
   meituanSkuId: string;
@@ -633,6 +634,8 @@ export class MeituanMappingService {
       pageSize = 25,
     } = params;
 
+    const storage = await getStorageStrategy();
+
     // 1. 查询系统商品池（根据 shopId 关联 ShopProduct 或全局 Product）
     const productWhere: any = {};
     if (userId) {
@@ -668,6 +671,12 @@ export class MeituanMappingService {
         specs: true,
         category: {
           select: { id: true, name: true },
+        },
+        shopProducts: {
+          select: {
+            shopId: true,
+            productImage: true,
+          },
         },
         meituanSkuMappings: {
           select: {
@@ -721,7 +730,8 @@ export class MeituanMappingService {
     }
 
     // 3. 为每个系统商品计算美团绑定状态与智能推荐
-    type EnrichedProduct = typeof rawProducts[0] & {
+    type EnrichedProduct = Omit<typeof rawProducts[0], "image"> & {
+      image: string | null;
       boundCount: number;
       isBound: boolean;
       suggestedMeituanItem?: {
@@ -739,6 +749,13 @@ export class MeituanMappingService {
     const enrichedProducts: EnrichedProduct[] = rawProducts.map((prod) => {
       const boundCount = prod.meituanSkuMappings.length;
       const isBound = boundCount > 0;
+
+      // 提取主图：优先使用店铺商品独立图，其次使用商品全局主图，并通过 storage.resolveUrl 转换为完整URL
+      const matchedShopProduct = shopId && shopId !== "ALL"
+        ? prod.shopProducts.find((sp) => sp.shopId === shopId)
+        : prod.shopProducts[0];
+      const rawImage = matchedShopProduct?.productImage || prod.image || null;
+      const resolvedImage = rawImage ? storage.resolveUrl(rawImage) : null;
 
       let suggestedMeituanItem: EnrichedProduct["suggestedMeituanItem"] = null;
 
@@ -759,7 +776,7 @@ export class MeituanMappingService {
             spec: match.spec,
             barcode: match.barcode,
             price: match.price,
-            imageUrl: match.imageUrl,
+            imageUrl: match.imageUrl ? storage.resolveUrl(match.imageUrl) : null,
             reason: "条形码完全相同",
           };
         }
@@ -776,7 +793,7 @@ export class MeituanMappingService {
               spec: match.spec,
               barcode: match.barcode,
               price: match.price,
-              imageUrl: match.imageUrl,
+              imageUrl: match.imageUrl ? storage.resolveUrl(match.imageUrl) : null,
               reason: "品名完全一致",
             };
           }
@@ -810,6 +827,7 @@ export class MeituanMappingService {
 
       return {
         ...prod,
+        image: resolvedImage,
         boundCount,
         isBound,
         suggestedMeituanItem,

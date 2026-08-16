@@ -783,18 +783,18 @@ export function MeituanMappingModal({
                   >
                     {/* 左侧：系统商品缩略图与主体信息 */}
                     <div className="flex items-center gap-3.5 flex-1 min-w-0">
-                      <div className="relative h-11 w-11 sm:h-12 sm:w-12 shrink-0 overflow-hidden rounded-xl bg-muted border border-border/60 shadow-inner">
+                      <div className="relative h-11 w-11 sm:h-12 sm:w-12 shrink-0 overflow-hidden rounded-xl bg-muted border border-border/60 shadow-inner flex items-center justify-center">
                         {prod.image ? (
                           <img
                             src={prod.image}
                             alt={prod.name}
                             className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-200"
+                            onError={(e) => {
+                              (e.currentTarget as HTMLElement).style.display = "none";
+                            }}
                           />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-                            <Package className="h-5 w-5 opacity-40" />
-                          </div>
-                        )}
+                        ) : null}
+                        <Package className="h-5 w-5 opacity-40 text-muted-foreground absolute pointer-events-none" />
                       </div>
 
                       <div className="flex-1 min-w-0 space-y-1">
