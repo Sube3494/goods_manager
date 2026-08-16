@@ -2130,20 +2130,22 @@ async function enrichMaiyatianOrderByCookie(cookie: string, order: AutoPickInbou
 
   // 根据麦芽田真实退款详情 /cancel/detail 判定退款性质
   if (Array.isArray(cancelDetails) && cancelDetails.length > 0) {
-    let refundAmountYuan = 0;
+    // 麦芽田 /cancel/detail 返回的是同一笔退款的生命周期流转记录（如“发起退款” status:0 与“确认退款” status:1 为同一笔退款）
+    // 优先读取已确认/生效的退款流水记录，防止重复求和导致退款金额翻倍
+    const confirmedCancel = cancelDetails.filter((item) => String(item.status || "").trim() === "1").pop();
+    const effectiveCancel = confirmedCancel || cancelDetails[cancelDetails.length - 1] || cancelDetails[0];
+    const refundAmountYuan = Number(effectiveCancel?.total_price || 0) || 0;
+
     let returnedCount = 0;
-    for (const cancelItem of cancelDetails) {
-      refundAmountYuan += Number(cancelItem.total_price || 0) || 0;
-      if (cancelItem.goods_format && typeof cancelItem.goods_format === "string") {
-        try {
-          const parsed = JSON.parse(cancelItem.goods_format);
-          if (Array.isArray(parsed)) {
-            for (const g of parsed) {
-              returnedCount += Number(g.number || 0) || 0;
-            }
+    if (effectiveCancel?.goods_format && typeof effectiveCancel.goods_format === "string") {
+      try {
+        const parsed = JSON.parse(effectiveCancel.goods_format);
+        if (Array.isArray(parsed)) {
+          for (const g of parsed) {
+            returnedCount += Number(g.number || 0) || 0;
           }
-        } catch {}
-      }
+        }
+      } catch {}
     }
 
     const orderActualPaidYuan = (Number(order.actualPaid || 0) || 0) / 100;
