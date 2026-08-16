@@ -1719,7 +1719,8 @@ export function OrderCard({
           },
         ]
         : [
-            { label: "预计到手", value: toCurrency(expectedIncome) },
+            { label: "预计到手", value: toCurrency(hasRefundAmount ? expectedIncome + refundAmount : expectedIncome) },
+            ...(hasRefundAmount ? [{ label: "减退款", value: toCurrency(refundAmount) }] : []),
             { label: `扣抽出 ${formatPercent(serviceFeeRate)} 后`, value: toCurrency(settlementAfterRate) },
             { label: "减配送费", value: toCurrency(deliveryFee) },
             { label: "减货品成本", value: toCurrency(productCost), editable: canEditProductCost },
@@ -1727,7 +1728,8 @@ export function OrderCard({
           ])
     : productCostStatusText
       ? [
-          { label: "预计到手", value: toCurrency(expectedIncome) },
+          { label: "预计到手", value: toCurrency(hasRefundAmount ? expectedIncome + refundAmount : expectedIncome) },
+          ...(hasRefundAmount ? [{ label: "退款", value: toCurrency(refundAmount) }] : []),
           { label: "抽出率", value: formatPercent(serviceFeeRate) },
           { label: "配送费", value: toCurrency(deliveryFee) },
           { label: "货品成本", value: productCostStatusText, editable: canEditProductCost },
