@@ -223,11 +223,20 @@ export async function PATCH(
           || String(item.productName || "").trim() === "手工配送占位商品";
       });
 
-    const actualPaid = offlineEdit ? Math.round(offlineActualPaid) : order.actualPaid;
-    const expectedIncome = offlineEdit ? Math.round(offlineActualPaid) : (hasExpectedIncome ? Math.round(nextExpectedIncome) : order.expectedIncome);
+    const isOfflineOrder = order.platform === "线下交易";
+    const actualPaid = offlineEdit
+      ? Math.round(offlineActualPaid)
+      : (hasAmountEdit && isOfflineOrder
+        ? Math.round(nextExpectedIncome)
+        : order.actualPaid);
+    const expectedIncome = offlineEdit
+      ? Math.round(offlineActualPaid)
+      : (hasExpectedIncome
+        ? Math.round(nextExpectedIncome)
+        : (isOfflineOrder && Number(order.actualPaid || 0) > 0 ? order.actualPaid : order.expectedIncome));
     const platformCommission = hasAmountEdit
-      ? (isManualDeliveryPlaceholderOrder ? 0 : Math.max(0, Math.round(Number(actualPaid || 0) - Number(expectedIncome || 0))))
-      : offlineEdit
+      ? (isOfflineOrder || isManualDeliveryPlaceholderOrder ? 0 : Math.max(0, Math.round(Number(actualPaid || 0) - Number(expectedIncome || 0))))
+      : offlineEdit || isOfflineOrder
         ? 0
         : order.platformCommission;
     const existingDelivery = order.delivery && typeof order.delivery === "object" && !Array.isArray(order.delivery)
@@ -298,9 +307,10 @@ export async function PATCH(
               ? {
                   manualAmountOverride: {
                     ...manualAmountOverride,
+                    actualPaid: isOfflineOrder ? actualPaid : manualAmountOverride.actualPaid,
                     expectedIncome,
                     platformCommission,
-                    onlyExpectedIncome: isManualDeliveryPlaceholderOrder || manualAmountOverride.onlyExpectedIncome === true,
+                    onlyExpectedIncome: isOfflineOrder || isManualDeliveryPlaceholderOrder || manualAmountOverride.onlyExpectedIncome === true,
                     updatedAt: new Date().toISOString(),
                     updatedBy: String(user.name || user.email || user.id),
                   },

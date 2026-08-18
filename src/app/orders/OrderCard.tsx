@@ -175,12 +175,26 @@ export function getCommissionDisplay(value: number | null | undefined) {
   };
 }
 
-export function getExpectedIncome(expectedIncome: number | null | undefined, actualPaid: number | null | undefined, platformCommission: number | null | undefined) {
+export function getExpectedIncome(
+  expectedIncome: number | null | undefined,
+  actualPaid: number | null | undefined,
+  platformCommission: number | null | undefined,
+  platform?: string | null
+) {
   const directIncome = Number(expectedIncome);
+  const paid = Number(actualPaid || 0);
+  const isOffline = platform === "线下交易" || String(platform || "").toLowerCase() === "other";
+
+  if (isOffline) {
+    if (Number.isFinite(directIncome) && directIncome > 0) {
+      return directIncome;
+    }
+    return Math.max(0, paid);
+  }
+
   if (Number.isFinite(directIncome)) {
     return directIncome;
   }
-  const paid = Number(actualPaid || 0);
   const commission = Number(platformCommission || 0);
   return paid - commission;
 }
@@ -204,14 +218,18 @@ export function summarizeOrders(orders: AutoPickOrder[]) {
   };
   return orders.reduce((acc, order) => {
     if (!isCancelledStatus(order.status) && !isDeletedStatus(order.status)) {
-      const expectedIncome = Math.max(0, getExpectedIncome(order.expectedIncome, order.actualPaid, order.platformCommission));
+      const isOffline = order.platform === "线下交易" || String(order.platform || "").toLowerCase() === "other";
+      const expectedIncome = Math.max(0, getExpectedIncome(order.expectedIncome, order.actualPaid, order.platformCommission, order.platform));
+      const actualPaid = isOffline && (!order.actualPaid || Number(order.actualPaid) <= 0) && expectedIncome > 0
+        ? expectedIncome
+        : Math.max(0, Number(order.actualPaid || 0));
       acc.receivedAmount += expectedIncome;
       if (order.isMainSystemSelfDelivery) {
         acc.brushReceivedAmount += expectedIncome;
-        acc.brushPaidAmount += Math.max(0, Number(order.actualPaid || 0));
+        acc.brushPaidAmount += actualPaid;
       } else {
         acc.realReceivedAmount += expectedIncome;
-        acc.realPaidAmount += Math.max(0, Number(order.actualPaid || 0));
+        acc.realPaidAmount += actualPaid;
       }
       acc.platformCommission += Math.max(0, Number(order.platformCommission || 0));
       acc.validOrderCount += 1;
@@ -610,8 +628,13 @@ function isManualDeliveryPlaceholderItem(item: AutoPickOrderItem) {
     || String(item.productName || "").trim() === MANUAL_DELIVERY_PLACEHOLDER_PRODUCT_NAME;
 }
 
+function isUnmatchedManualDeliveryPlaceholderItem(item: AutoPickOrderItem) {
+  const hasDisplayItems = Array.isArray(item.displayItems) && item.displayItems.length > 0;
+  return isManualDeliveryPlaceholderItem(item) && !item.matchedProduct && !hasDisplayItems;
+}
+
 function getVisibleOrderItems(items: AutoPickOrderItem[]) {
-  return items.filter((item) => !isManualDeliveryPlaceholderItem(item));
+  return (items || []).filter((item) => !isUnmatchedManualDeliveryPlaceholderItem(item));
 }
 
 function isLegacyManualDeliveryPlaceholderOrder(order: AutoPickOrder) {
@@ -997,7 +1020,8 @@ function OrderAmountEditModal({
   onSave: (values: { expectedIncome: number }) => Promise<boolean>;
 }) {
   const { showToast } = useToast();
-  const [expectedIncome, setExpectedIncome] = useState(() => formatCurrencyInputFromCents(getExpectedIncome(order.expectedIncome, order.actualPaid, order.platformCommission)));
+  const isOffline = order.platform === "线下交易" || String(order.platform || "").toLowerCase() === "other";
+  const [expectedIncome, setExpectedIncome] = useState(() => formatCurrencyInputFromCents(getExpectedIncome(order.expectedIncome, order.actualPaid, order.platformCommission, order.platform)));
   const [isSaving, setIsSaving] = useState(false);
   const isJd = String(order.platform || "").includes("京东");
 
@@ -1026,7 +1050,7 @@ function OrderAmountEditModal({
         <div className="flex items-start justify-between gap-3 px-6 pb-4 pt-6">
           <div>
             <h3 className="text-xl font-semibold tracking-tight text-foreground">修改商家到手</h3>
-            <p className="mt-2 text-xs leading-5 text-muted-foreground">{isJd ? "只覆盖京东订单的到手金额，实付保持系统原值不变。" : "手动记录这张手工配送单的商家到手金额，实付保持系统原值不变。"}</p>
+            <p className="mt-2 text-xs leading-5 text-muted-foreground">{isJd ? "只覆盖京东订单的到手金额，实付保持系统原值不变。" : isOffline ? "修改线下订单金额（实付与到手保持一致）。" : "手动记录这张手工配送单的商家到手金额，实付保持系统原值不变。"}</p>
           </div>
           <button
             type="button"
@@ -1615,7 +1639,8 @@ export function OrderCard({
 
   const profitTooltipRef = useRef<HTMLDivElement | null>(null);
   const legacyManualDeliveryPlaceholderOrder = isLegacyManualDeliveryPlaceholderOrder(order);
-  const visibleItems = legacyManualDeliveryPlaceholderOrder ? order.items : getVisibleOrderItems(order.items);
+  const visibleItems = getVisibleOrderItems(order.items);
+  const unmatchedPlaceholderItem = (order.items || []).find(isUnmatchedManualDeliveryPlaceholderItem);
   const itemCount = getItemCount(visibleItems);
   const completed = isCompletedStatus(order.status);
   const cancelled = isCancelledStatus(order.status);
@@ -1624,7 +1649,7 @@ export function OrderCard({
   const abnormal = isAbnormalStatus(order.status);
   const deliveryFee = getDeliveryFee(order.delivery);
   const hasDeliveryAddress = Boolean(String(order.userAddress || "").trim());
-  const displayAsOfflineOrder = order.platform === "线下交易" && !legacyManualDeliveryPlaceholderOrder;
+  const displayAsOfflineOrder = order.platform === "线下交易";
   const pickup = Boolean(order.isPickup) || (displayAsOfflineOrder && deliveryFee <= 0 && !hasDeliveryAddress);
   const showManualDeliveryMarker = displayAsOfflineOrder && !pickup;
   const showPlatformActions = !displayAsOfflineOrder;
@@ -1635,7 +1660,12 @@ export function OrderCard({
   const orderTypeLabel = getOrderTypeLabel(order);
   const platformMeta = getPlatformBadgeMeta(order.platform);
   const commissionDisplay = getCommissionDisplay(order.platformCommission);
-  const expectedIncome = getExpectedIncome(order.expectedIncome, order.actualPaid, order.platformCommission);
+  const expectedIncome = getExpectedIncome(order.expectedIncome, order.actualPaid, order.platformCommission, order.platform);
+  const effectiveActualPaid = (displayAsOfflineOrder || String(order.platform || "").toLowerCase() === "other")
+    && (!order.actualPaid || Number(order.actualPaid) <= 0)
+    && expectedIncome > 0
+      ? expectedIncome
+      : order.actualPaid;
   const hasPureProfit = typeof order.pureProfit === "number" && Number.isFinite(order.pureProfit);
   const pureProfit = hasPureProfit ? Number(order.pureProfit) : 0;
   const productCostStatusText = getProductCostStatusText(order);
@@ -2052,7 +2082,7 @@ export function OrderCard({
                   <div className="grid grid-cols-2 gap-x-3 gap-y-2">
                     <div className="min-w-0">
                       <div className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">实付</div>
-                      <div className="mt-0.5 truncate text-sm font-semibold text-foreground">{toCurrency(order.actualPaid)}</div>
+                      <div className="mt-0.5 truncate text-sm font-semibold text-foreground">{toCurrency(effectiveActualPaid)}</div>
                     </div>
                     {canEditExpectedIncome ? (
                       <div className="min-w-0 text-right">
@@ -2085,7 +2115,7 @@ export function OrderCard({
                 <div className="hidden sm:flex sm:flex-wrap sm:justify-end sm:gap-2">
                   <div className="flex min-w-0 items-center justify-between gap-2 rounded-2xl border border-black/8 bg-black/2 px-3 py-2 dark:border-white/10 dark:bg-white/3 sm:inline-flex sm:h-9 sm:justify-start sm:rounded-full sm:py-0">
                     <span className="shrink-0 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">实付</span>
-                    <span className="truncate text-sm font-semibold text-foreground">{toCurrency(order.actualPaid)}</span>
+                    <span className="truncate text-sm font-semibold text-foreground">{toCurrency(effectiveActualPaid)}</span>
                   </div>
                   {canEditExpectedIncome ? (
                     <button
@@ -2363,6 +2393,21 @@ export function OrderCard({
             <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-black/8 bg-white/85 px-3 py-1.5 text-xs font-medium text-muted-foreground dark:border-white/10 dark:bg-white/5">
               <Loader2 size={13} className="animate-spin" />
               正在加载订单详情...
+            </div>
+          ) : null}
+          {unmatchedPlaceholderItem ? (
+            <div className="mb-3 flex items-center justify-between gap-3 rounded-2xl border border-dashed border-black/15 bg-white/80 p-3 dark:border-white/15 dark:bg-white/4 sm:px-4 sm:py-3">
+              <div className="min-w-0">
+                <div className="text-xs font-semibold text-foreground">发货货品（可选）</div>
+                <div className="mt-0.5 text-[11px] text-muted-foreground">当前未关联发货商品，仅记录配送费</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => onOpenMatchEditor(order, unmatchedPlaceholderItem)}
+                className="inline-flex h-8 shrink-0 items-center justify-center rounded-xl border border-black/8 bg-white/85 px-3 text-xs font-bold text-foreground transition-all hover:border-black/12 hover:bg-zinc-100 dark:border-white/10 dark:bg-white/6 dark:text-white dark:hover:border-white/20 dark:hover:bg-white/14 cursor-pointer"
+              >
+                + 选择发货货品
+              </button>
             </div>
           ) : null}
           <div className="grid gap-3 sm:gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">

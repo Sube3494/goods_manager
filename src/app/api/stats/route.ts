@@ -203,6 +203,17 @@ function resolveDashboardIncomeMetrics(
   const paid = Math.max(0, Number(actualPaid || 0));
   const explicitExpectedIncome = Number(expectedIncome);
   const explicitCommission = Math.max(0, Math.abs(Number(fallbackCommission || 0)));
+  const isOffline = platform === "线下交易" || String(platform || "").toLowerCase() === "other";
+
+  if (isOffline) {
+    const finalAmount = Number.isFinite(explicitExpectedIncome) && explicitExpectedIncome > 0
+      ? explicitExpectedIncome
+      : paid;
+    return {
+      expectedIncome: finalAmount,
+      platformCommission: 0,
+    };
+  }
 
   if (Number.isFinite(explicitExpectedIncome)) {
     const resolvedExpectedIncome = Math.max(0, explicitExpectedIncome);
@@ -732,14 +743,21 @@ export async function GET(request: NextRequest) {
       const orderCostMeta = outboundMetaByOrderNo.get(String(order.orderNo || "").trim());
       if (!isCancelled) {
         const manualAmountOverride = readManualAmountOverride(order.rawPayload);
-        const paidYuan = (order.actualPaid || 0) / 100;
-        const isOffline = order.platform === "线下交易";
-        const deliveryYuan = getDeliveryFee(order.delivery) / 100;
-        const expectedIncomeCents = manualAmountOverride
+        const isOffline = order.platform === "线下交易" || String(order.platform || "").toLowerCase() === "other";
+        let paidYuan = (order.actualPaid || 0) / 100;
+        let expectedIncomeCents = manualAmountOverride
           ? manualAmountOverride.expectedIncome
           : typeof order.expectedIncome === "number"
             ? order.expectedIncome
             : null;
+        if (isOffline) {
+          if (paidYuan <= 0 && typeof expectedIncomeCents === "number" && expectedIncomeCents > 0) {
+            paidYuan = expectedIncomeCents / 100;
+          } else if ((expectedIncomeCents === null || expectedIncomeCents <= 0) && paidYuan > 0) {
+            expectedIncomeCents = Math.round(paidYuan * 100);
+          }
+        }
+        const deliveryYuan = getDeliveryFee(order.delivery) / 100;
         const commissionCents = manualAmountOverride && Number.isFinite(Number(manualAmountOverride.platformCommission))
           ? Number(manualAmountOverride.platformCommission)
           : manualAmountOverride?.onlyExpectedIncome
@@ -766,7 +784,7 @@ export async function GET(request: NextRequest) {
         const adjustedPaidYuan = paidYuan;
         const commissionYuan = adjustedMetrics.platformCommission;
         const expectedIncomeYuan = adjustedMetrics.expectedIncome;
-        const incomeYuan = manualAmountOverride ? expectedIncomeYuan : adjustedPaidYuan;
+        const incomeYuan = (manualAmountOverride || isOffline) ? expectedIncomeYuan : adjustedPaidYuan;
 
         const isBrush = readMainSystemSelfDeliveryFlag(order.rawPayload);
         const customCommission = order.orderNo ? customBrushCommissionMap.get(order.orderNo) : undefined;
@@ -933,14 +951,21 @@ export async function GET(request: NextRequest) {
         }
       } else {
         const manualAmountOverride = readManualAmountOverride(order.rawPayload);
-        const paidYuan = (order.actualPaid || 0) / 100;
-        const isOffline = order.platform === "线下交易";
-        const deliveryYuan = getDeliveryFee(order.delivery) / 100;
-        const expectedIncomeCents = manualAmountOverride
+        const isOffline = order.platform === "线下交易" || String(order.platform || "").toLowerCase() === "other";
+        let paidYuan = (order.actualPaid || 0) / 100;
+        let expectedIncomeCents = manualAmountOverride
           ? manualAmountOverride.expectedIncome
           : typeof order.expectedIncome === "number"
             ? order.expectedIncome
             : null;
+        if (isOffline) {
+          if (paidYuan <= 0 && typeof expectedIncomeCents === "number" && expectedIncomeCents > 0) {
+            paidYuan = expectedIncomeCents / 100;
+          } else if ((expectedIncomeCents === null || expectedIncomeCents <= 0) && paidYuan > 0) {
+            expectedIncomeCents = Math.round(paidYuan * 100);
+          }
+        }
+        const deliveryYuan = getDeliveryFee(order.delivery) / 100;
         const commissionCents = manualAmountOverride && Number.isFinite(Number(manualAmountOverride.platformCommission))
           ? Number(manualAmountOverride.platformCommission)
           : manualAmountOverride?.onlyExpectedIncome
@@ -965,7 +990,7 @@ export async function GET(request: NextRequest) {
         const adjustedPaidYuan = paidYuan;
         const commissionYuan = adjustedMetrics.platformCommission;
         const expectedIncomeYuan = adjustedMetrics.expectedIncome;
-        const incomeYuan = manualAmountOverride ? expectedIncomeYuan : adjustedPaidYuan;
+        const incomeYuan = (manualAmountOverride || isOffline) ? expectedIncomeYuan : adjustedPaidYuan;
 
         if (!isBrush) {
           if (point) {

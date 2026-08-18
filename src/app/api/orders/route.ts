@@ -466,6 +466,17 @@ function resolveIncomeMetrics(
   fallbackCommission: number,
   options?: { preferExplicitExpectedIncome?: boolean }
 ) {
+  const isOffline = platform === "线下交易" || platform === "other";
+  if (isOffline) {
+    const income = Number.isFinite(Number(expectedIncome)) && Number(expectedIncome) > 0
+      ? Math.round(Number(expectedIncome))
+      : (Number.isFinite(Number(actualPaid)) && Number(actualPaid) > 0 ? Math.round(Number(actualPaid)) : (Number.isFinite(Number(expectedIncome)) ? Math.round(Number(expectedIncome)) : 0));
+    return {
+      expectedIncome: income,
+      platformCommission: 0,
+    };
+  }
+
   if (Number.isFinite(Number(expectedIncome))) {
     const resolvedExpectedIncome = Math.round(Number(expectedIncome));
     const derivedCommission = Math.max(0, Math.round(Number(actualPaid || 0) - resolvedExpectedIncome));
@@ -1479,8 +1490,17 @@ export async function GET(request: NextRequest) {
     const summary = !includeMetrics
       ? null
       : summaryOrders.reduce((acc, order) => {
-          const expectedIncome = order.expectedIncome;
-          const metrics = resolveIncomeMetrics(order.platform, expectedIncome, order.actualPaid, order.platformCommission);
+          const isOffline = order.platform === "线下交易" || String(order.platform || "").toLowerCase() === "other";
+          let expectedIncome = order.expectedIncome;
+          let actualPaid = order.actualPaid;
+          if (isOffline) {
+            if ((!Number.isFinite(actualPaid) || actualPaid <= 0) && Number.isFinite(Number(expectedIncome)) && Number(expectedIncome) > 0) {
+              actualPaid = Math.round(Number(expectedIncome));
+            } else if ((!Number.isFinite(Number(expectedIncome)) || Number(expectedIncome) <= 0) && Number.isFinite(actualPaid) && actualPaid > 0) {
+              expectedIncome = actualPaid;
+            }
+          }
+          const metrics = resolveIncomeMetrics(order.platform, expectedIncome, actualPaid, order.platformCommission);
           const cancelled = isAutoPickOrderCancelledStatus(order.status);
           const deleted = isAutoPickOrderDeletedStatus(order.status);
           const platform = normalizeOrderPlatformForSummary(order.platform);
@@ -1538,17 +1558,17 @@ export async function GET(request: NextRequest) {
             const adjustedMetrics = resolveRefundAdjustedIncomeMetrics({
               expectedIncome: metrics.expectedIncome,
               platformCommission: metrics.platformCommission,
-              actualPaid: order.actualPaid,
+              actualPaid,
               refundAmount,
             });
             const expected = Math.max(0, Number(adjustedMetrics.expectedIncome || 0));
             acc.receivedAmount += expected;
             if (isBrush) {
               acc.brushReceivedAmount += expected;
-              acc.brushPaidAmount += Number(order.actualPaid || 0);
+              acc.brushPaidAmount += Number(actualPaid || 0);
             } else {
               acc.realReceivedAmount += expected;
-              acc.realPaidAmount += Number(order.actualPaid || 0);
+              acc.realPaidAmount += Number(actualPaid || 0);
             }
             acc.platformCommission += adjustedMetrics.platformCommission;
             acc.validOrderCount += 1;
@@ -1736,12 +1756,20 @@ export async function GET(request: NextRequest) {
 
     const enrichedOrders = orders.map((order) => {
       const manualAmountOverride = readManualAmountOverride(order.rawPayload);
-      const actualPaid = order.actualPaid;
-      const expectedIncome = manualAmountOverride && Number.isFinite(Number(manualAmountOverride.expectedIncome))
+      const isOffline = order.platform === "线下交易" || String(order.platform || "").toLowerCase() === "other";
+      let actualPaid = order.actualPaid;
+      let expectedIncome = manualAmountOverride && Number.isFinite(Number(manualAmountOverride.expectedIncome))
         ? Number(manualAmountOverride.expectedIncome)
         : (typeof order.expectedIncome === "number"
           ? order.expectedIncome
           : readExpectedIncomeFromRawPayload(order.rawPayload));
+      if (isOffline) {
+        if ((!Number.isFinite(actualPaid) || actualPaid <= 0) && Number.isFinite(Number(expectedIncome)) && Number(expectedIncome) > 0) {
+          actualPaid = Math.round(Number(expectedIncome));
+        } else if ((!Number.isFinite(Number(expectedIncome)) || Number(expectedIncome) <= 0) && Number.isFinite(actualPaid) && actualPaid > 0) {
+          expectedIncome = actualPaid;
+        }
+      }
       const metrics = resolveIncomeMetrics(
         order.platform,
         expectedIncome,

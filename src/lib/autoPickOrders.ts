@@ -107,8 +107,11 @@ export const AUTO_PICK_ALLOWED_STATUSES: AutoPickSyncStatus[] = [
 ];
 
 export type AutoPickProgressPayload = {
+  id?: string;
+  sourceId?: string;
   platform?: string;
   orderNo?: string;
+  orderSequence?: string;
   pickRemainingSeconds?: number;
   pickCompleted?: boolean;
   statusHint?: string;
@@ -3875,28 +3878,116 @@ export async function startAutoPickCookieListener() {
   }, AUTO_PICK_CONFIRM_LISTEN_INTERVAL_MS);
 }
 
+function extractOrderInfoFromProgressMessage(msgText: string): {
+  platform?: string;
+  orderNo?: string;
+  orderSequence?: string;
+  statusHint?: string;
+} {
+  const text = String(msgText || "").trim();
+  if (!text) return {};
+
+  let platform: string | undefined;
+  if (/其他|其它|线下|other/i.test(text)) {
+    platform = "线下交易";
+  } else if (/美团|闪购|shangou|meituan/i.test(text)) {
+    platform = "美团";
+  } else if (/饿了么|eleme/i.test(text)) {
+    platform = "饿了么";
+  } else if (/京东|到家|daojia|jddj|jd/i.test(text)) {
+    platform = "京东";
+  } else if (/抖音|douyin/i.test(text)) {
+    platform = "抖音";
+  }
+
+  let orderSequence: string | undefined;
+  let orderNo: string | undefined;
+  const seqMatch = text.match(/(?:其他|其它|线下|美团|饿了么|京东|抖音|淘宝|快手)?\s*#?\s*(\d+)\s*号(?:订单)?/);
+  if (seqMatch && seqMatch[1]) {
+    orderSequence = seqMatch[1];
+    orderNo = `#${seqMatch[1]}`;
+  }
+
+  let statusHint: string | undefined;
+  if (/骑手已到店|开始配送|已开始配送|配送中|已取货|骑手已取货|已到店/.test(text)) {
+    statusHint = "delivering";
+  } else if (/已送达|已完成|配送完成/.test(text)) {
+    statusHint = "done";
+  } else if (/已取消|取消订单/.test(text)) {
+    statusHint = "cancel";
+  } else if (/催单/.test(text)) {
+    statusHint = "remind";
+  }
+
+  return { platform, orderNo, orderSequence, statusHint };
+}
+
 function normalizeAutoPickProgressPayload(payload: unknown): AutoPickProgressPayload | null {
   if (!payload || typeof payload !== "object") {
     return null;
   }
 
   const input = payload as Record<string, unknown>;
-  const platform = String(input.platform || "").trim();
-  const orderNo = String(input.orderNo || "").trim();
-  const pickRemainingSeconds = Number(input.pickRemainingSeconds);
-  const pickCompleted = Boolean(input.pickCompleted);
-  const statusHint = String(input.statusHint || "").trim().toLowerCase();
+  let nested: Record<string, unknown> | null = null;
 
-  if (!platform || !orderNo) {
+  if (typeof input.msg === "string" && input.msg.trim().startsWith("{")) {
+    try {
+      const parsed = JSON.parse(input.msg);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        nested = parsed as Record<string, unknown>;
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  const rawMsg = typeof input.msg === "string"
+    ? input.msg
+    : (nested && typeof nested.msg === "string" ? nested.msg : "");
+
+  const msgParsed = extractOrderInfoFromProgressMessage(rawMsg);
+
+  const rawId = input.id ?? input.sourceId ?? nested?.id ?? nested?.sourceId;
+  const sourceId = rawId != null ? String(rawId).trim() : "";
+
+  let platform = String(input.platform || nested?.platform || msgParsed.platform || "").trim();
+  if (platform.toLowerCase() === "other") {
+    platform = "线下交易";
+  }
+
+  let orderNo = String(input.orderNo || input.order_no || nested?.orderNo || nested?.order_no || msgParsed.orderNo || "").trim();
+  let orderSequence = String(input.orderSequence || nested?.orderSequence || msgParsed.orderSequence || "").trim();
+
+  const pickRemainingSeconds = Number(input.pickRemainingSeconds ?? nested?.pickRemainingSeconds);
+  const pickCompleted = Boolean(input.pickCompleted ?? nested?.pickCompleted);
+
+  let rawStatusHint = String(
+    input.statusHint
+    || nested?.statusHint
+    || nested?.type
+    || input.cmd
+    || input.type
+    || msgParsed.statusHint
+    || ""
+  ).trim().toLowerCase();
+
+  if (rawStatusHint === "notify") {
+    rawStatusHint = String(nested?.type || nested?.statusHint || msgParsed.statusHint || "").trim().toLowerCase();
+  }
+
+  if (!sourceId && !orderNo && !orderSequence) {
     return null;
   }
 
   return {
-    platform,
-    orderNo,
+    id: sourceId || undefined,
+    sourceId: sourceId || undefined,
+    platform: platform || undefined,
+    orderNo: orderNo || (orderSequence ? `#${orderSequence}` : undefined),
+    orderSequence: orderSequence || undefined,
     pickRemainingSeconds: Number.isFinite(pickRemainingSeconds) ? Math.max(0, pickRemainingSeconds) : undefined,
     pickCompleted,
-    statusHint: statusHint || undefined,
+    statusHint: rawStatusHint || undefined,
   };
 }
 
@@ -4425,20 +4516,68 @@ export async function applyAutoPickProgress(userId: string, payload: unknown) {
     throw new Error("Invalid progress payload");
   }
 
-  const platformAliases = getAutoPickPlatformAliases(progress.platform);
+  const platformAliases = progress.platform ? getAutoPickPlatformAliases(progress.platform) : [];
+
+  const orderNoCandidates = new Set<string>();
+  if (progress.orderNo) {
+    orderNoCandidates.add(progress.orderNo);
+    const cleaned = progress.orderNo.replace(/^#/, "");
+    orderNoCandidates.add(cleaned);
+    orderNoCandidates.add(`#${cleaned}`);
+    orderNoCandidates.add(`其他${cleaned}号`);
+    orderNoCandidates.add(`其它${cleaned}号`);
+    orderNoCandidates.add(`其他#${cleaned}`);
+  }
+  if (progress.orderSequence) {
+    const seq = progress.orderSequence;
+    orderNoCandidates.add(seq);
+    orderNoCandidates.add(`#${seq}`);
+    orderNoCandidates.add(`其他${seq}号`);
+    orderNoCandidates.add(`其它${seq}号`);
+    orderNoCandidates.add(`其他#${seq}`);
+  }
+
+  const orderNoList = Array.from(orderNoCandidates).filter(Boolean);
+  const sourceId = String(progress.sourceId || progress.id || "").trim();
+
+  const orConditions: Array<Record<string, unknown>> = [];
+  if (sourceId) {
+    orConditions.push({ sourceId });
+  }
+
+  if (orderNoList.length > 0) {
+    if (platformAliases.length > 0) {
+      orConditions.push({
+        platform: { in: platformAliases },
+        orderNo: { in: orderNoList },
+      });
+      const numericSeq = Number(progress.orderSequence || (progress.orderNo ? progress.orderNo.replace(/\D/g, "") : 0));
+      if (Number.isFinite(numericSeq) && numericSeq > 0) {
+        orConditions.push({
+          platform: { in: platformAliases },
+          dailyPlatformSequence: numericSeq,
+        });
+      }
+    } else {
+      orConditions.push({
+        orderNo: { in: orderNoList },
+      });
+    }
+  }
+
   let order = await prisma.autoPickOrder.findFirst({
     where: {
       userId,
-      platform: { in: platformAliases },
-      orderNo: progress.orderNo,
+      ...(orConditions.length > 0 ? { OR: orConditions } : {}),
     },
     orderBy: {
       orderTime: "desc",
     },
   });
 
-  if (!order) {
+  if (!order && (progress.platform || progress.orderNo || sourceId)) {
     const refreshedOrder = await refreshAutoPickOrderFromPlugin(userId, {
+      id: sourceId || undefined,
       platform: progress.platform,
       orderNo: progress.orderNo,
       orderTime: new Date(),
