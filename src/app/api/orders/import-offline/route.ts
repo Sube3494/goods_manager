@@ -117,18 +117,24 @@ export async function POST(request: NextRequest) {
       const endOfDay = new Date(finalOrderTime);
       endOfDay.setHours(23, 59, 59, 999);
 
-      const countTodayOffline = await tx.autoPickOrder.count({
+      const maxSeqOfflineOrder = await tx.autoPickOrder.findFirst({
         where: {
           userId: session.id,
-          platform: "线下交易",
+          platform: { in: ["线下交易", "other"] },
           orderTime: {
             gte: startOfDay,
             lte: endOfDay,
           },
         },
+        orderBy: {
+          dailyPlatformSequence: "desc",
+        },
+        select: {
+          dailyPlatformSequence: true,
+        },
       });
 
-      const dailySequence = countTodayOffline + 1;
+      const dailySequence = Math.max(0, Number(maxSeqOfflineOrder?.dailyPlatformSequence || 0)) + 1;
       const defaultAddress = deliveryCents > 0 ? "线下送货上门" : "线下柜台交易";
 
       const newOrder = await tx.autoPickOrder.create({

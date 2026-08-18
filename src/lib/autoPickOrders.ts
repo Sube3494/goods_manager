@@ -3273,9 +3273,29 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
       },
     });
 
+    const isNormalizedManualOffline = Boolean(
+      normalized.rawPayload && typeof normalized.rawPayload === "object" && !Array.isArray(normalized.rawPayload)
+      && (normalized.rawPayload as Record<string, unknown>).isManualOffline
+    );
+
     const existingCandidatesSorted = [...existingCandidates]
       .filter((candidate) => {
         const candidatePlatform = String(candidate.platform || "").trim();
+        const isCandidateManualOffline = Boolean(
+          candidate.rawPayload && typeof candidate.rawPayload === "object" && !Array.isArray(candidate.rawPayload)
+          && (candidate.rawPayload as Record<string, unknown>).isManualOffline
+        );
+
+        // 如果 candidate 是手动直接录入的线下订单，而当前推送的是第三方推单（非手动录入），且没有相同的 sourceId，则不能匹配
+        if (isCandidateManualOffline && !isNormalizedManualOffline && normalized.id && candidate.sourceId !== normalized.id) {
+          return false;
+        }
+
+        // 反之，如果当前是手动录入订单，不能覆盖第三方的推单
+        if (!isCandidateManualOffline && isNormalizedManualOffline && candidate.sourceId && candidate.sourceId !== normalized.orderNo) {
+          return false;
+        }
+
         if (candidatePlatform !== "线下交易") {
           return true;
         }
@@ -4565,7 +4585,7 @@ export async function applyAutoPickProgress(userId: string, payload: unknown) {
     }
   }
 
-  let order = await prisma.autoPickOrder.findFirst({
+  let matchedOrders = await prisma.autoPickOrder.findMany({
     where: {
       userId,
       ...(orConditions.length > 0 ? { OR: orConditions } : {}),
@@ -4573,7 +4593,21 @@ export async function applyAutoPickProgress(userId: string, payload: unknown) {
     orderBy: {
       orderTime: "desc",
     },
+    take: 5,
   });
+
+  // 如果有多个匹配，优先选择非手动录入的第三方推单
+  let order = (sourceId
+    ? matchedOrders.find((o) => o.sourceId === sourceId)
+    : null)
+    || matchedOrders.find((candidate) => {
+      const raw = candidate.rawPayload && typeof candidate.rawPayload === "object" && !Array.isArray(candidate.rawPayload)
+        ? candidate.rawPayload as Record<string, unknown>
+        : null;
+      return !raw?.isManualOffline;
+    })
+    || matchedOrders[0]
+    || null;
 
   if (!order && (progress.platform || progress.orderNo || sourceId)) {
     const refreshedOrder = await refreshAutoPickOrderFromPlugin(userId, {
