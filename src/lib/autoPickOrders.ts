@@ -1135,7 +1135,12 @@ function normalizePlatformName(platform: string) {
   }
   const lower = normalized.toLowerCase();
   if (normalized === "淘宝闪购" || normalized.includes("淘宝") || lower === "taobao" || lower === "ebai") return "淘宝";
-  if (lower === "other") return "线下交易";
+  if (
+    ["other", "其它", "其他", "线下", "offline", "线下交易"].includes(lower)
+    || ["other", "其它", "其他", "线下", "offline", "线下交易"].includes(normalized)
+  ) {
+    return "线下交易";
+  }
   return normalized;
 }
 
@@ -1145,11 +1150,19 @@ function getAutoPickPlatformAliases(platform?: string | null) {
   if (normalized) {
     aliases.add(normalized);
   }
-  if (normalized === "线下交易" || normalized.toLowerCase() === "other") {
+  const lower = normalized.toLowerCase();
+  if (
+    ["线下交易", "other", "其它", "其他", "线下", "offline"].includes(lower)
+    || ["线下交易", "other", "其它", "其他", "线下", "offline"].includes(normalized)
+  ) {
     aliases.add("线下交易");
     aliases.add("other");
+    aliases.add("其它");
+    aliases.add("其他");
+    aliases.add("线下");
+    aliases.add("offline");
   }
-  if (normalized === "淘宝" || ["taobao", "ebai"].includes(normalized.toLowerCase())) {
+  if (normalized === "淘宝" || ["taobao", "ebai"].includes(lower)) {
     aliases.add("淘宝");
     aliases.add("淘宝闪购");
     aliases.add("taobao");
@@ -4678,10 +4691,14 @@ export async function applyAutoPickProgress(userId: string, payload: unknown) {
         wsStatusHint: progress.statusHint || null,
       };
 
+  const nextStatus = buildProgressStatus(progress, order.status);
+  const wasCompleted = isAutoPickOrderCompletedStatus(order.status);
+  const isNowCompleted = isAutoPickOrderCompletedStatus(nextStatus);
+
   const updatedOrder = await prisma.autoPickOrder.update({
     where: { id: order.id },
     data: {
-      status: buildProgressStatus(progress, order.status),
+      status: nextStatus,
       rawPayload: asPrismaJsonValue(nextRawPayload),
       lastSyncedAt: new Date(),
     },
@@ -4691,6 +4708,15 @@ export async function applyAutoPickProgress(userId: string, payload: unknown) {
       },
     },
   });
+
+  if (isNowCompleted && !wasCompleted) {
+    void syncAutoOutboundFromCompletedAutoPickOrder(userId, updatedOrder.id).catch((err) => {
+      console.error("Failed to sync auto-outbound for completed auto-pick order from progress:", err);
+    });
+    void syncBrushOrderFromCompletedAutoPickOrder(userId, updatedOrder.id).catch((err) => {
+      console.error("Failed to sync brush order for completed auto-pick order from progress:", err);
+    });
+  }
 
   emitAutoPickOrderEvent({
     type: "progress",
