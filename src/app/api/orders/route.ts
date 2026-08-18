@@ -1490,9 +1490,14 @@ export async function GET(request: NextRequest) {
     const summary = !includeMetrics
       ? null
       : summaryOrders.reduce((acc, order) => {
+          const manualAmountOverride = readManualAmountOverride(order.rawPayload);
           const isOffline = order.platform === "线下交易" || String(order.platform || "").toLowerCase() === "other";
-          let expectedIncome = order.expectedIncome;
           let actualPaid = order.actualPaid;
+          let expectedIncome = manualAmountOverride && Number.isFinite(Number(manualAmountOverride.expectedIncome))
+            ? Number(manualAmountOverride.expectedIncome)
+            : (typeof order.expectedIncome === "number"
+              ? order.expectedIncome
+              : readExpectedIncomeFromRawPayload(order.rawPayload));
           if (isOffline) {
             if ((!Number.isFinite(actualPaid) || actualPaid <= 0) && Number.isFinite(Number(expectedIncome)) && Number(expectedIncome) > 0) {
               actualPaid = Math.round(Number(expectedIncome));
@@ -1500,7 +1505,19 @@ export async function GET(request: NextRequest) {
               expectedIncome = actualPaid;
             }
           }
-          const metrics = resolveIncomeMetrics(order.platform, expectedIncome, actualPaid, order.platformCommission);
+          const metrics = resolveIncomeMetrics(
+            order.platform,
+            expectedIncome,
+            actualPaid,
+            manualAmountOverride && Number.isFinite(Number(manualAmountOverride.platformCommission))
+              ? Number(manualAmountOverride.platformCommission)
+              : manualAmountOverride?.onlyExpectedIncome
+                ? 0
+                : manualAmountOverride
+              ? Math.round(Number(expectedIncome || 0) - Number(actualPaid || 0))
+              : order.platformCommission,
+            { preferExplicitExpectedIncome: Boolean(manualAmountOverride) }
+          );
           const cancelled = isAutoPickOrderCancelledStatus(order.status);
           const deleted = isAutoPickOrderDeletedStatus(order.status);
           const platform = normalizeOrderPlatformForSummary(order.platform);
@@ -1585,11 +1602,11 @@ export async function GET(request: NextRequest) {
             }
 
             // 计算该 order 的 pureProfit
-            const hiddenDeletedOfflineIncome = deleted && order.platform === "线下交易";
+            const hiddenDeletedOfflineIncome = deleted && isOffline;
             const safeExpectedIncome = hiddenDeletedOfflineIncome
               ? null
               : (typeof adjustedMetrics.expectedIncome === "number" ? adjustedMetrics.expectedIncome : null);
-            const serviceFeeRate = order.platform === "线下交易"
+            const serviceFeeRate = isOffline
               ? 0
               : (shopRateMap.get(matchedShopName) ?? 0.06);
             const productCost = outboundMeta?.productCost || 0;
@@ -1599,7 +1616,7 @@ export async function GET(request: NextRequest) {
             const hasFulfillmentItems = hasAutoPickFulfillmentItems(order.items);
             const isManualDeliveryLoss = isOfflineManualDeliveryLossOrder({
               platform: order.platform,
-              actualPaid: order.actualPaid,
+              actualPaid,
               expectedIncome: adjustedMetrics.expectedIncome,
               deliveryFee,
             }) && !hasFulfillmentItems;
