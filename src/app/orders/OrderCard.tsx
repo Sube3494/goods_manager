@@ -1860,11 +1860,6 @@ export function OrderCard({
                       到店自取
                     </span>
                   ) : null}
-                  {showManualDeliveryMarker ? (
-                    <span className="inline-flex h-7 items-center rounded-full border border-orange-500/15 bg-orange-500/10 px-1.5 text-[11px] font-medium leading-none text-orange-700 dark:text-orange-300 sm:h-8 sm:px-2.5 sm:text-[13px]">
-                      手工配送
-                    </span>
-                  ) : null}
                   {showBrushMarker ? (
                     <span className="inline-flex h-7 items-center rounded-full border border-rose-500/15 bg-rose-500/10 px-1.5 text-[11px] font-medium leading-none text-rose-700 dark:text-rose-400 sm:h-8 sm:px-2.5 sm:text-[13px]">
                       刷单
