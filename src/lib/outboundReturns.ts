@@ -142,24 +142,6 @@ export async function returnOutboundOrderById(
           const restoreToThisBatch = Math.min(batchReturnableQuantity, amountToRestore);
           if (restoreToThisBatch <= 0) continue;
 
-          await tx.purchaseOrderItem.update({
-            where: { id: batch.purchaseOrderItemId },
-            data: {
-              remainingQuantity: {
-                increment: restoreToThisBatch,
-              },
-            },
-          });
-
-          await tx.productBatch.updateMany({
-            where: { purchaseOrderItemId: batch.purchaseOrderItemId },
-            data: {
-              remainingStock: {
-                increment: restoreToThisBatch,
-              },
-            },
-          });
-
           restoredAmount = FinanceMath.add(
             restoredAmount,
             FinanceMath.multiply(Number(batch.unitCost) || 0, restoreToThisBatch)
@@ -198,24 +180,6 @@ export async function returnOutboundOrderById(
           const restoreToThisBatch = Math.min(spaceInBatch, amountToRestore);
 
           if (restoreToThisBatch > 0) {
-            await tx.purchaseOrderItem.update({
-              where: { id: batch.id },
-              data: {
-                remainingQuantity: {
-                  increment: restoreToThisBatch,
-                },
-              },
-            });
-
-            await tx.productBatch.updateMany({
-              where: { purchaseOrderItemId: batch.id },
-              data: {
-                remainingStock: {
-                  increment: restoreToThisBatch,
-                },
-              },
-            });
-
             restoredAmount = FinanceMath.add(
               restoredAmount,
               FinanceMath.multiply(Number(batch.costPrice) || 0, restoreToThisBatch)
