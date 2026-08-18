@@ -1684,6 +1684,7 @@ export function OrderCard({
   const riderName = getDisplayText(order.delivery?.riderName);
   const riderPhone = getDisplayText(order.delivery?.riderPhone);
   const expectedIncomeDisplay = hideDeletedOfflineIncome ? "-" : toCurrency(expectedIncome);
+  const actualPaidDisplay = hideDeletedOfflineIncome ? "-" : toCurrency(effectiveActualPaid);
   const pureProfitDisplay = hideDeletedOfflineIncome
     ? "-"
     : (hasPureProfit ? toCurrency(pureProfit) : (productCostStatusText || "-"));
@@ -2082,7 +2083,7 @@ export function OrderCard({
                   <div className="grid grid-cols-2 gap-x-3 gap-y-2">
                     <div className="min-w-0">
                       <div className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">实付</div>
-                      <div className="mt-0.5 truncate text-sm font-semibold text-foreground">{toCurrency(effectiveActualPaid)}</div>
+                      <div className="mt-0.5 truncate text-sm font-semibold text-foreground">{actualPaidDisplay}</div>
                     </div>
                     {canEditExpectedIncome ? (
                       <div className="min-w-0 text-right">
@@ -2115,7 +2116,7 @@ export function OrderCard({
                 <div className="hidden sm:flex sm:flex-wrap sm:justify-end sm:gap-2">
                   <div className="flex min-w-0 items-center justify-between gap-2 rounded-2xl border border-black/8 bg-black/2 px-3 py-2 dark:border-white/10 dark:bg-white/3 sm:inline-flex sm:h-9 sm:justify-start sm:rounded-full sm:py-0">
                     <span className="shrink-0 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">实付</span>
-                    <span className="truncate text-sm font-semibold text-foreground">{toCurrency(effectiveActualPaid)}</span>
+                    <span className="truncate text-sm font-semibold text-foreground">{actualPaidDisplay}</span>
                   </div>
                   {canEditExpectedIncome ? (
                     <button
@@ -2235,7 +2236,7 @@ export function OrderCard({
                   <ProductStripItem
                     key={`${item.productNo || item.productName}-${index}-${display.sku}-${displayIndex}`}
                     display={display}
-                    showEditMatch={displayIndex === 0}
+                    showEditMatch={displayIndex === 0 && !deleted}
                     onEditMatch={() => onOpenMatchEditor(order, item)}
                     matchedProduct={item.matchedProduct}
                     showMatchStatus={displayIndex === 0}
@@ -2303,12 +2304,10 @@ export function OrderCard({
 
           <div className={cn(
             "grid gap-2 lg:min-w-110",
-            showManualDeliveryMarker
+            deleted
+              ? "grid-cols-1 sm:grid-cols-1 lg:min-w-0 lg:w-32 ml-auto"
+              : showManualDeliveryMarker || displayAsOfflineOrder
               ? "grid-cols-3 sm:grid-cols-3 lg:min-w-0 lg:w-96 ml-auto"
-              : displayAsOfflineOrder
-              ? deleted
-                ? "grid-cols-1 sm:grid-cols-1 lg:min-w-0 lg:w-32 ml-auto"
-                : "grid-cols-3 sm:grid-cols-3 lg:min-w-0 lg:w-96 ml-auto"
               : "grid-cols-4 sm:grid-cols-4"
           )}>
             <ActionButton
