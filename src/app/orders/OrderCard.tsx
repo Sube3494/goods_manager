@@ -659,13 +659,22 @@ function isManualDeliveryPlaceholderItem(item: AutoPickOrderItem) {
     || String(item.productName || "").trim() === MANUAL_DELIVERY_PLACEHOLDER_PRODUCT_NAME;
 }
 
-function isUnmatchedManualDeliveryPlaceholderItem(item: AutoPickOrderItem) {
+function isUnmatchedOrIgnoredItem(item: AutoPickOrderItem) {
+  const rawPayload = item.rawPayload && typeof item.rawPayload === "object" && !Array.isArray(item.rawPayload)
+    ? item.rawPayload as Record<string, unknown>
+    : {};
+  const isIgnored = rawPayload.ignoreOutbound === true
+    || rawPayload.isManualIgnored === true
+    || (item.matchedProduct as any)?.ignoreOutbound === true;
+  if (isIgnored) {
+    return true;
+  }
   const hasDisplayItems = Array.isArray(item.displayItems) && item.displayItems.length > 0;
   return isManualDeliveryPlaceholderItem(item) && !item.matchedProduct && !hasDisplayItems;
 }
 
 function getVisibleOrderItems(items: AutoPickOrderItem[]) {
-  return (items || []).filter((item) => !isUnmatchedManualDeliveryPlaceholderItem(item));
+  return (items || []).filter((item) => !isUnmatchedOrIgnoredItem(item));
 }
 
 function isLegacyManualDeliveryPlaceholderOrder(order: AutoPickOrder) {
@@ -1900,7 +1909,7 @@ export function OrderCard({
   const profitTooltipRef = useRef<HTMLDivElement | null>(null);
   const legacyManualDeliveryPlaceholderOrder = isLegacyManualDeliveryPlaceholderOrder(order);
   const visibleItems = getVisibleOrderItems(order.items);
-  const unmatchedPlaceholderItem = (order.items || []).find(isUnmatchedManualDeliveryPlaceholderItem);
+  const unmatchedPlaceholderItem = (order.items || []).find(isUnmatchedOrIgnoredItem);
   const itemCount = getItemCount(visibleItems);
   const completed = isCompletedStatus(order.status);
   const cancelled = isCancelledStatus(order.status);
@@ -2504,11 +2513,20 @@ export function OrderCard({
               )}
             </div>
           </div>
-          ) : displayAsOfflineOrder ? (
-            <div className="rounded-2xl border border-dashed border-black/10 bg-black/[0.015] px-4 py-3 text-center text-xs text-muted-foreground dark:border-white/10 dark:bg-white/[0.015]">
-              纯配送 / 跑腿订单（无关联商品）
+          ) : (
+            <div className="flex items-center justify-between rounded-2xl border border-dashed border-black/10 bg-black/[0.015] px-4 py-2.5 text-xs text-muted-foreground dark:border-white/10 dark:bg-white/[0.015]">
+              <span>纯配送 / 跑腿订单（无关联商品）</span>
+              {order.items && order.items.length > 0 && !deleted ? (
+                <button
+                  type="button"
+                  onClick={() => onOpenMatchEditor(order, order.items[0])}
+                  className="text-xs text-sky-600 hover:text-sky-500 dark:text-sky-400 font-medium hover:underline cursor-pointer"
+                >
+                  + 重新匹配商品
+                </button>
+              ) : null}
             </div>
-          ) : null}
+          )}
         </div>
 
         <div className="mt-2.5 flex flex-col gap-2 border-t border-black/6 pt-2.5 dark:border-white/6 lg:flex-row lg:items-center lg:justify-between lg:pt-4">
