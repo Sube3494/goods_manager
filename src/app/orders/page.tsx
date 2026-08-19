@@ -1981,23 +1981,24 @@ export default function OrdersPage() {
     setMatchEditorTarget(null);
   }, [isSavingMatch]);
 
-  const saveManualMatch = useCallback(async (productId: string, items?: Array<{ id: string; quantity: number }>) => {
+  const saveManualMatch = useCallback(async (productId: string, items?: Array<{ id: string; quantity: number }>, options?: { clear?: boolean }) => {
     if (!matchEditorTarget?.orderId || !matchEditorTarget.itemId) return;
 
     setIsSavingMatch(true);
     try {
+      const isClear = Boolean(options?.clear);
       const response = await fetch(`/api/orders/${matchEditorTarget.orderId}/items/${matchEditorTarget.itemId}/match`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ productId, items }),
+        body: JSON.stringify(isClear ? { clear: true } : { productId, items }),
       });
       const data = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        throw new Error(data?.error || "更新商品匹配失败");
+        throw new Error(data?.error || (isClear ? "解除商品匹配失败" : "更新商品匹配失败"));
       }
 
-      showToast("商品匹配已更新", "success");
+      showToast(isClear ? "已解除商品匹配" : "商品匹配已更新", "success");
       setIsMatchPickerOpen(false);
       setMatchEditorTarget(null);
       triggerParentRefresh();
@@ -2742,6 +2743,9 @@ export default function OrdersPage() {
         isOpen={isMatchPickerOpen}
         onClose={closeMatchEditor}
         showQuantityControls={true}
+        onClear={() => void saveManualMatch("", [], { clear: true })}
+        clearLabel="解除商品匹配"
+        confirmLabel="确认匹配"
         onSelect={(products) => {
           const items = products.map((p) => {
             const id = String(p.shopProductId || p.id || p.sourceProductId || p.productId || "").trim();
@@ -2750,7 +2754,10 @@ export default function OrdersPage() {
           }).filter((item) => Boolean(item.id));
 
           const resolvedIds = items.map((item) => item.id);
-          if (resolvedIds.length === 0) return;
+          if (resolvedIds.length === 0) {
+            void saveManualMatch("", [], { clear: true });
+            return;
+          }
           void saveManualMatch(resolvedIds.join("+"), items);
         }}
         selectedIds={matchEditorTarget?.currentMatchedProductId ? matchEditorTarget.currentMatchedProductId.split("+").filter(Boolean) : []}

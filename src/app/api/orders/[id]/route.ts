@@ -127,17 +127,22 @@ export async function PATCH(
       },
       select: {
         id: true,
+        orderNo: true,
         platform: true,
         actualPaid: true,
         expectedIncome: true,
         platformCommission: true,
         delivery: true,
         rawPayload: true,
+        shopId: true,
         shopAddress: true,
         items: {
           select: {
+            id: true,
             productName: true,
             productNo: true,
+            quantity: true,
+            thumb: true,
             rawPayload: true,
           },
         },
@@ -249,108 +254,210 @@ export async function PATCH(
           isOffline: true,
         }
       : null;
+    const hasOfflineItems = offlineEdit && Array.isArray(offlineEdit.items);
+    const offlineItems = hasOfflineItems ? (offlineEdit.items as Array<any>) : null;
 
-    await prisma.autoPickOrder.update({
-      where: { id: order.id },
-      data: {
-        ...(hasAmountEdit
-          ? {
-              actualPaid,
-              expectedIncome,
-              platformCommission,
-            }
-          : {}),
-        ...(hasShopEdit
-          ? {
-              shopId: targetShopId,
-              ...(targetShopAddress !== null ? { shopAddress: targetShopAddress } : {}),
-            }
-          : {}),
-        ...(offlineEdit
-          ? {
-              actualPaid,
-              expectedIncome,
-              platformCommission,
-              userAddress: offlineUserAddress || (Math.round(offlineDeliveryFee) > 0 ? "线下送货上门" : "线下柜台交易"),
-              customerRemark: offlineCustomerRemark || null,
-              delivery: nextDelivery as Prisma.InputJsonValue,
-            }
-          : {}),
-        rawPayload: {
-          ...rawPayload,
-          ...(offlineEdit
+    await prisma.$transaction(async (tx) => {
+      if (offlineItems !== null) {
+        // 1. 先清理或回滚原有关联出库单
+        const existingOutbounds = await tx.outboundOrder.findMany({
+          where: {
+            userId: user.id,
+            note: {
+              contains: `平台单号: ${order.orderNo}`,
+              mode: "insensitive",
+            },
+          },
+          select: { id: true, note: true },
+        });
+
+        const filteredOutbounds = existingOutbounds.filter((outbound: any) => {
+          const match = outbound.note?.match(/平台单号:\s*([^\s|]+)/);
+          if (!match) return false;
+          return match[1].toLowerCase() === order.orderNo.toLowerCase();
+        });
+
+        if (filteredOutbounds.length > 0) {
+          await tx.outboundOrder.deleteMany({
+            where: {
+              id: { in: filteredOutbounds.map((o: any) => o.id) },
+            },
+          });
+        }
+
+        // 2. 同步 items：删除已移除的 item，更新已有的，创建新加的
+        const incomingItemIds = new Set(
+          offlineItems.map((item) => String(item.id || "").trim()).filter(Boolean)
+        );
+
+        await tx.autoPickOrderItem.deleteMany({
+          where: {
+            orderId: order.id,
+            id: { notIn: Array.from(incomingItemIds) },
+          },
+        });
+
+        const resolvedShopName = (rawPayload?.systemMeta?.resolvedShop?.name as string) || "";
+        for (const item of offlineItems) {
+          const rawId = String(item.id || "").trim();
+          const pName = String(item.productName || "").trim();
+          if (!pName) continue;
+          const pNo = item.productNo ? String(item.productNo).trim() : null;
+          const pQty = Math.max(1, Number(item.quantity) || 1);
+          const pThumb = item.thumb ? String(item.thumb).trim() : null;
+          const resolvedProductId = String(item.productId || item.sourceProductId || "").trim();
+          const resolvedShopProductId = item.shopProductId ? String(item.shopProductId).trim() : null;
+
+          const itemRawPayload: Record<string, any> = {
+            ...(resolvedProductId || resolvedShopProductId ? {
+              manualMatchedProduct: {
+                id: resolvedProductId || resolvedShopProductId || rawId,
+                name: pName,
+                sku: pNo,
+                image: pThumb,
+                sourceType: item.sourceType === "shopProduct" ? "shopProduct" : "product",
+                shopProductId: resolvedShopProductId || undefined,
+                shopName: resolvedShopName || null,
+                isManual: true,
+              },
+            } : {}),
+          };
+
+          if (rawId && order.items.some((existing) => existing.id === rawId)) {
+            const existingItem = order.items.find((existing) => existing.id === rawId);
+            const existingPayload = existingItem?.rawPayload && typeof existingItem.rawPayload === "object" && !Array.isArray(existingItem.rawPayload)
+              ? existingItem.rawPayload as Record<string, any>
+              : {};
+            await tx.autoPickOrderItem.update({
+              where: { id: rawId },
+              data: {
+                productName: pName,
+                productNo: pNo,
+                quantity: pQty,
+                thumb: pThumb,
+                rawPayload: {
+                  ...existingPayload,
+                  ...itemRawPayload,
+                } as Prisma.InputJsonValue,
+              },
+            });
+          } else {
+            await tx.autoPickOrderItem.create({
+              data: {
+                orderId: order.id,
+                productName: pName,
+                productNo: pNo,
+                quantity: pQty,
+                thumb: pThumb,
+                rawPayload: itemRawPayload as Prisma.InputJsonValue,
+              },
+            });
+          }
+        }
+      }
+
+      await tx.autoPickOrder.update({
+        where: { id: order.id },
+        data: {
+          ...(hasAmountEdit
             ? {
-                note: offlineCustomerRemark,
-                customerRemark: offlineCustomerRemark,
+                actualPaid,
+                expectedIncome,
+                platformCommission,
               }
             : {}),
-          systemMeta: {
-            ...systemMeta,
-            ...(hasBrushToggle
-              ? {
-                  mainSystemSelfDelivery: {
-                    ...mainSystemSelfDelivery,
-                    triggered: Boolean(body.isMainSystemSelfDelivery),
-                  },
-                  ...(Boolean(body.isMainSystemSelfDelivery)
-                    ? {
-                        autoOutbound: {
-                          status: "skipped",
-                          error: "brush-order-no-auto-outbound",
-                          resolvedAt: new Date().toISOString(),
-                        },
-                      }
-                    : {}),
-                }
-              : {}),
-            ...(hasAmountEdit
-              ? {
-                  manualAmountOverride: {
-                    ...manualAmountOverride,
-                    actualPaid: isOfflineOrder ? actualPaid : manualAmountOverride.actualPaid,
-                    expectedIncome,
-                    platformCommission,
-                    onlyExpectedIncome: isOfflineOrder || isManualDeliveryPlaceholderOrder || manualAmountOverride.onlyExpectedIncome === true,
-                    updatedAt: new Date().toISOString(),
-                    updatedBy: String(user.name || user.email || user.id),
-                  },
-                }
-              : {}),
-            ...(hasShopEdit
-              ? {
-                  resolvedShop: {
-                    id: targetShopId,
-                    name: targetShopName,
-                  },
-                  manualShopOverride: {
-                    shopId: targetShopId,
-                    shopName: targetShopName,
-                    updatedAt: new Date().toISOString(),
-                    updatedBy: String(user.name || user.email || user.id),
-                  },
-                }
-              : {}),
+          ...(hasShopEdit
+            ? {
+                shopId: targetShopId,
+                ...(targetShopAddress !== null ? { shopAddress: targetShopAddress } : {}),
+              }
+            : {}),
+          ...(offlineEdit
+            ? {
+                actualPaid,
+                expectedIncome,
+                platformCommission,
+                userAddress: offlineUserAddress || (Math.round(offlineDeliveryFee) > 0 ? "线下送货上门" : "线下柜台交易"),
+                customerRemark: offlineCustomerRemark || null,
+                delivery: nextDelivery as Prisma.InputJsonValue,
+              }
+            : {}),
+          rawPayload: {
+            ...rawPayload,
             ...(offlineEdit
               ? {
-                  manualOfflineEdit: {
-                    actualPaid,
-                    expectedIncome,
-                    deliveryFee: Math.round(offlineDeliveryFee),
-                    userAddress: offlineUserAddress,
-                    customerRemark: offlineCustomerRemark,
-                    updatedAt: new Date().toISOString(),
-                    updatedBy: String(user.name || user.email || user.id),
-                  },
+                  note: offlineCustomerRemark,
+                  customerRemark: offlineCustomerRemark,
                 }
               : {}),
-          },
-        } as Prisma.InputJsonValue,
-      },
+            systemMeta: {
+              ...systemMeta,
+              ...(hasBrushToggle
+                ? {
+                    mainSystemSelfDelivery: {
+                      ...mainSystemSelfDelivery,
+                      triggered: Boolean(body.isMainSystemSelfDelivery),
+                    },
+                    ...(Boolean(body.isMainSystemSelfDelivery)
+                      ? {
+                          autoOutbound: {
+                            status: "skipped",
+                            error: "brush-order-no-auto-outbound",
+                            resolvedAt: new Date().toISOString(),
+                          },
+                        }
+                      : {}),
+                  }
+                : {}),
+              ...(hasAmountEdit
+                ? {
+                    manualAmountOverride: {
+                      ...manualAmountOverride,
+                      actualPaid: isOfflineOrder ? actualPaid : manualAmountOverride.actualPaid,
+                      expectedIncome,
+                      platformCommission,
+                      onlyExpectedIncome: isOfflineOrder || isManualDeliveryPlaceholderOrder || manualAmountOverride.onlyExpectedIncome === true,
+                      updatedAt: new Date().toISOString(),
+                      updatedBy: String(user.name || user.email || user.id),
+                    },
+                  }
+                : {}),
+              ...(hasShopEdit
+                ? {
+                    resolvedShop: {
+                      id: targetShopId,
+                      name: targetShopName,
+                    },
+                    manualShopOverride: {
+                      shopId: targetShopId,
+                      shopName: targetShopName,
+                      updatedAt: new Date().toISOString(),
+                      updatedBy: String(user.name || user.email || user.id),
+                    },
+                  }
+                : {}),
+              ...(offlineEdit
+                ? {
+                    manualOfflineEdit: {
+                      actualPaid,
+                      expectedIncome,
+                      deliveryFee: Math.round(offlineDeliveryFee),
+                      userAddress: offlineUserAddress,
+                      customerRemark: offlineCustomerRemark,
+                      updatedAt: new Date().toISOString(),
+                      updatedBy: String(user.name || user.email || user.id),
+                    },
+                  }
+                : {}),
+            },
+          } as Prisma.InputJsonValue,
+        },
+      });
     });
 
     if (hasAmountEdit || offlineEdit) {
       await syncAutoOutboundFromCompletedAutoPickOrder(user.id, order.id).catch((error) => {
-        console.error("Failed to auto-create outbound after order amount edit:", error);
+        console.error("Failed to auto-create outbound after order edit:", error);
       });
     }
 

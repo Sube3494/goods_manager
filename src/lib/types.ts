@@ -238,6 +238,8 @@ export interface AutoPickOrder {
   autoCompleteJobError?: string | null;
   autoCompleteJobAttempts?: number | null;
   autoOutboundStatus?: string | null;
+  rawPayload?: any;
+  isManualOffline?: boolean;
   autoOutboundError?: string | null;
   autoOutboundAttemptedAt?: string | null;
   autoOutboundResolvedAt?: string | null;

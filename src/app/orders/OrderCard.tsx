@@ -13,7 +13,9 @@ import {
   Navigation,
   Package2,
   Pencil,
+  Plus,
   RefreshCw,
+  Trash2,
   TriangleAlert,
   TimerReset,
   Truck,
@@ -22,6 +24,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/Toast";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
+import { ProductSelectionModal } from "@/components/Purchases/ProductSelectionModal";
 import { createPortal } from "react-dom";
 import { AutoPickOrder, AutoPickOrderItem, AutoPickIntegrationConfig } from "@/lib/types";
 type OrderAction = "self-delivery" | "complete-delivery" | "pickup-complete" | "sync" | "outbound" | "sync-brush";
@@ -520,11 +523,34 @@ export function hasAutoOutboundFailure(order: Pick<AutoPickOrder, "autoOutboundS
   return String(order.autoOutboundStatus || "").trim().toLowerCase() === "failed";
 }
 
-export function getPlatformBadgeMeta(platform?: string | null) {
+export function isPureManualOfflineOrder(order: { platform?: string | null; orderNo?: string | null; sourceId?: string | null; rawPayload?: unknown }) {
+  const rawPayload = order.rawPayload && typeof order.rawPayload === "object" && !Array.isArray(order.rawPayload)
+    ? order.rawPayload as Record<string, unknown>
+    : {};
+  const systemMeta = rawPayload.systemMeta && typeof rawPayload.systemMeta === "object" && !Array.isArray(rawPayload.systemMeta)
+    ? rawPayload.systemMeta as Record<string, unknown>
+    : {};
+  if (rawPayload.isManualOffline === true || systemMeta.isManualOffline === true) {
+    return true;
+  }
+  const orderNo = String(order.orderNo || "").trim();
+  const sourceId = String(order.sourceId || "").trim();
+  if (orderNo.startsWith("OFFLINE-") || sourceId.startsWith("OFFLINE-")) {
+    return true;
+  }
+  return false;
+}
+
+export function getPlatformBadgeMeta(platform?: string | null, rawPayload?: unknown) {
   const text = String(platform || "").trim();
   const normalized = text.toLowerCase();
 
-  if (normalized === "other" || normalized.includes("线下交易") || normalized.includes("线下")) {
+  const raw = rawPayload && typeof rawPayload === "object" && !Array.isArray(rawPayload)
+    ? rawPayload as Record<string, unknown>
+    : {};
+  const isManualOffline = raw.isManualOffline === true || (raw.systemMeta as any)?.isManualOffline === true;
+
+  if (isManualOffline || normalized === "线下交易") {
     return {
       iconSrc: "/platform/线下交易.svg",
       iconAlt: "线下交易",
@@ -554,7 +580,7 @@ export function getPlatformBadgeMeta(platform?: string | null) {
 
   return {
     iconSrc: "/platform/其他.svg",
-    iconAlt: text || "其他平台",
+    iconAlt: text === "other" ? "其他平台" : (text || "其他平台"),
   };
 }
 
@@ -1107,6 +1133,17 @@ function OrderAmountEditModal({
   );
 }
 
+interface EditableOfflineOrderItem {
+  id?: string;
+  productId?: string;
+  shopProductId?: string | null;
+  productName: string;
+  productNo?: string | null;
+  thumb?: string | null;
+  quantity: number;
+  sourceType?: "product" | "shopProduct";
+}
+
 function OfflineOrderEditModal({
   order,
   onClose,
@@ -1119,6 +1156,7 @@ function OfflineOrderEditModal({
     deliveryFee: number;
     userAddress: string;
     customerRemark: string;
+    items?: EditableOfflineOrderItem[];
   }) => Promise<boolean>;
 }) {
   const { showToast } = useToast();
@@ -1126,7 +1164,86 @@ function OfflineOrderEditModal({
   const [deliveryFee, setDeliveryFee] = useState(() => formatCurrencyInputFromCents(getDeliveryFee(order.delivery)));
   const [userAddress, setUserAddress] = useState(() => String(order.userAddress || ""));
   const [customerRemark, setCustomerRemark] = useState(() => String(order.customerRemark || ""));
+  const [items, setItems] = useState<EditableOfflineOrderItem[]>(() => {
+    if (!Array.isArray(order.items)) return [];
+    return order.items.map((item) => {
+      const rawRecord = item.rawPayload && typeof item.rawPayload === "object" && !Array.isArray(item.rawPayload)
+        ? (item.rawPayload as Record<string, any>)
+        : {};
+      const manualMatched = rawRecord.manualMatchedProduct && typeof rawRecord.manualMatchedProduct === "object"
+        ? (rawRecord.manualMatchedProduct as Record<string, any>)
+        : null;
+      return {
+        id: item.id,
+        productId: manualMatched?.id || item.matchedProduct?.id || "",
+        shopProductId: manualMatched?.shopProductId || item.matchedProduct?.shopProductId || null,
+        productName: item.productName || "未命名商品",
+        productNo: item.productNo || item.matchedProduct?.sku || null,
+        thumb: item.thumb || item.matchedProduct?.image || null,
+        quantity: Math.max(1, Number(item.quantity) || 1),
+        sourceType: (manualMatched?.sourceType as "product" | "shopProduct") || "shopProduct",
+      };
+    });
+  });
+  const [isProductPickerOpen, setIsProductPickerOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  const handleUpdateQuantity = (index: number, delta: number) => {
+    setItems((prev) =>
+      prev.map((item, i) => (i === index ? { ...item, quantity: Math.max(1, item.quantity + delta) } : item))
+    );
+  };
+
+  const handleQuantityInputChange = (index: number, val: string) => {
+    const parsed = parseInt(val, 10);
+    const validQty = isNaN(parsed) || parsed <= 0 ? 1 : parsed;
+    setItems((prev) =>
+      prev.map((item, i) => (i === index ? { ...item, quantity: validQty } : item))
+    );
+  };
+
+  const handleRemoveItem = (index: number) => {
+    setItems((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleClearAllItems = () => {
+    setItems([]);
+  };
+
+  const handleSelectProducts = (selectedProducts: any[]) => {
+    if (!selectedProducts || selectedProducts.length === 0) return;
+
+    setItems((prevItems) => {
+      const nextItems = [...prevItems];
+      selectedProducts.forEach((prod) => {
+        const resolvedProductId = String(prod.productId || prod.sourceProductId || prod.id || "").trim();
+        const resolvedShopProductId = prod.sourceType === "shopProduct" ? prod.id : (prod.shopProductId || null);
+        if (!resolvedProductId && !resolvedShopProductId) return;
+
+        const existingIndex = nextItems.findIndex(
+          (item) => (resolvedProductId && item.productId === resolvedProductId) || (resolvedShopProductId && item.shopProductId === resolvedShopProductId)
+        );
+
+        if (existingIndex > -1) {
+          nextItems[existingIndex].quantity += 1;
+        } else {
+          nextItems.push({
+            productId: resolvedProductId,
+            shopProductId: resolvedShopProductId,
+            productName: prod.productName || prod.name || "未命名商品",
+            productNo: prod.sku || prod.productNo || null,
+            thumb: prod.productImage || prod.image || prod.thumb || null,
+            quantity: 1,
+            sourceType: prod.sourceType === "shopProduct" ? "shopProduct" : "product",
+          });
+        }
+      });
+      return nextItems;
+    });
+
+    setIsProductPickerOpen(false);
+    showToast(`成功添加 ${selectedProducts.length} 个商品`, "success");
+  };
 
   const handleSave = async () => {
     const nextActualPaid = parseCurrencyInputToCents(actualPaid);
@@ -1140,12 +1257,18 @@ function OfflineOrderEditModal({
       return;
     }
 
+    if (items.length === 0 && nextActualPaid <= 0 && nextDeliveryFee <= 0) {
+      showToast("请至少添加一个商品或填写商品金额/配送支出", "error");
+      return;
+    }
+
     setIsSaving(true);
     const ok = await onSave({
       actualPaid: nextActualPaid,
       deliveryFee: nextDeliveryFee,
       userAddress,
       customerRemark,
+      items,
     });
     setIsSaving(false);
     if (ok) {
@@ -1157,24 +1280,24 @@ function OfflineOrderEditModal({
 
   return createPortal(
     <div className="fixed inset-0 z-100000 flex items-center justify-center px-4">
-      <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm" onClick={() => { if (!isSaving) onClose(); }} />
-      <div className="relative w-full max-w-lg rounded-[28px] border border-black/8 bg-white/96 shadow-[0_24px_64px_rgba(15,23,42,0.20)] dark:border-white/10 dark:bg-[#0d1420]/98">
-        <div className="flex items-start justify-between gap-3 border-b border-black/8 px-6 pb-4 pt-6 dark:border-white/10">
+      <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm" onClick={() => { if (!isSaving && !isProductPickerOpen) onClose(); }} />
+      <div className="relative w-full max-w-xl max-h-[90vh] flex flex-col rounded-[28px] border border-black/8 bg-white/96 shadow-[0_24px_64px_rgba(15,23,42,0.20)] dark:border-white/10 dark:bg-[#0d1420]/98 overflow-hidden">
+        <div className="flex items-start justify-between gap-3 border-b border-black/8 px-6 pb-4 pt-6 dark:border-white/10 shrink-0">
           <div>
             <h3 className="text-xl font-semibold tracking-tight text-foreground">修改线下订单</h3>
-            <p className="mt-2 text-xs leading-5 text-muted-foreground">用于修正金额、配送支出、地址和备注；商品明细变更仍建议作废重录以保持库存准确。</p>
+            <p className="mt-1.5 text-xs leading-5 text-muted-foreground">可调整金额、配送支出、地址、备注及商品明细（支持删除商品或清空为纯跑腿单）。</p>
           </div>
           <button
             type="button"
             onClick={onClose}
             disabled={isSaving}
-            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-black/8 bg-white/80 text-muted-foreground transition-all hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-white/4"
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-black/8 bg-white/80 text-muted-foreground transition-all hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-white/4 cursor-pointer"
           >
             <X size={18} />
           </button>
         </div>
 
-        <div className="space-y-4 px-6 py-5">
+        <div className="space-y-4 px-6 py-5 overflow-y-auto flex-1 custom-scrollbar">
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="block">
               <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">商品金额</span>
@@ -1199,15 +1322,117 @@ function OfflineOrderEditModal({
 
           <label className="block">
             <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">备注</span>
-            <textarea value={customerRemark} onChange={(event) => setCustomerRemark(event.target.value)} rows={3} className={cn("mt-2 min-h-22 py-3 resize-none", inputClass)} placeholder="订单备注" />
+            <textarea value={customerRemark} onChange={(event) => setCustomerRemark(event.target.value)} rows={2} className={cn("mt-2 min-h-18 py-2.5 resize-none", inputClass)} placeholder="订单备注" />
           </label>
 
-          <div className="flex gap-3 pt-1">
+          {/* 商品明细编辑 */}
+          <div className="rounded-2xl border border-black/8 bg-black/[0.02] p-4 dark:border-white/10 dark:bg-white/[0.02]">
+            <div className="flex items-center justify-between gap-2 mb-3">
+              <div className="text-xs font-bold text-foreground flex items-center gap-2">
+                <span>商品明细</span>
+                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
+                  {items.length} 件
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                {items.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleClearAllItems}
+                    className="inline-flex items-center gap-1 rounded-lg border border-rose-200 dark:border-rose-900/50 bg-rose-50/80 px-2.5 py-1 text-[11px] font-semibold text-rose-600 dark:bg-rose-950/30 dark:text-rose-400 hover:bg-rose-100 transition-colors cursor-pointer"
+                  >
+                    <Trash2 size={12} />
+                    清空商品
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setIsProductPickerOpen(true)}
+                  className="inline-flex items-center gap-1 rounded-lg border border-primary/20 bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary hover:bg-primary/15 transition-colors cursor-pointer"
+                >
+                  <Plus size={12} />
+                  添加商品
+                </button>
+              </div>
+            </div>
+
+            {items.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-black/10 py-6 text-center text-xs text-muted-foreground dark:border-white/10">
+                暂无关联商品明细（将作为纯跑腿 / 配送费订单保存，不关联扣减库存）
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-56 overflow-y-auto pr-1 custom-scrollbar">
+                {items.map((item, index) => (
+                  <div
+                    key={`${item.id || item.productId || item.productName}-${index}`}
+                    className="flex items-center justify-between gap-3 rounded-xl border border-black/6 bg-white p-2.5 shadow-2xs dark:border-white/8 dark:bg-[#151c28]"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                      {item.thumb ? (
+                        <img src={item.thumb} alt="" className="h-10 w-10 shrink-0 rounded-lg object-cover border border-black/6 dark:border-white/6" />
+                      ) : (
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-black/5 text-muted-foreground dark:bg-white/5">
+                          <Package2 size={18} />
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-xs font-semibold text-foreground leading-tight" title={item.productName}>
+                          {item.productName}
+                        </div>
+                        {item.productNo ? (
+                          <div className="mt-0.5 truncate text-[10px] text-muted-foreground">
+                            货号: {item.productNo}
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex items-center rounded-lg border border-black/8 bg-black/3 dark:border-white/10 dark:bg-white/5 p-0.5">
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateQuantity(index, -1)}
+                          className="flex h-6 w-6 items-center justify-center rounded text-xs font-bold text-muted-foreground hover:bg-white dark:hover:bg-white/10 active:scale-95 transition-all cursor-pointer"
+                        >
+                          -
+                        </button>
+                        <input
+                          type="number"
+                          min={1}
+                          value={item.quantity}
+                          onChange={(e) => handleQuantityInputChange(index, e.target.value)}
+                          className="h-6 w-9 bg-transparent text-center text-xs font-bold text-foreground outline-none border-none p-0"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateQuantity(index, 1)}
+                          className="flex h-6 w-6 items-center justify-center rounded text-xs font-bold text-muted-foreground hover:bg-white dark:hover:bg-white/10 active:scale-95 transition-all cursor-pointer"
+                        >
+                          +
+                        </button>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveItem(index)}
+                        title="删除该商品"
+                        className="flex h-7 w-7 items-center justify-center rounded-lg border border-rose-200 dark:border-rose-900/50 bg-rose-50 text-rose-600 dark:bg-rose-950/30 dark:text-rose-400 hover:bg-rose-100 transition-colors cursor-pointer"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="flex gap-3 pt-2">
             <button
               type="button"
               onClick={onClose}
               disabled={isSaving}
-              className="inline-flex h-11 flex-1 items-center justify-center rounded-2xl border border-black/8 bg-white/85 px-4 text-sm font-bold text-foreground transition-all hover:bg-white disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-white/5"
+              className="inline-flex h-11 flex-1 items-center justify-center rounded-2xl border border-black/8 bg-white/85 px-4 text-sm font-bold text-foreground transition-all hover:bg-white disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-white/5 cursor-pointer"
             >
               取消
             </button>
@@ -1215,7 +1440,7 @@ function OfflineOrderEditModal({
               type="button"
               onClick={() => void handleSave()}
               disabled={isSaving}
-              className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-2xl bg-foreground px-4 text-sm font-bold text-background transition-all hover:opacity-92 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-black"
+              className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-2xl bg-foreground px-4 text-sm font-bold text-background transition-all hover:opacity-92 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-black cursor-pointer"
             >
               {isSaving ? <Loader2 size={15} className="animate-spin" /> : null}
               保存修改
@@ -1223,6 +1448,28 @@ function OfflineOrderEditModal({
           </div>
         </div>
       </div>
+
+      {isProductPickerOpen ? (
+        <ProductSelectionModal
+          isOpen={isProductPickerOpen}
+          onClose={() => setIsProductPickerOpen(false)}
+          onSelect={handleSelectProducts}
+          selectedIds={items.map((it) => it.shopProductId || it.productId || "").filter(Boolean)}
+          title="选择线下订单商品"
+          fetchPath="/api/shop-products"
+          showPlatformSelector={false}
+          showCategoryFilter={true}
+          showPrice={false}
+          query={{
+            all: "true",
+            ...(order.shopId ? { shopId: order.shopId } : {}),
+            ...(order.matchedShopName ? { shopName: order.matchedShopName } : {}),
+          }}
+          loadAllOnOpen={true}
+          singleSelect={false}
+          confirmLabel="添加至订单"
+        />
+      ) : null}
     </div>,
     document.body
   );
@@ -1577,6 +1824,7 @@ export function OrderCard({
     deliveryFee: number;
     userAddress: string;
     customerRemark: string;
+    items?: EditableOfflineOrderItem[];
   }) => {
     try {
       setIsSavingOfflineEdit(true);
@@ -1649,7 +1897,8 @@ export function OrderCard({
   const abnormal = isAbnormalStatus(order.status);
   const deliveryFee = getDeliveryFee(order.delivery);
   const hasDeliveryAddress = Boolean(String(order.userAddress || "").trim());
-  const displayAsOfflineOrder = order.platform === "线下交易";
+  const isPureOffline = isPureManualOfflineOrder(order);
+  const displayAsOfflineOrder = isPureOffline;
   const pickup = Boolean(order.isPickup) || (displayAsOfflineOrder && deliveryFee <= 0 && !hasDeliveryAddress);
   const showManualDeliveryMarker = displayAsOfflineOrder && !pickup;
   const showPlatformActions = !displayAsOfflineOrder;
@@ -1658,7 +1907,7 @@ export function OrderCard({
   const hasOutbound = Boolean(order.hasOutbound);
   const showBrushMarker = !pickup && !showManualDeliveryMarker && order.isMainSystemSelfDelivery;
   const orderTypeLabel = getOrderTypeLabel(order);
-  const platformMeta = getPlatformBadgeMeta(order.platform);
+  const platformMeta = getPlatformBadgeMeta(order.platform, order.rawPayload);
   const commissionDisplay = getCommissionDisplay(order.platformCommission);
   const expectedIncome = getExpectedIncome(order.expectedIncome, order.actualPaid, order.platformCommission, order.platform);
   const effectiveActualPaid = (displayAsOfflineOrder || String(order.platform || "").toLowerCase() === "other")
@@ -2243,6 +2492,10 @@ export function OrderCard({
               )}
             </div>
           </div>
+          ) : displayAsOfflineOrder ? (
+            <div className="rounded-2xl border border-dashed border-black/10 bg-black/[0.015] px-4 py-3 text-center text-xs text-muted-foreground dark:border-white/10 dark:bg-white/[0.015]">
+              纯配送 / 跑腿订单（无关联商品）
+            </div>
           ) : null}
         </div>
 

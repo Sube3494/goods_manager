@@ -147,8 +147,8 @@ export function CreateOfflineOrderModal({ shopOptions, onClose, onSuccess }: Cre
       showToast("配送费不能为负数", "error");
       return;
     }
-    if (items.length === 0) {
-      showToast("请至少添加一个商品明细", "error");
+    if (items.length === 0 && Number(actualPaid || 0) <= 0 && Number(deliveryFee || 0) <= 0) {
+      showToast("请至少添加一个商品或填写商品金额/配送费", "error");
       return;
     }
 

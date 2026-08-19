@@ -86,6 +86,9 @@ interface ProductSelectionModalProps {
   showQuantityControls?: boolean;
   disableAlreadySelected?: boolean;
   defaultViewMode?: "grid" | "list";
+  onClear?: () => void;
+  clearLabel?: string;
+  confirmLabel?: string;
 }
 
 function ProductSkeleton({ imageOnly = false }: { imageOnly?: boolean }) {
@@ -130,6 +133,9 @@ export function ProductSelectionModal({
   showQuantityControls = false,
   disableAlreadySelected = true,
   defaultViewMode,
+  onClear,
+  clearLabel = "解除匹配",
+  confirmLabel,
 }: ProductSelectionModalProps) {
   const [localSingleSelect, setLocalSingleSelect] = useState(Boolean(singleSelect));
   const queryRef = useRef(query);
@@ -956,7 +962,16 @@ export function ProductSelectionModal({
                 <div className="text-xs sm:text-sm font-medium text-muted-foreground mr-2">
                   已选 <span className="text-primary font-medium">{tempSelectedIds.length}</span> 项
                 </div>
-                <div className="flex gap-2">
+                <div className="flex items-center gap-2">
+                  {onClear ? (
+                    <button
+                      type="button"
+                      onClick={onClear}
+                      className="rounded-xl px-3.5 py-2.5 text-xs sm:text-sm font-bold text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-all active:scale-95"
+                    >
+                      {clearLabel}
+                    </button>
+                  ) : null}
                   <button 
                     onClick={onClose} 
                     className="rounded-xl px-4 py-2.5 text-xs sm:text-sm font-medium text-muted-foreground hover:bg-black/5 dark:hover:bg-white/10 hover:text-foreground transition-all active:scale-95"
@@ -978,7 +993,7 @@ export function ProductSelectionModal({
                     disabled={tempSelectedIds.length === 0}
                     className="bg-foreground text-background dark:text-black px-6 sm:px-8 py-2.5 rounded-xl text-xs sm:text-sm font-black shadow-xl shadow-foreground/10 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    确认添加
+                    {confirmLabel || "确认添加"}
                   </button>
                 </div>
                </div>

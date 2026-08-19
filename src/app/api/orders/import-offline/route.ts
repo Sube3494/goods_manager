@@ -37,15 +37,13 @@ export async function POST(request: NextRequest) {
     if (isNaN(Number(deliveryFee)) || Number(deliveryFee) < 0) {
       return NextResponse.json({ error: "请输入有效的配送费" }, { status: 400 });
     }
-    if (!Array.isArray(items) || items.length === 0) {
-      return NextResponse.json({ error: "请至少添加一个商品" }, { status: 400 });
+    const safeItems = Array.isArray(items) ? items : [];
+    if (safeItems.length === 0 && Number(actualPaid || 0) <= 0 && Number(deliveryFee || 0) <= 0) {
+      return NextResponse.json({ error: "请至少添加一个商品或输入商品金额/配送支出" }, { status: 400 });
     }
 
     // 检查商品数据是否完整
-    for (const item of items) {
-      if (!item.productId) {
-        return NextResponse.json({ error: "商品列表中存在无效的商品关联" }, { status: 400 });
-      }
+    for (const item of safeItems) {
       if (!item.productName) {
         return NextResponse.json({ error: "商品名称不能为空" }, { status: 400 });
       }
@@ -158,7 +156,7 @@ export async function POST(request: NextRequest) {
           },
           rawPayload: rawPayload,
           items: {
-            create: items.map((item) => {
+            create: safeItems.map((item: any) => {
               // 构造单项商品的手动映射，存放在 item 的 rawPayload 中
               const itemRawPayload = {
                 manualMatchedProduct: {
