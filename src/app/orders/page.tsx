@@ -1998,7 +1998,7 @@ export default function OrdersPage() {
         throw new Error(data?.error || (isClear ? "解除商品匹配失败" : "更新商品匹配失败"));
       }
 
-      showToast(isClear ? "已解除商品匹配" : "商品匹配已更新", "success");
+      showToast(isClear ? "已标记为无需出库，解除商品绑定" : "商品匹配已更新", "success");
       setIsMatchPickerOpen(false);
       setMatchEditorTarget(null);
       triggerParentRefresh();
@@ -2744,7 +2744,7 @@ export default function OrdersPage() {
         onClose={closeMatchEditor}
         showQuantityControls={true}
         onClear={() => void saveManualMatch("", [], { clear: true })}
-        clearLabel="解除商品匹配"
+        clearLabel="无需出库 / 解除绑定"
         confirmLabel="确认匹配"
         onSelect={(products) => {
           const items = products.map((p) => {

@@ -126,22 +126,36 @@ export async function PATCH(
     const autoMatchedProduct = previousAutoMatchedProduct || requestedAutoMatchedProduct;
 
     if (shouldClear) {
+      const nextPayload = {
+        ...restPayload,
+        ignoreOutbound: true,
+        isManualIgnored: true,
+      };
+
       await prisma.$transaction(async (tx) => {
         await tx.autoPickOrderItem.update({
           where: { id: orderItem.id },
           data: {
-            rawPayload: (Object.keys(restPayload).length > 0 ? restPayload : Prisma.JsonNull) as Prisma.InputJsonValue,
+            rawPayload: (Object.keys(nextPayload).length > 0 ? nextPayload : Prisma.JsonNull) as Prisma.InputJsonValue,
           },
         });
         await deleteLegacyOutbound(tx, orderItem.order.orderNo);
       });
 
+      await syncAutoOutboundFromCompletedAutoPickOrder(user.id, id).catch(() => null);
+
       return NextResponse.json({
         ok: true,
-        matchedProduct: autoMatchedProduct ? {
-          ...autoMatchedProduct,
-          isManual: false,
-        } : null,
+        matchedProduct: {
+          id: "__ignored__",
+          name: "无需出库（纯取货/跑腿）",
+          sku: "-",
+          image: null,
+          sourceType: "product",
+          shopProductId: "",
+          isManual: true,
+          ignoreOutbound: true,
+        },
       });
     }
 

@@ -316,7 +316,22 @@ function readManualMatchedProduct(rawPayload: unknown): MatchedCatalogProduct | 
     return null;
   }
 
-  const candidate = (rawPayload as Record<string, unknown>).manualMatchedProduct;
+  const payloadObj = rawPayload as Record<string, unknown>;
+  if (payloadObj.ignoreOutbound === true || payloadObj.isManualIgnored === true) {
+    return {
+      id: "__ignored__",
+      name: "无需出库（纯取货/跑腿）",
+      sku: "-",
+      image: null,
+      sourceType: "product",
+      shopProductId: "__ignored__",
+      shopName: null,
+      isManual: true,
+      ignoreOutbound: true,
+    } as any;
+  }
+
+  const candidate = payloadObj.manualMatchedProduct;
   if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
     return null;
   }

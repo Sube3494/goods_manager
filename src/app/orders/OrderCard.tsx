@@ -516,8 +516,13 @@ export function hasAutoCompleteFailure(order: Pick<AutoPickOrder, "autoCompleteJ
     || String(order.autoCompleteJobStatus || "").trim().toUpperCase() === "FAILED";
 }
 
-export function hasAutoOutboundFailure(order: Pick<AutoPickOrder, "autoOutboundStatus" | "hasOutbound">) {
+export function hasAutoOutboundFailure(order: Pick<AutoPickOrder, "autoOutboundStatus" | "hasOutbound" | "actualPaid" | "expectedIncome" | "delivery">) {
   if (order.hasOutbound) {
+    return false;
+  }
+  const deliveryFee = getDeliveryFee(order.delivery);
+  const isPureDeliveryFeeOrder = Number(order.actualPaid || 0) <= 0 && Number(order.expectedIncome || 0) <= 0 && deliveryFee > 0;
+  if (isPureDeliveryFeeOrder) {
     return false;
   }
   return String(order.autoOutboundStatus || "").trim().toLowerCase() === "failed";
@@ -1572,11 +1577,15 @@ export function ProductStripItem({
           {showMatchStatus ? (
             <span className={cn(
               "inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none whitespace-nowrap",
-              matchedProduct
+              (matchedProduct as any)?.ignoreOutbound
+                ? "bg-slate-500/10 text-slate-700 dark:text-slate-400"
+                : matchedProduct
                 ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
                 : "bg-rose-500/10 text-rose-700 dark:text-rose-400"
             )}>
-              {matchedProduct ? (matchedProduct.isManual ? "手动" : "自动") : (display.optionalMatch ? "可选" : "未匹配")}
+              {(matchedProduct as any)?.ignoreOutbound
+                ? "无需出库"
+                : matchedProduct ? (matchedProduct.isManual ? "手动" : "自动") : (display.optionalMatch ? "可选" : "未匹配")}
             </span>
           ) : null}
           {isJdOrder && display.sourceId ? (

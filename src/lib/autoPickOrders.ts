@@ -5644,6 +5644,13 @@ async function resolveOutboundItemsForAutoPickOrder(
   const resolvedItems: ResolvedAutoPickOutboundItem[] = [];
 
   for (const item of order.items) {
+    const itemRawPayload = item.rawPayload && typeof item.rawPayload === "object" && !Array.isArray(item.rawPayload)
+      ? item.rawPayload as Record<string, unknown>
+      : {};
+    if (itemRawPayload.ignoreOutbound === true || itemRawPayload.isManualIgnored === true) {
+      continue;
+    }
+
     const manualMatchedProduct = readManualMatchedProductFromOrderItemRawPayload(item.rawPayload);
     const productName = toAutoPickBaseProductName(item.productName);
     const normalizedSkus = splitCompositeAutoPickSku(item.productNo);
@@ -6158,12 +6165,13 @@ export async function syncAutoOutboundFromCompletedAutoPickOrder(userId: string,
       return result;
     }
 
-    if (result.reason === "no-items") {
+    if (result.reason === "no-items" || result.reason === "delivery-fee-only") {
       await updateAutoPickOrderAutoOutboundState(userId, orderId, {
-        status: "failed",
+        status: "success",
         attemptedAt,
-        error: "订单没有可生成出库的商品",
+        error: undefined,
       });
+      return result;
     }
     if (result.reason === "insufficient-stock") {
       const summary = Array.isArray(result.insufficientItems)
