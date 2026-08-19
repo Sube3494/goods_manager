@@ -884,7 +884,7 @@ export async function GET(request: NextRequest) {
     const liteMode = searchParams.get("_lite") === "1";
     const includeMetrics = !liteMode && searchParams.get("_metrics") === "1";
     const page = Math.max(1, Number(searchParams.get("page") || 1));
-    const pageSize = Math.min(100, Math.max(1, Number(searchParams.get("pageSize") || 20)));
+    const pageSize = Math.min(10000, Math.max(1, Number(searchParams.get("pageSize") || 20)));
     const query = String(searchParams.get("query") || "").trim();
     const platform = String(searchParams.get("platform") || "").trim();
     const status = String(searchParams.get("status") || "").trim();
