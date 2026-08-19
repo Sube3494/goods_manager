@@ -932,18 +932,18 @@ export function ProductSelectionModal({
                 )}
             </div>
 
-            <div className="flex flex-col sm:flex-row items-center justify-between border-t border-border/50 p-5 sm:p-8 shrink-0 bg-zinc-50/50 dark:bg-white/5 gap-4">
+            <div className="border-t border-border/50 bg-zinc-50/80 p-3 sm:p-6 shrink-0 dark:bg-white/5 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:pb-6">
                {showPlatformSelector ? (
-                 <div className="flex flex-col gap-2 w-full sm:w-auto">
+                 <div className="flex flex-col gap-1.5 mb-3 sm:mb-4 w-full">
                    <div className="text-xs font-bold text-muted-foreground uppercase tracking-wider pl-1">添加到平台</div>
-                   <div className="flex items-center gap-1 p-1 bg-muted/50 rounded-xl border border-border/50">
+                   <div className="flex items-center gap-1 p-1 bg-muted/50 rounded-xl border border-border/50 overflow-x-auto no-scrollbar">
                       {PLATFORMS.map(p => (
                         <button
                           key={p}
                           type="button"
                           onClick={() => setTargetPlatform(p)}
                           className={cn(
-                            "px-4 py-1.5 rounded-lg text-xs font-black transition-all",
+                            "px-3 sm:px-4 py-1.5 rounded-lg text-xs font-black transition-all whitespace-nowrap shrink-0",
                             targetPlatform === p 
                               ? "bg-white dark:bg-white/10 text-primary shadow-sm border border-border" 
                               : "text-muted-foreground hover:text-foreground hover:bg-white/5"
@@ -954,48 +954,82 @@ export function ProductSelectionModal({
                       ))}
                    </div>
                  </div>
-               ) : (
-                 <div />
-               )}
+               ) : null}
 
-               <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-4 w-full sm:w-auto">
-                <div className="text-xs sm:text-sm font-medium text-muted-foreground mr-2">
-                  已选 <span className="text-primary font-medium">{tempSelectedIds.length}</span> 项
-                </div>
-                <div className="flex items-center gap-2">
-                  {onClear ? (
-                    <button
-                      type="button"
-                      onClick={onClear}
-                      className="rounded-xl px-3.5 py-2.5 text-xs sm:text-sm font-bold text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-all active:scale-95"
-                    >
-                      {clearLabel}
-                    </button>
-                  ) : null}
-                  <button 
-                    onClick={onClose} 
-                    className="rounded-xl px-4 py-2.5 text-xs sm:text-sm font-medium text-muted-foreground hover:bg-black/5 dark:hover:bg-white/10 hover:text-foreground transition-all active:scale-95"
-                  >
-                    取消
-                  </button>
-                  {!localSingleSelect && (
-                    <button
-                      type="button"
-                      onClick={handleToggleSelectAll}
-                      disabled={selectableProducts.length === 0 || isSelectingAll}
-                      className="rounded-xl px-4 py-2.5 text-xs sm:text-sm font-bold text-muted-foreground transition-all hover:bg-black/5 hover:text-foreground active:scale-95 disabled:cursor-not-allowed disabled:opacity-45 dark:hover:bg-white/10"
-                    >
-                      {isSelectingAll ? "全选中..." : allFilteredSelected ? "取消全选" : "全选"}
-                    </button>
-                  )}
+               {/* 移动端顶部信息栏 (桌面端隐藏) */}
+               <div className="flex sm:hidden items-center justify-between gap-2 pb-2 mb-2 border-b border-border/40 text-xs">
+                 <div className="font-medium text-muted-foreground whitespace-nowrap">
+                   已选 <span className="text-primary font-bold">{tempSelectedIds.length}</span> 项
+                 </div>
+                 <div className="flex items-center gap-2">
+                   {!localSingleSelect && (
+                     <button
+                       type="button"
+                       onClick={handleToggleSelectAll}
+                       disabled={selectableProducts.length === 0 || isSelectingAll}
+                       className="px-2.5 py-1 rounded-lg font-medium text-muted-foreground hover:bg-black/5 hover:text-foreground active:scale-95 disabled:opacity-40 whitespace-nowrap dark:hover:bg-white/10"
+                     >
+                       {isSelectingAll ? "全选中..." : allFilteredSelected ? "取消全选" : "全选"}
+                     </button>
+                   )}
                    <button 
-                    onClick={handleConfirm}
-                    disabled={tempSelectedIds.length === 0}
-                    className="bg-foreground text-background dark:text-black px-6 sm:px-8 py-2.5 rounded-xl text-xs sm:text-sm font-black shadow-xl shadow-foreground/10 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {confirmLabel || "确认添加"}
-                  </button>
-                </div>
+                     type="button"
+                     onClick={onClose} 
+                     className="px-2.5 py-1 rounded-lg font-medium text-muted-foreground hover:bg-black/5 hover:text-foreground active:scale-95 whitespace-nowrap dark:hover:bg-white/10"
+                   >
+                     取消
+                   </button>
+                 </div>
+               </div>
+
+               {/* 按钮操作区 */}
+               <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-3 w-full">
+                 {/* 桌面端已选计数 */}
+                 <div className="hidden sm:block text-xs sm:text-sm font-medium text-muted-foreground mr-2 whitespace-nowrap">
+                   已选 <span className="text-primary font-bold">{tempSelectedIds.length}</span> 项
+                 </div>
+
+                 {/* 桌面端取消与全选按钮 */}
+                 <div className="hidden sm:flex items-center gap-2">
+                   <button 
+                     type="button"
+                     onClick={onClose} 
+                     className="rounded-xl px-4 py-2.5 text-xs sm:text-sm font-medium text-muted-foreground hover:bg-black/5 hover:text-foreground transition-all active:scale-95 whitespace-nowrap dark:hover:bg-white/10"
+                   >
+                     取消
+                   </button>
+                   {!localSingleSelect && (
+                     <button
+                       type="button"
+                       onClick={handleToggleSelectAll}
+                       disabled={selectableProducts.length === 0 || isSelectingAll}
+                       className="rounded-xl px-4 py-2.5 text-xs sm:text-sm font-bold text-muted-foreground transition-all hover:bg-black/5 hover:text-foreground active:scale-95 disabled:cursor-not-allowed disabled:opacity-45 whitespace-nowrap dark:hover:bg-white/10"
+                     >
+                       {isSelectingAll ? "全选中..." : allFilteredSelected ? "取消全选" : "全选"}
+                     </button>
+                   )}
+                 </div>
+
+                 {/* 主操作按钮：无需出库与确认 */}
+                 <div className="flex items-center gap-2 w-full sm:w-auto">
+                   {onClear ? (
+                     <button
+                       type="button"
+                       onClick={onClear}
+                       className="flex-1 sm:flex-initial rounded-xl px-3 sm:px-4 py-2.5 text-xs sm:text-sm font-bold text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-all active:scale-95 whitespace-nowrap text-center"
+                     >
+                       {clearLabel || "无需出库 / 解除绑定"}
+                     </button>
+                   ) : null}
+                   <button 
+                     type="button"
+                     onClick={handleConfirm}
+                     disabled={tempSelectedIds.length === 0}
+                     className="flex-1 sm:flex-initial bg-foreground text-background dark:text-black px-4 sm:px-8 py-2.5 rounded-xl text-xs sm:text-sm font-black shadow-xl shadow-foreground/10 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap text-center"
+                   >
+                     {confirmLabel || "确认添加"}
+                   </button>
+                 </div>
                </div>
             </div>
           </div>
