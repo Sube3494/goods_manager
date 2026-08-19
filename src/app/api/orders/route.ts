@@ -324,9 +324,9 @@ function readManualMatchedProduct(rawPayload: unknown): MatchedCatalogProduct | 
   const record = candidate as Record<string, unknown>;
   const id = String(record.id || "").trim();
   const name = String(record.name || "").trim();
-  const sourceType = record.sourceType === "shopProduct" ? "shopProduct" : "product";
-  const shopProductId = String(record.shopProductId || "").trim();
-  if (!id || !name || sourceType !== "shopProduct" || !shopProductId) {
+  const sourceType = record.sourceType === "product" ? "product" : "shopProduct";
+  const shopProductId = String(record.shopProductId || "").trim() || (sourceType === "shopProduct" ? id : "");
+  if (!id || !name) {
     return null;
   }
 
@@ -337,7 +337,7 @@ function readManualMatchedProduct(rawPayload: unknown): MatchedCatalogProduct | 
     image: String(record.image || "").trim() || null,
     sourceType,
     productId: String(record.productId || "").trim() || null,
-    shopProductId,
+    shopProductId: shopProductId || id,
     shopName: String(record.shopName || "").trim() || null,
     isManual: true,
     bundleItems: Array.isArray(record.bundleItems) ? record.bundleItems : undefined,
@@ -1727,14 +1727,35 @@ export async function GET(request: NextRequest) {
       }))
     ));
 
-    const shopProducts = productSkuCandidates.length > 0
+    const manualMatchedProductIds = Array.from(new Set(
+      orders.flatMap((order) => order.items.flatMap((item) => {
+        const manual = readManualMatchedProduct(item.rawPayload);
+        if (!manual) return [];
+        const ids = [manual.id, manual.shopProductId, manual.productId].filter(Boolean) as string[];
+        if (Array.isArray(manual.bundleItems)) {
+          for (const b of manual.bundleItems) {
+            if (b.id) ids.push(b.id);
+            if (b.shopProductId) ids.push(b.shopProductId);
+          }
+        }
+        return ids.flatMap((id) => id.split(/[+＋]/)).map((s) => s.trim()).filter(Boolean);
+      }))
+    ));
+
+    const shopProducts = (productSkuCandidates.length > 0 || manualMatchedProductIds.length > 0)
       ? await prisma.shopProduct.findMany({
             where: {
               shop: { userId: session.id },
               OR: [
-                { sku: { in: productSkuCandidates } },
-                { jdSkuId: { in: productSkuCandidates } },
-                { product: { jdSkuMappings: { some: { jdSkuId: { in: productSkuCandidates } } } } },
+                ...(productSkuCandidates.length > 0 ? [
+                  { sku: { in: productSkuCandidates } },
+                  { jdSkuId: { in: productSkuCandidates } },
+                  { product: { jdSkuMappings: { some: { jdSkuId: { in: productSkuCandidates } } } } },
+                ] : []),
+                ...(manualMatchedProductIds.length > 0 ? [
+                  { id: { in: manualMatchedProductIds } },
+                  { productId: { in: manualMatchedProductIds } },
+                ] : []),
               ],
             },
             select: {
@@ -1745,6 +1766,11 @@ export async function GET(request: NextRequest) {
               sourceProductId: true,
               productName: true,
               productImage: true,
+              product: {
+                select: {
+                  image: true,
+                },
+              },
               shop: {
                 select: {
                   id: true,
@@ -1756,18 +1782,21 @@ export async function GET(request: NextRequest) {
       : [];
     perf.lap("shop-product-lookup");
 
-    const mappedShopProducts = shopProducts.map((item) => ({
-      id: item.id,
-      name: item.productName || "未命名商品",
-      sku: item.sku,
-      jdSkuId: item.jdSkuId,
-      image: item.productImage ? storage.resolveUrl(item.productImage) : null,
-      sourceType: "shopProduct" as const,
-      productId: item.productId || item.sourceProductId || null,
-      shopProductId: item.id,
-      shopId: item.shop?.id || null,
-      shopName: item.shop?.name || null,
-    }));
+    const mappedShopProducts = shopProducts.map((item) => {
+      const rawImage = item.productImage || item.product?.image || null;
+      return {
+        id: item.id,
+        name: item.productName || "未命名商品",
+        sku: item.sku,
+        jdSkuId: item.jdSkuId,
+        image: rawImage ? storage.resolveUrl(rawImage) : null,
+        sourceType: "shopProduct" as const,
+        productId: item.productId || item.sourceProductId || null,
+        shopProductId: item.id,
+        shopId: item.shop?.id || null,
+        shopName: item.shop?.name || null,
+      };
+    });
 
 
 
@@ -1981,6 +2010,16 @@ export async function GET(request: NextRequest) {
           const hasStrictMatchForAllSegments = normalizedSkuCandidates.length > 0
             && normalizedSkuCandidates.every((candidate) => Boolean(resolveStrictSkuMatch(candidate)));
           const matchedProduct = manualMatchedProduct || (hasStrictMatchForAllSegments ? (strictMatches[0] || null) : null);
+          if (matchedProduct) {
+            const foundShopProduct = mappedShopProducts.find((p) =>
+              (matchedProduct.shopProductId && p.id === matchedProduct.shopProductId)
+              || (matchedProduct.id && p.id === matchedProduct.id)
+              || (matchedProduct.productId && p.productId === matchedProduct.productId)
+              || (matchedProduct.sku && p.sku === matchedProduct.sku)
+            );
+            const fallbackImg = foundShopProduct?.image || null;
+            matchedProduct.image = matchedProduct.image ? storage.resolveUrl(matchedProduct.image) : fallbackImg;
+          }
           
           const matchedSkuToSplit = manualMatchedProduct?.sku || item.productNo;
           const segmentsFromSku = splitCompositeSkuSegments(matchedSkuToSplit);
@@ -1995,6 +2034,13 @@ export async function GET(request: NextRequest) {
                   : (item.quantity > 1 && item.quantity % bundleItems.length === 0
                     ? Math.max(1, Math.floor(item.quantity / bundleItems.length))
                     : 1);
+                const foundBShopProduct = mappedShopProducts.find((p) =>
+                  (bItem.shopProductId && p.id === bItem.shopProductId)
+                  || (bItem.id && p.id === bItem.id)
+                  || (bItem.sku && p.sku === bItem.sku)
+                );
+                const bFallbackImg = foundBShopProduct?.image || null;
+                const bResolvedImg = bItem.image ? storage.resolveUrl(bItem.image) : bFallbackImg;
                 return {
                   name: bItem.name || item.productName || "未命名商品",
                   sku: (
@@ -2002,7 +2048,7 @@ export async function GET(request: NextRequest) {
                       ? (bItem.jdSkuId || bItem.sku)
                       : (bItem.sku || bItem.jdSkuId)
                   ) || "-",
-                  image: bItem.image || null,
+                  image: bResolvedImg,
                   quantity: bQty,
                 };
               })
@@ -2019,13 +2065,14 @@ export async function GET(request: NextRequest) {
                       ? (segmentMatchedProduct?.jdSkuId || segmentMatchedProduct?.sku)
                       : (segmentMatchedProduct?.sku || segmentMatchedProduct?.jdSkuId)
                   ) || candidate,
-                  image: segmentMatchedProduct?.image || item.thumb || null,
+                  image: segmentMatchedProduct?.image || (item.thumb ? storage.resolveUrl(item.thumb) : null),
                   quantity: segQty,
                 };
               })
             : undefined;
           return {
             ...item,
+            thumb: item.thumb ? storage.resolveUrl(item.thumb) : null,
             displayItems,
             matchedProduct,
           };

@@ -167,6 +167,11 @@ export async function PATCH(
           productName: true,
           sku: true,
           productImage: true,
+          product: {
+            select: {
+              image: true,
+            },
+          },
           shop: {
             select: {
               name: true,
@@ -179,6 +184,7 @@ export async function PATCH(
         return NextResponse.json({ error: "未找到对应的店铺商品" }, { status: 404 });
       }
 
+      const firstImage = shopProducts[0]?.productImage || shopProducts[0]?.product?.image || null;
       const matchedProduct = {
         id: shopProducts.map((p) => p.id).join("+"),
         name: shopProducts.map((p) => {
@@ -186,21 +192,24 @@ export async function PATCH(
           return qty && qty > 1 ? `${p.productName || "未命名商品"} x${qty}` : (p.productName || "未命名商品");
         }).join(" + "),
         sku: shopProducts.map((p) => p.sku || "").join(" + "),
-        image: shopProducts[0]?.productImage ? storage.resolveUrl(shopProducts[0].productImage) : null,
+        image: firstImage ? storage.resolveUrl(firstImage) : null,
         sourceType: "shopProduct" as const,
         shopProductId: shopProducts.map((p) => p.id).join("+"),
         shopName: shopProducts[0]?.shop?.name || null,
         isManual: true,
-        bundleItems: shopProducts.map((p) => ({
-          id: p.id,
-          name: p.productName || "未命名商品",
-          sku: p.sku || null,
-          image: p.productImage ? storage.resolveUrl(p.productImage) : null,
-          sourceType: "shopProduct" as const,
-          shopProductId: p.id,
-          shopName: p.shop?.name || null,
-          quantity: itemsQtyMap.get(p.id) || 1,
-        })),
+        bundleItems: shopProducts.map((p) => {
+          const rawItemImg = p.productImage || p.product?.image || null;
+          return {
+            id: p.id,
+            name: p.productName || "未命名商品",
+            sku: p.sku || null,
+            image: rawItemImg ? storage.resolveUrl(rawItemImg) : null,
+            sourceType: "shopProduct" as const,
+            shopProductId: p.id,
+            shopName: p.shop?.name || null,
+            quantity: itemsQtyMap.get(p.id) || 1,
+          };
+        }),
       };
 
       await prisma.$transaction(async (tx) => {
@@ -235,6 +244,11 @@ export async function PATCH(
         productName: true,
         sku: true,
         productImage: true,
+        product: {
+          select: {
+            image: true,
+          },
+        },
         shop: {
           select: {
             name: true,
@@ -248,11 +262,12 @@ export async function PATCH(
     }
 
     const singleQty = itemsQtyMap.get(shopProduct.id) || (body?.quantity ? Number(body.quantity) : undefined);
+    const rawSingleImage = shopProduct.productImage || shopProduct.product?.image || null;
     const matchedProduct = {
       id: shopProduct.id,
       name: shopProduct.productName || "未命名商品",
       sku: shopProduct.sku || null,
-      image: shopProduct.productImage ? storage.resolveUrl(shopProduct.productImage) : null,
+      image: rawSingleImage ? storage.resolveUrl(rawSingleImage) : null,
       sourceType: "shopProduct" as const,
       shopProductId: shopProduct.id,
       shopName: shopProduct.shop?.name || null,

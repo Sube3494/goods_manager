@@ -1541,10 +1541,12 @@ export function ProductStripItem({
   }>;
   isJdOrder?: boolean;
 }) {
+  const [imgError, setImgError] = useState(false);
+
   return (
     <div className="flex items-center gap-2.5 rounded-2xl border border-black/6 bg-white/70 px-2.5 py-2 dark:border-white/8 dark:bg-white/4 sm:gap-3 sm:rounded-[18px] sm:px-3 sm:py-2.5">
       <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-white dark:bg-white/6 sm:h-11 sm:w-11 sm:rounded-xl">
-        {display.image ? (
+        {display.image && !imgError ? (
           <Image
             src={display.image}
             alt={display.name}
@@ -1552,6 +1554,7 @@ export function ProductStripItem({
             height={44}
             className="h-full w-full object-cover"
             unoptimized
+            onError={() => setImgError(true)}
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-muted-foreground/30">
