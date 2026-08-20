@@ -17,6 +17,7 @@ import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { useToast } from "@/components/ui/Toast";
 import { CategoryModal } from "@/components/Categories/CategoryModal";
 import { SupplierModal } from "@/components/Suppliers/SupplierModal";
+import { PurchaseOrderModal } from "@/components/Purchases/PurchaseOrderModal";
 
 import { useUser } from "@/hooks/useUser";
 
@@ -209,6 +210,7 @@ export function ProductFormModal({
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editingCostValue, setEditingCostValue] = useState<string>("");
   const [isSavingCost, setIsSavingCost] = useState<boolean>(false);
+  const [viewingPurchase, setViewingPurchase] = useState<PurchaseOrder | null>(null);
 
   const handleSaveCost = async (purchaseOrderItemId: string, orderId: string) => {
     const costPrice = Number(editingCostValue);
@@ -1447,7 +1449,15 @@ export function ProductFormModal({
                                                                 {order.status === "Received" ? "已入库" : "待入库"}
                                                             </span>
                                                         </div>
-                                                        <span className="text-xs font-medium text-foreground">单号: {order.id}</span>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setViewingPurchase(order)}
+                                                            className="group inline-flex max-w-full items-center gap-1.5 text-left text-xs font-medium text-foreground transition-colors hover:text-primary"
+                                                            title="查看采购单"
+                                                        >
+                                                            <span className="truncate">单号: {order.id}</span>
+                                                            <Eye size={12} className="shrink-0 text-muted-foreground transition-colors group-hover:text-primary" />
+                                                        </button>
                                                     </div>
                                                     <div className="text-right flex flex-col items-end gap-0.5">
                                                         <div className="text-xs font-semibold text-foreground">
@@ -2122,6 +2132,15 @@ export function ProductFormModal({
                 isOpen={isSupplierModalOpen}
                 onClose={() => setIsSupplierModalOpen(false)}
                 onSubmit={handleCreateSupplier}
+            />
+
+            <PurchaseOrderModal
+                isOpen={Boolean(viewingPurchase)}
+                onClose={() => setViewingPurchase(null)}
+                onSubmit={() => {}}
+                initialData={viewingPurchase}
+                readOnly
+                defaultType="Purchase"
             />
           </motion.div>
         </>
