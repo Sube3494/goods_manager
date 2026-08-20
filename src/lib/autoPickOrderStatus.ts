@@ -50,6 +50,7 @@ export function getBaseAutoPickStatusDisplay(status?: string | null) {
 
   if (
     text.includes("已完成")
+    || text.includes("订单完成")
     || text.includes("配送完成")
     || text.includes("已送达")
     || normalized === "done"
@@ -155,6 +156,16 @@ export function hasAutoPickCompletionProof(rawPayload: unknown, deliveryValue?: 
   const delivery = rawDelivery && typeof rawDelivery === "object" && !Array.isArray(rawDelivery)
     ? rawDelivery as Record<string, unknown>
     : {};
+  const completionText = [
+    record.status,
+    record.tips,
+    record.orderStatus,
+    record.order_status,
+    record.deliveryStatus,
+    record.delivery_status,
+    delivery.track,
+    delivery.status,
+  ].map((item) => String(item || "").trim()).filter(Boolean).join(" ");
 
   return Boolean(
     record.completedAt
@@ -162,7 +173,7 @@ export function hasAutoPickCompletionProof(rawPayload: unknown, deliveryValue?: 
     || record.finished_time
     || delivery.completedTime
     || delivery.completed_time
-    || String(delivery.track || "").trim() === "配送完成"
+    || /订单完成|已完成|配送完成|已送达/.test(completionText)
   );
 }
 
