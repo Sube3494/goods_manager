@@ -3945,7 +3945,9 @@ function extractOrderInfoFromProgressMessage(msgText: string): {
   }
 
   let statusHint: string | undefined;
-  if (/骑手已到店|开始配送|已开始配送|配送中|已取货|骑手已取货|已到店/.test(text)) {
+  if (/已拣货|拣货完成|出餐完成|备餐完成|餐品已完成|商品已备好|商品备货完成/.test(text)) {
+    statusHint = "meal";
+  } else if (/骑手已到店|开始配送|已开始配送|配送中|已取货|骑手已取货|已到店/.test(text)) {
     statusHint = "delivering";
   } else if (/已送达|已完成|配送完成/.test(text)) {
     statusHint = "done";
@@ -3995,7 +3997,7 @@ function normalizeAutoPickProgressPayload(payload: unknown): AutoPickProgressPay
   let orderSequence = String(input.orderSequence || nested?.orderSequence || msgParsed.orderSequence || "").trim();
 
   const pickRemainingSeconds = Number(input.pickRemainingSeconds ?? nested?.pickRemainingSeconds);
-  const pickCompleted = Boolean(input.pickCompleted ?? nested?.pickCompleted);
+  const pickCompleted = Boolean(input.pickCompleted ?? nested?.pickCompleted) || msgParsed.statusHint === "meal";
 
   let rawStatusHint = String(
     input.statusHint
