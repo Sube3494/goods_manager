@@ -147,6 +147,25 @@ export function isAutoPickOrderDeliveringStatus(status?: string | null) {
   return getBaseAutoPickStatusDisplay(status) === "配送中";
 }
 
+export function hasAutoPickCompletionProof(rawPayload: unknown, deliveryValue?: unknown) {
+  const record = rawPayload && typeof rawPayload === "object" && !Array.isArray(rawPayload)
+    ? rawPayload as Record<string, unknown>
+    : {};
+  const rawDelivery = deliveryValue || record.delivery;
+  const delivery = rawDelivery && typeof rawDelivery === "object" && !Array.isArray(rawDelivery)
+    ? rawDelivery as Record<string, unknown>
+    : {};
+
+  return Boolean(
+    record.completedAt
+    || record.finishedTime
+    || record.finished_time
+    || delivery.completedTime
+    || delivery.completed_time
+    || String(delivery.track || "").trim() === "配送完成"
+  );
+}
+
 export function doesAutoPickOrderRequirePickConfirmation(platform?: string | null) {
   const normalized = String(platform || "").trim().toLowerCase();
   return normalized.includes("美团")

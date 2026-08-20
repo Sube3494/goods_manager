@@ -1,6 +1,6 @@
 import prisma from "@/lib/prisma";
 import { formatLocalDate, parseAsShanghaiTime } from "@/lib/dateUtils";
-import { getBaseAutoPickStatusDisplay, isAutoPickOrderAbnormalStatus, isAutoPickOrderCancelledStatus, isAutoPickOrderCompletedStatus, isAutoPickOrderDeletedStatus, isAutoPickOrderDeliveringStatus, isAutoPickOrderTerminalStatus, isAutoPickOtherPickupOrder, isAutoPickPickupOrder, resolveAutoPickBusinessStatus } from "@/lib/autoPickOrderStatus";
+import { getBaseAutoPickStatusDisplay, hasAutoPickCompletionProof, isAutoPickOrderAbnormalStatus, isAutoPickOrderCancelledStatus, isAutoPickOrderCompletedStatus, isAutoPickOrderDeletedStatus, isAutoPickOrderDeliveringStatus, isAutoPickOrderTerminalStatus, isAutoPickOtherPickupOrder, isAutoPickPickupOrder, resolveAutoPickBusinessStatus } from "@/lib/autoPickOrderStatus";
 import { Prisma } from "../../prisma/generated-client";
 import { createHash, randomBytes } from "crypto";
 import { AutoPickIntegrationConfig, AutoPickMaiyatianShop, AutoPickMaiyatianShopMapping, AutoPickSelfDeliveryTimingConfig } from "@/lib/types";
@@ -3529,7 +3529,10 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
     at: new Date().toISOString(),
   });
 
-  const becameCompleted = isAutoPickOrderCompletedStatus(order.status) && !isAutoPickOrderCompletedStatus(previousStatus);
+  const becameCompleted = (
+    isAutoPickOrderCompletedStatus(order.status)
+    || hasAutoPickCompletionProof(order.rawPayload, order.delivery)
+  ) && !isAutoPickOrderCompletedStatus(previousStatus);
   if (becameCompleted) {
     await syncBrushOrderFromCompletedAutoPickOrder(userId, order.id).catch((brushError) => {
       console.error("Failed to sync brush order after webhook upsert:", brushError);
@@ -4058,18 +4061,6 @@ function buildProgressStatus(progress: AutoPickProgressPayload, currentStatus?: 
   if (statusHint === "delivering") {
     return "delivering";
   }
-  if (statusHint === "pickup") {
-    return "pickup";
-  }
-  if (statusHint === "delivery") {
-    return "delivery";
-  }
-  if (statusHint === "confirm") {
-    return "confirm";
-  }
-  if (statusHint === "subscribe" || statusHint === "remind") {
-    return "delivery";
-  }
   if (statusHint === "meal") {
     return "已拣货";
   }
@@ -4092,6 +4083,19 @@ function buildProgressStatus(progress: AutoPickProgressPayload, currentStatus?: 
       return currentStatus || "已拣货";
     }
     return "已拣货";
+  }
+
+  if (statusHint === "pickup") {
+    return "pickup";
+  }
+  if (statusHint === "delivery") {
+    return "delivery";
+  }
+  if (statusHint === "confirm") {
+    return "confirm";
+  }
+  if (statusHint === "subscribe" || statusHint === "remind") {
+    return "delivery";
   }
 
   if (typeof progress.pickRemainingSeconds === "number") {
@@ -5881,7 +5885,7 @@ export async function createOutboundFromAutoPickOrder(
     return { ok: false, skipped: true, reason: "order-cancelled" as const };
   }
 
-  if (requireCompleted && !isAutoPickOrderCompletedStatus(order.status)) {
+  if (requireCompleted && !isAutoPickOrderCompletedStatus(order.status) && !hasAutoPickCompletionProof(order.rawPayload, order.delivery)) {
     return { ok: false, skipped: true, reason: "order-not-completed" as const };
   }
 
@@ -6247,7 +6251,7 @@ export async function syncBrushOrderFromCompletedAutoPickOrder(
     };
   }
 
-  if (!isAutoPickOrderCompletedStatus(order.status)) {
+  if (!isAutoPickOrderCompletedStatus(order.status) && !hasAutoPickCompletionProof(order.rawPayload, order.delivery)) {
     return { ok: false, skipped: true, reason: "order-not-completed" as const };
   }
 

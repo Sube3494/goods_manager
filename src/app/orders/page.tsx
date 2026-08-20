@@ -2582,10 +2582,9 @@ export default function OrdersPage() {
                       {shopProfitEntries.map((shop) => (
                         <div key={shop.key} className="rounded-2xl border border-black/8 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/[0.035]">
                           <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <div className="truncate text-sm font-bold">{shop.name}</div>
-                              {shop.id ? <div className="mt-0.5 truncate text-[11px] text-muted-foreground">{shop.id}</div> : null}
-                            </div>
+                              <div className="min-w-0">
+                               <div className="truncate text-sm font-bold">{shop.name}</div>
+                             </div>
                             <div className={cn("shrink-0 text-right text-base font-black tabular-nums", shop.amount < 0 ? "text-rose-500" : "text-emerald-500")}>
                               {toCurrency(shop.amount)}
                             </div>
@@ -2640,7 +2639,6 @@ export default function OrdersPage() {
                             <div className="grid grid-cols-[minmax(0,1.5fr)_0.8fr_0.8fr_0.8fr_0.8fr_0.8fr] items-center gap-3">
                             <div className="min-w-0">
                               <div className="truncate font-semibold">{shop.name}</div>
-                              {shop.id ? <div className="mt-0.5 truncate text-xs text-muted-foreground">{shop.id}</div> : null}
                             </div>
                             <div className={cn("text-right font-bold", shop.amount < 0 ? "text-rose-500" : "text-emerald-500")}>{toCurrency(shop.amount)}</div>
                             <div className="text-right tabular-nums">{shop.count}</div>
