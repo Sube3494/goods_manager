@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Loader2, Package2, Search, X, ChevronDown } from "lucide-react";
+import { ArrowUp, Loader2, Package2, Search, X, ChevronDown } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { DatePicker } from "@/components/ui/DatePicker";
@@ -50,7 +50,7 @@ interface AllOrdersViewProps {
   localShops: Array<{ id: string; name: string; address: string }>;
 }
 
-const ALL_ORDERS_BATCH_SIZE = 20;
+const ALL_ORDERS_BATCH_SIZE = 100;
 
 export function AllOrdersView({
   refreshTrigger,
@@ -126,6 +126,7 @@ export function AllOrdersView({
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [showScrollTop, setShowScrollTop] = useState(false);
 
   const [actingId, setActingId] = useState("");
   const [expandedIds, setExpandedIds] = useState<string[]>([]);
@@ -234,6 +235,23 @@ export function AllOrdersView({
       setEndDate(startDate);
     }
   }, [endDate, startDate, todayDate]);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollTop = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
+      setShowScrollTop(scrollTop > 240);
+    };
+
+    handleScroll();
+    window.addEventListener("scroll", handleScroll, true);
+    return () => window.removeEventListener("scroll", handleScroll, true);
+  }, []);
+
+  const scrollToTop = useCallback(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    document.documentElement.scrollTo({ top: 0, behavior: "smooth" });
+    document.body.scrollTo({ top: 0, behavior: "smooth" });
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -679,6 +697,18 @@ export function AllOrdersView({
           </div>
         ) : null}
       </main>
+
+      {showScrollTop ? (
+        <button
+          type="button"
+          onClick={scrollToTop}
+          className="group fixed bottom-24 right-4 z-9999 flex h-11 w-11 items-center justify-center rounded-full border border-black/10 bg-white text-foreground shadow-[0_20px_50px_rgba(0,0,0,0.3)] backdrop-blur-xl transition-all hover:scale-110 active:scale-95 dark:border-white/10 dark:bg-white/10 sm:bottom-12 sm:right-12 sm:h-12 sm:w-12"
+          aria-label="返回顶部"
+          title="返回顶部"
+        >
+          <ArrowUp size={20} className="transition-transform group-hover:-translate-y-1" />
+        </button>
+      ) : null}
     </div>
   );
 }
