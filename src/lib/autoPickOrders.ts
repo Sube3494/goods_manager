@@ -3349,12 +3349,14 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
     const isIncomingTerminal = isAutoPickOrderTerminalStatus(normalized.status);
     const shouldKeepCompletedStatus = isExistingCompleted && !isIncomingTerminal;
     const isExistingCancelled = isAutoPickOrderCancelledStatus(existing?.status);
+    const preservedPickingStatus = resolvePreservedPickingStatus(existing || {}, normalized.status);
     const status = shouldKeepCompletedStatus
       ? existing?.status || null
       : isExistingCancelled && normalized.status && !isAutoPickOrderCancelledStatus(normalized.status)
         ? normalized.status
-        : (shouldPreservePickingStatus(existing || {}, normalized.status)
-          || shouldPreserveRealtimeStatus(existing || {}, normalized.status))
+        : preservedPickingStatus
+          ? preservedPickingStatus
+          : shouldPreserveRealtimeStatus(existing || {}, normalized.status)
           ? existing?.status || null
           : normalized.status || existing?.status || null;
     const deliveryDeadline = shouldKeepCompletedStatus
@@ -4267,23 +4269,35 @@ function readAutoPickPickProgress(rawPayload: unknown) {
   };
 }
 
-function shouldPreservePickingStatus(existing: {
+function resolvePreservedPickingStatus(existing: {
   status?: string | null;
   rawPayload?: unknown;
 }, incomingStatus?: string | null) {
   const progress = readAutoPickPickProgress(existing.rawPayload);
   if (!progress || (!progress.pickCompleted && typeof progress.pickRemainingSeconds !== "number")) {
-    return false;
+    return null;
   }
 
   const normalizedIncoming = String(incomingStatus || "").trim();
   if (!normalizedIncoming) {
-    return false;
+    return null;
   }
 
   const incomingBaseStatus = getBaseAutoPickStatusDisplay(normalizedIncoming);
+  if (incomingBaseStatus !== "待处理" && incomingBaseStatus !== "同步中") {
+    return null;
+  }
 
-  return incomingBaseStatus === "待处理" || incomingBaseStatus === "同步中";
+  if (progress.pickCompleted) {
+    return "已拣货";
+  }
+
+  const existingBaseStatus = getBaseAutoPickStatusDisplay(existing.status);
+  if (existingBaseStatus === "已拣货") {
+    return existing.status || "已拣货";
+  }
+
+  return "拣货中";
 }
 
 function getAutoPickStatusPriority(status?: string | null) {
