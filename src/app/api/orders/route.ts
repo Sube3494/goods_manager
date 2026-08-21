@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
 import {
   backfillJdSkuIdForManualMatchedShopProducts,
+  backfillMeituanSkuIdForManualMatchedShopProducts,
   normalizeAutoPickIntegrationConfig,
   readCustomerMaskedPhoneFromRawPayload,
   readCustomerNameFromRawPayload,
@@ -1882,6 +1883,7 @@ export async function GET(request: NextRequest) {
           },
         };
     await backfillJdSkuIdForManualMatchedShopProducts(prisma, session.id);
+    await backfillMeituanSkuIdForManualMatchedShopProducts(prisma, session.id);
 
     const productNames = Array.from(new Set(
       responseOrders.flatMap((order) => order.items.map((item) => String(item.productName || "").trim()).filter(Boolean))

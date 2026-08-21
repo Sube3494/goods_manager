@@ -6961,4 +6961,48 @@ export async function backfillJdSkuIdForManualMatchedShopProducts(
   }
 }
 
+export async function backfillMeituanSkuIdForManualMatchedShopProducts(
+  tx: Prisma.TransactionClient,
+  userId: string
+) {
+  const items = await tx.autoPickOrderItem.findMany({
+    where: {
+      order: {
+        userId,
+        OR: [
+          { platform: "美团" },
+          { platform: { contains: "meituan", mode: "insensitive" } },
+          { platform: { contains: "闪购" } },
+          { platform: { contains: "shangou", mode: "insensitive" } },
+        ],
+      },
+    },
+    select: {
+      id: true,
+      platformSkuId: true,
+      rawPayload: true,
+    },
+  });
+
+  for (const item of items) {
+    const rawPayloadRecord = item.rawPayload && typeof item.rawPayload === "object" && !Array.isArray(item.rawPayload)
+      ? (item.rawPayload as Record<string, unknown>)
+      : {};
+    const manualMatched = rawPayloadRecord.manualMatchedProduct && typeof rawPayloadRecord.manualMatchedProduct === "object" && !Array.isArray(rawPayloadRecord.manualMatchedProduct)
+      ? (rawPayloadRecord.manualMatchedProduct as Record<string, unknown>)
+      : null;
+    const shopProductIds = String(manualMatched?.shopProductId || manualMatched?.id || "")
+      .split(/[+＋]/)
+      .map((value) => value.trim())
+      .filter(Boolean);
+    const sourceId = normalizeAutoPickSkuForMatch(item.platformSkuId) || resolveAutoPickItemPlatformSkuId("美团", rawPayloadRecord);
+
+    if (shopProductIds.length > 0 && sourceId) {
+      for (const shopProductId of shopProductIds) {
+        await syncMeituanSkuIdForShopProduct(tx, userId, shopProductId, sourceId);
+      }
+    }
+  }
+}
+
 
