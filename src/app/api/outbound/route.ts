@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { Prisma } from '../../../../prisma/generated-client';
 import { getAuthorizedUser } from "@/lib/auth";
@@ -6,6 +6,7 @@ import { InventoryService } from "@/services/inventoryService";
 import { FinanceMath } from "@/lib/math";
 import { getStorageStrategy } from "@/lib/storage";
 import { getOutboundOrderItemSchemaErrorMessage } from "@/lib/prismaSchemaCompat";
+import { getPlatformMeta, parseOutboundNote } from "@/lib/utils";
  
 interface OutboundItem {
   productId: string;
@@ -14,31 +15,167 @@ interface OutboundItem {
   price?: number;
 }
 
-export async function GET() {
+function normalizeOutboundType(value: string | null) {
+  const normalized = String(value || "").trim();
+  return normalized && normalized !== "all" ? normalized : null;
+}
+
+function normalizeOption(value: string | null, allLabel: string) {
+  const normalized = String(value || "").trim();
+  return normalized && normalized !== allLabel ? normalized : null;
+}
+
+function resolveOutboundShopName(order: {
+  note?: string | null;
+  shopName?: string | null;
+  items: Array<{ shopProduct?: { shop?: { name?: string | null } | null } | null }>;
+}) {
+  const noteShopName = parseOutboundNote(order.note).shopName;
+  if (noteShopName) return noteShopName;
+  return order.items.find((item) => item.shopProduct?.shop?.name)?.shopProduct?.shop?.name || order.shopName || null;
+}
+
+function resolveOutboundPlatform(note: string | null | undefined) {
+  const rawPlatform = parseOutboundNote(note).platform;
+  return getPlatformMeta(rawPlatform)?.name || null;
+}
+
+export async function GET(request: NextRequest) {
   try {
     const user = await getAuthorizedUser("outbound:manage");
     if (!user) {
       return NextResponse.json({ error: "Unauthorized or insufficient permissions" }, { status: 401 });
     }
 
-    const orders = await prisma.outboundOrder.findMany({
-      where: { userId: user.id },
-      include: {
-        items: {
-          include: {
-            product: true,
-            shopProduct: {
-              include: {
-                shop: { select: { id: true, name: true } }
-              }
-            }
-          }
-        }
-      },
-      orderBy: { date: 'desc' }
-    });
+    const { searchParams } = new URL(request.url);
+    const page = Math.max(1, Number.parseInt(searchParams.get("page") || "1", 10) || 1);
+    const pageSize = Math.min(100, Math.max(10, Number.parseInt(searchParams.get("pageSize") || "20", 10) || 20));
+    const search = String(searchParams.get("q") || "").trim().toLowerCase();
+    const typeFilter = normalizeOutboundType(searchParams.get("type"));
+    const platformFilter = normalizeOption(searchParams.get("platform"), "全部平台");
+    const shopFilter = normalizeOption(searchParams.get("shop"), "全部门店");
+    const startDate = String(searchParams.get("startDate") || "").trim();
+    const endDate = String(searchParams.get("endDate") || "").trim();
+
+    const where: Prisma.OutboundOrderWhereInput = {
+      userId: user.id,
+      ...(typeFilter ? { type: typeFilter } : {}),
+      ...((startDate || endDate) ? {
+        date: {
+          ...(startDate ? { gte: new Date(`${startDate}T00:00:00.000`) } : {}),
+          ...(endDate ? { lte: new Date(`${endDate}T23:59:59.999`) } : {}),
+        },
+      } : {}),
+      ...(search ? {
+        OR: [
+          { id: { contains: search, mode: "insensitive" } },
+          { note: { contains: search, mode: "insensitive" } },
+          { items: { some: { product: { name: { contains: search, mode: "insensitive" } } } } },
+          { items: { some: { shopProduct: { productName: { contains: search, mode: "insensitive" } } } } },
+        ],
+      } : {}),
+    };
+
+    const shouldPostFilter = Boolean(platformFilter || shopFilter);
+    const takeForFilter = shouldPostFilter ? 500 : pageSize;
+    const skipForFilter = shouldPostFilter ? 0 : (page - 1) * pageSize;
+
+    const [orders, total, filterSource] = await Promise.all([
+      prisma.outboundOrder.findMany({
+        where,
+        select: {
+          id: true,
+          type: true,
+          date: true,
+          note: true,
+          createdAt: true,
+          updatedAt: true,
+          status: true,
+          items: {
+            select: {
+              id: true,
+              outboundOrderId: true,
+              productId: true,
+              shopProductId: true,
+              quantity: true,
+              price: true,
+              costSnapshot: true,
+              product: {
+                select: {
+                  id: true,
+                  name: true,
+                  sku: true,
+                  image: true,
+                },
+              },
+              shopProduct: {
+                select: {
+                  id: true,
+                  productId: true,
+                  sourceProductId: true,
+                  sku: true,
+                  productName: true,
+                  productImage: true,
+                  categoryId: true,
+                  categoryName: true,
+                  supplierId: true,
+                  costPrice: true,
+                  stock: true,
+                  shopId: true,
+                  isPublic: true,
+                  isDiscontinued: true,
+                  remark: true,
+                  specs: true,
+                  createdAt: true,
+                  updatedAt: true,
+                  shop: { select: { id: true, name: true } },
+                },
+              },
+            },
+          },
+        },
+        orderBy: { date: "desc" },
+        skip: skipForFilter,
+        take: takeForFilter,
+      }),
+      shouldPostFilter ? Promise.resolve(0) : prisma.outboundOrder.count({ where }),
+      prisma.outboundOrder.findMany({
+        where: { userId: user.id },
+        select: {
+          note: true,
+          items: {
+            select: {
+              shopProduct: {
+                select: {
+                  shop: { select: { name: true } },
+                },
+              },
+            },
+          },
+        },
+        orderBy: { date: "desc" },
+        take: 1000,
+      }),
+    ]);
+
+    const filteredOrders = shouldPostFilter
+      ? orders.filter((order) => {
+          const platform = resolveOutboundPlatform(order.note);
+          const shopName = resolveOutboundShopName(order);
+          return (!platformFilter || platform === platformFilter)
+            && (!shopFilter || shopName === shopFilter);
+        })
+      : orders;
+    const pageOrders = shouldPostFilter
+      ? filteredOrders.slice((page - 1) * pageSize, page * pageSize)
+      : filteredOrders;
+    const responseTotal = shouldPostFilter ? filteredOrders.length : total;
+
+    const allPlatforms = Array.from(new Set(filterSource.map((order) => resolveOutboundPlatform(order.note)).filter(Boolean) as string[])).sort();
+    const allShopNames = Array.from(new Set(filterSource.map((order) => resolveOutboundShopName(order)).filter(Boolean) as string[])).sort();
+
     const storage = await getStorageStrategy();
-    const normalizedOrders = orders.map((order) => ({
+    const normalizedOrders = pageOrders.map((order) => ({
       ...order,
       items: order.items.map((item) => ({
         ...item,
@@ -69,7 +206,20 @@ export async function GET() {
         } : item.shopProduct,
       })),
     }));
-    return NextResponse.json(normalizedOrders);
+
+    return NextResponse.json({
+      items: normalizedOrders,
+      meta: {
+        total: responseTotal,
+        page,
+        pageSize,
+        totalPages: Math.max(1, Math.ceil(responseTotal / pageSize)),
+      },
+      filters: {
+        platforms: allPlatforms,
+        shops: allShopNames,
+      },
+    });
   } catch (error) {
     console.error("Failed to fetch outbound orders:", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });

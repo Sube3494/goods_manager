@@ -9,7 +9,7 @@ import { OutboundDetailModal } from "@/components/Outbound/OutboundDetailModal";
 import { PartialReturnModal } from "@/components/Outbound/PartialReturnModal";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import Image from "next/image";
-import { format, isWithinInterval, startOfDay, endOfDay, parseISO } from "date-fns";
+import { format } from "date-fns";
 import { zhCN } from "date-fns/locale/zh-CN";
 import { OutboundOrder, OutboundOrderItem } from "@/lib/types";
 import { DatePicker } from "@/components/ui/DatePicker";
@@ -22,6 +22,10 @@ import { EmptyState } from "@/components/ui/EmptyState";
 
 export default function OutboundPage() {
   const [orders, setOrders] = useState<OutboundOrder[]>([]);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [allShopNames, setAllShopNames] = useState<string[]>([]);
+  const [allPlatforms, setAllPlatforms] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
@@ -42,14 +46,37 @@ export default function OutboundPage() {
 
   useEffect(() => {
     fetchOrders();
-  }, []);
+  }, [currentPage, pageSize, searchQuery, startDate, endDate, typeFilter, platformFilter, selectedShop]);
 
   const fetchOrders = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch("/api/outbound");
+      const params = new URLSearchParams({
+        page: String(currentPage),
+        pageSize: String(pageSize),
+      });
+      if (searchQuery.trim()) params.set("q", searchQuery.trim());
+      if (startDate) params.set("startDate", startDate);
+      if (endDate) params.set("endDate", endDate);
+      if (typeFilter !== "all") params.set("type", typeFilter);
+      if (platformFilter !== "全部平台") params.set("platform", platformFilter);
+      if (selectedShop !== "全部门店") params.set("shop", selectedShop);
+
+      const res = await fetch(`/api/outbound?${params.toString()}`);
       if (res.ok) {
-        setOrders(await res.json());
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setOrders(data);
+          setTotalItems(data.length);
+          setTotalPages(Math.max(1, Math.ceil(data.length / pageSize)));
+          return;
+        }
+
+        setOrders(Array.isArray(data.items) ? data.items : []);
+        setTotalItems(Number(data.meta?.total || 0));
+        setTotalPages(Math.max(1, Number(data.meta?.totalPages || 1)));
+        setAllPlatforms(Array.isArray(data.filters?.platforms) ? data.filters.platforms : []);
+        setAllShopNames(Array.isArray(data.filters?.shops) ? data.filters.shops : []);
       }
     } catch (error) {
       console.error("Failed to fetch outbound orders:", error);
@@ -104,63 +131,7 @@ export default function OutboundPage() {
     return getPlatformMeta(rawPlatform)?.name || null;
   };
 
-  const allShopNames = useMemo(() => {
-    const names = orders.map((order) => resolveOrderShopName(order)).filter(Boolean) as string[];
-    return Array.from(new Set(names)).sort();
-  }, [orders]);
-
-  const allPlatforms = useMemo(() => {
-    const platforms = orders.map(o => extractPlatform(o.note)).filter(Boolean) as string[];
-    return Array.from(new Set(platforms)).sort();
-  }, [orders]);
-
-  const filteredOrders = orders.filter(order => {
-    const parsedNote = parseOutboundNote(order.note);
-    
-    const matchesItemSearch = order.items.some((item: OutboundOrderItem) => {
-      const displayName = item.shopProduct?.name || item.product?.name || "";
-      return displayName.toLowerCase().includes(searchQuery.toLowerCase());
-    });
-
-    // Search query filter: supports serial number, platform, address, user note and items
-    const matchesSearch = order.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      parsedNote.rawNote.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      parsedNote.userNote?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      parsedNote.platform?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      parsedNote.platformId?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      parsedNote.address?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      matchesItemSearch;
-    
-    // Type filter
-    const matchesType = typeFilter === "all" || order.type === typeFilter;
-
-    // Platform filter
-    const orderPlatform = extractPlatform(order.note);
-    const matchesPlatform = platformFilter === "全部平台" || orderPlatform === platformFilter;
-
-    // Shop filter
-    const orderShop = resolveOrderShopName(order);
-    const matchesShop = selectedShop === "全部门店" || orderShop === selectedShop;
-    
-    // Date filter
-    let matchesDate = true;
-    if (startDate || endDate) {
-      const orderDate = new Date(order.date);
-      const start = startDate ? startOfDay(parseISO(startDate)) : new Date(0);
-      const end = endDate ? endOfDay(parseISO(endDate)) : new Date(8640000000000000);
-      matchesDate = isWithinInterval(orderDate, { start, end });
-    }
-    
-    return matchesSearch && matchesType && matchesPlatform && matchesShop && matchesDate;
-  });
-
-  const totalItems = filteredOrders.length;
-  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
-
-  const paginatedOrders = filteredOrders.slice(
-    (currentPage - 1) * pageSize,
-    currentPage * pageSize
-  );
+  const paginatedOrders = orders;
 
   // Reset page when filters change
   useEffect(() => {
