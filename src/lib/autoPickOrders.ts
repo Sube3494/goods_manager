@@ -4464,8 +4464,13 @@ async function backfillMeituanIdForAutoPickMatchedShopProduct(
   userId: string,
   shopProductId: string | null | undefined,
   rawPayload: unknown,
+  platform: string | null | undefined,
 ) {
-  const meituanSkuId = readAutoPickPlatformProductIdForMatch("meituan", rawPayload, null);
+  if (!isMeituanPlatform(platform)) {
+    return;
+  }
+
+  const meituanSkuId = readAutoPickPlatformProductIdForMatch(platform, rawPayload, null);
   if (!shopProductId || !meituanSkuId) {
     return;
   }
@@ -5610,7 +5615,7 @@ async function resolveBrushOrderItemsForAutoPickOrder(
       continue;
     }
 
-    await backfillMeituanIdForAutoPickMatchedShopProduct(prisma, userId, sameShopSkuCandidate?.id, item.rawPayload);
+    await backfillMeituanIdForAutoPickMatchedShopProduct(prisma, userId, sameShopSkuCandidate?.id, item.rawPayload, order.platform);
 
     const resolvedCandidateShopName = String(sameShopSkuCandidate?.shopName || "").trim();
     if (resolvedCandidateShopName) {
@@ -5952,7 +5957,7 @@ async function resolveOutboundItemsForAutoPickOrder(
       if (isJdOrder && targetShopProductId && targetSourceId) {
         await syncJdSkuIdForShopProduct(tx, userId, targetShopProductId, targetSourceId);
       }
-      await backfillMeituanIdForAutoPickMatchedShopProduct(tx, userId, targetShopProductId, item.rawPayload);
+      await backfillMeituanIdForAutoPickMatchedShopProduct(tx, userId, targetShopProductId, item.rawPayload, order.platform);
 
       resolvedItems.push({
         productId: String(
