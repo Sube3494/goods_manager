@@ -56,7 +56,7 @@ function readRecord(value: unknown) {
     : {};
 }
 
-function readMeituanOriginalSkuId(rawPayload: Record<string, unknown>) {
+function readMeituanSkuId(rawPayload: Record<string, unknown>, productNo?: string | null) {
   const goodsExtra = rawPayload.goods_extra || rawPayload.goodsExtra;
   const parsedGoodsExtra = typeof goodsExtra === "string"
     ? (() => {
@@ -68,7 +68,13 @@ function readMeituanOriginalSkuId(rawPayload: Record<string, unknown>) {
       })()
     : readRecord(goodsExtra);
 
-  return String(parsedGoodsExtra.original_sku_id || "").trim();
+  return String(
+    parsedGoodsExtra.original_sku_id
+    || rawPayload.source_id
+    || rawPayload.sourceId
+    || productNo
+    || ""
+  ).trim();
 }
 
 function isMeituanPlatform(platform: string | null | undefined) {
@@ -131,12 +137,13 @@ async function syncMeituanIdForMatchedShopProduct(
   rawPayload: Record<string, unknown>,
   fallbackRawPayload?: Record<string, unknown>,
   platform?: string | null,
+  productNo?: string | null,
 ) {
   if (!isMeituanPlatform(platform)) {
     return;
   }
 
-  const meituanId = readMeituanOriginalSkuId(rawPayload) || (fallbackRawPayload ? readMeituanOriginalSkuId(fallbackRawPayload) : "");
+  const meituanId = readMeituanSkuId(rawPayload, productNo) || (fallbackRawPayload ? readMeituanSkuId(fallbackRawPayload, productNo) : "");
   if (!meituanId) {
     return;
   }
@@ -409,7 +416,7 @@ export async function PATCH(
 
     if (autoMatchedProduct?.shopProductId && autoMatchedProduct.shopProductId === matchedProduct.shopProductId) {
       await prisma.$transaction(async (tx) => {
-        await syncMeituanIdForMatchedShopProduct(tx, user.id, shopProduct, basePayload, fallbackItemPayload, orderItem.order.platform);
+        await syncMeituanIdForMatchedShopProduct(tx, user.id, shopProduct, basePayload, fallbackItemPayload, orderItem.order.platform, orderItem.productNo);
         await tx.autoPickOrderItem.update({
           where: { id: orderItem.id },
           data: {
@@ -482,7 +489,7 @@ export async function PATCH(
         }
       }
 
-      await syncMeituanIdForMatchedShopProduct(tx, user.id, shopProduct, basePayload, fallbackItemPayload, orderItem.order.platform);
+      await syncMeituanIdForMatchedShopProduct(tx, user.id, shopProduct, basePayload, fallbackItemPayload, orderItem.order.platform, orderItem.productNo);
 
       await tx.autoPickOrderItem.update({
         where: { id: orderItem.id },

@@ -4459,7 +4459,13 @@ function readAutoPickPlatformProductIdForMatch(
       ? rawPayload as Record<string, unknown>
       : {};
     const goodsExtra = readAutoPickGoodsExtraRecord(record);
-    return normalizeAutoPickSkuForMatch(String(goodsExtra.original_sku_id || ""));
+    return normalizeAutoPickSkuForMatch(String(
+      goodsExtra.original_sku_id
+      || record.source_id
+      || record.sourceId
+      || productNo
+      || ""
+    ));
   }
 
   if (isJdPlatform(platform)) {
