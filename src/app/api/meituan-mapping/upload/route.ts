@@ -11,6 +11,7 @@ export async function POST(req: NextRequest) {
 
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
+    const platform = String(formData.get("platform") || "meituan");
 
     if (!file) {
       return NextResponse.json({ error: "请上传 Excel 文件" }, { status: 400 });
@@ -25,8 +26,9 @@ export async function POST(req: NextRequest) {
 
     const batch = await MeituanMappingService.createImportBatch(
       user.id,
-      file.name || "未命名美团商品表格.xlsx",
-      items
+      file.name || "未命名商品表格.xlsx",
+      items,
+      platform
     );
 
     return NextResponse.json({

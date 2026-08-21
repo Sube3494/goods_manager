@@ -9,14 +9,16 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "未授权或权限不足" }, { status: 401 });
     }
 
+    const platform = req.nextUrl.searchParams.get("platform") || "meituan";
     const batches = await prisma.meituanImportBatch.findMany({
-      where: { userId: user.id },
+      where: { userId: user.id, platform },
       orderBy: { createdAt: "desc" },
       select: {
         id: true,
         fileName: true,
         totalCount: true,
         matchedCount: true,
+        platform: true,
         status: true,
         createdAt: true,
         updatedAt: true,
@@ -39,13 +41,14 @@ export async function DELETE(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const batchId = searchParams.get("batchId");
+    const platform = searchParams.get("platform") || "meituan";
 
     if (!batchId) {
       return NextResponse.json({ error: "缺少 batchId 参数" }, { status: 400 });
     }
 
     await prisma.meituanImportBatch.deleteMany({
-      where: { id: batchId, userId: user.id },
+      where: { id: batchId, userId: user.id, platform },
     });
 
     return NextResponse.json({ success: true, message: "批次已删除" });

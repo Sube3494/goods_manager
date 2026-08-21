@@ -200,7 +200,7 @@ export class MeituanMappingService {
   /**
    * 创建导入批次并自动进行智能初筛
    */
-  static async createImportBatch(userId: string, fileName: string, items: ParsedMeituanItem[]) {
+  static async createImportBatch(userId: string, fileName: string, items: ParsedMeituanItem[], platform = "meituan") {
     if (!items || items.length === 0) {
       throw new Error("导入列表中无有效商品数据");
     }
@@ -243,13 +243,15 @@ export class MeituanMappingService {
     }
 
     // 2. 获取用户之前已持久化绑定的 ProductMeituanSku
-    const existingMappings = await prisma.productMeituanSku.findMany({
-      where: { userId },
-      select: {
-        meituanSkuId: true,
-        productId: true,
-      },
-    });
+    const existingMappings = platform === "meituan"
+      ? await prisma.productMeituanSku.findMany({
+          where: { userId },
+          select: {
+            meituanSkuId: true,
+            productId: true,
+          },
+        })
+      : [];
     const boundSkuMap = new Map<string, string>();
     for (const m of existingMappings) {
       boundSkuMap.set(m.meituanSkuId, m.productId);
@@ -298,6 +300,7 @@ export class MeituanMappingService {
 
       return {
         userId,
+        platform,
         meituanSkuId: item.meituanSkuId,
         meituanSpuId: item.meituanSpuId || null,
         name: item.name,
@@ -321,6 +324,7 @@ export class MeituanMappingService {
       const createdBatch = await tx.meituanImportBatch.create({
         data: {
           userId,
+          platform,
           fileName,
           totalCount,
           matchedCount,
@@ -619,6 +623,7 @@ export class MeituanMappingService {
     userId?: string;
     shopId?: string;
     batchId?: string;
+    platform?: string;
     status?: "ALL" | "UNBOUND" | "BOUND" | "HAS_SUGGESTION";
     search?: string;
     page?: number;
@@ -628,6 +633,7 @@ export class MeituanMappingService {
       userId,
       shopId,
       batchId,
+      platform = "meituan",
       status = "ALL",
       search = "",
       page = 1,
@@ -701,6 +707,7 @@ export class MeituanMappingService {
     // 2. 获取美团候选池未绑定的项（用于智能推荐匹配）
     const meituanItemWhere: any = {
       status: { not: "IGNORED" },
+      platform,
     };
     if (userId) meituanItemWhere.userId = userId;
     if (batchId && batchId !== "ALL") meituanItemWhere.batchId = batchId;
@@ -890,14 +897,16 @@ export class MeituanMappingService {
     userId?: string;
     query?: string;
     batchId?: string;
+    platform?: string;
     filterStatus?: "ALL" | "UNBOUND" | "BOUND";
   }) {
-    const { userId, query = "", batchId, filterStatus = "ALL" } = params;
+    const { userId, query = "", batchId, platform = "meituan", filterStatus = "ALL" } = params;
     const trimmed = query.trim();
 
     // 基础过滤条件
     const baseWhere: any = {
       status: { not: "IGNORED" },
+      platform,
     };
     if (userId) baseWhere.userId = userId;
     if (batchId && batchId !== "ALL") baseWhere.batchId = batchId;

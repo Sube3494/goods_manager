@@ -45,6 +45,7 @@ export async function PATCH(
       select: {
         id: true,
         shopId: true,
+        productId: true,
         productName: true,
       },
     });
@@ -72,15 +73,33 @@ export async function PATCH(
       }
     }
 
-    const updated = await prisma.shopProduct.update({
-      where: { id: existing.id },
-      data: { [field]: value },
-      select: {
-        id: true,
-        jdSkuId: true,
-        meituanSkuId: true,
-        taobaoSkuId: true,
-      },
+    const updated = await prisma.$transaction(async (tx) => {
+      const item = await tx.shopProduct.update({
+        where: { id: existing.id },
+        data: { [field]: value },
+        select: {
+          id: true,
+          jdSkuId: true,
+          meituanSkuId: true,
+          taobaoSkuId: true,
+        },
+      });
+
+      if (value) {
+        await tx.meituanImportItem.updateMany({
+          where: {
+            userId: user.id,
+            platform,
+            meituanSkuId: value,
+          },
+          data: {
+            bindProductId: existing.productId || null,
+            status: "BOUND",
+          },
+        });
+      }
+
+      return item;
     });
 
     return NextResponse.json({ ok: true, item: updated });

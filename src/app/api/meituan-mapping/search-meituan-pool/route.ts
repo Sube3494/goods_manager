@@ -12,12 +12,14 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const query = searchParams.get("query") || "";
     const batchId = searchParams.get("batchId") || undefined;
+    const platform = searchParams.get("platform") || "meituan";
     const filterStatus = (searchParams.get("filterStatus") as any) || "ALL";
 
     const items = await MeituanMappingService.searchMeituanCandidates({
       userId: user.id,
       query,
       batchId,
+      platform,
       filterStatus,
     });
 

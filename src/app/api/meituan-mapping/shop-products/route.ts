@@ -12,6 +12,7 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const shopId = searchParams.get("shopId") || undefined;
     const batchId = searchParams.get("batchId") || undefined;
+    const platform = searchParams.get("platform") || "meituan";
     const status = (searchParams.get("status") as any) || "ALL";
     const search = searchParams.get("search") || "";
     const page = parseInt(searchParams.get("page") || "1", 10);
@@ -21,6 +22,7 @@ export async function GET(req: NextRequest) {
       userId: user.id,
       shopId,
       batchId,
+      platform,
       status,
       search,
       page,

@@ -58,6 +58,8 @@ interface MeituanProductSelectionModalProps {
   } | null;
   batches: ImportBatch[];
   currentBatchId?: string;
+  platform?: string;
+  platformLabel?: string;
   onSelect: (item: MeituanCandidateItem) => void;
 }
 
@@ -67,6 +69,8 @@ export function MeituanProductSelectionModal({
   targetProduct,
   batches,
   currentBatchId = "ALL",
+  platform = "meituan",
+  platformLabel = "美团",
   onSelect,
 }: MeituanProductSelectionModalProps) {
   const [selectedBatchId, setSelectedBatchId] = useState(currentBatchId);
@@ -99,6 +103,7 @@ export function MeituanProductSelectionModal({
         const params = new URLSearchParams();
         if (q.trim()) params.append("query", q.trim());
         if (batchId && batchId !== "ALL") params.append("batchId", batchId);
+        params.append("platform", platform);
         if (status !== "ALL") params.append("filterStatus", status);
 
         const res = await fetch(
@@ -114,7 +119,7 @@ export function MeituanProductSelectionModal({
         setLoading(false);
       }
     },
-    []
+    [platform]
   );
 
   useEffect(() => {
@@ -151,7 +156,7 @@ export function MeituanProductSelectionModal({
               <div>
                 <div className="flex items-center gap-2.5 flex-wrap">
                   <h3 className="text-base sm:text-lg font-black text-foreground">
-                    挑选美团商品进行配对
+                    挑选{platformLabel}商品进行配对
                   </h3>
                   <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-black bg-primary/10 text-primary border border-primary/20">
                     <span>目标: {targetProduct.name}</span>
@@ -163,7 +168,7 @@ export function MeituanProductSelectionModal({
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  从已导入的美团数据池中挑选商品，点击直接将美团商品 ID 赋给当前系统商品
+                  从已导入的{platformLabel}数据池中挑选商品，点击直接将{platformLabel}商品 ID 赋给当前系统商品
                 </p>
               </div>
             </div>

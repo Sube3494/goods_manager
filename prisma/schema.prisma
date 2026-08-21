@@ -865,6 +865,7 @@ model ProductMeituanSku {
 model MeituanImportBatch {
   id           String   @id @default(cuid())
   userId       String?
+  platform     String   @default("meituan")
   fileName     String
   totalCount   Int      @default(0)
   matchedCount Int      @default(0)
@@ -875,7 +876,7 @@ model MeituanImportBatch {
   user  User?               @relation(fields: [userId], references: [id], onDelete: Cascade)
   items MeituanImportItem[]
 
-  @@index([userId])
+  @@index([userId, platform])
   @@index([createdAt])
 }
 
@@ -883,6 +884,7 @@ model MeituanImportItem {
   id                 String   @id @default(cuid())
   batchId            String
   userId             String?
+  platform           String   @default("meituan")
   meituanSkuId       String
   meituanSpuId       String?
   name               String
@@ -904,7 +906,7 @@ model MeituanImportItem {
   suggestedProduct Product?           @relation("MeituanSuggestedProduct", fields: [suggestedProductId], references: [id], onDelete: SetNull)
 
   @@index([batchId])
-  @@index([userId, meituanSkuId])
+  @@index([userId, platform, meituanSkuId])
   @@index([status])
 }
 

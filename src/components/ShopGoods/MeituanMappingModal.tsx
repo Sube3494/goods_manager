@@ -246,7 +246,7 @@ export function MeituanMappingModal({
   // 获取导入批次列表
   const fetchBatches = useCallback(async () => {
     try {
-      const res = await fetch("/api/meituan-mapping/batches");
+      const res = await fetch(`/api/meituan-mapping/batches?platform=${activePlatform}`);
       if (res.ok) {
         const data = await res.json();
         setBatches(data.batches || []);
@@ -254,7 +254,7 @@ export function MeituanMappingModal({
     } catch (err) {
       console.error("加载美团批次列表失败", err);
     }
-  }, []);
+  }, [activePlatform]);
 
   // 获取系统店铺商品正向配对列表
   const fetchShopProducts = useCallback(async () => {
@@ -266,6 +266,7 @@ export function MeituanMappingModal({
         search: searchQuery,
         page: page.toString(),
         pageSize: pageSize.toString(),
+        platform: activePlatform,
       });
       if (selectedShop?.id) {
         params.append("shopId", selectedShop.id);
@@ -296,6 +297,11 @@ export function MeituanMappingModal({
       fetchBatches();
     }
   }, [isOpen, fetchBatches]);
+
+  useEffect(() => {
+    setCurrentBatchId("ALL");
+    setPage(1);
+  }, [activePlatform]);
 
   useEffect(() => {
     if (isOpen) {
@@ -354,14 +360,14 @@ export function MeituanMappingModal({
     };
   }, [activePlatform, activePlatformConfig.field, products, statusCounts]);
 
-  const handleSavePlatformId = async (product: ShopProductWithMapping) => {
+  const handleSavePlatformId = async (product: ShopProductWithMapping, nextValue?: string) => {
     if (!product.shopProductId) {
       showToast("当前商品没有对应的店铺商品记录，无法保存平台 ID", "error");
       return;
     }
 
     const draftKey = `${product.shopProductId}:${activePlatform}`;
-    const value = (platformIdDrafts[draftKey] ?? String(product[activePlatformConfig.field] || "")).trim();
+    const value = (nextValue ?? platformIdDrafts[draftKey] ?? String(product[activePlatformConfig.field] || "")).trim();
 
     try {
       setSavingPlatformIds((prev) => ({ ...prev, [draftKey]: true }));
@@ -580,7 +586,7 @@ export function MeituanMappingModal({
       onConfirm: async () => {
         try {
           const res = await fetch(
-            `/api/meituan-mapping/batches?batchId=${currentBatchId}`,
+            `/api/meituan-mapping/batches?batchId=${currentBatchId}&platform=${activePlatform}`,
             { method: "DELETE" }
           );
           if (res.ok) {
@@ -862,17 +868,13 @@ export function MeituanMappingModal({
                 </span>
               </button>
 
-              {activePlatform === "meituan" && (
-                <>
-                  <button
-                    onClick={() => setIsUploadOpen(true)}
-                    className="flex items-center justify-center gap-2 px-4 sm:px-5 h-10 sm:h-11 rounded-full text-xs sm:text-sm font-black bg-primary text-primary-foreground hover:bg-primary/90 active:scale-95 transition-all shadow-lg shadow-primary/20"
-                  >
-                    <UploadCloud className="h-4 w-4" />
-                    <span className="leading-tight">导入美团数据池</span>
-                  </button>
-                </>
-              )}
+              <button
+                onClick={() => setIsUploadOpen(true)}
+                className="flex items-center justify-center gap-2 px-4 sm:px-5 h-10 sm:h-11 rounded-full text-xs sm:text-sm font-black bg-primary text-primary-foreground hover:bg-primary/90 active:scale-95 transition-all shadow-lg shadow-primary/20"
+              >
+                <UploadCloud className="h-4 w-4" />
+                <span className="leading-tight">导入{activePlatformConfig.label}数据池</span>
+              </button>
 
               <button
                 onClick={onClose}
@@ -913,7 +915,6 @@ export function MeituanMappingModal({
 
             <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-3">
               {/* 美团候选数据池选择 */}
-              {activePlatform === "meituan" && (
               <div className="flex items-center gap-2.5 flex-1 sm:flex-none">
                 <div className="w-full sm:w-96 h-10 sm:h-11">
                   <CustomSelect
@@ -925,28 +926,27 @@ export function MeituanMappingModal({
                     options={[
                       {
                         value: "ALL",
-                        label: `全部美团数据 (共 ${batches.reduce((acc, b) => acc + b.totalCount, 0)} 条)`,
+                        label: `全部${activePlatformConfig.label}数据 (共 ${batches.reduce((acc, b) => acc + b.totalCount, 0)} 条)`,
                       },
                       ...batches.map((b) => ({
                         value: b.id,
                         label: `${b.fileName} (${b.matchedCount}/${b.totalCount} 已配对)`,
                       })),
                     ]}
-                    placeholder="选择美团数据池"
+                    placeholder={`选择${activePlatformConfig.label}数据池`}
                     triggerClassName="h-10 sm:h-11 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 px-5 text-xs sm:text-sm font-bold text-foreground hover:border-primary/40 focus:ring-2 focus:ring-primary/20 transition-all shadow-xs truncate"
                   />
                 </div>
                 {currentBatchId !== "ALL" && (
                   <button
                     onClick={handleDeleteBatch}
-                    title="删除当前美团数据池"
+                    title={`删除当前${activePlatformConfig.label}数据池`}
                     className="h-10 sm:h-11 w-10 sm:w-11 flex items-center justify-center text-muted-foreground hover:text-rose-500 rounded-full hover:bg-rose-500/10 border border-border dark:border-white/10 bg-white dark:bg-white/5 shadow-xs active:scale-95 transition-all shrink-0"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
                 )}
               </div>
-              )}
 
               {/* 状态统计分段胶囊 */}
               <div className={cn(
@@ -1211,6 +1211,15 @@ export function MeituanMappingModal({
                           </div>
                           <button
                             type="button"
+                            onClick={() => setTargetProductForPicker(prod)}
+                            disabled={!prod.shopProductId}
+                            className="inline-flex items-center justify-center gap-1.5 px-3.5 h-9 rounded-full text-xs font-black border border-border dark:border-white/10 bg-white dark:bg-white/5 hover:bg-muted text-foreground transition-all active:scale-95 disabled:opacity-40"
+                          >
+                            <Search className="h-3.5 w-3.5" />
+                            <span>挑选</span>
+                          </button>
+                          <button
+                            type="button"
                             onClick={() => handleSavePlatformId(prod)}
                             disabled={!prod.shopProductId || isSavingPlatformId || !isPlatformValueChanged}
                             className={cn(
@@ -1269,9 +1278,15 @@ export function MeituanMappingModal({
           targetProduct={targetProductForPicker}
           batches={batches}
           currentBatchId={currentBatchId}
+          platform={activePlatform}
+          platformLabel={activePlatformConfig.label}
           onSelect={(mItem) => {
             if (targetProductForPicker) {
-              handleBindMeituan(targetProductForPicker, mItem);
+              if (activePlatform === "meituan") {
+                handleBindMeituan(targetProductForPicker, mItem);
+              } else {
+                handleSavePlatformId(targetProductForPicker, mItem.meituanSkuId);
+              }
               setTargetProductForPicker(null);
             }
           }}
@@ -1281,6 +1296,8 @@ export function MeituanMappingModal({
         <UploadMeituanModal
           isOpen={isUploadOpen}
           onClose={() => setIsUploadOpen(false)}
+          platform={activePlatform}
+          platformLabel={activePlatformConfig.label}
           onSuccess={(newBatchId) => {
             fetchBatches();
             setCurrentBatchId(newBatchId);

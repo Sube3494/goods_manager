@@ -8,12 +8,16 @@ interface UploadMeituanModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: (batchId: string) => void;
+  platform?: string;
+  platformLabel?: string;
 }
 
 export function UploadMeituanModal({
   isOpen,
   onClose,
   onSuccess,
+  platform = "meituan",
+  platformLabel = "美团",
 }: UploadMeituanModalProps) {
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -54,6 +58,7 @@ export function UploadMeituanModal({
       setIsUploading(true);
       const formData = new FormData();
       formData.append("file", file);
+      formData.append("platform", platform);
 
       const res = await fetch("/api/meituan-mapping/upload", {
         method: "POST",
@@ -86,8 +91,8 @@ export function UploadMeituanModal({
               <FileSpreadsheet className="h-6 w-6" />
             </div>
             <div>
-              <h3 className="text-base sm:text-lg font-black text-foreground">导入美团商品表格</h3>
-              <p className="text-xs text-muted-foreground mt-0.5">支持油猴脚本导出的 Excel 表格或美团闪购商品表</p>
+              <h3 className="text-base sm:text-lg font-black text-foreground">导入{platformLabel}商品表格</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">支持油猴脚本导出的 Excel 表格或{platformLabel}商品表</p>
             </div>
           </div>
           <button
@@ -195,4 +200,3 @@ export function UploadMeituanModal({
     </div>
   );
 }
-
