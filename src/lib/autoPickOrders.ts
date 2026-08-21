@@ -4020,6 +4020,10 @@ function normalizeAutoPickProgressPayload(payload: unknown): AutoPickProgressPay
     rawStatusHint = String(nested?.type || nested?.statusHint || msgParsed.statusHint || "").trim().toLowerCase();
   }
 
+  if (!rawStatusHint && pickCompleted) {
+    rawStatusHint = "meal";
+  }
+
   if (!sourceId && !orderNo && !orderSequence) {
     return null;
   }
@@ -4673,7 +4677,7 @@ export async function applyAutoPickProgress(userId: string, payload: unknown) {
     }).catch(() => null);
 
     if (refreshedOrder) {
-      return refreshedOrder;
+      order = refreshedOrder;
     }
   }
 
