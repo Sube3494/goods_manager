@@ -2592,7 +2592,7 @@ export function OrderCard({
                       ? "订单已在配送中，不能重复发起自配"
                       : "发起商家自配送"
                 }
-                className="inline-flex h-7 items-center gap-1.5 rounded-full border border-sky-500/20 bg-sky-500/10 px-2.5 text-[11px] font-semibold text-sky-700 transition-all hover:bg-sky-500/15 disabled:cursor-not-allowed disabled:opacity-45 dark:text-sky-300 sm:h-8 sm:px-3 sm:text-xs"
+                className="hidden h-7 items-center gap-1.5 rounded-full border border-sky-500/20 bg-sky-500/10 px-2.5 text-[11px] font-semibold text-sky-700 transition-all hover:bg-sky-500/15 disabled:cursor-not-allowed disabled:opacity-45 dark:text-sky-300 sm:inline-flex sm:h-8 sm:px-3 sm:text-xs"
               >
                 {actingId === `${order.id}:self-delivery` ? <Loader2 size={12} className="animate-spin" /> : <Truck size={12} />}
                 自配
@@ -2606,7 +2606,7 @@ export function OrderCard({
               ? "grid-cols-1 sm:grid-cols-1 lg:min-w-0 lg:w-32 ml-auto"
             : showManualDeliveryMarker || displayAsOfflineOrder
               ? "grid-cols-3 sm:grid-cols-3 lg:min-w-0 lg:w-96 ml-auto"
-              : "grid-cols-3 sm:grid-cols-3"
+              : "grid-cols-2 sm:grid-cols-3"
           )}>
             <ActionButton
               label={expanded ? "收起详情" : "展开详情"}
@@ -2643,6 +2643,24 @@ export function OrderCard({
                   disabled={Boolean(actingId) || deleted}
                   mobileIconOnly
                 />
+                <div className="sm:hidden">
+                  <ActionButton
+                    label="自配"
+                    icon={actingId === `${order.id}:self-delivery` ? <Loader2 size={14} className="animate-spin" /> : <Truck size={14} />}
+                    onClick={() => onRunAction(order.id, "self-delivery")}
+                    disabled={Boolean(actingId) || terminal || delivering || pickup}
+                    mobileIconOnly
+                    title={
+                      pickup
+                        ? "到店自取订单不需要发起自配送"
+                        : terminal
+                        ? (cancelled ? "订单已取消，不能发起自配" : "订单已完成，不能再次发起自配")
+                        : delivering
+                          ? "订单已在配送中，不能重复发起自配"
+                          : "发起商家自配送"
+                    }
+                  />
+                </div>
                 <ActionButton
                   label={pickup ? "完成取货" : "完成配送"}
                   variant="primary"
