@@ -13,6 +13,7 @@ import {
   readCustomerRemarkFromRawPayload,
   readRiderPhoneFromDelivery,
   readRiderPhoneFromRawPayload,
+  syncMeituanSkuIdForShopProduct,
 } from "@/lib/autoPickOrders";
 import {
   resolveShopBrushCommission,
@@ -427,6 +428,33 @@ function readPlatformProductIdForMatch(
       || record.sku_code
       || record.skuCode
       || productNo
+      || ""
+    ));
+  }
+
+  return "";
+}
+
+function readStrictPlatformProductId(
+  platform: string | null | undefined,
+  rawPayload: unknown,
+  platformSkuId?: string | null,
+) {
+  const normalizedPlatformSkuId = normalizeSkuDigits(platformSkuId);
+  if (normalizedPlatformSkuId) {
+    return normalizedPlatformSkuId;
+  }
+
+  const record = rawPayload && typeof rawPayload === "object" && !Array.isArray(rawPayload)
+    ? rawPayload as Record<string, unknown>
+    : {};
+
+  if (isMeituanPlatform(platform)) {
+    const goodsExtra = readGoodsExtraRecord(record);
+    return normalizeSkuDigits(String(
+      goodsExtra.original_sku_id
+      || record.source_id
+      || record.sourceId
       || ""
     ));
   }
@@ -1979,6 +2007,8 @@ export async function GET(request: NextRequest) {
 
 
 
+    const autoMatchedMeituanBackfills: Array<{ shopProductId: string; meituanSkuId: string }> = [];
+
     const enrichedOrders = responseOrders.map((order) => {
       const manualAmountOverride = readManualAmountOverride(order.rawPayload);
       const isOffline = order.platform === "线下交易" || String(order.platform || "").toLowerCase() === "other";
@@ -2153,6 +2183,7 @@ export async function GET(request: NextRequest) {
         firstMissingCostPurchaseOrderItemId: outboundMeta?.firstMissingCostPurchaseOrderItemId || null,
         items: order.items.map((item) => {
           const manualMatchedProduct = readManualMatchedProduct(item.rawPayload);
+          const strictPlatformProductId = readStrictPlatformProductId(order.platform, item.rawPayload, item.platformSkuId);
           const platformProductId = readPlatformProductIdForMatch(order.platform, item.rawPayload, item.productNo, item.platformSkuId);
           const skuFallbacks = splitCompositeSkuSegments(item.productNo);
           const normalizedSkuCandidates = skuFallbacks.length > 0
@@ -2200,6 +2231,12 @@ export async function GET(request: NextRequest) {
             );
             const fallbackImg = foundShopProduct?.image || null;
             matchedProduct.image = matchedProduct.image ? storage.resolveUrl(matchedProduct.image) : fallbackImg;
+            if (!manualMatchedProduct && isMeituanPlatform(order.platform) && strictPlatformProductId && foundShopProduct?.id) {
+              autoMatchedMeituanBackfills.push({
+                shopProductId: foundShopProduct.id,
+                meituanSkuId: strictPlatformProductId,
+              });
+            }
           }
           
           const matchedSkuToSplit = manualMatchedProduct?.sku || item.productNo;
@@ -2260,6 +2297,14 @@ export async function GET(request: NextRequest) {
         }),
       };
     });
+    const uniqueAutoMatchedMeituanBackfills = Array.from(
+      new Map(autoMatchedMeituanBackfills.map((item) => [`${item.shopProductId}:${item.meituanSkuId}`, item])).values()
+    );
+    await Promise.all(uniqueAutoMatchedMeituanBackfills.map((item) =>
+      syncMeituanSkuIdForShopProduct(prisma, session.id, item.shopProductId, item.meituanSkuId).catch((error) => {
+        console.warn("[orders/route] 忽略展示层自动匹配美团 SKU 回填失败:", error);
+      })
+    ));
     perf.lap("response-build");
     perf.log("GET /api/orders", { page, pageSize, count: responseOrders.length, total: responseTotal });
 
