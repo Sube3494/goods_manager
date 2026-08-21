@@ -624,17 +624,7 @@ function readDisplaySourceId(item: AutoPickOrderItem, platform?: string | null, 
     : {};
   if (isMeituanOrder(platform, channelTag)) {
     const goodsExtra = readGoodsExtraRecord(rawPayload);
-    return String(
-      goodsExtra.original_spu_id
-      || goodsExtra.originalSpuId
-      || rawPayload.original_spu_id
-      || rawPayload.originalSpuId
-      || rawPayload.platformProductId
-      || item.productNo
-      || rawPayload.source_id
-      || rawPayload.sourceId
-      || ""
-    ).trim();
+    return String(goodsExtra.original_spu_id || "").trim();
   }
   return String(
     item.productNo

@@ -4442,14 +4442,7 @@ function readAutoPickPlatformProductIdForMatch(
       ? rawPayload as Record<string, unknown>
       : {};
     const goodsExtra = readAutoPickGoodsExtraRecord(record);
-    return normalizeAutoPickSkuForMatch(String(
-      goodsExtra.original_spu_id
-      || goodsExtra.originalSpuId
-      || record.original_spu_id
-      || record.originalSpuId
-      || record.platformProductId
-      || ""
-    ));
+    return normalizeAutoPickSkuForMatch(String(goodsExtra.original_spu_id || ""));
   }
 
   if (isJdPlatform(platform)) {

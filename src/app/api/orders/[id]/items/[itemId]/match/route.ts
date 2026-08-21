@@ -68,13 +68,7 @@ function readMeituanOriginalSpuId(rawPayload: Record<string, unknown>) {
       })()
     : readRecord(goodsExtra);
 
-  return String(
-    parsedGoodsExtra.original_spu_id
-    || parsedGoodsExtra.originalSpuId
-    || rawPayload.original_spu_id
-    || rawPayload.originalSpuId
-    || ""
-  ).trim();
+  return String(parsedGoodsExtra.original_spu_id || "").trim();
 }
 
 function isMeituanPlatform(platform: string | null | undefined) {
