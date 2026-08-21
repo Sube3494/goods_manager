@@ -50,6 +50,89 @@ function readAutoMatchedProductSnapshot(rawPayload: unknown) {
   );
 }
 
+function readRecord(value: unknown) {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+}
+
+function readMeituanOriginalSpuId(rawPayload: Record<string, unknown>) {
+  const goodsExtra = rawPayload.goods_extra || rawPayload.goodsExtra;
+  const parsedGoodsExtra = typeof goodsExtra === "string"
+    ? (() => {
+        try {
+          return JSON.parse(goodsExtra) as Record<string, unknown>;
+        } catch {
+          return {};
+        }
+      })()
+    : readRecord(goodsExtra);
+
+  return String(
+    parsedGoodsExtra.original_spu_id
+    || parsedGoodsExtra.originalSpuId
+    || rawPayload.original_spu_id
+    || rawPayload.originalSpuId
+    || ""
+  ).trim();
+}
+
+async function syncMeituanIdForMatchedShopProduct(
+  tx: Prisma.TransactionClient,
+  userId: string,
+  shopProduct: { productId: string | null; productName: string | null },
+  rawPayload: Record<string, unknown>,
+) {
+  const meituanId = readMeituanOriginalSpuId(rawPayload);
+  if (!meituanId || !shopProduct.productId) {
+    return;
+  }
+
+  try {
+    await tx.productMeituanSku.deleteMany({
+      where: {
+        userId,
+        meituanSkuId: meituanId,
+        productId: { not: shopProduct.productId },
+      },
+    });
+    await tx.productMeituanSku.upsert({
+      where: {
+        userId_meituanSkuId: {
+          userId,
+          meituanSkuId: meituanId,
+        },
+      },
+      update: {
+        productId: shopProduct.productId,
+        meituanSpuId: meituanId,
+        meituanName: String(rawPayload.productName || rawPayload.goods_name || shopProduct.productName || "").trim() || null,
+        meituanSpec: String(rawPayload.spec || "").trim() || null,
+      },
+      create: {
+        productId: shopProduct.productId,
+        userId,
+        meituanSkuId: meituanId,
+        meituanSpuId: meituanId,
+        meituanName: String(rawPayload.productName || rawPayload.goods_name || shopProduct.productName || "").trim() || null,
+        meituanSpec: String(rawPayload.spec || "").trim() || null,
+      },
+    });
+    await tx.meituanImportItem.updateMany({
+      where: {
+        userId,
+        meituanSkuId: meituanId,
+      },
+      data: {
+        bindProductId: shopProduct.productId,
+        status: "BOUND",
+      },
+    });
+  } catch (error) {
+    console.warn("[match/route] 忽略冲突的 meituanId 回填:", error);
+  }
+}
+
 export async function PATCH(
   request: NextRequest,
   context: { params: Promise<{ id: string; itemId: string }> }
@@ -361,6 +444,14 @@ export async function PATCH(
             data: { productNo: targetJdSkuId },
           });
         }
+      }
+
+      const isMeituanOrder = platformStr.includes("美团")
+        || platformStr.includes("闪购")
+        || platformStr.toLowerCase().includes("meituan")
+        || platformStr.toLowerCase().includes("shangou");
+      if (isMeituanOrder) {
+        await syncMeituanIdForMatchedShopProduct(tx, user.id, shopProduct, basePayload);
       }
 
       await tx.autoPickOrderItem.update({

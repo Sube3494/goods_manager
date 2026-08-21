@@ -3121,6 +3121,7 @@ export function normalizeAutoPickOrderPayload(payload: unknown): AutoPickInbound
         ? (rawSourceId || rawProductNo)
         : (rawProductNo || rawSkuCode || rawSourceId);
       return {
+        ...current,
         productName: String(current.productName || current.goods_name || "").trim(),
         productNo: targetProductNo || undefined,
         quantity: Math.max(0, Number(current.quantity || current.number || 0)),
