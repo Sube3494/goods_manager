@@ -1782,6 +1782,7 @@ function buildItemsFromDetailJSON(detail: MaiyatianOrderDetailResponse["data"]):
   const isJD = channelTag === "daojia" || sourceTag === "daojia";
 
   return goods.map((item) => ({
+    ...item,
     productName: String(item.goods_name || "").trim(),
     productNo: isJD
       ? (String(item.source_id || "").trim() || undefined)
