@@ -4459,6 +4459,46 @@ function readAutoPickPlatformProductIdForMatch(
   return "";
 }
 
+async function backfillMeituanIdForAutoPickMatchedShopProduct(
+  tx: Prisma.TransactionClient,
+  userId: string,
+  shopProductId: string | null | undefined,
+  rawPayload: unknown,
+) {
+  const meituanSkuId = readAutoPickPlatformProductIdForMatch("meituan", rawPayload, null);
+  if (!shopProductId || !meituanSkuId) {
+    return;
+  }
+
+  try {
+    const existing = await tx.shopProduct.findFirst({
+      where: {
+        shop: { userId },
+        meituanSkuId,
+        id: { not: shopProductId },
+      },
+      select: { id: true },
+    });
+    if (existing) {
+      return;
+    }
+
+    await tx.shopProduct.updateMany({
+      where: {
+        id: shopProductId,
+        shop: { userId },
+        OR: [
+          { meituanSkuId: null },
+          { meituanSkuId: "" },
+        ],
+      },
+      data: { meituanSkuId },
+    });
+  } catch (error) {
+    console.warn("[autoPickOrders] 忽略冲突的 meituanSkuId 自动回填:", error);
+  }
+}
+
 function normalizeShopProductSkuForPlatformMatch(
   platform: string | null | undefined,
   item: { sku?: string | null; jdSkuId?: string | null; meituanSkuId?: string | null }
@@ -5570,6 +5610,8 @@ async function resolveBrushOrderItemsForAutoPickOrder(
       continue;
     }
 
+    await backfillMeituanIdForAutoPickMatchedShopProduct(prisma, userId, sameShopSkuCandidate?.id, item.rawPayload);
+
     const resolvedCandidateShopName = String(sameShopSkuCandidate?.shopName || "").trim();
     if (resolvedCandidateShopName) {
       resolvedCandidateShopNames.add(resolvedCandidateShopName);
@@ -5910,6 +5952,7 @@ async function resolveOutboundItemsForAutoPickOrder(
       if (isJdOrder && targetShopProductId && targetSourceId) {
         await syncJdSkuIdForShopProduct(tx, userId, targetShopProductId, targetSourceId);
       }
+      await backfillMeituanIdForAutoPickMatchedShopProduct(tx, userId, targetShopProductId, item.rawPayload);
 
       resolvedItems.push({
         productId: String(

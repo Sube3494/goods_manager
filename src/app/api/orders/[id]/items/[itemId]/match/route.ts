@@ -77,6 +77,51 @@ function readMeituanOriginalSpuId(rawPayload: Record<string, unknown>) {
   ).trim();
 }
 
+function readArray(value: unknown) {
+  return Array.isArray(value) ? value : [];
+}
+
+function normalizeComparable(value: unknown) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function findOrderRawPayloadItemPayload(
+  orderRawPayload: unknown,
+  item: {
+    productNo?: string | null;
+    rawPayload?: unknown;
+  },
+) {
+  const itemPayload = readRawPayloadRecord(item.rawPayload);
+  const orderPayload = readRawPayloadRecord(orderRawPayload);
+  const goods = [
+    ...readArray(orderPayload.goods),
+    ...readArray(orderPayload.items),
+    ...readArray(readRecord(orderPayload.data).goods),
+    ...readArray(readRecord(orderPayload.data).items),
+  ];
+  const itemProductNo = normalizeComparable(item.productNo);
+  const itemName = normalizeComparable(itemPayload.productName || itemPayload.goods_name);
+
+  for (const rawGoods of goods) {
+    const goodsRecord = readRecord(rawGoods);
+    const goodsProductNo = normalizeComparable(
+      goodsRecord.productNo
+      || goodsRecord.source_id
+      || goodsRecord.sourceId
+      || goodsRecord.sku_code
+      || goodsRecord.skuCode
+    );
+    const goodsName = normalizeComparable(goodsRecord.productName || goodsRecord.goods_name);
+    if ((itemProductNo && goodsProductNo && itemProductNo === goodsProductNo)
+      || (itemName && goodsName && itemName === goodsName)) {
+      return goodsRecord;
+    }
+  }
+
+  return {};
+}
+
 async function syncMeituanIdForMatchedShopProduct(
   tx: Prisma.TransactionClient,
   userId: string,
@@ -85,8 +130,9 @@ async function syncMeituanIdForMatchedShopProduct(
     productName: string | null;
   },
   rawPayload: Record<string, unknown>,
+  fallbackRawPayload?: Record<string, unknown>,
 ) {
-  const meituanId = readMeituanOriginalSpuId(rawPayload);
+  const meituanId = readMeituanOriginalSpuId(rawPayload) || (fallbackRawPayload ? readMeituanOriginalSpuId(fallbackRawPayload) : "");
   if (!meituanId) {
     return;
   }
@@ -144,6 +190,7 @@ export async function PATCH(
           select: {
             orderNo: true,
             platform: true,
+            rawPayload: true,
           },
         },
       },
@@ -181,6 +228,7 @@ export async function PATCH(
     };
 
     const basePayload = readRawPayloadRecord(orderItem.rawPayload);
+    const fallbackItemPayload = findOrderRawPayloadItemPayload(orderItem.order.rawPayload, orderItem);
     const { manualMatchedProduct: _removedManualMatchedProduct, ...restPayload } = basePayload;
     const previousAutoMatchedProduct = readAutoMatchedProductSnapshot(orderItem.rawPayload);
     const requestedAutoMatchedProduct = normalizeMatchedProductCandidate(body?.autoMatchedProduct);
@@ -357,7 +405,7 @@ export async function PATCH(
 
     if (autoMatchedProduct?.shopProductId && autoMatchedProduct.shopProductId === matchedProduct.shopProductId) {
       await prisma.$transaction(async (tx) => {
-        await syncMeituanIdForMatchedShopProduct(tx, user.id, shopProduct, basePayload);
+        await syncMeituanIdForMatchedShopProduct(tx, user.id, shopProduct, basePayload, fallbackItemPayload);
         await tx.autoPickOrderItem.update({
           where: { id: orderItem.id },
           data: {
@@ -430,7 +478,7 @@ export async function PATCH(
         }
       }
 
-      await syncMeituanIdForMatchedShopProduct(tx, user.id, shopProduct, basePayload);
+      await syncMeituanIdForMatchedShopProduct(tx, user.id, shopProduct, basePayload, fallbackItemPayload);
 
       await tx.autoPickOrderItem.update({
         where: { id: orderItem.id },
