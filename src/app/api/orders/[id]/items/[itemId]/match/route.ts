@@ -4,7 +4,7 @@ import { getAuthorizedUser } from "@/lib/auth";
 import { getStorageStrategy } from "@/lib/storage";
 import { normalizeJdSkuIds, replaceProductJdSkuMappings } from "@/lib/productJdSku";
 import { Prisma } from "../../../../../../../../prisma/generated-client";
-import { syncAutoOutboundFromCompletedAutoPickOrder } from "@/lib/autoPickOrders";
+import { syncAutoOutboundFromCompletedAutoPickOrder, syncMeituanSkuIdForShopProduct } from "@/lib/autoPickOrders";
 
 function readRawPayloadRecord(rawPayload: unknown) {
   return rawPayload && typeof rawPayload === "object" && !Array.isArray(rawPayload)
@@ -147,24 +147,7 @@ async function syncMeituanIdForMatchedShopProduct(
     return;
   }
 
-  try {
-    const existing = await tx.shopProduct.findFirst({
-      where: {
-        shop: { userId },
-        meituanSkuId: meituanId,
-        id: { not: shopProduct.id },
-      },
-    });
-    if (existing) {
-      return;
-    }
-    await tx.shopProduct.update({
-      where: { id: shopProduct.id },
-      data: { meituanSkuId: meituanId },
-    });
-  } catch (error) {
-    console.warn("[match/route] 忽略冲突的 meituanId 回填:", error);
-  }
+  await syncMeituanSkuIdForShopProduct(tx, userId, shopProduct.id, meituanId);
 }
 
 export async function PATCH(

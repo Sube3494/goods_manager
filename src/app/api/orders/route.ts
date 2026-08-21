@@ -23,6 +23,7 @@ import { getStorageStrategy } from "@/lib/storage";
 import { Prisma } from "../../../../prisma/generated-client";
 import { buildShopDedupeKey, normalizeExternalId, normalizeShopNameKey, isShopNameMatch } from "@/lib/shopIdentity";
 import { isPrismaMissingColumnError } from "@/lib/prismaSchemaCompat";
+import { normalizeMeituanSkuIds } from "@/lib/productMeituanSku";
 import {
   getOutboundReturnTotals,
   getOutboundReturnedQuantityMap,
@@ -441,14 +442,16 @@ function doesShopProductMatchStableKey(
     return false;
   }
 
-  const platformKey = normalizeShopProductSkuForPlatformMatch(platform, item);
+  const platformKeys = isMeituanPlatform(platform)
+    ? normalizeMeituanSkuIds(item.meituanSkuId).map((value) => normalizeSkuDigits(value))
+    : [normalizeShopProductSkuForPlatformMatch(platform, item)];
   const fallbackKeys = [
     normalizeSkuDigits(item.sku),
     normalizeSkuDigits(item.jdSkuId),
-    normalizeSkuDigits(item.meituanSkuId),
+    ...normalizeMeituanSkuIds(item.meituanSkuId).map((value) => normalizeSkuDigits(value)),
   ].filter(Boolean);
 
-  return platformKey === normalizedKey || fallbackKeys.includes(normalizedKey);
+  return platformKeys.includes(normalizedKey) || fallbackKeys.includes(normalizedKey);
 }
 
 function findMappedShopNameFromIntegrationConfig(

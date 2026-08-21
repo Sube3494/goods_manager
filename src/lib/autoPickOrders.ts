@@ -12,6 +12,7 @@ import { getOutboundOrderItemSchemaErrorMessage } from "@/lib/prismaSchemaCompat
 import { getStorageStrategy } from "@/lib/storage";
 import { returnOutboundOrderById } from "@/lib/outboundReturns";
 import { normalizeJdSkuIds, replaceProductJdSkuMappings } from "@/lib/productJdSku";
+import { normalizeMeituanSkuIds, replaceProductMeituanSkuMappings } from "@/lib/productMeituanSku";
 import {
   resolveShopBrushCommission,
   resolveShopSelfDeliveryTiming,
@@ -4491,33 +4492,7 @@ async function backfillMeituanIdForAutoPickMatchedShopProduct(
     return;
   }
 
-  try {
-    const existing = await tx.shopProduct.findFirst({
-      where: {
-        shop: { userId },
-        meituanSkuId,
-        id: { not: shopProductId },
-      },
-      select: { id: true },
-    });
-    if (existing) {
-      return;
-    }
-
-    await tx.shopProduct.updateMany({
-      where: {
-        id: shopProductId,
-        shop: { userId },
-        OR: [
-          { meituanSkuId: null },
-          { meituanSkuId: "" },
-        ],
-      },
-      data: { meituanSkuId },
-    });
-  } catch (error) {
-    console.warn("[autoPickOrders] 忽略冲突的 meituanSkuId 自动回填:", error);
-  }
+  await syncMeituanSkuIdForShopProduct(tx, userId, shopProductId, meituanSkuId);
 }
 
 export async function backfillPlatformIdsForSyncedAutoPickOrder(userId: string, orderId: string) {
@@ -4616,14 +4591,16 @@ function doesShopProductMatchAutoPickStableKey(
     return false;
   }
 
-  const platformKey = normalizeShopProductSkuForPlatformMatch(platform, item);
+  const platformKeys = isMeituanPlatform(platform)
+    ? normalizeMeituanSkuIds(item.meituanSkuId).map((value) => normalizeAutoPickSkuForMatch(value))
+    : [normalizeShopProductSkuForPlatformMatch(platform, item)];
   const fallbackKeys = [
     normalizeAutoPickSkuForMatch(item.sku),
     normalizeAutoPickSkuForMatch(item.jdSkuId),
-    normalizeAutoPickSkuForMatch(item.meituanSkuId),
+    ...normalizeMeituanSkuIds(item.meituanSkuId).map((value) => normalizeAutoPickSkuForMatch(value)),
   ].filter(Boolean);
 
-  return platformKey === normalizedKey || fallbackKeys.includes(normalizedKey);
+  return platformKeys.includes(normalizedKey) || fallbackKeys.includes(normalizedKey);
 }
 
 async function findExistingShopProductByShopAndSku(
@@ -6835,6 +6812,50 @@ export async function syncJdSkuIdForShopProduct(
     }
   } catch (error) {
     console.warn("[syncJdSkuIdForShopProduct] 忽略已存在的 jdSkuId 冲突:", error);
+  }
+}
+
+export async function syncMeituanSkuIdForShopProduct(
+  tx: Prisma.TransactionClient,
+  userId: string,
+  shopProductId: string,
+  sourceId: string
+) {
+  const cleanSourceId = String(sourceId || "").trim();
+  if (!shopProductId || !cleanSourceId) return;
+
+  const shopProduct = await tx.shopProduct.findFirst({
+    where: { id: shopProductId, shop: { userId } },
+    select: { id: true, productId: true, meituanSkuId: true },
+  });
+
+  if (!shopProduct) return;
+
+  try {
+    const existingIds = normalizeMeituanSkuIds(shopProduct.meituanSkuId);
+    if (!existingIds.includes(cleanSourceId)) {
+      const nextMeituanSkuIds = Array.from(new Set([...existingIds, cleanSourceId]));
+      const primaryStr = nextMeituanSkuIds.join(",");
+
+      await tx.shopProduct.update({
+        where: { id: shopProduct.id },
+        data: { meituanSkuId: primaryStr },
+      });
+
+      if (shopProduct.productId) {
+        const existingProductSkus = await tx.productMeituanSku.findMany({
+          where: { productId: shopProduct.productId },
+          select: { meituanSkuId: true },
+        });
+        const productMeituanSkuIds = Array.from(new Set([
+          ...existingProductSkus.map((i) => i.meituanSkuId),
+          ...nextMeituanSkuIds,
+        ]));
+        await replaceProductMeituanSkuMappings(tx, shopProduct.productId, userId, productMeituanSkuIds);
+      }
+    }
+  } catch (error) {
+    console.warn("[syncMeituanSkuIdForShopProduct] 忽略已存在的 meituanSkuId 冲突:", error);
   }
 }
 
