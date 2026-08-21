@@ -912,14 +912,14 @@ export function MeituanMappingModal({
               )}
 
               {/* 状态统计分段胶囊 */}
-              <div className="flex w-full sm:w-auto items-center gap-1.5 p-1 bg-muted/60 dark:bg-white/10 rounded-full border border-border/50 dark:border-white/10 overflow-x-auto sm:shrink-0 shadow-inner scrollbar-none">
+              <div className="grid w-full grid-cols-3 gap-1 p-1 bg-muted/60 dark:bg-white/10 rounded-full border border-border/50 dark:border-white/10 sm:flex sm:w-auto sm:items-center sm:gap-1.5 sm:overflow-x-auto sm:shrink-0 shadow-inner scrollbar-none">
                 {[
-                  { key: "ALL", label: "全部商品", count: platformStatusCounts.TOTAL || total },
-                  { key: "UNBOUND", label: activePlatform === "meituan" ? "未配对美团ID" : `未填${activePlatformConfig.idLabel}`, count: platformStatusCounts.UNBOUND || 0, color: "text-amber-500" },
+                  { key: "ALL", label: "全部商品", mobileLabel: "全部", count: platformStatusCounts.TOTAL || total },
+                  { key: "UNBOUND", label: activePlatform === "meituan" ? "未配对美团ID" : `未填${activePlatformConfig.idLabel}`, mobileLabel: "未配对", count: platformStatusCounts.UNBOUND || 0, color: "text-amber-500" },
                   ...(activePlatform === "meituan"
-                    ? [{ key: "HAS_SUGGESTION", label: "有智能推荐", count: platformStatusCounts.HAS_SUGGESTION || 0, color: "text-sky-500" }]
+                    ? [{ key: "HAS_SUGGESTION", label: "有智能推荐", mobileLabel: "推荐", count: platformStatusCounts.HAS_SUGGESTION || 0, color: "text-sky-500" }]
                     : []),
-                  { key: "BOUND", label: activePlatform === "meituan" ? "已配对" : "已填写", count: platformStatusCounts.BOUND || 0, color: "text-emerald-500" },
+                  { key: "BOUND", label: activePlatform === "meituan" ? "已配对" : "已填写", mobileLabel: activePlatform === "meituan" ? "已配对" : "已填", count: platformStatusCounts.BOUND || 0, color: "text-emerald-500" },
                 ].map((tab) => {
                   const isActive = statusFilter === tab.key;
                   return (
@@ -930,13 +930,14 @@ export function MeituanMappingModal({
                         setPage(1);
                       }}
                       className={cn(
-                        "flex items-center gap-2 px-4 py-1.5 rounded-full text-xs sm:text-sm font-black transition-all shrink-0 cursor-pointer",
+                        "flex min-w-0 items-center justify-center gap-1.5 px-2 sm:px-4 py-1.5 rounded-full text-xs sm:text-sm font-black transition-all sm:shrink-0 cursor-pointer",
                         isActive
                           ? "bg-white dark:bg-white/20 text-foreground shadow-sm"
                           : "text-muted-foreground hover:text-foreground"
                       )}
                     >
-                      <span>{tab.label}</span>
+                      <span className="min-w-0 truncate sm:hidden">{tab.mobileLabel}</span>
+                      <span className="hidden sm:inline">{tab.label}</span>
                       <span
                         className={cn(
                           "font-number text-xs px-2 py-0.5 rounded-full font-bold",
