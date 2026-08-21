@@ -50,7 +50,7 @@ interface AllOrdersViewProps {
   localShops: Array<{ id: string; name: string; address: string }>;
 }
 
-const ALL_ORDERS_BATCH_SIZE = 100;
+const ALL_ORDERS_BATCH_SIZE = 10000;
 
 export function AllOrdersView({
   refreshTrigger,
