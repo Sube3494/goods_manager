@@ -177,7 +177,14 @@ export async function GET(request: Request) {
       ? { AND: statsAndWhere, userId: session.id }
       : { userId: session.id };
 
-    const [purchases, total, statsRows, shopRows] = await Promise.all([
+    const receivedStatsWhere: Prisma.PurchaseOrderWhereInput = {
+      AND: [unscopedStatusWhere, { status: "Received" }],
+    };
+    const pendingStatsWhere: Prisma.PurchaseOrderWhereInput = {
+      AND: [unscopedStatusWhere, { NOT: { status: "Received" } }],
+    };
+
+    const [purchases, total, totalStats, receivedStats, pendingStats, shopRows] = await Promise.all([
       prisma.purchaseOrder.findMany({
         where: {
           ...where,
@@ -189,7 +196,6 @@ export async function GET(request: Request) {
               product: true,
               shopProduct: true,
               supplier: true,
-              batches: true
             }
           }
         },
@@ -205,19 +211,36 @@ export async function GET(request: Request) {
           userId: session.id
         }
       }),
-      prisma.purchaseOrder.findMany({
+      prisma.purchaseOrder.aggregate({
         where: unscopedStatusWhere,
-        select: {
-          status: true,
+        _count: {
+          _all: true,
+        },
+        _sum: {
           totalAmount: true,
-          shopName: true,
+        },
+      }),
+      prisma.purchaseOrder.aggregate({
+        where: receivedStatsWhere,
+        _count: {
+          _all: true,
+        },
+        _sum: {
+          totalAmount: true,
+        },
+      }),
+      prisma.purchaseOrder.aggregate({
+        where: pendingStatsWhere,
+        _count: {
+          _all: true,
+        },
+        _sum: {
+          totalAmount: true,
         },
       }),
       prisma.purchaseOrder.findMany({
         where: unscopedStatusWhere,
-        select: {
-          shopName: true,
-        },
+        select: { shopName: true },
         distinct: ["shopName"],
         orderBy: {
           shopName: "asc",
@@ -225,16 +248,14 @@ export async function GET(request: Request) {
       }),
     ]);
     const resolvedPurchases = await Promise.all(purchases.map((purchase) => resolvePurchaseOrderResponse(purchase)));
-    const receivedRows = statsRows.filter((purchase) => purchase.status === "Received");
-    const pendingRows = statsRows.filter((purchase) => purchase.status !== "Received");
     const stats = {
-      totalCount: statsRows.length,
-      totalAmount: statsRows.reduce((sum, purchase) => sum + (Number(purchase.totalAmount) || 0), 0),
-      receivedCount: receivedRows.length,
-      receivedAmount: receivedRows.reduce((sum, purchase) => sum + (Number(purchase.totalAmount) || 0), 0),
-      pendingCount: pendingRows.length,
-      pendingAmount: pendingRows.reduce((sum, purchase) => sum + (Number(purchase.totalAmount) || 0), 0),
-      shopCount: new Set(statsRows.map((purchase) => purchase.shopName).filter(Boolean)).size,
+      totalCount: totalStats._count._all,
+      totalAmount: Number(totalStats._sum.totalAmount || 0),
+      receivedCount: receivedStats._count._all,
+      receivedAmount: Number(receivedStats._sum.totalAmount || 0),
+      pendingCount: pendingStats._count._all,
+      pendingAmount: Number(pendingStats._sum.totalAmount || 0),
+      shopCount: shopRows.filter((row) => row.shopName).length,
     };
 
     return NextResponse.json({
