@@ -1403,6 +1403,11 @@ function resolveMaiyatianOrderStatus(rawOrder: Record<string, unknown>) {
     return "已取消";
   }
 
+  const tipStatus = parseDeliveryDeadline(String(rawOrder.tips || "").trim());
+  if (tipStatus) {
+    return tipStatus;
+  }
+
   return parseMaiyatianStatusValue(rawOrder.status);
 }
 
