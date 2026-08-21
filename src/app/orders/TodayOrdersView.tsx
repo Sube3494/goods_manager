@@ -8,16 +8,12 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { AutoPickOrder, AutoPickOrderItem, PurchaseOrder, PurchaseStatus } from "@/lib/types";
 import { formatLocalDate } from "@/lib/dateUtils";
 import { isShopNameMatch } from "@/lib/shopIdentity";
-import { pinyinMatch } from "@/lib/pinyin";
-import { AUTO_PICK_EXTRA_STATUS_FILTERS, getBaseAutoPickStatusDisplay, getAutoPickStatusFilterLabel, isAutoPickExtraStatusFilter, matchesAutoPickStatusFilter } from "@/lib/autoPickOrderStatus";
+import { AUTO_PICK_EXTRA_STATUS_FILTERS, getBaseAutoPickStatusDisplay, getAutoPickStatusFilterLabel } from "@/lib/autoPickOrderStatus";
 import {
   OrderCard,
   OrderCardErrorBoundary,
   isCompletedStatus,
-  summarizeOrders,
   isCancelledStatus,
-  isDeletedStatus,
-  isAbnormalStatus,
   isBrushSyncEligibleOrder,
   getOrderActionErrorMessage
 } from "./OrderCard";
@@ -50,7 +46,7 @@ interface TodayOrdersViewProps {
   localShops: Array<{ id: string; name: string; address: string }>;
 }
 
-const TODAY_TAB_PAGE_SIZE = 9999;
+const TODAY_TAB_PAGE_SIZE = 100;
 
 export function TodayOrdersView({
   refreshTrigger,
@@ -62,6 +58,50 @@ export function TodayOrdersView({
 }: TodayOrdersViewProps) {
   const { showToast } = useToast();
   const [orders, setOrders] = useState<AutoPickOrder[]>([]);
+  const [summary, setSummary] = useState<{
+    receivedAmount: number;
+    platformCommission: number;
+    validOrderCount: number;
+    itemCount: number;
+    totalDeliveryFee: number;
+    platformReceived?: Record<string, { amount: number; count: number }>;
+    platformDelivery?: Record<string, number>;
+    pureProfit: number;
+    platformProfit?: Record<string, { amount: number; count: number }>;
+    shopProfit?: Record<string, ShopProfitInfo>;
+  }>({
+    receivedAmount: 0,
+    platformCommission: 0,
+    validOrderCount: 0,
+    itemCount: 0,
+    totalDeliveryFee: 0,
+    platformReceived: {},
+    platformDelivery: {},
+    pureProfit: 0,
+    platformProfit: {},
+    shopProfit: {},
+  });
+  const [overview, setOverview] = useState<{
+    totalCount: number;
+    trueOrderCount: number;
+    brushCount: number;
+    cancelledCount: number;
+    platformBreakdown?: {
+      truePlatformCounts: Record<string, number>;
+      brushPlatformCounts: Record<string, number>;
+      cancelledPlatformCounts: Record<string, number>;
+    };
+  }>({
+    totalCount: 0,
+    trueOrderCount: 0,
+    brushCount: 0,
+    cancelledCount: 0,
+    platformBreakdown: {
+      truePlatformCounts: {},
+      brushPlatformCounts: {},
+      cancelledPlatformCounts: {},
+    },
+  });
   const [platforms, setPlatforms] = useState<string[]>([]);
   const [statuses, setStatuses] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -104,9 +144,9 @@ export function TodayOrdersView({
 
       if (query.trim()) params.set("query", query.trim());
       if (platform !== "all") params.set("platform", platform);
-      if (status !== "all" && !isAutoPickExtraStatusFilter(status)) params.set("status", status);
+      if (status !== "all") params.set("status", status);
       if (shop !== "all") params.set("shop", shop);
-      if (silent) params.set("_lite", "1");
+      params.set("_metrics", "1");
 
       const response = await fetch(`/api/orders?${params.toString()}`, { cache: "no-store" });
       const data = await response.json().catch(() => ({}));
@@ -122,6 +162,8 @@ export function TodayOrdersView({
         setPlatforms(Array.from(new Set(data.filters.platforms.map(normalizeDisplayPlatform))));
       }
       if (Array.isArray(data.filters?.statuses)) setStatuses(data.filters.statuses);
+      if (data.summary) setSummary(data.summary);
+      if (data.overview) setOverview(data.overview);
 
     } catch (error) {
       console.error("Failed to fetch orders:", error);
@@ -358,9 +400,6 @@ export function TodayOrdersView({
   );
 
   const statusOptions = useMemo(() => {
-    const dynamicExtraOptions = AUTO_PICK_EXTRA_STATUS_FILTERS.filter((option) => (
-      orders.some((order) => matchesAutoPickStatusFilter(order, option.value))
-    ));
     const baseStatusOptions = Array.from(
       new Map(
         statuses.map((item) => {
@@ -371,10 +410,10 @@ export function TodayOrdersView({
     );
     return [
       { value: "all", label: "全部状态" },
-      ...dynamicExtraOptions,
+      ...AUTO_PICK_EXTRA_STATUS_FILTERS,
       ...baseStatusOptions,
     ];
-  }, [orders, statuses]);
+  }, [statuses]);
 
   useEffect(() => {
     if (status === "all") return;
@@ -382,26 +421,10 @@ export function TodayOrdersView({
     setStatus("all");
   }, [status, statusOptions]);
 
-  // 根据店铺和查询框对列表进行前端内存级过滤与拼音匹配
+  // 筛选和统计都交给后端；前端只对当前页做展示分组。
   const filteredOrders = useMemo(() => {
-    const q = query.trim();
-    return orders.filter((order) => {
-      if (shop !== "all" && order.matchedShopName !== shop) return false;
-      if (!matchesAutoPickStatusFilter(order, status)) return false;
-      if (q) {
-        const matchesQuery =
-          pinyinMatch(order.orderNo, q) ||
-          pinyinMatch(order.platform || "", q) ||
-          pinyinMatch(order.userAddress || "", q) ||
-          pinyinMatch(order.matchedShopName || "", q) ||
-          pinyinMatch(order.customerName || "", q) ||
-          pinyinMatch(order.customerPhone || "", q) ||
-          order.items?.some((i) => pinyinMatch(i.productName || "", q) || pinyinMatch(i.productNo || "", q));
-        if (!matchesQuery) return false;
-      }
-      return true;
-    });
-  }, [orders, shop, status, query]);
+    return orders;
+  }, [orders]);
 
   const todayCompletedOrders = useMemo(() => {
     return filteredOrders.filter((order) => isCompletedStatus(order.status));
@@ -422,46 +445,18 @@ export function TodayOrdersView({
   }, [filteredOrders]);
 
   const displayedSummary = useMemo(() => {
-    return summarizeOrders(filteredOrders);
-  }, [filteredOrders]);
+    return summary;
+  }, [summary]);
 
   const orderOverviewCounts = useMemo(() => {
-    const cancelledCount = filteredOrders.filter((item) => isCancelledStatus(item.status) || isDeletedStatus(item.status)).length;
-    const validOrders = filteredOrders.filter((item) => !isCancelledStatus(item.status) && !isDeletedStatus(item.status));
-    const brushCount = validOrders.filter((item) => item.isMainSystemSelfDelivery && !isAbnormalStatus(item.status)).length;
-    const trueOrderCount = Math.max(0, validOrders.length - brushCount);
-
-    const truePlatformCounts: Record<string, number> = {};
-    const brushPlatformCounts: Record<string, number> = {};
-    const cancelledPlatformCounts: Record<string, number> = {};
-
-    for (const item of filteredOrders) {
-      const platform = normalizeDisplayPlatform(item.platform);
-      const cancelled = isCancelledStatus(item.status) || isDeletedStatus(item.status);
-      if (cancelled) {
-        cancelledPlatformCounts[platform] = (cancelledPlatformCounts[platform] || 0) + 1;
-      } else {
-        const isBrush = item.isMainSystemSelfDelivery && !isAbnormalStatus(item.status);
-        if (isBrush) {
-          brushPlatformCounts[platform] = (brushPlatformCounts[platform] || 0) + 1;
-        } else {
-          truePlatformCounts[platform] = (truePlatformCounts[platform] || 0) + 1;
-        }
-      }
-    }
-
     return {
-      totalCount: filteredOrders.length,
-      trueOrderCount,
-      brushCount,
-      cancelledCount,
-      platformBreakdown: {
-        truePlatformCounts,
-        brushPlatformCounts,
-        cancelledPlatformCounts,
-      },
+      totalCount: overview.totalCount,
+      trueOrderCount: overview.trueOrderCount,
+      brushCount: overview.brushCount,
+      cancelledCount: overview.cancelledCount,
+      platformBreakdown: overview.platformBreakdown || { truePlatformCounts: {}, brushPlatformCounts: {}, cancelledPlatformCounts: {} },
     };
-  }, [filteredOrders]);
+  }, [overview]);
 
   const eligibleBrushSyncOrders = useMemo(() => {
     return filteredOrders.filter(isBrushSyncEligibleOrder);
@@ -472,12 +467,12 @@ export function TodayOrdersView({
     onDataLoad({
       summary: displayedSummary,
       overview: orderOverviewCounts,
-      total: filteredOrders.length,
+      total: overview.totalCount,
       eligibleBrushSyncOrders,
       isLoading,
       promotionDate: todayDate,
     });
-  }, [displayedSummary, orderOverviewCounts, filteredOrders.length, eligibleBrushSyncOrders, isLoading, onDataLoad, todayDate]);
+  }, [displayedSummary, orderOverviewCounts, overview.totalCount, eligibleBrushSyncOrders, isLoading, onDataLoad, todayDate]);
 
   const hasActiveFilters = Boolean(query.trim() || platform !== "all" || shop !== "all" || status !== "all");
 
