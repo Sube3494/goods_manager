@@ -886,36 +886,35 @@ export function MeituanMappingModal({
           </div>
 
           {/* 2. 数据池批次与状态统计胶囊 */}
-          <div className="flex flex-col gap-3 px-4 sm:px-8 py-3.5 sm:py-4 border-b border-border/60 bg-zinc-50/50 dark:bg-white/[0.01] shrink-0">
-            <div className="flex w-full sm:w-auto overflow-x-auto items-center gap-1.5 p-1 bg-muted/60 dark:bg-white/10 rounded-full border border-border/50 dark:border-white/10 self-start shadow-inner scrollbar-none">
-              {PRODUCT_MAPPING_PLATFORMS.map((platform) => {
-                const isActive = activePlatform === platform.key;
-                return (
-                  <button
-                    key={platform.key}
-                    type="button"
-                    onClick={() => {
-                      setActivePlatform(platform.key);
-                      setStatusFilter("ALL");
-                      setPage(1);
-                    }}
-                    className={cn(
-                      "inline-flex shrink-0 items-center gap-2 px-4 h-9 rounded-full text-xs sm:text-sm font-black transition-all",
-                      isActive
-                        ? "bg-white dark:bg-white/20 text-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    <Tag className="h-3.5 w-3.5" />
-                    <span>{platform.label}</span>
-                  </button>
-                );
-              })}
-            </div>
+          <div className="grid gap-3 px-4 sm:px-8 py-3.5 sm:py-4 border-b border-border/60 bg-zinc-50/50 dark:bg-white/[0.01] shrink-0 xl:grid-cols-[minmax(420px,0.9fr)_minmax(420px,1fr)] xl:items-end xl:gap-x-8">
+            <div className="grid gap-3">
+              <div className="flex w-full sm:w-auto overflow-x-auto items-center gap-1.5 p-1 bg-muted/60 dark:bg-white/10 rounded-full border border-border/50 dark:border-white/10 self-start shadow-inner scrollbar-none">
+                {PRODUCT_MAPPING_PLATFORMS.map((platform) => {
+                  const isActive = activePlatform === platform.key;
+                  return (
+                    <button
+                      key={platform.key}
+                      type="button"
+                      onClick={() => {
+                        setActivePlatform(platform.key);
+                        setStatusFilter("ALL");
+                        setPage(1);
+                      }}
+                      className={cn(
+                        "inline-flex shrink-0 items-center gap-2 px-4 h-9 rounded-full text-xs sm:text-sm font-black transition-all",
+                        isActive
+                          ? "bg-white dark:bg-white/20 text-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      <Tag className="h-3.5 w-3.5" />
+                      <span>{platform.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
 
-            <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-3">
-              {/* 美团候选数据池选择 */}
-              <div className="flex items-center gap-2.5 flex-1 sm:flex-none">
+              <div className="flex items-center gap-2.5">
                 <div className="w-full sm:w-96 h-10 sm:h-11">
                   <CustomSelect
                     value={currentBatchId}
@@ -948,7 +947,22 @@ export function MeituanMappingModal({
                 )}
               </div>
 
-              {/* 状态统计分段胶囊 */}
+              <div className="relative min-w-0 group sm:max-w-xl">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                <input
+                  type="text"
+                  placeholder="搜索系统商品名 / 自编SKU / 店内码 / 拼音..."
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    setPage(1);
+                  }}
+                  className="w-full pl-11 pr-4 h-10 sm:h-11 text-xs sm:text-sm rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:outline-none focus:ring-2 focus:ring-primary/20 text-foreground transition-all shadow-xs"
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-3 xl:justify-items-end">
               <div className={cn(
                 "grid w-full gap-1 p-1 bg-muted/60 dark:bg-white/10 rounded-full border border-border/50 dark:border-white/10 sm:flex sm:w-auto sm:items-center sm:gap-1.5 sm:overflow-x-auto sm:shrink-0 shadow-inner scrollbar-none",
                 activePlatform === "meituan" ? "grid-cols-4" : "grid-cols-3"
@@ -992,25 +1006,8 @@ export function MeituanMappingModal({
                   );
                 })}
               </div>
-            </div>
 
-            {/* 搜索与工具 */}
-            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2.5 pt-1 sm:flex sm:justify-between sm:gap-3">
-              <div className="relative min-w-0 flex-1 sm:max-w-lg group">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
-                <input
-                  type="text"
-                  placeholder="搜索系统商品名 / 自编SKU / 店内码 / 拼音..."
-                  value={searchQuery}
-                  onChange={(e) => {
-                    setSearchQuery(e.target.value);
-                    setPage(1);
-                  }}
-                  className="w-full pl-11 pr-4 h-10 sm:h-11 text-xs sm:text-sm rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:outline-none focus:ring-2 focus:ring-primary/20 text-foreground transition-all shadow-xs"
-                />
-              </div>
-
-              <div className="flex items-center gap-2.5">
+              <div className="flex w-full items-center justify-end gap-2.5">
                 <button
                   onClick={() => fetchShopProducts()}
                   title="刷新商品列表"
