@@ -1701,34 +1701,54 @@ export default function ShopGoodsPage() {
     }
   }, [fetchSelectedItems, fetchShopProducts, selectedIds, showToast]);
 
-  const openEditModal = useCallback((item: ShopCatalogItem) => {
+  const openEditModal = useCallback(async (item: ShopCatalogItem) => {
     editScrollTopRef.current = window.scrollY;
     if (document.activeElement instanceof HTMLElement) {
       document.activeElement.blur();
     }
-    setEditingItemId(item.id);
-    setEditingShopId(item.shopId || "");
+    const targetShopId = item.shopId || selectedShopId || "";
+    let latestItem = item;
+    if (targetShopId) {
+      try {
+        const queryParams = buildAggregateQuery(1, {
+          ids: item.id,
+          pageSize: "1",
+          shopId: targetShopId,
+        });
+        const res = await fetch(`/api/shop-products?${queryParams.toString()}`, { cache: "no-store" });
+        const data = await res.json().catch(() => ({})) as ShopProductsResponse & { error?: string };
+        if (res.ok && Array.isArray(data.items) && data.items[0]) {
+          latestItem = data.items[0];
+          setItems((prev) => prev.map((current) => current.id === latestItem.id ? latestItem : current));
+        }
+      } catch (error) {
+        console.error("Failed to refresh shop product before edit:", error);
+      }
+    }
+
+    setEditingItemId(latestItem.id);
+    setEditingShopId(latestItem.shopId || targetShopId);
     setEditingProduct({
-      id: item.id,
-      sku: item.sku || "",
-      jdSkuId: item.jdSkuId || "",
-      meituanSkuId: item.meituanSkuId || "",
-      meituanSkuIds: item.meituanSkuIds || [],
-      name: item.name,
-      categoryId: item.categoryId || "",
-      costPrice: item.costPrice || 0,
-      stock: item.stock || 0,
-      image: item.image || "",
-      supplierId: item.supplierId || "",
-      isPublic: item.isPublic ?? true,
-      isDiscontinued: item.isDiscontinued ?? false,
-      specs: item.specs || {},
-      remark: item.remark || "",
-      isShelfLife: item.isShelfLife ?? false,
-      shelfLifeDays: item.shelfLifeDays ?? null,
+      id: latestItem.id,
+      sku: latestItem.sku || "",
+      jdSkuId: latestItem.jdSkuId || "",
+      meituanSkuId: latestItem.meituanSkuId || "",
+      meituanSkuIds: latestItem.meituanSkuIds || [],
+      name: latestItem.name,
+      categoryId: latestItem.categoryId || "",
+      costPrice: latestItem.costPrice || 0,
+      stock: latestItem.stock || 0,
+      image: latestItem.image || "",
+      supplierId: latestItem.supplierId || "",
+      isPublic: latestItem.isPublic ?? true,
+      isDiscontinued: latestItem.isDiscontinued ?? false,
+      specs: latestItem.specs || {},
+      remark: latestItem.remark || "",
+      isShelfLife: latestItem.isShelfLife ?? false,
+      shelfLifeDays: latestItem.shelfLifeDays ?? null,
     });
     setIsEditOpen(true);
-  }, []);
+  }, [buildAggregateQuery, selectedShopId]);
 
   useEffect(() => {
     if (!requestedShopId || !requestedEditItemId) {
@@ -1746,7 +1766,7 @@ export default function ShopGoodsPage() {
 
     if (target) {
       autoOpenedEditKeyRef.current = currentKey;
-      openEditModal(target);
+      void openEditModal(target);
       return;
     }
 
@@ -1776,7 +1796,7 @@ export default function ShopGoodsPage() {
           prev.some((item) => item.id === fetchedItem.id) ? prev : [fetchedItem, ...prev]
         ));
         autoOpenedEditKeyRef.current = currentKey;
-        openEditModal(fetchedItem);
+        void openEditModal(fetchedItem);
       } catch (error) {
         console.error("Failed to fetch requested edit item:", error);
       }
@@ -1829,7 +1849,7 @@ export default function ShopGoodsPage() {
       showToast("未找到要编辑的店铺商品", "error");
       return;
     }
-    openEditModal(rawTarget);
+    void openEditModal(rawTarget);
   }, [displayedItems, items, openEditModal, selectedIds, showToast]);
 
   const handleSaveEdit = useCallback(async (formData: Omit<Product, "id"> & { id?: string }) => {
