@@ -131,6 +131,7 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
       lastSyncedAt: refreshedOrder.lastSyncedAt,
       backfilled: backfill.count,
       platformIdBackfilled: platformIdBackfill.count,
+      platformIdBackfillDetails: platformIdBackfill.details,
       order: syncedOrder,
     });
   } catch (error) {
