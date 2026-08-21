@@ -378,41 +378,43 @@ export default function ProfilePage() {
         <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="overflow-hidden rounded-[22px] border border-border/70 bg-white/88 shadow-xl shadow-black/5 backdrop-blur-xl dark:bg-[#0b111e]/84 dark:shadow-black/20 sm:rounded-[26px]">
           <div className="px-3.5 py-3.5 sm:px-6 sm:py-4 lg:px-8">
             <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-start">
-              <div className="flex items-start gap-3 sm:gap-4">
+              <div className="grid gap-3 sm:flex sm:items-start sm:gap-4">
                 <Link href="/" className="group inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-border/70 bg-white/82 text-muted-foreground shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:text-primary dark:bg-white/5 sm:h-11 sm:w-11">
                   <ArrowLeft size={18} className="transition-transform group-hover:-translate-x-0.5" />
                 </Link>
-                <a
-                  href="https://cravatar.cn/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  title="前往 Cravatar 设置头像"
-                  className="group relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full border-4 border-white bg-white shadow-md shadow-black/10 dark:border-white/60 dark:bg-white/10 sm:h-14 sm:w-14"
-                >
-                  {user?.email ? (
-                    <Image
-                      src={`https://cravatar.cn/avatar/${md5(user.email)}?d=mp&s=200`}
-                      alt="当前用户头像"
-                      fill
-                      className="object-cover transition-transform duration-500 group-hover:scale-105"
-                    />
-                  ) : (
-                    <User size={28} className="text-white" />
-                  )}
-                </a>
-                <div className="min-w-0 flex-1 pt-0.5">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h1 className="text-2xl font-black tracking-tight text-foreground sm:text-[28px]">个人中心</h1>
-                    <span className="inline-flex items-center rounded-full border border-border/60 bg-white/80 px-2.5 py-1 text-[10px] font-black text-foreground dark:bg-white/10 sm:px-3 sm:text-[11px]">
+                <div className="flex min-w-0 items-start gap-3 sm:gap-4">
+                  <a
+                    href="https://cravatar.cn/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="前往 Cravatar 设置头像"
+                    className="group relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full border-4 border-white bg-white shadow-md shadow-black/10 dark:border-white/60 dark:bg-white/10 sm:h-14 sm:w-14"
+                  >
+                    {user?.email ? (
+                      <Image
+                        src={`https://cravatar.cn/avatar/${md5(user.email)}?d=mp&s=200`}
+                        alt="当前用户头像"
+                        fill
+                        className="object-cover transition-transform duration-500 group-hover:scale-105"
+                      />
+                    ) : (
+                      <User size={28} className="text-white" />
+                    )}
+                  </a>
+                  <div className="min-w-0 flex-1 pt-0.5">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h1 className="text-[26px] font-black leading-tight tracking-tight text-foreground sm:text-[28px]">个人中心</h1>
+                      <span className="inline-flex items-center rounded-full border border-border/60 bg-white/80 px-2.5 py-1 text-[10px] font-black text-foreground dark:bg-white/10 sm:px-3 sm:text-[11px]">
                         {identityLabel}
-                    </span>
+                      </span>
+                    </div>
+                    <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground sm:mt-2">集中管理你的基本资料、账号安全和常用收货地址。</p>
                   </div>
-                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">集中管理你的基本资料、账号安全和常用收货地址。</p>
                 </div>
               </div>
 
               <div className="space-y-2.5 xl:max-w-[460px] xl:justify-self-end">
-                <div className="flex flex-wrap gap-2 xl:justify-end">
+                <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap xl:justify-end">
                   <a href="#profile-core" className="inline-flex h-10 items-center justify-center whitespace-nowrap rounded-2xl border border-border/70 bg-white/82 px-3 text-xs font-black text-muted-foreground transition-all hover:border-primary/30 hover:text-primary dark:bg-white/5">基本资料</a>
                   <a href="#security-center" className="inline-flex h-10 items-center justify-center whitespace-nowrap rounded-2xl border border-border/70 bg-white/82 px-3 text-xs font-black text-muted-foreground transition-all hover:border-primary/30 hover:text-primary dark:bg-white/5">账号安全</a>
                   <a href="#address-library" className="inline-flex h-10 items-center justify-center whitespace-nowrap rounded-2xl border border-border/70 bg-white/82 px-3 text-xs font-black text-muted-foreground transition-all hover:border-primary/30 hover:text-primary dark:bg-white/5">地址库</a>
@@ -420,7 +422,7 @@ export default function ProfilePage() {
                     href="https://cravatar.cn/"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex h-10 items-center justify-center gap-2 whitespace-nowrap rounded-2xl border border-border/70 bg-white/82 px-3 text-sm font-black text-foreground transition-all hover:border-primary/30 hover:text-primary dark:bg-white/5 sm:px-4"
+                    className="inline-flex h-10 items-center justify-center gap-2 whitespace-nowrap rounded-2xl border border-border/70 bg-white/82 px-3 text-xs font-black text-foreground transition-all hover:border-primary/30 hover:text-primary dark:bg-white/5 sm:px-4 sm:text-sm"
                   >
                     <ExternalLink size={15} />
                     头像设置
