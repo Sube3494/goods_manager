@@ -542,6 +542,33 @@ export function MeituanMappingModal({
     }
   };
 
+  const handleExportPlatformList = () => {
+    const escapeCsv = (value: unknown) => {
+      const text = String(value ?? "");
+      return `"${text.replace(/"/g, '""')}"`;
+    };
+    const rows = [
+      ["商品名称", "店内码/SKU", activePlatformConfig.idLabel, "分类"],
+      ...platformProducts.map((item) => [
+        item.shopProductName || item.name,
+        item.shopSku || item.sku || "",
+        item[activePlatformConfig.field] || "",
+        item.category?.name || "",
+      ]),
+    ];
+    const csv = `\uFEFF${rows.map((row) => row.map(escapeCsv).join(",")).join("\r\n")}`;
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${selectedShop?.name || "店铺"}_${activePlatformConfig.label}_商品配对表.csv`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+    showToast(`已导出${activePlatformConfig.label}商品配对表`, "success");
+  };
+
   // 删除批次
   const handleDeleteBatch = () => {
     if (currentBatchId === "ALL") return;
@@ -806,27 +833,37 @@ export function MeituanMappingModal({
 
             {/* 顶栏操作按钮 */}
             <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-center gap-2.5 sm:flex sm:self-auto">
+              <button
+                onClick={activePlatform === "meituan" ? handleExportExcel : handleExportPlatformList}
+                disabled={activePlatform === "meituan" ? isExporting || batches.length === 0 : platformProducts.length === 0}
+                title={
+                  activePlatform === "meituan"
+                    ? batches.length === 0 ? "请先导入美团表格" : "导出填好自编SKU的美团Excel"
+                    : `导出${activePlatformConfig.label}商品配对表`
+                }
+                className={cn(
+                  "flex items-center justify-center gap-2 px-4 sm:px-5 h-10 sm:h-11 rounded-full text-xs sm:text-sm font-black transition-all shadow-md active:scale-95",
+                  activePlatform === "meituan"
+                    ? batches.length > 0
+                      ? "bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/20"
+                      : "bg-muted text-muted-foreground cursor-not-allowed opacity-50 shadow-none"
+                    : platformProducts.length > 0
+                    ? "bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/20"
+                    : "bg-muted text-muted-foreground cursor-not-allowed opacity-50 shadow-none"
+                )}
+              >
+                {isExporting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4" />
+                )}
+                <span className="leading-tight">
+                  {activePlatform === "meituan" ? "导出回写美团表格" : `导出${activePlatformConfig.label}配对表`}
+                </span>
+              </button>
+
               {activePlatform === "meituan" && (
                 <>
-                  <button
-                    onClick={handleExportExcel}
-                    disabled={isExporting || batches.length === 0}
-                    title={batches.length === 0 ? "请先导入美团表格" : "导出填好自编SKU的美团Excel"}
-                    className={cn(
-                      "flex items-center justify-center gap-2 px-4 sm:px-5 h-10 sm:h-11 rounded-full text-xs sm:text-sm font-black transition-all shadow-md active:scale-95",
-                      batches.length > 0
-                        ? "bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/20"
-                        : "bg-muted text-muted-foreground cursor-not-allowed opacity-50 shadow-none"
-                    )}
-                  >
-                    {isExporting ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Download className="h-4 w-4" />
-                    )}
-                    <span className="leading-tight">导出回写美团表格</span>
-                  </button>
-
                   <button
                     onClick={() => setIsUploadOpen(true)}
                     className="flex items-center justify-center gap-2 px-4 sm:px-5 h-10 sm:h-11 rounded-full text-xs sm:text-sm font-black bg-primary text-primary-foreground hover:bg-primary/90 active:scale-95 transition-all shadow-lg shadow-primary/20"
