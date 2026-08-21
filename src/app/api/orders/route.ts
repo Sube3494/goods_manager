@@ -399,7 +399,13 @@ function readPlatformProductIdForMatch(
       ? rawPayload as Record<string, unknown>
       : {};
     const goodsExtra = readGoodsExtraRecord(record);
-    return normalizeSkuDigits(String(goodsExtra.original_sku_id || ""));
+    return normalizeSkuDigits(String(
+      goodsExtra.original_sku_id
+      || record.source_id
+      || record.sourceId
+      || productNo
+      || ""
+    ));
   }
 
   if (isJDPlatform(platform)) {
@@ -2119,11 +2125,8 @@ export async function GET(request: NextRequest) {
           const manualMatchedProduct = readManualMatchedProduct(item.rawPayload);
           const platformProductId = readPlatformProductIdForMatch(order.platform, item.rawPayload, item.productNo);
           const skuFallbacks = splitCompositeSkuSegments(item.productNo);
-          const skuSegments = platformProductId
-            ? Array.from(new Set([platformProductId, ...skuFallbacks].filter(Boolean)))
-            : skuFallbacks;
-          const normalizedSkuCandidates = skuSegments.length > 0
-            ? skuSegments
+          const normalizedSkuCandidates = skuFallbacks.length > 0
+            ? skuFallbacks
             : [normalizeSkuDigits(item.productNo)].filter(Boolean);
           const candidatesInMatchedShop = mappedShopProducts.filter((product) => (
             matchedShopId
@@ -2151,12 +2154,13 @@ export async function GET(request: NextRequest) {
 
             return strictCandidates[0] || null;
           };
-          const strictMatches = normalizedSkuCandidates
+          const platformStrictMatch = platformProductId ? resolveStrictSkuMatch(platformProductId) : null;
+          const fallbackStrictMatches = normalizedSkuCandidates
             .map((candidate) => resolveStrictSkuMatch(candidate))
             .filter((product): product is typeof mappedShopProducts[number] => Boolean(product));
           const hasStrictMatchForAllSegments = normalizedSkuCandidates.length > 0
             && normalizedSkuCandidates.every((candidate) => Boolean(resolveStrictSkuMatch(candidate)));
-          const matchedProduct = manualMatchedProduct || (hasStrictMatchForAllSegments ? (strictMatches[0] || null) : null);
+          const matchedProduct = manualMatchedProduct || platformStrictMatch || (hasStrictMatchForAllSegments ? (fallbackStrictMatches[0] || null) : null);
           if (matchedProduct) {
             const foundShopProduct = mappedShopProducts.find((p) =>
               (matchedProduct.shopProductId && p.id === matchedProduct.shopProductId)

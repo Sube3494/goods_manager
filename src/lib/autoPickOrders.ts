@@ -4459,7 +4459,13 @@ function readAutoPickPlatformProductIdForMatch(
       ? rawPayload as Record<string, unknown>
       : {};
     const goodsExtra = readAutoPickGoodsExtraRecord(record);
-    return normalizeAutoPickSkuForMatch(String(goodsExtra.original_sku_id || ""));
+    return normalizeAutoPickSkuForMatch(String(
+      goodsExtra.original_sku_id
+      || record.source_id
+      || record.sourceId
+      || productNo
+      || ""
+    ));
   }
 
   if (isJdPlatform(platform)) {
@@ -5880,9 +5886,7 @@ async function resolveOutboundItemsForAutoPickOrder(
     const productName = toAutoPickBaseProductName(item.productName);
     const platformProductId = readAutoPickPlatformProductIdForMatch(order.platform, item.rawPayload, item.productNo);
     const skuFallbacks = splitCompositeAutoPickSku(item.productNo);
-    const normalizedSkus = platformProductId
-      ? Array.from(new Set([platformProductId, ...skuFallbacks].filter(Boolean)))
-      : skuFallbacks;
+    const normalizedSkus = skuFallbacks.length > 0 ? skuFallbacks : [platformProductId].filter(Boolean);
     const skuParts = normalizedSkus.length > 0 ? normalizedSkus : [normalizeAutoPickSkuForMatch(item.productNo)];
     const perResolvedPrice = FinanceMath.divide(priceShare, Math.max(1, skuParts.filter(Boolean).length || 1));
 

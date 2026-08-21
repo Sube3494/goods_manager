@@ -56,7 +56,7 @@ function readRecord(value: unknown) {
     : {};
 }
 
-function readMeituanOriginalSkuId(rawPayload: Record<string, unknown>) {
+function readMeituanSkuId(rawPayload: Record<string, unknown>) {
   const goodsExtra = rawPayload.goods_extra || rawPayload.goodsExtra;
   const parsedGoodsExtra = typeof goodsExtra === "string"
     ? (() => {
@@ -68,7 +68,12 @@ function readMeituanOriginalSkuId(rawPayload: Record<string, unknown>) {
       })()
     : readRecord(goodsExtra);
 
-  return String(parsedGoodsExtra.original_sku_id || "").trim();
+  return String(
+    parsedGoodsExtra.original_sku_id
+    || rawPayload.source_id
+    || rawPayload.sourceId
+    || ""
+  ).trim();
 }
 
 function isMeituanPlatform(platform: string | null | undefined) {
@@ -136,7 +141,7 @@ async function syncMeituanIdForMatchedShopProduct(
     return;
   }
 
-  const meituanId = readMeituanOriginalSkuId(rawPayload) || (fallbackRawPayload ? readMeituanOriginalSkuId(fallbackRawPayload) : "");
+  const meituanId = readMeituanSkuId(rawPayload) || (fallbackRawPayload ? readMeituanSkuId(fallbackRawPayload) : "");
   if (!meituanId) {
     return;
   }
