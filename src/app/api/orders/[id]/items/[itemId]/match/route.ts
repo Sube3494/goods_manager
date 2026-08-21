@@ -329,6 +329,9 @@ export async function PATCH(
       };
 
       await prisma.$transaction(async (tx) => {
+        for (const shopProduct of shopProducts) {
+          await syncMeituanIdForMatchedShopProduct(tx, user.id, shopProduct, basePayload, fallbackItemPayload, orderItem.order.platform, orderItem.productNo);
+        }
         await tx.autoPickOrderItem.update({
           where: { id: orderItem.id },
           data: {

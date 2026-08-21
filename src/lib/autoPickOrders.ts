@@ -3552,6 +3552,10 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
     });
   }
 
+  await backfillPlatformIdsForSyncedAutoPickOrder(userId, order.id).catch((platformIdError) => {
+    console.error("Failed to backfill platform ids after webhook upsert:", platformIdError);
+  });
+
   const isDeliveringSelfDelivery =
     isAutoPickOrderDeliveringStatus(order.status)
     && !isAutoPickPickupOrder(order.rawPayload, order.userAddress, order.shopAddress)
@@ -4273,6 +4277,26 @@ function mergeAutoPickOrderItemRawPayload(
   existingRawPayload: unknown
 ) {
   const nextPayload = { ...basePayload };
+  const existingPayload = readAutoPickRawPayloadRecord(existingRawPayload);
+  const baseGoodsExtra = readAutoPickGoodsExtraRecord(nextPayload);
+  const existingGoodsExtra = readAutoPickGoodsExtraRecord(existingPayload);
+  const existingOriginalSkuId = String(existingGoodsExtra.original_sku_id || "").trim();
+  const baseOriginalSkuId = String(baseGoodsExtra.original_sku_id || "").trim();
+
+  if (!baseOriginalSkuId && existingOriginalSkuId) {
+    nextPayload.goods_extra = {
+      ...existingGoodsExtra,
+      ...baseGoodsExtra,
+      original_sku_id: existingOriginalSkuId,
+    };
+  }
+
+  for (const key of ["source_id", "sourceId", "sku_code", "skuCode"]) {
+    if (!String(nextPayload[key] || "").trim() && String(existingPayload[key] || "").trim()) {
+      nextPayload[key] = existingPayload[key];
+    }
+  }
+
   const manualMatchedProduct = readManualMatchedProductFromOrderItemRawPayload(existingRawPayload);
   if (!manualMatchedProduct) {
     return nextPayload;
