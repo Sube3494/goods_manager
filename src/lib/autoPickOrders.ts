@@ -5430,16 +5430,6 @@ async function resolveBrushOrderItemsForAutoPickOrder(
     return isShopNameMatch(candidateShopName, mappedShopNameText);
   };
 
-  const shopProductNameMap = new Map<string, Array<{
-    id: string;
-    productId: string | null;
-    sourceProductId: string | null;
-    sku: string | null;
-    jdSkuId: string | null;
-    meituanSkuId: string | null;
-    shopId: string | null;
-    shopName: string | null;
-  }>>();
   const shopProductSkuMap = new Map<string, Array<{
     id: string;
     productId: string | null;
@@ -5450,17 +5440,6 @@ async function resolveBrushOrderItemsForAutoPickOrder(
     shopId: string | null;
     shopName: string | null;
   }>>();
-  const normalizedShopProductEntries: Array<{
-    id: string;
-    normalizedProductName: string;
-    productId: string | null;
-    sourceProductId: string | null;
-    sku: string | null;
-    jdSkuId: string | null;
-    meituanSkuId: string | null;
-    shopId: string | null;
-    shopName: string | null;
-  }> = [];
   for (const item of shopProducts) {
     const entry = {
       id: item.id,
@@ -5472,17 +5451,6 @@ async function resolveBrushOrderItemsForAutoPickOrder(
       shopId: item.shop?.id || null,
       shopName: item.shop?.name || null,
     };
-    const productName = toAutoPickBaseProductName(item.productName);
-    const normalizedName = toNormalizedText(productName);
-    if (normalizedName) {
-      const current = shopProductNameMap.get(normalizedName) || [];
-      current.push(entry);
-      shopProductNameMap.set(normalizedName, current);
-      normalizedShopProductEntries.push({
-        normalizedProductName: normalizedName,
-        ...entry,
-      });
-    }
     const normalizedSku = normalizeShopProductSkuForPlatformMatch(order.platform, item);
     if (normalizedSku) {
       const current = shopProductSkuMap.get(normalizedSku) || [];
@@ -5717,16 +5685,6 @@ async function resolveOutboundItemsForAutoPickOrder(
     shopId: string | null;
     shopName: string | null;
   }>>();
-  const shopProductNameMap = new Map<string, Array<{
-    id: string;
-    productId: string | null;
-    sourceProductId: string | null;
-    sku: string | null;
-    jdSkuId: string | null;
-    meituanSkuId: string | null;
-    shopId: string | null;
-    shopName: string | null;
-  }>>();
   for (const item of shopProducts) {
     const entry = {
       id: item.id,
@@ -5738,13 +5696,6 @@ async function resolveOutboundItemsForAutoPickOrder(
       shopId: item.shop?.id || null,
       shopName: item.shop?.name || null,
     };
-
-    const normalizedName = toNormalizedText(item.productName);
-    if (normalizedName) {
-      const current = shopProductNameMap.get(normalizedName) || [];
-      current.push(entry);
-      shopProductNameMap.set(normalizedName, current);
-    }
 
     const normalizedSku = normalizeShopProductSkuForPlatformMatch(order.platform, item);
     if (normalizedSku) {
