@@ -4,6 +4,7 @@ import { getAuthorizedUser } from "@/lib/auth";
 import {
   backfillJdSkuIdForManualMatchedShopProducts,
   backfillMeituanSkuIdForManualMatchedShopProducts,
+  backfillPlatformIdsForSyncedAutoPickOrder,
   normalizeAutoPickIntegrationConfig,
   readCustomerMaskedPhoneFromRawPayload,
   readCustomerNameFromRawPayload,
@@ -1884,6 +1885,13 @@ export async function GET(request: NextRequest) {
         };
     await backfillJdSkuIdForManualMatchedShopProducts(prisma, session.id);
     await backfillMeituanSkuIdForManualMatchedShopProducts(prisma, session.id);
+    await Promise.all(
+      responseOrders
+        .filter((order) => isMeituanPlatform(order.platform) || isJDPlatform(order.platform))
+        .map((order) => backfillPlatformIdsForSyncedAutoPickOrder(session.id, order.id).catch((error) => {
+          console.warn("[orders/route] 忽略当前页平台 SKU 自动回填失败:", error);
+        }))
+    );
 
     const productNames = Array.from(new Set(
       responseOrders.flatMap((order) => order.items.map((item) => String(item.productName || "").trim()).filter(Boolean))
