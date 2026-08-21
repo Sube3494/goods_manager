@@ -1181,6 +1181,10 @@ function isSameAutoPickPlatform(left?: string | null, right?: string | null) {
   );
 }
 
+function isOfflineAutoPickPlatform(platform?: string | null) {
+  return getAutoPickPlatformAliases(platform).includes("线下交易");
+}
+
 const MANUAL_DELIVERY_PLACEHOLDER_PRODUCT_NO = "__manual_delivery_placeholder__";
 const MANUAL_DELIVERY_PLACEHOLDER_PRODUCT_NAME = "手工配送占位商品";
 
@@ -4967,10 +4971,17 @@ export async function applyAutoPickProgress(userId: string, payload: unknown) {
     take: 5,
   });
 
-  // 如果有多个匹配，优先选择非手动录入的第三方推单
+  const isOfflineProgress = isOfflineAutoPickPlatform(progress.platform);
   let order = (sourceId
     ? matchedOrders.find((o) => o.sourceId === sourceId)
-    : null)
+    : null);
+
+  if (!order && isOfflineProgress) {
+    order = matchedOrders.find((candidate) => isOfflineAutoPickPlatform(candidate.platform)) || null;
+  }
+
+  // 如果有多个匹配，普通平台优先选择非手动录入的第三方推单；线下交易必须优先落到线下单本身。
+  order = order
     || matchedOrders.find((candidate) => {
       const raw = candidate.rawPayload && typeof candidate.rawPayload === "object" && !Array.isArray(candidate.rawPayload)
         ? candidate.rawPayload as Record<string, unknown>
@@ -4997,7 +5008,7 @@ export async function applyAutoPickProgress(userId: string, payload: unknown) {
     throw new Error("Order not found");
   }
 
-  if (shouldRefreshAutoPickOrderOnProgressStatusHint(progress.statusHint)) {
+  if (!isOfflineProgress && shouldRefreshAutoPickOrderOnProgressStatusHint(progress.statusHint)) {
     const refreshedOrder = await refreshAutoPickOrderFromPlugin(userId, {
       id: order.sourceId,
       platform: resolveAutoPickCommandPlatform(order) || progress.platform,
