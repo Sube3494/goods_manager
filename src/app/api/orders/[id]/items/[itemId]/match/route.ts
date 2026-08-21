@@ -80,53 +80,31 @@ function readMeituanOriginalSpuId(rawPayload: Record<string, unknown>) {
 async function syncMeituanIdForMatchedShopProduct(
   tx: Prisma.TransactionClient,
   userId: string,
-  shopProduct: { productId: string | null; productName: string | null },
+  shopProduct: {
+    id: string;
+    productName: string | null;
+  },
   rawPayload: Record<string, unknown>,
 ) {
   const meituanId = readMeituanOriginalSpuId(rawPayload);
-  if (!meituanId || !shopProduct.productId) {
+  if (!meituanId) {
     return;
   }
 
   try {
-    await tx.productMeituanSku.deleteMany({
+    const existing = await tx.shopProduct.findFirst({
       where: {
-        userId,
+        shop: { userId },
         meituanSkuId: meituanId,
-        productId: { not: shopProduct.productId },
+        id: { not: shopProduct.id },
       },
     });
-    await tx.productMeituanSku.upsert({
-      where: {
-        userId_meituanSkuId: {
-          userId,
-          meituanSkuId: meituanId,
-        },
-      },
-      update: {
-        productId: shopProduct.productId,
-        meituanSpuId: meituanId,
-        meituanName: String(rawPayload.productName || rawPayload.goods_name || shopProduct.productName || "").trim() || null,
-        meituanSpec: String(rawPayload.spec || "").trim() || null,
-      },
-      create: {
-        productId: shopProduct.productId,
-        userId,
-        meituanSkuId: meituanId,
-        meituanSpuId: meituanId,
-        meituanName: String(rawPayload.productName || rawPayload.goods_name || shopProduct.productName || "").trim() || null,
-        meituanSpec: String(rawPayload.spec || "").trim() || null,
-      },
-    });
-    await tx.meituanImportItem.updateMany({
-      where: {
-        userId,
-        meituanSkuId: meituanId,
-      },
-      data: {
-        bindProductId: shopProduct.productId,
-        status: "BOUND",
-      },
+    if (existing) {
+      return;
+    }
+    await tx.shopProduct.update({
+      where: { id: shopProduct.id },
+      data: { meituanSkuId: meituanId },
     });
   } catch (error) {
     console.warn("[match/route] 忽略冲突的 meituanId 回填:", error);
@@ -337,10 +315,15 @@ export async function PATCH(
       select: {
         id: true,
         productId: true,
+        sourceProductId: true,
         jdSkuId: true,
         productName: true,
         sku: true,
         productImage: true,
+        categoryId: true,
+        categoryName: true,
+        supplierId: true,
+        costPrice: true,
         product: {
           select: {
             image: true,

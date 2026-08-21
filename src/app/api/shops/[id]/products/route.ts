@@ -3,7 +3,7 @@ import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
 import { getStorageStrategy } from "@/lib/storage";
 import { normalizeJdSkuIds } from "@/lib/productJdSku";
-import { normalizeMeituanSkuIds, replaceProductMeituanSkuMappings } from "@/lib/productMeituanSku";
+import { normalizeMeituanSkuIds } from "@/lib/productMeituanSku";
 import { Prisma } from "../../../../../../prisma/generated-client";
 import { pinyin } from "pinyin-pro";
 
@@ -337,7 +337,10 @@ export async function GET(
         ...(item.product?.jdSkuMappings?.map((mapping: any) => mapping.jdSkuId) || []),
       ]));
       const aggregatedMeituanSkuIds = Array.from(new Set(
-        item.product?.meituanSkuMappings?.map((mapping: any) => mapping.meituanSkuId) || []
+        [
+          item.meituanSkuId,
+          ...(item.product?.meituanSkuMappings?.map((mapping: any) => mapping.meituanSkuId) || []),
+        ].filter(Boolean)
       ));
       return {
         id: item.id,
@@ -346,7 +349,7 @@ export async function GET(
         sku: item.sku || null,
         jdSkuId: aggregatedJdSkuIds.join(",") || item.jdSkuId || null,
         jdSkuIds: aggregatedJdSkuIds,
-        meituanSkuId: aggregatedMeituanSkuIds.join(",") || null,
+        meituanSkuId: item.meituanSkuId || aggregatedMeituanSkuIds.join(",") || null,
         meituanSkuIds: aggregatedMeituanSkuIds,
         name: item.productName || item.product?.name || "未命名商品",
         image: item.productImage
@@ -456,6 +459,8 @@ export async function PUT(
     const productName = String(body?.name || "").trim();
     const normalizedSku = normalizeSku(body?.sku);
     const normalizedJdSkuId = normalizeSku(body?.jdSkuId);
+    const normalizedMeituanSkuIds = normalizeMeituanSkuIds(body?.meituanSkuIds ?? body?.meituanSkuId);
+    const normalizedMeituanSkuId = normalizedMeituanSkuIds[0] || null;
     const categoryId = typeof body?.categoryId === "string" ? body.categoryId.trim() : "";
     const categoryName = String(body?.categoryName || "").trim();
     const productImage = typeof body?.image === "string" ? body.image.trim() : "";
@@ -520,6 +525,7 @@ export async function PUT(
         pinyin: generatePinyinSearchText(productName),
         sku: normalizedSku,
         jdSkuId: normalizedJdSkuId,
+        meituanSkuId: normalizedMeituanSkuId,
         categoryId: categoryId || null,
         categoryName: categoryName || "未分类",
         productImage: finalProductImage,
@@ -541,6 +547,7 @@ export async function PUT(
         sourceProductId: true,
         sku: true,
         jdSkuId: true,
+        meituanSkuId: true,
         productName: true,
         productImage: true,
         categoryId: true,
@@ -562,13 +569,6 @@ export async function PUT(
       },
     });
 
-    // 如果关联了主商品库商品，同步更新主商品的美团ID映射
-    const targetProductId = existing.productId || existing.sourceProductId;
-    const normalizedMeituanSkuIds = normalizeMeituanSkuIds(body?.meituanSkuIds ?? body?.meituanSkuId);
-    if (targetProductId) {
-      await replaceProductMeituanSkuMappings(prisma, targetProductId, user.id, normalizedMeituanSkuIds);
-    }
-
     const resolvedImage = updated.productImage
       ? storage.resolveUrl(updated.productImage)
       : existing.product?.image
@@ -583,8 +583,8 @@ export async function PUT(
       sourceProductId: updated.sourceProductId,
       sku: updated.sku || null,
       jdSkuId: updated.jdSkuId || null,
-      meituanSkuId: normalizedMeituanSkuIds.join(",") || null,
-      meituanSkuIds: normalizedMeituanSkuIds,
+      meituanSkuId: updated.meituanSkuId || null,
+      meituanSkuIds: updated.meituanSkuId ? [updated.meituanSkuId] : [],
       name: updated.productName || "未命名商品",
       image: resolvedImage,
       categoryId: updated.categoryId || null,
@@ -659,6 +659,7 @@ export async function POST(
         libraryId: true,
         category: { select: { name: true } },
         supplier: { select: { name: true } },
+        meituanSkuMappings: { select: { meituanSkuId: true } },
       },
     });
 
@@ -754,6 +755,7 @@ export async function POST(
       return [{
         ...product,
         sku: nextSku,
+        meituanSkuId: product.meituanSkuMappings[0]?.meituanSkuId || null,
       }];
     });
     const skippedCount = skippedAssignmentCount;
@@ -764,6 +766,7 @@ export async function POST(
         productId: product.id,
         sourceProductId: product.id,
         sku: product.sku,
+        meituanSkuId: product.meituanSkuId,
         productName: product.name,
         pinyin: generatePinyinSearchText(product.name),
         productImage: product.image || null,
