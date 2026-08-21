@@ -6894,29 +6894,31 @@ export async function syncMeituanSkuIdForShopProduct(
 
   try {
     const existingIds = normalizeMeituanSkuIds(shopProduct.meituanSkuId);
+    const nextMeituanSkuIds = Array.from(new Set([...existingIds, cleanSourceId]));
     if (!existingIds.includes(cleanSourceId)) {
-      const nextMeituanSkuIds = Array.from(new Set([...existingIds, cleanSourceId]));
-      const primaryStr = nextMeituanSkuIds.join(",");
-
       await tx.shopProduct.update({
         where: { id: shopProduct.id },
-        data: { meituanSkuId: primaryStr },
+        data: { meituanSkuId: nextMeituanSkuIds.join(",") },
       });
-
-      if (shopProduct.productId) {
-        const existingProductSkus = await tx.productMeituanSku.findMany({
-          where: { productId: shopProduct.productId },
-          select: { meituanSkuId: true },
-        });
-        const productMeituanSkuIds = Array.from(new Set([
-          ...existingProductSkus.map((i) => i.meituanSkuId),
-          ...nextMeituanSkuIds,
-        ]));
-        await replaceProductMeituanSkuMappings(tx, shopProduct.productId, userId, productMeituanSkuIds);
-      }
     }
   } catch (error) {
-    console.warn("[syncMeituanSkuIdForShopProduct] 忽略已存在的 meituanSkuId 冲突:", error);
+    console.warn("[syncMeituanSkuIdForShopProduct] 忽略已存在的店铺 meituanSkuId 冲突:", error);
+  }
+
+  if (shopProduct.productId) {
+    try {
+      const existingProductSkus = await tx.productMeituanSku.findMany({
+        where: { productId: shopProduct.productId },
+        select: { meituanSkuId: true },
+      });
+      const productMeituanSkuIds = Array.from(new Set([
+        ...existingProductSkus.map((i) => i.meituanSkuId),
+        cleanSourceId,
+      ]));
+      await replaceProductMeituanSkuMappings(tx, shopProduct.productId, userId, productMeituanSkuIds);
+    } catch (error) {
+      console.warn("[syncMeituanSkuIdForShopProduct] 忽略已存在的主库 meituanSkuId 冲突:", error);
+    }
   }
 }
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
 import { getStorageStrategy } from "@/lib/storage";
+import { normalizeMeituanSkuIds } from "@/lib/productMeituanSku";
 
 function buildOrderBy(sortBy: string) {
   if (sortBy === "createdAt-desc") return [{ createdAt: "desc" as const }, { id: "asc" as const }];
@@ -15,6 +16,18 @@ function buildOrderBy(sortBy: string) {
   if (sortBy === "sortNumber-desc") return [{ sortNumber: { sort: "desc" as const, nulls: "last" as const } }, { sku: "asc" as const }, { id: "asc" as const }];
   if (sortBy === "sku-desc") return [{ sku: "desc" as const }, { id: "asc" as const }];
   return [{ sku: "desc" as const }, { id: "asc" as const }];
+}
+
+function resolveMeituanSkuIds(item: {
+  meituanSkuId?: string | null;
+  product?: {
+    meituanSkuMappings?: Array<{ meituanSkuId: string }> | null;
+  } | null;
+}) {
+  return Array.from(new Set([
+    ...normalizeMeituanSkuIds(item.meituanSkuId),
+    ...(item.product?.meituanSkuMappings || []).flatMap((mapping) => normalizeMeituanSkuIds(mapping.meituanSkuId)),
+  ]));
 }
 
 export async function GET(request: NextRequest) {
@@ -139,6 +152,7 @@ export async function GET(request: NextRequest) {
                 supplierId: true,
                 supplier: { select: { id: true, name: true } },
                 category: { select: { name: true } },
+                meituanSkuMappings: { select: { meituanSkuId: true } },
               },
             },
           },
@@ -149,14 +163,16 @@ export async function GET(request: NextRequest) {
           .filter((item): item is NonNullable<typeof item> => Boolean(item));
 
         return NextResponse.json({
-          items: orderedItems.map((item) => ({
+          items: orderedItems.map((item) => {
+            const meituanSkuIds = resolveMeituanSkuIds(item);
+            return {
             id: item.id,
             sourceProductId: item.sourceProductId || item.productId || item.id,
             productId: item.productId || null,
             sku: item.sku || null,
             jdSkuId: item.jdSkuId || null,
-            meituanSkuId: item.meituanSkuId || null,
-            meituanSkuIds: item.meituanSkuId ? [item.meituanSkuId] : [],
+            meituanSkuId: meituanSkuIds.join(",") || null,
+            meituanSkuIds,
             name: item.productName || item.product?.name || "未命名商品",
             image: item.productImage
               ? storage.resolveUrl(item.productImage)
@@ -187,7 +203,8 @@ export async function GET(request: NextRequest) {
             specs: item.specs ?? null,
             createdAt: item.createdAt,
             updatedAt: item.updatedAt,
-          })),
+            };
+          }),
           total: orderedItems.length,
           page: 1,
           pageSize: orderedItems.length,
@@ -213,6 +230,7 @@ export async function GET(request: NextRequest) {
               supplierId: true,
               supplier: { select: { id: true, name: true } },
               category: { select: { name: true } },
+              meituanSkuMappings: { select: { meituanSkuId: true } },
             },
           },
         },
@@ -220,14 +238,16 @@ export async function GET(request: NextRequest) {
       });
 
       return NextResponse.json({
-        items: selectedItems.map((item) => ({
+        items: selectedItems.map((item) => {
+          const meituanSkuIds = resolveMeituanSkuIds(item);
+          return {
           id: item.id,
           sourceProductId: item.sourceProductId || item.productId || item.id,
           productId: item.productId || null,
           sku: item.sku || null,
           jdSkuId: item.jdSkuId || null,
-          meituanSkuId: item.meituanSkuId || null,
-          meituanSkuIds: item.meituanSkuId ? [item.meituanSkuId] : [],
+          meituanSkuId: meituanSkuIds.join(",") || null,
+          meituanSkuIds,
           name: item.productName || item.product?.name || "未命名商品",
           image: item.productImage
             ? storage.resolveUrl(item.productImage)
@@ -258,7 +278,8 @@ export async function GET(request: NextRequest) {
           specs: item.specs ?? null,
           createdAt: item.createdAt,
           updatedAt: item.updatedAt,
-        })),
+          };
+        }),
         total: selectedItems.length,
         page: 1,
         pageSize: selectedItems.length,
@@ -294,6 +315,7 @@ export async function GET(request: NextRequest) {
               supplierId: true,
               supplier: { select: { id: true, name: true } },
               category: { select: { name: true } },
+              meituanSkuMappings: { select: { meituanSkuId: true } },
             },
           },
         },
@@ -402,6 +424,7 @@ export async function GET(request: NextRequest) {
               supplierId: true,
               supplier: { select: { id: true, name: true } },
               category: { select: { name: true } },
+              meituanSkuMappings: { select: { meituanSkuId: true } },
             },
           },
         },
@@ -413,14 +436,16 @@ export async function GET(request: NextRequest) {
     ]);
 
     const storage = await getStorageStrategy();
-    const resolved = items.map((item) => ({
+    const resolved = items.map((item) => {
+      const meituanSkuIds = resolveMeituanSkuIds(item);
+      return {
       id: item.id,
       sourceProductId: item.sourceProductId || item.productId || item.id,
       productId: item.productId || null,
       sku: item.sku || null,
       jdSkuId: item.jdSkuId || null,
-      meituanSkuId: item.meituanSkuId || null,
-      meituanSkuIds: item.meituanSkuId ? [item.meituanSkuId] : [],
+      meituanSkuId: meituanSkuIds.join(",") || null,
+      meituanSkuIds,
       name: item.productName || item.product?.name || "未命名商品",
       image: item.productImage
         ? storage.resolveUrl(item.productImage)
@@ -451,7 +476,8 @@ export async function GET(request: NextRequest) {
       specs: item.specs ?? null,
       createdAt: item.createdAt,
       updatedAt: item.updatedAt,
-    }));
+      };
+    });
 
     return NextResponse.json({
       items: resolved,
