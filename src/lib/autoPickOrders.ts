@@ -4001,7 +4001,14 @@ function normalizeAutoPickProgressPayload(payload: unknown): AutoPickProgressPay
   }
 
   let orderNo = String(input.orderNo || input.order_no || nested?.orderNo || nested?.order_no || msgParsed.orderNo || "").trim();
-  let orderSequence = String(input.orderSequence || nested?.orderSequence || msgParsed.orderSequence || "").trim();
+  let orderSequence = String(
+    input.orderSequence
+    || input.dailyPlatformSequence
+    || nested?.orderSequence
+    || nested?.dailyPlatformSequence
+    || msgParsed.orderSequence
+    || ""
+  ).trim();
 
   const pickRemainingSeconds = Number(input.pickRemainingSeconds ?? nested?.pickRemainingSeconds);
   const pickCompleted = Boolean(input.pickCompleted ?? nested?.pickCompleted) || msgParsed.statusHint === "meal";
