@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowUp, Loader2, Package2, Search, X, ChevronDown } from "lucide-react";
+import { ArrowUp, ChevronDown, Loader2, Package2, Search, X } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { DatePicker } from "@/components/ui/DatePicker";
@@ -14,7 +14,7 @@ import {
   OrderCard,
   OrderCardErrorBoundary,
   isBrushSyncEligibleOrder,
-  getOrderActionErrorMessage
+  getOrderActionErrorMessage,
 } from "./OrderCard";
 
 type OrderAction = "self-delivery" | "complete-delivery" | "pickup-complete" | "sync" | "outbound" | "sync-brush";
@@ -35,8 +35,29 @@ interface AllOrdersViewProps {
   onOpenMatchEditor: (order: AutoPickOrder, item: AutoPickOrderItem) => void;
   onOpenPurchaseDraft?: (draft: PurchaseDraftPayload) => void;
   onDataLoad: (data: {
-    summary: { receivedAmount: number; platformCommission: number; validOrderCount: number; itemCount: number; totalDeliveryFee: number; platformReceived?: Record<string, { amount: number; count: number }>; platformDelivery?: Record<string, number>; pureProfit: number; platformProfit?: Record<string, { amount: number; count: number }>; shopProfit?: Record<string, ShopProfitInfo> };
-    overview: { totalCount: number; trueOrderCount: number; brushCount: number; cancelledCount: number; platformBreakdown?: { truePlatformCounts: Record<string, number>; brushPlatformCounts: Record<string, number>; cancelledPlatformCounts: Record<string, number> } };
+    summary: {
+      receivedAmount: number;
+      platformCommission: number;
+      validOrderCount: number;
+      itemCount: number;
+      totalDeliveryFee: number;
+      platformReceived?: Record<string, { amount: number; count: number }>;
+      platformDelivery?: Record<string, number>;
+      pureProfit: number;
+      platformProfit?: Record<string, { amount: number; count: number }>;
+      shopProfit?: Record<string, ShopProfitInfo>;
+    };
+    overview: {
+      totalCount: number;
+      trueOrderCount: number;
+      brushCount: number;
+      cancelledCount: number;
+      platformBreakdown?: {
+        truePlatformCounts: Record<string, number>;
+        brushPlatformCounts: Record<string, number>;
+        cancelledPlatformCounts: Record<string, number>;
+      };
+    };
     total: number;
     eligibleBrushSyncOrders: AutoPickOrder[];
     isLoading: boolean;
@@ -45,7 +66,7 @@ interface AllOrdersViewProps {
   localShops: Array<{ id: string; name: string; address: string }>;
 }
 
-const ALL_ORDERS_BATCH_SIZE = 100;
+const ALL_ORDERS_BATCH_SIZE = 30;
 
 export function AllOrdersView({
   refreshTrigger,
@@ -115,6 +136,7 @@ export function AllOrdersView({
 
   // 筛选状态
   const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [platform, setPlatform] = useState("all");
   const [shop, setShop] = useState("all");
   const [status, setStatus] = useState("all");
@@ -127,6 +149,14 @@ export function AllOrdersView({
   const [expandedIds, setExpandedIds] = useState<string[]>([]);
   const isFetchingRef = useRef(false);
   const loadMoreTriggerRef = useRef<HTMLDivElement | null>(null);
+
+  // 搜索输入 300ms 防抖
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(query);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [query]);
 
   const todayDate = useMemo(() => formatLocalDate(new Date()), []);
   const hasMore = meta.page < meta.totalPages;
@@ -151,7 +181,7 @@ export function AllOrdersView({
         pageSize: String(ALL_ORDERS_BATCH_SIZE),
       });
 
-      if (query.trim()) params.set("query", query.trim());
+      if (debouncedQuery.trim()) params.set("query", debouncedQuery.trim());
       if (platform !== "all") params.set("platform", platform);
       if (status !== "all") params.set("status", status);
       if (startDate) params.set("startDate", startDate);
@@ -203,7 +233,7 @@ export function AllOrdersView({
       setIsLoading(false);
       setIsLoadingMore(false);
     }
-  }, [platform, query, startDate, endDate, status, shop, showToast]);
+  }, [platform, debouncedQuery, startDate, endDate, status, shop, showToast]);
 
   // 外部刷新信号监听
   useEffect(() => {
@@ -214,7 +244,7 @@ export function AllOrdersView({
   useEffect(() => {
     setCurrentPage(1);
     void fetchOrders();
-  }, [platform, query, startDate, endDate, status, shop, fetchOrders]);
+  }, [platform, debouncedQuery, startDate, endDate, status, shop, fetchOrders]);
 
   // 日期范围自适应
   useEffect(() => {
@@ -248,6 +278,7 @@ export function AllOrdersView({
     document.body.scrollTo({ top: 0, behavior: "smooth" });
   }, []);
 
+  // 滚动自动触底加载
   useEffect(() => {
     if (typeof window === "undefined") {
       return;
@@ -310,7 +341,7 @@ export function AllOrdersView({
   }, [orders, patchOrder, showToast]);
 
   // 卡片操作与事件回调
-  const toggleExpanded = (orderId: string) => {
+  const toggleExpanded = useCallback((orderId: string) => {
     let shouldLoadDetail = false;
     setExpandedIds((current) => {
       if (current.includes(orderId)) {
@@ -322,9 +353,13 @@ export function AllOrdersView({
     if (shouldLoadDetail) {
       void ensureOrderDetail(orderId);
     }
-  };
+  }, [ensureOrderDetail]);
 
-  const runAction = async (orderId: string, action: OrderAction) => {
+  const handleRefreshOrder = useCallback(() => {
+    void fetchOrders({ silent: true });
+  }, [fetchOrders]);
+
+  const runAction = useCallback(async (orderId: string, action: OrderAction) => {
     setActingId(`${orderId}:${action}`);
     try {
       let requestInit: RequestInit = { method: "POST" };
@@ -353,7 +388,7 @@ export function AllOrdersView({
               id: `PO-${today.toISOString().slice(0, 10).replace(/-/g, "")}-${Math.floor(Math.random() * 1000).toString().padStart(3, "0")}`,
               status: "Confirmed" as PurchaseStatus,
               type: "Purchase",
-              date: today.toLocaleString('sv-SE').slice(0, 16).replace('T', ' '),
+              date: today.toLocaleString("sv-SE").slice(0, 16).replace("T", " "),
               items: data.insufficientItems.map((item: { productId?: string; shopProductId?: string; name?: string; image?: string | null; missingQuantity: number; mappedShopId?: string; mappedShopName?: string }) => ({
                 productId: item.productId || null,
                 shopProductId: item.shopProductId || null,
@@ -410,9 +445,7 @@ export function AllOrdersView({
     } finally {
       setActingId("");
     }
-  };
-
-
+  }, [fetchOrders, localShops, onOpenPurchaseDraft, patchOrder, showToast]);
 
   // 数据统计与过滤处理
   const shopOptions = useMemo(() => {
@@ -500,8 +533,6 @@ export function AllOrdersView({
       {/* 筛选栏 */}
       <section className="rounded-3xl border border-black/8 bg-zinc-50/45 px-4 py-4 shadow-xs dark:border-white/10 dark:bg-white/4">
         <div className="flex flex-col gap-4">
-
-
           <div className="grid gap-3 lg:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))_minmax(0,1fr)_minmax(0,1fr)]">
             <div className="flex items-center gap-2 min-w-0">
               <label className="flex h-11 flex-1 items-center gap-3 rounded-xl border border-black/8 bg-white px-4 focus-within:ring-2 focus-within:ring-primary/10 dark:border-white/10 dark:bg-white/3 min-w-0">
@@ -592,7 +623,7 @@ export function AllOrdersView({
                   onRunAction={runAction}
                   onOpenCostBackfill={onOpenCostBackfill}
                   onOpenMatchEditor={onOpenMatchEditor}
-                  onRefresh={() => fetchOrders({ silent: true })}
+                  onRefresh={handleRefreshOrder}
                 />
               </OrderCardErrorBoundary>
             ))}

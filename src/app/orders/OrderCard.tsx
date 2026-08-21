@@ -1,6 +1,6 @@
 "use client";
 
-import { Component, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { Component, memo, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import {
   Check,
@@ -1782,7 +1782,7 @@ export class OrderCardErrorBoundary extends Component<{ children: React.ReactNod
   }
 }
 
-export function OrderCard({
+export const OrderCard = memo(function OrderCard({
   order,
   expanded,
   actingId,
@@ -3056,7 +3056,7 @@ export function OrderCard({
       ) : null}
     </>
   );
-}
+});
 
 function OrderShopEditModal({
   order,
