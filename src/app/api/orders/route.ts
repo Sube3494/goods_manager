@@ -399,7 +399,7 @@ function readPlatformProductIdForMatch(
       ? rawPayload as Record<string, unknown>
       : {};
     const goodsExtra = readGoodsExtraRecord(record);
-    return normalizeSkuDigits(String(goodsExtra.original_spu_id || ""));
+    return normalizeSkuDigits(String(goodsExtra.original_sku_id || ""));
   }
 
   if (isJDPlatform(platform)) {
