@@ -4407,12 +4407,67 @@ function isJdPlatform(platform: string | null | undefined) {
   return normalized === "jd" || normalized.includes("jingdong") || normalized.includes("jddj") || normalized.includes("京东");
 }
 
+function isMeituanPlatform(platform: string | null | undefined) {
+  const normalized = String(platform || "").trim().toLowerCase();
+  return normalized.includes("meituan") || normalized.includes("美团") || normalized.includes("闪购") || normalized.includes("shangou");
+}
+
+function readAutoPickGoodsExtraRecord(rawPayload: unknown) {
+  const record = rawPayload && typeof rawPayload === "object" && !Array.isArray(rawPayload)
+    ? rawPayload as Record<string, unknown>
+    : {};
+  const goodsExtra = record.goods_extra || record.goodsExtra;
+  if (typeof goodsExtra === "string") {
+    try {
+      const parsed = JSON.parse(goodsExtra) as unknown;
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+        ? parsed as Record<string, unknown>
+        : {};
+    } catch {
+      return {};
+    }
+  }
+  return goodsExtra && typeof goodsExtra === "object" && !Array.isArray(goodsExtra)
+    ? goodsExtra as Record<string, unknown>
+    : {};
+}
+
+function readAutoPickPlatformProductIdForMatch(
+  platform: string | null | undefined,
+  rawPayload: unknown,
+  productNo?: string | null,
+) {
+  if (isMeituanPlatform(platform)) {
+    const record = rawPayload && typeof rawPayload === "object" && !Array.isArray(rawPayload)
+      ? rawPayload as Record<string, unknown>
+      : {};
+    const goodsExtra = readAutoPickGoodsExtraRecord(record);
+    return normalizeAutoPickSkuForMatch(String(
+      goodsExtra.original_spu_id
+      || goodsExtra.originalSpuId
+      || record.original_spu_id
+      || record.originalSpuId
+      || record.platformProductId
+      || ""
+    ));
+  }
+
+  if (isJdPlatform(platform)) {
+    return normalizeAutoPickSkuForMatch(productNo);
+  }
+
+  return "";
+}
+
 function normalizeShopProductSkuForPlatformMatch(
   platform: string | null | undefined,
-  item: { sku?: string | null; jdSkuId?: string | null }
+  item: { sku?: string | null; jdSkuId?: string | null; meituanSkuId?: string | null }
 ) {
   if (isJdPlatform(platform)) {
     return normalizeAutoPickSkuForMatch(item.jdSkuId);
+  }
+  if (isMeituanPlatform(platform)) {
+    return normalizeAutoPickSkuForMatch(item.meituanSkuId);
   }
   return normalizeAutoPickSkuForMatch(item.sku || item.jdSkuId);
 }
@@ -4435,6 +4490,7 @@ async function findExistingShopProductByShopAndSku(
         shopId,
         OR: [
           { jdSkuId: targetJdSku },
+          { meituanSkuId: targetJdSku },
           { product: { jdSkuMappings: { some: { jdSkuId: targetJdSku } } } },
         ],
       },
@@ -4444,6 +4500,7 @@ async function findExistingShopProductByShopAndSku(
         sourceProductId: true,
         sku: true,
         jdSkuId: true,
+        meituanSkuId: true,
         productName: true,
       },
     });
@@ -4464,6 +4521,7 @@ async function findExistingShopProductByShopAndSku(
       sourceProductId: true,
       sku: true,
       jdSkuId: true,
+      meituanSkuId: true,
       productName: true,
     },
   });
@@ -4481,6 +4539,7 @@ async function findExistingShopProductByShopAndSku(
       sourceProductId: true,
       sku: true,
       jdSkuId: true,
+      meituanSkuId: true,
       productName: true,
     },
   });
@@ -5338,6 +5397,7 @@ async function resolveBrushOrderItemsForAutoPickOrder(
         productName: true,
         sku: true,
         jdSkuId: true,
+        meituanSkuId: true,
         shop: {
           select: {
             id: true,
@@ -5376,6 +5436,7 @@ async function resolveBrushOrderItemsForAutoPickOrder(
     sourceProductId: string | null;
     sku: string | null;
     jdSkuId: string | null;
+    meituanSkuId: string | null;
     shopId: string | null;
     shopName: string | null;
   }>>();
@@ -5385,6 +5446,7 @@ async function resolveBrushOrderItemsForAutoPickOrder(
     sourceProductId: string | null;
     sku: string | null;
     jdSkuId: string | null;
+    meituanSkuId: string | null;
     shopId: string | null;
     shopName: string | null;
   }>>();
@@ -5395,6 +5457,7 @@ async function resolveBrushOrderItemsForAutoPickOrder(
     sourceProductId: string | null;
     sku: string | null;
     jdSkuId: string | null;
+    meituanSkuId: string | null;
     shopId: string | null;
     shopName: string | null;
   }> = [];
@@ -5405,6 +5468,7 @@ async function resolveBrushOrderItemsForAutoPickOrder(
       sourceProductId: item.sourceProductId || null,
       sku: item.sku || null,
       jdSkuId: item.jdSkuId || null,
+      meituanSkuId: item.meituanSkuId || null,
       shopId: item.shop?.id || null,
       shopName: item.shop?.name || null,
     };
@@ -5424,6 +5488,12 @@ async function resolveBrushOrderItemsForAutoPickOrder(
       const current = shopProductSkuMap.get(normalizedSku) || [];
       current.push(entry);
       shopProductSkuMap.set(normalizedSku, current);
+    }
+    const normalizedFallbackSku = normalizeAutoPickSkuForMatch(item.sku || item.jdSkuId);
+    if (normalizedFallbackSku && normalizedFallbackSku !== normalizedSku) {
+      const current = shopProductSkuMap.get(normalizedFallbackSku) || [];
+      current.push(entry);
+      shopProductSkuMap.set(normalizedFallbackSku, current);
     }
   }
 
@@ -5486,8 +5556,10 @@ async function resolveBrushOrderItemsForAutoPickOrder(
     }
 
     const productName = toAutoPickBaseProductName(item.productName);
+    const platformProductId = readAutoPickPlatformProductIdForMatch(order.platform, item.rawPayload, item.productNo);
     const normalizedSku = normalizeAutoPickSkuForMatch(item.productNo);
-    const allSameSkuCandidates = normalizedSku ? (shopProductSkuMap.get(normalizedSku) || []) : [];
+    const matchKeys = Array.from(new Set([platformProductId, normalizedSku].filter(Boolean)));
+    const allSameSkuCandidates = matchKeys.flatMap((key) => shopProductSkuMap.get(key) || []);
 
     const sameSkuCandidates = allSameSkuCandidates.filter((candidate) => isCandidateInMappedShop(candidate.shopId, candidate.shopName));
     const sameShopSkuCandidate = sameSkuCandidates.find((candidate) => {
@@ -5502,7 +5574,7 @@ async function resolveBrushOrderItemsForAutoPickOrder(
     ).trim();
 
     if (!resolvedProductId) {
-      missingItems.push(`${productName}${normalizedSku ? ` / SKU ${normalizedSku}` : ""}`);
+      missingItems.push(`${productName}${matchKeys[0] ? ` / SKU ${matchKeys[0]}` : ""}`);
       continue;
     }
 
@@ -5626,6 +5698,7 @@ async function resolveOutboundItemsForAutoPickOrder(
         productName: true,
         sku: true,
         jdSkuId: true,
+        meituanSkuId: true,
         shop: {
           select: {
             id: true,
@@ -5640,6 +5713,7 @@ async function resolveOutboundItemsForAutoPickOrder(
     sourceProductId: string | null;
     sku: string | null;
     jdSkuId: string | null;
+    meituanSkuId: string | null;
     shopId: string | null;
     shopName: string | null;
   }>>();
@@ -5649,6 +5723,7 @@ async function resolveOutboundItemsForAutoPickOrder(
     sourceProductId: string | null;
     sku: string | null;
     jdSkuId: string | null;
+    meituanSkuId: string | null;
     shopId: string | null;
     shopName: string | null;
   }>>();
@@ -5659,6 +5734,7 @@ async function resolveOutboundItemsForAutoPickOrder(
       sourceProductId: item.sourceProductId || null,
       sku: item.sku || null,
       jdSkuId: item.jdSkuId || null,
+      meituanSkuId: item.meituanSkuId || null,
       shopId: item.shop?.id || null,
       shopName: item.shop?.name || null,
     };
@@ -5671,10 +5747,17 @@ async function resolveOutboundItemsForAutoPickOrder(
     }
 
     const normalizedSku = normalizeShopProductSkuForPlatformMatch(order.platform, item);
-    if (!normalizedSku) continue;
-    const current = shopProductSkuMap.get(normalizedSku) || [];
-    current.push(entry);
-    shopProductSkuMap.set(normalizedSku, current);
+    if (normalizedSku) {
+      const current = shopProductSkuMap.get(normalizedSku) || [];
+      current.push(entry);
+      shopProductSkuMap.set(normalizedSku, current);
+    }
+    const normalizedFallbackSku = normalizeAutoPickSkuForMatch(item.sku || item.jdSkuId);
+    if (normalizedFallbackSku && normalizedFallbackSku !== normalizedSku) {
+      const currentFallback = shopProductSkuMap.get(normalizedFallbackSku) || [];
+      currentFallback.push(entry);
+      shopProductSkuMap.set(normalizedFallbackSku, currentFallback);
+    }
   }
 
   const priceShare = Math.max(0, FinanceMath.divide((Number(order.actualPaid || 0) || 0) / 100, Math.max(1, order.items.length)));
@@ -5690,7 +5773,11 @@ async function resolveOutboundItemsForAutoPickOrder(
 
     const manualMatchedProduct = readManualMatchedProductFromOrderItemRawPayload(item.rawPayload);
     const productName = toAutoPickBaseProductName(item.productName);
-    const normalizedSkus = splitCompositeAutoPickSku(item.productNo);
+    const platformProductId = readAutoPickPlatformProductIdForMatch(order.platform, item.rawPayload, item.productNo);
+    const skuFallbacks = splitCompositeAutoPickSku(item.productNo);
+    const normalizedSkus = platformProductId
+      ? Array.from(new Set([platformProductId, ...skuFallbacks].filter(Boolean)))
+      : skuFallbacks;
     const skuParts = normalizedSkus.length > 0 ? normalizedSkus : [normalizeAutoPickSkuForMatch(item.productNo)];
     const perResolvedPrice = FinanceMath.divide(priceShare, Math.max(1, skuParts.filter(Boolean).length || 1));
 
@@ -5783,6 +5870,7 @@ async function resolveOutboundItemsForAutoPickOrder(
         sourceProductId: string | null;
         sku: string | null;
         jdSkuId: string | null;
+        meituanSkuId: string | null;
         shopId: string | null;
         shopName: string | null;
       } | null = null;
@@ -5820,6 +5908,7 @@ async function resolveOutboundItemsForAutoPickOrder(
             sourceProductId: existingShopProduct.sourceProductId || null,
             sku: existingShopProduct.sku || null,
             jdSkuId: existingShopProduct.jdSkuId || null,
+            meituanSkuId: existingShopProduct.meituanSkuId || null,
             shopId: internalShop.id,
             shopName: internalShop.name,
           };

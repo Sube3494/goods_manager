@@ -364,12 +364,67 @@ function isJDPlatform(platform: string | null | undefined) {
   return normalized === "jd" || normalized.includes("jingdong") || normalized.includes("jddj") || normalized.includes("京东");
 }
 
+function isMeituanPlatform(platform: string | null | undefined) {
+  const normalized = String(platform || "").trim().toLowerCase();
+  return normalized.includes("meituan") || normalized.includes("美团") || normalized.includes("闪购") || normalized.includes("shangou");
+}
+
+function readGoodsExtraRecord(rawPayload: unknown) {
+  const record = rawPayload && typeof rawPayload === "object" && !Array.isArray(rawPayload)
+    ? rawPayload as Record<string, unknown>
+    : {};
+  const goodsExtra = record.goods_extra || record.goodsExtra;
+  if (typeof goodsExtra === "string") {
+    try {
+      const parsed = JSON.parse(goodsExtra) as unknown;
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+        ? parsed as Record<string, unknown>
+        : {};
+    } catch {
+      return {};
+    }
+  }
+  return goodsExtra && typeof goodsExtra === "object" && !Array.isArray(goodsExtra)
+    ? goodsExtra as Record<string, unknown>
+    : {};
+}
+
+function readPlatformProductIdForMatch(
+  platform: string | null | undefined,
+  rawPayload: unknown,
+  productNo?: string | null,
+) {
+  if (isMeituanPlatform(platform)) {
+    const record = rawPayload && typeof rawPayload === "object" && !Array.isArray(rawPayload)
+      ? rawPayload as Record<string, unknown>
+      : {};
+    const goodsExtra = readGoodsExtraRecord(record);
+    return normalizeSkuDigits(String(
+      goodsExtra.original_spu_id
+      || goodsExtra.originalSpuId
+      || record.original_spu_id
+      || record.originalSpuId
+      || record.platformProductId
+      || ""
+    ));
+  }
+
+  if (isJDPlatform(platform)) {
+    return normalizeSkuDigits(productNo);
+  }
+
+  return "";
+}
+
 function normalizeShopProductSkuForPlatformMatch(
   platform: string | null | undefined,
-  item: { sku?: string | null; jdSkuId?: string | null }
+  item: { sku?: string | null; jdSkuId?: string | null; meituanSkuId?: string | null }
 ) {
   if (isJDPlatform(platform)) {
     return normalizeSkuDigits(item.jdSkuId);
+  }
+  if (isMeituanPlatform(platform)) {
+    return normalizeSkuDigits(item.meituanSkuId);
   }
   return normalizeSkuDigits(item.sku || item.jdSkuId);
 }
@@ -1791,7 +1846,8 @@ export async function GET(request: NextRequest) {
     ));
     const productSkuCandidates = Array.from(new Set(
       responseOrders.flatMap((order) => order.items.flatMap((item) => {
-        return buildSkuMatchCandidates(item.productNo);
+        const platformProductId = readPlatformProductIdForMatch(order.platform, item.rawPayload, item.productNo);
+        return platformProductId ? [platformProductId, ...buildSkuMatchCandidates(item.productNo)] : buildSkuMatchCandidates(item.productNo);
       }))
     ));
 
@@ -1818,6 +1874,7 @@ export async function GET(request: NextRequest) {
                 ...(productSkuCandidates.length > 0 ? [
                   { sku: { in: productSkuCandidates } },
                   { jdSkuId: { in: productSkuCandidates } },
+                  { meituanSkuId: { in: productSkuCandidates } },
                   { product: { jdSkuMappings: { some: { jdSkuId: { in: productSkuCandidates } } } } },
                 ] : []),
                 ...(manualMatchedProductIds.length > 0 ? [
@@ -1830,6 +1887,7 @@ export async function GET(request: NextRequest) {
               id: true,
               sku: true,
               jdSkuId: true,
+              meituanSkuId: true,
               productId: true,
               sourceProductId: true,
               productName: true,
@@ -1857,6 +1915,7 @@ export async function GET(request: NextRequest) {
         name: item.productName || "未命名商品",
         sku: item.sku,
         jdSkuId: item.jdSkuId,
+        meituanSkuId: item.meituanSkuId,
         image: rawImage ? storage.resolveUrl(rawImage) : null,
         sourceType: "shopProduct" as const,
         productId: item.productId || item.sourceProductId || null,
@@ -2042,7 +2101,11 @@ export async function GET(request: NextRequest) {
         firstMissingCostPurchaseOrderItemId: outboundMeta?.firstMissingCostPurchaseOrderItemId || null,
         items: order.items.map((item) => {
           const manualMatchedProduct = readManualMatchedProduct(item.rawPayload);
-          const skuSegments = splitCompositeSkuSegments(item.productNo);
+          const platformProductId = readPlatformProductIdForMatch(order.platform, item.rawPayload, item.productNo);
+          const skuFallbacks = splitCompositeSkuSegments(item.productNo);
+          const skuSegments = platformProductId
+            ? Array.from(new Set([platformProductId, ...skuFallbacks].filter(Boolean)))
+            : skuFallbacks;
           const normalizedSkuCandidates = skuSegments.length > 0
             ? skuSegments
             : [normalizeSkuDigits(item.productNo)].filter(Boolean);
