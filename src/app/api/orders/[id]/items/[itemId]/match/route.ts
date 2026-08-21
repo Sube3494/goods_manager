@@ -76,6 +76,24 @@ function readMeituanSkuId(rawPayload: Record<string, unknown>) {
   ).trim();
 }
 
+function readOrderItemPlatformSkuId(
+  platform: string | null | undefined,
+  platformSkuId: string | null | undefined,
+  rawPayload: Record<string, unknown>,
+  fallbackRawPayload?: Record<string, unknown>,
+) {
+  const normalizedPlatformSkuId = String(platformSkuId || "").trim();
+  if (normalizedPlatformSkuId) {
+    return normalizedPlatformSkuId;
+  }
+
+  if (isMeituanPlatform(platform)) {
+    return readMeituanSkuId(rawPayload) || (fallbackRawPayload ? readMeituanSkuId(fallbackRawPayload) : "");
+  }
+
+  return "";
+}
+
 function isMeituanPlatform(platform: string | null | undefined) {
   const normalized = String(platform || "").trim().toLowerCase();
   return normalized.includes("meituan") || normalized.includes("美团") || normalized.includes("闪购") || normalized.includes("shangou");
@@ -137,12 +155,13 @@ async function syncMeituanIdForMatchedShopProduct(
   fallbackRawPayload?: Record<string, unknown>,
   platform?: string | null,
   productNo?: string | null,
+  platformSkuId?: string | null,
 ) {
   if (!isMeituanPlatform(platform)) {
     return;
   }
 
-  const meituanId = readMeituanSkuId(rawPayload) || (fallbackRawPayload ? readMeituanSkuId(fallbackRawPayload) : "");
+  const meituanId = readOrderItemPlatformSkuId(platform, platformSkuId, rawPayload, fallbackRawPayload);
   if (!meituanId) {
     return;
   }
@@ -178,6 +197,7 @@ export async function PATCH(
       select: {
         id: true,
         productNo: true,
+        platformSkuId: true,
         rawPayload: true,
         order: {
           select: {
@@ -330,7 +350,7 @@ export async function PATCH(
 
       await prisma.$transaction(async (tx) => {
         for (const shopProduct of shopProducts) {
-          await syncMeituanIdForMatchedShopProduct(tx, user.id, shopProduct, basePayload, fallbackItemPayload, orderItem.order.platform, orderItem.productNo);
+          await syncMeituanIdForMatchedShopProduct(tx, user.id, shopProduct, basePayload, fallbackItemPayload, orderItem.order.platform, orderItem.productNo, orderItem.platformSkuId);
         }
         await tx.autoPickOrderItem.update({
           where: { id: orderItem.id },
@@ -401,7 +421,7 @@ export async function PATCH(
 
     if (autoMatchedProduct?.shopProductId && autoMatchedProduct.shopProductId === matchedProduct.shopProductId) {
       await prisma.$transaction(async (tx) => {
-        await syncMeituanIdForMatchedShopProduct(tx, user.id, shopProduct, basePayload, fallbackItemPayload, orderItem.order.platform, orderItem.productNo);
+        await syncMeituanIdForMatchedShopProduct(tx, user.id, shopProduct, basePayload, fallbackItemPayload, orderItem.order.platform, orderItem.productNo, orderItem.platformSkuId);
         await tx.autoPickOrderItem.update({
           where: { id: orderItem.id },
           data: {
@@ -474,7 +494,7 @@ export async function PATCH(
         }
       }
 
-      await syncMeituanIdForMatchedShopProduct(tx, user.id, shopProduct, basePayload, fallbackItemPayload, orderItem.order.platform, orderItem.productNo);
+      await syncMeituanIdForMatchedShopProduct(tx, user.id, shopProduct, basePayload, fallbackItemPayload, orderItem.order.platform, orderItem.productNo, orderItem.platformSkuId);
 
       await tx.autoPickOrderItem.update({
         where: { id: orderItem.id },

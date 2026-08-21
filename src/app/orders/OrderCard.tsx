@@ -619,6 +619,11 @@ function readGoodsExtraRecord(rawPayload: Record<string, unknown>) {
 }
 
 function readDisplaySourceId(item: AutoPickOrderItem, platform?: string | null, channelTag?: string | null) {
+  const platformSkuId = String(item.platformSkuId || "").trim();
+  if (platformSkuId) {
+    return platformSkuId;
+  }
+
   const rawPayload = item.rawPayload && typeof item.rawPayload === "object" && !Array.isArray(item.rawPayload)
     ? item.rawPayload as Record<string, unknown>
     : {};

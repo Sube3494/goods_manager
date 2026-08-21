@@ -155,6 +155,7 @@ export interface AutoPickOrderItem {
   orderId?: string;
   productName: string;
   productNo?: string | null;
+  platformSkuId?: string | null;
   quantity: number;
   thumb?: string | null;
   rawPayload?: unknown;

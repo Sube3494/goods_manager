@@ -725,6 +725,7 @@ model AutoPickOrderItem {
   orderId     String
   productName String
   productNo   String?
+  platformSkuId String?
   quantity    Int           @default(1)
   thumb       String?
   rawPayload  Json?
@@ -734,6 +735,7 @@ model AutoPickOrderItem {
 
   @@index([orderId])
   @@index([productNo])
+  @@index([platformSkuId])
 }
 
 model AutoPickApiKey {

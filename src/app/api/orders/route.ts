@@ -394,7 +394,13 @@ function readPlatformProductIdForMatch(
   platform: string | null | undefined,
   rawPayload: unknown,
   productNo?: string | null,
+  platformSkuId?: string | null,
 ) {
+  const normalizedPlatformSkuId = normalizeSkuDigits(platformSkuId);
+  if (normalizedPlatformSkuId) {
+    return normalizedPlatformSkuId;
+  }
+
   if (isMeituanPlatform(platform)) {
     const record = rawPayload && typeof rawPayload === "object" && !Array.isArray(rawPayload)
       ? rawPayload as Record<string, unknown>
@@ -410,7 +416,17 @@ function readPlatformProductIdForMatch(
   }
 
   if (isJDPlatform(platform)) {
-    return normalizeSkuDigits(productNo);
+    const record = rawPayload && typeof rawPayload === "object" && !Array.isArray(rawPayload)
+      ? rawPayload as Record<string, unknown>
+      : {};
+    return normalizeSkuDigits(String(
+      record.source_id
+      || record.sourceId
+      || record.sku_code
+      || record.skuCode
+      || productNo
+      || ""
+    ));
   }
 
   return "";
@@ -1202,6 +1218,7 @@ export async function GET(request: NextRequest) {
                 select: {
                   productName: true,
                   productNo: true,
+                  platformSkuId: true,
                   quantity: true,
                   rawPayload: true,
                 },
@@ -1871,7 +1888,7 @@ export async function GET(request: NextRequest) {
     ));
     const productSkuCandidates = Array.from(new Set(
       responseOrders.flatMap((order) => order.items.flatMap((item) => {
-        const platformProductId = readPlatformProductIdForMatch(order.platform, item.rawPayload, item.productNo);
+        const platformProductId = readPlatformProductIdForMatch(order.platform, item.rawPayload, item.productNo, item.platformSkuId);
         return platformProductId ? [platformProductId, ...buildSkuMatchCandidates(item.productNo)] : buildSkuMatchCandidates(item.productNo);
       }))
     ));
@@ -2126,7 +2143,7 @@ export async function GET(request: NextRequest) {
         firstMissingCostPurchaseOrderItemId: outboundMeta?.firstMissingCostPurchaseOrderItemId || null,
         items: order.items.map((item) => {
           const manualMatchedProduct = readManualMatchedProduct(item.rawPayload);
-          const platformProductId = readPlatformProductIdForMatch(order.platform, item.rawPayload, item.productNo);
+          const platformProductId = readPlatformProductIdForMatch(order.platform, item.rawPayload, item.productNo, item.platformSkuId);
           const skuFallbacks = splitCompositeSkuSegments(item.productNo);
           const normalizedSkuCandidates = skuFallbacks.length > 0
             ? skuFallbacks

@@ -141,6 +141,7 @@ export async function PATCH(
             id: true,
             productName: true,
             productNo: true,
+            platformSkuId: true,
             quantity: true,
             thumb: true,
             rawPayload: true,
@@ -333,6 +334,7 @@ export async function PATCH(
               data: {
                 productName: pName,
                 productNo: pNo,
+                platformSkuId: existingItem?.platformSkuId || null,
                 quantity: pQty,
                 thumb: pThumb,
                 rawPayload: {
@@ -347,6 +349,7 @@ export async function PATCH(
                 orderId: order.id,
                 productName: pName,
                 productNo: pNo,
+                platformSkuId: null,
                 quantity: pQty,
                 thumb: pThumb,
                 rawPayload: itemRawPayload as Prisma.InputJsonValue,
