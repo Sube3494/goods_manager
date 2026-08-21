@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
-import { X, Check, CheckCircle, Package, Tag, Truck, FileText, Camera, Plus, ChevronLeft, ChevronRight, Eye, Crown, Activity, RotateCw, Trash2, Calendar, Pencil } from "lucide-react";
+import { X, Check, CheckCircle, Package, Tag, Truck, FileText, Camera, Plus, ChevronLeft, ChevronRight, ChevronDown, Eye, Crown, Activity, RotateCw, Trash2, Calendar, Pencil } from "lucide-react";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { Switch } from "@/components/ui/Switch";
 import { DatePicker } from "@/components/ui/DatePicker";
@@ -260,6 +260,9 @@ export function ProductFormModal({
 
   const jdSkuPreview = useMemo(() => normalizeJdSkuPreview(formData.jdSkuId), [formData.jdSkuId]);
   const meituanSkuPreview = useMemo(() => normalizeMeituanSkuPreview(formData.meituanSkuId), [formData.meituanSkuId]);
+  const [isPlatformIdsOpen, setIsPlatformIdsOpen] = useState(false);
+  const showPlatformIdSection = showJdSkuField || showMeituanSkuField;
+  const platformIdCount = jdSkuPreview.length + meituanSkuPreview.length + (formData.taobaoSkuId ? 1 : 0);
 
   const [shelfLifeVal, setShelfLifeVal] = useState("");
   const [shelfLifeUnit, setShelfLifeUnit] = useState<"天" | "月" | "年">("天");
@@ -1184,60 +1187,93 @@ export function ProductFormModal({
                       </div>
                     )}
 
-                    {showJdSkuField && (
-                      <div className="space-y-2">
-                          <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                              <FileText size={16} className="text-rose-500" /> JD SKU ID
-                          </label>
-                          <input
-                              type="text"
-                              value={formData.jdSkuId}
-                              onChange={(e) => setFormData({ ...formData, jdSkuId: e.target.value.replace(/[\r\n]+/g, ",") })}
-                              className="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all font-mono dark:hover:bg-white/10"
-                              placeholder="用逗号分隔多个 JD SKU，例如：123456,234567,345678"
-                          />
-                          <div className="flex items-start justify-between gap-3 text-[11px] text-muted-foreground">
-                            <span>只支持逗号分隔多个 JD SKU，保存时会自动去重。</span>
-                            <span className="shrink-0 font-mono">{jdSkuPreview.length} 条</span>
-                          </div>
-                      </div>
-                    )}
+                    {showPlatformIdSection && (
+                      <div className="rounded-2xl border border-border bg-white/60 dark:bg-white/5 dark:border-white/10">
+                        <button
+                          type="button"
+                          onClick={() => setIsPlatformIdsOpen((value) => !value)}
+                          className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+                        >
+                          <span className="flex min-w-0 items-center gap-2 text-sm font-medium text-muted-foreground">
+                            <Tag size={16} className="shrink-0 text-amber-500" />
+                            <span className="truncate">平台商品 ID</span>
+                          </span>
+                          <span className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
+                            <span className="font-mono">{platformIdCount} 条</span>
+                            <ChevronDown size={16} className={cn("transition-transform", isPlatformIdsOpen && "rotate-180")} />
+                          </span>
+                        </button>
 
-                    {showMeituanSkuField && (
-                      <div className="space-y-2">
-                          <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                              <Tag size={16} className="text-amber-500" /> 美团商品 ID (Meituan SKU ID)
-                          </label>
-                          <input
-                              type="text"
-                              value={formData.meituanSkuId}
-                              onChange={(e) => setFormData({ ...formData, meituanSkuId: e.target.value.replace(/[\r\n]+/g, ",") })}
-                              className="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all font-mono dark:hover:bg-white/10"
-                              placeholder="用逗号分隔多个美团商品 ID，例如：100234,100235"
-                          />
-                          <div className="flex items-start justify-between gap-3 text-[11px] text-muted-foreground">
-                            <span>支持逗号分隔多个美团 ID，保存时将与美团配对池联动更新。</span>
-                            <span className="shrink-0 font-mono text-amber-500 font-bold">{meituanSkuPreview.length} 条</span>
-                          </div>
-                      </div>
-                    )}
+                        <AnimatePresence initial={false}>
+                          {isPlatformIdsOpen && (
+                            <motion.div
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: "auto", opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              transition={{ duration: 0.18, ease: "easeOut" }}
+                              className="overflow-hidden"
+                            >
+                              <div className="space-y-4 border-t border-border px-4 py-4 dark:border-white/10">
+                                {showJdSkuField && (
+                                  <div className="space-y-2">
+                                      <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                                          <FileText size={16} className="text-rose-500" /> JD SKU ID
+                                      </label>
+                                      <input
+                                          type="text"
+                                          value={formData.jdSkuId}
+                                          onChange={(e) => setFormData({ ...formData, jdSkuId: e.target.value.replace(/[\r\n]+/g, ",") })}
+                                          className="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all font-mono dark:hover:bg-white/10"
+                                          placeholder="用逗号分隔多个 JD SKU，例如：123456,234567,345678"
+                                      />
+                                      <div className="flex items-start justify-between gap-3 text-[11px] text-muted-foreground">
+                                        <span>只支持逗号分隔多个 JD SKU，保存时会自动去重。</span>
+                                        <span className="shrink-0 font-mono">{jdSkuPreview.length} 条</span>
+                                      </div>
+                                  </div>
+                                )}
 
-                    {showMeituanSkuField && (
-                      <div className="space-y-2">
-                          <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                              <Tag size={16} className="text-orange-500" /> 淘宝商品 ID (Taobao SKU ID)
-                          </label>
-                          <input
-                              type="text"
-                              value={formData.taobaoSkuId}
-                              onChange={(e) => setFormData({ ...formData, taobaoSkuId: e.target.value.trim() })}
-                              className="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all font-mono dark:hover:bg-white/10"
-                              placeholder="淘宝 sku_id，例如：17709501602235146"
-                          />
-                          <div className="flex items-start justify-between gap-3 text-[11px] text-muted-foreground">
-                            <span>淘宝订单将优先使用该 SKU ID 匹配，自动匹配成功后会回填。</span>
-                            <span className="shrink-0 font-mono text-orange-500 font-bold">{formData.taobaoSkuId ? 1 : 0} 条</span>
-                          </div>
+                                {showMeituanSkuField && (
+                                  <div className="space-y-2">
+                                      <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                                          <Tag size={16} className="text-amber-500" /> 美团商品 ID (Meituan SKU ID)
+                                      </label>
+                                      <input
+                                          type="text"
+                                          value={formData.meituanSkuId}
+                                          onChange={(e) => setFormData({ ...formData, meituanSkuId: e.target.value.replace(/[\r\n]+/g, ",") })}
+                                          className="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all font-mono dark:hover:bg-white/10"
+                                          placeholder="用逗号分隔多个美团商品 ID，例如：100234,100235"
+                                      />
+                                      <div className="flex items-start justify-between gap-3 text-[11px] text-muted-foreground">
+                                        <span>支持逗号分隔多个美团 ID，保存时将与美团配对池联动更新。</span>
+                                        <span className="shrink-0 font-mono text-amber-500 font-bold">{meituanSkuPreview.length} 条</span>
+                                      </div>
+                                  </div>
+                                )}
+
+                                {showMeituanSkuField && (
+                                  <div className="space-y-2">
+                                      <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                                          <Tag size={16} className="text-orange-500" /> 淘宝商品 ID (Taobao SKU ID)
+                                      </label>
+                                      <input
+                                          type="text"
+                                          value={formData.taobaoSkuId}
+                                          onChange={(e) => setFormData({ ...formData, taobaoSkuId: e.target.value.trim() })}
+                                          className="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all font-mono dark:hover:bg-white/10"
+                                          placeholder="淘宝 sku_id，例如：17709501602235146"
+                                      />
+                                      <div className="flex items-start justify-between gap-3 text-[11px] text-muted-foreground">
+                                        <span>淘宝订单将优先使用该 SKU ID 匹配，自动匹配成功后会回填。</span>
+                                        <span className="shrink-0 font-mono text-orange-500 font-bold">{formData.taobaoSkuId ? 1 : 0} 条</span>
+                                      </div>
+                                  </div>
+                                )}
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
                       </div>
                     )}
 
