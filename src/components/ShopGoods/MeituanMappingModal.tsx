@@ -573,27 +573,43 @@ export function MeituanMappingModal({
 
   return createPortal(
     <AnimatePresence>
-      <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/60 dark:bg-[#080c16]/75 backdrop-blur-md p-3 sm:p-6 md:p-8 overflow-hidden">
+      <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/60 dark:bg-[#080c16]/75 backdrop-blur-md p-2 sm:p-6 md:p-8 overflow-hidden">
         <motion.div
           initial={{ opacity: 0, scale: 0.95, y: 15 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 15 }}
           transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-          className="relative flex flex-col w-full max-w-7xl h-[92vh] max-h-[92vh] rounded-[28px] sm:rounded-[36px] border border-border/80 dark:border-white/10 bg-card/98 dark:bg-[#0b111e]/98 backdrop-blur-2xl shadow-2xl overflow-hidden"
+          className="relative flex flex-col w-full max-w-7xl h-[96dvh] max-h-[96dvh] rounded-[24px] sm:h-[92vh] sm:max-h-[92vh] sm:rounded-[36px] border border-border/80 dark:border-white/10 bg-card/98 dark:bg-[#0b111e]/98 backdrop-blur-2xl shadow-2xl overflow-hidden"
         >
           {/* 装饰光晕背景 */}
           <div className="absolute top-0 right-0 w-96 h-96 bg-primary/5 dark:bg-sky-500/5 rounded-full blur-3xl pointer-events-none" />
           <div className="absolute bottom-0 left-0 w-96 h-96 bg-primary/5 dark:bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
 
           {/* 1. 顶部 Header */}
-          <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-6 sm:px-8 py-4 sm:py-5 border-b border-border/60 dark:border-white/10 bg-muted/20 dark:bg-white/[0.02] shrink-0">
-            <div className="flex items-center gap-3.5">
-              <div className="flex h-11 sm:h-12 w-11 sm:w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-500 border border-amber-500/20 shadow-inner">
+          <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 sm:px-8 py-4 sm:py-5 border-b border-border/60 dark:border-white/10 bg-muted/20 dark:bg-white/[0.02] shrink-0">
+            <div className="flex items-start gap-3.5">
+              <div className="hidden h-11 sm:flex sm:h-12 w-11 sm:w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-500 border border-amber-500/20 shadow-inner">
                 <Link2 className="h-5 sm:h-6 w-5 sm:w-6" />
               </div>
-              <div>
-                <div className="flex items-center gap-2.5 flex-wrap">
-                  <h2 className="text-lg sm:text-xl font-black tracking-tight text-foreground">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-start justify-between gap-3 sm:hidden">
+                  <div className="min-w-0">
+                    <h2 className="text-lg font-black leading-tight tracking-tight text-foreground">
+                      店铺商品 · 商品配对工作台
+                    </h2>
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                      统一维护三平台商品 ID
+                    </p>
+                  </div>
+                  <button
+                    onClick={onClose}
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border dark:border-white/10 bg-white dark:bg-white/5 text-muted-foreground hover:text-foreground hover:bg-muted active:scale-95 transition-all"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+                <div className="hidden sm:flex sm:items-center gap-2.5 flex-wrap">
+                  <h2 className="text-xl font-black tracking-tight text-foreground">
                     店铺商品 · 商品配对工作台
                   </h2>
                   <div className="relative inline-block" ref={shopDropdownRef}>
@@ -712,14 +728,84 @@ export function MeituanMappingModal({
                     </AnimatePresence>
                   </div>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">
+                <div className="mt-3 sm:hidden">
+                  <div className="relative inline-block w-full" ref={shopDropdownRef}>
+                    <button
+                      type="button"
+                      onClick={() => setIsShopDropdownOpen((prev) => !prev)}
+                      className={cn(
+                        "inline-flex h-10 w-full items-center justify-center gap-2 px-3.5 rounded-full text-xs font-black transition-all shadow-xs group cursor-pointer border select-none",
+                        isShopDropdownOpen
+                          ? "bg-primary/20 text-primary border-primary/40 ring-2 ring-primary/20 shadow-sm"
+                          : "bg-primary/10 text-primary border-primary/20 hover:bg-primary/15 hover:border-primary/35 active:scale-95"
+                      )}
+                      title="点击切换当前门店"
+                    >
+                      <Store className="h-3.5 w-3.5 text-primary/80 group-hover:text-primary transition-colors shrink-0" />
+                      <span className="min-w-0 truncate">{selectedShop?.name || "选择门店"}</span>
+                      <ChevronDown className={cn("h-3.5 w-3.5 text-primary/60 group-hover:text-primary transition-transform duration-200 shrink-0", isShopDropdownOpen && "rotate-180 text-primary")} />
+                    </button>
+
+                    <AnimatePresence>
+                      {isShopDropdownOpen && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 8, scale: 0.96 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: 8, scale: 0.96 }}
+                          transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
+                          className="absolute left-0 top-full mt-2 w-full max-h-72 flex flex-col rounded-2xl bg-white/95 dark:bg-[#0c1222]/95 backdrop-blur-2xl border border-black/10 dark:border-white/10 shadow-2xl z-50 p-2 overflow-hidden ring-1 ring-black/5 dark:ring-white/5"
+                        >
+                          {shopList.length >= 4 && (
+                            <div className="relative flex items-center mb-1.5 px-0.5">
+                              <Search className="absolute left-3 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                              <input
+                                type="text"
+                                value={shopSearchQuery}
+                                onChange={(e) => setShopSearchQuery(e.target.value)}
+                                placeholder="搜索门店名称 / 拼音..."
+                                className="w-full h-8 pl-8 pr-7 text-xs bg-muted/60 dark:bg-white/5 rounded-xl outline-none border border-border/50 dark:border-white/10 focus:border-primary/40 text-foreground placeholder:text-muted-foreground transition-colors"
+                                autoFocus
+                              />
+                            </div>
+                          )}
+                          <div className="overflow-y-auto space-y-1 max-h-56 pr-0.5 scrollbar-thin">
+                            {filteredShopList.length === 0 ? (
+                              <div className="py-6 text-center text-xs text-muted-foreground">未找到匹配门店</div>
+                            ) : (
+                              filteredShopList.map((shop) => {
+                                const isSelected = selectedShop?.id === shop.id;
+                                return (
+                                  <button
+                                    key={shop.id}
+                                    type="button"
+                                    onClick={() => handleSelectShop(shop)}
+                                    className={cn(
+                                      "group w-full flex items-center justify-between p-2 rounded-xl text-xs text-left transition-all cursor-pointer select-none",
+                                      isSelected
+                                        ? "bg-primary/10 dark:bg-primary/20 text-primary font-bold border border-primary/25 shadow-xs"
+                                        : "text-foreground hover:bg-muted/70 dark:hover:bg-white/8 active:scale-[0.98] border border-transparent"
+                                    )}
+                                  >
+                                    <span className="truncate">{shop.name}</span>
+                                    {isSelected && <Check className="h-3.5 w-3.5 stroke-[3]" />}
+                                  </button>
+                                );
+                              })
+                            )}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                </div>
+                <p className="hidden sm:block text-xs text-muted-foreground mt-1">
                   以店铺商品为主体，统一维护美团、京东、淘宝的平台商品 ID
                 </p>
               </div>
             </div>
 
             {/* 顶栏操作按钮 */}
-            <div className="flex items-center gap-2.5 self-end sm:self-auto">
+            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-center gap-2.5 sm:flex sm:self-auto">
               {activePlatform === "meituan" && (
                 <>
                   <button
@@ -727,7 +813,7 @@ export function MeituanMappingModal({
                     disabled={isExporting || batches.length === 0}
                     title={batches.length === 0 ? "请先导入美团表格" : "导出填好自编SKU的美团Excel"}
                     className={cn(
-                      "flex items-center gap-2 px-5 h-10 sm:h-11 rounded-full text-xs sm:text-sm font-black transition-all shadow-md active:scale-95",
+                      "flex items-center justify-center gap-2 px-4 sm:px-5 h-10 sm:h-11 rounded-full text-xs sm:text-sm font-black transition-all shadow-md active:scale-95",
                       batches.length > 0
                         ? "bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/20"
                         : "bg-muted text-muted-foreground cursor-not-allowed opacity-50 shadow-none"
@@ -738,22 +824,22 @@ export function MeituanMappingModal({
                     ) : (
                       <Download className="h-4 w-4" />
                     )}
-                    <span>导出回写美团表格</span>
+                    <span className="leading-tight">导出回写美团表格</span>
                   </button>
 
                   <button
                     onClick={() => setIsUploadOpen(true)}
-                    className="flex items-center gap-2 px-5 h-10 sm:h-11 rounded-full text-xs sm:text-sm font-black bg-primary text-primary-foreground hover:bg-primary/90 active:scale-95 transition-all shadow-lg shadow-primary/20"
+                    className="flex items-center justify-center gap-2 px-4 sm:px-5 h-10 sm:h-11 rounded-full text-xs sm:text-sm font-black bg-primary text-primary-foreground hover:bg-primary/90 active:scale-95 transition-all shadow-lg shadow-primary/20"
                   >
                     <UploadCloud className="h-4 w-4" />
-                    <span>导入美团数据池</span>
+                    <span className="leading-tight">导入美团数据池</span>
                   </button>
                 </>
               )}
 
               <button
                 onClick={onClose}
-                className="flex h-10 sm:h-11 w-10 sm:w-11 items-center justify-center rounded-full border border-border dark:border-white/10 bg-white dark:bg-white/5 text-muted-foreground hover:text-foreground hover:bg-muted active:scale-95 transition-all"
+                className="hidden sm:flex h-10 sm:h-11 w-10 sm:w-11 items-center justify-center rounded-full border border-border dark:border-white/10 bg-white dark:bg-white/5 text-muted-foreground hover:text-foreground hover:bg-muted active:scale-95 transition-all"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -761,8 +847,8 @@ export function MeituanMappingModal({
           </div>
 
           {/* 2. 数据池批次与状态统计胶囊 */}
-          <div className="flex flex-col gap-3.5 px-6 sm:px-8 py-4 border-b border-border/60 bg-zinc-50/50 dark:bg-white/[0.01] shrink-0">
-            <div className="flex flex-wrap items-center gap-1.5 p-1 bg-muted/60 dark:bg-white/10 rounded-full border border-border/50 dark:border-white/10 self-start shadow-inner">
+          <div className="flex flex-col gap-3 px-4 sm:px-8 py-3.5 sm:py-4 border-b border-border/60 bg-zinc-50/50 dark:bg-white/[0.01] shrink-0">
+            <div className="flex w-full sm:w-auto overflow-x-auto items-center gap-1.5 p-1 bg-muted/60 dark:bg-white/10 rounded-full border border-border/50 dark:border-white/10 self-start shadow-inner scrollbar-none">
               {PRODUCT_MAPPING_PLATFORMS.map((platform) => {
                 const isActive = activePlatform === platform.key;
                 return (
@@ -775,7 +861,7 @@ export function MeituanMappingModal({
                       setPage(1);
                     }}
                     className={cn(
-                      "inline-flex items-center gap-2 px-4 h-9 rounded-full text-xs sm:text-sm font-black transition-all",
+                      "inline-flex shrink-0 items-center gap-2 px-4 h-9 rounded-full text-xs sm:text-sm font-black transition-all",
                       isActive
                         ? "bg-white dark:bg-white/20 text-foreground shadow-sm"
                         : "text-muted-foreground hover:text-foreground"
@@ -788,7 +874,7 @@ export function MeituanMappingModal({
               })}
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-3.5">
+            <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-3">
               {/* 美团候选数据池选择 */}
               {activePlatform === "meituan" && (
               <div className="flex items-center gap-2.5 flex-1 sm:flex-none">
@@ -826,7 +912,7 @@ export function MeituanMappingModal({
               )}
 
               {/* 状态统计分段胶囊 */}
-              <div className="flex items-center gap-1.5 p-1 bg-muted/60 dark:bg-white/10 rounded-full border border-border/50 dark:border-white/10 overflow-x-auto shrink-0 shadow-inner">
+              <div className="flex w-full sm:w-auto items-center gap-1.5 p-1 bg-muted/60 dark:bg-white/10 rounded-full border border-border/50 dark:border-white/10 overflow-x-auto sm:shrink-0 shadow-inner scrollbar-none">
                 {[
                   { key: "ALL", label: "全部商品", count: platformStatusCounts.TOTAL || total },
                   { key: "UNBOUND", label: activePlatform === "meituan" ? "未配对美团ID" : `未填${activePlatformConfig.idLabel}`, count: platformStatusCounts.UNBOUND || 0, color: "text-amber-500" },
@@ -868,8 +954,8 @@ export function MeituanMappingModal({
             </div>
 
             {/* 搜索与工具 */}
-            <div className="flex items-center justify-between gap-3 pt-1">
-              <div className="relative flex-1 max-w-lg group">
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2.5 pt-1 sm:flex sm:justify-between sm:gap-3">
+              <div className="relative min-w-0 flex-1 sm:max-w-lg group">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
                 <input
                   type="text"
@@ -887,7 +973,7 @@ export function MeituanMappingModal({
                 <button
                   onClick={() => fetchShopProducts()}
                   title="刷新商品列表"
-                  className="h-10 sm:h-11 w-10 sm:w-11 flex items-center justify-center rounded-full border border-border dark:border-white/10 bg-white dark:bg-white/5 hover:bg-muted text-muted-foreground hover:text-foreground active:scale-95 transition-all shadow-xs"
+                  className="h-10 sm:h-11 w-10 sm:w-11 flex shrink-0 items-center justify-center rounded-full border border-border dark:border-white/10 bg-white dark:bg-white/5 hover:bg-muted text-muted-foreground hover:text-foreground active:scale-95 transition-all shadow-xs"
                 >
                   <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
                 </button>
