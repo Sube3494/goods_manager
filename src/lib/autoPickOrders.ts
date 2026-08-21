@@ -3865,8 +3865,14 @@ async function syncAutoPickConfirmOrdersByCookieListener(userId: string, cookie:
 }
 
 async function syncAutoPickChangedOrdersByCookieListener(userId: string, cookie: string, state: AutoPickCookieListenerState) {
-  const date = formatLocalDate(new Date());
-  const orders = await fetchSimplifiedAllMaiyatianOrdersByDateByCookie(cookie, date);
+  const now = new Date();
+  const dates = Array.from(new Set([
+    formatLocalDate(now),
+    formatLocalDate(new Date(now.getTime() - 24 * 60 * 60 * 1000)),
+  ]));
+  const orders = (
+    await Promise.all(dates.map((date) => fetchSimplifiedAllMaiyatianOrdersByDateByCookie(cookie, date).catch(() => [])))
+  ).flat();
 
   for (const order of orders) {
     const normalized = normalizeAutoPickOrderPayload(order);
@@ -5061,7 +5067,14 @@ export async function applyAutoPickProgress(userId: string, payload: unknown) {
     throw new Error("Order not found");
   }
 
-  if (!isOfflineProgress && shouldRefreshAutoPickOrderOnProgressStatusHint(progress.statusHint)) {
+  const orderRawPayload = order.rawPayload && typeof order.rawPayload === "object" && !Array.isArray(order.rawPayload)
+    ? order.rawPayload as Record<string, unknown>
+    : {};
+  const isPureManualOfflineOrder = orderRawPayload.isManualOffline === true
+    || (orderRawPayload.systemMeta && typeof orderRawPayload.systemMeta === "object" && !Array.isArray(orderRawPayload.systemMeta)
+      && (orderRawPayload.systemMeta as Record<string, unknown>).isManualOffline === true);
+
+  if (!isPureManualOfflineOrder && shouldRefreshAutoPickOrderOnProgressStatusHint(progress.statusHint)) {
     const refreshedOrder = await refreshAutoPickOrderFromPlugin(userId, {
       id: order.sourceId,
       platform: resolveAutoPickCommandPlatform(order) || progress.platform,
