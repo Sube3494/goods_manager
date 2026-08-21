@@ -4559,6 +4559,7 @@ export async function backfillPlatformIdsForSyncedAutoPickOrder(userId: string, 
     select: {
       id: true,
       platform: true,
+      rawPayload: true,
       items: {
         select: {
           id: true,
@@ -4573,10 +4574,20 @@ export async function backfillPlatformIdsForSyncedAutoPickOrder(userId: string, 
     return { count: 0 };
   }
 
+  const resolvedShop = readResolvedAutoPickShop(order.rawPayload);
+  const resolvedShopId = String(resolvedShop?.id || "").trim();
+  if (!resolvedShopId) {
+    return { count: 0 };
+  }
+
   const shopProducts = await prisma.shopProduct.findMany({
-    where: { shop: { userId } },
+    where: {
+      shop: { userId },
+      shopId: resolvedShopId,
+    },
     select: {
       id: true,
+      shopId: true,
       sku: true,
       jdSkuId: true,
       meituanSkuId: true,
