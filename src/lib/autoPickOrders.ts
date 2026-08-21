@@ -4673,7 +4673,7 @@ export async function applyAutoPickProgress(userId: string, payload: unknown) {
     }).catch(() => null);
 
     if (refreshedOrder) {
-      order = refreshedOrder;
+      return refreshedOrder;
     }
   }
 
