@@ -662,19 +662,19 @@ export default function ProfilePage() {
               <div className="grid gap-3.5 sm:gap-4">
                 {addressList.map((item, index) => (
                   <div key={item.id} className="rounded-[20px] border border-border/60 bg-white/78 p-3.5 shadow-sm dark:bg-white/[0.05] sm:rounded-[22px] sm:p-4">
-                    <div className="flex items-start gap-3">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+                      <div className="flex min-w-0 items-start gap-3">
                       <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-border/60 bg-white/80 text-sm font-black text-foreground dark:bg-white/[0.05]">
                         {index + 1}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-start justify-between gap-3">
                           <button
                             type="button"
                             onClick={() => setExpandedAddressId(expandedAddressId === item.id ? null : item.id)}
-                            className="min-w-0 flex-1 text-left"
+                            className="min-w-0 w-full text-left"
                           >
                             <div className="flex flex-wrap items-center gap-2">
-                              <span className="truncate text-sm font-black text-foreground">
+                              <span className="min-w-0 max-w-full truncate text-sm font-black text-foreground">
                                 {String(item.label || "").trim() || "未命名门店"}
                               </span>
                               {item.isDefault && (
@@ -698,7 +698,9 @@ export default function ProfilePage() {
                               {item.detailAddress || "请补全详细地址"}
                             </div>
                           </button>
-                          <div className="flex shrink-0 items-center gap-2">
+                      </div>
+                      </div>
+                          <div className="grid grid-cols-3 gap-2 sm:ml-auto sm:flex sm:shrink-0 sm:items-center">
                             <button
                               type="button"
                               onClick={() => {
@@ -709,7 +711,7 @@ export default function ProfilePage() {
                                 setAddressList(newList);
                               }}
                               disabled={Boolean(item.isDefault)}
-                              className={`inline-flex h-10 items-center justify-center gap-1.5 rounded-2xl border px-3 text-xs font-black transition-all ${
+                              className={`inline-flex h-10 min-w-0 items-center justify-center gap-1.5 rounded-2xl border px-3 text-xs font-black transition-all sm:w-auto ${
                                 item.isDefault
                                   ? "cursor-default border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
                                   : "border-border/60 bg-white text-muted-foreground hover:border-primary/30 hover:text-primary dark:bg-white/5"
@@ -717,12 +719,12 @@ export default function ProfilePage() {
                               title={item.isDefault ? "当前默认地址" : "设为默认地址"}
                             >
                               <CheckCircle2 size={14} />
-                              <span className="hidden sm:inline">{item.isDefault ? "默认" : "设默认"}</span>
+                              <span className="truncate">{item.isDefault ? "默认" : "设默认"}</span>
                             </button>
                             <button
                               type="button"
                               onClick={() => setExpandedAddressId(expandedAddressId === item.id ? null : item.id)}
-                              className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-border/60 bg-white text-muted-foreground transition-all hover:text-foreground dark:bg-white/5"
+                              className="inline-flex h-10 min-w-0 items-center justify-center rounded-2xl border border-border/60 bg-white text-muted-foreground transition-all hover:text-foreground dark:bg-white/5 sm:w-10"
                             >
                               <ChevronDown size={16} className={`transition-transform ${expandedAddressId === item.id ? "rotate-180" : ""}`} />
                             </button>
@@ -738,13 +740,11 @@ export default function ProfilePage() {
                                   setExpandedAddressId(null);
                                 }
                               }}
-                              className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-destructive/15 bg-destructive/5 text-destructive transition-all hover:bg-destructive/10"
+                              className="inline-flex h-10 min-w-0 items-center justify-center rounded-2xl border border-destructive/15 bg-destructive/5 text-destructive transition-all hover:bg-destructive/10 sm:w-10"
                             >
                               <Trash2 size={14} />
                             </button>
                           </div>
-                        </div>
-                      </div>
                     </div>
 
                     {expandedAddressId === item.id ? (
