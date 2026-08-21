@@ -943,9 +943,9 @@ export function MeituanMappingModal({
                       <span className="hidden sm:inline">{tab.label}</span>
                       <span
                         className={cn(
-                          "font-number text-xs px-1.5 sm:px-2 py-0.5 rounded-full font-bold",
+                          "font-number text-xs font-black",
                           isActive
-                            ? "bg-muted dark:bg-white/10 text-foreground"
+                            ? "text-foreground"
                             : tab.color || "text-foreground"
                         )}
                       >
