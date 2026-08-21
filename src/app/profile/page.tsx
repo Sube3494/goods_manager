@@ -16,6 +16,7 @@ import {
   ShieldCheck,
   Home,
   ChevronDown,
+  CheckCircle2,
 } from "lucide-react";
 import { useUser } from "@/hooks/useUser";
 import { useToast } from "@/components/ui/Toast";
@@ -90,6 +91,17 @@ export default function ProfilePage() {
       ...(nextCanUseBrushSimulation ? { brushCommissionBoostEnabled: nextBrushCommissionBoostEnabled } : {}),
     });
 
+  const normalizeAddressDefaults = (list: AddressItem[]) => {
+    let defaultAssigned = false;
+    return list.map((item) => {
+      const shouldBeDefault = Boolean(item.isDefault) && !defaultAssigned;
+      if (shouldBeDefault) {
+        defaultAssigned = true;
+      }
+      return { ...item, isDefault: shouldBeDefault };
+    });
+  };
+
   useEffect(() => {
     if (!typedUser) {
       return;
@@ -101,13 +113,13 @@ export default function ProfilePage() {
     let nextAddressList: AddressItem[] = [];
     const addresses = typedUser?.shippingAddresses;
     if (Array.isArray(addresses)) {
-      nextAddressList = addresses.map((item) => ({
+      nextAddressList = normalizeAddressDefaults(addresses.map((item) => ({
         ...item,
         address: item.detailAddress || item.address || "",
         detailAddress: item.detailAddress || item.address || "",
         contactName: "",
         contactPhone: "",
-      }));
+      })));
     } else if (typeof typedUser?.shippingAddress === "string" && typedUser.shippingAddress) {
       nextAddressList = [
         {
@@ -131,7 +143,8 @@ export default function ProfilePage() {
   }, [typedUser?.name, typedUser?.shippingAddress, typedUser?.shippingAddresses, typedUser?.brushCommissionBoostEnabled]);
 
   const saveProfile = async (nextName: string, nextAddressList: AddressItem[], nextBrushCommissionBoostEnabled: boolean, silent = true) => {
-    const snapshot = buildProfileSnapshot(nextName, nextAddressList, nextBrushCommissionBoostEnabled, canUseBrushSimulation);
+    const normalizedAddressList = normalizeAddressDefaults(nextAddressList);
+    const snapshot = buildProfileSnapshot(nextName, normalizedAddressList, nextBrushCommissionBoostEnabled, canUseBrushSimulation);
     if (snapshot === lastSavedSnapshotRef.current) {
       setSaveState("saved");
       return true;
@@ -143,11 +156,11 @@ export default function ProfilePage() {
       brushCommissionBoostEnabled?: boolean;
     };
     const hasNameChanged = nextName !== (lastSaved.name || "");
-    const hasAddressesChanged = JSON.stringify(nextAddressList) !== JSON.stringify(lastSaved.shippingAddresses || []);
+    const hasAddressesChanged = JSON.stringify(normalizedAddressList) !== JSON.stringify(lastSaved.shippingAddresses || []);
     const hasBrushSimulationChanged = nextBrushCommissionBoostEnabled !== Boolean(lastSaved.brushCommissionBoostEnabled);
 
     if (hasAddressesChanged) {
-      const missingLabel = nextAddressList.find((item) => !String(item.label || "").trim());
+      const missingLabel = normalizedAddressList.find((item) => !String(item.label || "").trim());
       if (missingLabel) {
         setSaveState("invalid");
         if (!silent) {
@@ -156,7 +169,7 @@ export default function ProfilePage() {
         return false;
       }
 
-      const missingAddress = nextAddressList.find((item) => !String(item.detailAddress || "").trim());
+      const missingAddress = normalizedAddressList.find((item) => !String(item.detailAddress || "").trim());
       if (missingAddress) {
         setSaveState("invalid");
         if (!silent) {
@@ -174,7 +187,7 @@ export default function ProfilePage() {
         payload.name = nextName;
       }
       if (hasAddressesChanged) {
-        payload.shippingAddresses = nextAddressList;
+        payload.shippingAddresses = normalizedAddressList;
       }
       if (canUseBrushSimulation && hasBrushSimulationChanged) {
         payload.brushCommissionBoostEnabled = nextBrushCommissionBoostEnabled;
@@ -210,7 +223,7 @@ export default function ProfilePage() {
       return;
     }
 
-    const snapshot = buildProfileSnapshot(name, addressList, brushCommissionBoostEnabled, canUseBrushSimulation);
+    const snapshot = buildProfileSnapshot(name, normalizeAddressDefaults(addressList), brushCommissionBoostEnabled, canUseBrushSimulation);
     setSaveState(snapshot === lastSavedSnapshotRef.current ? "saved" : "idle");
   }, [name, addressList, brushCommissionBoostEnabled, canUseBrushSimulation]);
 
@@ -624,7 +637,7 @@ export default function ProfilePage() {
                 </button>
                 <button
                   onClick={() => {
-                    const newAddress = { id: Math.random().toString(36).slice(2, 11), label: "", address: "", detailAddress: "", contactName: "", contactPhone: "", isDefault: false, libraryId: libraries[0]?.id || "" };
+                    const newAddress = { id: Math.random().toString(36).slice(2, 11), label: "", address: "", detailAddress: "", contactName: "", contactPhone: "", isDefault: addressList.length === 0, libraryId: libraries[0]?.id || "" };
                     setAddressList([newAddress, ...addressList]);
                     setExpandedAddressId(newAddress.id);
                   }}
@@ -664,6 +677,12 @@ export default function ProfilePage() {
                               <span className="truncate text-sm font-black text-foreground">
                                 {String(item.label || "").trim() || "未命名门店"}
                               </span>
+                              {item.isDefault && (
+                                <span className="inline-flex items-center gap-1 rounded-md border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-black text-emerald-600 dark:text-emerald-400">
+                                  <CheckCircle2 size={11} />
+                                  默认
+                                </span>
+                              )}
                               {libraries.length > 1 && (() => {
                                 const matchedLib = libraries.find((lib) => lib.id === item.libraryId);
                                 if (!matchedLib) return null;
@@ -682,6 +701,26 @@ export default function ProfilePage() {
                           <div className="flex shrink-0 items-center gap-2">
                             <button
                               type="button"
+                              onClick={() => {
+                                const newList = addressList.map((address, addressIndex) => ({
+                                  ...address,
+                                  isDefault: addressIndex === index,
+                                }));
+                                setAddressList(newList);
+                              }}
+                              disabled={Boolean(item.isDefault)}
+                              className={`inline-flex h-10 items-center justify-center gap-1.5 rounded-2xl border px-3 text-xs font-black transition-all ${
+                                item.isDefault
+                                  ? "cursor-default border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                                  : "border-border/60 bg-white text-muted-foreground hover:border-primary/30 hover:text-primary dark:bg-white/5"
+                              }`}
+                              title={item.isDefault ? "当前默认地址" : "设为默认地址"}
+                            >
+                              <CheckCircle2 size={14} />
+                              <span className="hidden sm:inline">{item.isDefault ? "默认" : "设默认"}</span>
+                            </button>
+                            <button
+                              type="button"
                               onClick={() => setExpandedAddressId(expandedAddressId === item.id ? null : item.id)}
                               className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-border/60 bg-white text-muted-foreground transition-all hover:text-foreground dark:bg-white/5"
                             >
@@ -689,7 +728,12 @@ export default function ProfilePage() {
                             </button>
                             <button
                               onClick={() => {
-                                setAddressList(addressList.filter((_, i) => i !== index));
+                                const remaining = addressList.filter((_, i) => i !== index);
+                                setAddressList(
+                                  item.isDefault && remaining.length > 0
+                                    ? remaining.map((address, addressIndex) => ({ ...address, isDefault: addressIndex === 0 }))
+                                    : remaining
+                                );
                                 if (expandedAddressId === item.id) {
                                   setExpandedAddressId(null);
                                 }

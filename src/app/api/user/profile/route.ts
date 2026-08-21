@@ -16,6 +16,17 @@ type ShippingAddressInput = {
   libraryId?: string;
 };
 
+function normalizeDefaultShippingAddresses(items: ShippingAddressInput[]) {
+  let defaultAssigned = false;
+  return items.map((item) => {
+    const isDefault = Boolean(item.isDefault) && !defaultAssigned;
+    if (isDefault) {
+      defaultAssigned = true;
+    }
+    return { ...item, isDefault };
+  });
+}
+
 export async function PATCH(req: Request) {
   try {
     const session = await getFreshSession() as SessionUser | null;
@@ -38,7 +49,7 @@ export async function PATCH(req: Request) {
         return NextResponse.json({ error: "门店详细地址为必填项" }, { status: 400 });
       }
 
-      normalizedShippingAddresses = (shippingAddresses as ShippingAddressInput[]).map((item) => {
+      normalizedShippingAddresses = normalizeDefaultShippingAddresses((shippingAddresses as ShippingAddressInput[]).map((item) => {
         const label = String(item.label || "").trim();
         const detailAddress = getAddressDetail(item);
         const normalizedItem = {
@@ -54,7 +65,7 @@ export async function PATCH(req: Request) {
           longitude: undefined,
           latitude: undefined,
         };
-      });
+      }));
     }
 
     const canUseBrushSimulation = hasPermission(session, "brush:simulate");
