@@ -4559,6 +4559,8 @@ export async function backfillPlatformIdsForSyncedAutoPickOrder(userId: string, 
     select: {
       id: true,
       platform: true,
+      shopId: true,
+      shopAddress: true,
       rawPayload: true,
       items: {
         select: {
@@ -4574,7 +4576,14 @@ export async function backfillPlatformIdsForSyncedAutoPickOrder(userId: string, 
     return { count: 0 };
   }
 
-  const resolvedShop = readResolvedAutoPickShop(order.rawPayload);
+  const rawShopName = readShopNameFromRawPayload(order.rawPayload);
+  const rawShopAddress = readShopAddressFromRawPayload(order.rawPayload) || order.shopAddress || null;
+  const resolvedShop = readResolvedAutoPickShop(order.rawPayload)
+    || await resolveAutoPickInternalShop(prisma, userId, {
+      shopId: order.shopId || readShopIdFromRawPayload(order.rawPayload) || undefined,
+      rawShopName: rawShopName || undefined,
+      rawShopAddress: rawShopAddress || undefined,
+    });
   const resolvedShopId = String(resolvedShop?.id || "").trim();
   if (!resolvedShopId) {
     return { count: 0 };
