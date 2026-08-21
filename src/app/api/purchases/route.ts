@@ -6,7 +6,7 @@ import { Prisma } from "../../../../prisma/generated-client";
 import { getFreshSession } from "@/lib/auth";
 import { hasPermission, SessionUser } from "@/lib/permissions";
 import { FinanceMath } from "@/lib/math";
-import { AUTO_INBOUND_TYPE } from "@/lib/purchaseOrderTypes";
+import { AUTO_INBOUND_NOTE_KEYWORD, AUTO_INBOUND_TYPE, ORDER_SHORTAGE_PURCHASE_NOTE_KEYWORD } from "@/lib/purchaseOrderTypes";
 import { sanitizePurchaseOrderItems } from "@/lib/purchaseOrderItems";
 import { InventoryService } from "@/services/inventoryService";
 import { allocateShippingToPurchaseItems, calculatePurchaseOrderTotalAmount } from "@/lib/purchaseCosting";
@@ -75,8 +75,11 @@ export async function GET(request: Request) {
   const type = searchParams.get("type");
   const orderId = String(searchParams.get("orderId") || searchParams.get("id") || "").trim();
   const productId = searchParams.get("productId");
-  const page = parseInt(searchParams.get("page") || "1");
-  const pageSize = parseInt(searchParams.get("pageSize") || "50");
+  const search = String(searchParams.get("search") || "").trim();
+  const statusFilter = String(searchParams.get("status") || "").trim();
+  const shopFilter = String(searchParams.get("shop") || "").trim();
+  const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
+  const pageSize = Math.min(200, Math.max(1, parseInt(searchParams.get("pageSize") || "50")));
   const skip = (page - 1) * pageSize;
 
   if (!session) {
@@ -108,14 +111,51 @@ export async function GET(request: Request) {
       andWhere.push({ type });
     } else {
       andWhere.push({
-        NOT: {
-          OR: [
-            { type: "Inbound" },
-            { type: AUTO_INBOUND_TYPE },
-            { type: "Return" },
-            { type: "InternalReturn" },
-          ],
-        },
+        AND: [
+          {
+            NOT: {
+              OR: [
+                { type: "Inbound" },
+                { type: AUTO_INBOUND_TYPE },
+                { type: "Return" },
+                { type: "InternalReturn" },
+              ],
+            },
+          },
+          { NOT: { id: { startsWith: "PO-AUTO-" } } },
+          { NOT: { note: { contains: AUTO_INBOUND_NOTE_KEYWORD, mode: "insensitive" } } },
+          { NOT: { note: { contains: ORDER_SHORTAGE_PURCHASE_NOTE_KEYWORD, mode: "insensitive" } } },
+        ],
+      });
+    }
+    if (statusFilter && statusFilter !== "All") {
+      if (statusFilter === "Confirmed") {
+        andWhere.push({ status: { in: ["Confirmed", "Ordered", "Shipped", "Draft"] } });
+      } else {
+        andWhere.push({ status: statusFilter });
+      }
+    }
+    if (shopFilter && shopFilter !== "All") {
+      andWhere.push({ shopName: shopFilter });
+    }
+    if (search) {
+      andWhere.push({
+        OR: [
+          { id: { contains: search, mode: "insensitive" } },
+          { shopName: { contains: search, mode: "insensitive" } },
+          {
+            items: {
+              some: {
+                OR: [
+                  { supplier: { name: { contains: search, mode: "insensitive" } } },
+                  { product: { name: { contains: search, mode: "insensitive" } } },
+                  { shopProduct: { productName: { contains: search, mode: "insensitive" } } },
+                  { shopProduct: { sku: { contains: search, mode: "insensitive" } } },
+                ],
+              },
+            },
+          },
+        ],
       });
     }
     if (productId) {
@@ -132,7 +172,12 @@ export async function GET(request: Request) {
     }
     const where: Prisma.PurchaseOrderWhereInput = andWhere.length > 0 ? { AND: andWhere } : {};
 
-    const [purchases, total] = await Promise.all([
+    const statsAndWhere = andWhere.filter((clause) => !("status" in clause));
+    const unscopedStatusWhere: Prisma.PurchaseOrderWhereInput = statsAndWhere.length > 0
+      ? { AND: statsAndWhere, userId: session.id }
+      : { userId: session.id };
+
+    const [purchases, total, statsRows, shopRows] = await Promise.all([
       prisma.purchaseOrder.findMany({
         where: {
           ...where,
@@ -159,15 +204,46 @@ export async function GET(request: Request) {
           ...where,
           userId: session.id
         }
-      })
+      }),
+      prisma.purchaseOrder.findMany({
+        where: unscopedStatusWhere,
+        select: {
+          status: true,
+          totalAmount: true,
+          shopName: true,
+        },
+      }),
+      prisma.purchaseOrder.findMany({
+        where: unscopedStatusWhere,
+        select: {
+          shopName: true,
+        },
+        distinct: ["shopName"],
+        orderBy: {
+          shopName: "asc",
+        },
+      }),
     ]);
     const resolvedPurchases = await Promise.all(purchases.map((purchase) => resolvePurchaseOrderResponse(purchase)));
+    const receivedRows = statsRows.filter((purchase) => purchase.status === "Received");
+    const pendingRows = statsRows.filter((purchase) => purchase.status !== "Received");
+    const stats = {
+      totalCount: statsRows.length,
+      totalAmount: statsRows.reduce((sum, purchase) => sum + (Number(purchase.totalAmount) || 0), 0),
+      receivedCount: receivedRows.length,
+      receivedAmount: receivedRows.reduce((sum, purchase) => sum + (Number(purchase.totalAmount) || 0), 0),
+      pendingCount: pendingRows.length,
+      pendingAmount: pendingRows.reduce((sum, purchase) => sum + (Number(purchase.totalAmount) || 0), 0),
+      shopCount: new Set(statsRows.map((purchase) => purchase.shopName).filter(Boolean)).size,
+    };
 
     return NextResponse.json({
       items: resolvedPurchases,
       total,
       page,
       pageSize,
+      stats,
+      shops: shopRows.map((row) => row.shopName).filter(Boolean),
       hasMore: (skip + purchases.length) < total
     });
   } catch (error) {

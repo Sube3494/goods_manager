@@ -23,8 +23,7 @@ import { PurchaseStatusBadge } from "@/components/Purchases/PurchaseStatusBadge"
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { formatLocalDateTime, formatLocalDate } from "@/lib/dateUtils";
 import { sortPurchaseItems } from "@/lib/pinyin";
-import { filterPurchases, isPurchaseStatusFilter, PurchaseStatusFilter } from "@/lib/purchases";
-import { isAutoInboundOrderLike, isOrderShortagePurchaseLike } from "@/lib/purchaseOrderTypes";
+import { isPurchaseStatusFilter, PurchaseStatusFilter } from "@/lib/purchases";
 
 function sortPurchasesByRecency(items: PurchaseOrder[]) {
   return [...items].sort((a, b) => {
@@ -62,14 +61,6 @@ function formatCurrency(value: number) {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;
-}
-
-function isAutoCreatedPurchaseOrder(order: Pick<PurchaseOrder, "id">) {
-  return order.id.startsWith("PO-AUTO-");
-}
-
-function shouldHideFromPurchaseManagement(order: Pick<PurchaseOrder, "id" | "type" | "note">) {
-  return isAutoCreatedPurchaseOrder(order) || isAutoInboundOrderLike(order) || isOrderShortagePurchaseLike(order);
 }
 
 function PurchaseMetricCard({
@@ -131,6 +122,17 @@ function PurchasesContent() {
   const [pageSize, setPageSize] = useState(10);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedPurchaseIds, setSelectedPurchaseIds] = useState<string[]>([]);
+  const [totalItems, setTotalItems] = useState(0);
+  const [availableShops, setAvailableShops] = useState<string[]>([]);
+  const [purchaseStats, setPurchaseStats] = useState({
+    totalCount: 0,
+    totalAmount: 0,
+    receivedCount: 0,
+    receivedAmount: 0,
+    pendingCount: 0,
+    pendingAmount: 0,
+    shopCount: 0,
+  });
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [confirmConfig, setConfirmConfig] = useState<{
     isOpen: boolean;
@@ -186,15 +188,37 @@ function PurchasesContent() {
   const fetchData = useCallback(async (silent = false) => {
     if (!silent) setIsLoading(true);
     try {
-      const pRes = await fetch(`/api/purchases?page=1&pageSize=99999&_ts=${Date.now()}`, {
+      const params = new URLSearchParams({
+        page: String(currentPage),
+        pageSize: String(pageSize),
+        _ts: String(Date.now()),
+      });
+      if (searchQuery.trim()) params.set("search", searchQuery.trim());
+      if (statusFilter !== "All") params.set("status", statusFilter);
+      if (shopFilter !== "All") params.set("shop", shopFilter);
+
+      const pRes = await fetch(`/api/purchases?${params.toString()}`, {
         cache: "no-store",
       });
-      
-      if (pRes.ok) {
-        const data = await pRes.json();
-        // Extract items from paginated response
-        const nextItems = Array.isArray(data) ? data : (data.items || []);
-        setPurchases(sortPurchasesByRecency(nextItems));
+      const data = await pRes.json().catch(() => ({}));
+
+      if (!pRes.ok) {
+        throw new Error(data?.error || "加载采购单失败");
+      }
+      const nextItems = Array.isArray(data) ? data : (data.items || []);
+      setPurchases(sortPurchasesByRecency(nextItems));
+      setTotalItems(Number(data.total || nextItems.length) || 0);
+      setAvailableShops(Array.isArray(data.shops) ? data.shops.filter(Boolean) : []);
+      if (data.stats && typeof data.stats === "object") {
+        setPurchaseStats({
+          totalCount: Number(data.stats.totalCount || 0),
+          totalAmount: Number(data.stats.totalAmount || 0),
+          receivedCount: Number(data.stats.receivedCount || 0),
+          receivedAmount: Number(data.stats.receivedAmount || 0),
+          pendingCount: Number(data.stats.pendingCount || 0),
+          pendingAmount: Number(data.stats.pendingAmount || 0),
+          shopCount: Number(data.stats.shopCount || 0),
+        });
       }
     } catch (error) {
       console.error("Failed to fetch purchases data:", error);
@@ -202,7 +226,7 @@ function PurchasesContent() {
     } finally {
       setIsLoading(false);
     }
-  }, [showToast]);
+  }, [currentPage, pageSize, searchQuery, statusFilter, shopFilter, showToast]);
 
   // 1. Initial Data Fetch (Run only once on mount)
   useEffect(() => {
@@ -419,48 +443,10 @@ function PurchasesContent() {
     }
   };
 
-  const visiblePurchases = useMemo(() => {
-    return purchases.filter((purchase) => !shouldHideFromPurchaseManagement(purchase));
-  }, [purchases]);
-
-  const filteredPurchases = useMemo(() => {
-    return filterPurchases(visiblePurchases, { searchQuery, statusFilter, shopFilter });
-  }, [visiblePurchases, searchQuery, statusFilter, shopFilter]);
-
-  const statsPurchases = useMemo(() => {
-    return filterPurchases(visiblePurchases, {
-      searchQuery,
-      statusFilter: "All",
-      shopFilter,
-    });
-  }, [visiblePurchases, searchQuery, shopFilter]);
-
-  const purchaseStats = useMemo(() => {
-    const totalAmount = statsPurchases.reduce((sum, purchase) => sum + (Number(purchase.totalAmount) || 0), 0);
-    const receivedPurchases = statsPurchases.filter((purchase) => purchase.status === "Received");
-    const pendingPurchases = statsPurchases.filter((purchase) => purchase.status !== "Received");
-    const receivedAmount = receivedPurchases.reduce((sum, purchase) => sum + (Number(purchase.totalAmount) || 0), 0);
-    const pendingAmount = pendingPurchases.reduce((sum, purchase) => sum + (Number(purchase.totalAmount) || 0), 0);
-    const shopCount = new Set(statsPurchases.map((purchase) => purchase.shopName).filter(Boolean)).size;
-
-    return {
-      totalCount: statsPurchases.length,
-      totalAmount,
-      receivedCount: receivedPurchases.length,
-      receivedAmount,
-      pendingCount: pendingPurchases.length,
-      pendingAmount,
-      shopCount,
-    };
-  }, [statsPurchases]);
-
-  const totalItems = filteredPurchases.length;
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
-  const paginatedPurchases = filteredPurchases.slice(
-    (currentPage - 1) * pageSize,
-    currentPage * pageSize
-  );
-  const selectedPurchases = visiblePurchases.filter((purchase) => selectedPurchaseIds.includes(purchase.id));
+  const filteredPurchases = purchases;
+  const paginatedPurchases = purchases;
+  const selectedPurchases = purchases.filter((purchase) => selectedPurchaseIds.includes(purchase.id));
 
   useEffect(() => {
     setCurrentPage(1);
@@ -1524,7 +1510,7 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
       </section>
 
       <PurchaseFilters
-        purchases={purchases}
+        shops={availableShops}
         searchQuery={searchQuery}
         statusFilter={statusFilter}
         shopFilter={shopFilter}

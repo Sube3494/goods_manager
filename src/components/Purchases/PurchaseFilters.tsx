@@ -3,11 +3,10 @@
 import { RotateCcw, Search, X } from "lucide-react";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { cn } from "@/lib/utils";
-import { getUniquePurchaseShops, PURCHASE_STATUS_OPTIONS, PurchaseStatusFilter } from "@/lib/purchases";
-import { PurchaseOrder } from "@/lib/types";
+import { PURCHASE_STATUS_OPTIONS, PurchaseStatusFilter } from "@/lib/purchases";
 
 interface PurchaseFiltersProps {
-  purchases: PurchaseOrder[];
+  shops: string[];
   searchQuery: string;
   statusFilter: PurchaseStatusFilter;
   shopFilter: string;
@@ -19,7 +18,7 @@ interface PurchaseFiltersProps {
 }
 
 export function PurchaseFilters({
-  purchases,
+  shops,
   searchQuery,
   statusFilter,
   shopFilter,
@@ -29,10 +28,9 @@ export function PurchaseFilters({
   onShopChange,
   onReset,
 }: PurchaseFiltersProps) {
-  const uniqueShops = getUniquePurchaseShops(purchases);
   const shopOptions = [
     { value: "All", label: "全部店铺" },
-    ...uniqueShops.map((shop) => ({ value: shop, label: shop })),
+    ...shops.map((shop) => ({ value: shop, label: shop })),
   ];
 
   return (
