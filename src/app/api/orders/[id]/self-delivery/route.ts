@@ -14,8 +14,6 @@ import { getEstimatedAutoCompleteAt } from "@/lib/autoPickSchedule";
 
 export const dynamic = "force-dynamic";
 
-const MIN_AUTO_COMPLETE_DELAY_MS = 5 * 60 * 1000;
-
 async function waitForDeliveringSelfDelivery(
   userId: string,
   lookup: { id?: string; platform?: string; orderNo?: string; orderTime?: Date | string | null },
@@ -137,24 +135,21 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
             rawPayload: schedulingOrder.rawPayload,
           }))
         : null;
-      const safeAutoCompleteAt = autoCompleteAt && autoCompleteAt.getTime() > Date.now() + MIN_AUTO_COMPLETE_DELAY_MS
-        ? autoCompleteAt
-        : null;
       await prisma.autoPickOrder.update({
         where: { id },
         data: {
           status: confirmedDelivering ? schedulingOrder.status : order.status,
           deliveryDeadline: schedulingOrder.deliveryDeadline || order.deliveryDeadline || null,
-          autoCompleteAt: safeAutoCompleteAt,
+          autoCompleteAt: autoCompleteAt || null,
         },
       });
       await markAutoPickOrderMainSystemSelfDelivery(session.id, id);
 
-      if (safeAutoCompleteAt) {
+      if (autoCompleteAt) {
         await ensureAutoCompleteJob({
           userId: session.id,
           orderId: id,
-          dueAt: safeAutoCompleteAt,
+          dueAt: autoCompleteAt,
         });
       } else {
         await cancelAutoCompleteJob(
@@ -162,7 +157,7 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
           autoCompleteBlocked
             ? "abnormal-status-no-auto-complete"
             : confirmedDelivering
-              ? "auto-complete-time-too-soon"
+              ? "missing-auto-complete-time"
               : "waiting-delivering-status"
         );
       }
