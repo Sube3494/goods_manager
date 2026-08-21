@@ -357,6 +357,7 @@ export async function PATCH(
 
     if (autoMatchedProduct?.shopProductId && autoMatchedProduct.shopProductId === matchedProduct.shopProductId) {
       await prisma.$transaction(async (tx) => {
+        await syncMeituanIdForMatchedShopProduct(tx, user.id, shopProduct, basePayload);
         await tx.autoPickOrderItem.update({
           where: { id: orderItem.id },
           data: {
@@ -429,13 +430,7 @@ export async function PATCH(
         }
       }
 
-      const isMeituanOrder = platformStr.includes("美团")
-        || platformStr.includes("闪购")
-        || platformStr.toLowerCase().includes("meituan")
-        || platformStr.toLowerCase().includes("shangou");
-      if (isMeituanOrder) {
-        await syncMeituanIdForMatchedShopProduct(tx, user.id, shopProduct, basePayload);
-      }
+      await syncMeituanIdForMatchedShopProduct(tx, user.id, shopProduct, basePayload);
 
       await tx.autoPickOrderItem.update({
         where: { id: orderItem.id },
