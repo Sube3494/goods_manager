@@ -601,6 +601,12 @@ export function isMeituanOrder(platform?: string | null, channelTag?: string | n
   return p.includes("美团") || p.includes("meituan") || p === "shangou" || c === "shangou";
 }
 
+export function isTaobaoOrder(platform?: string | null, channelTag?: string | null) {
+  const p = String(platform || "").trim().toLowerCase();
+  const c = String(channelTag || "").trim().toLowerCase();
+  return p.includes("淘宝") || p.includes("天猫") || p === "taobao" || p === "ebai" || c === "taobao" || c === "ebai";
+}
+
 function readGoodsExtraRecord(rawPayload: Record<string, unknown>) {
   const goodsExtra = rawPayload.goods_extra || rawPayload.goodsExtra;
   if (typeof goodsExtra === "string") {
@@ -630,6 +636,9 @@ function readDisplaySourceId(item: AutoPickOrderItem, platform?: string | null, 
   if (isMeituanOrder(platform, channelTag)) {
     const goodsExtra = readGoodsExtraRecord(rawPayload);
     return String(goodsExtra.original_sku_id || "").trim();
+  }
+  if (isTaobaoOrder(platform, channelTag)) {
+    return String(rawPayload.sku_id || rawPayload.skuId || "").trim();
   }
   return String(
     item.productNo
@@ -1571,6 +1580,7 @@ export function ProductStripItem({
   returnedDetails = [],
   isJdOrder = false,
   isMeituanOrder = false,
+  isTaobaoOrder = false,
 }: {
   display: { name: string; sku: string; image: string | null; quantity: number; sourceId?: string; optionalMatch?: boolean };
   onEditMatch?: () => void;
@@ -1587,10 +1597,11 @@ export function ProductStripItem({
   }>;
   isJdOrder?: boolean;
   isMeituanOrder?: boolean;
+  isTaobaoOrder?: boolean;
 }) {
   const [imgError, setImgError] = useState(false);
-  const platformSourceLabel = isJdOrder ? "JD SKU" : isMeituanOrder ? "美团 SKU ID" : "";
-  const platformSourceShortLabel = isJdOrder ? "JD" : isMeituanOrder ? "MT" : "";
+  const platformSourceLabel = isJdOrder ? "JD SKU" : isMeituanOrder ? "美团 SKU ID" : isTaobaoOrder ? "淘宝 SKU ID" : "";
+  const platformSourceShortLabel = isJdOrder ? "JD" : isMeituanOrder ? "MT" : isTaobaoOrder ? "TB" : "";
 
   return (
     <div className="flex items-center gap-2.5 rounded-2xl border border-black/6 bg-white/70 px-2.5 py-2 dark:border-white/8 dark:bg-white/4 sm:gap-3 sm:rounded-[18px] sm:px-3 sm:py-2.5">
@@ -2545,6 +2556,7 @@ export function OrderCard({
                     returnedDetails={returnedItemDetailsMap.get(getReturnedProductKey(item)) || []}
                     isJdOrder={isJdOrder}
                     isMeituanOrder={isMeituanPlatformOrder}
+                    isTaobaoOrder={isTaobaoOrder(order.platform)}
                   />
                 ))
               )}

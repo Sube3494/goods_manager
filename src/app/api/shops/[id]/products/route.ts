@@ -50,6 +50,17 @@ async function findConflictingShopProductByJdSkuId(shopId: string, jdSkuId: stri
   });
 }
 
+async function findConflictingShopProductByTaobaoSkuId(shopId: string, taobaoSkuId: string, excludeId?: string) {
+  return prisma.shopProduct.findFirst({
+    where: {
+      shopId,
+      taobaoSkuId,
+      ...(excludeId ? { id: { not: excludeId } } : {}),
+    },
+    select: { id: true, productName: true },
+  });
+}
+
 async function getOwnedShop(shopId: string, userId: string, isAdmin: boolean) {
   return prisma.shop.findFirst({
     where: isAdmin ? { id: shopId } : { id: shopId, userId },
@@ -249,6 +260,7 @@ export async function GET(
           sku: item.sku || null,
           jdSkuId: aggregatedJdSkuIds.join(",") || item.jdSkuId || null,
           jdSkuIds: aggregatedJdSkuIds,
+          taobaoSkuId: item.taobaoSkuId || null,
           name: item.productName || item.product?.name || "未命名商品",
           image: item.productImage
             ? storage.resolveUrl(item.productImage)
@@ -351,6 +363,7 @@ export async function GET(
         jdSkuIds: aggregatedJdSkuIds,
         meituanSkuId: item.meituanSkuId || aggregatedMeituanSkuIds.join(",") || null,
         meituanSkuIds: aggregatedMeituanSkuIds,
+        taobaoSkuId: item.taobaoSkuId || null,
         name: item.productName || item.product?.name || "未命名商品",
         image: item.productImage
           ? storage.resolveUrl(item.productImage)
@@ -461,6 +474,7 @@ export async function PUT(
     const normalizedJdSkuId = normalizeSku(body?.jdSkuId);
     const normalizedMeituanSkuIds = normalizeMeituanSkuIds(body?.meituanSkuIds ?? body?.meituanSkuId);
     const normalizedMeituanSkuId = normalizedMeituanSkuIds[0] || null;
+    const normalizedTaobaoSkuId = normalizeSku(body?.taobaoSkuId);
     const categoryId = typeof body?.categoryId === "string" ? body.categoryId.trim() : "";
     const categoryName = String(body?.categoryName || "").trim();
     const productImage = typeof body?.image === "string" ? body.image.trim() : "";
@@ -496,6 +510,15 @@ export async function PUT(
       }
     }
 
+    if (normalizedTaobaoSkuId) {
+      const conflictingShopProduct = await findConflictingShopProductByTaobaoSkuId(shopId, normalizedTaobaoSkuId, existing.id);
+      if (conflictingShopProduct) {
+        return NextResponse.json({
+          error: `当前店铺内淘宝 SKU ID "${normalizedTaobaoSkuId}" 已存在，请检查映射商品`,
+        }, { status: 409 });
+      }
+    }
+
     const storage = await getStorageStrategy();
     const normalizedProductImage = storage.stripUrl(productImage) || null;
 
@@ -526,6 +549,7 @@ export async function PUT(
         sku: normalizedSku,
         jdSkuId: normalizedJdSkuId,
         meituanSkuId: normalizedMeituanSkuId,
+        taobaoSkuId: normalizedTaobaoSkuId,
         categoryId: categoryId || null,
         categoryName: categoryName || "未分类",
         productImage: finalProductImage,
@@ -548,6 +572,7 @@ export async function PUT(
         sku: true,
         jdSkuId: true,
         meituanSkuId: true,
+        taobaoSkuId: true,
         productName: true,
         productImage: true,
         categoryId: true,
@@ -585,6 +610,7 @@ export async function PUT(
       jdSkuId: updated.jdSkuId || null,
       meituanSkuId: updated.meituanSkuId || null,
       meituanSkuIds: updated.meituanSkuId ? [updated.meituanSkuId] : [],
+      taobaoSkuId: updated.taobaoSkuId || null,
       name: updated.productName || "未命名商品",
       image: resolvedImage,
       categoryId: updated.categoryId || null,

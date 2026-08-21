@@ -610,6 +610,7 @@ model ShopProduct {
   sku             String?
   jdSkuId         String?
   meituanSkuId    String?
+  taobaoSkuId     String?
   productName     String?
   pinyin          String?
   productImage    String?
@@ -642,6 +643,7 @@ model ShopProduct {
   @@unique([shopId, sku])
   @@unique([shopId, jdSkuId])
   @@unique([shopId, meituanSkuId])
+  @@unique([shopId, taobaoSkuId])
   @@index([productId])
   @@index([shopId, createdAt])
   @@index([shopId, sortNumber])

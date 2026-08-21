@@ -4469,6 +4469,11 @@ function isMeituanPlatform(platform: string | null | undefined) {
   return normalized.includes("meituan") || normalized.includes("美团") || normalized.includes("闪购") || normalized.includes("shangou");
 }
 
+function isTaobaoPlatform(platform: string | null | undefined) {
+  const normalized = String(platform || "").trim().toLowerCase();
+  return normalized.includes("淘宝") || normalized.includes("天猫") || normalized === "taobao" || normalized === "ebai";
+}
+
 function readAutoPickGoodsExtraRecord(rawPayload: unknown) {
   const record = rawPayload && typeof rawPayload === "object" && !Array.isArray(rawPayload)
     ? rawPayload as Record<string, unknown>
@@ -4502,6 +4507,10 @@ function readAutoPickPlatformProductIdForMatch(
     return resolveAutoPickItemPlatformSkuId(platform, rawPayload) || normalizeAutoPickSkuForMatch(productNo);
   }
 
+  if (isTaobaoPlatform(platform)) {
+    return resolveAutoPickItemPlatformSkuId(platform, rawPayload) || normalizeAutoPickSkuForMatch(productNo);
+  }
+
   return "";
 }
 
@@ -4529,6 +4538,17 @@ export function resolveAutoPickItemPlatformSkuId(
       || record.sourceId
       || record.sku_code
       || record.skuCode
+      || record.productNo
+      || ""
+    ));
+  }
+
+  if (isTaobaoPlatform(platform)) {
+    return normalizeAutoPickSkuForMatch(String(
+      record.sku_id
+      || record.skuId
+      || record.source_id
+      || record.sourceId
       || record.productNo
       || ""
     ));
@@ -4577,7 +4597,7 @@ export async function backfillPlatformIdsForSyncedAutoPickOrder(userId: string, 
     },
   });
   const details: Array<Record<string, unknown>> = [];
-  if (!order || (!isMeituanPlatform(order?.platform) && !isJdPlatform(order?.platform))) {
+  if (!order || (!isMeituanPlatform(order?.platform) && !isJdPlatform(order?.platform) && !isTaobaoPlatform(order?.platform))) {
     return { count: 0, details };
   }
 
@@ -4613,6 +4633,7 @@ export async function backfillPlatformIdsForSyncedAutoPickOrder(userId: string, 
       sku: true,
       jdSkuId: true,
       meituanSkuId: true,
+      taobaoSkuId: true,
     },
   });
   const shopProductMap = new Map(shopProducts.map((item) => [item.id, item]));
@@ -4694,6 +4715,34 @@ export async function backfillPlatformIdsForSyncedAutoPickOrder(userId: string, 
         });
       }
     }
+
+    if (isTaobaoPlatform(order.platform)) {
+      const sourceId = platformSkuForBackfill;
+      if (sourceId) {
+        const result = await syncTaobaoSkuIdForShopProduct(prisma, userId, matchedShopProductId, sourceId);
+        details.push({
+          itemId: item.id,
+          productNo: item.productNo,
+          platformSkuId: sourceId,
+          matchKeys,
+          resolvedShopId,
+          matchedShopProductId,
+          result,
+        });
+        if (result?.ok) {
+          count += 1;
+        }
+      } else {
+        details.push({
+          itemId: item.id,
+          productNo: item.productNo,
+          matchKeys,
+          resolvedShopId,
+          matchedShopProductId,
+          reason: "missing-platform-sku-id",
+        });
+      }
+    }
   }
 
   return { count, details };
@@ -4701,7 +4750,7 @@ export async function backfillPlatformIdsForSyncedAutoPickOrder(userId: string, 
 
 function normalizeShopProductSkuForPlatformMatch(
   platform: string | null | undefined,
-  item: { sku?: string | null; jdSkuId?: string | null; meituanSkuId?: string | null }
+  item: { sku?: string | null; jdSkuId?: string | null; meituanSkuId?: string | null; taobaoSkuId?: string | null }
 ) {
   if (isJdPlatform(platform)) {
     return normalizeAutoPickSkuForMatch(item.jdSkuId);
@@ -4709,12 +4758,15 @@ function normalizeShopProductSkuForPlatformMatch(
   if (isMeituanPlatform(platform)) {
     return normalizeAutoPickSkuForMatch(item.meituanSkuId);
   }
+  if (isTaobaoPlatform(platform)) {
+    return normalizeAutoPickSkuForMatch(item.taobaoSkuId);
+  }
   return normalizeAutoPickSkuForMatch(item.sku || item.jdSkuId);
 }
 
 function doesShopProductMatchAutoPickStableKey(
   platform: string | null | undefined,
-  item: { sku?: string | null; jdSkuId?: string | null; meituanSkuId?: string | null },
+  item: { sku?: string | null; jdSkuId?: string | null; meituanSkuId?: string | null; taobaoSkuId?: string | null },
   key: string
 ) {
   const normalizedKey = normalizeAutoPickSkuForMatch(key);
@@ -4728,6 +4780,7 @@ function doesShopProductMatchAutoPickStableKey(
   const fallbackKeys = [
     normalizeAutoPickSkuForMatch(item.sku),
     normalizeAutoPickSkuForMatch(item.jdSkuId),
+    normalizeAutoPickSkuForMatch(item.taobaoSkuId),
     ...normalizeMeituanSkuIds(item.meituanSkuId).map((value) => normalizeAutoPickSkuForMatch(value)),
   ].filter(Boolean);
 
@@ -7028,6 +7081,70 @@ export async function syncMeituanSkuIdForShopProduct(
     shopFieldError,
     productMappingError,
   };
+}
+
+export async function syncTaobaoSkuIdForShopProduct(
+  tx: Prisma.TransactionClient,
+  userId: string,
+  shopProductId: string,
+  sourceId: string
+) {
+  const cleanSourceId = String(sourceId || "").trim();
+  if (!shopProductId || !cleanSourceId) {
+    return {
+      ok: false,
+      reason: !shopProductId ? "missing-shop-product-id" : "missing-taobao-sku-id",
+    };
+  }
+
+  const shopProduct = await tx.shopProduct.findFirst({
+    where: { id: shopProductId, shop: { userId } },
+    select: { id: true, productId: true, taobaoSkuId: true },
+  });
+
+  if (!shopProduct) {
+    return { ok: false, reason: "shop-product-not-found" };
+  }
+
+  if (String(shopProduct.taobaoSkuId || "").trim() === cleanSourceId) {
+    return {
+      ok: true,
+      taobaoSkuId: cleanSourceId,
+      shopProductId: shopProduct.id,
+      productId: shopProduct.productId,
+      shopFieldUpdated: false,
+      shopFieldAlreadyHadId: true,
+      shopFieldError: null,
+    };
+  }
+
+  try {
+    await tx.shopProduct.update({
+      where: { id: shopProduct.id },
+      data: { taobaoSkuId: cleanSourceId },
+    });
+    return {
+      ok: true,
+      taobaoSkuId: cleanSourceId,
+      shopProductId: shopProduct.id,
+      productId: shopProduct.productId,
+      shopFieldUpdated: true,
+      shopFieldAlreadyHadId: false,
+      shopFieldError: null,
+    };
+  } catch (error) {
+    const shopFieldError = error instanceof Error ? error.message : String(error);
+    console.warn("[syncTaobaoSkuIdForShopProduct] 忽略已存在的店铺 taobaoSkuId 冲突:", error);
+    return {
+      ok: false,
+      taobaoSkuId: cleanSourceId,
+      shopProductId: shopProduct.id,
+      productId: shopProduct.productId,
+      shopFieldUpdated: false,
+      shopFieldAlreadyHadId: false,
+      shopFieldError,
+    };
+  }
 }
 
 export async function backfillJdSkuIdForManualMatchedShopProducts(

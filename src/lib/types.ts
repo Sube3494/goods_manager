@@ -60,6 +60,7 @@ export interface Product {
   jdSkuIds?: string[];
   meituanSkuId?: string;
   meituanSkuIds?: string[];
+  taobaoSkuId?: string;
   name: string;
   productId?: string | null;
   sourceProductId?: string | null;
@@ -116,6 +117,7 @@ export interface ShopCatalogItem {
   jdSkuIds?: string[];
   meituanSkuId?: string | null;
   meituanSkuIds?: string[];
+  taobaoSkuId?: string | null;
   name: string;
   productName?: string | null;
   image?: string | null;

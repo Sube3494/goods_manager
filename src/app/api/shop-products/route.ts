@@ -173,6 +173,7 @@ export async function GET(request: NextRequest) {
             jdSkuId: item.jdSkuId || null,
             meituanSkuId: meituanSkuIds.join(",") || null,
             meituanSkuIds,
+            taobaoSkuId: item.taobaoSkuId || null,
             name: item.productName || item.product?.name || "未命名商品",
             image: item.productImage
               ? storage.resolveUrl(item.productImage)
@@ -248,6 +249,7 @@ export async function GET(request: NextRequest) {
           jdSkuId: item.jdSkuId || null,
           meituanSkuId: meituanSkuIds.join(",") || null,
           meituanSkuIds,
+          taobaoSkuId: item.taobaoSkuId || null,
           name: item.productName || item.product?.name || "未命名商品",
           image: item.productImage
             ? storage.resolveUrl(item.productImage)
@@ -351,6 +353,7 @@ export async function GET(request: NextRequest) {
           productId: item.productId || null,
           sku: item.sku || null,
           jdSkuId: item.jdSkuId || null,
+          taobaoSkuId: item.taobaoSkuId || null,
           name: item.productName || item.product?.name || "未命名商品",
           image: item.productImage
             ? storage.resolveUrl(item.productImage)
@@ -446,6 +449,7 @@ export async function GET(request: NextRequest) {
       jdSkuId: item.jdSkuId || null,
       meituanSkuId: meituanSkuIds.join(",") || null,
       meituanSkuIds,
+      taobaoSkuId: item.taobaoSkuId || null,
       name: item.productName || item.product?.name || "未命名商品",
       image: item.productImage
         ? storage.resolveUrl(item.productImage)
