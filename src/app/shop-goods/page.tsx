@@ -1712,6 +1712,8 @@ export default function ShopGoodsPage() {
       id: item.id,
       sku: item.sku || "",
       jdSkuId: item.jdSkuId || "",
+      meituanSkuId: item.meituanSkuId || "",
+      meituanSkuIds: item.meituanSkuIds || [],
       name: item.name,
       categoryId: item.categoryId || "",
       costPrice: item.costPrice || 0,
