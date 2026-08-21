@@ -123,8 +123,18 @@ export async function GET(request: Request) {
             },
           },
           { NOT: { id: { startsWith: "PO-AUTO-" } } },
-          { NOT: { note: { contains: AUTO_INBOUND_NOTE_KEYWORD, mode: "insensitive" } } },
-          { NOT: { note: { contains: ORDER_SHORTAGE_PURCHASE_NOTE_KEYWORD, mode: "insensitive" } } },
+          {
+            OR: [
+              { note: null },
+              { NOT: { note: { contains: AUTO_INBOUND_NOTE_KEYWORD, mode: "insensitive" } } },
+            ],
+          },
+          {
+            OR: [
+              { note: null },
+              { NOT: { note: { contains: ORDER_SHORTAGE_PURCHASE_NOTE_KEYWORD, mode: "insensitive" } } },
+            ],
+          },
         ],
       });
     }
