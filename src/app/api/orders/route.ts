@@ -903,6 +903,9 @@ export async function GET(request: NextRequest) {
     const query = String(searchParams.get("query") || "").trim();
     const platform = String(searchParams.get("platform") || "").trim();
     const status = String(searchParams.get("status") || "").trim();
+    const productCostStatusFilter = status === "pending-outbound" || status === "pending-backfill"
+      ? status
+      : "";
     const startDate = String(searchParams.get("startDate") || "").trim();
     const endDate = String(searchParams.get("endDate") || "").trim();
     const hasDelivery = toBooleanFilter(searchParams.get("hasDelivery"));
@@ -975,12 +978,12 @@ export async function GET(request: NextRequest) {
     const where: Prisma.AutoPickOrderWhereInput = {
       ...baseWhere,
       ...(platformWhere || {}),
-      ...(buildStatusWhere(status) || {}),
+      ...(productCostStatusFilter ? {} : (buildStatusWhere(status) || {})),
     };
 
     const platformFilterWhere: Prisma.AutoPickOrderWhereInput = {
       ...baseWhere,
-      ...(buildStatusWhere(status) || {}),
+      ...(productCostStatusFilter ? {} : (buildStatusWhere(status) || {})),
     };
 
     const statusFilterWhere: Prisma.AutoPickOrderWhereInput = {
@@ -1040,8 +1043,8 @@ export async function GET(request: NextRequest) {
           { orderTime: "desc" },
           { createdAt: "desc" },
         ],
-        skip: (page - 1) * pageSize,
-        take: pageSize,
+        skip: productCostStatusFilter ? 0 : (page - 1) * pageSize,
+        take: productCostStatusFilter ? 10000 : pageSize,
       }),
       prisma.autoPickOrder.count({ where }),
       liteMode
@@ -1489,7 +1492,49 @@ export async function GET(request: NextRequest) {
       : {};
     const integrationConfig = normalizeAutoPickIntegrationConfig(permissionsObj.autoPickIntegration);
 
-    const allOrderNos = Array.from(new Set([...summaryOrders.map((o) => o.orderNo), ...orders.map((o) => o.orderNo)])).filter(Boolean);
+    const resolveProductCostStatusForOrder = (order: {
+      platform: string | null;
+      status: string | null;
+      actualPaid: number;
+      expectedIncome: number | null;
+      delivery: unknown;
+      orderNo: string;
+      items: Array<{ productName?: string | null; productNo?: string | null; rawPayload?: unknown }>;
+    }) => {
+      const outboundMeta = outboundByOrderNo.get(order.orderNo) || null;
+      const deliveryFee = readDeliveryFee(order.delivery);
+      const hasOutbound = Boolean(outboundMeta);
+      const cancelledDeliveryLoss = (isAutoPickOrderCancelledStatus(order.status) || isAutoPickOrderDeletedStatus(order.status))
+        && hasRealizedCancelledDeliveryCost({
+          deliveryFee,
+          platform: order.platform,
+          delivery: order.delivery,
+          hasOutbound,
+        });
+      const manualDeliveryLoss = isOfflineManualDeliveryLossOrder({
+        platform: order.platform,
+        actualPaid: order.actualPaid,
+        expectedIncome: order.expectedIncome,
+        deliveryFee,
+      }) && !hasAutoPickFulfillmentItems(order.items);
+      if (cancelledDeliveryLoss || manualDeliveryLoss) {
+        return "ready";
+      }
+      if (!hasOutbound) {
+        return "pending-outbound";
+      }
+      return (outboundMeta?.missingCostItemCount || 0) > 0 ? "pending-backfill" : "ready";
+    };
+
+    const metricOrders = productCostStatusFilter
+      ? orders.filter((order) => resolveProductCostStatusForOrder(order) === productCostStatusFilter)
+      : summaryOrders;
+    const responseTotal = productCostStatusFilter ? metricOrders.length : total;
+    const responseOrders = (productCostStatusFilter
+      ? metricOrders.slice((page - 1) * pageSize, page * pageSize)
+      : orders) as typeof orders;
+
+    const allOrderNos = Array.from(new Set([...metricOrders.map((o) => o.orderNo), ...responseOrders.map((o) => o.orderNo)])).filter(Boolean);
     const customBrushOrders = allOrderNos.length > 0
       ? await prisma.brushOrder.findMany({
           where: { userId: session.id, platformOrderId: { in: allOrderNos } },
@@ -1504,7 +1549,7 @@ export async function GET(request: NextRequest) {
 
     const summary = !includeMetrics
       ? null
-      : summaryOrders.reduce((acc, order) => {
+      : metricOrders.reduce((acc, order) => {
           const manualAmountOverride = readManualAmountOverride(order.rawPayload);
           const isOffline = order.platform === "线下交易" || String(order.platform || "").toLowerCase() === "other";
           let actualPaid = order.actualPaid;
@@ -1702,7 +1747,7 @@ export async function GET(request: NextRequest) {
     const cancelledPlatformCounts: Record<string, number> = {};
 
     if (includeMetrics) {
-      for (const order of summaryOrders) {
+      for (const order of metricOrders) {
         const platform = normalizeOrderPlatformForSummary(order.platform);
         const cancelled = isAutoPickOrderCancelledStatus(order.status) || isAutoPickOrderDeletedStatus(order.status);
         if (cancelled) {
@@ -1721,10 +1766,18 @@ export async function GET(request: NextRequest) {
     const overview = !includeMetrics
       ? null
       : {
-          totalCount: total,
-          cancelledCount: cancelledTotal,
-          brushCount: brushTotal,
-          trueOrderCount: Math.max(0, total - cancelledTotal - brushTotal),
+          totalCount: responseTotal,
+          cancelledCount: productCostStatusFilter
+            ? metricOrders.filter((order) => isAutoPickOrderCancelledStatus(order.status) || isAutoPickOrderDeletedStatus(order.status)).length
+            : cancelledTotal,
+          brushCount: productCostStatusFilter
+            ? metricOrders.filter((order) => !isAutoPickOrderCancelledStatus(order.status) && !isAutoPickOrderDeletedStatus(order.status) && readMainSystemSelfDeliveryFlag(order.rawPayload)).length
+            : brushTotal,
+          trueOrderCount: Math.max(0, responseTotal - (productCostStatusFilter
+            ? metricOrders.filter((order) => isAutoPickOrderCancelledStatus(order.status) || isAutoPickOrderDeletedStatus(order.status)).length
+            : cancelledTotal) - (productCostStatusFilter
+            ? metricOrders.filter((order) => !isAutoPickOrderCancelledStatus(order.status) && !isAutoPickOrderDeletedStatus(order.status) && readMainSystemSelfDeliveryFlag(order.rawPayload)).length
+            : brushTotal)),
           platformBreakdown: {
             truePlatformCounts,
             brushPlatformCounts,
@@ -1734,16 +1787,16 @@ export async function GET(request: NextRequest) {
     await backfillJdSkuIdForManualMatchedShopProducts(prisma, session.id);
 
     const productNames = Array.from(new Set(
-      orders.flatMap((order) => order.items.map((item) => String(item.productName || "").trim()).filter(Boolean))
+      responseOrders.flatMap((order) => order.items.map((item) => String(item.productName || "").trim()).filter(Boolean))
     ));
     const productSkuCandidates = Array.from(new Set(
-      orders.flatMap((order) => order.items.flatMap((item) => {
+      responseOrders.flatMap((order) => order.items.flatMap((item) => {
         return buildSkuMatchCandidates(item.productNo);
       }))
     ));
 
     const manualMatchedProductIds = Array.from(new Set(
-      orders.flatMap((order) => order.items.flatMap((item) => {
+      responseOrders.flatMap((order) => order.items.flatMap((item) => {
         const manual = readManualMatchedProduct(item.rawPayload);
         if (!manual) return [];
         const ids = [manual.id, manual.shopProductId, manual.productId].filter(Boolean) as string[];
@@ -1815,7 +1868,7 @@ export async function GET(request: NextRequest) {
 
 
 
-    const enrichedOrders = orders.map((order) => {
+    const enrichedOrders = responseOrders.map((order) => {
       const manualAmountOverride = readManualAmountOverride(order.rawPayload);
       const isOffline = order.platform === "线下交易" || String(order.platform || "").toLowerCase() === "other";
       let actualPaid = order.actualPaid;
@@ -2095,15 +2148,15 @@ export async function GET(request: NextRequest) {
       };
     });
     perf.lap("response-build");
-    perf.log("GET /api/orders", { page, pageSize, count: orders.length, total });
+    perf.log("GET /api/orders", { page, pageSize, count: responseOrders.length, total: responseTotal });
 
     return NextResponse.json({
       items: enrichedOrders,
       meta: {
-        total,
+        total: responseTotal,
         page,
         pageSize,
-        totalPages: Math.max(1, Math.ceil(total / pageSize)),
+        totalPages: Math.max(1, Math.ceil(responseTotal / pageSize)),
       },
       ...(liteMode ? {} : {
         filters: {
