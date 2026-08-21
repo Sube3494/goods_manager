@@ -70,11 +70,17 @@ interface SuggestedMeituanItem {
 
 interface ShopProductWithMapping {
   id: string;
+  shopProductId?: string | null;
   name: string;
+  shopProductName?: string | null;
   sku: string | null;
+  shopSku?: string | null;
   image: string | null;
   costPrice: number;
   stock: number;
+  jdSkuId?: string | null;
+  meituanSkuId?: string | null;
+  taobaoSkuId?: string | null;
   barcode?: string | null;
   category: { id: string; name: string } | null;
   meituanSkuMappings: MeituanMappingRecord[];
@@ -90,6 +96,38 @@ interface MeituanMappingModalProps {
   shops?: Shop[];
   onShopChange?: (shop: Shop) => void;
 }
+
+type ProductMappingPlatform = "meituan" | "jd" | "taobao";
+
+const PRODUCT_MAPPING_PLATFORMS: Array<{
+  key: ProductMappingPlatform;
+  label: string;
+  idLabel: string;
+  field: "meituanSkuId" | "jdSkuId" | "taobaoSkuId";
+  placeholder: string;
+}> = [
+  {
+    key: "meituan",
+    label: "美团",
+    idLabel: "美团 SKU ID",
+    field: "meituanSkuId",
+    placeholder: "输入美团 SKU ID",
+  },
+  {
+    key: "jd",
+    label: "京东",
+    idLabel: "JD SKU ID",
+    field: "jdSkuId",
+    placeholder: "输入 JD SKU ID",
+  },
+  {
+    key: "taobao",
+    label: "淘宝",
+    idLabel: "淘宝 SKU ID",
+    field: "taobaoSkuId",
+    placeholder: "输入淘宝 SKU ID",
+  },
+];
 
 export function MeituanMappingModal({
   isOpen,
@@ -110,6 +148,9 @@ export function MeituanMappingModal({
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
+  const [activePlatform, setActivePlatform] = useState<ProductMappingPlatform>("meituan");
+  const [platformIdDrafts, setPlatformIdDrafts] = useState<Record<string, string>>({});
+  const [savingPlatformIds, setSavingPlatformIds] = useState<Record<string, boolean>>({});
 
   // 同步外部 currentShop
   useEffect(() => {
@@ -221,7 +262,7 @@ export function MeituanMappingModal({
     try {
       setIsLoading(true);
       const params = new URLSearchParams({
-        status: statusFilter,
+        status: activePlatform === "meituan" ? statusFilter : "ALL",
         search: searchQuery,
         page: page.toString(),
         pageSize: pageSize.toString(),
@@ -229,7 +270,7 @@ export function MeituanMappingModal({
       if (selectedShop?.id) {
         params.append("shopId", selectedShop.id);
       }
-      if (currentBatchId && currentBatchId !== "ALL") {
+      if (activePlatform === "meituan" && currentBatchId && currentBatchId !== "ALL") {
         params.append("batchId", currentBatchId);
       }
 
@@ -248,7 +289,7 @@ export function MeituanMappingModal({
     } finally {
       setIsLoading(false);
     }
-  }, [isOpen, selectedShop?.id, currentBatchId, statusFilter, searchQuery, page, pageSize]);
+  }, [isOpen, selectedShop?.id, currentBatchId, activePlatform, statusFilter, searchQuery, page, pageSize]);
 
   useEffect(() => {
     if (isOpen) {
@@ -261,6 +302,91 @@ export function MeituanMappingModal({
       fetchShopProducts();
     }
   }, [isOpen, fetchShopProducts]);
+
+  useEffect(() => {
+    setPlatformIdDrafts((prev) => {
+      const next = { ...prev };
+      for (const product of products) {
+        if (!product.shopProductId) continue;
+        for (const option of PRODUCT_MAPPING_PLATFORMS) {
+          const key = `${product.shopProductId}:${option.key}`;
+          if (next[key] === undefined) {
+            next[key] = String(product[option.field] || "");
+          }
+        }
+      }
+      return next;
+    });
+  }, [products]);
+
+  const activePlatformConfig = useMemo(
+    () => PRODUCT_MAPPING_PLATFORMS.find((item) => item.key === activePlatform) || PRODUCT_MAPPING_PLATFORMS[0],
+    [activePlatform]
+  );
+
+  const platformProducts = useMemo(() => {
+    if (activePlatform === "meituan") {
+      return products;
+    }
+
+    const field = activePlatformConfig.field;
+    if (statusFilter === "BOUND") {
+      return products.filter((product) => Boolean(String(product[field] || "").trim()));
+    }
+    if (statusFilter === "UNBOUND") {
+      return products.filter((product) => !String(product[field] || "").trim());
+    }
+    return products;
+  }, [activePlatform, activePlatformConfig.field, products, statusFilter]);
+
+  const platformStatusCounts = useMemo(() => {
+    if (activePlatform === "meituan") {
+      return statusCounts;
+    }
+
+    const field = activePlatformConfig.field;
+    const bound = products.filter((product) => Boolean(String(product[field] || "").trim())).length;
+    return {
+      TOTAL: products.length,
+      BOUND: bound,
+      UNBOUND: products.length - bound,
+      HAS_SUGGESTION: 0,
+    };
+  }, [activePlatform, activePlatformConfig.field, products, statusCounts]);
+
+  const handleSavePlatformId = async (product: ShopProductWithMapping) => {
+    if (!product.shopProductId) {
+      showToast("当前商品没有对应的店铺商品记录，无法保存平台 ID", "error");
+      return;
+    }
+
+    const draftKey = `${product.shopProductId}:${activePlatform}`;
+    const value = (platformIdDrafts[draftKey] ?? String(product[activePlatformConfig.field] || "")).trim();
+
+    try {
+      setSavingPlatformIds((prev) => ({ ...prev, [draftKey]: true }));
+      const res = await fetch(`/api/shop-products/${product.shopProductId}/platform-id`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          platform: activePlatform,
+          value,
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data?.error || "保存平台商品 ID 失败");
+      }
+
+      showToast(`已保存${activePlatformConfig.idLabel}`, "success");
+      await fetchShopProducts();
+    } catch (err: any) {
+      showToast(err?.message || "保存平台商品 ID 失败", "error");
+    } finally {
+      setSavingPlatformIds((prev) => ({ ...prev, [draftKey]: false }));
+    }
+  };
 
   // 给系统商品绑定选中的美团商品
   const handleBindMeituan = async (
@@ -468,7 +594,7 @@ export function MeituanMappingModal({
               <div>
                 <div className="flex items-center gap-2.5 flex-wrap">
                   <h2 className="text-lg sm:text-xl font-black tracking-tight text-foreground">
-                    店铺商品 · 美团 ID 配对工作台
+                    店铺商品 · 商品配对工作台
                   </h2>
                   <div className="relative inline-block" ref={shopDropdownRef}>
                     <button
@@ -587,39 +713,43 @@ export function MeituanMappingModal({
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  以系统/店铺商品为主体，对照导入的美团候选池快速配上美团商品 ID，并支持一键导出回写 Excel
+                  以店铺商品为主体，统一维护美团、京东、淘宝的平台商品 ID
                 </p>
               </div>
             </div>
 
             {/* 顶栏操作按钮 */}
             <div className="flex items-center gap-2.5 self-end sm:self-auto">
-              <button
-                onClick={handleExportExcel}
-                disabled={isExporting || batches.length === 0}
-                title={batches.length === 0 ? "请先导入美团表格" : "导出填好自编SKU的美团Excel"}
-                className={cn(
-                  "flex items-center gap-2 px-5 h-10 sm:h-11 rounded-full text-xs sm:text-sm font-black transition-all shadow-md active:scale-95",
-                  batches.length > 0
-                    ? "bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/20"
-                    : "bg-muted text-muted-foreground cursor-not-allowed opacity-50 shadow-none"
-                )}
-              >
-                {isExporting ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Download className="h-4 w-4" />
-                )}
-                <span>导出回写美团表格</span>
-              </button>
+              {activePlatform === "meituan" && (
+                <>
+                  <button
+                    onClick={handleExportExcel}
+                    disabled={isExporting || batches.length === 0}
+                    title={batches.length === 0 ? "请先导入美团表格" : "导出填好自编SKU的美团Excel"}
+                    className={cn(
+                      "flex items-center gap-2 px-5 h-10 sm:h-11 rounded-full text-xs sm:text-sm font-black transition-all shadow-md active:scale-95",
+                      batches.length > 0
+                        ? "bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/20"
+                        : "bg-muted text-muted-foreground cursor-not-allowed opacity-50 shadow-none"
+                    )}
+                  >
+                    {isExporting ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Download className="h-4 w-4" />
+                    )}
+                    <span>导出回写美团表格</span>
+                  </button>
 
-              <button
-                onClick={() => setIsUploadOpen(true)}
-                className="flex items-center gap-2 px-5 h-10 sm:h-11 rounded-full text-xs sm:text-sm font-black bg-primary text-primary-foreground hover:bg-primary/90 active:scale-95 transition-all shadow-lg shadow-primary/20"
-              >
-                <UploadCloud className="h-4 w-4" />
-                <span>导入美团数据池</span>
-              </button>
+                  <button
+                    onClick={() => setIsUploadOpen(true)}
+                    className="flex items-center gap-2 px-5 h-10 sm:h-11 rounded-full text-xs sm:text-sm font-black bg-primary text-primary-foreground hover:bg-primary/90 active:scale-95 transition-all shadow-lg shadow-primary/20"
+                  >
+                    <UploadCloud className="h-4 w-4" />
+                    <span>导入美团数据池</span>
+                  </button>
+                </>
+              )}
 
               <button
                 onClick={onClose}
@@ -632,8 +762,35 @@ export function MeituanMappingModal({
 
           {/* 2. 数据池批次与状态统计胶囊 */}
           <div className="flex flex-col gap-3.5 px-6 sm:px-8 py-4 border-b border-border/60 bg-zinc-50/50 dark:bg-white/[0.01] shrink-0">
+            <div className="flex flex-wrap items-center gap-1.5 p-1 bg-muted/60 dark:bg-white/10 rounded-full border border-border/50 dark:border-white/10 self-start shadow-inner">
+              {PRODUCT_MAPPING_PLATFORMS.map((platform) => {
+                const isActive = activePlatform === platform.key;
+                return (
+                  <button
+                    key={platform.key}
+                    type="button"
+                    onClick={() => {
+                      setActivePlatform(platform.key);
+                      setStatusFilter("ALL");
+                      setPage(1);
+                    }}
+                    className={cn(
+                      "inline-flex items-center gap-2 px-4 h-9 rounded-full text-xs sm:text-sm font-black transition-all",
+                      isActive
+                        ? "bg-white dark:bg-white/20 text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    <Tag className="h-3.5 w-3.5" />
+                    <span>{platform.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+
             <div className="flex flex-wrap items-center justify-between gap-3.5">
               {/* 美团候选数据池选择 */}
+              {activePlatform === "meituan" && (
               <div className="flex items-center gap-2.5 flex-1 sm:flex-none">
                 <div className="w-full sm:w-96 h-10 sm:h-11">
                   <CustomSelect
@@ -666,14 +823,17 @@ export function MeituanMappingModal({
                   </button>
                 )}
               </div>
+              )}
 
               {/* 状态统计分段胶囊 */}
               <div className="flex items-center gap-1.5 p-1 bg-muted/60 dark:bg-white/10 rounded-full border border-border/50 dark:border-white/10 overflow-x-auto shrink-0 shadow-inner">
                 {[
-                  { key: "ALL", label: "全部商品", count: statusCounts.TOTAL || total },
-                  { key: "UNBOUND", label: "未配对美团ID", count: statusCounts.UNBOUND || 0, color: "text-amber-500" },
-                  { key: "HAS_SUGGESTION", label: "有智能推荐", count: statusCounts.HAS_SUGGESTION || 0, color: "text-sky-500" },
-                  { key: "BOUND", label: "已配对", count: statusCounts.BOUND || 0, color: "text-emerald-500" },
+                  { key: "ALL", label: "全部商品", count: platformStatusCounts.TOTAL || total },
+                  { key: "UNBOUND", label: activePlatform === "meituan" ? "未配对美团ID" : `未填${activePlatformConfig.idLabel}`, count: platformStatusCounts.UNBOUND || 0, color: "text-amber-500" },
+                  ...(activePlatform === "meituan"
+                    ? [{ key: "HAS_SUGGESTION", label: "有智能推荐", count: platformStatusCounts.HAS_SUGGESTION || 0, color: "text-sky-500" }]
+                    : []),
+                  { key: "BOUND", label: activePlatform === "meituan" ? "已配对" : "已填写", count: platformStatusCounts.BOUND || 0, color: "text-emerald-500" },
                 ].map((tab) => {
                   const isActive = statusFilter === tab.key;
                   return (
@@ -732,7 +892,7 @@ export function MeituanMappingModal({
                   <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
                 </button>
 
-                {statusCounts.HAS_SUGGESTION > 0 && (
+                {activePlatform === "meituan" && statusCounts.HAS_SUGGESTION > 0 && (
                   <button
                     onClick={handleAcceptAllPageSuggestions}
                     className="flex items-center gap-2 px-5 h-10 sm:h-11 text-xs sm:text-sm font-black rounded-full bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/30 hover:bg-sky-500/20 active:scale-95 transition-all shadow-xs"
@@ -752,7 +912,7 @@ export function MeituanMappingModal({
                 <Loader2 className="h-7 w-7 animate-spin text-primary" />
                 <p className="text-xs font-bold">正在加载店铺商品与配对数据...</p>
               </div>
-            ) : products.length === 0 ? (
+            ) : platformProducts.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20 text-center space-y-2.5">
                 <div className="p-3.5 rounded-2xl bg-muted/60 dark:bg-[#111827] text-muted-foreground">
                   <Package className="h-8 w-8 opacity-40" />
@@ -765,18 +925,23 @@ export function MeituanMappingModal({
                 </div>
               </div>
             ) : (
-              products.map((prod) => {
+              platformProducts.map((prod) => {
                 const isBound = prod.isBound;
                 const hasSuggestion = !isBound && prod.suggestedMeituanItem;
+                const platformDraftKey = prod.shopProductId ? `${prod.shopProductId}:${activePlatform}` : "";
+                const currentPlatformValue = String(prod[activePlatformConfig.field] || "");
+                const draftPlatformValue = platformIdDrafts[platformDraftKey] ?? currentPlatformValue;
+                const isSavingPlatformId = Boolean(savingPlatformIds[platformDraftKey]);
+                const isPlatformValueChanged = draftPlatformValue.trim() !== currentPlatformValue.trim();
 
                 return (
                   <div
                     key={prod.id}
                     className={cn(
                       "group relative flex flex-col md:flex-row md:items-center justify-between gap-3 px-4 py-3 rounded-2xl border transition-all duration-150 shadow-xs hover:shadow-md",
-                      isBound
+                      activePlatform === "meituan" && isBound
                         ? "border-emerald-500/30 bg-emerald-500/[0.02] dark:bg-emerald-950/[0.04]"
-                        : hasSuggestion
+                        : activePlatform === "meituan" && hasSuggestion
                         ? "border-sky-500/30 bg-sky-500/[0.02] dark:bg-sky-950/[0.04]"
                         : "border-border/70 dark:border-white/8 bg-white dark:bg-white/[0.03] hover:border-primary/40"
                     )}
@@ -813,7 +978,7 @@ export function MeituanMappingModal({
                         <div className="flex items-center gap-2 text-xs">
                           <span className="inline-flex items-center gap-1 font-mono text-[11px] font-bold bg-primary/10 text-primary border border-primary/15 px-2 py-0.5 rounded-md">
                             <span className="text-[10px] opacity-70">店内码/SKU:</span>
-                            <span>{prod.sku || "未设置"}</span>
+                            <span>{prod.shopSku || prod.sku || "未设置"}</span>
                           </span>
                         </div>
                       </div>
@@ -822,7 +987,7 @@ export function MeituanMappingModal({
                     {/* 右侧：美团配对状态与操作区域 */}
                     <div className="flex flex-wrap items-center gap-2.5 self-end md:self-auto shrink-0">
                       {/* 1. 已关联美团 ID 徽章展示（允许多对一） */}
-                      {isBound && (
+                      {activePlatform === "meituan" && isBound && (
                         <div className="flex flex-wrap items-center gap-2">
                           {prod.meituanSkuMappings.map((mapping) => (
                             <div
@@ -861,7 +1026,7 @@ export function MeituanMappingModal({
                       )}
 
                       {/* 2. 智能推荐美团商品展示 */}
-                      {hasSuggestion && (
+                      {activePlatform === "meituan" && hasSuggestion && (
                         <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-sky-500/10 border border-sky-500/25 text-xs shadow-xs">
                           <Sparkles className="h-3.5 w-3.5 text-sky-500 shrink-0" />
                           <div className="min-w-0 max-w-[160px]">
@@ -888,18 +1053,51 @@ export function MeituanMappingModal({
                       )}
 
                       {/* 3. 手动选择美团商品配对按钮 */}
-                      <button
-                        onClick={() => setTargetProductForPicker(prod)}
-                        className={cn(
-                          "flex items-center gap-1.5 px-3.5 h-8 sm:h-8.5 text-xs font-black rounded-full transition-all shadow-xs active:scale-95 cursor-pointer",
-                          isBound
-                            ? "border border-border dark:border-white/10 bg-white dark:bg-white/5 hover:bg-muted text-foreground"
-                            : "bg-primary text-primary-foreground hover:bg-primary/90 shadow-xs"
-                        )}
-                      >
-                        {isBound ? <Plus className="h-3.5 w-3.5" /> : <Search className="h-3.5 w-3.5" />}
-                        <span>{isBound ? "追加美团ID" : "配对美团ID"}</span>
-                      </button>
+                      {activePlatform === "meituan" ? (
+                        <button
+                          onClick={() => setTargetProductForPicker(prod)}
+                          className={cn(
+                            "flex items-center gap-1.5 px-3.5 h-8 sm:h-8.5 text-xs font-black rounded-full transition-all shadow-xs active:scale-95 cursor-pointer",
+                            isBound
+                              ? "border border-border dark:border-white/10 bg-white dark:bg-white/5 hover:bg-muted text-foreground"
+                              : "bg-primary text-primary-foreground hover:bg-primary/90 shadow-xs"
+                          )}
+                        >
+                          {isBound ? <Plus className="h-3.5 w-3.5" /> : <Search className="h-3.5 w-3.5" />}
+                          <span>{isBound ? "追加美团ID" : "配对美团ID"}</span>
+                        </button>
+                      ) : (
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full md:w-auto">
+                          <div className="flex items-center gap-2 px-3 h-9 rounded-full border border-border dark:border-white/10 bg-white dark:bg-white/5 min-w-0 sm:w-72">
+                            <Tag className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                            <input
+                              value={draftPlatformValue}
+                              onChange={(event) =>
+                                setPlatformIdDrafts((prev) => ({
+                                  ...prev,
+                                  [platformDraftKey]: event.target.value,
+                                }))
+                              }
+                              placeholder={activePlatformConfig.placeholder}
+                              className="w-full min-w-0 bg-transparent outline-none text-xs font-mono font-bold text-foreground placeholder:text-muted-foreground"
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleSavePlatformId(prod)}
+                            disabled={!prod.shopProductId || isSavingPlatformId || !isPlatformValueChanged}
+                            className={cn(
+                              "inline-flex items-center justify-center gap-1.5 px-3.5 h-9 rounded-full text-xs font-black transition-all active:scale-95",
+                              isPlatformValueChanged
+                                ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-xs"
+                                : "border border-border dark:border-white/10 bg-white dark:bg-white/5 text-muted-foreground"
+                            )}
+                          >
+                            {isSavingPlatformId ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+                            <span>保存</span>
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 );

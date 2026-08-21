@@ -674,7 +674,13 @@ export class MeituanMappingService {
         },
         shopProducts: {
           select: {
+            id: true,
             shopId: true,
+            sku: true,
+            jdSkuId: true,
+            meituanSkuId: true,
+            taobaoSkuId: true,
+            productName: true,
             productImage: true,
           },
         },
@@ -828,6 +834,12 @@ export class MeituanMappingService {
       return {
         ...prod,
         image: resolvedImage,
+        shopProductId: matchedShopProduct?.id || null,
+        shopSku: matchedShopProduct?.sku || null,
+        shopProductName: matchedShopProduct?.productName || null,
+        jdSkuId: matchedShopProduct?.jdSkuId || null,
+        meituanSkuId: matchedShopProduct?.meituanSkuId || null,
+        taobaoSkuId: matchedShopProduct?.taobaoSkuId || null,
         boundCount,
         isBound,
         suggestedMeituanItem,
@@ -1173,4 +1185,3 @@ export class MeituanMappingService {
     return { success: true };
   }
 }
-
