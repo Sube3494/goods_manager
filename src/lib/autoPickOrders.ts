@@ -4472,6 +4472,26 @@ function normalizeShopProductSkuForPlatformMatch(
   return normalizeAutoPickSkuForMatch(item.sku || item.jdSkuId);
 }
 
+function doesShopProductMatchAutoPickStableKey(
+  platform: string | null | undefined,
+  item: { sku?: string | null; jdSkuId?: string | null; meituanSkuId?: string | null },
+  key: string
+) {
+  const normalizedKey = normalizeAutoPickSkuForMatch(key);
+  if (!normalizedKey) {
+    return false;
+  }
+
+  const platformKey = normalizeShopProductSkuForPlatformMatch(platform, item);
+  const fallbackKeys = [
+    normalizeAutoPickSkuForMatch(item.sku),
+    normalizeAutoPickSkuForMatch(item.jdSkuId),
+    normalizeAutoPickSkuForMatch(item.meituanSkuId),
+  ].filter(Boolean);
+
+  return platformKey === normalizedKey || fallbackKeys.includes(normalizedKey);
+}
+
 async function findExistingShopProductByShopAndSku(
   tx: Prisma.TransactionClient,
   shopId: string,
@@ -4513,7 +4533,11 @@ async function findExistingShopProductByShopAndSku(
   const directHit = await tx.shopProduct.findFirst({
     where: {
       shopId,
-      sku: String(sku || "").trim(),
+      OR: [
+        { sku: String(sku || "").trim() },
+        { jdSkuId: String(sku || "").trim() },
+        { meituanSkuId: String(sku || "").trim() },
+      ],
     },
     select: {
       id: true,
@@ -4544,7 +4568,7 @@ async function findExistingShopProductByShopAndSku(
     },
   });
 
-  return candidates.find((item) => normalizeShopProductSkuForPlatformMatch(platform, item) === normalizedSku) || null;
+  return candidates.find((item) => doesShopProductMatchAutoPickStableKey(platform, item, normalizedSku)) || null;
 }
 
 async function resolveAutoPickInternalShop(

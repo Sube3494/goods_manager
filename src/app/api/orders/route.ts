@@ -429,6 +429,29 @@ function normalizeShopProductSkuForPlatformMatch(
   return normalizeSkuDigits(item.sku || item.jdSkuId);
 }
 
+function doesShopProductMatchStableKey(
+  platform: string | null | undefined,
+  item: { sku?: string | null; jdSkuId?: string | null; meituanSkuId?: string | null },
+  key: string
+) {
+  if (!key) {
+    return false;
+  }
+  const normalizedKey = normalizeSkuDigits(key);
+  if (!normalizedKey) {
+    return false;
+  }
+
+  const platformKey = normalizeShopProductSkuForPlatformMatch(platform, item);
+  const fallbackKeys = [
+    normalizeSkuDigits(item.sku),
+    normalizeSkuDigits(item.jdSkuId),
+    normalizeSkuDigits(item.meituanSkuId),
+  ].filter(Boolean);
+
+  return platformKey === normalizedKey || fallbackKeys.includes(normalizedKey);
+}
+
 function findMappedShopNameFromIntegrationConfig(
   maiyatianShopId: string | null,
   rawShopName: string | null,
@@ -2120,7 +2143,7 @@ export async function GET(request: NextRequest) {
             }
 
             const strictCandidates = candidatesInMatchedShop.filter((product) =>
-              normalizeShopProductSkuForPlatformMatch(order.platform, product) === normalizedSku
+              doesShopProductMatchStableKey(order.platform, product, normalizedSku)
             );
 
             const uniqueCandidateShopIds = Array.from(new Set(
