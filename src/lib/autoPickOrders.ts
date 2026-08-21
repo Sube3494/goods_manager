@@ -4504,6 +4504,79 @@ async function backfillMeituanIdForAutoPickMatchedShopProduct(
   }
 }
 
+export async function backfillPlatformIdsForSyncedAutoPickOrder(userId: string, orderId: string) {
+  const order = await prisma.autoPickOrder.findFirst({
+    where: { id: orderId, userId },
+    select: {
+      id: true,
+      platform: true,
+      items: {
+        select: {
+          id: true,
+          productNo: true,
+          rawPayload: true,
+        },
+      },
+    },
+  });
+  if (!order || (!isMeituanPlatform(order.platform) && !isJdPlatform(order.platform))) {
+    return { count: 0 };
+  }
+
+  const shopProducts = await prisma.shopProduct.findMany({
+    where: { shop: { userId } },
+    select: {
+      id: true,
+      sku: true,
+      jdSkuId: true,
+      meituanSkuId: true,
+    },
+  });
+  const shopProductMap = new Map(shopProducts.map((item) => [item.id, item]));
+  let count = 0;
+
+  for (const item of order.items) {
+    const manualMatchedProduct = readManualMatchedProductFromOrderItemRawPayload(item.rawPayload);
+    const manualShopProductId = String(manualMatchedProduct?.shopProductId || "").trim() || null;
+    let matchedShopProductId = manualShopProductId && !manualShopProductId.includes("+")
+      ? manualShopProductId
+      : null;
+
+    if (!matchedShopProductId) {
+      const platformProductId = readAutoPickPlatformProductIdForMatch(order.platform, item.rawPayload, item.productNo);
+      const skuFallbacks = splitCompositeAutoPickSku(item.productNo);
+      const matchKeys = Array.from(new Set([platformProductId, ...skuFallbacks].filter(Boolean)));
+      const matched = shopProducts.find((product) =>
+        matchKeys.some((key) => doesShopProductMatchAutoPickStableKey(order.platform, product, key))
+      );
+      matchedShopProductId = matched?.id || null;
+    }
+
+    if (!matchedShopProductId || !shopProductMap.has(matchedShopProductId)) {
+      continue;
+    }
+
+    if (isMeituanPlatform(order.platform)) {
+      await backfillMeituanIdForAutoPickMatchedShopProduct(prisma, userId, matchedShopProductId, item.rawPayload, order.platform);
+      count += 1;
+      continue;
+    }
+
+    if (isJdPlatform(order.platform)) {
+      const rawPayloadRecord = item.rawPayload && typeof item.rawPayload === "object" && !Array.isArray(item.rawPayload)
+        ? item.rawPayload as Record<string, unknown>
+        : {};
+      const sourceId = String(item.productNo || rawPayloadRecord.source_id || rawPayloadRecord.sourceId || "").trim();
+      if (sourceId) {
+        await syncJdSkuIdForShopProduct(prisma, userId, matchedShopProductId, sourceId);
+        count += 1;
+      }
+    }
+  }
+
+  return { count };
+}
+
 function normalizeShopProductSkuForPlatformMatch(
   platform: string | null | undefined,
   item: { sku?: string | null; jdSkuId?: string | null; meituanSkuId?: string | null }

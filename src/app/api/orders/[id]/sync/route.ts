@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
 import {
   backfillPersistedAutoPickOrderFields,
+  backfillPlatformIdsForSyncedAutoPickOrder,
   clearAutoPickOrderMainSystemSelfDelivery,
   normalizeAutoPickOrderPayload,
   readCustomerMaskedPhoneFromRawPayload,
@@ -102,6 +103,7 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
     const backfill = await backfillPersistedAutoPickOrderFields(session.id, {
       orderIds: [refreshedOrder.id],
     });
+    const platformIdBackfill = await backfillPlatformIdsForSyncedAutoPickOrder(session.id, refreshedOrder.id);
 
     const normalized = normalizeAutoPickOrderPayload(refreshedOrder.rawPayload);
     const syncedOrder = {
@@ -128,6 +130,7 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
       completedAt: normalized?.completedAt || null,
       lastSyncedAt: refreshedOrder.lastSyncedAt,
       backfilled: backfill.count,
+      platformIdBackfilled: platformIdBackfill.count,
       order: syncedOrder,
     });
   } catch (error) {
