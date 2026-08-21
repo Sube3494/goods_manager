@@ -595,7 +595,56 @@ export function isJdOrder(platform?: string | null, channelTag?: string | null) 
   return p === "jd" || p.includes("jingdong") || p.includes("jddj") || p.includes("京东") || c === "daojia";
 }
 
-export function getOrderItemDisplay(item: AutoPickOrderItem) {
+export function isMeituanOrder(platform?: string | null, channelTag?: string | null) {
+  const p = String(platform || "").trim().toLowerCase();
+  const c = String(channelTag || "").trim().toLowerCase();
+  return p.includes("美团") || p.includes("meituan") || p === "shangou" || c === "shangou";
+}
+
+function readGoodsExtraRecord(rawPayload: Record<string, unknown>) {
+  const goodsExtra = rawPayload.goods_extra || rawPayload.goodsExtra;
+  if (typeof goodsExtra === "string") {
+    try {
+      const parsed = JSON.parse(goodsExtra);
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+        ? parsed as Record<string, unknown>
+        : {};
+    } catch {
+      return {};
+    }
+  }
+  return goodsExtra && typeof goodsExtra === "object" && !Array.isArray(goodsExtra)
+    ? goodsExtra as Record<string, unknown>
+    : {};
+}
+
+function readDisplaySourceId(item: AutoPickOrderItem, platform?: string | null, channelTag?: string | null) {
+  const rawPayload = item.rawPayload && typeof item.rawPayload === "object" && !Array.isArray(item.rawPayload)
+    ? item.rawPayload as Record<string, unknown>
+    : {};
+  if (isMeituanOrder(platform, channelTag)) {
+    const goodsExtra = readGoodsExtraRecord(rawPayload);
+    return String(
+      goodsExtra.original_spu_id
+      || goodsExtra.originalSpuId
+      || rawPayload.original_spu_id
+      || rawPayload.originalSpuId
+      || rawPayload.platformProductId
+      || item.productNo
+      || rawPayload.source_id
+      || rawPayload.sourceId
+      || ""
+    ).trim();
+  }
+  return String(
+    item.productNo
+    || rawPayload.source_id
+    || rawPayload.sourceId
+    || ""
+  ).trim();
+}
+
+export function getOrderItemDisplay(item: AutoPickOrderItem, platform?: string | null, channelTag?: string | null) {
   const matchedProduct = item.matchedProduct;
   const rawPayload = item.rawPayload && typeof item.rawPayload === "object" && !Array.isArray(item.rawPayload)
     ? item.rawPayload as Record<string, unknown>
@@ -604,12 +653,7 @@ export function getOrderItemDisplay(item: AutoPickOrderItem) {
     String(item.productNo || "").trim() === MANUAL_DELIVERY_PLACEHOLDER_PRODUCT_NO
     || rawPayload.isManualDeliveryPlaceholder === true
     || String(item.productName || "").trim() === MANUAL_DELIVERY_PLACEHOLDER_PRODUCT_NAME;
-  const sourceId = String(
-    item.productNo
-    || rawPayload.source_id
-    || rawPayload.sourceId
-    || ""
-  ).trim();
+  const sourceId = readDisplaySourceId(item, platform, channelTag);
 
   return {
     name: matchedProduct?.name || (isManualDeliveryPlaceholder ? "可添加发货货品" : item.productName) || "未命名商品",
@@ -621,17 +665,9 @@ export function getOrderItemDisplay(item: AutoPickOrderItem) {
   };
 }
 
-export function getExpandedOrderItemDisplays(item: AutoPickOrderItem) {
+export function getExpandedOrderItemDisplays(item: AutoPickOrderItem, platform?: string | null, channelTag?: string | null) {
   const matchedProduct = item.matchedProduct;
-  const rawPayload = item.rawPayload && typeof item.rawPayload === "object" && !Array.isArray(item.rawPayload)
-    ? item.rawPayload as Record<string, unknown>
-    : {};
-  const sourceId = String(
-    item.productNo
-    || rawPayload.source_id
-    || rawPayload.sourceId
-    || ""
-  ).trim();
+  const sourceId = readDisplaySourceId(item, platform, channelTag);
 
   if (Array.isArray(item.displayItems) && item.displayItems.length > 0) {
     return item.displayItems.map((displayItem) => ({
@@ -643,7 +679,7 @@ export function getExpandedOrderItemDisplays(item: AutoPickOrderItem) {
     }));
   }
 
-  return [getOrderItemDisplay(item)];
+  return [getOrderItemDisplay(item, platform, channelTag)];
 }
 
 const MANUAL_DELIVERY_PLACEHOLDER_PRODUCT_NO = "__manual_delivery_placeholder__";
@@ -1539,6 +1575,7 @@ export function ProductStripItem({
   returnedQuantity = 0,
   returnedDetails = [],
   isJdOrder = false,
+  isMeituanOrder = false,
 }: {
   display: { name: string; sku: string; image: string | null; quantity: number; sourceId?: string; optionalMatch?: boolean };
   onEditMatch?: () => void;
@@ -1554,8 +1591,11 @@ export function ProductStripItem({
     extraExpense?: number;
   }>;
   isJdOrder?: boolean;
+  isMeituanOrder?: boolean;
 }) {
   const [imgError, setImgError] = useState(false);
+  const platformSourceLabel = isJdOrder ? "JD SKU" : isMeituanOrder ? "美团 ID" : "";
+  const platformSourceShortLabel = isJdOrder ? "JD" : isMeituanOrder ? "MT" : "";
 
   return (
     <div className="flex items-center gap-2.5 rounded-2xl border border-black/6 bg-white/70 px-2.5 py-2 dark:border-white/8 dark:bg-white/4 sm:gap-3 sm:rounded-[18px] sm:px-3 sm:py-2.5">
@@ -1597,10 +1637,10 @@ export function ProductStripItem({
                 : matchedProduct ? (matchedProduct.isManual ? "手动" : "自动") : (display.optionalMatch ? "可选" : "未匹配")}
             </span>
           ) : null}
-          {isJdOrder && display.sourceId ? (
+          {platformSourceLabel && display.sourceId ? (
             <span className="inline-flex shrink-0 items-center font-mono text-[10px] font-normal text-amber-700 dark:text-amber-300 bg-amber-500/10 dark:bg-amber-500/20 px-1.5 py-0.5 rounded border border-amber-500/20 leading-none whitespace-nowrap">
-              <span className="hidden sm:inline">JD SKU:&nbsp;</span>
-              <span className="sm:hidden">JD:&nbsp;</span>
+              <span className="hidden sm:inline">{platformSourceLabel}:&nbsp;</span>
+              <span className="sm:hidden">{platformSourceShortLabel}:&nbsp;</span>
               {display.sourceId}
             </span>
           ) : null}
@@ -2002,6 +2042,7 @@ export function OrderCard({
   const canEditProductCost = order.productCostStatus === "pending-backfill" || productCostBreakdown.length > 0;
   const settlementAfterRate = Math.round(expectedIncome * (1 - serviceFeeRate));
   const isJdOrder = String(order.platform || "").includes("京东");
+  const isMeituanPlatformOrder = isMeituanOrder(order.platform);
   const canEditExpectedIncome = isJdOrder || legacyManualDeliveryPlaceholderOrder;
   const pureProfitTooltipRows: Array<{ label: string; value: string; editable?: boolean; onEdit?: () => void }> = hasPureProfit
     ? (showManualDeliveryMarker
@@ -2497,7 +2538,7 @@ export function OrderCard({
 
             <div className="mt-2 grid gap-1.5 sm:mt-2.5 sm:gap-2">
               {visibleItems.flatMap((item, index) =>
-                getExpandedOrderItemDisplays(item).map((display, displayIndex) => (
+                getExpandedOrderItemDisplays(item, order.platform).map((display, displayIndex) => (
                   <ProductStripItem
                     key={`${item.productNo || item.productName}-${index}-${display.sku}-${displayIndex}`}
                     display={display}
@@ -2508,6 +2549,7 @@ export function OrderCard({
                     returnedQuantity={returnedItemQuantityMap.get(getReturnedProductKey(item)) || 0}
                     returnedDetails={returnedItemDetailsMap.get(getReturnedProductKey(item)) || []}
                     isJdOrder={isJdOrder}
+                    isMeituanOrder={isMeituanPlatformOrder}
                   />
                 ))
               )}
