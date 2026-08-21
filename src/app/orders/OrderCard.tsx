@@ -1584,7 +1584,7 @@ export function ProductStripItem({
   isMeituanOrder?: boolean;
 }) {
   const [imgError, setImgError] = useState(false);
-  const platformSourceLabel = isJdOrder ? "JD SKU" : isMeituanOrder ? "美团 ID" : "";
+  const platformSourceLabel = isJdOrder ? "JD SKU" : isMeituanOrder ? "美团 SKU ID" : "";
   const platformSourceShortLabel = isJdOrder ? "JD" : isMeituanOrder ? "MT" : "";
 
   return (
