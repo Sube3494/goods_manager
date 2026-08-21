@@ -2759,7 +2759,7 @@ export default function OrdersPage() {
           void saveManualMatch(resolvedIds.join("+"), items);
         }}
         selectedIds={matchEditorTarget?.currentMatchedProductId ? matchEditorTarget.currentMatchedProductId.split("+").filter(Boolean) : []}
-        singleSelect={false}
+        singleSelect={true}
         disableAlreadySelected={false}
         allowMultipleToggle={true}
         loadAllOnOpen
