@@ -3676,6 +3676,11 @@ export async function enrichAutoPickInboundOrderIfNeeded(
         customerRemark: true,
         rawPayload: true,
         delivery: true,
+        items: {
+          select: {
+            rawPayload: true,
+          },
+        },
       },
     });
 
@@ -3702,6 +3707,9 @@ export async function enrichAutoPickInboundOrderIfNeeded(
     );
 
     const isAccepted = currentStatusDisplay === "待配送" || currentStatusDisplay === "配送中";
+    const isMeituanOrder = isMeituanPlatform(current.platform);
+    const hasCurrentMeituanSpuId = hasMeituanOriginalSpuIdInItems(current.items as Array<Record<string, unknown>>);
+    const hasExistingMeituanSpuId = hasMeituanOriginalSpuIdInItems(existing?.items);
 
     const shouldEnrichOrderDetail =
       !existing
@@ -3709,7 +3717,8 @@ export async function enrichAutoPickInboundOrderIfNeeded(
       || !hasCustomerName
       || !hasEncryptedCustomerPhone
       || !hasMaskedCustomerPhone
-      || (isAccepted && !hasRiderPhone);
+      || (isAccepted && !hasRiderPhone)
+      || (isMeituanOrder && !hasCurrentMeituanSpuId && !hasExistingMeituanSpuId);
 
     if (shouldEnrichOrderDetail) {
       console.log(`[AutoEnrich] Synchronously enriching order ${current.orderNo} (status: ${current.status})`);
@@ -4272,6 +4281,13 @@ function mergeAutoPickOrderItemRawPayload(
     ...nextPayload,
     manualMatchedProduct,
   };
+}
+
+function hasMeituanOriginalSpuIdInItems(items: Array<{ rawPayload?: unknown } | Record<string, unknown>> | undefined | null) {
+  return (items || []).some((item) => {
+    const rawPayload = "rawPayload" in item && item.rawPayload ? item.rawPayload : item;
+    return Boolean(readAutoPickPlatformProductIdForMatch("美团", rawPayload, null));
+  });
 }
 
 function readAutoPickPickProgress(rawPayload: unknown) {
