@@ -557,11 +557,13 @@ function ShopSortWorkbench({
           if (!matchesCategory) return false;
 
           if (!normalizedQuery) return true;
-          const name = (row.name || "").toLowerCase();
-          const skuInput = (row.skuInput || "").toLowerCase();
-          const sku = (row.sku || "").toLowerCase();
-          const group = (row.sortGroupNameInput || row.categoryName || "").toLowerCase();
-          return name.includes(normalizedQuery) || skuInput.includes(normalizedQuery) || sku.includes(normalizedQuery) || group.includes(normalizedQuery);
+          const name = String(row.name || row.productName || "").toLowerCase();
+          const skuInput = String(row.skuInput || "").toLowerCase();
+          const sku = String(row.sku || "").toLowerCase();
+          const jdSku = String(row.jdSkuId || "").toLowerCase();
+          const mtSku = String(row.meituanSkuId || "").toLowerCase();
+          const group = String(row.sortGroupNameInput || row.categoryName || "").toLowerCase();
+          return name.includes(normalizedQuery) || skuInput.includes(normalizedQuery) || sku.includes(normalizedQuery) || jdSku.includes(normalizedQuery) || mtSku.includes(normalizedQuery) || group.includes(normalizedQuery);
         })
         .sort((a, b) => {
           const groupA = (a.sortGroupNameInput || a.categoryName || "未分组").trim();
@@ -572,10 +574,10 @@ function ShopSortWorkbench({
           const numberA = getIncrementingCodeNumber(a.skuInput);
           const numberB = getIncrementingCodeNumber(b.skuInput);
           if (numberA !== numberB) return numberA - numberB;
-          return a.name.localeCompare(b.name, "zh-CN");
+          return (a.name || "").localeCompare(b.name || "", "zh-CN");
         });
     },
-    [categories, rows, selectedCategoryName]
+    [categories, rows, searchQuery, selectedCategoryName]
   );
 
   const handleRowDrop = useCallback((targetId: string) => {
