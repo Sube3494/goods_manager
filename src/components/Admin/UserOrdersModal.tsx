@@ -372,40 +372,26 @@ export function UserOrdersModal({
                   ) : null}
                 </div>
 
-                {/* 3. 总配送费分布卡片 */}
-                <div className="min-w-0 h-full rounded-[20px] border border-black/8 bg-white/76 px-4 py-3.5 shadow-xs dark:border-white/10 dark:bg-white/5 flex flex-col gap-2.5">
-                  <div className="flex flex-col w-full">
-                    <div className="flex items-center justify-between sm:block">
+                {/* 3. 最右侧：总配送费与推广费垂直列 */}
+                <div className="h-full flex flex-col gap-3">
+                  <div className="flex-1 min-w-0 rounded-[20px] border border-black/8 bg-white/76 px-4 py-3.5 shadow-xs dark:border-white/10 dark:bg-white/5 flex flex-col justify-between">
+                    <div>
                       <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">总配送费</div>
-                      <div className="sm:hidden text-[22px] font-bold leading-none tracking-tight text-foreground">
+                      <div className="mt-2 text-[26px] font-bold leading-none tracking-tight text-foreground">
                         {toCurrency(todaySummary.totalDeliveryFee || 0)}
                       </div>
                     </div>
-                    <div className="hidden sm:block mt-2 text-[26px] font-bold leading-none tracking-tight text-foreground">
-                      {toCurrency(todaySummary.totalDeliveryFee || 0)}
-                    </div>
-                    <div className="mt-1.5 text-xs text-muted-foreground">今日各平台配送费汇总</div>
+                    <div className="mt-1.5 text-xs text-muted-foreground">今日订单汇总</div>
                   </div>
-                  <div className="flex flex-col gap-2 border-t border-black/4 pt-3 dark:border-white/5">
-                    {todaySummary.platformDelivery && Object.keys(todaySummary.platformDelivery).length > 0 ? (
-                      Object.entries(todaySummary.platformDelivery)
-                        .sort(([, a], [, b]) => b - a)
-                        .map(([platform, fee]) => {
-                          const meta = getPlatformBadgeMeta(platform);
-                          return (
-                            <div key={platform} className="flex items-center justify-between rounded-xl bg-black/1.5 px-3 py-1.5 dark:bg-white/1.5 text-[11px] text-foreground/80 dark:text-white/80">
-                              <span className="flex items-center gap-1.5 min-w-0">
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img src={meta.iconSrc} alt={meta.iconAlt} className="h-3.5 w-3.5 object-contain shrink-0" onError={(e) => { e.currentTarget.style.display = "none"; }} />
-                                <span className="truncate font-medium">{platform}</span>
-                              </span>
-                              <span className="font-bold shrink-0 text-blue-600 dark:text-blue-400">{toCurrency(fee)}</span>
-                            </div>
-                          );
-                        })
-                    ) : (
-                      <div className="text-muted-foreground/30 text-center py-1.5 text-[11px]">-</div>
-                    )}
+
+                  <div className="flex-1 min-w-0 rounded-[20px] border border-black/8 bg-white/76 px-4 py-3.5 shadow-xs dark:border-white/10 dark:bg-white/5 flex flex-col justify-between">
+                    <div>
+                      <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">推广费</div>
+                      <div className="mt-2 text-[26px] font-bold leading-none tracking-tight text-foreground">
+                        ¥0.00
+                      </div>
+                    </div>
+                    <div className="mt-1.5 text-xs text-muted-foreground">今日推广费录入</div>
                   </div>
                 </div>
               </div>
