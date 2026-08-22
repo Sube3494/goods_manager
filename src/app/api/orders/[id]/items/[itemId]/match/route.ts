@@ -188,11 +188,17 @@ export async function PATCH(
       return NextResponse.json({ error: "请选择要匹配的商品" }, { status: 400 });
     }
 
+    const isAdmin = Boolean(
+      user.role === "SUPER_ADMIN" ||
+      (user.role && String(user.role).includes("管理")) ||
+      (Array.isArray(user.permissions) && (user.permissions.includes("*") || user.permissions.includes("members:manage") || user.permissions.includes("admin")))
+    );
+
     const orderItem = await prisma.autoPickOrderItem.findFirst({
       where: {
         id: itemId,
         orderId: id,
-        order: { userId: user.id },
+        ...(isAdmin ? {} : { order: { userId: user.id } }),
       },
       select: {
         id: true,
@@ -204,6 +210,7 @@ export async function PATCH(
             orderNo: true,
             platform: true,
             rawPayload: true,
+            userId: true,
           },
         },
       },
@@ -213,10 +220,12 @@ export async function PATCH(
       return NextResponse.json({ error: "订单商品不存在" }, { status: 404 });
     }
 
+    const targetUserId = orderItem.order.userId || user.id;
+
     const deleteLegacyOutbound = async (tx: any, orderNo: string) => {
       const existingOutbounds = await tx.outboundOrder.findMany({
         where: {
-          userId: user.id,
+          userId: targetUserId,
           note: {
             contains: `平台单号: ${orderNo}`,
             mode: "insensitive",
@@ -239,7 +248,6 @@ export async function PATCH(
         });
       }
     };
-
     const basePayload = readRawPayloadRecord(orderItem.rawPayload);
     const fallbackItemPayload = findOrderRawPayloadItemPayload(orderItem.order.rawPayload, orderItem);
     const { manualMatchedProduct: _removedManualMatchedProduct, ...restPayload } = basePayload;
@@ -264,7 +272,7 @@ export async function PATCH(
         await deleteLegacyOutbound(tx, orderItem.order.orderNo);
       });
 
-      await syncAutoOutboundFromCompletedAutoPickOrder(user.id, id).catch(() => null);
+      await syncAutoOutboundFromCompletedAutoPickOrder(targetUserId, id).catch(() => null);
 
       return NextResponse.json({
         ok: true,
@@ -296,7 +304,7 @@ export async function PATCH(
       const shopProducts = await prisma.shopProduct.findMany({
         where: {
           id: { in: productIds },
-          shop: { userId: user.id },
+          shop: { userId: targetUserId },
         },
         select: {
           id: true,
@@ -349,9 +357,6 @@ export async function PATCH(
       };
 
       await prisma.$transaction(async (tx) => {
-        for (const shopProduct of shopProducts) {
-          await syncMeituanIdForMatchedShopProduct(tx, user.id, shopProduct, basePayload, fallbackItemPayload, orderItem.order.platform, orderItem.productNo, orderItem.platformSkuId);
-        }
         await tx.autoPickOrderItem.update({
           where: { id: orderItem.id },
           data: {
@@ -364,7 +369,14 @@ export async function PATCH(
         await deleteLegacyOutbound(tx, orderItem.order.orderNo);
       });
 
-      await syncAutoOutboundFromCompletedAutoPickOrder(user.id, id).catch((error) => {
+      const isCompositeItemSku = /[+＋]/.test(String(orderItem.productNo || ""));
+      if (!isCompositeItemSku) {
+        for (const shopProduct of shopProducts) {
+          await syncMeituanIdForMatchedShopProduct(prisma, targetUserId, shopProduct, basePayload, fallbackItemPayload, orderItem.order.platform, orderItem.productNo, orderItem.platformSkuId).catch(() => null);
+        }
+      }
+
+      await syncAutoOutboundFromCompletedAutoPickOrder(targetUserId, id).catch((error) => {
         console.error("Failed to auto-create outbound after manual product match:", error);
       });
 
@@ -374,7 +386,7 @@ export async function PATCH(
     const shopProduct = await prisma.shopProduct.findFirst({
       where: {
         id: productId,
-        shop: { userId: user.id },
+        shop: { userId: targetUserId },
       },
       select: {
         id: true,
@@ -421,7 +433,6 @@ export async function PATCH(
 
     if (autoMatchedProduct?.shopProductId && autoMatchedProduct.shopProductId === matchedProduct.shopProductId) {
       await prisma.$transaction(async (tx) => {
-        await syncMeituanIdForMatchedShopProduct(tx, user.id, shopProduct, basePayload, fallbackItemPayload, orderItem.order.platform, orderItem.productNo, orderItem.platformSkuId);
         await tx.autoPickOrderItem.update({
           where: { id: orderItem.id },
           data: {
@@ -430,6 +441,11 @@ export async function PATCH(
         });
         await deleteLegacyOutbound(tx, orderItem.order.orderNo);
       });
+
+      const isCompositeItemSku = /[+＋]/.test(String(orderItem.productNo || ""));
+      if (!isCompositeItemSku) {
+        await syncMeituanIdForMatchedShopProduct(prisma, targetUserId, shopProduct, basePayload, fallbackItemPayload, orderItem.order.platform, orderItem.productNo, orderItem.platformSkuId).catch(() => null);
+      }
 
       return NextResponse.json({
         ok: true,
@@ -450,53 +466,11 @@ export async function PATCH(
         || ""
       ).trim();
 
-      const platformStr = String(orderItem.order?.platform || "");
-      const isJdOrder = platformStr.includes("京东") ||
-        platformStr.toLowerCase().includes("daojia") ||
-        platformStr.toLowerCase().includes("jd");
-
-      if (isJdOrder && targetJdSkuId) {
-        try {
-          const existingJdSkuIds = normalizeJdSkuIds(shopProduct.jdSkuId);
-          const nextJdSkuIds = Array.from(new Set([...existingJdSkuIds, targetJdSkuId]));
-          const primaryJdSkuIdStr = nextJdSkuIds.join(",");
-
-          await tx.shopProduct.update({
-            where: { id: shopProduct.id },
-            data: { jdSkuId: primaryJdSkuIdStr },
-          });
-
-          if (shopProduct.productId) {
-            const existingProductJdSkus = await tx.productJdSku.findMany({
-              where: { productId: shopProduct.productId },
-              select: { jdSkuId: true },
-            });
-            const productJdSkuIds = Array.from(new Set([
-              ...existingProductJdSkus.map((item) => item.jdSkuId),
-              ...nextJdSkuIds,
-            ]));
-
-            await replaceProductJdSkuMappings(tx, shopProduct.productId, user.id, productJdSkuIds);
-            await tx.product.update({
-              where: { id: shopProduct.productId },
-              data: { jdSkuId: productJdSkuIds[0] || null },
-            });
-          }
-        } catch (error) {
-          console.warn("[match/route] 忽略冲突的 jdSkuId 更新:", error);
-        }
-
-        if (!orderItem.productNo) {
-          await tx.autoPickOrderItem.update({
-            where: { id: orderItem.id },
-            data: { productNo: targetJdSkuId },
-          });
-        }
-      }
-
-      const isCompositeItemSku = /[+＋]/.test(String(orderItem.productNo || ""));
-      if (!isCompositeItemSku) {
-        await syncMeituanIdForMatchedShopProduct(tx, user.id, shopProduct, basePayload, fallbackItemPayload, orderItem.order.platform, orderItem.productNo, orderItem.platformSkuId);
+      if (targetJdSkuId && !orderItem.productNo) {
+        await tx.autoPickOrderItem.update({
+          where: { id: orderItem.id },
+          data: { productNo: targetJdSkuId },
+        });
       }
 
       await tx.autoPickOrderItem.update({
@@ -520,7 +494,12 @@ export async function PATCH(
       await deleteLegacyOutbound(tx, orderItem.order.orderNo);
     });
 
-    await syncAutoOutboundFromCompletedAutoPickOrder(user.id, id).catch((error) => {
+    const isCompositeItemSku = /[+＋]/.test(String(orderItem.productNo || ""));
+    if (!isCompositeItemSku) {
+      await syncMeituanIdForMatchedShopProduct(prisma, targetUserId, shopProduct, basePayload, fallbackItemPayload, orderItem.order.platform, orderItem.productNo, orderItem.platformSkuId).catch(() => null);
+    }
+
+    await syncAutoOutboundFromCompletedAutoPickOrder(targetUserId, id).catch((error) => {
       console.error("Failed to auto-create outbound after manual product match:", error);
     });
 
