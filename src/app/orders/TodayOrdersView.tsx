@@ -92,6 +92,7 @@ interface TodayOrdersViewProps {
     promotionDate?: string;
   }) => void;
   localShops: Array<{ id: string; name: string; address: string }>;
+  userId?: string | null;
 }
 
 const TODAY_TAB_PAGE_SIZE = 100;
@@ -103,6 +104,7 @@ export function TodayOrdersView({
   onDataLoad,
   localShops,
   onOpenPurchaseDraft,
+  userId,
 }: TodayOrdersViewProps) {
   const { showToast } = useToast();
   const [orders, setOrders] = useState<AutoPickOrder[]>([]);
@@ -194,6 +196,7 @@ export function TodayOrdersView({
       if (platform !== "all") params.set("platform", platform);
       if (status !== "all") params.set("status", status);
       if (shop !== "all") params.set("shop", shop);
+      if (userId) params.set("userId", userId);
       params.set("_metrics", "1");
 
       const response = await fetch(`/api/orders?${params.toString()}`, { cache: "no-store" });
@@ -212,6 +215,15 @@ export function TodayOrdersView({
       if (Array.isArray(data.filters?.statuses)) setStatuses(data.filters.statuses);
       if (data.summary) setSummary(data.summary);
       if (data.overview) setOverview(data.overview);
+      if (onDataLoad) {
+        onDataLoad({
+          summary: data.summary || { receivedAmount: 0, platformCommission: 0, validOrderCount: 0, itemCount: 0, totalDeliveryFee: 0, pureProfit: 0 },
+          overview: data.overview || { totalCount: 0, trueOrderCount: 0, brushCount: 0, cancelledCount: 0 },
+          total: typeof data.total === "number" ? data.total : nextItems.length,
+          eligibleBrushSyncOrders: [],
+          isLoading: false,
+        });
+      }
 
     } catch (error) {
       console.error("Failed to fetch orders:", error);
@@ -220,7 +232,7 @@ export function TodayOrdersView({
       isFetchingRef.current = false;
       setIsLoading(false);
     }
-  }, [platform, query, shop, status, todayDate, showToast]);
+  }, [platform, query, shop, status, todayDate, showToast, userId, onDataLoad]);
 
   // 外部刷新信号监听
   useEffect(() => {
