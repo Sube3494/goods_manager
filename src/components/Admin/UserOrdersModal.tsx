@@ -1,34 +1,29 @@
 "use client";
 
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   X,
   Package,
   ShoppingBag,
-  ExternalLink,
   Search,
-  Calendar,
-  Layers,
-  CheckCircle2,
-  Clock,
-  Truck,
-  AlertTriangle,
   RotateCcw,
   Maximize,
   Minimize,
-  Store,
-  MapPin,
-  CircleDollarSign,
-  ReceiptText,
-  User as UserIcon,
   Shield,
   Loader2,
+  TrendingUp,
+  Wallet,
+  Receipt,
+  Truck,
+  Clock,
 } from "lucide-react";
 import { AutoPickOrder } from "@/lib/types";
+import { OrderCard } from "@/app/orders/OrderCard";
 import { Pagination } from "@/components/ui/Pagination";
-import { formatLocalDate, formatLocalDateTime } from "@/lib/dateUtils";
+import { formatLocalDate } from "@/lib/dateUtils";
+import { useToast } from "@/components/ui/Toast";
 
 interface UserOrdersModalProps {
   isOpen: boolean;
@@ -39,7 +34,21 @@ interface UserOrdersModalProps {
   roleName?: string | null;
 }
 
-type DateRangeType = "today" | "7d" | "30d" | "all";
+type DateRangeType = "all" | "today" | "7d" | "30d";
+
+interface OrderSummaryMetrics {
+  totalCount: number;
+  todayCount: number;
+  pendingCount: number;
+  completedCount: number;
+  trueSalesAmount: number;
+  pureProfit: number;
+  profitRate: number;
+  brushCount: number;
+  brushCommission: number;
+  deliveryFee: number;
+  platformBreakdown?: Record<string, { count: number; sales: number }>;
+}
 
 export function UserOrdersModal({
   isOpen,
@@ -49,6 +58,7 @@ export function UserOrdersModal({
   userEmail,
   roleName,
 }: UserOrdersModalProps) {
+  const { showToast } = useToast();
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [orders, setOrders] = useState<AutoPickOrder[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -56,20 +66,35 @@ export function UserOrdersModal({
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
 
+  // 展开折叠状态
+  const [expandedIds, setExpandedIds] = useState<string[]>([]);
+  const [actingId, setActingId] = useState("");
+
   // Filters
   const [searchQuery, setSearchQuery] = useState("");
   const [dateRange, setDateRange] = useState<DateRangeType>("all");
   const [platformFilter, setPlatformFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
 
-  // Summary Metrics
-  const [summaryStats, setSummaryStats] = useState({
+  // Summary Metrics 对齐订单大盘
+  const [summaryMetrics, setSummaryMetrics] = useState<OrderSummaryMetrics>({
     totalCount: 0,
     todayCount: 0,
     pendingCount: 0,
     completedCount: 0,
-    totalRevenue: 0,
+    trueSalesAmount: 0,
+    pureProfit: 0,
+    profitRate: 0,
+    brushCount: 0,
+    brushCommission: 0,
+    deliveryFee: 0,
   });
+
+  const toggleExpanded = useCallback((id: string) => {
+    setExpandedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  }, []);
 
   const calculateDateBounds = useCallback((range: DateRangeType) => {
     const now = new Date();
@@ -102,9 +127,7 @@ export function UserOrdersModal({
         _metrics: "1",
       });
 
-      if (searchQuery.trim()) {
-        params.set("query", searchQuery.trim());
-      }
+      if (searchQuery.trim()) params.set("query", searchQuery.trim());
       if (startDate) params.set("startDate", startDate);
       if (endDate) params.set("endDate", endDate);
       if (platformFilter !== "all") params.set("platform", platformFilter);
@@ -116,56 +139,95 @@ export function UserOrdersModal({
       }
 
       const data = await res.json();
-      const orderList = Array.isArray(data.items) ? data.items : (Array.isArray(data.orders) ? data.orders : []);
+      const orderList: AutoPickOrder[] = Array.isArray(data.items)
+        ? data.items
+        : Array.isArray(data.orders)
+        ? data.orders
+        : [];
       setOrders(orderList);
       const reportedTotal = typeof data.total === "number" ? data.total : orderList.length;
       setTotalCount(reportedTotal);
 
-      // 计算指标
+      // 对齐指标计算
       const todayStr = formatLocalDate(new Date());
-      let todayOrders = 0;
-      let pendingOrders = 0;
-      let completedOrders = 0;
-      let revenue = 0;
+      let todayCount = 0;
+      let pendingCount = 0;
+      let completedCount = 0;
+      let salesAmount = 0;
+      let profit = 0;
+      let brushCount = 0;
+      let brushCommission = 0;
+      let deliveryFee = 0;
+      const platformMap: Record<string, { count: number; sales: number }> = {};
 
       if (data.summary && typeof data.summary === "object") {
-        todayOrders = Number(data.summary.todayOrdersCount || 0);
-        pendingOrders = Number(data.summary.pendingCount || 0);
-        completedOrders = Number(data.summary.completedCount || 0);
-        revenue = Number(data.summary.trueSalesAmount || data.summary.revenue || 0);
+        const s = data.summary;
+        todayCount = Number(s.todayOrdersCount || s.todayCount || 0);
+        pendingCount = Number(s.pendingCount || 0);
+        completedCount = Number(s.completedCount || 0);
+        salesAmount = Number(s.trueSalesAmount ?? s.actualPaidTotal ?? 0);
+        profit = Number(s.pureProfit ?? s.profitTotal ?? 0);
+        brushCount = Number(s.brushOrdersCount ?? s.brushTotal ?? 0);
+        brushCommission = Number(s.brushCommissionTotal ?? 0);
+        deliveryFee = Number(s.totalDeliveryFee ?? 0);
       }
 
-      // 如果 summary 没有给全，从列表补充统计
-      if (todayOrders === 0 && pendingOrders === 0 && revenue === 0 && orderList.length > 0) {
-        orderList.forEach((order: AutoPickOrder) => {
-          const orderDateStr = formatLocalDate(order.orderTime);
-          if (orderDateStr === todayStr) {
-            todayOrders++;
-          }
+      if (salesAmount === 0 && orderList.length > 0) {
+        orderList.forEach((order) => {
+          const isToday = formatLocalDate(new Date(order.orderTime)) === todayStr;
+          if (isToday) todayCount++;
+
           const st = String(order.status || "").toLowerCase();
           if (st.includes("完成") || st === "completed" || st === "done") {
-            completedOrders++;
+            completedCount++;
           } else if (!st.includes("取消") && !st.includes("退款") && !st.includes("关闭")) {
-            pendingOrders++;
+            pendingCount++;
           }
-          revenue += (Number(order.expectedIncome) || Number(order.actualPaid) || 0) / 100;
+
+          const curSales = (Number(order.expectedIncome) || Number(order.actualPaid) || 0) / 100;
+          salesAmount += curSales;
+
+          const pName = order.platform || "其他";
+          if (!platformMap[pName]) platformMap[pName] = { count: 0, sales: 0 };
+          platformMap[pName].count += 1;
+          platformMap[pName].sales += curSales;
         });
       }
 
-      setSummaryStats({
+      const rate = salesAmount > 0 ? (profit / salesAmount) * 100 : 0;
+
+      setSummaryMetrics({
         totalCount: reportedTotal,
-        todayCount: todayOrders,
-        pendingCount: pendingOrders,
-        completedCount: completedOrders,
-        totalRevenue: revenue,
+        todayCount,
+        pendingCount,
+        completedCount,
+        trueSalesAmount: salesAmount,
+        pureProfit: profit,
+        profitRate: rate,
+        brushCount,
+        brushCommission,
+        deliveryFee,
+        platformBreakdown: platformMap,
       });
     } catch (err) {
       console.error("Fetch user orders failed:", err);
+      showToast("加载用户订单失败", "error");
       setOrders([]);
     } finally {
       setIsLoading(false);
     }
-  }, [userId, isOpen, currentPage, pageSize, dateRange, platformFilter, statusFilter, searchQuery, calculateDateBounds]);
+  }, [
+    userId,
+    isOpen,
+    currentPage,
+    pageSize,
+    dateRange,
+    platformFilter,
+    statusFilter,
+    searchQuery,
+    calculateDateBounds,
+    showToast,
+  ]);
 
   useEffect(() => {
     if (isOpen && userId) {
@@ -181,42 +243,51 @@ export function UserOrdersModal({
     setCurrentPage(1);
   };
 
+  const handleRunAction = useCallback(async (orderId: string, action: string) => {
+    setActingId(orderId);
+    try {
+      showToast(`正在处理操作: ${action}`, "info");
+      await fetchOrders();
+    } finally {
+      setActingId("");
+    }
+  }, [fetchOrders, showToast]);
+
+  const totalPages = Math.ceil(totalCount / pageSize);
+
   if (typeof document === "undefined") return null;
 
   return createPortal(
     <AnimatePresence>
       {isOpen && (
         <>
-          {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-85000 bg-black/60 backdrop-blur-sm"
+            className="fixed inset-0 z-85000 bg-black/65 backdrop-blur-sm"
             onClick={onClose}
           />
 
-          {/* Modal Container */}
           <motion.div
             initial={{ opacity: 0, scale: 0.96, y: 16 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 16 }}
             transition={{ type: "spring", stiffness: 450, damping: 35 }}
-            className={`fixed left-1/2 top-1/2 z-85001 -translate-x-1/2 -translate-y-1/2 bg-white dark:bg-gray-900 shadow-2xl overflow-hidden flex flex-col ${
+            className={`fixed left-1/2 top-1/2 z-85001 -translate-x-1/2 -translate-y-1/2 bg-background border border-border/80 shadow-2xl overflow-hidden flex flex-col ${
               isFullscreen
                 ? "w-screen h-dynamic-screen max-w-none max-h-none rounded-none border-none"
-                : "w-[calc(100%-20px)] sm:w-[calc(100%-40px)] max-w-5xl max-h-safe-modal rounded-3xl border border-border/60"
+                : "w-[calc(100%-20px)] sm:w-[calc(100%-40px)] max-w-5xl max-h-safe-modal rounded-3xl"
             }`}
           >
-            {/* Header */}
-            <div className="flex items-center justify-between px-5 sm:px-7 py-4 sm:py-5 border-b border-border/60 shrink-0 bg-muted/20">
+            <div className="flex items-center justify-between px-5 sm:px-7 py-4 sm:py-5 border-b border-border/60 shrink-0 bg-muted/25">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
                   <ShoppingBag size={20} />
                 </div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h2 className="text-base sm:text-xl font-bold text-foreground truncate">
+                    <h2 className="text-base sm:text-lg font-bold text-foreground truncate">
                       {userName || "成员"} 的订单数据
                     </h2>
                     {roleName && (
@@ -225,6 +296,9 @@ export function UserOrdersModal({
                         {roleName}
                       </span>
                     )}
+                    <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                      麦芽田已接入
+                    </span>
                   </div>
                   <p className="text-xs text-muted-foreground font-mono mt-0.5 truncate">
                     {userEmail || userId}
@@ -233,43 +307,24 @@ export function UserOrdersModal({
               </div>
 
               <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-                {/* 跳转到全量订单页 */}
-                {userId && (
-                  <a
-                    href={`/orders?userId=${userId}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="h-9 px-2.5 sm:px-3.5 rounded-xl border border-border/70 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors flex items-center gap-1.5 active:scale-95"
-                    title="在订单工作台中打开"
-                  >
-                    <ExternalLink size={14} className="text-blue-500" />
-                    <span className="hidden md:inline">在订单大盘查看</span>
-                  </a>
-                )}
-
-                {/* 刷新 */}
                 <button
                   onClick={() => void fetchOrders()}
                   disabled={isLoading}
-                  className="h-9 w-9 rounded-xl border border-border/70 text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all flex items-center justify-center active:scale-95 disabled:opacity-50"
+                  className="h-9 w-9 rounded-xl border border-border/70 text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors flex items-center justify-center active:scale-95 disabled:opacity-50"
                   title="刷新数据"
                 >
                   <RotateCcw size={15} className={isLoading ? "animate-spin" : ""} />
                 </button>
-
-                {/* 全屏切换 */}
                 <button
-                  onClick={() => setIsFullscreen(!isFullscreen)}
-                  className="h-9 w-9 rounded-xl border border-border/70 text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all hidden sm:flex items-center justify-center active:scale-95"
+                  onClick={() => setIsFullscreen((prev) => !prev)}
+                  className="h-9 w-9 rounded-xl border border-border/70 text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors flex items-center justify-center active:scale-95 hidden sm:flex"
                   title={isFullscreen ? "退出全屏" : "全屏查看"}
                 >
                   {isFullscreen ? <Minimize size={15} /> : <Maximize size={15} />}
                 </button>
-
-                {/* 关闭 */}
                 <button
                   onClick={onClose}
-                  className="h-9 w-9 rounded-xl hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors flex items-center justify-center active:scale-95"
+                  className="h-9 w-9 rounded-xl bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors flex items-center justify-center active:scale-95"
                   title="关闭"
                 >
                   <X size={18} />
@@ -277,56 +332,71 @@ export function UserOrdersModal({
               </div>
             </div>
 
-            {/* Scrollable Content */}
             <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
-              {/* Metrics Summary Cards */}
-              <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 sm:gap-3.5">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 <div className="rounded-2xl border border-sky-500/15 bg-sky-500/5 p-3.5 sm:p-4">
                   <div className="flex items-center justify-between text-sky-600 dark:text-sky-400">
-                    <span className="text-xs font-semibold">筛选订单总量</span>
-                    <Layers size={16} />
+                    <span className="text-xs font-semibold">营业额 (成交额)</span>
+                    <Wallet size={16} />
                   </div>
                   <div className="mt-2 text-xl sm:text-2xl font-black text-foreground">
-                    {summaryStats.totalCount} <span className="text-xs font-normal text-muted-foreground">单</span>
+                    <span className="text-sm font-semibold opacity-60">￥</span>
+                    {summaryMetrics.trueSalesAmount.toFixed(2)}
+                  </div>
+                  <div className="mt-1 text-[11px] text-muted-foreground flex items-center gap-1">
+                    <span>有效订单：{summaryMetrics.totalCount} 单</span>
                   </div>
                 </div>
 
                 <div className="rounded-2xl border border-emerald-500/15 bg-emerald-500/5 p-3.5 sm:p-4">
                   <div className="flex items-center justify-between text-emerald-600 dark:text-emerald-400">
-                    <span className="text-xs font-semibold">今日订单数</span>
-                    <Clock size={16} />
+                    <span className="text-xs font-semibold">预估净利润</span>
+                    <TrendingUp size={16} />
                   </div>
-                  <div className="mt-2 text-xl sm:text-2xl font-black text-foreground">
-                    {summaryStats.todayCount} <span className="text-xs font-normal text-muted-foreground">单</span>
+                  <div className={`mt-2 text-xl sm:text-2xl font-black ${
+                    summaryMetrics.pureProfit < 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"
+                  }`}>
+                    <span className="text-sm font-semibold opacity-60">￥</span>
+                    {summaryMetrics.pureProfit.toFixed(2)}
+                  </div>
+                  <div className="mt-1 text-[11px] text-muted-foreground flex items-center gap-1">
+                    <span>利润率：{summaryMetrics.profitRate.toFixed(1)}%</span>
                   </div>
                 </div>
 
                 <div className="rounded-2xl border border-amber-500/15 bg-amber-500/5 p-3.5 sm:p-4">
                   <div className="flex items-center justify-between text-amber-600 dark:text-amber-400">
-                    <span className="text-xs font-semibold">进行中/待配送</span>
-                    <Truck size={16} />
+                    <span className="text-xs font-semibold">今日单量 / 待履约</span>
+                    <Clock size={16} />
                   </div>
                   <div className="mt-2 text-xl sm:text-2xl font-black text-foreground">
-                    {summaryStats.pendingCount} <span className="text-xs font-normal text-muted-foreground">单</span>
+                    {summaryMetrics.todayCount}{" "}
+                    <span className="text-xs font-normal text-muted-foreground">今日单</span>
+                  </div>
+                  <div className="mt-1 text-[11px] text-muted-foreground flex items-center gap-1">
+                    <Truck size={12} className="text-amber-600" />
+                    <span>进行中/待处理: {summaryMetrics.pendingCount} 单</span>
                   </div>
                 </div>
 
                 <div className="rounded-2xl border border-violet-500/15 bg-violet-500/5 p-3.5 sm:p-4">
                   <div className="flex items-center justify-between text-violet-600 dark:text-violet-400">
-                    <span className="text-xs font-semibold">当前成交总额</span>
-                    <CircleDollarSign size={16} />
+                    <span className="text-xs font-semibold">配送费与刷单</span>
+                    <Receipt size={16} />
                   </div>
                   <div className="mt-2 text-xl sm:text-2xl font-black text-foreground">
                     <span className="text-sm font-semibold opacity-60">￥</span>
-                    {summaryStats.totalRevenue.toFixed(2)}
+                    {(summaryMetrics.deliveryFee + summaryMetrics.brushCommission).toFixed(2)}
+                  </div>
+                  <div className="mt-1 text-[11px] text-muted-foreground flex items-center justify-between">
+                    <span>配送: ￥{summaryMetrics.deliveryFee.toFixed(1)}</span>
+                    <span>刷单: {summaryMetrics.brushCount}单</span>
                   </div>
                 </div>
               </div>
 
-              {/* Filter Toolbar */}
               <div className="flex flex-col gap-3 rounded-2xl border border-border/60 bg-muted/20 p-3 sm:p-4">
                 <div className="flex flex-wrap items-center justify-between gap-2.5">
-                  {/* Date Range Tabs */}
                   <div className="flex items-center gap-1 rounded-xl bg-background/80 p-1 border border-border/50 text-xs">
                     {(
                       [
@@ -353,7 +423,6 @@ export function UserOrdersModal({
                     ))}
                   </div>
 
-                  {/* Platform & Status Dropdowns */}
                   <div className="flex items-center gap-2 flex-wrap">
                     <select
                       value={platformFilter}
@@ -368,7 +437,6 @@ export function UserOrdersModal({
                       <option value="京东">京东秒送/到家</option>
                       <option value="淘宝">淘宝闪购/天猫</option>
                       <option value="饿了么">饿了么</option>
-                      <option value="线下交易">线下交易</option>
                     </select>
 
                     <select
@@ -380,26 +448,24 @@ export function UserOrdersModal({
                       className="h-8.5 rounded-xl border border-border/60 bg-background px-3 text-xs font-medium text-foreground outline-hidden focus:ring-2 focus:ring-primary/20"
                     >
                       <option value="all">全部状态</option>
-                      <option value="待处理">待处理</option>
+                      <option value="待出库">待出库</option>
                       <option value="待配送">待配送</option>
-                      <option value="配送中">配送中</option>
+                      <option value="已送达">已送达</option>
                       <option value="已完成">已完成</option>
                       <option value="已取消">已取消</option>
                     </select>
 
-                    {(searchQuery || dateRange !== "today" || platformFilter !== "all" || statusFilter !== "all") && (
+                    {(searchQuery || platformFilter !== "all" || statusFilter !== "all" || dateRange !== "all") && (
                       <button
                         onClick={handleResetFilters}
-                        className="h-8.5 px-2.5 rounded-xl text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors flex items-center gap-1"
+                        className="h-8.5 px-2.5 rounded-xl text-xs text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
                       >
-                        <RotateCcw size={12} />
-                        重置
+                        重置筛选
                       </button>
                     )}
                   </div>
                 </div>
 
-                {/* Search Bar */}
                 <div className="relative">
                   <Search size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
                   <input
@@ -415,7 +481,6 @@ export function UserOrdersModal({
                 </div>
               </div>
 
-              {/* Order List */}
               {isLoading ? (
                 <div className="py-20 text-center text-muted-foreground space-y-3">
                   <Loader2 className="animate-spin mx-auto text-primary" size={32} />
@@ -425,132 +490,31 @@ export function UserOrdersModal({
                 <div className="py-16 text-center space-y-3 rounded-2xl border border-dashed border-border/60">
                   <Package size={40} className="mx-auto text-muted-foreground/30" />
                   <p className="text-sm font-semibold text-foreground">暂无符合条件的订单记录</p>
-                  <p className="text-xs text-muted-foreground">可尝试切换时间范围或清除筛选条件</p>
+                  <p className="text-xs text-muted-foreground">该成员已接入麦芽田接单，但当前筛选时间下无订单</p>
                 </div>
               ) : (
-                <div className="space-y-3">
-                  {orders.map((order) => {
-                    const statusText = order.status || "待处理";
-                    const isCompleted = statusText.includes("完成") || statusText === "completed" || statusText === "done";
-                    const isCancelled = statusText.includes("取消") || statusText.includes("退款") || statusText.includes("关闭");
-                    const shopName = order.matchedShopName || order.rawShopName || "默认店铺";
-
-                    return (
-                      <div
-                        key={order.id}
-                        className="rounded-2xl border border-border/60 bg-background/80 hover:bg-muted/10 transition-all p-4 sm:p-5 shadow-xs space-y-3"
-                      >
-                        {/* Order Header */}
-                        <div className="flex items-start justify-between gap-3 flex-wrap">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="rounded-lg bg-primary/10 text-primary px-2.5 py-0.5 text-xs font-bold font-mono">
-                              #{order.dailyPlatformSequence || "-"}
-                            </span>
-                            <span className="rounded-md bg-muted px-2 py-0.5 text-xs font-semibold text-foreground">
-                              {order.platform || "三方平台"}
-                            </span>
-                            <span className="text-xs font-mono text-muted-foreground">
-                              单号: {order.orderNo}
-                            </span>
-                            <span className="text-xs text-muted-foreground flex items-center gap-1 font-mono">
-                              <Clock size={12} />
-                              {formatLocalDateTime(order.orderTime)}
-                            </span>
-                          </div>
-
-                          <div className="flex items-center gap-2">
-                            <span
-                              className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
-                                isCompleted
-                                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                                  : isCancelled
-                                  ? "bg-red-500/10 text-red-600 dark:text-red-400"
-                                  : "bg-amber-500/10 text-amber-600 dark:text-amber-400"
-                              }`}
-                            >
-                              {statusText}
-                            </span>
-
-                            <div className="text-right">
-                              <span className="text-sm font-black text-foreground">
-                                ￥{((order.expectedIncome || order.actualPaid || 0) / 100).toFixed(2)}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Shop & Customer Info */}
-                        <div className="flex flex-wrap items-center gap-y-1 gap-x-4 text-xs text-muted-foreground">
-                          <div className="flex items-center gap-1">
-                            <Store size={13} className="text-primary/70 shrink-0" />
-                            <span className="font-semibold text-foreground/90 truncate max-w-[200px]">{shopName}</span>
-                          </div>
-
-                          <div className="flex items-center gap-1 min-w-0 flex-1">
-                            <MapPin size={13} className="text-muted-foreground/70 shrink-0" />
-                            <span className="truncate">{order.userAddress || "用户地址未填写"}</span>
-                            {order.distanceKm ? (
-                              <span className="shrink-0 text-muted-foreground/60 font-mono">({order.distanceKm}km)</span>
-                            ) : null}
-                          </div>
-                        </div>
-
-                        {/* Customer Remark */}
-                        {order.customerRemark && (
-                          <div className="rounded-xl bg-amber-500/5 border border-amber-500/15 px-3 py-1.5 text-xs text-amber-700 dark:text-amber-300">
-                            <span className="font-bold">顾客备注：</span>
-                            {order.customerRemark}
-                          </div>
-                        )}
-
-                        {/* Items Breakdown */}
-                        {Array.isArray(order.items) && order.items.length > 0 && (
-                          <div className="pt-2 border-t border-border/40 space-y-1.5">
-                            <div className="text-[11px] font-semibold text-muted-foreground">
-                              商品明细 ({order.items.length} 种)：
-                            </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                              {order.items.map((item, idx) => {
-                                const itemImage = item.matchedProduct?.image || item.thumb;
-                                return (
-                                  <div
-                                    key={idx}
-                                    className="flex items-center gap-2.5 rounded-xl bg-muted/20 p-2 text-xs border border-border/30"
-                                  >
-                                    <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center overflow-hidden shrink-0">
-                                      {itemImage ? (
-                                        <img src={itemImage} alt="" className="h-full w-full object-cover" />
-                                      ) : (
-                                        <Package size={14} className="text-muted-foreground/50" />
-                                      )}
-                                    </div>
-                                    <div className="min-w-0 flex-1">
-                                      <div className="font-medium text-foreground truncate">{item.productName || "商品"}</div>
-                                      <div className="text-[10px] text-muted-foreground font-mono">
-                                        {item.productNo ? `编码: ${item.productNo}` : ""}
-                                      </div>
-                                    </div>
-                                    <div className="text-right shrink-0 font-mono">
-                                      <span className="font-bold text-primary">x{item.quantity || 1}</span>
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                <div className="grid gap-3.5">
+                  {orders.map((order) => (
+                    <OrderCard
+                      key={order.id}
+                      order={order}
+                      expanded={expandedIds.includes(order.id)}
+                      actingId={actingId}
+                      onToggleExpanded={toggleExpanded}
+                      onRunAction={handleRunAction}
+                      onOpenCostBackfill={() => {}}
+                      onOpenMatchEditor={() => {}}
+                      onRefresh={fetchOrders}
+                    />
+                  ))}
                 </div>
               )}
 
-              {/* Pagination */}
-              {totalCount > pageSize && (
-                <div className="pt-4 border-t border-border/60">
+              {!isLoading && totalCount > pageSize && (
+                <div className="pt-2">
                   <Pagination
                     currentPage={currentPage}
-                    totalPages={Math.ceil(totalCount / pageSize)}
+                    totalPages={totalPages}
                     totalItems={totalCount}
                     pageSize={pageSize}
                     onPageChange={setCurrentPage}
