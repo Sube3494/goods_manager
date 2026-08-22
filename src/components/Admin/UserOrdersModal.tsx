@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -82,6 +82,8 @@ export function UserOrdersModal({
     },
   });
 
+  const [localShops, setLocalShops] = useState<Array<{ id: string; name: string; address: string }>>([]);
+
   const handleDataLoad = (data: {
     summary: typeof todaySummary;
     overview: typeof todayOverview;
@@ -89,6 +91,22 @@ export function UserOrdersModal({
     if (data.summary) setTodaySummary(data.summary);
     if (data.overview) setTodayOverview(data.overview);
   };
+
+  useEffect(() => {
+    if (!isOpen || !userId) return;
+    const fetchShops = async () => {
+      try {
+        const res = await fetch(`/api/orders/integration/local-shops?userId=${encodeURIComponent(userId)}`);
+        const data = await res.json().catch(() => ({}));
+        if (Array.isArray(data?.shops)) {
+          setLocalShops(data.shops);
+        }
+      } catch (err) {
+        console.warn("Failed to load user shops:", err);
+      }
+    };
+    void fetchShops();
+  }, [isOpen, userId]);
 
   if (typeof document === "undefined") return null;
 
@@ -404,7 +422,7 @@ export function UserOrdersModal({
                   onOpenCostBackfill={() => {}}
                   onOpenMatchEditor={() => {}}
                   onDataLoad={handleDataLoad}
-                  localShops={[]}
+                  localShops={localShops}
                 />
               </div>
             </div>

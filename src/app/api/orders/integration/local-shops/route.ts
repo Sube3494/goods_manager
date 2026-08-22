@@ -13,15 +13,24 @@ type ShippingAddress = {
   isDefault?: boolean;
 };
 
-export async function GET() {
+export async function GET(request: Request) {
   const session = await getAuthorizedUser("order:manage");
   if (!session) {
     return NextResponse.json({ error: "Permission denied" }, { status: 403 });
   }
 
+  const { searchParams } = new URL(request.url);
+  const requestedUserId = String(searchParams.get("userId") || "").trim();
+  const isAdmin = Boolean(
+    session.role === "SUPER_ADMIN" ||
+    (session.role && String(session.role).includes("管理")) ||
+    (Array.isArray(session.permissions) && (session.permissions.includes("*") || session.permissions.includes("members:manage") || session.permissions.includes("admin")))
+  );
+  const targetUserId = (isAdmin && requestedUserId) ? requestedUserId : session.id;
+
   try {
     const user = await prisma.user.findUnique({
-      where: { id: session.id },
+      where: { id: targetUserId },
       select: { shippingAddresses: true },
     });
 
@@ -29,9 +38,9 @@ export async function GET() {
       ? (user.shippingAddresses as ShippingAddress[])
       : [];
 
-    // 查询当前用户的所有本地店铺
+    // 查询目标用户的所有本地店铺
     const dbShops = await prisma.shop.findMany({
-      where: { userId: session.id },
+      where: { userId: targetUserId },
       select: { id: true, addressBookId: true, libraryId: true }
     });
 
