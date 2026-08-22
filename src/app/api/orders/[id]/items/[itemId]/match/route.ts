@@ -494,7 +494,10 @@ export async function PATCH(
         }
       }
 
-      await syncMeituanIdForMatchedShopProduct(tx, user.id, shopProduct, basePayload, fallbackItemPayload, orderItem.order.platform, orderItem.productNo, orderItem.platformSkuId);
+      const isCompositeItemSku = /[+＋]/.test(String(orderItem.productNo || ""));
+      if (!isCompositeItemSku) {
+        await syncMeituanIdForMatchedShopProduct(tx, user.id, shopProduct, basePayload, fallbackItemPayload, orderItem.order.platform, orderItem.productNo, orderItem.platformSkuId);
+      }
 
       await tx.autoPickOrderItem.update({
         where: { id: orderItem.id },

@@ -6163,8 +6163,11 @@ async function resolveOutboundItemsForAutoPickOrder(
       continue;
     }
 
-    // 2. 自动匹配：第一优先级尝试平台规格 ID (美团 SKU ID / 京东 SKU ID / 淘宝 SKU ID)
-    const platformProductId = normalizeAutoPickSkuForMatch(item.platformSkuId) || readAutoPickPlatformProductIdForMatch(order.platform, item.rawPayload, item.productNo);
+    // 2. 自动匹配：遇到包含 + 组合商品时，禁用平台规格 ID 匹配，直接走组合拆分逻辑
+    const isCompositeProductNo = /[+＋]/.test(String(item.productNo || ""));
+    const platformProductId = isCompositeProductNo
+      ? null
+      : (normalizeAutoPickSkuForMatch(item.platformSkuId) || readAutoPickPlatformProductIdForMatch(order.platform, item.rawPayload, item.productNo));
     type OutboundMatchedShopProduct = {
       id: string;
       productId: string | null;
@@ -6217,7 +6220,9 @@ async function resolveOutboundItemsForAutoPickOrder(
       if (isJdOrder && targetShopProductId && targetSourceId) {
         await syncJdSkuIdForShopProduct(tx, userId, targetShopProductId, targetSourceId);
       }
-      await backfillMeituanIdForAutoPickMatchedShopProduct(tx, userId, targetShopProductId, item.rawPayload, order.platform, item.platformSkuId);
+      if (!isCompositeProductNo) {
+        await backfillMeituanIdForAutoPickMatchedShopProduct(tx, userId, targetShopProductId, item.rawPayload, order.platform, item.platformSkuId);
+      }
 
       resolvedItems.push({
         productId: String(

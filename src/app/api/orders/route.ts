@@ -2232,8 +2232,9 @@ export async function GET(request: NextRequest) {
         firstMissingCostPurchaseOrderItemId: outboundMeta?.firstMissingCostPurchaseOrderItemId || null,
         items: order.items.map((item) => {
           const manualMatchedProduct = readManualMatchedProduct(item.rawPayload);
-          const strictPlatformProductId = readStrictPlatformProductId(order.platform, item.rawPayload, item.platformSkuId);
-          const platformProductId = readPlatformProductIdForMatch(order.platform, item.rawPayload, item.productNo, item.platformSkuId);
+          const isCompositeSku = /[+＋]/.test(String(item.productNo || ""));
+          const strictPlatformProductId = isCompositeSku ? null : readStrictPlatformProductId(order.platform, item.rawPayload, item.platformSkuId);
+          const platformProductId = isCompositeSku ? null : readPlatformProductIdForMatch(order.platform, item.rawPayload, item.productNo, item.platformSkuId);
           const skuFallbacks = splitCompositeSkuSegments(item.productNo);
           const normalizedSkuCandidates = skuFallbacks.length > 0
             ? skuFallbacks
@@ -2280,7 +2281,7 @@ export async function GET(request: NextRequest) {
             );
             const fallbackImg = foundShopProduct?.image || null;
             matchedProduct.image = matchedProduct.image ? storage.resolveUrl(matchedProduct.image) : fallbackImg;
-            if (!manualMatchedProduct && isMeituanPlatform(order.platform) && strictPlatformProductId && foundShopProduct?.id) {
+            if (!manualMatchedProduct && !isCompositeSku && isMeituanPlatform(order.platform) && strictPlatformProductId && foundShopProduct?.id) {
               autoMatchedMeituanBackfills.push({
                 shopProductId: foundShopProduct.id,
                 meituanSkuId: strictPlatformProductId,
