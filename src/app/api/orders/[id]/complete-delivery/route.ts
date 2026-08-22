@@ -21,10 +21,15 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
 
   try {
     const { id } = await context.params;
+    const isAdmin = Boolean(
+      session.role === "SUPER_ADMIN" ||
+      (session.role && String(session.role).includes("管理")) ||
+      (Array.isArray(session.permissions) && (session.permissions.includes("*") || session.permissions.includes("members:manage") || session.permissions.includes("admin")))
+    );
     const order = await prisma.autoPickOrder.findFirst({
       where: {
         id,
-        userId: session.id,
+        ...(isAdmin ? {} : { userId: session.id }),
       },
     });
 
@@ -48,13 +53,13 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
       return NextResponse.json({ error: "Order is not delivering yet" }, { status: 409 });
     }
 
-    const triggeredByMainSystem = await wasAutoPickOrderSelfDeliveryTriggeredByMainSystem(session.id, order.orderNo);
+    const triggeredByMainSystem = await wasAutoPickOrderSelfDeliveryTriggeredByMainSystem(order.userId, order.orderNo);
     if (!triggeredByMainSystem) {
       return NextResponse.json({ error: "Order is not main-system self delivery" }, { status: 409 });
     }
 
     const commandPlatform = resolveAutoPickCommandPlatform(order);
-    const result = await callAutoPickCommand(session.id, "/complete-delivery", {
+    const result = await callAutoPickCommand(order.userId, "/complete-delivery", {
       platform: commandPlatform,
       dailyPlatformSequence: order.dailyPlatformSequence,
       orderNo: order.orderNo,
@@ -73,21 +78,21 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
       });
       emitAutoPickOrderEvent({
         type: "upsert",
-        userId: session.id,
+        userId: order.userId,
         orderId: order.id,
         orderNo: order.orderNo,
         platform: order.platform,
         at: new Date().toISOString(),
       });
       await cancelAutoCompleteJob(order.id, "manual-complete-delivery");
-      await syncBrushOrderFromCompletedAutoPickOrder(session.id, order.id).catch((brushError) => {
+      await syncBrushOrderFromCompletedAutoPickOrder(order.userId, order.id).catch((brushError) => {
         console.error("Failed to sync brush order after complete delivery:", brushError);
       });
-      await syncAutoOutboundFromCompletedAutoPickOrder(session.id, order.id).catch((outboundError) => {
+      await syncAutoOutboundFromCompletedAutoPickOrder(order.userId, order.id).catch((outboundError) => {
         console.error("Failed to auto-create outbound after complete delivery:", outboundError);
       });
 
-      void refreshAutoPickOrderFromPlugin(session.id, {
+      void refreshAutoPickOrderFromPlugin(order.userId, {
         id: order.sourceId,
         platform: commandPlatform,
         orderNo: order.orderNo,

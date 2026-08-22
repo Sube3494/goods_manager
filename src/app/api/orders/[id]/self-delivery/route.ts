@@ -45,10 +45,15 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
 
   try {
     const { id } = await context.params;
+    const isAdmin = Boolean(
+      session.role === "SUPER_ADMIN" ||
+      (session.role && String(session.role).includes("管理")) ||
+      (Array.isArray(session.permissions) && (session.permissions.includes("*") || session.permissions.includes("members:manage") || session.permissions.includes("admin")))
+    );
     const order = await prisma.autoPickOrder.findFirst({
       where: {
         id,
-        userId: session.id,
+        ...(isAdmin ? {} : { userId: session.id }),
       },
     });
 
@@ -73,7 +78,7 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
     const shouldRefreshBeforeSelfDelivery = isAutoPickOrderAbnormalStatus(order.status)
       || !String(commandBaseOrder.sourceId || "").trim();
     if (shouldRefreshBeforeSelfDelivery) {
-      const refreshedOrder = await refreshAutoPickOrderFromPlugin(session.id, {
+      const refreshedOrder = await refreshAutoPickOrderFromPlugin(order.userId, {
         id: commandBaseOrder.sourceId,
         platform: commandBaseOrder.platform,
         orderNo: commandBaseOrder.orderNo,
@@ -96,7 +101,7 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
     }
 
     const commandPlatform = resolveAutoPickCommandPlatform(commandOrder);
-    const result = await callAutoPickCommand(session.id, "/self-delivery", {
+    const result = await callAutoPickCommand(order.userId, "/self-delivery", {
       platform: commandPlatform,
       dailyPlatformSequence: commandOrder.dailyPlatformSequence,
       orderNo: commandOrder.orderNo,
@@ -104,14 +109,14 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
     });
 
     if (result.ok) {
-      const refreshedOrder = await waitForDeliveringSelfDelivery(session.id, {
+      const refreshedOrder = await waitForDeliveringSelfDelivery(order.userId, {
         id: sourceId,
         platform: commandPlatform,
         orderNo: commandOrder.orderNo,
         orderTime: commandOrder.orderTime,
       });
 
-      const latestOrder = refreshedOrder || await refreshAutoPickOrderFromPlugin(session.id, {
+      const latestOrder = refreshedOrder || await refreshAutoPickOrderFromPlugin(order.userId, {
         id: sourceId,
         platform: commandOrder.platform,
         orderNo: commandOrder.orderNo,
@@ -124,7 +129,7 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
       const schedulingOrder = latestOrder || commandOrder;
       const confirmedDelivering = isAutoPickOrderDeliveringStatus(schedulingOrder.status);
       const integrationConfig = confirmedDelivering
-        ? await getAutoPickIntegrationConfigByUserId(session.id)
+        ? await getAutoPickIntegrationConfigByUserId(order.userId)
         : null;
       const autoCompleteBlocked = isAutoPickOrderAbnormalStatus(schedulingOrder.status);
       const autoCompleteAt = confirmedDelivering && !autoCompleteBlocked && integrationConfig
@@ -143,11 +148,11 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
           autoCompleteAt: autoCompleteAt || null,
         },
       });
-      await markAutoPickOrderMainSystemSelfDelivery(session.id, id);
+      await markAutoPickOrderMainSystemSelfDelivery(order.userId, id);
 
       if (autoCompleteAt) {
         await ensureAutoCompleteJob({
-          userId: session.id,
+          userId: order.userId,
           orderId: id,
           dueAt: autoCompleteAt,
         });

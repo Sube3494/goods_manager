@@ -20,10 +20,15 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
 
   try {
     const { id } = await context.params;
+    const isAdmin = Boolean(
+      session.role === "SUPER_ADMIN" ||
+      (session.role && String(session.role).includes("管理")) ||
+      (Array.isArray(session.permissions) && (session.permissions.includes("*") || session.permissions.includes("members:manage") || session.permissions.includes("admin")))
+    );
     const order = await prisma.autoPickOrder.findFirst({
       where: {
         id,
-        userId: session.id,
+        ...(isAdmin ? {} : { userId: session.id }),
       },
     });
 
@@ -43,7 +48,7 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
       return NextResponse.json({ error: "Non-pickup order does not require pickup complete" }, { status: 409 });
     }
 
-    const result = await callAutoPickCommand(session.id, "/pickup-complete", {
+    const result = await callAutoPickCommand(order.userId, "/pickup-complete", {
       platform: order.platform,
       dailyPlatformSequence: order.dailyPlatformSequence,
       orderNo: order.orderNo,
@@ -62,21 +67,21 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
       });
       emitAutoPickOrderEvent({
         type: "upsert",
-        userId: session.id,
+        userId: order.userId,
         orderId: order.id,
         orderNo: order.orderNo,
         platform: order.platform,
         at: new Date().toISOString(),
       });
       await cancelAutoCompleteJob(order.id, "manual-pickup-complete");
-      await syncBrushOrderFromCompletedAutoPickOrder(session.id, order.id).catch((brushError) => {
+      await syncBrushOrderFromCompletedAutoPickOrder(order.userId, order.id).catch((brushError) => {
         console.error("Failed to sync brush order after pickup complete:", brushError);
       });
-      await syncAutoOutboundFromCompletedAutoPickOrder(session.id, order.id).catch((outboundError) => {
+      await syncAutoOutboundFromCompletedAutoPickOrder(order.userId, order.id).catch((outboundError) => {
         console.error("Failed to auto-create outbound after pickup complete:", outboundError);
       });
 
-      void refreshAutoPickOrderFromPlugin(session.id, {
+      void refreshAutoPickOrderFromPlugin(order.userId, {
         id: order.sourceId,
         platform: order.platform,
         orderNo: order.orderNo,

@@ -30,10 +30,15 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
 
   try {
     const { id } = await context.params;
+    const isAdmin = Boolean(
+      session.role === "SUPER_ADMIN" ||
+      (session.role && String(session.role).includes("管理")) ||
+      (Array.isArray(session.permissions) && (session.permissions.includes("*") || session.permissions.includes("members:manage") || session.permissions.includes("admin")))
+    );
     const order = await prisma.autoPickOrder.findFirst({
       where: {
         id,
-        userId: session.id,
+        ...(isAdmin ? {} : { userId: session.id }),
       },
     });
 
@@ -43,7 +48,7 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
 
     // 允许对订单执行同步刷新，以便从平台获取最新真实状态并自动恢复误取消的订单
 
-    const refreshedOrder = await refreshAutoPickOrderFromPlugin(session.id, {
+    const refreshedOrder = await refreshAutoPickOrderFromPlugin(order.userId, {
       id: order.sourceId,
       platform: resolveAutoPickCommandPlatform(order),
       orderNo: order.orderNo,
@@ -83,10 +88,10 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
       );
     }
     if (isAutoPickOrderCompletedStatus(refreshedOrder.status)) {
-      await syncBrushOrderFromCompletedAutoPickOrder(session.id, refreshedOrder.id).catch((brushError) => {
+      await syncBrushOrderFromCompletedAutoPickOrder(order.userId, refreshedOrder.id).catch((brushError) => {
         console.error("Failed to sync brush order after order sync:", brushError);
       });
-      await syncAutoOutboundFromCompletedAutoPickOrder(session.id, refreshedOrder.id).catch((outboundError) => {
+      await syncAutoOutboundFromCompletedAutoPickOrder(order.userId, refreshedOrder.id).catch((outboundError) => {
         console.error("Failed to auto-create outbound after order sync:", outboundError);
       });
     }
@@ -97,13 +102,13 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
       && !isAutoPickOrderCancelledStatus(refreshedOrder.status)
       && !isAutoPickOrderAbnormalStatus(refreshedOrder.status)
     ) {
-      await clearAutoPickOrderMainSystemSelfDelivery(session.id, refreshedOrder.id, "sync-restored-non-self-delivery");
+      await clearAutoPickOrderMainSystemSelfDelivery(order.userId, refreshedOrder.id, "sync-restored-non-self-delivery");
     }
 
-    const backfill = await backfillPersistedAutoPickOrderFields(session.id, {
+    const backfill = await backfillPersistedAutoPickOrderFields(order.userId, {
       orderIds: [refreshedOrder.id],
     });
-    const platformIdBackfill = await backfillPlatformIdsForSyncedAutoPickOrder(session.id, refreshedOrder.id);
+    const platformIdBackfill = await backfillPlatformIdsForSyncedAutoPickOrder(order.userId, refreshedOrder.id);
 
     const normalized = normalizeAutoPickOrderPayload(refreshedOrder.rawPayload);
     const syncedOrder = {
