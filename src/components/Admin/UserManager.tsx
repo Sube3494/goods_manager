@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Shield, Settings2, Loader2, User as UserIcon, Mail, Plus, Trash2, AlertCircle, NotebookPen, Search, Check, UserCheck, Ban, MonitorSmartphone, Smartphone, FolderLock } from "lucide-react";
+import { Shield, Settings2, Loader2, User as UserIcon, Mail, Plus, Trash2, AlertCircle, NotebookPen, Search, Check, UserCheck, Ban, MonitorSmartphone, Smartphone, FolderLock, ShoppingBag } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { Switch } from "@/components/ui/Switch";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { ActionBar } from "@/components/ui/ActionBar";
+import { UserOrdersModal } from "@/components/Admin/UserOrdersModal";
 import { createPortal } from "react-dom";
 import { useUser } from "@/hooks/useUser";
 import { hasAdminAccess, SessionUser } from "@/lib/permissions";
@@ -316,6 +317,14 @@ export function UserManager() {
   const [isBatchRunning, setIsBatchRunning] = useState(false);
   const [isBatchRoleOpen, setIsBatchRoleOpen] = useState(false);
 
+  // 查看成员订单数据状态
+  const [viewOrdersUser, setViewOrdersUser] = useState<{
+    id: string;
+    name: string;
+    email: string;
+    roleName?: string;
+  } | null>(null);
+
   // 新增：商品库授权状态
   const [authLibraryUserId, setAuthLibraryUserId] = useState<string | null>(null);
   const [selectedLibraryIds, setSelectedLibraryIds] = useState<string[]>([]);
@@ -357,7 +366,7 @@ export function UserManager() {
     [selectedEntries]
   );
   const allFilteredSelected = filteredEntries.length > 0 && filteredEntries.every((entry) => selectedEmails.includes(entry.email));
-  const shouldHideActionBar = Boolean(editingUserId || isBatchRoleOpen || editingRemarkEntry || deleteEmail);
+  const shouldHideActionBar = Boolean(editingUserId || isBatchRoleOpen || editingRemarkEntry || deleteEmail || viewOrdersUser);
 
   const fetchData = useCallback(async () => {
     if (!canViewEntries) {
@@ -843,6 +852,22 @@ export function UserManager() {
                                {isRegistered && canManageMembers ? (
                                   <button
                                     onClick={() => {
+                                      setViewOrdersUser({
+                                        id: entry.user!.id,
+                                        name: entry.user?.name || entry.email,
+                                        email: entry.email,
+                                        roleName: entry.user?.roleProfile?.name || entry.roleProfile?.name,
+                                      });
+                                    }}
+                                    className="p-2.5 rounded-xl text-muted-foreground hover:bg-sky-500/10 hover:text-sky-600 transition-all"
+                                    title="查看订单数据"
+                                  >
+                                    <ShoppingBag size={18} />
+                                  </button>
+                                ) : null}
+                               {isRegistered && canManageMembers ? (
+                                  <button
+                                    onClick={() => {
                                       setEditingUserId(entry.user!.id);
                                       setCurrentRoleId(entry.user!.roleProfileId);
                                     }}
@@ -980,6 +1005,22 @@ export function UserManager() {
                         >
                           <Settings2 size={14} />
                           角色分配
+                        </button>
+                      )}
+                      {isRegistered && canManageMembers && (
+                        <button
+                          onClick={() => {
+                            setViewOrdersUser({
+                              id: entry.user!.id,
+                              name: entry.user?.name || entry.email,
+                              email: entry.email,
+                              roleName: entry.user?.roleProfile?.name || entry.roleProfile?.name,
+                            });
+                          }}
+                          className="col-span-2 h-9 rounded-xl bg-sky-500/5 text-sky-700 dark:text-sky-300 text-xs font-bold transition-all hover:bg-sky-500/10 flex items-center justify-center gap-2"
+                        >
+                          <ShoppingBag size={14} />
+                          查看订单数据
                         </button>
                       )}
                       {isRegistered && canManageMembers && (
@@ -1192,6 +1233,16 @@ export function UserManager() {
            }
            return true;
          })}
+       />
+
+       {/* 成员订单数据弹窗 */}
+       <UserOrdersModal
+         isOpen={Boolean(viewOrdersUser)}
+         onClose={() => setViewOrdersUser(null)}
+         userId={viewOrdersUser?.id || null}
+         userName={viewOrdersUser?.name}
+         userEmail={viewOrdersUser?.email}
+         roleName={viewOrdersUser?.roleName}
        />
     </div>
   );

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
+import { hasAdminAccess } from "@/lib/permissions";
 import {
   backfillJdSkuIdForManualMatchedShopProducts,
   backfillMeituanSkuIdForManualMatchedShopProducts,
@@ -1071,12 +1072,16 @@ export async function GET(request: NextRequest) {
     const hasDelivery = toBooleanFilter(searchParams.get("hasDelivery"));
     const mainSystemSelfDelivery = toBooleanFilter(searchParams.get("mainSystemSelfDelivery"));
 
+    const requestedUserId = String(searchParams.get("userId") || "").trim();
+    const canManageMembers = hasAdminAccess(session, "members:manage");
+    const targetUserId = (canManageMembers && requestedUserId) ? requestedUserId : session.id;
+
     const shopFilter = String(searchParams.get("shop") || "").trim();
     let shopWhereFilter: Prisma.AutoPickOrderWhereInput | undefined = undefined;
     if (shopFilter && shopFilter !== "all") {
       const targetShop = await prisma.shop.findFirst({
         where: {
-          userId: session.id,
+          userId: targetUserId,
           name: shopFilter,
         },
         select: { id: true },
@@ -1092,7 +1097,7 @@ export async function GET(request: NextRequest) {
     }
 
     const baseWhere: Prisma.AutoPickOrderWhereInput = {
-      userId: session.id,
+      userId: targetUserId,
       ...(shopWhereFilter || {}),
       ...(startDate || endDate ? {
         orderTime: {
