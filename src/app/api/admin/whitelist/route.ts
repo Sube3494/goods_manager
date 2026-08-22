@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { getAuthorizedAdmin, getAuthorizedAdminAny, getOnlineDeviceCutoff } from "@/lib/auth";
 import { sendInvitationEmail } from "@/lib/email";
 import { getRequestOrigin } from "@/lib/utils";
+import { normalizeAutoPickIntegrationConfig } from "@/lib/autoPickOrders";
 
 /**
  * GET /api/admin/whitelist - List all whitelisted emails and invitations
@@ -65,11 +66,23 @@ export async function GET() {
     const combined = whitelist.map(entry => {
         const entryEmail = entry.email.toLowerCase();
         const invitation = invitations.find(i => i.email.toLowerCase() === entryEmail);
+        const userRecord = users.find(u => u.email.toLowerCase() === entryEmail);
+        let userWithConfig = null;
+        if (userRecord) {
+            const rawPermissions = userRecord.permissions && typeof userRecord.permissions === "object" ? userRecord.permissions as Record<string, unknown> : {};
+            const autoPickConfig = normalizeAutoPickIntegrationConfig(rawPermissions.autoPickIntegration);
+            const hasMaiyatianCookie = Boolean(String(autoPickConfig.maiyatianCookie || "").trim());
+            userWithConfig = {
+                ...userRecord,
+                hasMaiyatianCookie,
+            };
+        }
+
         return {
             ...entry,
             invitationToken: invitation?.token || null,
             invitationExpiresAt: invitation?.expiresAt || null,
-            user: users.find(u => u.email.toLowerCase() === entryEmail) || null
+            user: userWithConfig
         };
     });
 

@@ -49,6 +49,7 @@ interface WhitelistEntry {
     roleProfileId: string | null;
     roleProfile?: RoleProfile;
     isInternal?: boolean;
+    hasMaiyatianCookie?: boolean;
     accessibleLibraries?: Array<{ id: string; name: string }>;
   };
 }
@@ -811,11 +812,18 @@ export function UserManager() {
                           <div className="flex flex-col min-w-0">
                             <span className="text-sm font-bold truncate">{isRegistered ? entry.user?.name : "待邀请成员"}</span>
                             <span className="text-[10px] text-muted-foreground font-mono truncate">{entry.email}</span>
-                            {entry.remark ? (
-                              <span className="mt-1 inline-flex max-w-fit items-center rounded-md bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300">
-                                {entry.remark}
-                              </span>
-                            ) : null}
+                            <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                              {entry.remark ? (
+                                <span className="inline-flex max-w-fit items-center rounded-md bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300">
+                                  {entry.remark}
+                                </span>
+                              ) : null}
+                              {entry.user?.hasMaiyatianCookie ? (
+                                <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                                  麦芽田已接入
+                                </span>
+                              ) : null}
+                            </div>
                           </div>
                         </div>
                       </td>
@@ -849,7 +857,7 @@ export function UserManager() {
                        <td className="px-6 py-5 text-center">
                          <div className="flex justify-center gap-2">
                             <div className="flex items-center gap-1">
-                               {isRegistered && canManageMembers ? (
+                               {isRegistered && canManageMembers && entry.user?.hasMaiyatianCookie ? (
                                   <button
                                     onClick={() => {
                                       setViewOrdersUser({
@@ -860,7 +868,7 @@ export function UserManager() {
                                       });
                                     }}
                                     className="p-2.5 rounded-xl text-muted-foreground hover:bg-sky-500/10 hover:text-sky-600 transition-all"
-                                    title="查看订单数据"
+                                    title="查看麦芽田订单数据"
                                   >
                                     <ShoppingBag size={18} />
                                   </button>
@@ -943,11 +951,18 @@ export function UserManager() {
                         <div className="min-w-0 flex-1">
                           <span className="block text-sm font-bold truncate">{isRegistered ? entry.user?.name : "待邀请成员"}</span>
                           <span className="mt-0.5 block text-[10px] text-muted-foreground font-mono break-all leading-relaxed">{entry.email}</span>
-                          {entry.remark ? (
-                            <span className="mt-2 inline-flex max-w-full items-center rounded-md bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300 break-all">
-                              {entry.remark}
-                            </span>
-                          ) : null}
+                          <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                            {entry.remark ? (
+                              <span className="inline-flex max-w-full items-center rounded-md bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300 break-all">
+                                {entry.remark}
+                              </span>
+                            ) : null}
+                            {entry.user?.hasMaiyatianCookie ? (
+                              <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                                麦芽田已接入
+                              </span>
+                            ) : null}
+                          </div>
                         </div>
                       </div>
                       <SelectionCircleButton checked={selectedEmails.includes(entry.email)} onClick={() => toggleSelectEmail(entry.email)} />
@@ -1007,7 +1022,7 @@ export function UserManager() {
                           角色分配
                         </button>
                       )}
-                      {isRegistered && canManageMembers && (
+                      {isRegistered && canManageMembers && entry.user?.hasMaiyatianCookie && (
                         <button
                           onClick={() => {
                             setViewOrdersUser({
@@ -1020,7 +1035,7 @@ export function UserManager() {
                           className="col-span-2 h-9 rounded-xl bg-sky-500/5 text-sky-700 dark:text-sky-300 text-xs font-bold transition-all hover:bg-sky-500/10 flex items-center justify-center gap-2"
                         >
                           <ShoppingBag size={14} />
-                          查看订单数据
+                          查看麦芽田订单数据
                         </button>
                       )}
                       {isRegistered && canManageMembers && (

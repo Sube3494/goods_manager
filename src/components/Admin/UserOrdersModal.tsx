@@ -58,7 +58,7 @@ export function UserOrdersModal({
 
   // Filters
   const [searchQuery, setSearchQuery] = useState("");
-  const [dateRange, setDateRange] = useState<DateRangeType>("today");
+  const [dateRange, setDateRange] = useState<DateRangeType>("all");
   const [platformFilter, setPlatformFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
 
@@ -99,6 +99,7 @@ export function UserOrdersModal({
         userId,
         page: String(currentPage),
         pageSize: String(pageSize),
+        _metrics: "1",
       });
 
       if (searchQuery.trim()) {
@@ -115,9 +116,10 @@ export function UserOrdersModal({
       }
 
       const data = await res.json();
-      const orderList = Array.isArray(data.orders) ? data.orders : [];
+      const orderList = Array.isArray(data.items) ? data.items : (Array.isArray(data.orders) ? data.orders : []);
       setOrders(orderList);
-      setTotalCount(typeof data.total === "number" ? data.total : orderList.length);
+      const reportedTotal = typeof data.total === "number" ? data.total : orderList.length;
+      setTotalCount(reportedTotal);
 
       // 计算指标
       const todayStr = formatLocalDate(new Date());
@@ -126,22 +128,32 @@ export function UserOrdersModal({
       let completedOrders = 0;
       let revenue = 0;
 
-      orderList.forEach((order: AutoPickOrder) => {
-        const orderDateStr = formatLocalDate(order.orderTime);
-        if (orderDateStr === todayStr) {
-          todayOrders++;
-        }
-        const st = String(order.status || "").toLowerCase();
-        if (st.includes("完成") || st === "completed" || st === "done") {
-          completedOrders++;
-        } else if (!st.includes("取消") && !st.includes("退款") && !st.includes("关闭")) {
-          pendingOrders++;
-        }
-        revenue += (Number(order.expectedIncome) || Number(order.actualPaid) || 0) / 100;
-      });
+      if (data.summary && typeof data.summary === "object") {
+        todayOrders = Number(data.summary.todayOrdersCount || 0);
+        pendingOrders = Number(data.summary.pendingCount || 0);
+        completedOrders = Number(data.summary.completedCount || 0);
+        revenue = Number(data.summary.trueSalesAmount || data.summary.revenue || 0);
+      }
+
+      // 如果 summary 没有给全，从列表补充统计
+      if (todayOrders === 0 && pendingOrders === 0 && revenue === 0 && orderList.length > 0) {
+        orderList.forEach((order: AutoPickOrder) => {
+          const orderDateStr = formatLocalDate(order.orderTime);
+          if (orderDateStr === todayStr) {
+            todayOrders++;
+          }
+          const st = String(order.status || "").toLowerCase();
+          if (st.includes("完成") || st === "completed" || st === "done") {
+            completedOrders++;
+          } else if (!st.includes("取消") && !st.includes("退款") && !st.includes("关闭")) {
+            pendingOrders++;
+          }
+          revenue += (Number(order.expectedIncome) || Number(order.actualPaid) || 0) / 100;
+        });
+      }
 
       setSummaryStats({
-        totalCount: typeof data.total === "number" ? data.total : orderList.length,
+        totalCount: reportedTotal,
         todayCount: todayOrders,
         pendingCount: pendingOrders,
         completedCount: completedOrders,
@@ -163,7 +175,7 @@ export function UserOrdersModal({
 
   const handleResetFilters = () => {
     setSearchQuery("");
-    setDateRange("today");
+    setDateRange("all");
     setPlatformFilter("all");
     setStatusFilter("all");
     setCurrentPage(1);
@@ -318,10 +330,10 @@ export function UserOrdersModal({
                   <div className="flex items-center gap-1 rounded-xl bg-background/80 p-1 border border-border/50 text-xs">
                     {(
                       [
+                        { key: "all", label: "全部时间" },
                         { key: "today", label: "今日" },
                         { key: "7d", label: "近 7 天" },
                         { key: "30d", label: "近 30 天" },
-                        { key: "all", label: "全部时间" },
                       ] as const
                     ).map((tab) => (
                       <button

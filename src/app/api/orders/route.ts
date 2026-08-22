@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
-import { hasAdminAccess } from "@/lib/permissions";
+import { hasAdminAccess, hasPermission } from "@/lib/permissions";
 import {
   backfillJdSkuIdForManualMatchedShopProducts,
   backfillMeituanSkuIdForManualMatchedShopProducts,
@@ -1073,7 +1073,13 @@ export async function GET(request: NextRequest) {
     const mainSystemSelfDelivery = toBooleanFilter(searchParams.get("mainSystemSelfDelivery"));
 
     const requestedUserId = String(searchParams.get("userId") || "").trim();
-    const canManageMembers = hasAdminAccess(session, "members:manage");
+    const canManageMembers = session.role === "SUPER_ADMIN"
+      || hasAdminAccess(session, "members:manage")
+      || hasAdminAccess(session, "members:status")
+      || hasAdminAccess(session, "whitelist:manage")
+      || hasAdminAccess(session, "roles:manage")
+      || String(session.roleProfile?.name || "").includes("管理")
+      || hasPermission(session, "order:manage");
     const targetUserId = (canManageMembers && requestedUserId) ? requestedUserId : session.id;
 
     const shopFilter = String(searchParams.get("shop") || "").trim();
@@ -1232,7 +1238,7 @@ export async function GET(request: NextRequest) {
             orderBy: { status: "asc" },
           }),
       prisma.user.findUnique({
-        where: { id: session.id },
+        where: { id: targetUserId },
         select: {
           permissions: true,
           shippingAddresses: true,
@@ -1312,7 +1318,7 @@ export async function GET(request: NextRequest) {
 
     if (orderNos.size > 0) {
       const outboundWhere: Prisma.OutboundOrderWhereInput = {
-        userId: session.id,
+        userId: targetUserId,
         ...(minDate && maxDate ? {
           date: {
             gte: new Date(minDate.getTime() - 24 * 60 * 60 * 1000),
@@ -1454,7 +1460,7 @@ export async function GET(request: NextRequest) {
       ? await prisma.purchaseOrderItem.findMany({
           where: {
             purchaseOrder: {
-              userId: session.id,
+              userId: targetUserId,
               status: "Received",
             },
             remainingQuantity: { gt: 0 },
@@ -1703,7 +1709,7 @@ export async function GET(request: NextRequest) {
     const allOrderNos = Array.from(new Set([...metricOrders.map((o) => o.orderNo), ...responseOrders.map((o) => o.orderNo)])).filter(Boolean);
     const customBrushOrders = allOrderNos.length > 0
       ? await prisma.brushOrder.findMany({
-          where: { userId: session.id, platformOrderId: { in: allOrderNos } },
+          where: { userId: targetUserId, platformOrderId: { in: allOrderNos } },
           select: { platformOrderId: true, commission: true },
         })
       : [];
@@ -1950,12 +1956,12 @@ export async function GET(request: NextRequest) {
             cancelledPlatformCounts,
           },
         };
-    await backfillJdSkuIdForManualMatchedShopProducts(prisma, session.id);
-    await backfillMeituanSkuIdForManualMatchedShopProducts(prisma, session.id);
+    await backfillJdSkuIdForManualMatchedShopProducts(prisma, targetUserId);
+    await backfillMeituanSkuIdForManualMatchedShopProducts(prisma, targetUserId);
     await Promise.all(
       responseOrders
         .filter((order) => isMeituanPlatform(order.platform) || isJDPlatform(order.platform) || isTaobaoPlatform(order.platform))
-        .map((order) => backfillPlatformIdsForSyncedAutoPickOrder(session.id, order.id).catch((error) => {
+        .map((order) => backfillPlatformIdsForSyncedAutoPickOrder(targetUserId, order.id).catch((error) => {
           console.warn("[orders/route] 忽略当前页平台 SKU 自动回填失败:", error);
         }))
     );
@@ -1988,7 +1994,7 @@ export async function GET(request: NextRequest) {
     const shopProducts = (productSkuCandidates.length > 0 || manualMatchedProductIds.length > 0)
       ? await prisma.shopProduct.findMany({
             where: {
-              shop: { userId: session.id },
+              shop: { userId: targetUserId },
               OR: [
                 ...(productSkuCandidates.length > 0 ? [
                   { sku: { in: productSkuCandidates } },
@@ -2350,7 +2356,7 @@ export async function GET(request: NextRequest) {
       new Map(autoMatchedMeituanBackfills.map((item) => [`${item.shopProductId}:${item.meituanSkuId}`, item])).values()
     );
     await Promise.all(uniqueAutoMatchedMeituanBackfills.map((item) =>
-      syncMeituanSkuIdForShopProduct(prisma, session.id, item.shopProductId, item.meituanSkuId).catch((error) => {
+      syncMeituanSkuIdForShopProduct(prisma, targetUserId, item.shopProductId, item.meituanSkuId).catch((error) => {
         console.warn("[orders/route] 忽略展示层自动匹配美团 SKU 回填失败:", error);
       })
     ));
@@ -2358,7 +2364,7 @@ export async function GET(request: NextRequest) {
       new Map(autoMatchedTaobaoBackfills.map((item) => [`${item.shopProductId}:${item.taobaoSkuId}`, item])).values()
     );
     await Promise.all(uniqueAutoMatchedTaobaoBackfills.map((item) =>
-      syncTaobaoSkuIdForShopProduct(prisma, session.id, item.shopProductId, item.taobaoSkuId).catch((error) => {
+      syncTaobaoSkuIdForShopProduct(prisma, targetUserId, item.shopProductId, item.taobaoSkuId).catch((error) => {
         console.warn("[orders/route] 忽略展示层自动匹配淘宝 SKU 回填失败:", error);
       })
     ));
