@@ -2300,6 +2300,23 @@ export async function GET(request: NextRequest) {
           const hasStrictMatchForAllSegmentsFromSku = segmentsFromSku.length > 1
             && segmentsFromSku.every((candidate) => Boolean(resolveStrictSkuMatch(candidate)));
 
+          const getProductSourceIdByPlatform = (product: any, platform?: string | null) => {
+            if (!product) return undefined;
+            if (isMeituanPlatform(platform)) {
+              const raw = String(product.meituanSkuId || "").trim();
+              return raw ? raw.split(",")[0].trim() : undefined;
+            }
+            if (isJDPlatform(platform)) {
+              const raw = String(product.jdSkuId || "").trim();
+              return raw ? raw.split(",")[0].trim() : undefined;
+            }
+            if (isTaobaoPlatform(platform)) {
+              const raw = String(product.taobaoSkuId || "").trim();
+              return raw ? raw.split(",")[0].trim() : undefined;
+            }
+            return undefined;
+          };
+
           const bundleItems = manualMatchedProduct?.bundleItems;
           const displayItems = (manualMatchedProduct && bundleItems && Array.isArray(bundleItems))
             ? bundleItems.map((bItem: any) => {
@@ -2315,6 +2332,8 @@ export async function GET(request: NextRequest) {
                 );
                 const bFallbackImg = foundBShopProduct?.image || null;
                 const bResolvedImg = bItem.image ? storage.resolveUrl(bItem.image) : bFallbackImg;
+                const bSourceId = getProductSourceIdByPlatform(foundBShopProduct, order.platform)
+                  || getProductSourceIdByPlatform(bItem, order.platform);
                 return {
                   name: bItem.name || item.productName || "未命名商品",
                   sku: (
@@ -2324,6 +2343,7 @@ export async function GET(request: NextRequest) {
                   ) || "-",
                   image: bResolvedImg,
                   quantity: bQty,
+                  sourceId: bSourceId || undefined,
                 };
               })
             : hasStrictMatchForAllSegmentsFromSku
@@ -2332,6 +2352,7 @@ export async function GET(request: NextRequest) {
                 const segQty = item.quantity > 1 && item.quantity % segmentsFromSku.length === 0
                   ? Math.max(1, Math.floor(item.quantity / segmentsFromSku.length))
                   : 1;
+                const segSourceId = getProductSourceIdByPlatform(segmentMatchedProduct, order.platform);
                 return {
                   name: segmentMatchedProduct?.name || item.productName || "未命名商品",
                   sku: (
@@ -2341,6 +2362,7 @@ export async function GET(request: NextRequest) {
                   ) || candidate,
                   image: segmentMatchedProduct?.image || (item.thumb ? storage.resolveUrl(item.thumb) : null),
                   quantity: segQty,
+                  sourceId: segSourceId || undefined,
                 };
               })
             : undefined;

@@ -679,7 +679,7 @@ export function getExpandedOrderItemDisplays(item: AutoPickOrderItem, platform?:
       sku: displayItem.sku || matchedProduct?.sku || item.productNo || "-",
       image: displayItem.image || item.thumb || null,
       quantity: displayItem.quantity,
-      sourceId: sourceId || undefined,
+      sourceId: (displayItem as any).sourceId || undefined,
     }));
   }
 
