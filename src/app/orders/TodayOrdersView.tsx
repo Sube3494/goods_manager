@@ -164,13 +164,18 @@ export function TodayOrdersView({
   
   const [actingId, setActingId] = useState("");
   const [expandedIds, setExpandedIds] = useState<string[]>([]);
-  const [showCompletedToday, setShowCompletedToday] = useState(false);
+  const [showCompletedToday, setShowCompletedToday] = useState(true);
   const [showCancelledToday, setShowCancelledToday] = useState(false);
   
   const isFetchingRef = useRef(false);
   const realtimeRefreshTimerRef = useRef<number | null>(null);
   const realtimePollingTimerRef = useRef<number | null>(null);
   const sseHealthyRef = useRef(false);
+  const onDataLoadRef = useRef(onDataLoad);
+
+  useEffect(() => {
+    onDataLoadRef.current = onDataLoad;
+  }, [onDataLoad]);
 
   const todayDate = useMemo(() => formatLocalDate(new Date()), []);
 
@@ -215,8 +220,8 @@ export function TodayOrdersView({
       if (Array.isArray(data.filters?.statuses)) setStatuses(data.filters.statuses);
       if (data.summary) setSummary(data.summary);
       if (data.overview) setOverview(data.overview);
-      if (onDataLoad) {
-        onDataLoad({
+      if (onDataLoadRef.current) {
+        onDataLoadRef.current({
           summary: data.summary || { receivedAmount: 0, platformCommission: 0, validOrderCount: 0, itemCount: 0, totalDeliveryFee: 0, pureProfit: 0 },
           overview: data.overview || { totalCount: 0, trueOrderCount: 0, brushCount: 0, cancelledCount: 0 },
           total: typeof data.total === "number" ? data.total : nextItems.length,
@@ -232,7 +237,7 @@ export function TodayOrdersView({
       isFetchingRef.current = false;
       setIsLoading(false);
     }
-  }, [platform, query, shop, status, todayDate, showToast, userId, onDataLoad]);
+  }, [platform, query, shop, status, todayDate, showToast, userId]);
 
   // 外部刷新信号监听
   useEffect(() => {

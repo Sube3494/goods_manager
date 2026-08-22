@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -84,13 +84,13 @@ export function UserOrdersModal({
 
   const [localShops, setLocalShops] = useState<Array<{ id: string; name: string; address: string }>>([]);
 
-  const handleDataLoad = (data: {
+  const handleDataLoad = useCallback((data: {
     summary: typeof todaySummary;
     overview: typeof todayOverview;
   }) => {
     if (data.summary) setTodaySummary(data.summary);
     if (data.overview) setTodayOverview(data.overview);
-  };
+  }, []);
 
   useEffect(() => {
     if (!isOpen || !userId) return;
