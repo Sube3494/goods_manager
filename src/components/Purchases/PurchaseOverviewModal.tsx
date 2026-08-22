@@ -90,7 +90,7 @@ export function PurchaseOverviewModal({ isOpen, onClose, purchases }: PurchaseOv
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-60000 bg-black/60 backdrop-blur-sm"
+            className="fixed inset-0 z-85000 bg-black/60 backdrop-blur-sm"
             onClick={onClose}
           />
           <motion.div
@@ -98,7 +98,7 @@ export function PurchaseOverviewModal({ isOpen, onClose, purchases }: PurchaseOv
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 16 }}
             transition={{ type: "spring", stiffness: 450, damping: 35 }}
-            className={`fixed left-1/2 top-1/2 z-60001 -translate-x-1/2 -translate-y-1/2 bg-white dark:bg-gray-900/70 backdrop-blur-xl shadow-2xl overflow-hidden flex flex-col ${
+            className={`fixed left-1/2 top-1/2 z-85001 -translate-x-1/2 -translate-y-1/2 bg-white dark:bg-gray-900/70 backdrop-blur-xl shadow-2xl overflow-hidden flex flex-col ${
               isFullscreen 
                 ? "w-screen h-dynamic-screen max-w-none max-h-none rounded-none border-none" 
                 : "w-[calc(100%-24px)] max-w-6xl max-h-safe-modal rounded-3xl border border-border/50"

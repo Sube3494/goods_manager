@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, Suspense, useMemo, useTransition, type ReactNode } from "react";
-import { Plus, ShoppingBag, Calendar, Trash2, Eye, Store, Package, Wallet, Archive, ReceiptText, Check, ArrowUp, X, FileSpreadsheet, FileText, Download, Loader2, CheckCircle2 } from "lucide-react";
+import { Plus, ShoppingBag, Calendar, Trash2, Eye, Store, Package, Wallet, Archive, ReceiptText, Check, ArrowUp, X, FileSpreadsheet, FileText, Download, Loader2, CheckCircle2, BarChart3 } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { PurchaseOrderModal } from "@/components/Purchases/PurchaseOrderModal";
 import { PurchaseOverviewModal } from "@/components/Purchases/PurchaseOverviewModal";
@@ -2007,11 +2007,21 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
         onClear={() => setSelectedPurchaseIds([])}
         label="张采购单"
         onDelete={canEdit ? handleBatchDelete : undefined}
-        extraActions={canEdit ? [{
-          label: "批量入库",
-          icon: <Archive size={16} />,
-          onClick: handleBatchReceive,
-        }] : []}
+        extraActions={[
+          {
+            label: "批量汇总",
+            icon: <BarChart3 size={16} />,
+            onClick: () => {
+              const selected = purchases.filter((purchase) => selectedPurchaseIds.includes(purchase.id));
+              setOverviewPurchases(selected);
+            },
+          },
+          ...(canEdit ? [{
+            label: "批量入库",
+            icon: <Archive size={16} />,
+            onClick: handleBatchReceive,
+          }] : []),
+        ]}
       />
 
       {typeof document !== "undefined" && createPortal(
@@ -2140,7 +2150,7 @@ function ExportSettingsModal({ isOpen, onClose, onConfirm, selectedColumns, onCh
   if (!mounted || !isOpen) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-60000 flex items-center sm:items-center justify-center p-3 sm:p-4">
+    <div className="fixed inset-0 z-85000 flex items-center sm:items-center justify-center p-3 sm:p-4">
       {/* Background overlay */}
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       

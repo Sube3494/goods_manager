@@ -1034,7 +1034,7 @@ export function PurchaseOrderModal({
           >
             {/* Expiration Batch Form Modal */}
             {shelfLifeModalOpen && activeShelfLifeItem && (
-              <div className="fixed inset-0 z-70000 flex items-center justify-center p-4">
+              <div className="fixed inset-0 z-90000 flex items-center justify-center p-4">
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShelfLifeModalOpen(false)} />
                 <div className="relative w-full max-w-md rounded-3xl border border-border/50 bg-white p-6 shadow-2xl dark:bg-gray-900/90 backdrop-blur-xl">
                   <div className="mb-4 flex items-center justify-between">
