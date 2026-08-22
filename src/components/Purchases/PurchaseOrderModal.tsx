@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useCallback, memo } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Check, CheckCircle, Package, Truck, Calendar, Plus, Minus, Trash2, ListOrdered, FileText, ShoppingBag, Download, AlertCircle, MapPin, BarChart3, Search } from "lucide-react";
+import { X, Check, CheckCircle, Package, Truck, Calendar, Plus, Minus, Trash2, ListOrdered, FileText, ShoppingBag, Download, AlertCircle, MapPin, BarChart3, Search, Loader2 } from "lucide-react";
 import { PurchaseOrder, Product, PurchaseOrderItem, PurchaseStatus, User as UserType, Supplier, Shop } from "@/lib/types";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { ProductSelectionModal } from "./ProductSelectionModal";
@@ -22,7 +22,7 @@ import { isShopNameMatch } from "@/lib/shopIdentity";
 interface PurchaseOrderModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: PurchaseOrder) => void;
+  onSubmit: (data: PurchaseOrder) => void | Promise<void>;
   onExport?: (po: PurchaseOrder) => void;
   onOverview?: (po: PurchaseOrder) => void;
   initialData?: PurchaseOrder | null;
@@ -413,7 +413,6 @@ export function PurchaseOrderModal({
 
 
 
-  
   // Local state for fee inputs to allow typing "0." or decimals comfortably
   const [shippingFeeInput, setShippingFeeInput] = useState(initialData?.shippingFees?.toString() || "0");
   const [extraFeeInput, setExtraFeeInput] = useState(initialData?.extraFees?.toString() || "0");
@@ -421,7 +420,6 @@ export function PurchaseOrderModal({
   const [quantityDrafts, setQuantityDrafts] = useState<Record<string, string>>({});
   const [costPriceDrafts, setCostPriceDrafts] = useState<Record<string, string>>({});
   const [lineTotalDrafts, setLineTotalDrafts] = useState<Record<string, string>>({});
-
 
   const [isSelectionModalOpen, setIsSelectionModalOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -432,6 +430,7 @@ export function PurchaseOrderModal({
   const [batchMode, setBatchMode] = useState(false);
   const [batchSelected, setBatchSelected] = useState<Set<string>>(new Set());
   const [batchConfirming, setBatchConfirming] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const purchaseCatalogFetchPath = "/api/purchase-products";
   
   // Shelf Life Modal State
@@ -894,27 +893,41 @@ export function PurchaseOrderModal({
     return "Confirmed";
   };
 
-  const handleAction = (status: PurchaseStatus) => {
-    if (formData.items.length === 0) return;
+  const handleAction = async (status: PurchaseStatus) => {
+    if (isSubmitting || formData.items.length === 0) return;
 
     const targetStatus = status === "Received" ? "Received" : inferStatus(formData);
 
-    onSubmit({
-      ...formData,
-      totalAmount: calculateTotal(),
-      status: targetStatus
-    });
+    setIsSubmitting(true);
+    try {
+      await onSubmit({
+        ...formData,
+        totalAmount: calculateTotal(),
+        status: targetStatus
+      });
+    } catch (error) {
+      console.error("Failed to submit purchase order:", error);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleRevokeReceived = useCallback(() => {
-    if (formData.status !== "Received") return;
+  const handleRevokeReceived = useCallback(async () => {
+    if (isSubmitting || formData.status !== "Received") return;
 
-    onSubmit({
-      ...formData,
-      totalAmount: calculateTotal(),
-      status: "Confirmed",
-    });
-  }, [formData, onSubmit, calculateTotal]);
+    setIsSubmitting(true);
+    try {
+      await onSubmit({
+        ...formData,
+        totalAmount: calculateTotal(),
+        status: "Confirmed",
+      });
+    } catch (error) {
+      console.error("Failed to revoke received status:", error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [formData, onSubmit, calculateTotal, isSubmitting]);
 
   const handleFileUpload = useCallback(async (files: FileList | File[], type: 'payment' | 'waybill', rowIndex?: number) => {
     if (!files || files.length === 0) return;
@@ -1425,7 +1438,7 @@ export function PurchaseOrderModal({
 
                 </div>
 
-                {/* Modern Footer Summary Panel */}
+{/* Modern Footer Summary Panel */}
                 <div className="bg-muted/30 dark:bg-white/5 border-t border-border/10 p-3 sm:p-4 px-4 sm:px-8 shrink-0">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-6">
                         {/* Fee Pills Group - Horizontal Scroll on Mobile */}
@@ -1488,44 +1501,53 @@ export function PurchaseOrderModal({
                                     {canBackfillReceivedCosts && (
                                         <button
                                             type="submit"
-                                            className="px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl text-[10px] sm:text-xs font-black transition-all shadow-lg bg-primary text-primary-foreground shadow-primary/20 hover:scale-[1.02] active:scale-[0.98]"
+                                            disabled={isSubmitting}
+                                            className="px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl text-[10px] sm:text-xs font-black transition-all shadow-lg bg-primary text-primary-foreground shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none flex items-center gap-1.5"
                                         >
-                                            保存成本
+                                            {isSubmitting ? <Loader2 size={13} className="animate-spin" /> : null}
+                                            {isSubmitting ? "保存中..." : "保存成本"}
                                         </button>
                                     )}
                                     {formData.status === "Received" && !isSystemGenerated && (
                                         <button
                                             type="button"
+                                            disabled={isSubmitting}
                                             onClick={handleRevokeReceived}
-                                            className="px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl text-[10px] sm:text-xs font-black transition-all shadow-sm bg-amber-500/12 text-amber-600 hover:bg-amber-500/20 dark:text-amber-400"
+                                            className="px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl text-[10px] sm:text-xs font-black transition-all shadow-sm bg-amber-500/12 text-amber-600 hover:bg-amber-500/20 dark:text-amber-400 disabled:opacity-50 disabled:pointer-events-none flex items-center gap-1.5"
                                         >
-                                            撤销入库
+                                            {isSubmitting ? <Loader2 size={13} className="animate-spin" /> : null}
+                                            {isSubmitting ? "处理中..." : "撤销入库"}
                                         </button>
                                     )}
                                     {!canBackfillReceivedCosts && ((formData.status as string) === "Confirmed" || (formData.status as string) === "Ordered" || formData.status === "Shipped") && (
                                         <>
                                             <button
                                                 type="submit"
-                                                className="px-3 sm:px-4 py-1.5 sm:py-2 text-[10px] sm:text-xs font-bold text-muted-foreground hover:text-foreground hover:bg-white/5 rounded-xl transition-all"
+                                                disabled={isSubmitting}
+                                                className="px-3 sm:px-4 py-1.5 sm:py-2 text-[10px] sm:text-xs font-bold text-muted-foreground hover:text-foreground hover:bg-white/5 rounded-xl transition-all disabled:opacity-50 disabled:pointer-events-none flex items-center gap-1.5"
                                             >
-                                                保存采购单
+                                                {isSubmitting ? <Loader2 size={13} className="animate-spin" /> : null}
+                                                {isSubmitting ? "保存中..." : "保存采购单"}
                                             </button>
 
                                             {isNewPurchase ? (
                                                 <button
                                                     type="submit"
-                                                    className="px-4 sm:px-6 py-2 sm:py-2.5 bg-primary text-primary-foreground text-[10px] sm:text-xs font-black rounded-xl shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-1.5 sm:gap-2"
+                                                    disabled={isSubmitting}
+                                                    className="px-4 sm:px-6 py-2 sm:py-2.5 bg-primary text-primary-foreground text-[10px] sm:text-xs font-black rounded-xl shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-1.5 sm:gap-2 disabled:opacity-50 disabled:pointer-events-none"
                                                 >
-                                                    <CheckCircle size={14} className="hidden sm:block" />
-                                                    确认下单
+                                                    {isSubmitting ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} className="hidden sm:block" />}
+                                                    {isSubmitting ? "下单中..." : "确认下单"}
                                                 </button>
                                             ) : (
                                                 <button
                                                     type="button"
+                                                    disabled={isSubmitting}
                                                     onClick={() => handleAction("Received")}
-                                                    className="px-6 sm:px-8 py-2 sm:py-2.5 rounded-xl text-[10px] sm:text-xs font-black transition-all shadow-lg bg-emerald-500 text-white shadow-emerald-500/20 hover:scale-[1.02]"
+                                                    className="px-6 sm:px-8 py-2 sm:py-2.5 rounded-xl text-[10px] sm:text-xs font-black transition-all shadow-lg bg-emerald-500 text-white shadow-emerald-500/20 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none flex items-center gap-1.5"
                                                 >
-                                                    确认入库
+                                                    {isSubmitting ? <Loader2 size={14} className="animate-spin" /> : null}
+                                                    {isSubmitting ? "入库中..." : "确认入库"}
                                                 </button>
                                             )}
                                         </>

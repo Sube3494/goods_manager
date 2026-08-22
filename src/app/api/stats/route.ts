@@ -19,6 +19,7 @@ import { formatLocalDate, parseAsShanghaiTime } from "@/lib/dateUtils";
 import { isPrismaMissingColumnError } from "@/lib/prismaSchemaCompat";
 import { getOutboundReturnTotals, parseOutboundReturnMeta } from "@/lib/outboundReturnMeta";
 import { getDailyFixedOperatingCost, getDailyUtilityCost, normalizeMonthKey } from "@/lib/operatingCosts";
+import { AUTO_INBOUND_TYPE } from "@/lib/purchaseOrderTypes";
 
 const SHANGHAI_DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -387,6 +388,10 @@ export async function GET(request: NextRequest) {
           purchaseOrder: {
             userId: user.id,
             status: "Received",
+            NOT: [
+              { type: AUTO_INBOUND_TYPE },
+              { id: { startsWith: "PO-AUTO-" } },
+            ],
             ...(shopName ? { shopName } : {}),
           },
         },

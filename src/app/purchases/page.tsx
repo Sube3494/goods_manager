@@ -63,6 +63,80 @@ function formatCurrency(value: number) {
   })}`;
 }
 
+function PurchasesTableSkeleton() {
+  return (
+    <div className="w-full animate-pulse divide-y divide-border">
+      {Array.from({ length: 6 }).map((_, index) => (
+        <div key={index} className="flex items-center px-4 py-3.5 gap-4">
+          <div className="w-[44px] flex justify-center">
+            <div className="h-4 w-4 rounded-full bg-black/6 dark:bg-white/8" />
+          </div>
+          <div className="w-[40px] flex justify-center">
+            <div className="h-4 w-6 rounded bg-black/6 dark:bg-white/8" />
+          </div>
+          <div className="w-[90px] flex justify-center">
+            <div className="h-6 w-16 rounded-full bg-black/6 dark:bg-white/8" />
+          </div>
+          <div className="w-[155px] flex items-center gap-2">
+            <div className="h-7 w-7 rounded-lg bg-black/6 dark:bg-white/8 shrink-0" />
+            <div className="space-y-1 flex-1">
+              <div className="h-3 w-3/4 rounded bg-black/6 dark:bg-white/8" />
+              <div className="h-2.5 w-1/2 rounded bg-black/4 dark:bg-white/5" />
+            </div>
+          </div>
+          <div className="w-[90px] flex justify-center">
+            <div className="h-4 w-14 rounded bg-black/6 dark:bg-white/8" />
+          </div>
+          <div className="w-[80px] flex justify-center">
+            <div className="h-6 w-14 rounded-full bg-black/6 dark:bg-white/8" />
+          </div>
+          <div className="w-[130px] flex justify-center">
+            <div className="h-3.5 w-24 rounded bg-black/6 dark:bg-white/8" />
+          </div>
+          <div className="w-[90px] flex justify-center gap-2">
+            <div className="h-7 w-7 rounded-lg bg-black/6 dark:bg-white/8" />
+            <div className="h-7 w-7 rounded-lg bg-black/6 dark:bg-white/8" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function PurchasesCardSkeleton() {
+  return (
+    <div className="space-y-3 animate-pulse">
+      {Array.from({ length: 4 }).map((_, index) => (
+        <div 
+          key={index}
+          className="rounded-[22px] border border-border/70 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-[#161b2b] space-y-3"
+        >
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <div className="h-4 w-4 rounded-full bg-black/6 dark:bg-white/8" />
+              <div className="h-4 w-6 rounded bg-black/6 dark:bg-white/8" />
+              <div className="h-5 w-16 rounded-full bg-black/6 dark:bg-white/8" />
+            </div>
+            <div className="h-5 w-14 rounded-full bg-black/6 dark:bg-white/8" />
+          </div>
+          <div className="flex items-center gap-3 pt-1">
+            <div className="h-10 w-10 rounded-xl bg-black/6 dark:bg-white/8 shrink-0" />
+            <div className="space-y-1.5 flex-1">
+              <div className="h-3.5 w-2/3 rounded bg-black/6 dark:bg-white/8" />
+              <div className="h-3 w-1/3 rounded bg-black/4 dark:bg-white/5" />
+            </div>
+            <div className="h-4 w-12 rounded bg-black/6 dark:bg-white/8 shrink-0" />
+          </div>
+          <div className="flex items-center justify-between pt-2 border-t border-black/5 dark:border-white/5">
+            <div className="h-3 w-24 rounded bg-black/4 dark:bg-white/5" />
+            <div className="h-4 w-16 rounded bg-black/6 dark:bg-white/8" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function PurchaseMetricCard({
   label,
   value,
@@ -1526,10 +1600,7 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
       <div className="hidden md:block rounded-2xl border border-border bg-white dark:bg-white/5 backdrop-blur-md overflow-hidden shadow-sm">
         <div className="overflow-auto max-h-[calc(100dvh-220px-env(safe-area-inset-bottom,0px))]">
           {isLoading && purchases.length === 0 ? (
-            <div className="py-20 flex flex-col items-center justify-center text-center">
-               <div className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin mb-4" />
-               <p className="text-muted-foreground text-sm font-medium">全力加载中...</p>
-            </div>
+            <PurchasesTableSkeleton />
           ) : paginatedPurchases.length > 0 ? (
           <table className="w-full min-w-[720px] table-fixed border-collapse text-left">
             <colgroup>
@@ -1730,10 +1801,7 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
       )}>
         <AnimatePresence mode="popLayout">
           {isLoading && purchases.length === 0 ? (
-             <div className="py-12 flex flex-col items-center justify-center text-center">
-                <div className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin mb-4" />
-                <p className="text-muted-foreground text-sm font-medium">加载中...</p>
-             </div>
+            <PurchasesCardSkeleton />
           ) : paginatedPurchases.length > 0 ? (
             paginatedPurchases.map((po, index) => (
               <motion.div

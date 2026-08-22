@@ -20,6 +20,72 @@ import { cn, parseOutboundNote, getPlatformMeta } from "@/lib/utils";
 import { Pagination } from "@/components/ui/Pagination";
 import { EmptyState } from "@/components/ui/EmptyState";
 
+function OutboundTableSkeleton() {
+  return (
+    <div className="w-full animate-pulse divide-y divide-border">
+      {Array.from({ length: 6 }).map((_, index) => (
+        <div key={index} className="flex items-center px-4 py-3.5 gap-4">
+          <div className="w-[140px] space-y-1">
+            <div className="h-3.5 w-24 rounded bg-black/6 dark:bg-white/8" />
+            <div className="h-2.5 w-16 rounded bg-black/4 dark:bg-white/5" />
+          </div>
+          <div className="w-[100px]">
+            <div className="h-5 w-16 rounded-full bg-black/6 dark:bg-white/8" />
+          </div>
+          <div className="flex-1 space-y-1.5">
+            <div className="h-3.5 w-3/4 rounded bg-black/6 dark:bg-white/8" />
+            <div className="h-2.5 w-1/2 rounded bg-black/4 dark:bg-white/5" />
+          </div>
+          <div className="w-[70px] flex justify-center">
+            <div className="h-4 w-8 rounded bg-black/6 dark:bg-white/8" />
+          </div>
+          <div className="w-[140px] space-y-1">
+            <div className="h-3.5 w-28 rounded bg-black/6 dark:bg-white/8" />
+            <div className="h-2.5 w-16 rounded bg-black/4 dark:bg-white/5" />
+          </div>
+          <div className="w-[110px] flex justify-end gap-2">
+            <div className="h-7 w-7 rounded-lg bg-black/6 dark:bg-white/8" />
+            <div className="h-7 w-7 rounded-lg bg-black/6 dark:bg-white/8" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function OutboundCardSkeleton() {
+  return (
+    <div className="space-y-3 animate-pulse">
+      {Array.from({ length: 4 }).map((_, index) => (
+        <div 
+          key={index}
+          className="rounded-[22px] border border-border/70 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-[#161b2b] space-y-3"
+        >
+          <div className="flex items-center justify-between gap-2">
+            <div className="space-y-1">
+              <div className="h-4 w-28 rounded bg-black/6 dark:bg-white/8" />
+              <div className="h-3 w-16 rounded bg-black/4 dark:bg-white/5" />
+            </div>
+            <div className="h-5 w-16 rounded-full bg-black/6 dark:bg-white/8" />
+          </div>
+          <div className="flex items-center gap-3 pt-1">
+            <div className="h-10 w-10 rounded-xl bg-black/6 dark:bg-white/8 shrink-0" />
+            <div className="space-y-1.5 flex-1">
+              <div className="h-3.5 w-2/3 rounded bg-black/6 dark:bg-white/8" />
+              <div className="h-3 w-1/3 rounded bg-black/4 dark:bg-white/5" />
+            </div>
+            <div className="h-4 w-10 rounded bg-black/6 dark:bg-white/8 shrink-0" />
+          </div>
+          <div className="flex items-center justify-between pt-2 border-t border-black/5 dark:border-white/5">
+            <div className="h-3 w-28 rounded bg-black/4 dark:bg-white/5" />
+            <div className="h-7 w-20 rounded-lg bg-black/6 dark:bg-white/8" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function OutboundPage() {
   const [orders, setOrders] = useState<OutboundOrder[]>([]);
   const [totalItems, setTotalItems] = useState(0);
@@ -308,10 +374,7 @@ export default function OutboundPage() {
       <div className="hidden md:block rounded-2xl border border-border bg-white dark:bg-white/5 backdrop-blur-md overflow-hidden shadow-sm">
         <div className="overflow-auto max-h-[calc(100dvh-280px-env(safe-area-inset-bottom,0px))]">
           {isLoading ? (
-            <div className="py-20 flex flex-col items-center justify-center text-center">
-               <div className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin mb-4" />
-               <p className="text-muted-foreground text-sm font-medium">加载中...</p>
-            </div>
+            <OutboundTableSkeleton />
           ) : paginatedOrders.length > 0 ? (
             <table className="w-full text-left border-collapse min-w-[900px] table-auto">
               <thead>
@@ -488,10 +551,7 @@ export default function OutboundPage() {
         <div className="p-4 space-y-4">
           <>
             {isLoading ? (
-               <div className="py-12 flex flex-col items-center justify-center text-center text-muted-foreground/50">
-                  <div className="w-8 h-8 border-4 border-primary/10 border-t-primary rounded-full animate-spin mb-4" />
-                   <p className="text-sm font-medium tracking-widest opacity-50">加载中</p>
-               </div>
+              <OutboundCardSkeleton />
             ) : paginatedOrders.length > 0 ? (
               paginatedOrders.map((order) => {
                 const isReturned = order.status === 'Returned';

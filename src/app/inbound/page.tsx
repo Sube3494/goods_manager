@@ -9,11 +9,71 @@ import { formatLocalDateTime } from "@/lib/dateUtils";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { startOfDay, endOfDay, parseISO, isWithinInterval } from "date-fns";
-import { cn } from "@/lib/utils";
+import { motion, AnimatePresence } from "framer-motion";
 import { Pagination } from "@/components/ui/Pagination";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Suspense } from "react";
 import { AUTO_INBOUND_TYPE, isAutoInboundOrderLike } from "@/lib/purchaseOrderTypes";
+import { cn } from "@/lib/utils";
+
+function InboundTableSkeleton() {
+  return (
+    <div className="divide-y divide-border animate-pulse">
+      {Array.from({ length: 6 }).map((_, idx) => (
+        <div key={idx} className="grid grid-cols-[160px_1fr_120px_100px_160px_80px] items-center gap-4 px-6 py-4">
+          <div className="flex flex-col items-center gap-1.5">
+            <div className="h-5 w-24 rounded-md bg-black/6 dark:bg-white/8" />
+            <div className="h-3 w-16 rounded bg-black/4 dark:bg-white/5" />
+          </div>
+          <div className="flex flex-wrap justify-center gap-2">
+            <div className="h-7 w-36 rounded-full bg-black/6 dark:bg-white/8" />
+            <div className="h-7 w-28 rounded-full bg-black/6 dark:bg-white/8" />
+          </div>
+          <div className="flex justify-center">
+            <div className="h-5 w-16 rounded bg-black/6 dark:bg-white/8" />
+          </div>
+          <div className="flex justify-center">
+            <div className="h-5 w-14 rounded-full bg-black/6 dark:bg-white/8" />
+          </div>
+          <div className="flex items-center justify-center gap-2">
+            <div className="h-4 w-4 rounded bg-black/4 dark:bg-white/5" />
+            <div className="h-4 w-28 rounded bg-black/6 dark:bg-white/8" />
+          </div>
+          <div className="flex justify-center">
+            <div className="h-7 w-7 rounded-lg bg-black/6 dark:bg-white/8" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function InboundCardSkeleton() {
+  return (
+    <div className="space-y-3 animate-pulse">
+      {Array.from({ length: 4 }).map((_, idx) => (
+        <div key={idx} className="rounded-2xl border border-border/50 bg-white/50 dark:bg-white/5 p-4 shadow-sm space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="h-5 w-16 rounded bg-black/6 dark:bg-white/8" />
+              <div className="h-4 w-12 rounded bg-black/4 dark:bg-white/5" />
+              <div className="h-4 w-20 rounded-full bg-black/4 dark:bg-white/5" />
+            </div>
+            <div className="h-5 w-12 rounded-full bg-black/6 dark:bg-white/8" />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <div className="h-6 w-32 rounded-full bg-black/6 dark:bg-white/8" />
+            <div className="h-6 w-24 rounded-full bg-black/6 dark:bg-white/8" />
+          </div>
+          <div className="flex items-center justify-between pt-2 border-t border-border/10">
+            <div className="h-4 w-28 rounded bg-black/4 dark:bg-white/5" />
+            <div className="h-4 w-20 rounded bg-black/6 dark:bg-white/8" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 const INBOUND_TYPE_ALL = "全部类型";
 const INBOUND_TYPE_OPTIONS = [
@@ -308,225 +368,269 @@ function InboundContent() {
       </div>
 
       {/* Desktop Table View */}
-      <div className="hidden md:block rounded-2xl border border-border bg-white dark:bg-white/5 backdrop-blur-md shadow-sm">
+      <div className="hidden md:block rounded-2xl border border-border bg-white dark:bg-white/5 backdrop-blur-md shadow-sm overflow-hidden">
         <div className="overflow-auto max-h-[calc(100dvh-280px-env(safe-area-inset-bottom,0px))]">
-          {isLoading ? (
-            <div className="py-20 flex flex-col items-center justify-center text-center">
-               <div className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin mb-4" />
-               <p className="text-muted-foreground text-sm font-medium">加载中...</p>
-            </div>
-          ) : filteredInbounds.length > 0 ? (
-          <table className="w-full text-left border-collapse min-w-[800px] table-auto">
-            <thead>
-              <tr className="border-b border-border bg-muted/30">
-                <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">入库单信息</th>
-                <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">包含商品</th>
-                <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">入库金额</th>
-                <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">状态</th>
-                <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">入库时间</th>
-                <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">操作</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-                {paginatedInbounds.map((po) => {
-                  const serialMatch = po.note?.match(/\[流水号:(.*?)\]/);
-                  const cleanId = getCleanShortId(po.id);
-                  const serialText = serialMatch && serialMatch[1] !== '无' ? `流水单号 #${serialMatch[1]}` : `#${cleanId}`;
-                  const displayAmount = getInboundDisplayAmount(po);
+          <AnimatePresence mode="wait">
+            {isLoading ? (
+              <motion.div
+                key="skeleton"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.15 }}
+              >
+                <InboundTableSkeleton />
+              </motion.div>
+            ) : filteredInbounds.length > 0 ? (
+              <motion.table 
+                key="table"
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.25 }}
+                className="w-full text-left border-collapse min-w-[800px] table-auto"
+              >
+                <thead>
+                  <tr className="border-b border-border bg-muted/30">
+                    <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">入库单信息</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">包含商品</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">入库金额</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">状态</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">入库时间</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">操作</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                    {paginatedInbounds.map((po) => {
+                      const serialMatch = po.note?.match(/\[流水号:(.*?)\]/);
+                      const cleanId = getCleanShortId(po.id);
+                      const serialText = serialMatch && serialMatch[1] !== '无' ? `流水单号 #${serialMatch[1]}` : `#${cleanId}`;
+                      const displayAmount = getInboundDisplayAmount(po);
 
-                  return (
-                   <tr 
-                    key={po.id}
-                    className="hover:bg-muted/20 transition-colors group"
-                  >
-                    <td className="px-6 py-4 whitespace-nowrap text-center">
-                      <div className="flex flex-col items-center justify-center gap-1.5">
-                        <div className="flex items-center gap-1.5">
-                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${
-                            isAutoInboundOrderLike(po)
-                              ? 'bg-orange-500/10 text-orange-600 border-orange-500/20'
-                              : po.type === "Return" || po.type === "InternalReturn"
-                              ? 'bg-violet-500/10 text-violet-600 border-violet-500/20'
-                              : 'bg-blue-500/10 text-blue-600 border-blue-500/20'
-                          }`}>
-                            {getInboundTypeLabel(po)}
-                          </span>
-                          {po.shopName && (
-                            <span className="flex items-center justify-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-primary/10 text-primary border border-primary/20 w-fit">
-                              <Store size={10} />
-                              {po.shopName}
-                            </span>
-                          )}
-                        </div>
-                        <span className="text-[10px] font-mono text-muted-foreground/50 font-medium">{serialText}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      <div className="flex flex-wrap justify-center gap-2 max-w-[320px] mx-auto">
-                        {po.items.slice(0, 3).map((item, idx) => (
-                          <div 
-                            key={idx} 
-                            className="flex items-center gap-2 p-0.5 pr-2.5 rounded-full bg-secondary/30 dark:bg-white/5 border border-border/50 max-w-[180px] shadow-sm hover:border-primary/30 transition-all cursor-default"
-                            title={item.shopProduct?.name || item.product?.name || item.shopProduct?.productName || ""}
-                          >
-                            <div className="w-6 h-6 shrink-0 rounded-full overflow-hidden bg-white dark:bg-black flex items-center justify-center">
-                              {(item.shopProduct?.image || item.product?.image) ? (
-                                <img src={item.shopProduct?.image || item.product?.image || ""} className="w-full h-full object-cover" alt="" loading="lazy" />
-                              ) : (
-                                <Package size={12} className="text-muted-foreground/50" />
+                      return (
+                       <tr 
+                        key={po.id}
+                        className="hover:bg-muted/20 transition-colors group"
+                      >
+                        <td className="px-6 py-4 whitespace-nowrap text-center">
+                          <div className="flex flex-col items-center justify-center gap-1.5">
+                            <div className="flex items-center gap-1.5">
+                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${
+                                isAutoInboundOrderLike(po)
+                                  ? 'bg-orange-500/10 text-orange-600 border-orange-500/20'
+                                  : po.type === "Return" || po.type === "InternalReturn"
+                                  ? 'bg-violet-500/10 text-violet-600 border-violet-500/20'
+                                  : 'bg-blue-500/10 text-blue-600 border-blue-500/20'
+                              }`}>
+                                {getInboundTypeLabel(po)}
+                              </span>
+                              {po.shopName && (
+                                <span className="flex items-center justify-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-primary/10 text-primary border border-primary/20 w-fit">
+                                  <Store size={10} />
+                                  {po.shopName}
+                                </span>
                               )}
                             </div>
-                            <span className="text-[10px] font-medium truncate text-foreground/80 leading-none">
-                              {item.shopProduct?.name || item.product?.name || item.shopProduct?.productName || '未知商品'}
-                            </span>
-                            <span className="text-[10px] font-black text-primary shrink-0 leading-none">
-                              x{item.quantity}
-                            </span>
+                            <span className="text-[10px] font-mono text-muted-foreground/50 font-medium">{serialText}</span>
                           </div>
-                        ))}
-                        {po.items.length > 3 && (
-                          <div className="flex items-center justify-center h-7 px-3 rounded-full bg-muted/50 border border-border/50 text-[10px] font-bold text-muted-foreground">
-                            +{po.items.length - 3}
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <div className="flex flex-wrap justify-center gap-2 max-w-[320px] mx-auto">
+                            {po.items.slice(0, 3).map((item, idx) => (
+                              <div 
+                                key={idx} 
+                                className="flex items-center gap-2 p-0.5 pr-2.5 rounded-full bg-secondary/30 dark:bg-white/5 border border-border/50 max-w-[180px] shadow-sm hover:border-primary/30 transition-all cursor-default"
+                                title={item.shopProduct?.name || item.product?.name || item.shopProduct?.productName || ""}
+                              >
+                                <div className="w-6 h-6 shrink-0 rounded-full overflow-hidden bg-white dark:bg-black flex items-center justify-center">
+                                  {(item.shopProduct?.image || item.product?.image) ? (
+                                    <img src={item.shopProduct?.image || item.product?.image || ""} className="w-full h-full object-cover" alt="" loading="lazy" />
+                                  ) : (
+                                    <Package size={12} className="text-muted-foreground/50" />
+                                  )}
+                                </div>
+                                <span className="text-[10px] font-medium truncate text-foreground/80 leading-none">
+                                  {item.shopProduct?.name || item.product?.name || item.shopProduct?.productName || '未知商品'}
+                                </span>
+                                <span className="text-[10px] font-black text-primary shrink-0 leading-none">
+                                  x{item.quantity}
+                                </span>
+                              </div>
+                            ))}
+                            {po.items.length > 3 && (
+                              <div className="flex items-center justify-center h-7 px-3 rounded-full bg-muted/50 border border-border/50 text-[10px] font-bold text-muted-foreground">
+                                +{po.items.length - 3}
+                              </div>
+                            )}
                           </div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-center">
-                      <div className="flex items-center justify-center font-bold text-sm text-foreground">
-                        <span className="mr-0.5 opacity-60">￥</span>
-                        {displayAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-center">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border bg-emerald-500/10 text-emerald-500 border-emerald-500/20">
-                        已入库
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-muted-foreground whitespace-nowrap text-center">
-                      <div className="flex items-center justify-center gap-2">
-                          <Calendar size={14} />
-                          <span className="font-mono">
-                              {formatLocalDateTime(po.date)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-center">
+                          <div className="flex items-center justify-center font-bold text-sm text-foreground">
+                            <span className="mr-0.5 opacity-60">￥</span>
+                            {displayAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-center">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border bg-emerald-500/10 text-emerald-500 border-emerald-500/20">
+                            已入库
                           </span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-center whitespace-nowrap">
-                        <button 
-                            onClick={() => handleView(po)}
-                            className="p-2 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-all"
-                            title="查看详情"
-                        >
-                            <Eye size={16} />
-                        </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          ) : (
-            <EmptyState
-              icon={<Package size={40} strokeWidth={1.5} />}
-              title="暂无入库记录"
-              description={searchQuery ? '没有找到匹配的记录。' : '还没有入库记录，点击上方按钮开始登记。'}
-            />
-          )}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-muted-foreground whitespace-nowrap text-center">
+                          <div className="flex items-center justify-center gap-2">
+                              <Calendar size={14} />
+                              <span className="font-mono">
+                                  {formatLocalDateTime(po.date)}
+                              </span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-center whitespace-nowrap">
+                            <button 
+                                onClick={() => handleView(po)}
+                                className="p-2 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-all"
+                                title="查看详情"
+                            >
+                                <Eye size={16} />
+                            </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </motion.table>
+            ) : (
+              <motion.div
+                key="empty"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+              >
+                <EmptyState
+                  icon={<Package size={40} strokeWidth={1.5} />}
+                  title="暂无入库记录"
+                  description={searchQuery ? '没有找到匹配的记录。' : '还没有入库记录，点击上方按钮开始登记。'}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
 
       {/* Mobile Card View */}
       <div className="md:hidden rounded-2xl border border-border bg-white dark:bg-white/5 overflow-hidden shadow-sm">
         <div className="p-4 space-y-4">
+          <AnimatePresence mode="wait">
             {isLoading ? (
-               <div className="py-12 flex flex-col items-center justify-center text-center text-muted-foreground/50">
-                  <div className="w-8 h-8 border-4 border-primary/10 border-t-primary rounded-full animate-spin mb-4" />
-                   <p className="text-sm font-medium tracking-widest opacity-50">加载中</p>
-               </div>
+              <motion.div
+                key="mobile-skeleton"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.15 }}
+              >
+                <InboundCardSkeleton />
+              </motion.div>
             ) : paginatedInbounds.length > 0 ? (
-              paginatedInbounds.map((po) => {
-                const serialMatch = po.note?.match(/\[流水号:(.*?)\]/);
-                const cleanId = getCleanShortId(po.id);
-                const shortIdText = serialMatch && serialMatch[1] !== '无' ? `#${serialMatch[1]}` : `#${cleanId}`;
-                const displayAmount = getInboundDisplayAmount(po);
+              <motion.div
+                key="mobile-list"
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.25 }}
+                className="space-y-4"
+              >
+                {paginatedInbounds.map((po) => {
+                  const serialMatch = po.note?.match(/\[流水号:(.*?)\]/);
+                  const cleanId = getCleanShortId(po.id);
+                  const shortIdText = serialMatch && serialMatch[1] !== '无' ? `#${serialMatch[1]}` : `#${cleanId}`;
+                  const displayAmount = getInboundDisplayAmount(po);
 
-                return (
-                <div
-                  key={po.id}
-                  onClick={() => handleView(po)}
-                  className="rounded-2xl border border-border/50 bg-white/50 dark:bg-white/5 p-4 shadow-sm active:scale-[0.98] transition-all cursor-pointer"
-                >
-                  <div className="flex items-center justify-between mb-3">
-                     <div className="flex flex-wrap items-center gap-1.5 min-w-0 flex-1">
-                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${
-                           po.id.startsWith('PO-AUTO') ? 'bg-orange-500/10 text-orange-600 border-orange-500/20' : 'bg-blue-500/10 text-blue-600 border-blue-500/20'
-                        }`}>
-                          {po.id.startsWith('PO-AUTO') ? '系统补库' : '采购入库'}
-                        </span>
-                        {po.shopName && (
-                          <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold bg-primary/10 text-primary border border-primary/20">
-                            <Store size={8} />
-                            {po.shopName}
+                  return (
+                  <div
+                    key={po.id}
+                    onClick={() => handleView(po)}
+                    className="rounded-2xl border border-border/50 bg-white/50 dark:bg-white/5 p-4 shadow-sm active:scale-[0.98] transition-all cursor-pointer"
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                       <div className="flex flex-wrap items-center gap-1.5 min-w-0 flex-1">
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${
+                             po.id.startsWith('PO-AUTO') ? 'bg-orange-500/10 text-orange-600 border-orange-500/20' : 'bg-blue-500/10 text-blue-600 border-blue-500/20'
+                          }`}>
+                            {po.id.startsWith('PO-AUTO') ? '系统补库' : '采购入库'}
                           </span>
-                        )}
-                        <span className="inline-flex items-center rounded-full border border-black/8 bg-black/3 dark:border-white/10 dark:bg-white/4 px-2 py-0.5 text-[10px] font-mono font-black text-foreground/80 whitespace-nowrap">
-                          {shortIdText}
-                        </span>
-                     </div>
-                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 uppercase shrink-0">
-                        已入库
-                     </span>
-                  </div>
-                  
-                  <div className="flex flex-wrap gap-2 mb-3 mt-1">
-                    {po.items.slice(0, 4).map((item, idx) => (
-                      <div 
-                        key={idx} 
-                        className="flex items-center gap-2 p-0.5 pr-2.5 rounded-full bg-secondary/30 dark:bg-white/5 border border-border/50 max-w-[160px] shadow-sm"
-                        title={item.shopProduct?.name || item.product?.name || item.shopProduct?.productName || ""}
-                      >
-                        <div className="w-5 h-5 shrink-0 rounded-full overflow-hidden bg-white dark:bg-black flex items-center justify-center">
-                          {(item.shopProduct?.image || item.product?.image) ? (
-                            <img src={item.shopProduct?.image || item.product?.image || ""} className="w-full h-full object-cover" alt="" loading="lazy" />
-                          ) : (
-                            <Package size={10} className="text-muted-foreground/50" />
+                          {po.shopName && (
+                            <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold bg-primary/10 text-primary border border-primary/20">
+                              <Store size={8} />
+                              {po.shopName}
+                            </span>
                           )}
-                        </div>
-                        <span className="text-[10px] font-medium truncate text-foreground/80 leading-none">
-                          {item.shopProduct?.name || item.product?.name || item.shopProduct?.productName || '未知商品'}
-                        </span>
-                        <span className="text-[10px] font-black text-primary shrink-0 leading-none">
-                          x{item.quantity}
-                        </span>
-                      </div>
-                    ))}
-                    {po.items.length > 4 && (
-                      <div className="flex items-center justify-center h-6 px-2.5 rounded-full bg-muted/50 border border-border/50 text-[10px] font-bold text-muted-foreground">
-                        +{po.items.length - 4}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex items-center justify-between mt-4 border-t border-border/10 pt-3">
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                        <Calendar size={12} />
-                        <span className="text-[10px] font-mono">{formatLocalDateTime(po.date)}</span>
+                          <span className="inline-flex items-center rounded-full border border-black/8 bg-black/3 dark:border-white/10 dark:bg-white/4 px-2 py-0.5 text-[10px] font-mono font-black text-foreground/80 whitespace-nowrap">
+                            {shortIdText}
+                          </span>
+                       </div>
+                       <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 uppercase shrink-0">
+                          已入库
+                       </span>
                     </div>
-                     <div className="font-bold text-foreground text-sm flex items-center gap-1">
-                         <span className="text-[10px] text-muted-foreground font-normal">金额:</span>
-                         <span className="text-[10px] text-muted-foreground">￥</span>
-                         {displayAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    
+                    <div className="flex flex-wrap gap-2 mb-3 mt-1">
+                      {po.items.slice(0, 4).map((item, idx) => (
+                        <div 
+                          key={idx} 
+                          className="flex items-center gap-2 p-0.5 pr-2.5 rounded-full bg-secondary/30 dark:bg-white/5 border border-border/50 max-w-[160px] shadow-sm"
+                          title={item.shopProduct?.name || item.product?.name || item.shopProduct?.productName || ""}
+                        >
+                          <div className="w-5 h-5 shrink-0 rounded-full overflow-hidden bg-white dark:bg-black flex items-center justify-center">
+                            {(item.shopProduct?.image || item.product?.image) ? (
+                              <img src={item.shopProduct?.image || item.product?.image || ""} className="w-full h-full object-cover" alt="" loading="lazy" />
+                            ) : (
+                              <Package size={10} className="text-muted-foreground/50" />
+                            )}
+                          </div>
+                          <span className="text-[10px] font-medium truncate text-foreground/80 leading-none">
+                            {item.shopProduct?.name || item.product?.name || item.shopProduct?.productName || '未知商品'}
+                          </span>
+                          <span className="text-[10px] font-black text-primary shrink-0 leading-none">
+                            x{item.quantity}
+                          </span>
+                        </div>
+                      ))}
+                      {po.items.length > 4 && (
+                        <div className="flex items-center justify-center h-6 px-2.5 rounded-full bg-muted/50 border border-border/50 text-[10px] font-bold text-muted-foreground">
+                          +{po.items.length - 4}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between mt-4 border-t border-border/10 pt-3">
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                          <Calendar size={12} />
+                          <span className="text-[10px] font-mono">{formatLocalDateTime(po.date)}</span>
+                      </div>
+                       <div className="font-bold text-foreground text-sm flex items-center gap-1">
+                           <span className="text-[10px] text-muted-foreground font-normal">金额:</span>
+                           <span className="text-[10px] text-muted-foreground">￥</span>
+                           {displayAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                       </div>
                      </div>
-                   </div>
-                </div>
-                );
-              })
+                  </div>
+                  );
+                })}
+              </motion.div>
             ) : (
-              <EmptyState
-                icon={<Package size={40} strokeWidth={1.5} />}
-                title="暂无记录"
-                description="暂时没有入库数据。"
-              />
+              <motion.div
+                key="mobile-empty"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+              >
+                <EmptyState
+                  icon={<Package size={40} strokeWidth={1.5} />}
+                  title="暂无记录"
+                  description="暂时没有入库数据。"
+                />
+              </motion.div>
             )}
+          </AnimatePresence>
         </div>
       </div>
 

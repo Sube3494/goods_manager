@@ -16,6 +16,54 @@ import {
   isBrushSyncEligibleOrder,
   getOrderActionErrorMessage,
 } from "./OrderCard";
+import { motion, AnimatePresence } from "framer-motion";
+
+function OrderListSkeleton({ count = 3 }: { count?: number }) {
+  return (
+    <div className="grid gap-4 animate-pulse">
+      {Array.from({ length: count }).map((_, index) => (
+        <div 
+          key={index} 
+          className="rounded-[28px] border border-black/8 bg-white/70 dark:border-white/10 dark:bg-white/4 p-5 sm:p-6 space-y-4 shadow-sm"
+        >
+          {/* Header row */}
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="h-7 w-20 rounded-full bg-black/6 dark:bg-white/8" />
+              <div className="h-7 w-24 rounded-full bg-black/6 dark:bg-white/8" />
+              <div className="h-6 w-16 rounded-md bg-black/4 dark:bg-white/5" />
+            </div>
+            <div className="h-6 w-20 rounded-lg bg-black/6 dark:bg-white/8" />
+          </div>
+
+          {/* Delivery Bar Skeleton */}
+          <div className="h-2 w-full rounded-full bg-black/4 dark:bg-white/5" />
+
+          {/* Items Preview */}
+          <div className="space-y-3 pt-2">
+            <div className="flex items-center gap-3">
+              <div className="h-12 w-12 rounded-xl bg-black/6 dark:bg-white/8 shrink-0" />
+              <div className="space-y-2 flex-1">
+                <div className="h-4 w-2/3 rounded bg-black/6 dark:bg-white/8" />
+                <div className="h-3 w-1/3 rounded bg-black/4 dark:bg-white/5" />
+              </div>
+              <div className="h-5 w-14 rounded bg-black/6 dark:bg-white/8 shrink-0" />
+            </div>
+          </div>
+
+          {/* Footer action row */}
+          <div className="flex items-center justify-between pt-3 border-t border-black/5 dark:border-white/5">
+            <div className="h-4 w-32 rounded bg-black/4 dark:bg-white/5" />
+            <div className="flex items-center gap-2">
+              <div className="h-8 w-20 rounded-xl bg-black/6 dark:bg-white/8" />
+              <div className="h-8 w-24 rounded-xl bg-black/8 dark:bg-white/10" />
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 type OrderAction = "self-delivery" | "complete-delivery" | "pickup-complete" | "sync" | "outbound" | "sync-brush";
 type PurchaseDraftPayload = PurchaseOrder & { sourceOrderId?: string };
@@ -603,42 +651,59 @@ export function AllOrdersView({
 
       {/* 订单列表 */}
       <main className="space-y-4 pb-8">
-        {isLoading ? (
-          <div className="grid gap-4">
-            {Array.from({ length: 3 }).map((_, index) => (
-              <div key={index} className="h-64 animate-pulse rounded-[28px] border border-black/8 bg-black/3 dark:border-white/10 dark:bg-white/4" />
-            ))}
-          </div>
-        ) : null}
-
-        {!isLoading && filteredOrders.length > 0 ? (
-          <div className="grid gap-4">
-            {filteredOrders.map((order) => (
-              <OrderCardErrorBoundary key={order.id} orderNo={order.orderNo || order.id}>
-                <OrderCard
-                  order={order}
-                  expanded={expandedIds.includes(order.id)}
-                  actingId={actingId}
-                  onToggleExpanded={toggleExpanded}
-                  onRunAction={runAction}
-                  onOpenCostBackfill={onOpenCostBackfill}
-                  onOpenMatchEditor={onOpenMatchEditor}
-                  onRefresh={handleRefreshOrder}
-                />
-              </OrderCardErrorBoundary>
-            ))}
-          </div>
-        ) : null}
-
-        {!isLoading && filteredOrders.length === 0 ? (
-          <div className="rounded-[28px] border border-black/8 bg-white/76 py-8 dark:border-white/10 dark:bg-white/4">
-            <EmptyState
-              icon={<Package2 size={56} strokeWidth={1.5} className="text-muted-foreground/25" />}
-              title="当前没有匹配订单"
-              description="可以换个筛选条件试试。"
-            />
-          </div>
-        ) : null}
+        <AnimatePresence mode="wait">
+          {isLoading ? (
+            <motion.div
+              key="all-orders-skeleton"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+            >
+              <OrderListSkeleton count={4} />
+            </motion.div>
+          ) : filteredOrders.length === 0 ? (
+            <motion.div
+              key="all-orders-empty"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="rounded-[28px] border border-black/8 bg-white/76 py-8 dark:border-white/10 dark:bg-white/4"
+            >
+              <EmptyState
+                icon={<Package2 size={56} strokeWidth={1.5} className="text-muted-foreground/25" />}
+                title="当前没有匹配订单"
+                description="可以换个筛选条件试试。"
+              />
+            </motion.div>
+          ) : (
+            <motion.div
+              key="all-orders-content"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.25 }}
+              className="space-y-4"
+            >
+              <div className="grid gap-4">
+                {filteredOrders.map((order) => (
+                  <OrderCardErrorBoundary key={order.id} orderNo={order.orderNo || order.id}>
+                    <OrderCard
+                      order={order}
+                      expanded={expandedIds.includes(order.id)}
+                      actingId={actingId}
+                      onToggleExpanded={toggleExpanded}
+                      onRunAction={runAction}
+                      onOpenCostBackfill={onOpenCostBackfill}
+                      onOpenMatchEditor={onOpenMatchEditor}
+                      onRefresh={handleRefreshOrder}
+                    />
+                  </OrderCardErrorBoundary>
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {!isLoading && filteredOrders.length > 0 ? (
           <div className="flex justify-center pt-2">
