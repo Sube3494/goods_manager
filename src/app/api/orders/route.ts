@@ -2300,21 +2300,24 @@ export async function GET(request: NextRequest) {
           const hasStrictMatchForAllSegmentsFromSku = segmentsFromSku.length > 1
             && segmentsFromSku.every((candidate) => Boolean(resolveStrictSkuMatch(candidate)));
 
-          const getProductSourceIdByPlatform = (product: any, platform?: string | null) => {
+          const parentPlatformSkuId = String(item.platformSkuId || "").trim();
+          const getProductSourceIdByPlatform = (product: any, platform?: string | null, excludedId?: string | null) => {
             if (!product) return undefined;
+            let val: string | undefined = undefined;
             if (isMeituanPlatform(platform)) {
               const raw = String(product.meituanSkuId || "").trim();
-              return raw ? raw.split(",")[0].trim() : undefined;
-            }
-            if (isJDPlatform(platform)) {
+              val = raw ? raw.split(",")[0].trim() : undefined;
+            } else if (isJDPlatform(platform)) {
               const raw = String(product.jdSkuId || "").trim();
-              return raw ? raw.split(",")[0].trim() : undefined;
-            }
-            if (isTaobaoPlatform(platform)) {
+              val = raw ? raw.split(",")[0].trim() : undefined;
+            } else if (isTaobaoPlatform(platform)) {
               const raw = String(product.taobaoSkuId || "").trim();
-              return raw ? raw.split(",")[0].trim() : undefined;
+              val = raw ? raw.split(",")[0].trim() : undefined;
             }
-            return undefined;
+            if (val && excludedId && String(val).trim().toLowerCase() === String(excludedId).trim().toLowerCase()) {
+              return undefined;
+            }
+            return val;
           };
 
           const bundleItems = manualMatchedProduct?.bundleItems;
@@ -2332,8 +2335,8 @@ export async function GET(request: NextRequest) {
                 );
                 const bFallbackImg = foundBShopProduct?.image || null;
                 const bResolvedImg = bItem.image ? storage.resolveUrl(bItem.image) : bFallbackImg;
-                const bSourceId = getProductSourceIdByPlatform(foundBShopProduct, order.platform)
-                  || getProductSourceIdByPlatform(bItem, order.platform);
+                const bSourceId = getProductSourceIdByPlatform(foundBShopProduct, order.platform, parentPlatformSkuId)
+                  || getProductSourceIdByPlatform(bItem, order.platform, parentPlatformSkuId);
                 return {
                   name: bItem.name || item.productName || "未命名商品",
                   sku: (
@@ -2352,7 +2355,7 @@ export async function GET(request: NextRequest) {
                 const segQty = item.quantity > 1 && item.quantity % segmentsFromSku.length === 0
                   ? Math.max(1, Math.floor(item.quantity / segmentsFromSku.length))
                   : 1;
-                const segSourceId = getProductSourceIdByPlatform(segmentMatchedProduct, order.platform);
+                const segSourceId = getProductSourceIdByPlatform(segmentMatchedProduct, order.platform, parentPlatformSkuId);
                 return {
                   name: segmentMatchedProduct?.name || item.productName || "未命名商品",
                   sku: (
