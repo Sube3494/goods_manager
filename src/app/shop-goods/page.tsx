@@ -184,6 +184,7 @@ function ShopSortWorkbench({
   const [newCategoryName, setNewCategoryName] = useState("");
   const [selectedCategoryName, setSelectedCategoryName] = useState("all");
   const [batchTargetCategoryName, setBatchTargetCategoryName] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
   const [draggingCategoryId, setDraggingCategoryId] = useState<string | null>(null);
   const [draggingRowId, setDraggingRowId] = useState<string | null>(null);
@@ -280,6 +281,7 @@ function ShopSortWorkbench({
       setSelectedRowIds([]);
       setSelectedCategoryName("all");
       setBatchTargetCategoryName("");
+      setSearchQuery("");
       setCategories(nextCategories);
       setHasRestoredDraft(restoredDraft);
       setDraftShopId(currentShopId);
@@ -547,19 +549,31 @@ function ShopSortWorkbench({
   const sortedPreview = useMemo(
     () => {
       const orderByName = new Map(categories.map((category, index) => [category.name.trim(), index]));
+      const normalizedQuery = searchQuery.trim().toLowerCase();
+
       return [...rows]
-        .filter((row) => selectedCategoryName === "all" || row.sortGroupNameInput === selectedCategoryName)
+        .filter((row) => {
+          const matchesCategory = selectedCategoryName === "all" || row.sortGroupNameInput === selectedCategoryName;
+          if (!matchesCategory) return false;
+
+          if (!normalizedQuery) return true;
+          const name = (row.name || "").toLowerCase();
+          const skuInput = (row.skuInput || "").toLowerCase();
+          const sku = (row.sku || "").toLowerCase();
+          const group = (row.sortGroupNameInput || row.categoryName || "").toLowerCase();
+          return name.includes(normalizedQuery) || skuInput.includes(normalizedQuery) || sku.includes(normalizedQuery) || group.includes(normalizedQuery);
+        })
         .sort((a, b) => {
           const groupA = (a.sortGroupNameInput || a.categoryName || "未分组").trim();
           const groupB = (b.sortGroupNameInput || b.categoryName || "未分组").trim();
           const orderA = orderByName.has(groupA) ? orderByName.get(groupA)! : Number.MAX_SAFE_INTEGER;
           const orderB = orderByName.has(groupB) ? orderByName.get(groupB)! : Number.MAX_SAFE_INTEGER;
           if (orderA !== orderB) return orderA - orderB;
-        const numberA = getIncrementingCodeNumber(a.skuInput);
-        const numberB = getIncrementingCodeNumber(b.skuInput);
-        if (numberA !== numberB) return numberA - numberB;
-        return a.name.localeCompare(b.name, "zh-CN");
-      });
+          const numberA = getIncrementingCodeNumber(a.skuInput);
+          const numberB = getIncrementingCodeNumber(b.skuInput);
+          if (numberA !== numberB) return numberA - numberB;
+          return a.name.localeCompare(b.name, "zh-CN");
+        });
     },
     [categories, rows, selectedCategoryName]
   );
@@ -742,17 +756,45 @@ function ShopSortWorkbench({
           </div>
         </div>
 
-        <div className="grid gap-3 border-b border-border p-3 sm:p-4 lg:grid-cols-[180px_1fr_260px]">
+        <div className="grid gap-3 border-b border-border p-3 sm:p-4 md:grid-cols-[160px_minmax(0,1fr)_260px] lg:grid-cols-[160px_minmax(0,1fr)_260px]">
           <label className="text-xs font-medium text-muted-foreground">
             起始店内码
             <input value={startNumber} onChange={(e) => setStartNumber(e.target.value)} placeholder="如 1001 / N1 / A001" className="mt-1 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-primary" />
           </label>
-          <div className="flex items-end text-xs text-muted-foreground">
-            支持 N1、A001；每个临时分类单独设置占位数。
+          
+          <div className="flex flex-col justify-end">
+            <label className="text-xs font-medium text-muted-foreground mb-1 flex items-center justify-between">
+              <span>搜索商品</span>
+              <span className="hidden sm:inline text-[11px] text-muted-foreground/60">支持 N1、A001；每个分类单独占位</span>
+            </label>
+            <div className="relative flex items-center">
+              <Search size={15} className="absolute left-3 text-muted-foreground pointer-events-none" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="搜索商品名称、店内码、分类..."
+                className="h-10 w-full rounded-xl border border-border bg-background pl-9 pr-8 text-sm text-foreground placeholder:text-muted-foreground outline-none transition-colors focus:border-primary"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-2.5 flex h-5 w-5 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+                  title="清空搜索"
+                >
+                  <X size={13} />
+                </button>
+              )}
+            </div>
           </div>
-          <div className="flex items-end gap-2">
-            <input value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addCategory(); }} placeholder="新建临时分类" className="h-10 min-w-0 flex-1 rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-primary" />
-            <button type="button" onClick={addCategory} className="h-10 rounded-xl bg-primary px-3 text-xs font-bold text-primary-foreground">新建</button>
+
+          <div className="flex flex-col justify-end">
+            <span className="text-xs font-medium text-muted-foreground mb-1">新建临时分类</span>
+            <div className="flex items-center gap-2">
+              <input value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addCategory(); }} placeholder="新建临时分类" className="h-10 min-w-0 flex-1 rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-primary" />
+              <button type="button" onClick={addCategory} className="h-10 shrink-0 rounded-xl bg-primary px-3 text-xs font-bold text-primary-foreground">新建</button>
+            </div>
           </div>
         </div>
 
@@ -843,7 +885,19 @@ function ShopSortWorkbench({
             <div className="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-2 border-b border-border bg-background/95 px-3 py-2 backdrop-blur">
               <div className="text-xs font-medium text-muted-foreground">
                 已选 <strong className="text-foreground">{selectedRowIds.length}</strong> 件，当前显示 <strong className="text-foreground">{sortedPreview.length}</strong> 件
+                {rows.length !== sortedPreview.length && (
+                  <span className="ml-1 text-muted-foreground/60">(共 {rows.length} 件)</span>
+                )}
               </div>
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="text-xs font-bold text-primary hover:underline"
+                >
+                  清除搜索「{searchQuery}」
+                </button>
+              )}
             </div>
             <div className="space-y-2 p-3 md:hidden">
               {sortedPreview.map((row, index) => (
@@ -918,9 +972,22 @@ function ShopSortWorkbench({
                   </div>
                 </div>
               ))}
-              {rows.length === 0 && (
+              {rows.length === 0 ? (
                 <div className="py-16 text-center text-sm text-muted-foreground">当前店铺还没有商品可排序</div>
-              )}
+              ) : sortedPreview.length === 0 ? (
+                <div className="py-16 text-center text-sm text-muted-foreground">
+                  未找到与「{searchQuery}」相关的商品
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery("")}
+                      className="ml-2 text-xs font-bold text-primary hover:underline"
+                    >
+                      清空搜索
+                    </button>
+                  )}
+                </div>
+              ) : null}
             </div>
             <table className="hidden w-full min-w-[760px] text-left text-sm md:table">
               <thead className="sticky top-0 z-10 bg-muted/80 text-center text-xs text-muted-foreground backdrop-blur">
@@ -1002,11 +1069,26 @@ function ShopSortWorkbench({
                     </td>
                   </tr>
                 ))}
-                {rows.length === 0 && (
+                {rows.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="py-16 text-center text-sm text-muted-foreground">当前店铺还没有商品可排序</td>
                   </tr>
-                )}
+                ) : sortedPreview.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-16 text-center text-sm text-muted-foreground">
+                      未找到与「{searchQuery}」相关的商品
+                      {searchQuery && (
+                        <button
+                          type="button"
+                          onClick={() => setSearchQuery("")}
+                          className="ml-2 text-xs font-bold text-primary hover:underline"
+                        >
+                          清空搜索
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ) : null}
               </tbody>
             </table>
             </>
@@ -1058,9 +1140,9 @@ function ShopSortWorkbench({
                 <button
                   type="button"
                   onClick={applyBatchTargetCategory}
-                  className="h-9 rounded-full bg-primary px-5 text-xs font-black text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 active:scale-[0.98] sm:h-8"
+                  className="h-9 shrink-0 whitespace-nowrap rounded-full bg-primary px-4 text-xs font-black text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 active:scale-[0.98] sm:h-8 sm:px-5"
                 >
-                  转移选中
+                  转移
                 </button>
                 <button
                   type="button"

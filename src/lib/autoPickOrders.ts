@@ -6039,17 +6039,30 @@ async function resolveOutboundItemsForAutoPickOrder(
       shopName: item.shop?.name || null,
     };
 
-    const normalizedSku = normalizeShopProductSkuForPlatformMatch(order.platform, item);
-    if (normalizedSku) {
-      const current = shopProductSkuMap.get(normalizedSku) || [];
-      current.push(entry);
-      shopProductSkuMap.set(normalizedSku, current);
+    const platformKeys = isMeituanPlatform(order.platform)
+      ? normalizeMeituanSkuIds(item.meituanSkuId).map((value) => normalizeAutoPickSkuForMatch(value))
+      : [normalizeShopProductSkuForPlatformMatch(order.platform, item)];
+
+    for (const key of platformKeys.filter(Boolean)) {
+      const current = shopProductSkuMap.get(key) || [];
+      if (!current.some((c) => c.id === entry.id)) {
+        current.push(entry);
+      }
+      shopProductSkuMap.set(key, current);
     }
-    const normalizedFallbackSku = normalizeAutoPickSkuForMatch(item.sku || item.jdSkuId);
-    if (normalizedFallbackSku && normalizedFallbackSku !== normalizedSku) {
-      const currentFallback = shopProductSkuMap.get(normalizedFallbackSku) || [];
-      currentFallback.push(entry);
-      shopProductSkuMap.set(normalizedFallbackSku, currentFallback);
+
+    const fallbackKeys = [
+      normalizeAutoPickSkuForMatch(item.sku),
+      normalizeAutoPickSkuForMatch(item.jdSkuId),
+      ...normalizeMeituanSkuIds(item.meituanSkuId).map((value) => normalizeAutoPickSkuForMatch(value)),
+    ].filter(Boolean);
+
+    for (const fallbackKey of fallbackKeys) {
+      const current = shopProductSkuMap.get(fallbackKey) || [];
+      if (!current.some((c) => c.id === entry.id)) {
+        current.push(entry);
+      }
+      shopProductSkuMap.set(fallbackKey, current);
     }
   }
 
@@ -6066,132 +6079,113 @@ async function resolveOutboundItemsForAutoPickOrder(
 
     const manualMatchedProduct = readManualMatchedProductFromOrderItemRawPayload(item.rawPayload);
     const productName = toAutoPickBaseProductName(item.productName);
-    const platformProductId = normalizeAutoPickSkuForMatch(item.platformSkuId) || readAutoPickPlatformProductIdForMatch(order.platform, item.rawPayload, item.productNo);
-    const skuFallbacks = splitCompositeAutoPickSku(item.productNo);
-    const normalizedSkus = skuFallbacks.length > 0 ? skuFallbacks : [platformProductId].filter(Boolean);
-    const skuParts = normalizedSkus.length > 0 ? normalizedSkus : [normalizeAutoPickSkuForMatch(item.productNo)];
-    const perResolvedPrice = FinanceMath.divide(priceShare, Math.max(1, skuParts.filter(Boolean).length || 1));
 
-    for (const normalizedSku of skuParts) {
-      if (manualMatchedProduct?.id) {
-        if ((manualMatchedProduct as any).bundleItems && Array.isArray((manualMatchedProduct as any).bundleItems)) {
-          const bundleItems = (manualMatchedProduct as any).bundleItems;
-          for (const bundleItem of bundleItems) {
-            const matchedShopProduct = await tx.shopProduct.findFirst({
-              where: {
-                id: bundleItem.shopProductId || bundleItem.id,
-                shop: { userId },
-              },
-              select: {
-                id: true,
-                productId: true,
-                sourceProductId: true,
-              },
-            });
+    // 1. 手动匹配处理
+    if (manualMatchedProduct?.id) {
+      if ((manualMatchedProduct as any).bundleItems && Array.isArray((manualMatchedProduct as any).bundleItems)) {
+        const bundleItems = (manualMatchedProduct as any).bundleItems;
+        for (const bundleItem of bundleItems) {
+          const matchedShopProduct = await tx.shopProduct.findFirst({
+            where: {
+              id: bundleItem.shopProductId || bundleItem.id,
+              shop: { userId },
+            },
+            select: {
+              id: true,
+              productId: true,
+              sourceProductId: true,
+            },
+          });
 
-            const resolvedSubProductId = String(
-              matchedShopProduct?.productId
-              || matchedShopProduct?.sourceProductId
-              || bundleItem.id
-              || ""
-            ).trim() || null;
-
-            const bundleItemQty = typeof bundleItem.quantity === "number" && bundleItem.quantity > 0
-              ? bundleItem.quantity
-              : (item.quantity > 1 && item.quantity % bundleItems.length === 0
-                ? Math.max(1, Math.floor(item.quantity / bundleItems.length))
-                : Math.max(1, Number(item.quantity || 1) || 1));
-
-            resolvedItems.push({
-              productId: resolvedSubProductId,
-              shopProductId: bundleItem.shopProductId || bundleItem.id,
-              quantity: bundleItemQty,
-              price: FinanceMath.divide(perResolvedPrice, bundleItems.length),
-            });
-          }
-          continue;
-        }
-
-        const storedManualShopProductId = String(manualMatchedProduct.shopProductId || "").trim() || null;
-        let manualShopProductId: string | null = storedManualShopProductId;
-        let manualResolvedProductId: string | null =
-          manualMatchedProduct.sourceType === "shopProduct" ? null : manualMatchedProduct.id;
-
-        const matchedShopProduct = await tx.shopProduct.findFirst({
-          where: {
-            shop: { userId },
-            ...(internalShop?.id ? { shopId: internalShop.id } : {}),
-            OR: [
-              ...(storedManualShopProductId ? [{ id: storedManualShopProductId }] : []),
-              { id: manualMatchedProduct.id },
-              { productId: manualMatchedProduct.id },
-              { sourceProductId: manualMatchedProduct.id },
-            ],
-          },
-          select: {
-            id: true,
-            productId: true,
-            sourceProductId: true,
-          },
-          orderBy: { updatedAt: "desc" },
-        });
-
-        if (matchedShopProduct) {
-          manualShopProductId = matchedShopProduct.id;
-          manualResolvedProductId = String(
-            matchedShopProduct.productId
-            || matchedShopProduct.sourceProductId
-            || manualResolvedProductId
+          const resolvedSubProductId = String(
+            matchedShopProduct?.productId
+            || matchedShopProduct?.sourceProductId
+            || bundleItem.id
             || ""
           ).trim() || null;
-        }
 
-        resolvedItems.push({
-          productId: manualResolvedProductId,
-          shopProductId: manualShopProductId,
-          quantity: Math.max(1, Number(item.quantity || 1) || 1),
-          price: perResolvedPrice,
-        });
+          const bundleItemQty = typeof bundleItem.quantity === "number" && bundleItem.quantity > 0
+            ? bundleItem.quantity
+            : (item.quantity > 1 && item.quantity % bundleItems.length === 0
+              ? Math.max(1, Math.floor(item.quantity / bundleItems.length))
+              : Math.max(1, Number(item.quantity || 1) || 1));
+
+          resolvedItems.push({
+            productId: resolvedSubProductId,
+            shopProductId: bundleItem.shopProductId || bundleItem.id,
+            quantity: bundleItemQty,
+            price: FinanceMath.divide(priceShare, bundleItems.length),
+          });
+        }
         continue;
       }
 
-      let resolvedShopProduct: {
-        id: string;
-        productId: string | null;
-        sourceProductId: string | null;
-        sku: string | null;
-        jdSkuId: string | null;
-        meituanSkuId: string | null;
-        shopId: string | null;
-        shopName: string | null;
-      } | null = null;
+      const storedManualShopProductId = String(manualMatchedProduct.shopProductId || "").trim() || null;
+      let manualShopProductId: string | null = storedManualShopProductId;
+      let manualResolvedProductId: string | null =
+        manualMatchedProduct.sourceType === "shopProduct" ? null : manualMatchedProduct.id;
 
-      if (normalizedSku) {
-        const skuCandidates = (shopProductSkuMap.get(normalizedSku) || []).filter((candidate) =>
-          isCandidateInMappedShop(candidate.shopId, candidate.shopName)
-        );
-        const uniqueCandidateShopIds = Array.from(
-          new Set(
-            skuCandidates
-              .map((candidate) => String(candidate.shopId || "").trim())
-              .filter(Boolean)
-          )
-        );
+      const matchedShopProduct = await tx.shopProduct.findFirst({
+        where: {
+          shop: { userId },
+          ...(internalShop?.id ? { shopId: internalShop.id } : {}),
+          OR: [
+            ...(storedManualShopProductId ? [{ id: storedManualShopProductId }] : []),
+            { id: manualMatchedProduct.id },
+            { productId: manualMatchedProduct.id },
+            { sourceProductId: manualMatchedProduct.id },
+          ],
+        },
+        select: {
+          id: true,
+          productId: true,
+          sourceProductId: true,
+        },
+        orderBy: { updatedAt: "desc" },
+      });
 
-        if (!internalShop?.id && uniqueCandidateShopIds.length > 1) {
-          throw new Error(
-            `店铺商品匹配冲突：SKU ${normalizedSku} 命中多个店铺，且当前订单未能唯一识别店铺`
-          );
-        }
-
-        const sameShopSkuCandidate = skuCandidates[0] || null;
-        if (sameShopSkuCandidate) {
-          resolvedShopProduct = sameShopSkuCandidate;
-        }
+      if (matchedShopProduct) {
+        manualShopProductId = matchedShopProduct.id;
+        manualResolvedProductId = String(
+          matchedShopProduct.productId
+          || matchedShopProduct.sourceProductId
+          || manualResolvedProductId
+          || ""
+        ).trim() || null;
       }
 
-      if (!resolvedShopProduct && internalShop?.id && normalizedSku) {
-        const existingShopProduct = await findExistingShopProductByShopAndSku(tx, internalShop.id, normalizedSku, order.platform);
+      resolvedItems.push({
+        productId: manualResolvedProductId,
+        shopProductId: manualShopProductId,
+        quantity: Math.max(1, Number(item.quantity || 1) || 1),
+        price: priceShare,
+      });
+      continue;
+    }
+
+    // 2. 自动匹配：第一优先级尝试平台规格 ID (美团 SKU ID / 京东 SKU ID / 淘宝 SKU ID)
+    const platformProductId = normalizeAutoPickSkuForMatch(item.platformSkuId) || readAutoPickPlatformProductIdForMatch(order.platform, item.rawPayload, item.productNo);
+    type OutboundMatchedShopProduct = {
+      id: string;
+      productId: string | null;
+      sourceProductId: string | null;
+      sku: string | null;
+      jdSkuId: string | null;
+      meituanSkuId: string | null;
+      shopId: string | null;
+      shopName: string | null;
+    } | null;
+
+    let resolvedShopProduct: OutboundMatchedShopProduct = null;
+
+    if (platformProductId) {
+      const skuCandidates = (shopProductSkuMap.get(platformProductId) || []).filter((candidate) =>
+        isCandidateInMappedShop(candidate.shopId, candidate.shopName)
+      );
+      if (skuCandidates.length > 0) {
+        resolvedShopProduct = skuCandidates[0];
+      } else if (internalShop?.id) {
+        const existingShopProduct = await findExistingShopProductByShopAndSku(tx, internalShop.id, platformProductId, order.platform);
         if (existingShopProduct) {
           resolvedShopProduct = {
             id: existingShopProduct.id,
@@ -6205,13 +6199,10 @@ async function resolveOutboundItemsForAutoPickOrder(
           };
         }
       }
+    }
 
-      if (!resolvedShopProduct) {
-        throw new Error(
-          `店铺商品匹配失败：${internalShop?.name || mappedShopName || "未识别店铺"} / 商品 ${productName || "未命名商品"} / SKU ${normalizedSku || "未提供"}`
-        );
-      }
-
+    // 如果平台规格 ID 成功匹配，直接加入
+    if (resolvedShopProduct) {
       const targetShopProductId = resolvedShopProduct.id;
       const rawPayloadRecord = item.rawPayload && typeof item.rawPayload === "object" && !Array.isArray(item.rawPayload)
         ? (item.rawPayload as Record<string, unknown>)
@@ -6235,6 +6226,97 @@ async function resolveOutboundItemsForAutoPickOrder(
           || ""
         ).trim() || null,
         shopProductId: resolvedShopProduct?.id || null,
+        quantity: Math.max(1, Number(item.quantity || 1) || 1),
+        price: priceShare,
+      });
+      continue;
+    }
+
+    // 3. 降级匹配：通过商品编码/货号 item.productNo (支持 A+B 组合拆分) 匹配
+    const skuFallbacks = splitCompositeAutoPickSku(item.productNo);
+    const skuParts = skuFallbacks.length > 0 ? skuFallbacks : [normalizeAutoPickSkuForMatch(item.productNo)].filter(Boolean);
+    const perResolvedPrice = FinanceMath.divide(priceShare, Math.max(1, skuParts.length || 1));
+
+    if (skuParts.length === 0) {
+      throw new Error(
+        `店铺商品匹配失败：${internalShop?.name || mappedShopName || "未识别店铺"} / 商品 ${productName || "未命名商品"} / SKU 未提供`
+      );
+    }
+
+    for (const normalizedSku of skuParts) {
+      let subResolvedShopProduct: OutboundMatchedShopProduct = null;
+      if (normalizedSku) {
+        const skuCandidates = (shopProductSkuMap.get(normalizedSku) || []).filter((candidate) =>
+          isCandidateInMappedShop(candidate.shopId, candidate.shopName)
+        );
+        const uniqueCandidateShopIds = Array.from(
+          new Set(
+            skuCandidates
+              .map((candidate) => String(candidate.shopId || "").trim())
+              .filter(Boolean)
+          )
+        );
+
+        if (!internalShop?.id && uniqueCandidateShopIds.length > 1) {
+          throw new Error(
+            `店铺商品匹配冲突：SKU ${normalizedSku} 命中多个店铺，且当前订单未能唯一识别店铺`
+          );
+        }
+
+        const sameShopSkuCandidate = skuCandidates[0] || null;
+        if (sameShopSkuCandidate) {
+          subResolvedShopProduct = sameShopSkuCandidate;
+        }
+      }
+
+      if (!subResolvedShopProduct && internalShop?.id && normalizedSku) {
+        const existingShopProduct = await findExistingShopProductByShopAndSku(tx, internalShop.id, normalizedSku, order.platform);
+        if (existingShopProduct) {
+          subResolvedShopProduct = {
+            id: existingShopProduct.id,
+            productId: existingShopProduct.productId || null,
+            sourceProductId: existingShopProduct.sourceProductId || null,
+            sku: existingShopProduct.sku || null,
+            jdSkuId: existingShopProduct.jdSkuId || null,
+            meituanSkuId: existingShopProduct.meituanSkuId || null,
+            shopId: internalShop.id,
+            shopName: internalShop.name,
+          };
+        }
+      }
+
+      if (!subResolvedShopProduct) {
+        const failedSkuDesc = platformProductId
+          ? `${normalizedSku} (平台SKU: ${platformProductId})`
+          : normalizedSku;
+        throw new Error(
+          `店铺商品匹配失败：${internalShop?.name || mappedShopName || "未识别店铺"} / 商品 ${productName || "未命名商品"} / SKU ${failedSkuDesc || "未提供"}`
+        );
+      }
+
+      const targetShopProductId = subResolvedShopProduct.id;
+      const rawPayloadRecord = item.rawPayload && typeof item.rawPayload === "object" && !Array.isArray(item.rawPayload)
+        ? (item.rawPayload as Record<string, unknown>)
+        : {};
+      const targetSourceId = String(item.platformSkuId || item.productNo || rawPayloadRecord.source_id || rawPayloadRecord.sourceId || "").trim();
+      const isJdOrder = order.platform && (
+        order.platform.includes("京东") ||
+        order.platform.toLowerCase().includes("daojia") ||
+        order.platform.toLowerCase().includes("jd")
+      );
+
+      if (isJdOrder && targetShopProductId && targetSourceId) {
+        await syncJdSkuIdForShopProduct(tx, userId, targetShopProductId, targetSourceId);
+      }
+      await backfillMeituanIdForAutoPickMatchedShopProduct(tx, userId, targetShopProductId, item.rawPayload, order.platform, item.platformSkuId);
+
+      resolvedItems.push({
+        productId: String(
+          subResolvedShopProduct?.productId
+          || subResolvedShopProduct?.sourceProductId
+          || ""
+        ).trim() || null,
+        shopProductId: subResolvedShopProduct?.id || null,
         quantity: Math.max(1, Number(item.quantity || 1) || 1),
         price: perResolvedPrice,
       });
