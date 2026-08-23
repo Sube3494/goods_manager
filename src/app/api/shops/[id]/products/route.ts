@@ -3,7 +3,7 @@ import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
 import { getStorageStrategy } from "@/lib/storage";
 import { normalizeJdSkuIds } from "@/lib/productJdSku";
-import { normalizeMeituanSkuIds } from "@/lib/productMeituanSku";
+import { normalizeMeituanSkuIds, replaceProductMeituanSkuMappings } from "@/lib/productMeituanSku";
 import { Prisma } from "../../../../../../prisma/generated-client";
 import { pinyin } from "pinyin-pro";
 
@@ -473,7 +473,7 @@ export async function PUT(
     const normalizedSku = normalizeSku(body?.sku);
     const normalizedJdSkuId = normalizeSku(body?.jdSkuId);
     const normalizedMeituanSkuIds = normalizeMeituanSkuIds(body?.meituanSkuIds ?? body?.meituanSkuId);
-    const normalizedMeituanSkuId = normalizedMeituanSkuIds[0] || null;
+    const normalizedMeituanSkuId = normalizedMeituanSkuIds.length > 0 ? normalizedMeituanSkuIds.join(",") : null;
     const normalizedTaobaoSkuId = normalizeSku(body?.taobaoSkuId);
     const categoryId = typeof body?.categoryId === "string" ? body.categoryId.trim() : "";
     const categoryName = String(body?.categoryName || "").trim();
@@ -539,59 +539,80 @@ export async function PUT(
       finalProductImage = existing.productImage;
     }
 
-    const updated = await prisma.shopProduct.update({
-      where: { id: existing.id },
-      data: {
-        productId: existing.productId || null,
-        sourceProductId: existing.sourceProductId || null,
-        productName,
-        pinyin: generatePinyinSearchText(productName),
-        sku: normalizedSku,
-        jdSkuId: normalizedJdSkuId,
-        meituanSkuId: normalizedMeituanSkuId,
-        taobaoSkuId: normalizedTaobaoSkuId,
-        categoryId: categoryId || null,
-        categoryName: categoryName || "未分类",
-        productImage: finalProductImage,
-        supplierId: supplierId || null,
-        costPrice: Number.isFinite(costPrice) ? costPrice : 0,
-        isPublic,
-        isDiscontinued,
-        remark: remark || null,
-        specs: Prisma.JsonNull,
-        isShelfLife,
-        shelfLifeDays: Number.isFinite(shelfLifeDays) ? shelfLifeDays : null,
-        sortNumber: "sortNumber" in body ? (sortNumber !== null && Number.isFinite(sortNumber) ? Math.trunc(sortNumber) : null) : existing.sortNumber,
-        sortGroupName: "sortGroupName" in body ? sortGroupName || null : existing.sortGroupName,
-        sortCategoryName: "sortCategoryName" in body ? sortCategoryName || null : existing.sortCategoryName,
-      },
-      select: {
-        id: true,
-        productId: true,
-        sourceProductId: true,
-        sku: true,
-        jdSkuId: true,
-        meituanSkuId: true,
-        taobaoSkuId: true,
-        productName: true,
-        productImage: true,
-        categoryId: true,
-        categoryName: true,
-        supplierId: true,
-        costPrice: true,
-        stock: true,
-        isPublic: true,
-        isDiscontinued: true,
-        isShelfLife: true,
-        shelfLifeDays: true,
-        sortNumber: true,
-        sortGroupName: true,
-        sortCategoryName: true,
-        remark: true,
-        specs: true,
-        createdAt: true,
-        updatedAt: true,
-      },
+    const updated = await prisma.$transaction(async (tx) => {
+      const item = await tx.shopProduct.update({
+        where: { id: existing.id },
+        data: {
+          productId: existing.productId || null,
+          sourceProductId: existing.sourceProductId || null,
+          productName,
+          pinyin: generatePinyinSearchText(productName),
+          sku: normalizedSku,
+          jdSkuId: normalizedJdSkuId,
+          meituanSkuId: normalizedMeituanSkuId,
+          taobaoSkuId: normalizedTaobaoSkuId,
+          categoryId: categoryId || null,
+          categoryName: categoryName || "未分类",
+          productImage: finalProductImage,
+          supplierId: supplierId || null,
+          costPrice: Number.isFinite(costPrice) ? costPrice : 0,
+          isPublic,
+          isDiscontinued,
+          remark: remark || null,
+          specs: Prisma.JsonNull,
+          isShelfLife,
+          shelfLifeDays: Number.isFinite(shelfLifeDays) ? shelfLifeDays : null,
+          sortNumber: "sortNumber" in body ? (sortNumber !== null && Number.isFinite(sortNumber) ? Math.trunc(sortNumber) : null) : existing.sortNumber,
+          sortGroupName: "sortGroupName" in body ? sortGroupName || null : existing.sortGroupName,
+          sortCategoryName: "sortCategoryName" in body ? sortCategoryName || null : existing.sortCategoryName,
+        },
+        select: {
+          id: true,
+          productId: true,
+          sourceProductId: true,
+          sku: true,
+          jdSkuId: true,
+          meituanSkuId: true,
+          taobaoSkuId: true,
+          productName: true,
+          productImage: true,
+          categoryId: true,
+          categoryName: true,
+          supplierId: true,
+          costPrice: true,
+          stock: true,
+          isPublic: true,
+          isDiscontinued: true,
+          isShelfLife: true,
+          shelfLifeDays: true,
+          sortNumber: true,
+          sortGroupName: true,
+          sortCategoryName: true,
+          remark: true,
+          specs: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+
+      if (existing.productId) {
+        const targetOwnerId = existing.shop?.userId || user.id;
+        const otherShopProducts = await tx.shopProduct.findMany({
+          where: {
+            productId: existing.productId,
+            id: { not: existing.id },
+            shop: { userId: targetOwnerId },
+          },
+          select: { meituanSkuId: true },
+        });
+        const allMeituanSkuIds = Array.from(new Set([
+          ...normalizedMeituanSkuIds,
+          ...otherShopProducts.flatMap((p) => normalizeMeituanSkuIds(p.meituanSkuId)),
+        ]));
+        await replaceProductMeituanSkuMappings(tx, existing.productId, targetOwnerId, allMeituanSkuIds);
+      }
+
+      return item;
     });
 
     const resolvedImage = updated.productImage
@@ -609,7 +630,7 @@ export async function PUT(
       sku: updated.sku || null,
       jdSkuId: updated.jdSkuId || null,
       meituanSkuId: updated.meituanSkuId || null,
-      meituanSkuIds: updated.meituanSkuId ? [updated.meituanSkuId] : [],
+      meituanSkuIds: normalizeMeituanSkuIds(updated.meituanSkuId),
       taobaoSkuId: updated.taobaoSkuId || null,
       name: updated.productName || "未命名商品",
       image: resolvedImage,

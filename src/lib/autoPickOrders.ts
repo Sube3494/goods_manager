@@ -7208,6 +7208,76 @@ export async function syncMeituanSkuIdForShopProduct(
   };
 }
 
+export async function unbindMeituanSkuIdForShopProduct(
+  tx: Prisma.TransactionClient,
+  userId: string,
+  shopProductId: string,
+  sourceId: string
+) {
+  const cleanSourceId = String(sourceId || "").trim();
+  if (!shopProductId || !cleanSourceId) {
+    return { ok: false, reason: "missing-params" };
+  }
+
+  const shopProduct = await tx.shopProduct.findFirst({
+    where: { id: shopProductId, shop: { userId } },
+    select: { id: true, productId: true, meituanSkuId: true },
+  });
+
+  if (!shopProduct) {
+    return { ok: false, reason: "shop-product-not-found" };
+  }
+
+  const existingIds = normalizeMeituanSkuIds(shopProduct.meituanSkuId);
+  const nextMeituanSkuIds = existingIds.filter((id) => id !== cleanSourceId);
+
+  if (existingIds.includes(cleanSourceId)) {
+    try {
+      await tx.shopProduct.update({
+        where: { id: shopProduct.id },
+        data: {
+          meituanSkuId: nextMeituanSkuIds.length > 0 ? nextMeituanSkuIds.join(",") : null,
+        },
+      });
+    } catch (error) {
+      console.warn("[unbindMeituanSkuIdForShopProduct] 解绑店铺商品 meituanSkuId 失败:", error);
+    }
+  }
+
+  if (shopProduct.productId) {
+    try {
+      const otherShopProducts = await tx.shopProduct.findMany({
+        where: {
+          productId: shopProduct.productId,
+          id: { not: shopProduct.id },
+          shop: { userId },
+        },
+        select: { meituanSkuId: true },
+      });
+
+      const isStillUsedByOtherShops = otherShopProducts.some((p) =>
+        normalizeMeituanSkuIds(p.meituanSkuId).includes(cleanSourceId)
+      );
+
+      if (!isStillUsedByOtherShops) {
+        const existingProductSkus = await tx.productMeituanSku.findMany({
+          where: { productId: shopProduct.productId },
+          select: { meituanSkuId: true },
+        });
+        const remainingProductMeituanSkuIds = existingProductSkus
+          .map((i) => i.meituanSkuId)
+          .filter((id) => id !== cleanSourceId);
+
+        await replaceProductMeituanSkuMappings(tx, shopProduct.productId, userId, remainingProductMeituanSkuIds);
+      }
+    } catch (error) {
+      console.warn("[unbindMeituanSkuIdForShopProduct] 解绑主库 meituanSkuMappings 失败:", error);
+    }
+  }
+
+  return { ok: true };
+}
+
 export async function syncTaobaoSkuIdForShopProduct(
   tx: Prisma.TransactionClient,
   userId: string,

@@ -6,6 +6,7 @@ import { handlePrismaError } from "@/lib/api-errors";
 import { ProductService } from "@/services/productService";
 import { Prisma } from "../../../../prisma/generated-client";
 import { findConflictingProductJdSkuIds, getPrimaryJdSkuId, normalizeJdSkuIds, replaceProductJdSkuMappings } from "@/lib/productJdSku";
+import { normalizeMeituanSkuIds, replaceProductMeituanSkuMappings } from "@/lib/productMeituanSku";
 
 function normalizeSku(sku: unknown) {
   if (typeof sku !== "string") {
@@ -134,12 +135,13 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { name, sku, jdSkuId, jdSkuIds, costPrice, categoryId, supplierId, image, isPublic, isDiscontinued, specs, remark, shopId, isShopOnly, libraryId } = body;
+    const { name, sku, jdSkuId, jdSkuIds, meituanSkuId, meituanSkuIds, costPrice, categoryId, supplierId, image, isPublic, isDiscontinued, specs, remark, shopId, isShopOnly, libraryId } = body;
     const isShelfLife = Boolean(body?.isShelfLife ?? false);
     const shelfLifeDays = body?.shelfLifeDays !== undefined && body.shelfLifeDays !== null ? Number(body.shelfLifeDays) : null;
     const normalizedSku = normalizeSku(sku);
     const normalizedJdSkuIds = normalizeJdSkuIds(jdSkuIds ?? jdSkuId);
     const normalizedJdSkuId = getPrimaryJdSkuId(normalizedJdSkuIds);
+    const normalizedMeituanSkuIds = normalizeMeituanSkuIds(meituanSkuIds ?? meituanSkuId);
 
     const storage = await getStorageStrategy();
 
@@ -197,6 +199,7 @@ export async function POST(request: Request) {
           sourceProductId: null,
           sku: normalizedSku,
           jdSkuId: normalizedJdSkuId,
+          meituanSkuId: normalizedMeituanSkuIds.join(",") || null,
           productName: name,
           pinyin: ProductService.generatePinyinSearchText(name),
           productImage: storage.stripUrl(image),
@@ -224,6 +227,8 @@ export async function POST(request: Request) {
         name: created.productName || name,
         sku: created.sku,
         jdSkuId: created.jdSkuId,
+        meituanSkuId: created.meituanSkuId,
+        meituanSkuIds: normalizeMeituanSkuIds(created.meituanSkuId),
         categoryId: created.categoryId,
         costPrice: created.costPrice,
         stock: created.stock,
@@ -305,6 +310,7 @@ export async function POST(request: Request) {
                 sourceProductId: undefined,
                 sku: normalizedSku,
                 jdSkuId: normalizedJdSkuId,
+                meituanSkuId: normalizedMeituanSkuIds.join(",") || null,
                 productName: name,
                 pinyin: ProductService.generatePinyinSearchText(name),
                 productImage: storage.stripUrl(image),
@@ -328,10 +334,12 @@ export async function POST(request: Request) {
           supplier: true,
           shopProducts: { select: { shopId: true } },
           jdSkuMappings: { select: { jdSkuId: true }, orderBy: { createdAt: "asc" } },
+          meituanSkuMappings: { select: { meituanSkuId: true }, orderBy: { createdAt: "asc" } },
         }
       });
 
       await replaceProductJdSkuMappings(tx, created.id, user.id, normalizedJdSkuIds);
+      await replaceProductMeituanSkuMappings(tx, created.id, user.id, normalizedMeituanSkuIds);
 
       return tx.product.findUniqueOrThrow({
         where: { id: created.id },
@@ -340,6 +348,7 @@ export async function POST(request: Request) {
           supplier: true,
           shopProducts: { select: { shopId: true } },
           jdSkuMappings: { select: { jdSkuId: true }, orderBy: { createdAt: "asc" } },
+          meituanSkuMappings: { select: { meituanSkuId: true }, orderBy: { createdAt: "asc" } },
         },
       });
     });
@@ -349,6 +358,7 @@ export async function POST(request: Request) {
       image: product.image ? storage.resolveUrl(product.image) : null,
       assignedShopIds: product.shopProducts.map((item) => item.shopId),
       jdSkuIds: product.jdSkuMappings.map((item) => item.jdSkuId),
+      meituanSkuIds: product.meituanSkuMappings.map((item) => item.meituanSkuId),
     });
   } catch (error: unknown) {
     return handlePrismaError(error, "商品", "Failed to create product");
@@ -364,12 +374,13 @@ export async function PUT(request: Request) {
     }
 
     const body = await request.json();
-    const { id, name, sku, jdSkuId, jdSkuIds, costPrice, categoryId, supplierId, image, isPublic, isDiscontinued, specs, remark, libraryId } = body;
+    const { id, name, sku, jdSkuId, jdSkuIds, meituanSkuId, meituanSkuIds, costPrice, categoryId, supplierId, image, isPublic, isDiscontinued, specs, remark, libraryId } = body;
     const isShelfLife = body?.isShelfLife !== undefined ? Boolean(body.isShelfLife) : undefined;
     const shelfLifeDays = body?.shelfLifeDays !== undefined ? (body.shelfLifeDays !== null ? Number(body.shelfLifeDays) : null) : undefined;
     const normalizedSku = normalizeSku(sku);
     const normalizedJdSkuIds = normalizeJdSkuIds(jdSkuIds ?? jdSkuId);
     const normalizedJdSkuId = getPrimaryJdSkuId(normalizedJdSkuIds);
+    const normalizedMeituanSkuIds = normalizeMeituanSkuIds(meituanSkuIds ?? meituanSkuId);
 
     const storage = await getStorageStrategy();
 
@@ -426,6 +437,7 @@ export async function PUT(request: Request) {
       });
 
       await replaceProductJdSkuMappings(tx, id, user.id, normalizedJdSkuIds);
+      await replaceProductMeituanSkuMappings(tx, id, user.id, normalizedMeituanSkuIds);
 
       return tx.product.findUniqueOrThrow({
         where: { id },
@@ -433,6 +445,7 @@ export async function PUT(request: Request) {
           category: true,
           supplier: true,
           jdSkuMappings: { select: { jdSkuId: true }, orderBy: { createdAt: "asc" } },
+          meituanSkuMappings: { select: { meituanSkuId: true }, orderBy: { createdAt: "asc" } },
         },
       });
     });
@@ -441,6 +454,7 @@ export async function PUT(request: Request) {
       ...updatedProduct,
       image: updatedProduct.image ? storage.resolveUrl(updatedProduct.image) : null,
       jdSkuIds: updatedProduct.jdSkuMappings.map((item) => item.jdSkuId),
+      meituanSkuIds: updatedProduct.meituanSkuMappings.map((item) => item.meituanSkuId),
     });
   } catch (error: unknown) {
     return handlePrismaError(error, "商品", "Failed to update product");

@@ -2,14 +2,39 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
 import { getStorageStrategy } from "@/lib/storage";
-import { normalizeJdSkuIds, replaceProductJdSkuMappings } from "@/lib/productJdSku";
 import { Prisma } from "../../../../../../../../prisma/generated-client";
-import { syncAutoOutboundFromCompletedAutoPickOrder, syncMeituanSkuIdForShopProduct } from "@/lib/autoPickOrders";
+import {
+  syncAutoOutboundFromCompletedAutoPickOrder,
+  syncMeituanSkuIdForShopProduct,
+  unbindMeituanSkuIdForShopProduct,
+} from "@/lib/autoPickOrders";
 
 function readRawPayloadRecord(rawPayload: unknown) {
   return rawPayload && typeof rawPayload === "object" && !Array.isArray(rawPayload)
-    ? rawPayload as Record<string, unknown>
+    ? (rawPayload as Record<string, unknown>)
     : {};
+}
+
+function extractShopProductIdsFromCandidate(candidate: unknown): string[] {
+  if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) return [];
+  const record = candidate as Record<string, unknown>;
+  const ids: string[] = [];
+  const rawId = String(record.id || "").trim();
+  const rawShopProductId = String(record.shopProductId || "").trim();
+  if (rawShopProductId && rawShopProductId !== "__ignored__") ids.push(rawShopProductId);
+  if (rawId && rawId !== "__ignored__") ids.push(rawId);
+
+  if (Array.isArray(record.bundleItems)) {
+    for (const item of record.bundleItems) {
+      if (item && typeof item === "object" && !Array.isArray(item)) {
+        const b = item as Record<string, unknown>;
+        if (b.shopProductId) ids.push(String(b.shopProductId).trim());
+        if (b.id) ids.push(String(b.id).trim());
+      }
+    }
+  }
+
+  return Array.from(new Set(ids.flatMap((id) => id.split(/[+＋]/)).map((s) => s.trim()).filter(Boolean)));
 }
 
 function normalizeMatchedProductCandidate(input: unknown) {
@@ -20,7 +45,7 @@ function normalizeMatchedProductCandidate(input: unknown) {
   const record = input as Record<string, unknown>;
   const id = String(record.id || "").trim();
   const name = String(record.name || "").trim();
-  const sourceType = record.sourceType === "shopProduct" ? "shopProduct" as const : "product" as const;
+  const sourceType = record.sourceType === "shopProduct" ? ("shopProduct" as const) : ("product" as const);
   const shopProductId = String(record.shopProductId || "").trim() || null;
   if (!id || !name || sourceType !== "shopProduct" || !shopProductId) {
     return null;
@@ -52,27 +77,28 @@ function readAutoMatchedProductSnapshot(rawPayload: unknown) {
 
 function readRecord(value: unknown) {
   return value && typeof value === "object" && !Array.isArray(value)
-    ? value as Record<string, unknown>
+    ? (value as Record<string, unknown>)
     : {};
 }
 
 function readMeituanSkuId(rawPayload: Record<string, unknown>) {
   const goodsExtra = rawPayload.goods_extra || rawPayload.goodsExtra;
-  const parsedGoodsExtra = typeof goodsExtra === "string"
-    ? (() => {
-        try {
-          return JSON.parse(goodsExtra) as Record<string, unknown>;
-        } catch {
-          return {};
-        }
-      })()
-    : readRecord(goodsExtra);
+  const parsedGoodsExtra =
+    typeof goodsExtra === "string"
+      ? (() => {
+          try {
+            return JSON.parse(goodsExtra) as Record<string, unknown>;
+          } catch {
+            return {};
+          }
+        })()
+      : readRecord(goodsExtra);
 
   return String(
-    parsedGoodsExtra.original_sku_id
-    || rawPayload.source_id
-    || rawPayload.sourceId
-    || ""
+    parsedGoodsExtra.original_sku_id ||
+      rawPayload.source_id ||
+      rawPayload.sourceId ||
+      ""
   ).trim();
 }
 
@@ -80,7 +106,7 @@ function readOrderItemPlatformSkuId(
   platform: string | null | undefined,
   platformSkuId: string | null | undefined,
   rawPayload: Record<string, unknown>,
-  fallbackRawPayload?: Record<string, unknown>,
+  fallbackRawPayload?: Record<string, unknown>
 ) {
   const normalizedPlatformSkuId = String(platformSkuId || "").trim();
   if (normalizedPlatformSkuId) {
@@ -88,7 +114,10 @@ function readOrderItemPlatformSkuId(
   }
 
   if (isMeituanPlatform(platform)) {
-    return readMeituanSkuId(rawPayload) || (fallbackRawPayload ? readMeituanSkuId(fallbackRawPayload) : "");
+    return (
+      readMeituanSkuId(rawPayload) ||
+      (fallbackRawPayload ? readMeituanSkuId(fallbackRawPayload) : "")
+    );
   }
 
   return "";
@@ -96,7 +125,12 @@ function readOrderItemPlatformSkuId(
 
 function isMeituanPlatform(platform: string | null | undefined) {
   const normalized = String(platform || "").trim().toLowerCase();
-  return normalized.includes("meituan") || normalized.includes("美团") || normalized.includes("闪购") || normalized.includes("shangou");
+  return (
+    normalized.includes("meituan") ||
+    normalized.includes("美团") ||
+    normalized.includes("闪购") ||
+    normalized.includes("shangou")
+  );
 }
 
 function readArray(value: unknown) {
@@ -112,7 +146,7 @@ function findOrderRawPayloadItemPayload(
   item: {
     productNo?: string | null;
     rawPayload?: unknown;
-  },
+  }
 ) {
   const itemPayload = readRawPayloadRecord(item.rawPayload);
   const orderPayload = readRawPayloadRecord(orderRawPayload);
@@ -128,15 +162,17 @@ function findOrderRawPayloadItemPayload(
   for (const rawGoods of goods) {
     const goodsRecord = readRecord(rawGoods);
     const goodsProductNo = normalizeComparable(
-      goodsRecord.productNo
-      || goodsRecord.source_id
-      || goodsRecord.sourceId
-      || goodsRecord.sku_code
-      || goodsRecord.skuCode
+      goodsRecord.productNo ||
+        goodsRecord.source_id ||
+        goodsRecord.sourceId ||
+        goodsRecord.sku_code ||
+        goodsRecord.skuCode
     );
     const goodsName = normalizeComparable(goodsRecord.productName || goodsRecord.goods_name);
-    if ((itemProductNo && goodsProductNo && itemProductNo === goodsProductNo)
-      || (itemName && goodsName && itemName === goodsName)) {
+    if (
+      (itemProductNo && goodsProductNo && itemProductNo === goodsProductNo) ||
+      (itemName && goodsName && itemName === goodsName)
+    ) {
       return goodsRecord;
     }
   }
@@ -155,7 +191,7 @@ async function syncMeituanIdForMatchedShopProduct(
   fallbackRawPayload?: Record<string, unknown>,
   platform?: string | null,
   productNo?: string | null,
-  platformSkuId?: string | null,
+  platformSkuId?: string | null
 ) {
   if (!isMeituanPlatform(platform)) {
     return;
@@ -190,8 +226,11 @@ export async function PATCH(
 
     const isAdmin = Boolean(
       user.role === "SUPER_ADMIN" ||
-      (user.role && String(user.role).includes("管理")) ||
-      (Array.isArray(user.permissions) && (user.permissions.includes("*") || user.permissions.includes("members:manage") || user.permissions.includes("admin")))
+        (user.role && String(user.role).includes("管理")) ||
+        (Array.isArray(user.permissions) &&
+          (user.permissions.includes("*") ||
+            user.permissions.includes("members:manage") ||
+            user.permissions.includes("admin")))
     );
 
     const orderItem = await prisma.autoPickOrderItem.findFirst({
@@ -255,6 +294,15 @@ export async function PATCH(
     const requestedAutoMatchedProduct = normalizeMatchedProductCandidate(body?.autoMatchedProduct);
     const autoMatchedProduct = previousAutoMatchedProduct || requestedAutoMatchedProduct;
 
+    const previousShopProductIds = Array.from(new Set([
+      ...extractShopProductIdsFromCandidate(basePayload.manualMatchedProduct),
+      ...extractShopProductIdsFromCandidate(autoMatchedProduct),
+    ]));
+
+    const currentMeituanSkuId = isMeituanPlatform(orderItem.order.platform)
+      ? readOrderItemPlatformSkuId(orderItem.order.platform, orderItem.platformSkuId, basePayload, fallbackItemPayload)
+      : "";
+
     if (shouldClear) {
       const nextPayload = {
         ...restPayload,
@@ -271,6 +319,12 @@ export async function PATCH(
         });
         await deleteLegacyOutbound(tx, orderItem.order.orderNo);
       });
+
+      if (currentMeituanSkuId && previousShopProductIds.length > 0) {
+        for (const oldShopProductId of previousShopProductIds) {
+          await unbindMeituanSkuIdForShopProduct(prisma, targetUserId, oldShopProductId, currentMeituanSkuId).catch(() => null);
+        }
+      }
 
       await syncAutoOutboundFromCompletedAutoPickOrder(targetUserId, id).catch(() => null);
 
@@ -290,7 +344,7 @@ export async function PATCH(
     }
 
     const storage = await getStorageStrategy();
-    const productIds = productId.split(/[+＋]/).map(item => item.trim()).filter(Boolean);
+    const productIds = productId.split(/[+＋]/).map((item) => item.trim()).filter(Boolean);
 
     const rawItems: Array<{ id: string; quantity?: number }> = Array.isArray(body?.items) ? body.items : [];
     const itemsQtyMap = new Map<string, number>();
@@ -331,10 +385,12 @@ export async function PATCH(
       const firstImage = shopProducts[0]?.productImage || shopProducts[0]?.product?.image || null;
       const matchedProduct = {
         id: shopProducts.map((p) => p.id).join("+"),
-        name: shopProducts.map((p) => {
-          const qty = itemsQtyMap.get(p.id);
-          return qty && qty > 1 ? `${p.productName || "未命名商品"} x${qty}` : (p.productName || "未命名商品");
-        }).join(" + "),
+        name: shopProducts
+          .map((p) => {
+            const qty = itemsQtyMap.get(p.id);
+            return qty && qty > 1 ? `${p.productName || "未命名商品"} x${qty}` : (p.productName || "未命名商品");
+          })
+          .join(" + "),
         sku: shopProducts.map((p) => p.sku || "").join(" + "),
         image: firstImage ? storage.resolveUrl(firstImage) : null,
         sourceType: "shopProduct" as const,
@@ -369,10 +425,27 @@ export async function PATCH(
         await deleteLegacyOutbound(tx, orderItem.order.orderNo);
       });
 
+      const newShopProductIds = new Set(shopProducts.map((p) => p.id));
+      if (currentMeituanSkuId && previousShopProductIds.length > 0) {
+        const unbindOldIds = previousShopProductIds.filter((oldId) => !newShopProductIds.has(oldId));
+        for (const oldShopProductId of unbindOldIds) {
+          await unbindMeituanSkuIdForShopProduct(prisma, targetUserId, oldShopProductId, currentMeituanSkuId).catch(() => null);
+        }
+      }
+
       const isCompositeItemSku = /[+＋]/.test(String(orderItem.productNo || ""));
       if (!isCompositeItemSku) {
         for (const shopProduct of shopProducts) {
-          await syncMeituanIdForMatchedShopProduct(prisma, targetUserId, shopProduct, basePayload, fallbackItemPayload, orderItem.order.platform, orderItem.productNo, orderItem.platformSkuId).catch(() => null);
+          await syncMeituanIdForMatchedShopProduct(
+            prisma,
+            targetUserId,
+            shopProduct,
+            basePayload,
+            fallbackItemPayload,
+            orderItem.order.platform,
+            orderItem.productNo,
+            orderItem.platformSkuId
+          ).catch(() => null);
         }
       }
 
@@ -444,7 +517,16 @@ export async function PATCH(
 
       const isCompositeItemSku = /[+＋]/.test(String(orderItem.productNo || ""));
       if (!isCompositeItemSku) {
-        await syncMeituanIdForMatchedShopProduct(prisma, targetUserId, shopProduct, basePayload, fallbackItemPayload, orderItem.order.platform, orderItem.productNo, orderItem.platformSkuId).catch(() => null);
+        await syncMeituanIdForMatchedShopProduct(
+          prisma,
+          targetUserId,
+          shopProduct,
+          basePayload,
+          fallbackItemPayload,
+          orderItem.order.platform,
+          orderItem.productNo,
+          orderItem.platformSkuId
+        ).catch(() => null);
       }
 
       return NextResponse.json({
@@ -458,12 +540,12 @@ export async function PATCH(
 
     await prisma.$transaction(async (tx) => {
       const targetJdSkuId = String(
-        orderItem.productNo
-        || basePayload.source_id
-        || basePayload.sourceId
-        || basePayload.sku_code
-        || basePayload.skuCode
-        || ""
+        orderItem.productNo ||
+          basePayload.source_id ||
+          basePayload.sourceId ||
+          basePayload.sku_code ||
+          basePayload.skuCode ||
+          ""
       ).trim();
 
       if (targetJdSkuId && !orderItem.productNo) {
@@ -494,9 +576,25 @@ export async function PATCH(
       await deleteLegacyOutbound(tx, orderItem.order.orderNo);
     });
 
+    if (currentMeituanSkuId && previousShopProductIds.length > 0) {
+      const unbindOldIds = previousShopProductIds.filter((oldId) => oldId !== shopProduct.id);
+      for (const oldShopProductId of unbindOldIds) {
+        await unbindMeituanSkuIdForShopProduct(prisma, targetUserId, oldShopProductId, currentMeituanSkuId).catch(() => null);
+      }
+    }
+
     const isCompositeItemSku = /[+＋]/.test(String(orderItem.productNo || ""));
     if (!isCompositeItemSku) {
-      await syncMeituanIdForMatchedShopProduct(prisma, targetUserId, shopProduct, basePayload, fallbackItemPayload, orderItem.order.platform, orderItem.productNo, orderItem.platformSkuId).catch(() => null);
+      await syncMeituanIdForMatchedShopProduct(
+        prisma,
+        targetUserId,
+        shopProduct,
+        basePayload,
+        fallbackItemPayload,
+        orderItem.order.platform,
+        orderItem.productNo,
+        orderItem.platformSkuId
+      ).catch(() => null);
     }
 
     await syncAutoOutboundFromCompletedAutoPickOrder(targetUserId, id).catch((error) => {
@@ -506,8 +604,11 @@ export async function PATCH(
     return NextResponse.json({ ok: true, matchedProduct });
   } catch (error) {
     console.error("Failed to patch auto-pick order item match:", error);
-    return NextResponse.json({
-      error: error instanceof Error ? error.message : "更新商品匹配失败",
-    }, { status: 500 });
+    return NextResponse.json(
+      {
+        error: error instanceof Error ? error.message : "更新商品匹配失败",
+      },
+      { status: 500 }
+    );
   }
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
+import { normalizeMeituanSkuIds, replaceProductMeituanSkuMappings } from "@/lib/productMeituanSku";
 
 const PLATFORM_FIELD = {
   jd: "jdSkuId",
@@ -84,6 +85,23 @@ export async function PATCH(
           taobaoSkuId: true,
         },
       });
+
+      if (platform === "meituan" && existing.productId) {
+        const nextIds = value ? normalizeMeituanSkuIds(value) : [];
+        const otherShopProducts = await tx.shopProduct.findMany({
+          where: {
+            productId: existing.productId,
+            id: { not: existing.id },
+            shop: { userId: user.id },
+          },
+          select: { meituanSkuId: true },
+        });
+        const allMeituanSkuIds = Array.from(new Set([
+          ...nextIds,
+          ...otherShopProducts.flatMap((p) => normalizeMeituanSkuIds(p.meituanSkuId)),
+        ]));
+        await replaceProductMeituanSkuMappings(tx, existing.productId, user.id, allMeituanSkuIds);
+      }
 
       if (value) {
         await tx.meituanImportItem.updateMany({

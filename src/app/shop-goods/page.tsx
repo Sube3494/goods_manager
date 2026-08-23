@@ -1701,6 +1701,9 @@ export default function ShopGoodsPage() {
         body: JSON.stringify({
           sku: formData.sku?.trim() || "",
           jdSkuId: formData.jdSkuId?.trim() || "",
+          meituanSkuId: formData.meituanSkuId?.trim() || "",
+          meituanSkuIds: formData.meituanSkuIds || [],
+          taobaoSkuId: formData.taobaoSkuId?.trim() || "",
           name: formData.name.trim(),
           categoryId: formData.categoryId || "",
           supplierId: formData.supplierId || "",
@@ -1961,6 +1964,8 @@ export default function ShopGoodsPage() {
           id: editingItemId,
           sku: formData.sku?.trim() || "",
           jdSkuId: formData.jdSkuId?.trim() || "",
+          meituanSkuId: formData.meituanSkuId?.trim() || "",
+          meituanSkuIds: formData.meituanSkuIds || [],
           taobaoSkuId: formData.taobaoSkuId?.trim() || "",
           name: formData.name.trim(),
           categoryId: formData.categoryId,
