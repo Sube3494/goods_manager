@@ -127,10 +127,10 @@ export function UserOrdersModal({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.98, y: 8 }}
             transition={{ type: "spring", stiffness: 450, damping: 35 }}
-            className={`fixed z-85001 bg-background border-border/80 shadow-2xl overflow-hidden flex flex-col ${
+            className={`fixed left-1/2 top-1/2 z-85001 -translate-x-1/2 -translate-y-1/2 bg-background border border-border/80 shadow-2xl overflow-hidden flex flex-col ${
               isFullscreen
-                ? "inset-0 w-screen h-dynamic-screen max-w-none max-h-none rounded-none border-none"
-                : "inset-0 sm:inset-auto sm:left-1/2 sm:top-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 w-full h-full sm:w-[calc(100%-40px)] sm:max-w-6xl sm:h-auto sm:max-h-safe-modal rounded-none sm:rounded-3xl border-none sm:border"
+                ? "w-screen h-dynamic-screen max-w-none max-h-none rounded-none border-none"
+                : "w-full h-full sm:w-[calc(100%-40px)] max-w-6xl sm:h-[90vh] max-h-safe-modal rounded-none sm:rounded-3xl"
             }`}
           >
             {/* 顶部标题栏 */}
