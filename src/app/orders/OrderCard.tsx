@@ -164,14 +164,7 @@ export function formatPercent(value: number | null | undefined) {
 }
 
 export function getCommissionDisplay(value: number | null | undefined) {
-  const amount = Number(value || 0);
-  if (amount < 0) {
-    return {
-      label: "平台扣费",
-      value: toCurrency(Math.abs(amount)),
-    };
-  }
-
+  const amount = Math.abs(Number(value || 0));
   return {
     label: "佣金",
     value: toCurrency(amount),

@@ -123,8 +123,38 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
     const platformIdBackfill = await backfillPlatformIdsForSyncedAutoPickOrder(order.userId, refreshedOrder.id);
 
     const normalized = normalizeAutoPickOrderPayload(refreshedOrder.rawPayload);
+
+    // 统一指标归一化（保留京东专属计算规则），保证单单同步返回的指标与列表接口完全一致
+    const rawPlatform = String(refreshedOrder.platform || "").trim();
+    const isOffline = rawPlatform === "线下交易" || rawPlatform === "other";
+    const isJD = rawPlatform.includes("京东") || rawPlatform.toLowerCase().includes("jd") || rawPlatform.toLowerCase().includes("daojia");
+    const actualPaidNum = Number(refreshedOrder.actualPaid || 0);
+    const expectedIncomeNum = refreshedOrder.expectedIncome;
+
+    let computedExpectedIncome = expectedIncomeNum;
+    let computedPlatformCommission = Number(refreshedOrder.platformCommission || 0);
+
+    if (isOffline) {
+      computedExpectedIncome = Number.isFinite(Number(expectedIncomeNum)) && Number(expectedIncomeNum) > 0
+        ? Math.round(Number(expectedIncomeNum))
+        : (actualPaidNum > 0 ? Math.round(actualPaidNum) : (Number.isFinite(Number(expectedIncomeNum)) ? Math.round(Number(expectedIncomeNum)) : 0));
+      computedPlatformCommission = 0;
+    } else if (Number.isFinite(Number(expectedIncomeNum))) {
+      computedExpectedIncome = Math.round(Number(expectedIncomeNum));
+      const derivedCommission = Math.max(0, Math.round(actualPaidNum - computedExpectedIncome));
+      computedPlatformCommission = Math.max(derivedCommission, Math.max(0, Math.round(Number(refreshedOrder.platformCommission || 0))));
+    } else if (isJD) {
+      const settledBase = Math.max(0, Math.round(actualPaidNum - 100));
+      computedPlatformCommission = Math.max(0, Math.round(settledBase * 0.06));
+      computedExpectedIncome = Math.max(0, settledBase - computedPlatformCommission);
+    } else {
+      computedPlatformCommission = Math.max(0, Math.round(Number(refreshedOrder.platformCommission || 0)));
+    }
+
     const syncedOrder = {
       ...refreshedOrder,
+      expectedIncome: computedExpectedIncome,
+      platformCommission: computedPlatformCommission,
       completedAt: normalized?.completedAt || null,
       customerName: readCustomerNameFromRawPayload(refreshedOrder.rawPayload),
       customerPhone: readCustomerPhoneFromRawPayload(refreshedOrder.rawPayload),
