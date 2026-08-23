@@ -541,15 +541,6 @@ export async function PUT(
       }
     }
 
-    if (normalizedMeituanSkuId) {
-      const conflictingShopProduct = await findConflictingShopProductByMeituanSkuId(shopId, normalizedMeituanSkuId, existing.id);
-      if (conflictingShopProduct) {
-        return NextResponse.json({
-          error: `当前店铺内美团商品 ID 已绑定到「${conflictingShopProduct.productName || "其他商品"}」，请检查`,
-        }, { status: 409 });
-      }
-    }
-
     const storage = await getStorageStrategy();
     const normalizedProductImage = storage.stripUrl(productImage) || null;
 
@@ -571,6 +562,44 @@ export async function PUT(
     }
 
     const updated = await prisma.$transaction(async (tx) => {
+      const targetOwnerId = existing.shop?.userId || user.id;
+
+      // 1. 如果有美团 ID，自动解绑并清理当前店铺内其他商品上已占用的美团 ID，防止唯一索引冲突
+      if (normalizedMeituanSkuIds.length > 0) {
+        const conflictingItems = await tx.shopProduct.findMany({
+          where: {
+            shopId: existing.shopId,
+            id: { not: existing.id },
+            meituanSkuId: { not: null },
+          },
+          select: { id: true, meituanSkuId: true, productId: true },
+        });
+
+        for (const other of conflictingItems) {
+          const otherIds = normalizeMeituanSkuIds(other.meituanSkuId);
+          const remainingIds = otherIds.filter((id) => !normalizedMeituanSkuIds.includes(id));
+          if (remainingIds.length !== otherIds.length) {
+            await tx.shopProduct.update({
+              where: { id: other.id },
+              data: {
+                meituanSkuId: remainingIds.length > 0 ? remainingIds.join(",") : null,
+              },
+            });
+            if (other.productId && other.productId !== existing.productId) {
+              const otherProductSkus = await tx.productMeituanSku.findMany({
+                where: { productId: other.productId },
+                select: { meituanSkuId: true },
+              });
+              const remainingOtherProductMeituanSkuIds = otherProductSkus
+                .map((i) => i.meituanSkuId)
+                .filter((id) => !normalizedMeituanSkuIds.includes(id));
+              await replaceProductMeituanSkuMappings(tx, other.productId, targetOwnerId, remainingOtherProductMeituanSkuIds);
+            }
+          }
+        }
+      }
+
+      // 2. 更新当前店铺商品
       const item = await tx.shopProduct.update({
         where: { id: existing.id },
         data: {
@@ -626,8 +655,8 @@ export async function PUT(
         },
       });
 
+      // 3. 同步主库映射
       if (existing.productId) {
-        const targetOwnerId = existing.shop?.userId || user.id;
         const otherShopProducts = await tx.shopProduct.findMany({
           where: {
             productId: existing.productId,

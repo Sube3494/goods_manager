@@ -57,24 +57,60 @@ export async function PATCH(
 
     const value = normalizePlatformId(body?.value);
 
-    if (value) {
-      const conflict = await prisma.shopProduct.findFirst({
-        where: {
-          shopId: existing.shopId,
-          id: { not: existing.id },
-          [field]: value,
-        },
-        select: { productName: true },
-      });
-
-      if (conflict) {
-        return NextResponse.json({
-          error: `当前店铺内该平台商品 ID 已绑定到「${conflict.productName || "其他商品"}」`,
-        }, { status: 409 });
-      }
-    }
-
     const updated = await prisma.$transaction(async (tx) => {
+      if (value) {
+        const conflictingItems = await tx.shopProduct.findMany({
+          where: {
+            shopId: existing.shopId,
+            id: { not: existing.id },
+            [field]: { not: null },
+          },
+          select: {
+            id: true,
+            jdSkuId: true,
+            meituanSkuId: true,
+            taobaoSkuId: true,
+            productId: true,
+          },
+        });
+
+        for (const other of conflictingItems) {
+          const otherId = String(other.id);
+          if (platform === "meituan") {
+            const otherIds = normalizeMeituanSkuIds(other.meituanSkuId);
+            const remainingIds = otherIds.filter((id) => id !== value);
+            if (remainingIds.length !== otherIds.length) {
+              await tx.shopProduct.update({
+                where: { id: otherId },
+                data: {
+                  meituanSkuId: remainingIds.length > 0 ? remainingIds.join(",") : null,
+                },
+              });
+              if (other.productId && other.productId !== existing.productId) {
+                const otherProductSkus = await tx.productMeituanSku.findMany({
+                  where: { productId: other.productId },
+                  select: { meituanSkuId: true },
+                });
+                const remainingOtherProductMeituanSkuIds = otherProductSkus
+                  .map((i) => i.meituanSkuId)
+                  .filter((id) => id !== value);
+                await replaceProductMeituanSkuMappings(tx, other.productId, user.id, remainingOtherProductMeituanSkuIds);
+              }
+            }
+          } else if (platform === "jd" && other.jdSkuId === value) {
+            await tx.shopProduct.update({
+              where: { id: otherId },
+              data: { jdSkuId: null },
+            });
+          } else if (platform === "taobao" && other.taobaoSkuId === value) {
+            await tx.shopProduct.update({
+              where: { id: otherId },
+              data: { taobaoSkuId: null },
+            });
+          }
+        }
+      }
+
       const item = await tx.shopProduct.update({
         where: { id: existing.id },
         data: { [field]: value },
