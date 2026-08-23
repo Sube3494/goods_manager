@@ -146,6 +146,12 @@ type AutoPickSystemMeta = {
     error?: string;
     outboundOrderId?: string;
   };
+  manualAmountOverride?: {
+    amount?: number;
+    updatedAt?: string;
+    userId?: string;
+  };
+  [key: string]: unknown;
 };
 
 type AutoPickManualMatchedProductMeta = {
@@ -819,8 +825,27 @@ function mergeAutoPickSystemMeta(
   explicitSystemMeta?: AutoPickSystemMeta | null
 ) {
   const existingRecord = readAutoPickRawPayloadRecord(existingRawPayload);
-  const existingSystemMeta = readAutoPickSystemMeta(existingRawPayload);
-  const nextSystemMeta = explicitSystemMeta || existingSystemMeta;
+  const existingSystemMeta = readAutoPickSystemMeta(existingRawPayload) || {};
+  const baseSystemMeta = readAutoPickSystemMeta(basePayload) || {};
+  const incomingSystemMeta = explicitSystemMeta || (Object.keys(baseSystemMeta).length > 0 ? baseSystemMeta : null);
+
+  const mergedSystemMeta: AutoPickSystemMeta = {
+    ...existingSystemMeta,
+    ...(incomingSystemMeta || {}),
+    mainSystemSelfDelivery: (incomingSystemMeta && incomingSystemMeta.mainSystemSelfDelivery !== undefined)
+      ? incomingSystemMeta.mainSystemSelfDelivery
+      : existingSystemMeta.mainSystemSelfDelivery,
+    manualAmountOverride: (incomingSystemMeta && incomingSystemMeta.manualAmountOverride !== undefined)
+      ? incomingSystemMeta.manualAmountOverride
+      : existingSystemMeta.manualAmountOverride,
+    autoOutbound: (incomingSystemMeta && incomingSystemMeta.autoOutbound !== undefined)
+      ? incomingSystemMeta.autoOutbound
+      : existingSystemMeta.autoOutbound,
+    resolvedShop: (incomingSystemMeta && incomingSystemMeta.resolvedShop !== undefined)
+      ? incomingSystemMeta.resolvedShop
+      : existingSystemMeta.resolvedShop,
+  };
+
   const nextPayload = { ...basePayload };
 
   if (!("pickProgress" in nextPayload) && "pickProgress" in existingRecord) {
@@ -835,13 +860,13 @@ function mergeAutoPickSystemMeta(
     }
   }
 
-  if (!nextSystemMeta) {
+  if (!Object.keys(mergedSystemMeta).length) {
     return nextPayload;
   }
 
   return {
     ...nextPayload,
-    systemMeta: nextSystemMeta,
+    systemMeta: mergedSystemMeta,
   };
 }
 

@@ -49,6 +49,21 @@ export class InventoryService {
             status: "Received"
           }
         },
+        include: {
+          purchaseOrder: {
+            select: {
+              shippingFees: true,
+              extraFees: true,
+              items: {
+                select: {
+                  id: true,
+                  quantity: true,
+                  costPrice: true,
+                }
+              }
+            }
+          }
+        },
         orderBy: {
           purchaseOrder: {
             date: 'asc'
@@ -93,7 +108,21 @@ export class InventoryService {
           }
         });
 
-        const unitCost = Number(batch.costPrice || 0);
+        let unitCost = Number(batch.costPrice || 0);
+        const po = (batch as any).purchaseOrder;
+        if (po && (Number(po.shippingFees || 0) > 0 || Number(po.extraFees || 0) > 0) && Array.isArray(po.items)) {
+          const totalAdditionalFees = Number(po.shippingFees || 0) + Number(po.extraFees || 0);
+          const totalItemValue = po.items.reduce((sum: number, it: any) => sum + (Number(it.costPrice || 0) * Number(it.quantity || 0)), 0);
+          const totalQuantity = po.items.reduce((sum: number, it: any) => sum + Number(it.quantity || 0), 0);
+          const itemQty = Math.max(0, Number(batch.quantity || 0));
+          if (totalItemValue > 0 && itemQty > 0) {
+            const itemValue = Number(batch.costPrice || 0) * itemQty;
+            const allocatedFee = totalAdditionalFees * (itemValue / totalItemValue);
+            unitCost = Number(batch.costPrice || 0) + (allocatedFee / itemQty);
+          } else if (totalQuantity > 0) {
+            unitCost = Number(batch.costPrice || 0) + (totalAdditionalFees / totalQuantity);
+          }
+        }
         consumedBatches.push({
           purchaseOrderItemId: batch.id,
           quantity: deductFromThisBatch,

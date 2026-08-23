@@ -476,6 +476,17 @@ export function AllOrdersView({
             isMainSystemSelfDelivery: true,
           } as AutoPickOrder;
         });
+      } else if (action === "self-delivery") {
+        showToast("发起自配成功", "success");
+        patchOrder(orderId, (order) => {
+          return {
+            ...order,
+            ...(data.order || {}),
+            status: data.order?.status || order.status,
+            isMainSystemSelfDelivery: true,
+            delivery: data.order?.delivery ?? order.delivery,
+          } as AutoPickOrder;
+        });
       } else {
         showToast("操作成功", "success");
         if (data.order) {

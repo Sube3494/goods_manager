@@ -96,8 +96,20 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
       });
     }
 
+    // 保护性逻辑：如果订单处于过渡态（例如刚发起自配 15 分钟内），不应因平台状态暂未变成“配送中”而误清空自配标记
+    const currentSystemMeta = refreshedOrder.rawPayload && typeof refreshedOrder.rawPayload === "object" && !Array.isArray(refreshedOrder.rawPayload)
+      ? (refreshedOrder.rawPayload as Record<string, unknown>).systemMeta as Record<string, unknown> | undefined
+      : undefined;
+    const selfDeliveryMeta = currentSystemMeta?.mainSystemSelfDelivery as { triggered?: boolean; triggeredAt?: string } | undefined;
+    const isRecentlySelfDelivered = Boolean(
+      selfDeliveryMeta?.triggered &&
+      selfDeliveryMeta?.triggeredAt &&
+      Date.now() - new Date(selfDeliveryMeta.triggeredAt).getTime() < 15 * 60 * 1000
+    );
+
     if (
-      !isAutoPickOrderDeliveringStatus(refreshedOrder.status)
+      !isRecentlySelfDelivered
+      && !isAutoPickOrderDeliveringStatus(refreshedOrder.status)
       && !isAutoPickOrderCompletedStatus(refreshedOrder.status)
       && !isAutoPickOrderCancelledStatus(refreshedOrder.status)
       && !isAutoPickOrderAbnormalStatus(refreshedOrder.status)

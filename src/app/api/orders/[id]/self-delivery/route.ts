@@ -109,6 +109,9 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
     });
 
     if (result.ok) {
+      // 1. 立即第一时间落库标记，防止并发推单/轮询在等待窗口期将标记覆盖冲掉
+      await markAutoPickOrderMainSystemSelfDelivery(order.userId, id);
+
       const refreshedOrder = await waitForDeliveringSelfDelivery(order.userId, {
         id: sourceId,
         platform: commandPlatform,
@@ -148,6 +151,7 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
           autoCompleteAt: autoCompleteAt || null,
         },
       });
+      // 2. 最终二次固化自配标记，确保无论刷新如何均保留
       await markAutoPickOrderMainSystemSelfDelivery(order.userId, id);
 
       if (autoCompleteAt) {
@@ -166,6 +170,24 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
               : "waiting-delivering-status"
         );
       }
+
+      // 3. 查询最新的完整订单数据，直接回传给前端，确保前端立即获得包含 isMainSystemSelfDelivery: true 的实体
+      const finalOrder = await prisma.autoPickOrder.findFirst({
+        where: { id },
+        include: {
+          items: {
+            orderBy: { createdAt: "asc" },
+          },
+        },
+      });
+
+      return NextResponse.json({
+        ...result.data,
+        order: finalOrder ? {
+          ...finalOrder,
+          isMainSystemSelfDelivery: true,
+        } : undefined,
+      }, { status: result.status });
     }
 
     return NextResponse.json(result.data, { status: result.status });

@@ -361,13 +361,13 @@ export async function POST(request: Request) {
           note: String(note || "").trim() || null,
           userId: session.id,
           items: {
-            create: costAllocatedItems.map((item: PurchaseOrderItem) => ({
+            create: sanitizedItems.map((item: PurchaseOrderItem) => ({
               productId: item.productId || null,
               shopProductId: item.shopProductId || null,
               supplierId: item.supplierId,
               quantity: Number(item.quantity) || 0,
               remainingQuantity: normalizedStatus === "Received" ? (Number(item.quantity) || 0) : undefined,
-              costPrice: FinanceMath.add(Number(item.costPrice) || 0, 0)
+              costPrice: FinanceMath.add(Number(item.costPrice) || 0, 0) // 保存用户填写的原始采购价，杜绝运费双重计费
             }))
           }
         },

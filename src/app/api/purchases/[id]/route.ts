@@ -245,15 +245,22 @@ export async function PUT(
           throw new Error("已入库批次补录成本时需要保留完整的原始明细");
         }
 
+        const rawCostPriceByPurchaseOrderItemId = new Map<string, number>();
+        for (const item of validatedItems) {
+          if (item.id) {
+            rawCostPriceByPurchaseOrderItemId.set(item.id, FinanceMath.add(Number(item.costPrice) || 0, 0));
+          }
+        }
+
         for (const existingItem of existingPurchase.items) {
-          const nextCostPrice = costPriceByPurchaseOrderItemId.get(existingItem.id);
-          if (nextCostPrice === undefined || nextCostPrice === Number(existingItem.costPrice || 0)) {
+          const nextRawCostPrice = rawCostPriceByPurchaseOrderItemId.get(existingItem.id);
+          if (nextRawCostPrice === undefined || nextRawCostPrice === Number(existingItem.costPrice || 0)) {
             continue;
           }
           await tx.purchaseOrderItem.update({
             where: { id: existingItem.id },
             data: {
-              costPrice: nextCostPrice,
+              costPrice: nextRawCostPrice,
             },
           });
         }
@@ -381,7 +388,7 @@ export async function PUT(
           ...(sanitizedItems && {
             items: {
               deleteMany: {},
-              create: (allocatedItems || []).map((item: PurchaseOrderItemType) => ({
+              create: (sanitizedItems || []).map((item: PurchaseOrderItemType) => ({
                 productId: item.productId || null,
                 shopProductId: item.shopProductId || null,
                 supplierId: item.supplierId,
