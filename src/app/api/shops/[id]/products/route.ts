@@ -61,6 +61,28 @@ async function findConflictingShopProductByTaobaoSkuId(shopId: string, taobaoSku
   });
 }
 
+async function findConflictingShopProductByMeituanSkuId(shopId: string, meituanSkuId: string, excludeId?: string) {
+  const targetIds = normalizeMeituanSkuIds(meituanSkuId);
+  if (targetIds.length === 0) return null;
+  const items = await prisma.shopProduct.findMany({
+    where: {
+      shopId,
+      meituanSkuId: { not: null },
+      ...(excludeId ? { id: { not: excludeId } } : {}),
+    },
+    select: { id: true, productName: true, meituanSkuId: true },
+  });
+  for (const item of items) {
+    const itemIds = normalizeMeituanSkuIds(item.meituanSkuId);
+    for (const tid of targetIds) {
+      if (itemIds.includes(tid)) {
+        return item;
+      }
+    }
+  }
+  return null;
+}
+
 async function getOwnedShop(shopId: string, userId: string, isAdmin: boolean) {
   return prisma.shop.findFirst({
     where: isAdmin ? { id: shopId } : { id: shopId, userId },
@@ -515,6 +537,15 @@ export async function PUT(
       if (conflictingShopProduct) {
         return NextResponse.json({
           error: `当前店铺内淘宝 SKU ID "${normalizedTaobaoSkuId}" 已存在，请检查映射商品`,
+        }, { status: 409 });
+      }
+    }
+
+    if (normalizedMeituanSkuId) {
+      const conflictingShopProduct = await findConflictingShopProductByMeituanSkuId(shopId, normalizedMeituanSkuId, existing.id);
+      if (conflictingShopProduct) {
+        return NextResponse.json({
+          error: `当前店铺内美团商品 ID 已绑定到「${conflictingShopProduct.productName || "其他商品"}」，请检查`,
         }, { status: 409 });
       }
     }

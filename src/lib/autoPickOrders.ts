@@ -7149,7 +7149,7 @@ export async function syncMeituanSkuIdForShopProduct(
 
   const shopProduct = await tx.shopProduct.findFirst({
     where: { id: shopProductId, shop: { userId } },
-    select: { id: true, productId: true, meituanSkuId: true },
+    select: { id: true, shopId: true, productId: true, meituanSkuId: true },
   });
 
   if (!shopProduct) {
@@ -7162,6 +7162,39 @@ export async function syncMeituanSkuIdForShopProduct(
   let productMappingError: string | null = null;
 
   try {
+    // 自动清理当前店铺内其他商品上已占用的 cleanSourceId，防止 @@unique([shopId, meituanSkuId]) 冲突
+    const conflictingShopProducts = await tx.shopProduct.findMany({
+      where: {
+        shopId: shopProduct.shopId,
+        id: { not: shopProduct.id },
+        meituanSkuId: { not: null },
+      },
+      select: { id: true, meituanSkuId: true, productId: true },
+    });
+
+    for (const other of conflictingShopProducts) {
+      const otherIds = normalizeMeituanSkuIds(other.meituanSkuId);
+      if (otherIds.includes(cleanSourceId)) {
+        const remainingIds = otherIds.filter((id) => id !== cleanSourceId);
+        await tx.shopProduct.update({
+          where: { id: other.id },
+          data: {
+            meituanSkuId: remainingIds.length > 0 ? remainingIds.join(",") : null,
+          },
+        });
+        if (other.productId && other.productId !== shopProduct.productId) {
+          const otherProductSkus = await tx.productMeituanSku.findMany({
+            where: { productId: other.productId },
+            select: { meituanSkuId: true },
+          });
+          const remainingOtherProductMeituanSkuIds = otherProductSkus
+            .map((i) => i.meituanSkuId)
+            .filter((id) => id !== cleanSourceId);
+          await replaceProductMeituanSkuMappings(tx, other.productId, userId, remainingOtherProductMeituanSkuIds);
+        }
+      }
+    }
+
     const existingIds = normalizeMeituanSkuIds(shopProduct.meituanSkuId);
     const nextMeituanSkuIds = Array.from(new Set([...existingIds, cleanSourceId]));
     if (!existingIds.includes(cleanSourceId)) {
