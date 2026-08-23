@@ -481,10 +481,13 @@ export function AllOrdersView({
         patchOrder(orderId, (order) => {
           return {
             ...order,
-            ...(data.order || {}),
-            status: data.order?.status || order.status,
+            status: data.order?.status || "delivering",
             isMainSystemSelfDelivery: true,
             delivery: data.order?.delivery ?? order.delivery,
+            deliveryDeadline: data.order?.deliveryDeadline ?? order.deliveryDeadline,
+            autoCompleteAt: data.order?.autoCompleteAt ?? order.autoCompleteAt,
+            // 关键：保留原有的 items 及其 matchedProduct 关联信息，彻底防止商品匹配状态闪烁
+            items: order.items,
           } as AutoPickOrder;
         });
       } else {
@@ -493,6 +496,9 @@ export function AllOrdersView({
           patchOrder(orderId, (order) => ({
             ...order,
             ...data.order,
+            items: data.order.items && data.order.items.some((i: any) => i.matchedProduct)
+              ? data.order.items
+              : order.items,
             delivery: data.order.delivery ?? order.delivery,
           }));
         } else {
