@@ -123,50 +123,50 @@ export function UserOrdersModal({
           />
 
           <motion.div
-            initial={{ opacity: 0, scale: 0.96, y: 16 }}
+            initial={{ opacity: 0, scale: 0.98, y: 8 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.96, y: 16 }}
+            exit={{ opacity: 0, scale: 0.98, y: 8 }}
             transition={{ type: "spring", stiffness: 450, damping: 35 }}
-            className={`fixed left-1/2 top-1/2 z-85001 -translate-x-1/2 -translate-y-1/2 bg-background border border-border/80 shadow-2xl overflow-hidden flex flex-col ${
+            className={`fixed z-85001 bg-background border-border/80 shadow-2xl overflow-hidden flex flex-col ${
               isFullscreen
-                ? "w-screen h-dynamic-screen max-w-none max-h-none rounded-none border-none"
-                : "w-[calc(100%-20px)] sm:w-[calc(100%-40px)] max-w-6xl max-h-safe-modal rounded-3xl"
+                ? "inset-0 w-screen h-dynamic-screen max-w-none max-h-none rounded-none border-none"
+                : "inset-0 sm:inset-auto sm:left-1/2 sm:top-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 w-full h-full sm:w-[calc(100%-40px)] sm:max-w-6xl sm:h-auto sm:max-h-safe-modal rounded-none sm:rounded-3xl border-none sm:border"
             }`}
           >
             {/* 顶部标题栏 */}
-            <div className="flex items-center justify-between px-5 sm:px-7 py-4 sm:py-5 border-b border-border/60 shrink-0 bg-muted/25">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                  <ShoppingBag size={20} />
+            <div className="flex items-center justify-between px-3.5 sm:px-7 py-3 sm:py-5 border-b border-border/60 shrink-0 bg-muted/25">
+              <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                <div className="h-8 w-8 sm:h-11 sm:w-11 rounded-xl sm:rounded-2xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                  <ShoppingBag className="h-4 w-4 sm:h-5 sm:w-5" />
                 </div>
                 <div className="min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h2 className="text-base sm:text-lg font-bold text-foreground truncate">
+                  <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                    <h2 className="text-sm sm:text-lg font-bold text-foreground truncate">
                       {userName || "成员"} 的今日订单看板
                     </h2>
                     {roleName && (
-                      <span className="inline-flex items-center gap-1 rounded-md border border-primary/15 bg-primary/5 px-2 py-0.5 text-[10px] font-bold text-primary">
-                        <Shield size={10} />
+                      <span className="inline-flex items-center gap-0.5 sm:gap-1 rounded-md border border-primary/15 bg-primary/5 px-1.5 sm:px-2 py-0.5 text-[9px] sm:text-[10px] font-bold text-primary shrink-0">
+                        <Shield size={9} />
                         {roleName}
                       </span>
                     )}
-                    <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                    <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/10 px-1.5 sm:px-2 py-0.5 text-[9px] sm:text-[10px] font-bold text-emerald-600 dark:text-emerald-400 shrink-0">
                       麦芽田已接入
                     </span>
                   </div>
-                  <p className="text-xs text-muted-foreground font-mono mt-0.5 truncate">
+                  <p className="text-[10px] sm:text-xs text-muted-foreground font-mono mt-0.5 truncate">
                     {userEmail || userId}
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+              <div className="flex items-center gap-1 sm:gap-2 shrink-0">
                 <button
                   onClick={() => setRefreshTrigger((prev) => prev + 1)}
-                  className="h-9 w-9 rounded-xl border border-border/70 text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors flex items-center justify-center active:scale-95"
+                  className="h-8 w-8 sm:h-9 sm:w-9 rounded-xl border border-border/70 text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors flex items-center justify-center active:scale-95"
                   title="刷新数据"
                 >
-                  <RotateCcw size={15} />
+                  <RotateCcw size={14} />
                 </button>
 
                 <button
@@ -179,30 +179,30 @@ export function UserOrdersModal({
 
                 <button
                   onClick={onClose}
-                  className="h-9 w-9 rounded-xl bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors flex items-center justify-center active:scale-95"
+                  className="h-8 w-8 sm:h-9 sm:w-9 rounded-xl bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors flex items-center justify-center active:scale-95"
                   title="关闭"
                 >
-                  <X size={18} />
+                  <X size={16} />
                 </button>
               </div>
             </div>
 
             {/* 弹窗内容区 */}
-            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
+            <div className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-3 sm:space-y-6 overscroll-contain">
               {/* 今日指标看板：与订单页面顶部 1:1 完全对齐 */}
-              <div className="grid items-stretch gap-3 md:grid-cols-2 lg:grid-cols-4">
+              <div className="grid items-stretch gap-2.5 sm:gap-3 md:grid-cols-2 lg:grid-cols-4">
                 {/* 1. 总订单 / 商家实收 合并卡片 */}
-                <div className="min-w-0 rounded-[20px] border border-black/8 bg-white/76 px-4 py-3.5 shadow-xs dark:border-white/10 dark:bg-white/5 md:col-span-2 lg:col-span-2">
-                  <div className="flex flex-col gap-2.5">
-                    <div className="flex items-baseline justify-between gap-3">
+                <div className="min-w-0 rounded-[20px] border border-black/8 bg-white/76 px-3.5 py-3 sm:px-4 sm:py-3.5 shadow-xs dark:border-white/10 dark:bg-white/5 md:col-span-2 lg:col-span-2">
+                  <div className="flex flex-col gap-2 sm:gap-2.5">
+                    <div className="flex items-baseline justify-between gap-2 sm:gap-3">
                       <div className="shrink-0">
-                        <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground whitespace-nowrap">总订单</div>
-                        <div className="mt-2 text-2xl sm:text-[30px] font-black leading-none tracking-tight text-foreground">{todayOverview.totalCount}</div>
+                        <div className="text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground whitespace-nowrap">总订单</div>
+                        <div className="mt-1 sm:mt-2 text-xl sm:text-[30px] font-black leading-none tracking-tight text-foreground">{todayOverview.totalCount}</div>
                       </div>
                       <div className="min-w-0 text-right">
-                        <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">商家实收</div>
-                        <div className="mt-2 text-2xl sm:text-[30px] font-black leading-none tracking-tight text-emerald-600 dark:text-emerald-400">{toCurrency(todaySummary.receivedAmount || 0)}</div>
-                        <div className="mt-1.5 flex flex-wrap items-center justify-end gap-x-1.5 gap-y-0.5 text-[11px] font-semibold">
+                        <div className="text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">商家实收</div>
+                        <div className="mt-1 sm:mt-2 text-xl sm:text-[30px] font-black leading-none tracking-tight text-emerald-600 dark:text-emerald-400">{toCurrency(todaySummary.receivedAmount || 0)}</div>
+                        <div className="mt-1 sm:mt-1.5 flex flex-wrap items-center justify-end gap-x-1.5 gap-y-0.5 text-[10px] sm:text-[11px] font-semibold">
                           <span className="whitespace-nowrap text-sky-600 dark:text-sky-400">真实收入 {toCurrency(todaySummary.realReceivedAmount || 0)}</span>
                           {(todaySummary.brushReceivedAmount || 0) > 0 || (todaySummary.brushPaidAmount || 0) > 0 ? (
                             <>
@@ -247,24 +247,24 @@ export function UserOrdersModal({
                     )}
 
                     {/* 三列看板网格：真单 / 刷单 / 取消 */}
-                    <div className="grid grid-cols-3 gap-2 sm:gap-5 mt-2 border-t border-black/4 pt-3 dark:border-white/5 text-[10px]">
+                    <div className="grid grid-cols-3 gap-1.5 sm:gap-5 mt-1.5 sm:mt-2 border-t border-black/4 pt-2.5 sm:pt-3 dark:border-white/5 text-[10px]">
                       {/* 第一列：真单 */}
-                      <div className="flex flex-col gap-1.5 min-w-0 rounded-xl bg-black/1.5 p-2 dark:bg-white/1.5 sm:bg-transparent sm:dark:bg-transparent sm:p-0">
-                        <div className="flex items-center justify-between rounded-lg bg-sky-500/8 px-1.5 py-0.5 text-sky-700 dark:bg-sky-500/12 dark:text-sky-400 font-medium text-[9px]">
+                      <div className="flex flex-col gap-1 sm:gap-1.5 min-w-0 rounded-xl bg-black/1.5 p-1.5 sm:p-0 dark:bg-white/1.5 sm:bg-transparent sm:dark:bg-transparent">
+                        <div className="flex items-center justify-between rounded-lg bg-sky-500/8 px-1 sm:px-1.5 py-0.5 text-sky-700 dark:bg-sky-500/12 dark:text-sky-400 font-medium text-[8.5px] sm:text-[9px]">
                           <span className="truncate">真单</span>
                           <span className="shrink-0">{todayOverview.trueOrderCount}单</span>
                         </div>
-                        <div className="flex flex-col gap-1 px-0.5">
+                        <div className="flex flex-col gap-0.5 sm:gap-1 px-0.5">
                           {todayOverview.platformBreakdown?.truePlatformCounts && Object.keys(todayOverview.platformBreakdown.truePlatformCounts).length > 0 ? (
                             Object.entries(todayOverview.platformBreakdown.truePlatformCounts)
                               .sort((a, b) => b[1] - a[1])
                               .map(([platform, count]) => {
                               const meta = getPlatformBadgeMeta(platform);
                               return (
-                                <div key={platform} className="flex items-center justify-between text-foreground/80 dark:text-white/80 text-[9px]">
-                                  <span className="flex items-center gap-0.5 min-w-0">
+                                <div key={platform} className="flex items-center justify-between text-foreground/80 dark:text-white/80 text-[8.5px] sm:text-[9px] gap-1">
+                                  <span className="flex items-center gap-0.5 min-w-0 truncate">
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img src={meta.iconSrc} alt={meta.iconAlt} className="h-3 w-3 object-contain shrink-0" onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                                    <img src={meta.iconSrc} alt={meta.iconAlt} className="h-2.5 w-2.5 sm:h-3 sm:w-3 object-contain shrink-0" onError={(e) => { e.currentTarget.style.display = "none"; }} />
                                     <span className="truncate">{platform}</span>
                                   </span>
                                   <span className="shrink-0">{count}单</span>
@@ -272,28 +272,28 @@ export function UserOrdersModal({
                               );
                             })
                           ) : (
-                            <div className="text-muted-foreground/30 text-center py-0.5 text-[9px]">-</div>
+                            <div className="text-muted-foreground/30 text-center py-0.5 text-[8.5px] sm:text-[9px]">-</div>
                           )}
                         </div>
                       </div>
 
                       {/* 第二列：刷单 */}
-                      <div className="flex flex-col gap-1.5 min-w-0 rounded-xl bg-black/1.5 p-2 dark:bg-white/1.5 sm:bg-transparent sm:dark:bg-transparent sm:p-0">
-                        <div className="flex items-center justify-between rounded-lg bg-rose-500/8 px-1.5 py-0.5 text-rose-700 dark:bg-rose-500/12 dark:text-rose-400 font-medium text-[9px]">
+                      <div className="flex flex-col gap-1 sm:gap-1.5 min-w-0 rounded-xl bg-black/1.5 p-1.5 sm:p-0 dark:bg-white/1.5 sm:bg-transparent sm:dark:bg-transparent">
+                        <div className="flex items-center justify-between rounded-lg bg-rose-500/8 px-1 sm:px-1.5 py-0.5 text-rose-700 dark:bg-rose-500/12 dark:text-rose-400 font-medium text-[8.5px] sm:text-[9px]">
                           <span className="truncate">刷单</span>
                           <span className="shrink-0">{todayOverview.brushCount}单</span>
                         </div>
-                        <div className="flex flex-col gap-1 px-0.5">
+                        <div className="flex flex-col gap-0.5 sm:gap-1 px-0.5">
                           {todayOverview.platformBreakdown?.brushPlatformCounts && Object.keys(todayOverview.platformBreakdown.brushPlatformCounts).length > 0 ? (
                             Object.entries(todayOverview.platformBreakdown.brushPlatformCounts)
                               .sort((a, b) => b[1] - a[1])
                               .map(([platform, count]) => {
                               const meta = getPlatformBadgeMeta(platform);
                               return (
-                                <div key={platform} className="flex items-center justify-between text-foreground/80 dark:text-white/80 text-[9px]">
-                                  <span className="flex items-center gap-0.5 min-w-0">
+                                <div key={platform} className="flex items-center justify-between text-foreground/80 dark:text-white/80 text-[8.5px] sm:text-[9px] gap-1">
+                                  <span className="flex items-center gap-0.5 min-w-0 truncate">
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img src={meta.iconSrc} alt={meta.iconAlt} className="h-3 w-3 object-contain shrink-0" onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                                    <img src={meta.iconSrc} alt={meta.iconAlt} className="h-2.5 w-2.5 sm:h-3 sm:w-3 object-contain shrink-0" onError={(e) => { e.currentTarget.style.display = "none"; }} />
                                     <span className="truncate">{platform}</span>
                                   </span>
                                   <span className="shrink-0">{count}单</span>
@@ -301,28 +301,28 @@ export function UserOrdersModal({
                               );
                             })
                           ) : (
-                            <div className="text-muted-foreground/30 text-center py-0.5 text-[9px]">-</div>
+                            <div className="text-muted-foreground/30 text-center py-0.5 text-[8.5px] sm:text-[9px]">-</div>
                           )}
                         </div>
                       </div>
 
                       {/* 第三列：取消 */}
-                      <div className="flex flex-col gap-1.5 min-w-0 rounded-xl bg-black/1.5 p-2 dark:bg-white/1.5 sm:bg-transparent sm:dark:bg-transparent sm:p-0">
-                        <div className="flex items-center justify-between rounded-lg bg-slate-500/8 px-1.5 py-0.5 text-slate-600 dark:bg-slate-500/12 dark:text-slate-400 font-medium text-[9px]">
+                      <div className="flex flex-col gap-1 sm:gap-1.5 min-w-0 rounded-xl bg-black/1.5 p-1.5 sm:p-0 dark:bg-white/1.5 sm:bg-transparent sm:dark:bg-transparent">
+                        <div className="flex items-center justify-between rounded-lg bg-slate-500/8 px-1 sm:px-1.5 py-0.5 text-slate-600 dark:bg-slate-500/12 dark:text-slate-400 font-medium text-[8.5px] sm:text-[9px]">
                           <span className="truncate">取消</span>
                           <span className="shrink-0">{todayOverview.cancelledCount}单</span>
                         </div>
-                        <div className="flex flex-col gap-1 px-0.5">
+                        <div className="flex flex-col gap-0.5 sm:gap-1 px-0.5">
                           {todayOverview.platformBreakdown?.cancelledPlatformCounts && Object.keys(todayOverview.platformBreakdown.cancelledPlatformCounts).length > 0 ? (
                             Object.entries(todayOverview.platformBreakdown.cancelledPlatformCounts)
                               .sort((a, b) => b[1] - a[1])
                               .map(([platform, count]) => {
                               const meta = getPlatformBadgeMeta(platform);
                               return (
-                                <div key={platform} className="flex items-center justify-between text-foreground/80 dark:text-white/80 text-[9px]">
-                                  <span className="flex items-center gap-0.5 min-w-0">
+                                <div key={platform} className="flex items-center justify-between text-foreground/80 dark:text-white/80 text-[8.5px] sm:text-[9px] gap-1">
+                                  <span className="flex items-center gap-0.5 min-w-0 truncate">
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img src={meta.iconSrc} alt={meta.iconAlt} className="h-3 w-3 object-contain shrink-0" onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                                    <img src={meta.iconSrc} alt={meta.iconAlt} className="h-2.5 w-2.5 sm:h-3 sm:w-3 object-contain shrink-0" onError={(e) => { e.currentTarget.style.display = "none"; }} />
                                     <span className="truncate">{platform}</span>
                                   </span>
                                   <span className="shrink-0">{count}单</span>
@@ -330,7 +330,7 @@ export function UserOrdersModal({
                               );
                             })
                           ) : (
-                            <div className="text-muted-foreground/30 text-center py-0.5 text-[9px]">-</div>
+                            <div className="text-muted-foreground/30 text-center py-0.5 text-[8.5px] sm:text-[9px]">-</div>
                           )}
                         </div>
                       </div>
@@ -339,15 +339,15 @@ export function UserOrdersModal({
                 </div>
 
                 {/* 2. 平台纯利润分布卡片 */}
-                <div className="group min-w-0 h-full rounded-[20px] border border-black/8 bg-white/76 px-4 py-3.5 text-left shadow-xs transition hover:border-emerald-400/40 hover:bg-emerald-50/60 focus:outline-none focus:ring-2 focus:ring-emerald-400/40 dark:border-white/10 dark:bg-white/5 dark:hover:border-emerald-300/35 dark:hover:bg-emerald-400/8 flex flex-col gap-2.5">
+                <div className="group min-w-0 h-full rounded-[20px] border border-black/8 bg-white/76 px-3.5 py-3 sm:px-4 sm:py-3.5 text-left shadow-xs transition hover:border-emerald-400/40 hover:bg-emerald-50/60 focus:outline-none focus:ring-2 focus:ring-emerald-400/40 dark:border-white/10 dark:bg-white/5 dark:hover:border-emerald-300/35 dark:hover:bg-emerald-400/8 flex flex-col gap-2 sm:gap-2.5">
                   <div className="flex flex-col w-full">
                     <div className="flex items-center justify-between sm:block">
-                      <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
+                      <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
                         <span>纯利润</span>
                         <Store className="h-3.5 w-3.5 opacity-0 transition group-hover:opacity-100" />
                       </div>
                       <div className={cn(
-                        "sm:hidden text-[22px] font-bold leading-none tracking-tight",
+                        "sm:hidden text-xl font-black leading-none tracking-tight",
                         todaySummary.pureProfit < 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"
                       )}>
                         {toCurrency(todaySummary.pureProfit || 0)}
@@ -359,22 +359,22 @@ export function UserOrdersModal({
                     )}>
                       {toCurrency(todaySummary.pureProfit || 0)}
                     </div>
-                    <div className="mt-1.5 text-xs text-muted-foreground">
+                    <div className="mt-1 text-[11px] sm:text-xs text-muted-foreground">
                       今日各平台纯利润汇总
                     </div>
                   </div>
                   {todaySummary.platformProfit && Object.entries(todaySummary.platformProfit).some(([, info]) => info.amount !== 0) ? (
-                    <div className="flex flex-col gap-2 border-t border-black/4 pt-3 dark:border-white/5">
+                    <div className="flex flex-col gap-1.5 sm:gap-2 border-t border-black/4 pt-2.5 sm:pt-3 dark:border-white/5">
                       {Object.entries(todaySummary.platformProfit)
                         .sort((a, b) => b[1].amount - a[1].amount)
                         .map(([platform, info]) => {
                         if (info.amount === 0) return null;
                         const meta = getPlatformBadgeMeta(platform);
                         return (
-                          <div key={platform} className="flex items-center justify-between rounded-xl bg-black/1.5 px-3 py-1.5 dark:bg-white/1.5 text-[11px] text-foreground/80 dark:text-white/80">
+                          <div key={platform} className="flex items-center justify-between rounded-xl bg-black/1.5 px-2.5 py-1.5 sm:px-3 dark:bg-white/1.5 text-[10px] sm:text-[11px] text-foreground/80 dark:text-white/80">
                             <span className="flex items-center gap-1.5 min-w-0">
                               {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img src={meta.iconSrc} alt={meta.iconAlt} className="h-3.5 w-3.5 object-contain shrink-0" onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                              <img src={meta.iconSrc} alt={meta.iconAlt} className="h-3 w-3 sm:h-3.5 sm:w-3.5 object-contain shrink-0" onError={(e) => { e.currentTarget.style.display = "none"; }} />
                               <span className="truncate font-medium">{platform}</span>
                             </span>
                             <span className={cn(
@@ -390,32 +390,32 @@ export function UserOrdersModal({
                   ) : null}
                 </div>
 
-                {/* 3. 最右侧：总配送费与推广费垂直列 */}
-                <div className="h-full flex flex-col gap-3">
-                  <div className="flex-1 min-w-0 rounded-[20px] border border-black/8 bg-white/76 px-4 py-3.5 shadow-xs dark:border-white/10 dark:bg-white/5 flex flex-col justify-between">
+                {/* 3. 最右侧：总配送费与推广费（移动端并排为2列，大屏为纵向列） */}
+                <div className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:flex lg:flex-col">
+                  <div className="min-w-0 rounded-[20px] border border-black/8 bg-white/76 px-3.5 py-3 sm:px-4 sm:py-3.5 shadow-xs dark:border-white/10 dark:bg-white/5 flex flex-col justify-between">
                     <div>
-                      <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">总配送费</div>
-                      <div className="mt-2 text-[26px] font-bold leading-none tracking-tight text-foreground">
+                      <div className="text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">总配送费</div>
+                      <div className="mt-1 sm:mt-2 text-lg sm:text-[26px] font-bold leading-none tracking-tight text-foreground">
                         {toCurrency(todaySummary.totalDeliveryFee || 0)}
                       </div>
                     </div>
-                    <div className="mt-1.5 text-xs text-muted-foreground">今日订单汇总</div>
+                    <div className="mt-1 text-[10px] sm:text-xs text-muted-foreground">今日订单汇总</div>
                   </div>
 
-                  <div className="flex-1 min-w-0 rounded-[20px] border border-black/8 bg-white/76 px-4 py-3.5 shadow-xs dark:border-white/10 dark:bg-white/5 flex flex-col justify-between">
+                  <div className="min-w-0 rounded-[20px] border border-black/8 bg-white/76 px-3.5 py-3 sm:px-4 sm:py-3.5 shadow-xs dark:border-white/10 dark:bg-white/5 flex flex-col justify-between">
                     <div>
-                      <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">推广费</div>
-                      <div className="mt-2 text-[26px] font-bold leading-none tracking-tight text-foreground">
+                      <div className="text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">推广费</div>
+                      <div className="mt-1 sm:mt-2 text-lg sm:text-[26px] font-bold leading-none tracking-tight text-foreground">
                         ¥0.00
                       </div>
                     </div>
-                    <div className="mt-1.5 text-xs text-muted-foreground">今日推广费录入</div>
+                    <div className="mt-1 text-[10px] sm:text-xs text-muted-foreground">今日推广费录入</div>
                   </div>
                 </div>
               </div>
 
               {/* 完整的今日订单视图：直接复用 TodayOrdersView */}
-              <div className="pt-2">
+              <div className="pt-1 sm:pt-2">
                 <TodayOrdersView
                   userId={userId}
                   refreshTrigger={refreshTrigger}
