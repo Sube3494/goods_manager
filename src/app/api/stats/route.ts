@@ -696,6 +696,7 @@ export async function GET(request: NextRequest) {
       }
     }
     const outboundMetaByOrderNo = new Map<string, {
+      itemCount: number;
       productCost: number;
       missingCostItemCount: number;
       refundAmount: number;
@@ -707,8 +708,9 @@ export async function GET(request: NextRequest) {
       if (!orderNo) return;
       const isCurrentReturned = outbound.status === "Returned";
       const existing = outboundMetaByOrderNo.get(orderNo);
-      // 优先采用有效出库单，避免已退货单覆盖有效单
+      // 优先采用有效出库单，避免已退货单或空单覆盖有效单
       if (existing && isCurrentReturned) return;
+      if (existing && existing.itemCount > 0 && outbound.items.length === 0) return;
 
       let missingCostItemCount = 0;
       const returnTotals = getOutboundReturnTotals(parseOutboundReturnMeta(outbound.note).returns);
@@ -727,6 +729,7 @@ export async function GET(request: NextRequest) {
       }, 0);
       const effectiveReturnedCost = isCurrentReturned ? returnTotals.returnedCost : 0;
       outboundMetaByOrderNo.set(orderNo, {
+        itemCount: outbound.items.length,
         productCost: FinanceMath.add(outboundCost, -effectiveReturnedCost),
         missingCostItemCount,
         refundAmount: returnTotals.refundAmount,

@@ -1398,6 +1398,7 @@ export async function GET(request: NextRequest) {
 
     const outboundByOrderNo = new Map<string, {
       id: string;
+      itemCount: number;
       productCost: number;
       refundAmount: number;
       extraExpense: number;
@@ -1643,8 +1644,13 @@ export async function GET(request: NextRequest) {
               ...item,
               totalCost: item.unitCost * item.quantity,
             }));
+        const existingOutboundMeta = outboundByOrderNo.get(orderNo);
+        if (existingOutboundMeta && existingOutboundMeta.itemCount > 0 && outbound.items.length === 0) {
+          continue;
+        }
         outboundByOrderNo.set(orderNo, {
           id: outbound.id,
+          itemCount: outbound.items.length,
           productCost: Math.max(0, productCost - Math.round(returnTotals.returnedCost * 100)),
           refundAmount: Math.round(returnTotals.refundAmount * 100),
           extraExpense: Math.round(returnTotals.extraExpense * 100),
@@ -1689,10 +1695,13 @@ export async function GET(request: NextRequest) {
         expectedIncome: order.expectedIncome,
         deliveryFee,
       }) && !hasAutoPickFulfillmentItems(order.items);
+      const hasOrderFulfillment = hasAutoPickFulfillmentItems(order.items);
+      const isOutboundEmpty = Boolean(outboundMeta && (outboundMeta.itemCount === 0 || (outboundMeta.breakdown?.length || 0) === 0));
+      const effectiveHasOutbound = hasOutbound && (!hasOrderFulfillment || !isOutboundEmpty);
       if (cancelledDeliveryLoss || manualDeliveryLoss) {
         return "ready";
       }
-      if (!hasOutbound) {
+      if (!effectiveHasOutbound) {
         return "pending-outbound";
       }
       return (outboundMeta?.missingCostItemCount || 0) > 0 ? "pending-backfill" : "ready";
@@ -2172,10 +2181,12 @@ export async function GET(request: NextRequest) {
         expectedIncome: adjustedMetrics.expectedIncome,
         deliveryFee,
       }) && !hasFulfillmentItems;
+      const isOutboundEmpty = Boolean(outboundMeta && (outboundMeta.itemCount === 0 || (outboundMeta.breakdown?.length || 0) === 0));
+      const effectiveHasOutbound = hasOutbound && (!hasFulfillmentItems || !isOutboundEmpty);
       const missingCostItemCount = outboundMeta?.missingCostItemCount || 0;
       const productCostStatus = cancelledDeliveryLoss || manualDeliveryLoss
         ? "ready" as const
-        : !hasOutbound
+        : !effectiveHasOutbound
         ? "pending-outbound" as const
         : missingCostItemCount > 0
           ? "pending-backfill" as const
@@ -2218,12 +2229,12 @@ export async function GET(request: NextRequest) {
         autoOutboundError: autoOutboundMeta.error,
         autoOutboundAttemptedAt: autoOutboundMeta.attemptedAt,
         autoOutboundResolvedAt: autoOutboundMeta.resolvedAt,
-        hasOutbound,
-        outboundOrderId: outboundMeta?.id || null,
+        hasOutbound: effectiveHasOutbound,
+        outboundOrderId: effectiveHasOutbound ? (outboundMeta?.id || null) : null,
         serviceFeeRate,
-        productCost: hasOutbound ? productCost : null,
-        outboundReturnDetails: outboundMeta?.returnDetails || [],
-        productCostBreakdown: outboundMeta?.breakdown || [],
+        productCost: effectiveHasOutbound ? productCost : null,
+        outboundReturnDetails: effectiveHasOutbound ? (outboundMeta?.returnDetails || []) : [],
+        productCostBreakdown: effectiveHasOutbound ? (outboundMeta?.breakdown || []) : [],
         pureProfit,
         productCostStatus,
         missingCostItemCount,

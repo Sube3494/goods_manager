@@ -6428,17 +6428,31 @@ export async function createOutboundFromAutoPickOrder(
     },
     select: {
       id: true,
+      items: {
+        select: {
+          id: true,
+        },
+      },
     },
     orderBy: {
       createdAt: "desc",
     },
   });
 
+  const hasOrderFulfillmentItems = hasAutoPickFulfillmentItems(order.items);
+
   if (existingOutbound) {
-    return { ok: true, duplicated: true, outboundOrderId: existingOutbound.id };
+    if (hasOrderFulfillmentItems && (!existingOutbound.items || existingOutbound.items.length === 0)) {
+      // 历史残留的空出库单（无商品明细），自动清理并重新生成包含商品明细的有效出库单
+      await prisma.outboundOrder.delete({
+        where: { id: existingOutbound.id },
+      }).catch(() => null);
+    } else {
+      return { ok: true, duplicated: true, outboundOrderId: existingOutbound.id };
+    }
   }
 
-  if (isOfflineDeliveryFeeOnlyOrder(order) && !hasAutoPickFulfillmentItems(order.items)) {
+  if (isOfflineDeliveryFeeOnlyOrder(order) && !hasOrderFulfillmentItems) {
     return { ok: true, skipped: true, reason: "delivery-fee-only" as const };
   }
 
@@ -6549,6 +6563,16 @@ export async function createOutboundFromAutoPickOrder(
       return {
         kind: "insufficient" as const,
         insufficientItems,
+      };
+    }
+
+    if (resolved.items.length === 0) {
+      if (hasOrderFulfillmentItems) {
+        throw new Error("出库失败：订单包含商品但未能解析出任何可出库的商品明细");
+      }
+      return {
+        kind: "created" as const,
+        outboundOrder: { id: "" },
       };
     }
 
