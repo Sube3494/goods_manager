@@ -7,7 +7,7 @@ import { Shop, StatsData } from "@/lib/types";
 import { PromotionCalendarModal } from "@/app/orders/PromotionCalendarModal";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { DatePicker } from "@/components/ui/DatePicker";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Maximize2, Minimize2 } from "lucide-react";
 import { format } from "date-fns";
 import { cn, getPlatformMeta } from "@/lib/utils";
 import { OverviewAiPanel } from "@/components/Dashboard/OverviewAiPanel";
@@ -415,6 +415,8 @@ export function DataOverview({
   const [profitPlatform, setProfitPlatform] = useState("all");
   const [orderPlatform, setOrderPlatform] = useState("all");
   const [orderScope, setOrderScope] = useState<"all" | "true">("all");
+  const [isProfitExpanded, setIsProfitExpanded] = useState(false);
+  const [isOrderExpanded, setIsOrderExpanded] = useState(false);
 
   const businessTrend = data?.businessTrend || [];
   const rangeDays = useMemo(() => countDays(startDate, endDate), [endDate, startDate]);
@@ -715,22 +717,35 @@ export function DataOverview({
         </div>
       </Panel>
 
-      <div className="grid gap-6 xl:grid-cols-2">
+      <div className={cn("grid gap-6", (isProfitExpanded || isOrderExpanded) ? "grid-cols-1" : "xl:grid-cols-2")}>
         <Panel
-          className="relative z-20"
+          className={cn("relative z-20 transition-all duration-200", isProfitExpanded ? "col-span-full" : "")}
           title="每日盈亏"
           subtitle="每日净利润走势"
           action={(
-            <CustomSelect
-              value={profitPlatform}
-              onChange={setProfitPlatform}
-              options={platformOptions}
-              className="h-9 min-w-[116px]"
-              triggerClassName="h-full rounded-xl border border-black/8 bg-white px-3 text-sm shadow-none dark:border-white/10 dark:bg-white/[0.03]"
-            />
+            <div className="flex items-center gap-2">
+              <CustomSelect
+                value={profitPlatform}
+                onChange={setProfitPlatform}
+                options={platformOptions}
+                className="h-9 min-w-[116px]"
+                triggerClassName="h-full rounded-xl border border-black/8 bg-white px-3 text-sm shadow-none dark:border-white/10 dark:bg-white/[0.03]"
+              />
+              <button
+                type="button"
+                onClick={() => setIsProfitExpanded((prev) => !prev)}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-black/8 bg-white text-muted-foreground hover:text-foreground hover:bg-black/3 dark:border-white/10 dark:bg-white/[0.03] dark:hover:bg-white/10 transition-all active:scale-95 cursor-pointer"
+                title={isProfitExpanded ? "收起为并排显示" : "独占整行全宽展示"}
+              >
+                {isProfitExpanded ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+              </button>
+            </div>
           )}
         >
-          <div className="h-[260px] sm:h-[290px] [&_.recharts-wrapper]:outline-none [&_.recharts-surface]:outline-none [&_.recharts-tooltip-wrapper]:!transition-none [&_*:focus]:outline-none">
+          <div className={cn(
+            "w-full [&_.recharts-wrapper]:outline-none [&_.recharts-surface]:outline-none [&_.recharts-tooltip-wrapper]:!transition-none [&_*:focus]:outline-none",
+            isProfitExpanded ? "h-[330px] sm:h-[380px]" : "h-[260px] sm:h-[290px]"
+          )}>
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart accessibilityLayer={false} data={profitTrend} margin={{ top: 18, right: 10, left: 0, bottom: 0 }}>
                 <defs>
@@ -762,7 +777,7 @@ export function DataOverview({
         </Panel>
 
         <Panel
-          className="relative z-10"
+          className={cn("relative z-10 transition-all duration-200", isOrderExpanded ? "col-span-full" : "")}
           title="订单波动"
           subtitle={orderScope === "true" ? "按日期查看真单变化" : "按日期查看订单变化"}
           actionMobileStack
@@ -785,10 +800,21 @@ export function DataOverview({
                 className="h-9 min-w-0 sm:min-w-[116px]"
                 triggerClassName="h-full rounded-xl border border-black/8 bg-white px-3 text-sm shadow-none dark:border-white/10 dark:bg-white/[0.03]"
               />
+              <button
+                type="button"
+                onClick={() => setIsOrderExpanded((prev) => !prev)}
+                className="hidden sm:inline-flex h-9 w-9 items-center justify-center rounded-xl border border-black/8 bg-white text-muted-foreground hover:text-foreground hover:bg-black/3 dark:border-white/10 dark:bg-white/[0.03] dark:hover:bg-white/10 transition-all active:scale-95 cursor-pointer shrink-0"
+                title={isOrderExpanded ? "收起为并排显示" : "独占整行全宽展示"}
+              >
+                {isOrderExpanded ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+              </button>
             </div>
           )}
         >
-          <div className="h-[260px] sm:h-[290px] [&_.recharts-wrapper]:outline-none [&_.recharts-surface]:outline-none [&_.recharts-tooltip-wrapper]:!transition-none [&_*:focus]:outline-none">
+          <div className={cn(
+            "w-full [&_.recharts-wrapper]:outline-none [&_.recharts-surface]:outline-none [&_.recharts-tooltip-wrapper]:!transition-none [&_*:focus]:outline-none",
+            isOrderExpanded ? "h-[330px] sm:h-[380px]" : "h-[260px] sm:h-[290px]"
+          )}>
             <ResponsiveContainer width="100%" height="100%">
               <LineChart accessibilityLayer={false} data={orderTrend} margin={{ top: 18, right: 10, left: 0, bottom: 0 }}>
                 <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="rgba(148,163,184,0.18)" />
