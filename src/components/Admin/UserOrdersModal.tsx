@@ -66,82 +66,87 @@ function TrendProfitTooltip({
   if (!item) return null;
 
   const netProfit = Number(item.netProfit || 0);
-  const platformProfits = item.platformProfits || {};
+  const platformProfits = (item.platformPureProfit || item.platformProfits || {}) as Record<string, number>;
   const platformEntries = Object.entries(platformProfits).filter(([, v]) => Number(v || 0) !== 0);
   const orderCount = Number(item.orderCount || 0);
   const trueOrderCount = Number(item.trueOrderCount || 0);
   const brushOrderCount = Number(item.brushOrderCount || 0);
-  const userPaid = Number(item.userPaid || 0);
-  const commission = Number(item.commission || 0);
-  const deliveryExpense = Number(item.deliveryExpense || 0);
+  const totalPureProfit = Number(item.pureProfit || 0);
+  const promotionExpense = Number(item.promotionExpense || 0);
+  const brushExpense = Number(item.brushExpense || 0);
   const productCost = Number(item.productCost || 0);
 
   return (
-    <div className="relative z-50 -translate-y-1/2 pointer-events-none min-w-[210px] max-w-[calc(100vw-32px)] max-h-[75vh] overflow-y-auto rounded-2xl border border-black/10 bg-white/95 p-3.5 shadow-2xl backdrop-blur-xl dark:border-white/10 dark:bg-zinc-950/95 text-xs">
-      <div className="flex items-center justify-between gap-2 border-b border-black/6 pb-2 dark:border-white/8">
-        <span className="font-bold text-slate-800 dark:text-zinc-200">{label} 经营盈亏</span>
+    <div className="relative z-[9999] -translate-y-1/2 pointer-events-none min-w-[220px] max-w-[calc(100vw-32px)] max-h-[75vh] overflow-y-auto rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-[0_20px_50px_rgba(0,0,0,0.35)] dark:border-zinc-700/80 dark:bg-zinc-900 text-xs">
+      <div className="flex items-center justify-between gap-2 border-b border-black/8 pb-2 dark:border-white/10">
+        <span className="font-bold text-slate-900 dark:text-zinc-100">{label} 经营盈亏明细</span>
         <span className={cn(
           "px-2 py-0.5 rounded-md font-bold text-[10px]",
-          netProfit >= 0 ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-rose-500/10 text-rose-600 dark:text-rose-400"
+          netProfit >= 0 ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" : "bg-rose-500/15 text-rose-600 dark:text-rose-400"
         )}>
           {netProfit >= 0 ? "盈利" : "承压"}
         </span>
       </div>
 
-      <div className="mt-2.5 space-y-1.5">
-        <div className="flex items-center justify-between gap-4 font-bold text-sm">
-          <span className="text-foreground">当日净利润:</span>
-          <span className={cn("tabular-nums", netProfit >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400")}>
-            {money(netProfit)}
-          </span>
-        </div>
-
-        {platformEntries.length > 0 && (
-          <div className="my-1.5 space-y-1 rounded-xl bg-black/2.5 p-2 dark:bg-white/4">
-            <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">各平台纯利润</div>
+      <div className="mt-2.5 space-y-2">
+        {platformEntries.length > 0 ? (
+          <div className="space-y-1.5 rounded-xl bg-slate-100/80 p-2 dark:bg-zinc-800/80">
+            <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">各平台订单纯利</div>
             {platformEntries.map(([platform, amount]) => {
               const meta = getPlatformMeta(platform);
               return (
-                <div key={platform} className="flex items-center justify-between gap-3 text-[11px]">
-                  <span className="text-muted-foreground truncate">{meta?.name || platform}:</span>
-                  <span className={cn("font-medium tabular-nums", Number(amount) >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400")}>
+                <div key={platform} className="flex items-center justify-between gap-3 text-xs">
+                  <span className="text-slate-700 dark:text-zinc-300 truncate">{meta?.name || platform}:</span>
+                  <span className={cn("font-semibold tabular-nums", Number(amount) >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-500")}>
                     {money(Number(amount))}
                   </span>
                 </div>
               );
             })}
           </div>
+        ) : (
+          <div className="text-xs text-muted-foreground py-0.5 text-center">暂无平台纯利润明细</div>
         )}
 
-        <div className="space-y-1 border-t border-dashed border-black/8 dark:border-white/8 pt-1.5 text-[11px] text-muted-foreground">
+        <div className="space-y-1 border-t border-dashed border-black/8 dark:border-white/10 pt-2 text-xs">
           <div className="flex items-center justify-between">
-            <span>实收营业额:</span>
-            <span className="tabular-nums font-medium text-foreground">{money(userPaid)}</span>
+            <span className="text-muted-foreground">订单纯利润小计:</span>
+            <span className={cn("tabular-nums font-semibold", totalPureProfit >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-500")}>
+              {money(totalPureProfit)}
+            </span>
           </div>
-          {commission > 0 && (
-            <div className="flex items-center justify-between">
-              <span>平台佣金扣点:</span>
-              <span className="tabular-nums font-medium text-rose-500">-{money(commission)}</span>
+          {promotionExpense > 0 && (
+            <div className="flex items-center justify-between text-amber-600 dark:text-amber-400">
+              <span>扣除推广费:</span>
+              <span className="tabular-nums font-semibold">-{money(promotionExpense)}</span>
             </div>
           )}
-          {deliveryExpense > 0 && (
-            <div className="flex items-center justify-between">
-              <span>配送费支出:</span>
-              <span className="tabular-nums font-medium text-rose-500">-{money(deliveryExpense)}</span>
+          {brushExpense > 0 && (
+            <div className="flex items-center justify-between text-rose-500">
+              <span>扣除刷单支出:</span>
+              <span className="tabular-nums font-semibold">-{money(brushExpense)}</span>
             </div>
           )}
           {productCost > 0 && (
-            <div className="flex items-center justify-between">
-              <span>货品成本:</span>
-              <span className="tabular-nums font-medium text-rose-500">-{money(productCost)}</span>
+            <div className="flex items-center justify-between text-muted-foreground">
+              <span>货品总成本:</span>
+              <span className="tabular-nums font-semibold">-{money(productCost)}</span>
             </div>
           )}
-          <div className="flex items-center justify-between pt-1 border-t border-black/4 dark:border-white/4">
-            <span>当日单量:</span>
-            <span className="tabular-nums font-semibold text-foreground">
-              共 {orderCount} 单 (真单 {trueOrderCount}{brushOrderCount > 0 ? ` · 刷单 ${brushOrderCount}` : ""})
-            </span>
-          </div>
+        </div>
+
+        <div className="flex items-center justify-between border-t border-solid border-black/10 dark:border-white/15 pt-2 font-bold text-sm">
+          <span className="text-foreground">当日最终净利润:</span>
+          <span className={cn("tabular-nums text-base", netProfit >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-500")}>
+            {money(netProfit)}
+          </span>
+        </div>
+
+        <div className="flex items-center justify-between pt-1 text-[11px] text-muted-foreground border-t border-black/4 dark:border-white/5">
+          <span>当日单量:</span>
+          <span className="tabular-nums font-semibold text-foreground">
+            共 {orderCount} 单 (真单 {trueOrderCount}{brushOrderCount > 0 ? ` · 刷单 ${brushOrderCount}` : ""})
+          </span>
         </div>
       </div>
     </div>
@@ -165,26 +170,26 @@ function TrendOrderTooltip({
 
   const isTrue = orderScope === "true";
   const total = isTrue ? Number(item.trueOrderCount || 0) : Number(item.orderCount || 0);
-  const platformCounts = item.platformOrderCount || {};
+  const platformCounts = (item.platformOrderCount || {}) as Record<string, number>;
   const entries = Object.entries(platformCounts).filter(([, v]) => Number(v || 0) > 0);
 
   return (
-    <div className="relative z-50 -translate-y-1/2 pointer-events-none min-w-[190px] rounded-2xl border border-black/10 bg-white/95 p-3.5 shadow-2xl backdrop-blur-xl dark:border-white/10 dark:bg-zinc-950/95 text-xs">
-      <div className="flex items-center justify-between gap-2 border-b border-black/6 pb-2 dark:border-white/8">
-        <span className="font-bold text-slate-800 dark:text-zinc-200">{label} 单量拆分</span>
-        <span className="px-2 py-0.5 rounded-md bg-sky-500/10 text-sky-600 dark:text-sky-400 font-bold text-[10px]">
+    <div className="relative z-[9999] -translate-y-1/2 pointer-events-none min-w-[200px] rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-[0_20px_50px_rgba(0,0,0,0.35)] dark:border-zinc-700/80 dark:bg-zinc-900 text-xs">
+      <div className="flex items-center justify-between gap-2 border-b border-black/8 pb-2 dark:border-white/10">
+        <span className="font-bold text-slate-900 dark:text-zinc-100">{label} 单量拆分</span>
+        <span className="px-2 py-0.5 rounded-md bg-sky-500/15 text-sky-600 dark:text-sky-400 font-bold text-[10px]">
           {isTrue ? "去除刷单" : "全部订单"}
         </span>
       </div>
 
-      <div className="mt-2 space-y-1.5">
+      <div className="mt-2.5 space-y-1.5">
         {entries.map(([platform, count]) => (
-          <div key={platform} className="flex items-center justify-between text-muted-foreground text-[11px]">
+          <div key={platform} className="flex items-center justify-between text-muted-foreground text-xs">
             <span>{platform}:</span>
             <span className="font-semibold tabular-nums text-sky-600 dark:text-sky-400">{count as number} 单</span>
           </div>
         ))}
-        <div className="flex items-center justify-between pt-1.5 border-t border-dashed border-black/8 dark:border-white/8 font-bold text-sm text-foreground">
+        <div className="flex items-center justify-between pt-1.5 border-t border-dashed border-black/8 dark:border-white/10 font-bold text-sm text-foreground">
           <span>当日总单量:</span>
           <span className="tabular-nums text-sky-600 dark:text-sky-400">{total} 单</span>
         </div>
@@ -444,7 +449,7 @@ function UserProfitTrendView({
           </div>
 
           {/* 主图表 1：每日净利润走势（AreaChart 渐变曲线） */}
-          <div className="rounded-[22px] border border-black/8 bg-white/76 p-4 shadow-xs backdrop-blur-sm dark:border-white/10 dark:bg-white/4">
+          <div className="relative z-20 rounded-[22px] border border-black/8 bg-white/76 p-4 shadow-xs backdrop-blur-sm dark:border-white/10 dark:bg-white/4">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-black/6 pb-3 dark:border-white/8">
               <div>
                 <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-1.5">
@@ -465,7 +470,7 @@ function UserProfitTrendView({
               />
             </div>
 
-            <div className="h-[250px] sm:h-[280px] w-full [&_.recharts-wrapper]:outline-none [&_.recharts-surface]:outline-none">
+            <div className="h-[250px] sm:h-[280px] w-full [&_.recharts-wrapper]:outline-none [&_.recharts-surface]:outline-none [&_.recharts-tooltip-wrapper]:!z-[9999] [&_.recharts-tooltip-wrapper]:!pointer-events-none">
               {profitTrend.length === 0 ? (
                 <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
                   所选区间暂无利润数据
@@ -491,6 +496,7 @@ function UserProfitTrendView({
                     <Tooltip
                       isAnimationActive={false}
                       allowEscapeViewBox={{ x: false, y: true }}
+                      wrapperStyle={{ zIndex: 9999, outline: "none", pointerEvents: "none" }}
                       content={<TrendProfitTooltip />}
                     />
                     <Area
@@ -508,7 +514,7 @@ function UserProfitTrendView({
           </div>
 
           {/* 主图表 2：每日订单波动走势 */}
-          <div className="rounded-[22px] border border-black/8 bg-white/76 p-4 shadow-xs backdrop-blur-sm dark:border-white/10 dark:bg-white/4">
+          <div className="relative z-10 rounded-[22px] border border-black/8 bg-white/76 p-4 shadow-xs backdrop-blur-sm dark:border-white/10 dark:bg-white/4">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-black/6 pb-3 dark:border-white/8">
               <div>
                 <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-1.5">
@@ -541,7 +547,7 @@ function UserProfitTrendView({
               </div>
             </div>
 
-            <div className="h-[220px] sm:h-[250px] w-full [&_.recharts-wrapper]:outline-none [&_.recharts-surface]:outline-none">
+            <div className="h-[220px] sm:h-[250px] w-full [&_.recharts-wrapper]:outline-none [&_.recharts-surface]:outline-none [&_.recharts-tooltip-wrapper]:!z-[9999] [&_.recharts-tooltip-wrapper]:!pointer-events-none">
               {orderTrend.length === 0 ? (
                 <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
                   所选区间暂无订单波动数据
@@ -561,6 +567,7 @@ function UserProfitTrendView({
                     <Tooltip
                       isAnimationActive={false}
                       allowEscapeViewBox={{ x: false, y: true }}
+                      wrapperStyle={{ zIndex: 9999, outline: "none", pointerEvents: "none" }}
                       content={<TrendOrderTooltip orderScope={orderScope} />}
                     />
                     <Area
