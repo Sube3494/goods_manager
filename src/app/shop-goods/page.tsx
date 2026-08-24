@@ -506,6 +506,7 @@ function ShopSortWorkbench({
       showToast("请先勾选商品", "error");
       return;
     }
+    const count = selectedRowIds.length;
     setRows((prev) => {
       const nextRows = prev.map((row) =>
         selectedRowIds.includes(row.id)
@@ -514,7 +515,9 @@ function ShopSortWorkbench({
       );
       return renumberRowsByCategoryOrder(nextRows, categories);
     });
-    showToast(`已把 ${selectedRowIds.length} 件商品改到「${categoryName}」`, "success");
+    setSelectedRowIds([]);
+    setBatchTargetCategoryName("");
+    showToast(`已把 ${count} 件商品改到「${categoryName}」`, "success");
   }, [categories, renumberRowsByCategoryOrder, selectedRowIds, showToast]);
 
   const applyBatchTargetCategory = useCallback(() => {
