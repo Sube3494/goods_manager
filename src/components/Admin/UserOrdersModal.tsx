@@ -312,7 +312,7 @@ function UserProfitTrendView({
       <div className="rounded-2xl border border-black/8 bg-white/70 p-3 sm:p-4 shadow-xs backdrop-blur-sm dark:border-white/10 dark:bg-white/4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           {/* 时间预设快捷按钮 */}
-          <div className="flex flex-wrap items-center gap-1.5">
+          <div className="inline-flex flex-wrap items-center rounded-xl border border-black/8 bg-black/3 p-1 dark:border-white/10 dark:bg-white/4">
             {[
               { key: "7d", label: "近7天" },
               { key: "15d", label: "近15天" },
@@ -325,10 +325,10 @@ function UserProfitTrendView({
                 type="button"
                 onClick={() => handleRangePresetChange(p.key)}
                 className={cn(
-                  "rounded-xl px-3 py-1.5 text-xs font-bold transition-all active:scale-95",
+                  "rounded-lg px-3 py-1.5 text-xs transition-all active:scale-95",
                   rangePreset === p.key
-                    ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-sm"
-                    : "border border-black/8 bg-white/80 text-muted-foreground hover:bg-black/4 hover:text-foreground dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10 dark:text-zinc-300"
+                    ? "bg-foreground text-background dark:bg-white dark:text-black font-semibold shadow-xs"
+                    : "text-muted-foreground hover:text-foreground"
                 )}
               >
                 {p.label}
@@ -728,14 +728,14 @@ export function UserOrdersModal({
               {/* 核心 Tab 切换与操作按钮组 */}
               <div className="flex items-center gap-2 shrink-0">
                 {/* 视图 Tab 切换 */}
-                <div className="flex items-center rounded-xl bg-black/5 p-1 dark:bg-white/8">
+                <div className="inline-flex items-center rounded-xl border border-black/8 bg-black/3 p-1 dark:border-white/10 dark:bg-white/4">
                   <button
                     type="button"
                     onClick={() => setActiveTab("today-orders")}
                     className={cn(
-                      "flex items-center gap-1.5 rounded-lg px-2.5 sm:px-3 py-1 sm:py-1.5 text-xs font-bold transition-all active:scale-95",
+                      "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs transition-all active:scale-95",
                       activeTab === "today-orders"
-                        ? "bg-white text-foreground shadow-xs dark:bg-zinc-800 dark:text-white"
+                        ? "bg-foreground text-background dark:bg-white dark:text-black font-semibold shadow-xs"
                         : "text-muted-foreground hover:text-foreground"
                     )}
                   >
@@ -747,10 +747,10 @@ export function UserOrdersModal({
                     type="button"
                     onClick={() => setActiveTab("profit-trend")}
                     className={cn(
-                      "flex items-center gap-1.5 rounded-lg px-2.5 sm:px-3 py-1 sm:py-1.5 text-xs font-bold transition-all active:scale-95",
+                      "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs transition-all active:scale-95",
                       activeTab === "profit-trend"
-                        ? "bg-emerald-600 text-white shadow-xs dark:bg-emerald-500 dark:text-white"
-                        : "text-muted-foreground hover:text-foreground hover:bg-black/4 dark:hover:bg-white/5"
+                        ? "bg-foreground text-background dark:bg-white dark:text-black font-semibold shadow-xs"
+                        : "text-muted-foreground hover:text-foreground"
                     )}
                   >
                     <TrendingUp size={13} />
