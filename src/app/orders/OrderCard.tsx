@@ -2626,14 +2626,14 @@ export const OrderCard = memo(function OrderCard({
                 订单已删除
               </span>
             ) : null}
-            {!pickup && !terminal && !abnormal && order.autoCompleteAt ? (
+            {!pickup && !terminal && !abnormal && Boolean(order.isMainSystemSelfDelivery) && order.autoCompleteAt ? (
               <span className="inline-flex min-w-0 items-center gap-1.5 rounded-full border border-amber-500/15 bg-amber-500/10 px-2.5 py-1 text-[11px] font-medium text-amber-700 dark:text-amber-400 sm:gap-2 sm:px-3 sm:py-1.5 sm:text-xs">
                 <TimerReset size={12} />
                 <span className="truncate sm:hidden">{`自动完成 ${compactAutoCompleteAt}`}</span>
                 <span className="hidden sm:inline">{`预计自动完成 ${formatLocalDateTime(order.autoCompleteAt)}`}</span>
               </span>
             ) : null}
-            {autoCompleteFailed ? (
+            {autoCompleteFailed && Boolean(order.isMainSystemSelfDelivery) ? (
               <span className="inline-flex items-center gap-1.5 rounded-full border border-rose-500/15 bg-rose-500/10 px-2.5 py-1 text-[11px] font-medium text-rose-700 dark:text-rose-400 sm:gap-2 sm:px-3 sm:py-1.5 sm:text-xs">
                 <X size={12} />
                 自动完成失败

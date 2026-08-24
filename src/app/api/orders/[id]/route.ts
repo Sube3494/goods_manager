@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { getAuthorizedUser, getAuthorizedUserAny } from "@/lib/auth";
 import { Prisma } from "../../../../../prisma/generated-client";
 import { returnOutboundOrderById } from "@/lib/outboundReturns";
+import { cancelAutoCompleteJob } from "@/lib/autoPickAutoComplete";
 import {
   getAutoPickIntegrationConfigByUserId,
   readCustomerMaskedPhoneFromRawPayload,
@@ -385,6 +386,9 @@ export async function PATCH(
                 delivery: nextDelivery as Prisma.InputJsonValue,
               }
             : {}),
+          ...(hasBrushToggle && !Boolean(body.isMainSystemSelfDelivery)
+            ? { autoCompleteAt: null }
+            : {}),
           rawPayload: {
             ...rawPayload,
             ...(offlineEdit
@@ -464,9 +468,16 @@ export async function PATCH(
       });
     }
 
+    if (hasBrushToggle && !Boolean(body.isMainSystemSelfDelivery)) {
+      await cancelAutoCompleteJob(order.id, "manual-unmark-brush").catch((error) => {
+        console.error("Failed to cancel auto complete job after unmarking brush:", error);
+      });
+    }
+
     return NextResponse.json({
       ok: true,
       isMainSystemSelfDelivery: hasBrushToggle ? Boolean(body.isMainSystemSelfDelivery) : undefined,
+      autoCompleteAt: hasBrushToggle && !Boolean(body.isMainSystemSelfDelivery) ? null : undefined,
       actualPaid,
       expectedIncome,
       platformCommission,
