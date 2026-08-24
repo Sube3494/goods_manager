@@ -101,6 +101,7 @@ function ChartTooltip({
       shopPlatformPureProfit?: Record<string, Record<string, number>>;
       promotionExpense?: number;
       brushExpense?: number;
+      operatingExpense?: number;
       netProfit?: number;
     };
   }>;
@@ -118,10 +119,14 @@ function ChartTooltip({
   const shopEntries = Object.entries(shopProfits)
     .filter(([, val]) => val !== 0 || Object.keys(shopProfits).length <= 1)
     .sort(([, a], [, b]) => (b as number) - (a as number));
-  const totalPureProfit = dataPoint?.pureProfit ?? 0;
-  const promotionExpense = dataPoint?.promotionExpense ?? 0;
-  const brushExpense = dataPoint?.brushExpense ?? 0;
-  const netProfit = dataPoint?.netProfit ?? (totalPureProfit - promotionExpense - brushExpense);
+  const totalPureProfit = Number(dataPoint?.pureProfit ?? 0);
+  const promotionExpense = Number(dataPoint?.promotionExpense ?? 0);
+  const brushExpense = Number(dataPoint?.brushExpense ?? 0);
+  const operatingExpense = Number(dataPoint?.operatingExpense ?? 0);
+  const netProfit = Number(dataPoint?.netProfit ?? (totalPureProfit - promotionExpense - brushExpense - operatingExpense));
+
+  const expectedNetProfit = totalPureProfit - promotionExpense - brushExpense - operatingExpense;
+  const otherExpense = Number((expectedNetProfit - netProfit).toFixed(2));
 
   return (
     <div className="relative z-[9999] -translate-y-1/2 pointer-events-none min-w-[200px] max-w-[calc(100vw-32px)] max-h-[70vh] overflow-y-auto rounded-[22px] border border-black/8 bg-white p-3 shadow-[0_18px_50px_rgba(15,23,42,0.22)] dark:border-white/10 dark:bg-slate-900 font-normal sm:min-w-[210px] sm:p-3.5">
@@ -196,6 +201,27 @@ function ChartTooltip({
           <div className="flex items-center justify-between gap-4 text-xs font-normal text-rose-500">
             <span>扣除刷单支出:</span>
             <span className="tabular-nums font-semibold">-{money(brushExpense)}</span>
+          </div>
+        )}
+
+        {operatingExpense > 0 && (
+          <div className="flex items-center justify-between gap-4 text-xs font-normal text-rose-500">
+            <span>扣除运营成本:</span>
+            <span className="tabular-nums font-semibold">-{money(operatingExpense)}</span>
+          </div>
+        )}
+
+        {otherExpense > 0.009 && (
+          <div className="flex items-center justify-between gap-4 text-xs font-normal text-rose-500">
+            <span>扣除其他支出:</span>
+            <span className="tabular-nums font-semibold">-{money(otherExpense)}</span>
+          </div>
+        )}
+
+        {otherExpense < -0.009 && (
+          <div className="flex items-center justify-between gap-4 text-xs font-normal text-emerald-600 dark:text-emerald-400">
+            <span>其他收益补贴:</span>
+            <span className="tabular-nums font-semibold">+{money(Math.abs(otherExpense))}</span>
           </div>
         )}
 
