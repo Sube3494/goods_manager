@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
+import { hasAdminAccess } from "@/lib/permissions";
 import { FinanceMath } from "@/lib/math";
 import {
   normalizeAutoPickIntegrationConfig,
@@ -249,10 +250,21 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const requestedUserId = String(request.nextUrl.searchParams.get("userId") || request.nextUrl.searchParams.get("targetUserId") || "").trim();
+    const canManageMembers = hasAdminAccess(user, "members:manage") || user.role === "SUPER_ADMIN";
+    const targetUserId = (canManageMembers && requestedUserId) ? requestedUserId : user.id;
+
+    const targetUserRecord = targetUserId === user.id
+      ? user
+      : await prisma.user.findUnique({
+          where: { id: targetUserId },
+          select: { id: true, permissions: true },
+        });
+
     const storage = await getStorageStrategy();
 
-    const permissionsObj = user?.permissions && typeof user.permissions === "object" && !Array.isArray(user.permissions)
-      ? user.permissions as Record<string, unknown>
+    const permissionsObj = targetUserRecord?.permissions && typeof targetUserRecord.permissions === "object" && !Array.isArray(targetUserRecord.permissions)
+      ? targetUserRecord.permissions as Record<string, unknown>
       : {};
     const integrationConfig = normalizeAutoPickIntegrationConfig(permissionsObj.autoPickIntegration);
     const defaultBrushCommission = integrationConfig.defaultBrushCommission || 0;
@@ -260,7 +272,7 @@ export async function GET(request: NextRequest) {
     const rangeMode = request.nextUrl.searchParams.get("range");
     const shopName = (request.nextUrl.searchParams.get("shopName") || "").trim();
     const settings = await prisma.systemSetting.findFirst({
-      where: { userId: user.id },
+      where: { userId: targetUserId },
     });
     const threshold = settings?.lowStockThreshold ?? 10;
 
@@ -278,7 +290,7 @@ export async function GET(request: NextRequest) {
       const [firstPurchase, firstOutbound, firstBrush, firstSettlement, firstShopProduct, firstAutoPickOrder] = await Promise.all([
         prisma.purchaseOrder.findFirst({
           where: {
-            userId: user.id,
+            userId: targetUserId,
             ...(shopName ? { shopName } : {}),
           },
           orderBy: { date: "asc" },
@@ -286,7 +298,7 @@ export async function GET(request: NextRequest) {
         }),
         prisma.outboundOrder.findFirst({
           where: {
-            userId: user.id,
+            userId: targetUserId,
             ...(shopName ? { note: { contains: `[店铺:${shopName}]` } } : {}),
           },
           orderBy: { date: "asc" },
@@ -294,7 +306,7 @@ export async function GET(request: NextRequest) {
         }),
         prisma.brushOrder.findFirst({
           where: {
-            userId: user.id,
+            userId: targetUserId,
             ...(shopName ? { shopName } : {}),
           },
           orderBy: { date: "asc" },
@@ -302,7 +314,7 @@ export async function GET(request: NextRequest) {
         }),
         prisma.settlement.findFirst({
           where: {
-            userId: user.id,
+            userId: targetUserId,
             ...(shopName
               ? {
                   OR: [
@@ -318,7 +330,7 @@ export async function GET(request: NextRequest) {
         prisma.shopProduct.findFirst({
           where: {
             shop: {
-              userId: user.id,
+              userId: targetUserId,
               ...(shopName ? { name: shopName } : {}),
             },
           },
@@ -327,7 +339,7 @@ export async function GET(request: NextRequest) {
         }),
         prisma.autoPickOrder.findFirst({
           where: {
-            userId: user.id,
+            userId: targetUserId,
           },
           orderBy: { orderTime: "asc" },
           select: {
@@ -358,7 +370,7 @@ export async function GET(request: NextRequest) {
     const [shopCount, shopProductRows, recentInboundItems, purchaseOrdersInRange, outboundOrdersInRange, pendingOrders, autoPickOrdersInRange] = await Promise.all([
       prisma.shop.count({
         where: {
-          userId: user.id,
+          userId: targetUserId,
           isSource: true,
           ...(shopName ? { name: shopName } : {}),
         },
@@ -366,7 +378,7 @@ export async function GET(request: NextRequest) {
       prisma.shopProduct.findMany({
         where: {
           shop: {
-            userId: user.id,
+            userId: targetUserId,
             ...(shopName ? { name: shopName } : {}),
           },
         },
@@ -386,7 +398,7 @@ export async function GET(request: NextRequest) {
         take: 10,
         where: {
           purchaseOrder: {
-            userId: user.id,
+            userId: targetUserId,
             status: "Received",
             NOT: [
               { type: AUTO_INBOUND_TYPE },
@@ -404,7 +416,7 @@ export async function GET(request: NextRequest) {
       }),
       prisma.purchaseOrder.findMany({
         where: {
-          userId: user.id,
+          userId: targetUserId,
           ...(shopName ? { shopName } : {}),
           date: { gte: startDate, lte: endDate },
         },
@@ -419,7 +431,7 @@ export async function GET(request: NextRequest) {
       }),
       prisma.outboundOrder.findMany({
         where: {
-          userId: user.id,
+          userId: targetUserId,
           ...(shopName ? { note: { contains: `[店铺:${shopName}]` } } : {}),
           date: { gte: startDate, lte: endDate },
         },
@@ -438,7 +450,7 @@ export async function GET(request: NextRequest) {
       }),
       prisma.purchaseOrder.findMany({
         where: {
-          userId: user.id,
+          userId: targetUserId,
           status: "Ordered",
           ...(shopName ? { shopName } : {}),
         },
@@ -449,7 +461,7 @@ export async function GET(request: NextRequest) {
       }),
       prisma.autoPickOrder.findMany({
         where: {
-          userId: user.id,
+          userId: targetUserId,
           orderTime: { gte: startDate, lte: endDate },
         },
         select: {
@@ -481,7 +493,7 @@ export async function GET(request: NextRequest) {
     const [brushOrdersInRange, promotionExpensesInRange] = await Promise.all([
       prisma.brushOrder.findMany({
         where: {
-          userId: user.id,
+          userId: targetUserId,
           ...(shopName ? { shopName } : {}),
           date: { gte: startDate, lte: endDate },
         },
@@ -499,7 +511,7 @@ export async function GET(request: NextRequest) {
       }),
       prisma.dailyPromotionExpense.findMany({
         where: {
-          userId: user.id,
+          userId: targetUserId,
           ...(shopName ? { shopName } : {}),
           date: { gte: startDate, lte: endDate },
         },
@@ -513,10 +525,10 @@ export async function GET(request: NextRequest) {
       }),
     ]);
     const operatingCostProfiles = await prisma.operatingCostProfile.findMany({
-      where: { userId: user.id, ...(shopName ? { shopName } : {}) },
+      where: { userId: targetUserId, ...(shopName ? { shopName } : {}) },
     });
     const operatingCostBills = await prisma.operatingCostMonthlyBill.findMany({
-      where: { userId: user.id, ...(shopName ? { shopName } : {}) },
+      where: { userId: targetUserId, ...(shopName ? { shopName } : {}) },
     });
     perf.lap("secondary-queries");
 
@@ -629,7 +641,7 @@ export async function GET(request: NextRequest) {
       try {
         outboundOrdersForCost.push(...(await prisma.outboundOrder.findMany({
           where: {
-            userId: user.id,
+            userId: targetUserId,
             OR: outboundLookupOrderNos.flatMap((orderNo) => [
               { note: { contains: `平台单号: ${orderNo}` } },
               { note: { contains: `平台单号:${orderNo}` } },
@@ -665,7 +677,7 @@ export async function GET(request: NextRequest) {
 
         outboundOrdersForCost.push(...(await prisma.outboundOrder.findMany({
           where: {
-            userId: user.id,
+            userId: targetUserId,
             OR: outboundLookupOrderNos.flatMap((orderNo) => [
               { note: { contains: `平台单号: ${orderNo}` } },
               { note: { contains: `平台单号:${orderNo}` } },
