@@ -322,8 +322,8 @@ function UserProfitTrendView({
                 className={cn(
                   "rounded-xl px-3 py-1.5 text-xs font-bold transition-all active:scale-95",
                   rangePreset === p.key
-                    ? "bg-primary text-white shadow-xs"
-                    : "border border-black/8 bg-white/80 text-muted-foreground hover:bg-black/4 hover:text-foreground dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10"
+                    ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-sm"
+                    : "border border-black/8 bg-white/80 text-muted-foreground hover:bg-black/4 hover:text-foreground dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10 dark:text-zinc-300"
                 )}
               >
                 {p.label}
@@ -742,7 +742,7 @@ export function UserOrdersModal({
                     className={cn(
                       "flex items-center gap-1.5 rounded-lg px-2.5 sm:px-3 py-1 sm:py-1.5 text-xs font-bold transition-all active:scale-95",
                       activeTab === "profit-trend"
-                        ? "bg-primary text-white shadow-xs dark:bg-primary dark:text-white"
+                        ? "bg-emerald-600 text-white shadow-xs dark:bg-emerald-500 dark:text-white"
                         : "text-muted-foreground hover:text-foreground hover:bg-black/4 dark:hover:bg-white/5"
                     )}
                   >
