@@ -763,6 +763,14 @@ export function formatCompactDateTime(value: string | null | undefined) {
   const text = String(value || "").trim();
   if (!text) return "-";
 
+  // 如果包含时间区间，比如 08-24 18:45-19:15 或 18:45-19:15
+  const rangeMatch = text.match(/(\d{4}[-/])?(\d{2}[-/]\d{2}\s+)?(\d{1,2}:\d{2}(?::\d{2})?\s*[-~至]\s*\d{1,2}:\d{2}(?::\d{2})?)/);
+  if (rangeMatch) {
+    const datePart = rangeMatch[2] || "";
+    const rangePart = rangeMatch[3];
+    return `${datePart}${rangePart}`.trim();
+  }
+
   const date = new Date(text);
   if (!Number.isNaN(date.getTime())) {
     const month = `${date.getMonth() + 1}`.padStart(2, "0");
@@ -800,7 +808,19 @@ export function getProductCostStatusText(order: Pick<AutoPickOrder, "productCost
   return "";
 }
 
-export function getDeadlineDisplay(order: Pick<AutoPickOrder, "isPickup" | "deliveryDeadline" | "deliveryTimeRange" | "orderTime" | "createdAt"> & { platform?: string | null; channelTag?: string | null }) {
+export function shiftTimeMinutes(timeStr: string, deltaMinutes: number): string {
+  const match = timeStr.trim().match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  if (!match) return timeStr;
+  const hours = parseInt(match[1], 10);
+  const minutes = parseInt(match[2], 10);
+  let totalMinutes = hours * 60 + minutes + deltaMinutes;
+  totalMinutes = (totalMinutes % 1440 + 1440) % 1440;
+  const newHours = Math.floor(totalMinutes / 60);
+  const newMinutes = totalMinutes % 60;
+  return `${String(newHours).padStart(2, "0")}:${String(newMinutes).padStart(2, "0")}`;
+}
+
+export function getDeadlineDisplay(order: Pick<AutoPickOrder, "isPickup" | "isSubscribe" | "deliveryDeadline" | "deliveryTimeRange" | "orderTime" | "createdAt"> & { platform?: string | null; channelTag?: string | null }) {
   const deadlineText = String(order.deliveryDeadline || "").trim();
   const rangeText = String(order.deliveryTimeRange || "").trim();
   const text = order.isPickup ? (rangeText || deadlineText) : (rangeText || deadlineText);
@@ -824,45 +844,55 @@ export function getDeadlineDisplay(order: Pick<AutoPickOrder, "isPickup" | "deli
     datePrefix = dateMatch[0] + " ";
   }
 
-  // 自动补齐秒级（如果只有 HH:mm 格式，补齐为 HH:mm:00）
-  const ensureSeconds = (val: string) => {
-    const trimmed = val.trim();
-    if (/\b\d{1,2}:\d{2}$/.test(trimmed)) {
-      return trimmed + ":00";
-    }
-    return trimmed;
-  };
-
   const isJd = isJdOrder(order.platform, order.channelTag);
+  const isMeituan = isMeituanOrder(order.platform, order.channelTag);
+  const isSubscribe = Boolean(order.isSubscribe);
+
+  // 美团预约单：美团真实最晚送达时间 = 麦芽田基准时间 + 20分钟，真实时间区间为 30 分钟窗口
+  if (isMeituan && isSubscribe) {
+    const baseMatch = text.match(/\d{1,2}:\d{2}/);
+    if (baseMatch) {
+      const baseTime = baseMatch[0];
+      const realStart = shiftTimeMinutes(baseTime, -10);
+      const realEnd = shiftTimeMinutes(baseTime, 20);
+      return `${datePrefix}${realStart}-${realEnd}`;
+    }
+  }
 
   // 优先匹配标准时间段: HH:mm-HH:mm, HH:mm~HH:mm, HH:mm至HH:mm 等
   const rangeMatch = text.match(/(\d{1,2}:\d{2}(?::\d{2})?)\s*[-~至]\s*(\d{1,2}:\d{2}(?::\d{2})?)/);
   if (rangeMatch) {
+    if (isSubscribe) {
+      return `${datePrefix}${rangeMatch[1]}-${rangeMatch[2]}`;
+    }
     const startTime = rangeMatch[1];
     const endTime = rangeMatch[2];
     const targetTime = isJd ? endTime : startTime;
-    return ensureSeconds(`${datePrefix}${targetTime}`);
+    return `${datePrefix}${targetTime}`;
   }
 
-  // 如果包含范围连字符：只有京东订单是读取时间段结束的时间，其他平台都是时间段开始的时间
+  // 如果包含范围连字符
   const parts = text.split(/\s*[-~至]\s*/);
   if (parts.length > 1) {
+    if (isSubscribe) {
+      return text;
+    }
     const targetSegment = isJd ? parts[parts.length - 1].trim() : parts[0].trim();
     const timeMatch = targetSegment.match(/\d{1,2}:\d{2}(:\d{2})?/);
     if (timeMatch) {
-      return ensureSeconds(`${datePrefix}${timeMatch[0]}`);
+      return `${datePrefix}${timeMatch[0]}`;
     }
-    return ensureSeconds(`${datePrefix}${targetSegment}`);
+    return `${datePrefix}${targetSegment}`;
   }
 
-  // 兜底：如果只是单一时间，也尝试仅抓取时分并拼接日期前缀
+  // 兜底：如果只是单一时间
   const timeMatch = text.match(/\d{1,2}:\d{2}(:\d{2})?/);
   if (timeMatch) {
-    return ensureSeconds(`${datePrefix}${timeMatch[0]}`);
+    return `${datePrefix}${timeMatch[0]}`;
   }
 
   const firstTimeMatch = text.match(/^(.*?\d{1,2}:\d{2})/);
-  return firstTimeMatch?.[1] ? ensureSeconds(firstTimeMatch[1].trim()) : "-";
+  return firstTimeMatch?.[1] ? `${datePrefix}${firstTimeMatch[1].trim()}` : "-";
 }
 
 export function MetricCard({
@@ -2613,10 +2643,20 @@ export const OrderCard = memo(function OrderCard({
               <span className="ml-auto inline-flex min-w-0 items-center justify-end gap-1.5 rounded-full border border-black/8 bg-white/85 px-2.5 py-1 text-[11px] font-medium text-muted-foreground dark:border-white/10 dark:bg-white/4 sm:ml-0 sm:justify-start sm:gap-2 sm:px-3 sm:py-1.5 sm:text-xs">
                 <Clock3 size={12} />
                 <span className="min-w-0 text-right sm:hidden">
-                  <span className="block truncate">{pickup ? `取货 ${compactDeadlineDisplay}` : `最晚 ${compactDeadlineDisplay}`}</span>
+                  <span className="block truncate">
+                    {pickup
+                      ? `取货 ${compactDeadlineDisplay}`
+                      : order.isSubscribe
+                        ? `预约 ${compactDeadlineDisplay}`
+                        : `最晚 ${compactDeadlineDisplay}`}
+                  </span>
                 </span>
                 <span className="hidden sm:inline">
-                  {pickup ? `取货时间 ${deadlineDisplay}` : `最晚送达 ${deadlineDisplay}`}
+                  {pickup
+                    ? `取货时间 ${deadlineDisplay}`
+                    : order.isSubscribe
+                      ? `预约时间 ${deadlineDisplay}`
+                      : `最晚送达 ${deadlineDisplay}`}
                 </span>
               </span>
             ) : null}
@@ -2796,7 +2836,7 @@ export const OrderCard = memo(function OrderCard({
                 <DetailStat label="出库状态" value={hasOutbound ? (productCostStatusText ? `已出库 · ${productCostStatusText}` : "已出库") : (autoOutboundFailed ? "自动出库失败" : "未出库")} />
                 <DetailStat label="履约方式" value={getFulfillmentLabel(order)} />
                 <DetailStat label="配送距离" value={pickup ? "-" : formatDistanceKm(order.distanceKm)} />
-                <DetailStat label={pickup ? "取货时间" : "最晚送达"} value={deadlineDisplay} />
+                <DetailStat label={pickup ? "取货时间" : order.isSubscribe ? "预约时间" : "最晚送达"} value={deadlineDisplay} />
                 <DetailStat
                   label="订单坐标"
                   value={order.longitude != null && order.latitude != null ? `${order.longitude}, ${order.latitude}` : "-"}
@@ -2900,7 +2940,13 @@ export const OrderCard = memo(function OrderCard({
                   <DetailStat label="骑手电话" value={riderPhone} valueClassName="break-all text-[13px] sm:text-sm" />
                   <DetailStat label="取餐时间" value={removeYear(order.delivery?.pickupTime)} />
                   <DetailStat
-                    label={isAutoPickOrderCompletedStatus(order.status) ? "送达时间" : "最晚送达"}
+                    label={
+                      isAutoPickOrderCompletedStatus(order.status)
+                        ? "送达时间"
+                        : order.isSubscribe
+                          ? "预约送达"
+                          : "最晚送达"
+                    }
                     value={
                       isAutoPickOrderCompletedStatus(order.status)
                         ? removeYear(order.delivery?.completedTime || order.completedAt)
