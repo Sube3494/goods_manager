@@ -206,7 +206,7 @@ function ChartTooltip({
 
         {operatingExpense > 0 && (
           <div className="flex items-center justify-between gap-4 text-xs font-normal text-rose-500">
-            <span>扣除运营成本:</span>
+            <span>扣除经营成本:</span>
             <span className="tabular-nums font-semibold">-{money(operatingExpense)}</span>
           </div>
         )}
