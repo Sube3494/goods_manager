@@ -415,8 +415,10 @@ export function DataOverview({
   const [profitPlatform, setProfitPlatform] = useState("all");
   const [orderPlatform, setOrderPlatform] = useState("all");
   const [orderScope, setOrderScope] = useState<"all" | "true">("all");
-  const [isProfitExpanded, setIsProfitExpanded] = useState(false);
-  const [isOrderExpanded, setIsOrderExpanded] = useState(false);
+  const [expandedChart, setExpandedChart] = useState<"none" | "profit" | "order">("none");
+
+  const isProfitExpanded = expandedChart === "profit";
+  const isOrderExpanded = expandedChart === "order";
 
   const businessTrend = data?.businessTrend || [];
   const rangeDays = useMemo(() => countDays(startDate, endDate), [endDate, startDate]);
@@ -717,9 +719,9 @@ export function DataOverview({
         </div>
       </Panel>
 
-      <div className={cn("grid gap-6", (isProfitExpanded || isOrderExpanded) ? "grid-cols-1" : "xl:grid-cols-2")}>
+      <div className="grid gap-6 grid-cols-1 xl:grid-cols-2">
         <Panel
-          className={cn("relative z-20 transition-all duration-200", isProfitExpanded ? "col-span-full" : "")}
+          className={cn("relative z-20 transition-all duration-200", isProfitExpanded ? "xl:col-span-2" : "xl:col-span-1")}
           title="每日盈亏"
           subtitle="每日净利润走势"
           action={(
@@ -733,7 +735,7 @@ export function DataOverview({
               />
               <button
                 type="button"
-                onClick={() => setIsProfitExpanded((prev) => !prev)}
+                onClick={() => setExpandedChart((prev) => (prev === "profit" ? "none" : "profit"))}
                 className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-black/8 bg-white text-muted-foreground hover:text-foreground hover:bg-black/3 dark:border-white/10 dark:bg-white/[0.03] dark:hover:bg-white/10 transition-all active:scale-95 cursor-pointer"
                 title={isProfitExpanded ? "收起为并排显示" : "独占整行全宽展示"}
               >
@@ -777,7 +779,7 @@ export function DataOverview({
         </Panel>
 
         <Panel
-          className={cn("relative z-10 transition-all duration-200", isOrderExpanded ? "col-span-full" : "")}
+          className={cn("relative z-10 transition-all duration-200", isOrderExpanded ? "xl:col-span-2" : "xl:col-span-1")}
           title="订单波动"
           subtitle={orderScope === "true" ? "按日期查看真单变化" : "按日期查看订单变化"}
           actionMobileStack
@@ -802,7 +804,7 @@ export function DataOverview({
               />
               <button
                 type="button"
-                onClick={() => setIsOrderExpanded((prev) => !prev)}
+                onClick={() => setExpandedChart((prev) => (prev === "order" ? "none" : "order"))}
                 className="hidden sm:inline-flex h-9 w-9 items-center justify-center rounded-xl border border-black/8 bg-white text-muted-foreground hover:text-foreground hover:bg-black/3 dark:border-white/10 dark:bg-white/[0.03] dark:hover:bg-white/10 transition-all active:scale-95 cursor-pointer shrink-0"
                 title={isOrderExpanded ? "收起为并排显示" : "独占整行全宽展示"}
               >
