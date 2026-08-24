@@ -341,8 +341,10 @@ function CustomizedDot(props: CustomizedDotProps) {
     <circle
       cx={cx}
       cy={cy}
-      r={2.5}
+      r={3}
       fill={isNegative ? "#ef4444" : "#22c55e"}
+      stroke="#ffffff"
+      strokeWidth={1.5}
     />
   );
 }
@@ -356,10 +358,10 @@ function CustomizedActiveDot(props: CustomizedDotProps) {
     <circle
       cx={cx}
       cy={cy}
-      r={4}
+      r={5}
+      fill={isNegative ? "#ef4444" : "#22c55e"}
       stroke="#ffffff"
       strokeWidth={2}
-      fill={isNegative ? "#ef4444" : "#22c55e"}
     />
   );
 }
