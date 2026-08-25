@@ -4143,7 +4143,11 @@ function buildProgressStatus(progress: AutoPickProgressPayload, currentStatus?: 
   if (statusHint === "delivering") {
     return "delivering";
   }
+  const currentPriority = getAutoPickStatusPriority(currentStatus);
   if (statusHint === "meal") {
+    if (currentPriority >= getAutoPickStatusPriority("delivery")) {
+      return currentStatus || "已拣货";
+    }
     return "已拣货";
   }
   if (
@@ -4158,8 +4162,6 @@ function buildProgressStatus(progress: AutoPickProgressPayload, currentStatus?: 
   ) {
     return "cancel";
   }
-
-  const currentPriority = getAutoPickStatusPriority(currentStatus);
   if (progress.pickCompleted) {
     if (currentPriority >= getAutoPickStatusPriority("delivery")) {
       return currentStatus || "已拣货";
@@ -4378,6 +4380,11 @@ function resolvePreservedPickingStatus(existing: {
   status?: string | null;
   rawPayload?: unknown;
 }, incomingStatus?: string | null) {
+  const existingPriority = getAutoPickStatusPriority(existing.status);
+  if (existingPriority >= getAutoPickStatusPriority("待配送")) {
+    return null;
+  }
+
   const progress = readAutoPickPickProgress(existing.rawPayload);
   if (!progress || (!progress.pickCompleted && typeof progress.pickRemainingSeconds !== "number")) {
     return null;
@@ -4432,13 +4439,18 @@ function shouldPreserveRealtimeStatus(existing: {
   status?: string | null;
   rawPayload?: unknown;
 }, incomingStatus?: string | null) {
-  const record = readAutoPickRawPayloadRecord(existing.rawPayload);
-  const wsStatusHint = String(record.wsStatusHint || "").trim().toLowerCase();
-  if (!wsStatusHint) {
+  if (!existing.status) {
     return false;
   }
 
-  return getAutoPickStatusPriority(existing.status) > getAutoPickStatusPriority(incomingStatus);
+  const existingPriority = getAutoPickStatusPriority(existing.status);
+  const incomingPriority = getAutoPickStatusPriority(incomingStatus);
+
+  if (isAutoPickOrderTerminalStatus(incomingStatus)) {
+    return false;
+  }
+
+  return existingPriority > incomingPriority;
 }
 
 function toAutoPickBaseProductName(value: string | null | undefined) {
