@@ -6,6 +6,7 @@ import { InventoryService } from "@/services/inventoryService";
 import { FinanceMath } from "@/lib/math";
 import { getStorageStrategy } from "@/lib/storage";
 import { getOutboundOrderItemSchemaErrorMessage } from "@/lib/prismaSchemaCompat";
+import { getOutboundReturnedQuantityMap, parseOutboundReturnMeta } from "@/lib/outboundReturnMeta";
 import { getPlatformMeta, parseOutboundNote } from "@/lib/utils";
  
 interface OutboundItem {
@@ -38,6 +39,18 @@ function resolveOutboundShopName(order: {
 function resolveOutboundPlatform(note: string | null | undefined) {
   const rawPlatform = parseOutboundNote(note).platform;
   return getPlatformMeta(rawPlatform)?.name || null;
+}
+
+function getOutboundItemReturnedQuantity(
+  order: { note?: string | null; status?: string | null },
+  item: { id: string; quantity: number }
+) {
+  const returnEntries = parseOutboundReturnMeta(order.note).returns;
+  if (returnEntries.length > 0) {
+    return Math.min(item.quantity, getOutboundReturnedQuantityMap(returnEntries).get(item.id) || 0);
+  }
+
+  return order.status === "Returned" ? item.quantity : 0;
 }
 
 export async function GET(request: NextRequest) {
@@ -80,60 +93,62 @@ export async function GET(request: NextRequest) {
     const takeForFilter = shouldPostFilter ? 500 : pageSize;
     const skipForFilter = shouldPostFilter ? 0 : (page - 1) * pageSize;
 
-    const [orders, total, filterSource] = await Promise.all([
-      prisma.outboundOrder.findMany({
-        where,
+    const orderSelect = {
+      id: true,
+      type: true,
+      date: true,
+      note: true,
+      createdAt: true,
+      updatedAt: true,
+      status: true,
+      items: {
         select: {
           id: true,
-          type: true,
-          date: true,
-          note: true,
-          createdAt: true,
-          updatedAt: true,
-          status: true,
-          items: {
+          outboundOrderId: true,
+          productId: true,
+          shopProductId: true,
+          quantity: true,
+          price: true,
+          costSnapshot: true,
+          product: {
             select: {
               id: true,
-              outboundOrderId: true,
+              name: true,
+              sku: true,
+              image: true,
+            },
+          },
+          shopProduct: {
+            select: {
+              id: true,
               productId: true,
-              shopProductId: true,
-              quantity: true,
-              price: true,
-              costSnapshot: true,
-              product: {
-                select: {
-                  id: true,
-                  name: true,
-                  sku: true,
-                  image: true,
-                },
-              },
-              shopProduct: {
-                select: {
-                  id: true,
-                  productId: true,
-                  sourceProductId: true,
-                  sku: true,
-                  productName: true,
-                  productImage: true,
-                  categoryId: true,
-                  categoryName: true,
-                  supplierId: true,
-                  costPrice: true,
-                  stock: true,
-                  shopId: true,
-                  isPublic: true,
-                  isDiscontinued: true,
-                  remark: true,
-                  specs: true,
-                  createdAt: true,
-                  updatedAt: true,
-                  shop: { select: { id: true, name: true } },
-                },
-              },
+              sourceProductId: true,
+              sku: true,
+              productName: true,
+              productImage: true,
+              categoryId: true,
+              categoryName: true,
+              supplierId: true,
+              costPrice: true,
+              stock: true,
+              shopId: true,
+              isPublic: true,
+              isDiscontinued: true,
+              remark: true,
+              specs: true,
+              createdAt: true,
+              updatedAt: true,
+              shop: { select: { id: true, name: true } },
             },
           },
         },
+      },
+    } satisfies Prisma.OutboundOrderSelect;
+
+    const [orders, total, filterSource, analyticsSource] = await Promise.all([
+      prisma.outboundOrder.findMany({
+        where,
+        select: orderSelect,
         orderBy: { date: "desc" },
         skip: skipForFilter,
         take: takeForFilter,
@@ -156,6 +171,12 @@ export async function GET(request: NextRequest) {
         orderBy: { date: "desc" },
         take: 1000,
       }),
+      prisma.outboundOrder.findMany({
+        where,
+        select: orderSelect,
+        orderBy: { date: "desc" },
+        take: 5000,
+      }),
     ]);
 
     const filteredOrders = shouldPostFilter
@@ -175,6 +196,84 @@ export async function GET(request: NextRequest) {
     const allShopNames = Array.from(new Set(filterSource.map((order) => resolveOutboundShopName(order)).filter(Boolean) as string[])).sort();
 
     const storage = await getStorageStrategy();
+    const analyticsOrders = (shouldPostFilter
+      ? analyticsSource.filter((order) => {
+          const platform = resolveOutboundPlatform(order.note);
+          const shopName = resolveOutboundShopName(order);
+          return (!platformFilter || platform === platformFilter)
+            && (!shopFilter || shopName === shopFilter);
+        })
+      : analyticsSource
+    ).filter((order) => order.type === "Sale");
+
+    const productSalesMap = new Map<string, {
+      key: string;
+      productId: string | null;
+      shopProductId: string | null;
+      name: string;
+      sku: string | null;
+      image: string | null;
+      shopName: string | null;
+      soldQuantity: number;
+      returnedQuantity: number;
+      netQuantity: number;
+      orderCount: number;
+      lastOutboundAt: Date | null;
+    }>();
+
+    analyticsOrders.forEach((order) => {
+      const countedOrderKeys = new Set<string>();
+      order.items.forEach((item) => {
+        const shopProduct = item.shopProduct;
+        const key = item.shopProductId || item.productId || item.product?.sku || item.id;
+        const existing = productSalesMap.get(key) || {
+          key,
+          productId: item.productId || shopProduct?.productId || null,
+          shopProductId: item.shopProductId || null,
+          name: shopProduct?.productName || item.product?.name || "未知商品",
+          sku: shopProduct?.sku || item.product?.sku || null,
+          image: shopProduct?.productImage || item.product?.image || null,
+          shopName: shopProduct?.shop?.name || null,
+          soldQuantity: 0,
+          returnedQuantity: 0,
+          netQuantity: 0,
+          orderCount: 0,
+          lastOutboundAt: null,
+        };
+
+        const quantity = Math.max(0, Number(item.quantity || 0));
+        const returnedQuantity = getOutboundItemReturnedQuantity(order, {
+          id: item.id,
+          quantity,
+        });
+
+        existing.soldQuantity += quantity;
+        existing.returnedQuantity += returnedQuantity;
+        existing.netQuantity = Math.max(0, existing.soldQuantity - existing.returnedQuantity);
+        if (!countedOrderKeys.has(key)) {
+          existing.orderCount += 1;
+          countedOrderKeys.add(key);
+        }
+        if (!existing.lastOutboundAt || order.date > existing.lastOutboundAt) {
+          existing.lastOutboundAt = order.date;
+        }
+
+        productSalesMap.set(key, existing);
+      });
+    });
+
+    const productSales = Array.from(productSalesMap.values())
+      .map((item) => ({
+        ...item,
+        image: item.image ? storage.resolveUrl(item.image) : item.image,
+        returnRate: item.soldQuantity > 0 ? item.returnedQuantity / item.soldQuantity : 0,
+        lastOutboundAt: item.lastOutboundAt ? item.lastOutboundAt.toISOString() : null,
+      }))
+      .sort((a, b) => b.soldQuantity - a.soldQuantity || b.returnRate - a.returnRate);
+
+    const soldQuantity = productSales.reduce((sum, item) => sum + item.soldQuantity, 0);
+    const returnedQuantity = productSales.reduce((sum, item) => sum + item.returnedQuantity, 0);
+
     const normalizedOrders = pageOrders.map((order) => ({
       ...order,
       items: order.items.map((item) => ({
@@ -218,6 +317,16 @@ export async function GET(request: NextRequest) {
       filters: {
         platforms: allPlatforms,
         shops: allShopNames,
+      },
+      analytics: {
+        productSales,
+        totals: {
+          soldQuantity,
+          returnedQuantity,
+          netQuantity: Math.max(0, soldQuantity - returnedQuantity),
+          skuCount: productSales.length,
+          returnRate: soldQuantity > 0 ? returnedQuantity / soldQuantity : 0,
+        },
       },
     });
   } catch (error) {

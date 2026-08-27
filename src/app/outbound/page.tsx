@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 
-import { Plus, Search, Package, History, RotateCcw, AlertCircle, Store, Eye, Filter, Pencil } from "lucide-react";
+import { Plus, Search, Package, History, RotateCcw, AlertCircle, Store, Eye, Filter, Pencil, BarChart3, TrendingUp, ArrowDownUp } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { OutboundModal } from "@/components/Outbound/OutboundModal";
 import { OutboundDetailModal } from "@/components/Outbound/OutboundDetailModal";
@@ -86,10 +86,55 @@ function OutboundCardSkeleton() {
   );
 }
 
+type AnalyticsSort = "sold-desc" | "return-rate-desc" | "returned-desc" | "net-desc" | "recent-desc";
+
+interface OutboundProductSalesItem {
+  key: string;
+  productId?: string | null;
+  shopProductId?: string | null;
+  name: string;
+  sku?: string | null;
+  image?: string | null;
+  shopName?: string | null;
+  soldQuantity: number;
+  returnedQuantity: number;
+  netQuantity: number;
+  orderCount: number;
+  returnRate: number;
+  lastOutboundAt?: string | null;
+}
+
+interface OutboundAnalytics {
+  productSales: OutboundProductSalesItem[];
+  totals: {
+    soldQuantity: number;
+    returnedQuantity: number;
+    netQuantity: number;
+    skuCount: number;
+    returnRate: number;
+  };
+}
+
+const emptyOutboundAnalytics: OutboundAnalytics = {
+  productSales: [],
+  totals: {
+    soldQuantity: 0,
+    returnedQuantity: 0,
+    netQuantity: 0,
+    skuCount: 0,
+    returnRate: 0,
+  },
+};
+
+function formatPercent(value: number) {
+  return `${(Math.max(0, value || 0) * 100).toFixed(1)}%`;
+}
+
 export default function OutboundPage() {
   const [orders, setOrders] = useState<OutboundOrder[]>([]);
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
+  const [analytics, setAnalytics] = useState<OutboundAnalytics>(emptyOutboundAnalytics);
   const [allShopNames, setAllShopNames] = useState<string[]>([]);
   const [allPlatforms, setAllPlatforms] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -105,6 +150,7 @@ export default function OutboundPage() {
   const [selectedShop, setSelectedShop] = useState("全部门店");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
+  const [analyticsSort, setAnalyticsSort] = useState<AnalyticsSort>("sold-desc");
   const [isFiltersExpanded, setIsFiltersExpanded] = useState(false);
   const { showToast } = useToast();
   const { user } = useUser();
@@ -135,6 +181,7 @@ export default function OutboundPage() {
           setOrders(data);
           setTotalItems(data.length);
           setTotalPages(Math.max(1, Math.ceil(data.length / pageSize)));
+          setAnalytics(emptyOutboundAnalytics);
           return;
         }
 
@@ -143,6 +190,7 @@ export default function OutboundPage() {
         setTotalPages(Math.max(1, Number(data.meta?.totalPages || 1)));
         setAllPlatforms(Array.isArray(data.filters?.platforms) ? data.filters.platforms : []);
         setAllShopNames(Array.isArray(data.filters?.shops) ? data.filters.shops : []);
+        setAnalytics(data.analytics && Array.isArray(data.analytics.productSales) ? data.analytics : emptyOutboundAnalytics);
       }
     } catch (error) {
       console.error("Failed to fetch outbound orders:", error);
@@ -209,6 +257,33 @@ export default function OutboundPage() {
            (platformFilter !== "全部平台" ? 1 : 0) + 
            (selectedShop !== "全部门店" ? 1 : 0);
   }, [typeFilter, platformFilter, selectedShop]);
+
+  const sortedProductSales = useMemo(() => {
+    const items = [...analytics.productSales];
+    items.sort((a, b) => {
+      if (analyticsSort === "return-rate-desc") {
+        return b.returnRate - a.returnRate || b.returnedQuantity - a.returnedQuantity || b.soldQuantity - a.soldQuantity;
+      }
+      if (analyticsSort === "returned-desc") {
+        return b.returnedQuantity - a.returnedQuantity || b.returnRate - a.returnRate || b.soldQuantity - a.soldQuantity;
+      }
+      if (analyticsSort === "net-desc") {
+        return b.netQuantity - a.netQuantity || b.soldQuantity - a.soldQuantity;
+      }
+      if (analyticsSort === "recent-desc") {
+        return new Date(b.lastOutboundAt || 0).getTime() - new Date(a.lastOutboundAt || 0).getTime();
+      }
+      return b.soldQuantity - a.soldQuantity || b.netQuantity - a.netQuantity;
+    });
+    return items;
+  }, [analytics.productSales, analyticsSort]);
+
+  const highReturnProducts = useMemo(() => {
+    return [...analytics.productSales]
+      .filter((item) => item.returnedQuantity > 0)
+      .sort((a, b) => b.returnRate - a.returnRate || b.returnedQuantity - a.returnedQuantity)
+      .slice(0, 6);
+  }, [analytics.productSales]);
 
   return (
     <div className="space-y-8 animate-in fade-in zoom-in-95 duration-500 pb-20">
@@ -367,6 +442,171 @@ export default function OutboundPage() {
             </div>
           </div>
         )}
+      </div>
+
+      {/* Product Analytics */}
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.75fr)]">
+        <section className="rounded-2xl border border-border bg-white dark:bg-white/5 shadow-sm overflow-hidden">
+          <div className="flex flex-col gap-3 border-b border-border/70 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <BarChart3 size={18} />
+              </span>
+              <div className="min-w-0">
+                <h2 className="text-base font-black text-foreground">商品表现</h2>
+                <p className="text-xs text-muted-foreground">
+                  {analytics.totals.skuCount} 个 SKU · 出库 {analytics.totals.soldQuantity} 件 · 退回 {analytics.totals.returnedQuantity} 件
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="hidden sm:inline-flex items-center gap-1.5 text-xs font-bold text-muted-foreground">
+                <ArrowDownUp size={13} />
+                排序
+              </span>
+              <div className="w-full sm:w-36 h-10">
+                <CustomSelect
+                  value={analyticsSort}
+                  onChange={(value) => setAnalyticsSort(value as AnalyticsSort)}
+                  options={[
+                    { value: "sold-desc", label: "销量最高" },
+                    { value: "return-rate-desc", label: "退货率最高" },
+                    { value: "returned-desc", label: "退货最多" },
+                    { value: "net-desc", label: "净销量最高" },
+                    { value: "recent-desc", label: "最近出库" },
+                  ]}
+                  className="h-full"
+                  triggerClassName="h-full rounded-full border shadow-sm text-xs font-bold px-4 bg-white dark:bg-white/5 border-border dark:border-white/10"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 border-b border-border/70">
+            {[
+              { label: "销售件数", value: analytics.totals.soldQuantity },
+              { label: "净出库", value: analytics.totals.netQuantity },
+              { label: "退货件数", value: analytics.totals.returnedQuantity },
+              { label: "整体退货率", value: formatPercent(analytics.totals.returnRate) },
+            ].map((item) => (
+              <div key={item.label} className="px-4 py-3 border-r border-border/60 last:border-r-0 odd:border-r sm:odd:border-r">
+                <p className="text-[11px] font-bold text-muted-foreground">{item.label}</p>
+                <p className="mt-1 text-lg font-black tabular-nums text-foreground">{item.value}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="divide-y divide-border/70">
+            {isLoading ? (
+              Array.from({ length: 4 }).map((_, index) => (
+                <div key={index} className="flex items-center gap-3 px-4 py-3 animate-pulse">
+                  <div className="h-10 w-10 rounded-xl bg-black/6 dark:bg-white/8" />
+                  <div className="flex-1 space-y-1.5">
+                    <div className="h-3.5 w-2/3 rounded bg-black/6 dark:bg-white/8" />
+                    <div className="h-2.5 w-1/3 rounded bg-black/4 dark:bg-white/5" />
+                  </div>
+                  <div className="h-4 w-16 rounded bg-black/6 dark:bg-white/8" />
+                </div>
+              ))
+            ) : sortedProductSales.length > 0 ? (
+              sortedProductSales.slice(0, 12).map((item, index) => (
+                <div key={item.key} className="grid grid-cols-[auto_minmax(0,1fr)] gap-3 px-4 py-3 sm:grid-cols-[auto_minmax(0,1fr)_92px_92px_92px] sm:items-center">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-muted text-[11px] font-black text-muted-foreground">
+                    {index + 1}
+                  </div>
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl bg-muted">
+                      {item.image ? (
+                        <Image src={item.image} alt="" fill sizes="40px" className="object-cover" />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+                          <Package size={16} />
+                        </div>
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-black text-foreground">{item.name}</p>
+                      <p className="truncate text-[11px] font-medium text-muted-foreground">
+                        {[item.sku, item.shopName].filter(Boolean).join(" · ") || "未记录 SKU"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="col-span-2 grid grid-cols-3 gap-2 text-right sm:col-span-3">
+                    <div>
+                      <p className="text-[10px] font-bold text-muted-foreground">销量</p>
+                      <p className="text-sm font-black tabular-nums text-foreground">{item.soldQuantity}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold text-muted-foreground">退货</p>
+                      <p className={cn("text-sm font-black tabular-nums", item.returnedQuantity > 0 ? "text-orange-600" : "text-foreground")}>{item.returnedQuantity}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold text-muted-foreground">退货率</p>
+                      <p className={cn("text-sm font-black tabular-nums", item.returnRate >= 0.2 ? "text-destructive" : item.returnRate > 0 ? "text-orange-600" : "text-foreground")}>
+                        {formatPercent(item.returnRate)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="px-4 py-12 text-center text-sm font-medium text-muted-foreground">
+                当前筛选范围内暂无销售出库商品。
+              </div>
+            )}
+          </div>
+        </section>
+
+        <section className="rounded-2xl border border-border bg-white dark:bg-white/5 shadow-sm overflow-hidden">
+          <div className="flex items-center gap-3 border-b border-border/70 px-4 py-4">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-orange-500/10 text-orange-600">
+              <TrendingUp size={18} />
+            </span>
+            <div>
+              <h2 className="text-base font-black text-foreground">退货率预警</h2>
+              <p className="text-xs text-muted-foreground">按退货率和退货件数综合排序</p>
+            </div>
+          </div>
+          <div className="divide-y divide-border/70">
+            {isLoading ? (
+              Array.from({ length: 4 }).map((_, index) => (
+                <div key={index} className="px-4 py-4 animate-pulse space-y-2">
+                  <div className="h-3.5 w-3/4 rounded bg-black/6 dark:bg-white/8" />
+                  <div className="h-2.5 w-1/2 rounded bg-black/4 dark:bg-white/5" />
+                </div>
+              ))
+            ) : highReturnProducts.length > 0 ? (
+              highReturnProducts.map((item) => (
+                <div key={item.key} className="px-4 py-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-black text-foreground">{item.name}</p>
+                      <p className="mt-1 truncate text-[11px] font-medium text-muted-foreground">
+                        出库 {item.soldQuantity} 件 · 退回 {item.returnedQuantity} 件
+                      </p>
+                    </div>
+                    <span className={cn(
+                      "shrink-0 rounded-full px-2.5 py-1 text-xs font-black tabular-nums",
+                      item.returnRate >= 0.2 ? "bg-destructive/10 text-destructive" : "bg-orange-500/10 text-orange-600"
+                    )}>
+                      {formatPercent(item.returnRate)}
+                    </span>
+                  </div>
+                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted">
+                    <div
+                      className={cn("h-full rounded-full", item.returnRate >= 0.2 ? "bg-destructive" : "bg-orange-500")}
+                      style={{ width: `${Math.min(100, Math.max(3, item.returnRate * 100))}%` }}
+                    />
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="px-4 py-12 text-center text-sm font-medium text-muted-foreground">
+                当前没有退货商品。
+              </div>
+            )}
+          </div>
+        </section>
       </div>
 
       {/* Orders List */}
