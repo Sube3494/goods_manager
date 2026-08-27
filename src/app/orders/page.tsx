@@ -61,6 +61,7 @@ import { ORDER_SHORTAGE_PURCHASE_NOTE_KEYWORD } from "@/lib/purchaseOrderTypes";
 type OrderAction = "self-delivery" | "complete-delivery" | "pickup-complete" | "sync" | "outbound";
 type OrdersTab = "today" | "all";
 type PurchaseDraftPayload = PurchaseOrder & { sourceOrderId?: string };
+const SHOP_PROFIT_PLATFORMS = ["美团", "京东", "淘宝", "抖店", "线下交易"] as const;
 type ShopProfitInfo = {
   id: string | null;
   name: string;
@@ -2611,7 +2612,7 @@ export default function OrdersPage() {
                           </div>
 
                           <div className="mt-3 flex flex-wrap gap-2">
-                            {["美团", "京东", "淘宝", "线下交易"].map((platform) => {
+                            {SHOP_PROFIT_PLATFORMS.map((platform) => {
                               const amount = shop.platformProfit?.[platform] || 0;
                               return (
                                 <div key={platform} className="flex min-w-[calc(50%-0.25rem)] flex-1 items-center justify-between gap-2 rounded-xl bg-white px-2.5 py-2 text-xs dark:bg-white/5">
@@ -2648,7 +2649,7 @@ export default function OrdersPage() {
                             <div className="text-right tabular-nums">{toCurrency(shop.platformCommission)}</div>
                             </div>
                             <div className="mt-3 grid grid-cols-2 gap-2 rounded-xl bg-slate-100/70 p-2.5 text-xs dark:bg-white/5 sm:grid-cols-4">
-                              {["美团", "京东", "淘宝", "线下交易"].map((platform) => {
+                              {SHOP_PROFIT_PLATFORMS.map((platform) => {
                                 const amount = shop.platformProfit?.[platform] || 0;
                                 return (
                                   <div key={platform} className="flex items-center justify-between gap-2 rounded-lg bg-white/60 px-2 py-1.5 dark:bg-white/5">

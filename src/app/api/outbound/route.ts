@@ -69,6 +69,7 @@ export async function GET(request: NextRequest) {
     const shopFilter = normalizeOption(searchParams.get("shop"), "全部门店");
     const startDate = String(searchParams.get("startDate") || "").trim();
     const endDate = String(searchParams.get("endDate") || "").trim();
+    const includeAnalytics = searchParams.get("analytics") === "1";
 
     const where: Prisma.OutboundOrderWhereInput = {
       userId: user.id,
@@ -171,12 +172,14 @@ export async function GET(request: NextRequest) {
         orderBy: { date: "desc" },
         take: 1000,
       }),
-      prisma.outboundOrder.findMany({
-        where,
-        select: orderSelect,
-        orderBy: { date: "desc" },
-        take: 5000,
-      }),
+      includeAnalytics
+        ? prisma.outboundOrder.findMany({
+            where,
+            select: orderSelect,
+            orderBy: { date: "desc" },
+            take: 5000,
+          })
+        : Promise.resolve([]),
     ]);
 
     const filteredOrders = shouldPostFilter
@@ -196,7 +199,7 @@ export async function GET(request: NextRequest) {
     const allShopNames = Array.from(new Set(filterSource.map((order) => resolveOutboundShopName(order)).filter(Boolean) as string[])).sort();
 
     const storage = await getStorageStrategy();
-    const analyticsOrders = (shouldPostFilter
+    const analyticsOrders = includeAnalytics ? (shouldPostFilter
       ? analyticsSource.filter((order) => {
           const platform = resolveOutboundPlatform(order.note);
           const shopName = resolveOutboundShopName(order);
@@ -204,7 +207,7 @@ export async function GET(request: NextRequest) {
             && (!shopFilter || shopName === shopFilter);
         })
       : analyticsSource
-    ).filter((order) => order.type === "Sale");
+    ).filter((order) => order.type === "Sale") : [];
 
     const productSalesMap = new Map<string, {
       key: string;
@@ -320,7 +323,7 @@ export async function GET(request: NextRequest) {
         platforms: allPlatforms,
         shops: allShopNames,
       },
-      analytics: {
+      ...(includeAnalytics ? { analytics: {
         productSales,
         totals: {
           soldQuantity,
@@ -329,7 +332,7 @@ export async function GET(request: NextRequest) {
           skuCount: productSales.length,
           returnRate: soldQuantity > 0 ? returnedQuantity / soldQuantity : 0,
         },
-      },
+      } } : {}),
     });
   } catch (error) {
     console.error("Failed to fetch outbound orders:", error);
