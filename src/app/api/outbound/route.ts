@@ -41,6 +41,19 @@ function resolveOutboundPlatform(note: string | null | undefined) {
   return getPlatformMeta(rawPlatform)?.name || null;
 }
 
+const OUTBOUND_PLATFORM_ORDER = ["美团", "京东", "淘宝", "抖店", "线下交易"] as const;
+
+function sortOutboundPlatforms(platforms: string[]) {
+  return [...platforms].sort((a, b) => {
+    const aIndex = OUTBOUND_PLATFORM_ORDER.indexOf(a as typeof OUTBOUND_PLATFORM_ORDER[number]);
+    const bIndex = OUTBOUND_PLATFORM_ORDER.indexOf(b as typeof OUTBOUND_PLATFORM_ORDER[number]);
+    if (aIndex >= 0 || bIndex >= 0) {
+      return (aIndex >= 0 ? aIndex : OUTBOUND_PLATFORM_ORDER.length) - (bIndex >= 0 ? bIndex : OUTBOUND_PLATFORM_ORDER.length);
+    }
+    return a.localeCompare(b, "zh-CN");
+  });
+}
+
 function getOutboundItemReturnedQuantity(
   order: { note?: string | null; status?: string | null },
   item: { id: string; quantity: number }
@@ -195,7 +208,7 @@ export async function GET(request: NextRequest) {
       : filteredOrders;
     const responseTotal = shouldPostFilter ? filteredOrders.length : total;
 
-    const allPlatforms = Array.from(new Set(filterSource.map((order) => resolveOutboundPlatform(order.note)).filter(Boolean) as string[])).sort();
+    const allPlatforms = sortOutboundPlatforms(Array.from(new Set(filterSource.map((order) => resolveOutboundPlatform(order.note)).filter(Boolean) as string[])));
     const allShopNames = Array.from(new Set(filterSource.map((order) => resolveOutboundShopName(order)).filter(Boolean) as string[])).sort();
 
     const storage = await getStorageStrategy();

@@ -857,7 +857,7 @@ export default function OutboundPage() {
       )}
 
       {isAnalyticsOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3 backdrop-blur-sm sm:p-6">
+        <div className="fixed inset-0 z-100000 flex items-center justify-center bg-black/50 p-3 backdrop-blur-sm sm:p-6">
           <div className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-border bg-background shadow-2xl">
             <div className="flex items-start justify-between gap-4 border-b border-border px-5 py-4">
               <div className="flex min-w-0 items-center gap-3">

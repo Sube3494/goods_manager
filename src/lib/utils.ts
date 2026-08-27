@@ -200,18 +200,25 @@ export function getPlatformMeta(platform: string | undefined | null): PlatformBa
       className: "bg-[#FFD000]/10 text-amber-700 dark:text-[#FFD000] border-amber-500/20 dark:bg-[#FFD000]/20 dark:border-[#FFD000]/30",
     };
   }
-  if (name.includes("京东")) {
+  if (name.includes("京东") || normalized.includes("jd") || normalized.includes("jingdong") || normalized.includes("jddj") || normalized === "daojia") {
     return {
       name: "京东",
       iconSrc: "/platform/京东.svg",
       className: "bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20 dark:bg-red-500/20 dark:border-red-500/30",
     };
   }
-  if (name.includes("淘宝")) {
+  if (name.includes("淘宝") || name.includes("天猫") || normalized.includes("taobao") || normalized.includes("ebai")) {
     return {
       name: "淘宝",
       iconSrc: "/platform/淘宝.svg",
       className: "bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20 dark:bg-orange-500/20 dark:border-orange-500/30",
+    };
+  }
+  if (name.includes("抖店") || name.includes("抖音") || normalized.includes("doudian") || normalized.includes("douyin")) {
+    return {
+      name: "抖店",
+      iconSrc: "/platform/doudian.svg",
+      className: "bg-sky-500/10 text-sky-600 dark:text-sky-300 border border-sky-500/20 dark:bg-sky-500/20 dark:border-sky-500/30",
     };
   }
   return {
