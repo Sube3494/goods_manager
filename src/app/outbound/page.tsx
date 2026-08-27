@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 
 import { Plus, Search, Package, History, RotateCcw, AlertCircle, Store, Eye, Filter, Pencil, BarChart3, TrendingUp, ArrowDownUp, X } from "lucide-react";
+import { createPortal } from "react-dom";
 import { useToast } from "@/components/ui/Toast";
 import { OutboundModal } from "@/components/Outbound/OutboundModal";
 import { OutboundDetailModal } from "@/components/Outbound/OutboundDetailModal";
@@ -171,6 +172,22 @@ export default function OutboundPage() {
       fetchAnalytics();
     }
   }, [isAnalyticsOpen, analyticsStartDate, analyticsEndDate, analyticsPlatform, analyticsShop]);
+
+  useEffect(() => {
+    if (!isAnalyticsOpen || typeof document === "undefined") {
+      return;
+    }
+
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousHtmlOverflow = document.documentElement.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousBodyOverflow;
+      document.documentElement.style.overflow = previousHtmlOverflow;
+    };
+  }, [isAnalyticsOpen]);
 
   const fetchOrders = async () => {
     setIsLoading(true);
@@ -856,9 +873,15 @@ export default function OutboundPage() {
         />
       )}
 
-      {isAnalyticsOpen && (
-        <div className="fixed inset-0 z-100000 flex items-center justify-center bg-black/50 p-3 backdrop-blur-sm sm:p-6">
-          <div className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-border bg-background shadow-2xl">
+      {isAnalyticsOpen && typeof document !== "undefined" && createPortal(
+        <div
+          className="fixed inset-0 z-100000 flex items-center justify-center overflow-hidden bg-black/50 p-3 backdrop-blur-sm overscroll-none sm:p-6"
+          onMouseDown={() => setIsAnalyticsOpen(false)}
+        >
+          <div
+            className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-border bg-background shadow-2xl overscroll-contain"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
             <div className="flex items-start justify-between gap-4 border-b border-border px-5 py-4">
               <div className="flex min-w-0 items-center gap-3">
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
@@ -955,7 +978,7 @@ export default function OutboundPage() {
               </div>
             </div>
 
-            <div className="overflow-y-auto p-5">
+            <div className="overflow-y-auto overscroll-contain p-5">
               <div className="grid gap-4 lg:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.75fr)]">
                 <section className="overflow-hidden rounded-2xl border border-border bg-white shadow-sm dark:bg-white/5">
                   <div className="flex flex-col gap-3 border-b border-border/70 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
@@ -1104,7 +1127,7 @@ export default function OutboundPage() {
             </div>
           </div>
         </div>
-      )}
+      , document.body)}
 
       <OutboundModal 
         isOpen={isModalOpen}
