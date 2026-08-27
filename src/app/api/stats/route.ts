@@ -136,7 +136,7 @@ function isVoidedOfflineOrder(order: {
   return Boolean(voided && typeof voided === "object" && !Array.isArray(voided));
 }
 
-const DASHBOARD_PLATFORMS = ["美团", "京东", "淘宝", "线下交易"] as const;
+const DASHBOARD_PLATFORMS = ["美团", "京东", "淘宝", "抖店", "线下交易"] as const;
 
 type OutboundCostLookupRow = {
   note: string | null;
@@ -890,6 +890,7 @@ export async function GET(request: NextRequest) {
       if (raw.includes("美团") || lower.includes("meituan") || lower === "shangou") return "美团";
       if (raw.includes("京东") || lower.includes("jd") || lower === "daojia") return "京东";
       if (raw.includes("淘宝") || raw.includes("天猫") || lower === "taobao" || lower === "ebai") return "淘宝";
+      if (raw.includes("抖店") || raw.includes("抖音") || lower === "doudian" || lower === "douyin") return "抖店";
       return "线下交易";
     };
 

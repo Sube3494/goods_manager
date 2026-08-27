@@ -166,7 +166,7 @@ function ChartTooltip({
                   </span>
                 </div>
                 <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] text-slate-500 dark:text-slate-400">
-                  {["美团", "京东", "淘宝", "线下交易"].map((platform) => {
+                  {["美团", "京东", "淘宝", "抖店", "线下交易"].map((platform) => {
                     const platformAmount = shopPlatformProfits[shop]?.[platform] || 0;
                     return (
                       <span key={platform} className="flex items-center justify-between gap-1">
@@ -394,6 +394,7 @@ function UserProfitTrendView({
     { value: "美团", label: "美团" },
     { value: "京东", label: "京东" },
     { value: "淘宝", label: "淘宝" },
+    { value: "抖店", label: "抖店" },
     { value: "线下交易", label: "线下交易" },
   ];
 
@@ -1165,4 +1166,3 @@ export function UserOrdersModal({
     document.body
   );
 }
-

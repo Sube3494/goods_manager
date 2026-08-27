@@ -75,6 +75,7 @@ function normalizeDisplayPlatform(platform?: string | null) {
   const lower = raw.toLowerCase();
   if (lower === "other" || !raw) return "线下交易";
   if (lower === "ebai" || lower === "taobao" || raw.includes("淘宝")) return "淘宝";
+  if (lower === "doudian" || lower === "douyin" || raw.includes("抖店") || raw.includes("抖音")) return "抖店";
   return raw;
 }
 

@@ -992,6 +992,7 @@ function normalizeOrderPlatformForSummary(platform?: string | null) {
   if (raw.includes("美团") || lower.includes("meituan") || lower === "shangou") return "美团";
   if (raw.includes("京东") || lower.includes("jd") || lower === "daojia") return "京东";
   if (raw.includes("淘宝") || raw.includes("天猫") || lower === "taobao" || lower === "ebai") return "淘宝";
+  if (raw.includes("抖店") || raw.includes("抖音") || lower === "doudian" || lower === "douyin") return "抖店";
   return raw;
 }
 
