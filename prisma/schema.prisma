@@ -27,6 +27,7 @@ model Product {
   id              String              @id @default(cuid())
   sku             String?             @unique
   jdSkuId         String?
+  doudianSkuId    String?
   name            String
   costPrice       Float               @default(0)
   stock           Int                 @default(0)
@@ -611,6 +612,7 @@ model ShopProduct {
   jdSkuId         String?
   meituanSkuId    String?
   taobaoSkuId     String?
+  doudianSkuId    String?
   productName     String?
   pinyin          String?
   productImage    String?
@@ -644,6 +646,7 @@ model ShopProduct {
   @@unique([shopId, jdSkuId])
   @@unique([shopId, meituanSkuId])
   @@unique([shopId, taobaoSkuId])
+  @@unique([shopId, doudianSkuId])
   @@index([productId])
   @@index([shopId, createdAt])
   @@index([shopId, sortNumber])

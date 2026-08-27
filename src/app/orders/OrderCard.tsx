@@ -576,6 +576,13 @@ export function getPlatformBadgeMeta(platform?: string | null, rawPayload?: unkn
     };
   }
 
+  if (normalized.includes("抖店") || normalized.includes("抖音") || normalized === "doudian" || normalized === "douyin") {
+    return {
+      iconSrc: "/platform/doudian.svg",
+      iconAlt: "抖店",
+    };
+  }
+
   return {
     iconSrc: "/platform/其他.svg",
     iconAlt: text === "other" ? "其他平台" : (text || "其他平台"),
@@ -598,6 +605,12 @@ export function isTaobaoOrder(platform?: string | null, channelTag?: string | nu
   const p = String(platform || "").trim().toLowerCase();
   const c = String(channelTag || "").trim().toLowerCase();
   return p.includes("淘宝") || p.includes("天猫") || p === "taobao" || p === "ebai" || c === "taobao" || c === "ebai";
+}
+
+export function isDoudianOrder(platform?: string | null, channelTag?: string | null) {
+  const p = String(platform || "").trim().toLowerCase();
+  const c = String(channelTag || "").trim().toLowerCase();
+  return p.includes("抖店") || p.includes("抖音") || p === "doudian" || p === "douyin" || c === "doudian" || c === "douyin";
 }
 
 function readGoodsExtraRecord(rawPayload: Record<string, unknown>) {
@@ -632,6 +645,15 @@ function readDisplaySourceId(item: AutoPickOrderItem, platform?: string | null, 
   }
   if (isTaobaoOrder(platform, channelTag)) {
     return String(rawPayload.sku_id || rawPayload.skuId || "").trim();
+  }
+  if (isDoudianOrder(platform, channelTag)) {
+    return String(
+      rawPayload.sku_id
+      || rawPayload.skuId
+      || rawPayload.source_id
+      || rawPayload.sourceId
+      || ""
+    ).trim();
   }
   return String(
     item.productNo
@@ -1604,6 +1626,7 @@ export function ProductStripItem({
   isJdOrder = false,
   isMeituanOrder = false,
   isTaobaoOrder = false,
+  isDoudianOrder = false,
 }: {
   display: { name: string; sku: string; image: string | null; quantity: number; sourceId?: string; optionalMatch?: boolean };
   onEditMatch?: () => void;
@@ -1621,10 +1644,11 @@ export function ProductStripItem({
   isJdOrder?: boolean;
   isMeituanOrder?: boolean;
   isTaobaoOrder?: boolean;
+  isDoudianOrder?: boolean;
 }) {
   const [imgError, setImgError] = useState(false);
-  const platformSourceLabel = isJdOrder ? "JD SKU" : isMeituanOrder ? "美团 SKU ID" : isTaobaoOrder ? "淘宝 SKU ID" : "";
-  const platformSourceShortLabel = isJdOrder ? "JD" : isMeituanOrder ? "MT" : isTaobaoOrder ? "TB" : "";
+  const platformSourceLabel = isJdOrder ? "JD SKU" : isMeituanOrder ? "美团 SKU ID" : isTaobaoOrder ? "淘宝 SKU ID" : isDoudianOrder ? "抖店 SKU ID" : "";
+  const platformSourceShortLabel = isJdOrder ? "JD" : isMeituanOrder ? "MT" : isTaobaoOrder ? "TB" : isDoudianOrder ? "DD" : "";
 
   return (
     <div className="flex items-center gap-2.5 rounded-2xl border border-black/6 bg-white/70 px-2.5 py-2 dark:border-white/8 dark:bg-white/4 sm:gap-3 sm:rounded-[18px] sm:px-3 sm:py-2.5">
@@ -2580,6 +2604,7 @@ export const OrderCard = memo(function OrderCard({
                     isJdOrder={isJdOrder}
                     isMeituanOrder={isMeituanPlatformOrder}
                     isTaobaoOrder={isTaobaoOrder(order.platform)}
+                    isDoudianOrder={isDoudianOrder(order.platform)}
                   />
                 ))
               )}

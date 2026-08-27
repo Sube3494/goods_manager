@@ -7,6 +7,7 @@ const PLATFORM_FIELD = {
   jd: "jdSkuId",
   meituan: "meituanSkuId",
   taobao: "taobaoSkuId",
+  doudian: "doudianSkuId",
 } as const;
 
 type PlatformKey = keyof typeof PLATFORM_FIELD;
@@ -70,6 +71,7 @@ export async function PATCH(
             jdSkuId: true,
             meituanSkuId: true,
             taobaoSkuId: true,
+            doudianSkuId: true,
             productId: true,
           },
         });
@@ -107,6 +109,11 @@ export async function PATCH(
               where: { id: otherId },
               data: { taobaoSkuId: null },
             });
+          } else if (platform === "doudian" && other.doudianSkuId === value) {
+            await tx.shopProduct.update({
+              where: { id: otherId },
+              data: { doudianSkuId: null },
+            });
           }
         }
       }
@@ -119,6 +126,7 @@ export async function PATCH(
           jdSkuId: true,
           meituanSkuId: true,
           taobaoSkuId: true,
+          doudianSkuId: true,
         },
       });
 

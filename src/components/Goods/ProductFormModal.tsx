@@ -82,6 +82,10 @@ function formatInitialTaobaoSkuValue(initialData?: Product | null) {
   return initialData?.taobaoSkuId || "";
 }
 
+function formatInitialDoudianSkuValue(initialData?: Product | null) {
+  return initialData?.doudianSkuId || "";
+}
+
 function parseShelfLife(daysStr: string): { value: string; unit: "天" | "月" | "年" } {
   const days = parseInt(daysStr, 10);
   if (isNaN(days) || days <= 0) return { value: "", unit: "天" };
@@ -165,6 +169,7 @@ export function ProductFormModal({
     jdSkuId: formatInitialJdSkuValue(initialData),
     meituanSkuId: formatInitialMeituanSkuValue(initialData),
     taobaoSkuId: formatInitialTaobaoSkuValue(initialData),
+    doudianSkuId: formatInitialDoudianSkuValue(initialData),
     isPublic: initialData?.isPublic ?? true,
     isDiscontinued: initialData?.isDiscontinued ?? false,
     specs: (initialData?.specs as Record<string, string>) || {},
@@ -262,7 +267,7 @@ export function ProductFormModal({
   const meituanSkuPreview = useMemo(() => normalizeMeituanSkuPreview(formData.meituanSkuId), [formData.meituanSkuId]);
   const [isPlatformIdsOpen, setIsPlatformIdsOpen] = useState(false);
   const showPlatformIdSection = showJdSkuField || showMeituanSkuField;
-  const platformIdCount = jdSkuPreview.length + meituanSkuPreview.length + (formData.taobaoSkuId ? 1 : 0);
+  const platformIdCount = jdSkuPreview.length + meituanSkuPreview.length + (formData.taobaoSkuId ? 1 : 0) + (formData.doudianSkuId ? 1 : 0);
 
   const [shelfLifeVal, setShelfLifeVal] = useState("");
   const [shelfLifeUnit, setShelfLifeUnit] = useState<"天" | "月" | "年">("天");
@@ -416,6 +421,7 @@ export function ProductFormModal({
           jdSkuId: formatInitialJdSkuValue(initialData),
           meituanSkuId: formatInitialMeituanSkuValue(initialData),
           taobaoSkuId: formatInitialTaobaoSkuValue(initialData),
+          doudianSkuId: formatInitialDoudianSkuValue(initialData),
           name: initialData.name,
           costPrice: String(initialData.costPrice || ""),
           stock: String(initialData.stock || ""),
@@ -441,6 +447,7 @@ export function ProductFormModal({
           jdSkuId: "",
           meituanSkuId: "",
           taobaoSkuId: "",
+          doudianSkuId: "",
           name: "",
           costPrice: "",
           stock: "",
@@ -932,6 +939,7 @@ export function ProductFormModal({
       meituanSkuId: formData.meituanSkuId,
       meituanSkuIds: meituanSkuPreview,
       taobaoSkuId: formData.taobaoSkuId,
+      doudianSkuId: formData.doudianSkuId,
       costPrice: Number(formData.costPrice),
       stock: hideStockField ? 0 : Number(formData.stock),
       specs: Object.keys(cleanedSpecs).length > 0 ? cleanedSpecs : undefined,
@@ -1270,6 +1278,25 @@ export function ProductFormModal({
                                       <div className="flex items-start justify-between gap-3 text-[11px] text-muted-foreground">
                                         <span>淘宝订单将优先使用该 SKU ID 匹配，自动匹配成功后会回填。</span>
                                         <span className="shrink-0 font-mono text-orange-500 font-bold">{formData.taobaoSkuId ? 1 : 0} 条</span>
+                                      </div>
+                                  </div>
+                                )}
+
+                                {showMeituanSkuField && (
+                                  <div className="space-y-2">
+                                      <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                                          <Tag size={16} className="text-sky-500" /> 抖店 SKU ID (Doudian SKU ID)
+                                      </label>
+                                      <input
+                                          type="text"
+                                          value={formData.doudianSkuId}
+                                          onChange={(e) => setFormData({ ...formData, doudianSkuId: e.target.value.trim() })}
+                                          className="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all font-mono dark:hover:bg-white/10"
+                                          placeholder="抖店 sku_id，例如：3706599584670722"
+                                      />
+                                      <div className="flex items-start justify-between gap-3 text-[11px] text-muted-foreground">
+                                        <span>抖店订单将优先使用该 SKU ID 匹配，自动匹配成功后会回填。</span>
+                                        <span className="shrink-0 font-mono text-sky-500 font-bold">{formData.doudianSkuId ? 1 : 0} 条</span>
                                       </div>
                                   </div>
                                 )}

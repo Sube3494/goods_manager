@@ -1160,6 +1160,7 @@ function normalizePlatformName(platform: string) {
     return "";
   }
   const lower = normalized.toLowerCase();
+  if (normalized === "抖店" || normalized.includes("抖音") || lower === "doudian" || lower === "douyin") return "抖店";
   if (normalized === "淘宝闪购" || normalized.includes("淘宝") || lower === "taobao" || lower === "ebai") return "淘宝";
   if (
     ["other", "其它", "其他", "线下", "offline", "线下交易"].includes(lower)
@@ -1193,6 +1194,12 @@ function getAutoPickPlatformAliases(platform?: string | null) {
     aliases.add("淘宝闪购");
     aliases.add("taobao");
     aliases.add("ebai");
+  }
+  if (normalized === "抖店" || normalized.includes("抖音") || ["doudian", "douyin"].includes(lower)) {
+    aliases.add("抖店");
+    aliases.add("抖音");
+    aliases.add("doudian");
+    aliases.add("douyin");
   }
   return Array.from(aliases).filter(Boolean);
 }
@@ -1321,6 +1328,10 @@ function inferPlatformNameFromChannelTag(channelTag: unknown) {
 
   if (normalizedTag === "daojia") {
     return "京东";
+  }
+
+  if (normalizedTag === "doudian" || normalizedTag === "douyin") {
+    return "抖店";
   }
 
   if (normalizedTag === "other") {
@@ -1504,13 +1515,16 @@ function parseAmountsFromRawValues(platform: string, rawValues: {
   balancePrice?: string | number;
 }) {
   const actualPaid = parseCentsValue(rawValues.userFee ?? rawValues.totalPrice);
-  const expectedIncome = parseCentsValue(rawValues.shopFee ?? rawValues.balancePrice);
+  const isDoudian = normalizePlatformName(platform) === "抖店";
+  const expectedIncome = isDoudian
+    ? Math.max(0, Math.round(actualPaid * 0.95))
+    : parseCentsValue(rawValues.shopFee ?? rawValues.balancePrice);
   const explicitCommission = Number(rawValues.commission);
-  const computedCommission = expectedIncome - actualPaid;
+  const computedCommission = Math.max(0, actualPaid - expectedIncome);
   const platformCommission = applyJDPlatformCommissionFallback(
     platform,
     actualPaid,
-    Number.isFinite(explicitCommission) ? Math.round(explicitCommission) : computedCommission,
+    isDoudian ? computedCommission : (Number.isFinite(explicitCommission) ? Math.round(explicitCommission) : computedCommission),
   );
 
   return {
@@ -1794,15 +1808,14 @@ function parseAmountsFromDetail(detail: MaiyatianOrderDetailResponse["data"], pl
   if (!fee) {
     return undefined;
   }
+  const feeRecord = fee as Record<string, string | number | undefined>;
 
-  const actualPaid = parseCentsValue(fee.user_fee);
-  const expectedIncome = parseCentsValue(fee.shop_fee);
-  const platformCommission = applyJDPlatformCommissionFallback(platform, actualPaid, expectedIncome - actualPaid);
-  return {
-    actualPaid,
-    expectedIncome,
-    platformCommission,
-  };
+  return parseAmountsFromRawValues(platform, {
+    commission: feeRecord.commission,
+    userFee: feeRecord.user_fee,
+    shopFee: feeRecord.shop_fee,
+    totalPrice: feeRecord.total_fee,
+  });
 }
 
 function buildItemsFromDetailJSON(detail: MaiyatianOrderDetailResponse["data"]): AutoPickInboundItem[] {
@@ -2930,7 +2943,10 @@ export function normalizeAutoPickOrderPayload(payload: unknown): AutoPickInbound
     return null;
   }
 
-  const input = payload as Record<string, unknown>;
+  const root = payload as Record<string, unknown>;
+  const input = root.data && typeof root.data === "object" && !Array.isArray(root.data)
+    ? root.data as Record<string, unknown>
+    : root;
   const extend = input.extend && typeof input.extend === "object" && !Array.isArray(input.extend)
     ? input.extend as Record<string, unknown>
     : null;
@@ -2965,10 +2981,39 @@ export function normalizeAutoPickOrderPayload(payload: unknown): AutoPickInbound
   const realName = String(input.customerName || input.real_name || userInfo?.real_name || userInfo?.realName || "").trim();
   const nickName = String(input.nick_name || userInfo?.nick_name || userInfo?.nickName || "").trim();
 
-  const platform = String(input.platform || "").trim();
+  const fee = input.fee && typeof input.fee === "object" && !Array.isArray(input.fee)
+    ? input.fee as Record<string, unknown>
+    : null;
+  const platform = String(input.platform || input.platform_name || "").trim();
   const channelTag = String(input.channelTag || input.channel_tag || "").trim();
   const isJD = platform === "京东" || channelTag === "daojia" || String(input.source_tag || "").trim().toLowerCase() === "daojia" || String(input.goods_channel_tag || "").trim().toLowerCase() === "daojia";
-  const inferredPlatform = inferPlatformNameFromChannelTag(channelTag);
+  const inferredPlatform = inferPlatformNameFromChannelTag(channelTag || input.source_tag || input.origin_tag);
+  const rawOrderNo = readTrimmedCandidateValue([
+    input.orderNo,
+    input.order_no,
+    input.source_id,
+    input.sourceId,
+    input.trade_sn,
+    input.tradeSn,
+    input.id,
+  ]) || "";
+  const rawOrderTime = readTrimmedCandidateValue([
+    input.orderTime,
+    input.order_time,
+    input.created_time,
+    input.createdTime,
+    input.ctime,
+  ]) || "";
+  const normalizedOrderTime = /^\d{10}$/.test(rawOrderTime)
+    ? parseUnixTimestampToOrderTime(rawOrderTime)
+    : rawOrderTime;
+  const parsedAmounts = parseAmountsFromRawValues(normalizePlatformName(platform || inferredPlatform || (isJD ? "京东" : "")), {
+    commission: fee?.commission as string | number | undefined ?? input.commission as string | number | undefined,
+    userFee: fee?.user_fee as string | number | undefined ?? input.user_fee as string | number | undefined ?? input.balance_price as string | number | undefined,
+    shopFee: fee?.shop_fee as string | number | undefined ?? input.shop_fee as string | number | undefined ?? input.balance_price as string | number | undefined,
+    totalPrice: fee?.total_fee as string | number | undefined ?? input.total_price as string | number | undefined,
+    balancePrice: input.balance_price as string | number | undefined,
+  });
 
   const shopIdValue = isJD
     ? (input.shop_id || input.shopId)
@@ -3012,8 +3057,8 @@ export function normalizeAutoPickOrderPayload(payload: unknown): AutoPickInbound
     channelTag: channelTag || undefined,
     platform: normalizePlatformName(platform || inferredPlatform || (isJD ? "京东" : "")),
     dailyPlatformSequence: Number(input.dailyPlatformSequence || 0),
-    orderNo: String(input.orderNo || "").trim(),
-    orderTime: String(input.orderTime || "").trim(),
+    orderNo: rawOrderNo,
+    orderTime: normalizedOrderTime,
     userAddress: String(
       unencryptedMapAddress
       || unencryptedAddress
@@ -3080,9 +3125,9 @@ export function normalizeAutoPickOrderPayload(payload: unknown): AutoPickInbound
     deliveryTimeRange: resolveAutoPickDeliveryTimeRange(input),
     distanceKm: Number.isFinite(Number(input.distanceKm)) ? Number(input.distanceKm) : undefined,
     distanceIsLinear: Boolean(input.distanceIsLinear),
-    actualPaid: Number.isFinite(Number(input.actualPaid)) ? Number(input.actualPaid) : 0,
-    expectedIncome: Number.isFinite(Number(input.expectedIncome)) ? Number(input.expectedIncome) : undefined,
-    platformCommission: Number.isFinite(Number(input.platformCommission)) ? Number(input.platformCommission) : 0,
+    actualPaid: Number.isFinite(Number(input.actualPaid)) ? Number(input.actualPaid) : parsedAmounts.actualPaid,
+    expectedIncome: Number.isFinite(Number(input.expectedIncome)) ? Number(input.expectedIncome) : parsedAmounts.expectedIncome,
+    platformCommission: Number.isFinite(Number(input.platformCommission)) ? Number(input.platformCommission) : parsedAmounts.platformCommission,
     refundAmount: Number.isFinite(Number(input.refundAmount ?? input.refund_amount)) ? Math.round(Number(input.refundAmount ?? input.refund_amount)) : undefined,
     cancelDetails: Array.isArray(input.cancelDetails) ? input.cancelDetails as Array<Record<string, unknown>> : undefined,
     delivery: (() => {
@@ -3146,11 +3191,12 @@ export function normalizeAutoPickOrderPayload(payload: unknown): AutoPickInbound
     items: items.map((item) => {
       const current = typeof item === "object" && item ? item as Record<string, unknown> : {};
       const rawSourceId = String(current.source_id || current.sourceId || "").trim();
+      const rawSkuId = String(current.sku_id || current.skuId || "").trim();
       const rawSkuCode = String(current.sku_code || current.skuCode || "").trim();
       const rawProductNo = String(current.productNo || "").trim();
       const targetProductNo = isJD
         ? (rawSourceId || rawProductNo)
-        : (rawProductNo || rawSkuCode || rawSourceId);
+        : (rawProductNo || rawSkuCode || rawSkuId || rawSourceId);
       return {
         ...current,
         productName: String(current.productName || current.goods_name || "").trim(),
@@ -3203,7 +3249,10 @@ function getInvalidAutoPickOrderPayloadReason(payload: unknown) {
     return "payload is not an object";
   }
 
-  const input = payload as Record<string, unknown>;
+  const root = payload as Record<string, unknown>;
+  const input = root.data && typeof root.data === "object" && !Array.isArray(root.data)
+    ? root.data as Record<string, unknown>
+    : root;
   const items = Array.isArray(input.items) ? input.items : (Array.isArray(input.goods) ? input.goods : []);
   const normalizedItems = items
     .map((item) => {
@@ -3219,9 +3268,9 @@ function getInvalidAutoPickOrderPayloadReason(payload: unknown) {
   const missingFields: string[] = [];
   const inferredPlatform = inferPlatformNameFromChannelTag(input.channelTag || input.channel_tag);
   if (!String(input.platform || inferredPlatform || "").trim()) missingFields.push("platform");
-  if (!String(input.orderNo || "").trim()) missingFields.push("orderNo");
-  if (!String(input.orderTime || "").trim()) missingFields.push("orderTime");
-  if (!String(input.userAddress || "").trim()) missingFields.push("userAddress");
+  if (!String(input.orderNo || input.order_no || input.source_id || input.sourceId || input.id || "").trim()) missingFields.push("orderNo");
+  if (!String(input.orderTime || input.order_time || input.created_time || input.createdTime || input.ctime || "").trim()) missingFields.push("orderTime");
+  if (!String(input.userAddress || input.map_address || input.unencrypted_map_address || input.address || "").trim()) missingFields.push("userAddress");
   if (!String(input.id || "").trim()) missingFields.push("id");
   const canUseManualDeliveryPlaceholder = isManualDeliveryPlaceholderEligible({
     platform: normalizePlatformName(String(input.platform || "")),
@@ -4517,6 +4566,11 @@ function isTaobaoPlatform(platform: string | null | undefined) {
   return normalized.includes("淘宝") || normalized.includes("天猫") || normalized === "taobao" || normalized === "ebai";
 }
 
+function isDoudianPlatform(platform: string | null | undefined) {
+  const normalized = String(platform || "").trim().toLowerCase();
+  return normalized.includes("抖店") || normalized.includes("抖音") || normalized === "doudian" || normalized === "douyin";
+}
+
 function readAutoPickGoodsExtraRecord(rawPayload: unknown) {
   const record = rawPayload && typeof rawPayload === "object" && !Array.isArray(rawPayload)
     ? rawPayload as Record<string, unknown>
@@ -4551,6 +4605,10 @@ function readAutoPickPlatformProductIdForMatch(
   }
 
   if (isTaobaoPlatform(platform)) {
+    return resolveAutoPickItemPlatformSkuId(platform, rawPayload) || normalizeAutoPickSkuForMatch(productNo);
+  }
+
+  if (isDoudianPlatform(platform)) {
     return resolveAutoPickItemPlatformSkuId(platform, rawPayload) || normalizeAutoPickSkuForMatch(productNo);
   }
 
@@ -4592,6 +4650,19 @@ export function resolveAutoPickItemPlatformSkuId(
       || record.skuId
       || record.source_id
       || record.sourceId
+      || record.productNo
+      || ""
+    ));
+  }
+
+  if (isDoudianPlatform(platform)) {
+    return normalizeAutoPickSkuForMatch(String(
+      record.sku_id
+      || record.skuId
+      || record.source_id
+      || record.sourceId
+      || record.goods_id
+      || record.goodsId
       || record.productNo
       || ""
     ));
@@ -4793,7 +4864,7 @@ export async function backfillPlatformIdsForSyncedAutoPickOrder(userId: string, 
 
 function normalizeShopProductSkuForPlatformMatch(
   platform: string | null | undefined,
-  item: { sku?: string | null; jdSkuId?: string | null; meituanSkuId?: string | null; taobaoSkuId?: string | null }
+  item: { sku?: string | null; jdSkuId?: string | null; meituanSkuId?: string | null; taobaoSkuId?: string | null; doudianSkuId?: string | null }
 ) {
   if (isJdPlatform(platform)) {
     return normalizeAutoPickSkuForMatch(item.jdSkuId);
@@ -4804,12 +4875,15 @@ function normalizeShopProductSkuForPlatformMatch(
   if (isTaobaoPlatform(platform)) {
     return normalizeAutoPickSkuForMatch(item.taobaoSkuId);
   }
+  if (isDoudianPlatform(platform)) {
+    return normalizeAutoPickSkuForMatch(item.doudianSkuId);
+  }
   return normalizeAutoPickSkuForMatch(item.sku || item.jdSkuId);
 }
 
 function doesShopProductMatchAutoPickStableKey(
   platform: string | null | undefined,
-  item: { sku?: string | null; jdSkuId?: string | null; meituanSkuId?: string | null; taobaoSkuId?: string | null },
+  item: { sku?: string | null; jdSkuId?: string | null; meituanSkuId?: string | null; taobaoSkuId?: string | null; doudianSkuId?: string | null },
   key: string
 ) {
   const normalizedKey = normalizeAutoPickSkuForMatch(key);
@@ -4824,6 +4898,7 @@ function doesShopProductMatchAutoPickStableKey(
     normalizeAutoPickSkuForMatch(item.sku),
     normalizeAutoPickSkuForMatch(item.jdSkuId),
     normalizeAutoPickSkuForMatch(item.taobaoSkuId),
+    normalizeAutoPickSkuForMatch(item.doudianSkuId),
     ...normalizeMeituanSkuIds(item.meituanSkuId).map((value) => normalizeAutoPickSkuForMatch(value)),
   ].filter(Boolean);
 

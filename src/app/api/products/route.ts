@@ -135,7 +135,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { name, sku, jdSkuId, jdSkuIds, meituanSkuId, meituanSkuIds, costPrice, categoryId, supplierId, image, isPublic, isDiscontinued, specs, remark, shopId, isShopOnly, libraryId } = body;
+    const { name, sku, jdSkuId, jdSkuIds, meituanSkuId, meituanSkuIds, taobaoSkuId, doudianSkuId, costPrice, categoryId, supplierId, image, isPublic, isDiscontinued, specs, remark, shopId, isShopOnly, libraryId } = body;
     const isShelfLife = Boolean(body?.isShelfLife ?? false);
     const shelfLifeDays = body?.shelfLifeDays !== undefined && body.shelfLifeDays !== null ? Number(body.shelfLifeDays) : null;
     const normalizedSku = normalizeSku(sku);
@@ -200,6 +200,7 @@ export async function POST(request: Request) {
           sku: normalizedSku,
           jdSkuId: normalizedJdSkuId,
           meituanSkuId: normalizedMeituanSkuIds.join(",") || null,
+          doudianSkuId: String(doudianSkuId || "").trim() || null,
           productName: name,
           pinyin: ProductService.generatePinyinSearchText(name),
           productImage: storage.stripUrl(image),
@@ -229,6 +230,8 @@ export async function POST(request: Request) {
         jdSkuId: created.jdSkuId,
         meituanSkuId: created.meituanSkuId,
         meituanSkuIds: normalizeMeituanSkuIds(created.meituanSkuId),
+        taobaoSkuId: created.taobaoSkuId,
+        doudianSkuId: created.doudianSkuId,
         categoryId: created.categoryId,
         costPrice: created.costPrice,
         stock: created.stock,
@@ -288,6 +291,7 @@ export async function POST(request: Request) {
           name,
           sku: normalizedSku,
           jdSkuId: normalizedJdSkuId,
+          doudianSkuId: String(doudianSkuId || "").trim() || null,
           libraryId: libraryId || undefined,
           costPrice: Number(costPrice) || 0,
           stock: 0,
@@ -311,6 +315,8 @@ export async function POST(request: Request) {
                 sku: normalizedSku,
                 jdSkuId: normalizedJdSkuId,
                 meituanSkuId: normalizedMeituanSkuIds.join(",") || null,
+                taobaoSkuId: String(taobaoSkuId || "").trim() || null,
+                doudianSkuId: String(doudianSkuId || "").trim() || null,
                 productName: name,
                 pinyin: ProductService.generatePinyinSearchText(name),
                 productImage: storage.stripUrl(image),
@@ -374,7 +380,7 @@ export async function PUT(request: Request) {
     }
 
     const body = await request.json();
-    const { id, name, sku, jdSkuId, jdSkuIds, meituanSkuId, meituanSkuIds, costPrice, categoryId, supplierId, image, isPublic, isDiscontinued, specs, remark, libraryId } = body;
+    const { id, name, sku, jdSkuId, jdSkuIds, meituanSkuId, meituanSkuIds, taobaoSkuId, doudianSkuId, costPrice, categoryId, supplierId, image, isPublic, isDiscontinued, specs, remark, libraryId } = body;
     const isShelfLife = body?.isShelfLife !== undefined ? Boolean(body.isShelfLife) : undefined;
     const shelfLifeDays = body?.shelfLifeDays !== undefined ? (body.shelfLifeDays !== null ? Number(body.shelfLifeDays) : null) : undefined;
     const normalizedSku = normalizeSku(sku);
@@ -421,6 +427,7 @@ export async function PUT(request: Request) {
           name,
           sku: normalizedSku,
           jdSkuId: normalizedJdSkuId,
+          doudianSkuId: doudianSkuId !== undefined ? (String(doudianSkuId || "").trim() || null) : undefined,
           libraryId: libraryId !== undefined ? (libraryId || null) : undefined,
           costPrice: costPrice !== undefined ? Math.max(0, Number(costPrice) || 0) : undefined,
           categoryId: categoryId || undefined,

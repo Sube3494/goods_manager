@@ -81,6 +81,7 @@ interface ShopProductWithMapping {
   jdSkuId?: string | null;
   meituanSkuId?: string | null;
   taobaoSkuId?: string | null;
+  doudianSkuId?: string | null;
   barcode?: string | null;
   category: { id: string; name: string } | null;
   meituanSkuMappings: MeituanMappingRecord[];
@@ -97,13 +98,13 @@ interface MeituanMappingModalProps {
   onShopChange?: (shop: Shop) => void;
 }
 
-type ProductMappingPlatform = "meituan" | "jd" | "taobao";
+type ProductMappingPlatform = "meituan" | "jd" | "taobao" | "doudian";
 
 const PRODUCT_MAPPING_PLATFORMS: Array<{
   key: ProductMappingPlatform;
   label: string;
   idLabel: string;
-  field: "meituanSkuId" | "jdSkuId" | "taobaoSkuId";
+  field: "meituanSkuId" | "jdSkuId" | "taobaoSkuId" | "doudianSkuId";
   placeholder: string;
 }> = [
   {
@@ -126,6 +127,13 @@ const PRODUCT_MAPPING_PLATFORMS: Array<{
     idLabel: "淘宝 SKU ID",
     field: "taobaoSkuId",
     placeholder: "输入淘宝 SKU ID",
+  },
+  {
+    key: "doudian",
+    label: "抖店",
+    idLabel: "抖店 SKU ID",
+    field: "doudianSkuId",
+    placeholder: "输入抖店 SKU ID",
   },
 ];
 

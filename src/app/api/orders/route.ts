@@ -380,6 +380,11 @@ function isTaobaoPlatform(platform: string | null | undefined) {
   return normalized.includes("淘宝") || normalized.includes("天猫") || normalized === "taobao" || normalized === "ebai";
 }
 
+function isDoudianPlatform(platform: string | null | undefined) {
+  const normalized = String(platform || "").trim().toLowerCase();
+  return normalized.includes("抖店") || normalized.includes("抖音") || normalized === "doudian" || normalized === "douyin";
+}
+
 function readGoodsExtraRecord(rawPayload: unknown) {
   const record = rawPayload && typeof rawPayload === "object" && !Array.isArray(rawPayload)
     ? rawPayload as Record<string, unknown>
@@ -453,6 +458,22 @@ function readPlatformProductIdForMatch(
     ));
   }
 
+  if (isDoudianPlatform(platform)) {
+    const record = rawPayload && typeof rawPayload === "object" && !Array.isArray(rawPayload)
+      ? rawPayload as Record<string, unknown>
+      : {};
+    return normalizeSkuDigits(String(
+      record.sku_id
+      || record.skuId
+      || record.source_id
+      || record.sourceId
+      || record.goods_id
+      || record.goodsId
+      || productNo
+      || ""
+    ));
+  }
+
   return "";
 }
 
@@ -490,12 +511,24 @@ function readStrictPlatformProductId(
     ));
   }
 
+  if (isDoudianPlatform(platform)) {
+    return normalizeSkuDigits(String(
+      record.sku_id
+      || record.skuId
+      || record.source_id
+      || record.sourceId
+      || record.goods_id
+      || record.goodsId
+      || ""
+    ));
+  }
+
   return "";
 }
 
 function normalizeShopProductSkuForPlatformMatch(
   platform: string | null | undefined,
-  item: { sku?: string | null; jdSkuId?: string | null; meituanSkuId?: string | null; taobaoSkuId?: string | null }
+  item: { sku?: string | null; jdSkuId?: string | null; meituanSkuId?: string | null; taobaoSkuId?: string | null; doudianSkuId?: string | null }
 ) {
   if (isJDPlatform(platform)) {
     return normalizeSkuDigits(item.jdSkuId);
@@ -506,12 +539,15 @@ function normalizeShopProductSkuForPlatformMatch(
   if (isTaobaoPlatform(platform)) {
     return normalizeSkuDigits(item.taobaoSkuId);
   }
+  if (isDoudianPlatform(platform)) {
+    return normalizeSkuDigits(item.doudianSkuId);
+  }
   return normalizeSkuDigits(item.sku || item.jdSkuId);
 }
 
 function doesShopProductMatchStableKey(
   platform: string | null | undefined,
-  item: { sku?: string | null; jdSkuId?: string | null; meituanSkuId?: string | null; taobaoSkuId?: string | null },
+  item: { sku?: string | null; jdSkuId?: string | null; meituanSkuId?: string | null; taobaoSkuId?: string | null; doudianSkuId?: string | null },
   key: string
 ) {
   if (!key) {
@@ -529,6 +565,7 @@ function doesShopProductMatchStableKey(
     normalizeSkuDigits(item.sku),
     normalizeSkuDigits(item.jdSkuId),
     normalizeSkuDigits(item.taobaoSkuId),
+    normalizeSkuDigits(item.doudianSkuId),
     ...normalizeMeituanSkuIds(item.meituanSkuId).map((value) => normalizeSkuDigits(value)),
   ].filter(Boolean);
 
