@@ -225,7 +225,9 @@ export async function GET(request: NextRequest) {
       const countedOrderKeys = new Set<string>();
       order.items.forEach((item) => {
         const shopProduct = item.shopProduct;
-        const key = item.shopProductId || item.productId || item.product?.sku || item.id;
+        const shopName = shopProduct?.shop?.name || resolveOutboundShopName(order) || null;
+        const productKey = item.shopProductId || item.productId || item.product?.sku || item.product?.name || item.id;
+        const key = `${shopName || "未分门店"}::${productKey}`;
         const existing = productSalesMap.get(key) || {
           key,
           productId: item.productId || shopProduct?.productId || null,
@@ -233,7 +235,7 @@ export async function GET(request: NextRequest) {
           name: shopProduct?.productName || item.product?.name || "未知商品",
           sku: shopProduct?.sku || item.product?.sku || null,
           image: shopProduct?.productImage || item.product?.image || null,
-          shopName: shopProduct?.shop?.name || null,
+          shopName,
           soldQuantity: 0,
           returnedQuantity: 0,
           netQuantity: 0,

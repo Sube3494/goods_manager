@@ -151,6 +151,7 @@ export default function OutboundPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [analyticsSort, setAnalyticsSort] = useState<AnalyticsSort>("sold-desc");
+  const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
   const [isFiltersExpanded, setIsFiltersExpanded] = useState(false);
   const { showToast } = useToast();
   const { user } = useUser();
@@ -383,6 +384,22 @@ export default function OutboundPage() {
               </span>
             )}
           </button>
+
+          <button
+            onClick={() => setIsAnalyticsOpen(!isAnalyticsOpen)}
+            className={cn(
+              "h-10 sm:h-11 px-4 flex items-center gap-2 rounded-full border text-xs font-bold transition-all active:scale-95 shadow-sm shrink-0 whitespace-nowrap",
+              isAnalyticsOpen
+                ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400"
+                : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-muted/50 dark:hover:bg-white/10 text-muted-foreground"
+            )}
+          >
+            <BarChart3 size={14} />
+            <span>商品分析</span>
+            <span className="flex items-center justify-center h-4 min-w-4 px-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[9px] font-black">
+              {analytics.totals.skuCount}
+            </span>
+          </button>
         </div>
 
         {/* 折叠高级筛选框面板 */}
@@ -445,7 +462,8 @@ export default function OutboundPage() {
       </div>
 
       {/* Product Analytics */}
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.75fr)]">
+      {isAnalyticsOpen && (
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.75fr)] animate-in fade-in slide-in-from-top-2 duration-200">
         <section className="rounded-2xl border border-border bg-white dark:bg-white/5 shadow-sm overflow-hidden">
           <div className="flex flex-col gap-3 border-b border-border/70 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3 min-w-0">
@@ -455,7 +473,7 @@ export default function OutboundPage() {
               <div className="min-w-0">
                 <h2 className="text-base font-black text-foreground">商品表现</h2>
                 <p className="text-xs text-muted-foreground">
-                  {analytics.totals.skuCount} 个 SKU · 出库 {analytics.totals.soldQuantity} 件 · 退回 {analytics.totals.returnedQuantity} 件
+                  按门店商品统计 · {analytics.totals.skuCount} 个 SKU · 出库 {analytics.totals.soldQuantity} 件 · 退回 {analytics.totals.returnedQuantity} 件
                 </p>
               </div>
             </div>
@@ -527,7 +545,7 @@ export default function OutboundPage() {
                     <div className="min-w-0">
                       <p className="truncate text-sm font-black text-foreground">{item.name}</p>
                       <p className="truncate text-[11px] font-medium text-muted-foreground">
-                        {[item.sku, item.shopName].filter(Boolean).join(" · ") || "未记录 SKU"}
+                        {[item.shopName, item.sku].filter(Boolean).join(" · ") || "未记录门店/SKU"}
                       </p>
                     </div>
                   </div>
@@ -564,7 +582,7 @@ export default function OutboundPage() {
             </span>
             <div>
               <h2 className="text-base font-black text-foreground">退货率预警</h2>
-              <p className="text-xs text-muted-foreground">按退货率和退货件数综合排序</p>
+              <p className="text-xs text-muted-foreground">按门店商品的退货率和退货件数排序</p>
             </div>
           </div>
           <div className="divide-y divide-border/70">
@@ -608,6 +626,7 @@ export default function OutboundPage() {
           </div>
         </section>
       </div>
+      )}
 
       {/* Orders List */}
       {/* Desktop Table View */}
