@@ -29,7 +29,7 @@ export class MeituanMappingService {
       throw new Error("Excel 工作表为空");
     }
 
-    const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
+    const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: false, defval: "" }) as any[][];
     if (!rawData || rawData.length < 1) {
       throw new Error("表格数据为空");
     }

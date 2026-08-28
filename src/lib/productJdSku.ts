@@ -1,18 +1,31 @@
 import { Prisma } from "../../prisma/generated-client";
 
+const PLATFORM_ID_SEPARATOR = /[\s,，;；、]+/g;
+
 function normalizeSingleJdSkuId(value: unknown) {
-  if (typeof value !== "string") {
+  if (value === null || value === undefined) {
     return "";
   }
-  return value.trim();
+
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value.toFixed(0).trim() : "";
+  }
+
+  if (typeof value === "bigint") {
+    return value.toString();
+  }
+
+  return String(value).trim();
 }
 
 export function normalizeJdSkuIds(value: unknown): string[] {
   const candidates = Array.isArray(value)
     ? value
     : typeof value === "string"
-      ? value.split(/[，,]+/g)
-      : [];
+      ? value.split(PLATFORM_ID_SEPARATOR)
+      : value === null || value === undefined
+        ? []
+        : [value];
 
   const unique = new Set<string>();
   for (const item of candidates) {

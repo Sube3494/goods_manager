@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { Search, Plus, Store, X, ArrowUp, Trash2, AlertCircle, Zap, ListOrdered, Save, Check, Link2 } from "lucide-react";
+import { Search, Plus, Store, X, ArrowUp, Trash2, AlertCircle, ListOrdered, Save, Check, Link2 } from "lucide-react";
 import Link from "next/link";
 import { ImportModal } from "@/components/Goods/ImportModal";
 import { GoodsCard } from "@/components/Goods/GoodsCard";
@@ -50,6 +50,11 @@ type ShopSortDraft = {
     sortCategoryNameInput: string;
   }>;
   updatedAt: number;
+};
+
+type ProductLibraryOption = {
+  id: string;
+  name: string;
 };
 
 function getShopSortDraftKey(shopId: string) {
@@ -460,7 +465,7 @@ function ShopSortWorkbench({
     setSelectedCategoryName((current) => (current === category.name ? "all" : current));
     setBatchTargetCategoryName((current) => (current === category.name ? "" : current));
     setDeleteCategoryTarget(null);
-  }, [categories, renumberRowsByCategoryOrder, rows]);
+  }, [renumberRowsByCategoryOrder, rows]);
 
   const renameCategory = useCallback((id: string, value: string) => {
     const nextName = value.trim();
@@ -845,7 +850,7 @@ function ShopSortWorkbench({
                       ::
                     </button>
                     <div className="flex min-w-0 flex-1 items-center">
-                      <div className="relative h-8 max-w-[120px] shrink-0">
+                      <div className="relative h-8 max-w-30 shrink-0">
                         <span aria-hidden className="invisible block whitespace-pre pr-1 text-sm font-semibold">
                           {category.name || " "}
                         </span>
@@ -994,7 +999,7 @@ function ShopSortWorkbench({
                 </div>
               ) : null}
             </div>
-            <table className="hidden w-full min-w-[760px] text-left text-sm md:table">
+            <table className="hidden w-full min-w-190 text-left text-sm md:table">
               <thead className="sticky top-0 z-10 bg-muted/80 text-center text-xs text-muted-foreground backdrop-blur">
                 <tr>
                   <th className="w-24 px-3 py-3"></th>
@@ -1110,7 +1115,7 @@ function ShopSortWorkbench({
               transition={{ type: "spring", stiffness: 400, damping: 30 }}
               className="absolute bottom-4 left-1/2 z-30 w-[calc(100%-1rem)] pointer-events-none sm:w-fit sm:max-w-[calc(100%-2rem)]"
             >
-              <div className="pointer-events-auto flex flex-wrap items-center gap-x-3 gap-y-2 rounded-[24px] glass-panel px-3 py-2 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.5)] sm:h-12 sm:flex-nowrap sm:gap-5 sm:rounded-full sm:px-6 sm:py-0">
+              <div className="pointer-events-auto flex flex-wrap items-center gap-x-3 gap-y-2 rounded-3xl glass-panel px-3 py-2 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.5)] sm:h-12 sm:flex-nowrap sm:gap-5 sm:rounded-full sm:px-6 sm:py-0">
                 <button
                   type="button"
                   onClick={toggleVisibleSelection}
@@ -1218,7 +1223,7 @@ export default function ShopGoodsPage() {
   const [needsAddress, setNeedsAddress] = useState(false);
   const [selectedShopId, setSelectedShopId] = useState("");
   
-  const [libraries, setLibraries] = useState<any[]>([]);
+  const [libraries, setLibraries] = useState<ProductLibraryOption[]>([]);
   const [activeLibraryId, setActiveLibraryId] = useState<string>("all");
   const [importErrors, setImportErrors] = useState<string[]>([]);
 
@@ -1436,7 +1441,7 @@ export default function ShopGoodsPage() {
       }
     };
     void fetchShops();
-  }, [showToast]);
+  }, [requestedShopId, showToast]);
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -2239,8 +2244,8 @@ export default function ShopGoodsPage() {
                 const rowOffset = Math.max(0, ((ROW_HEIGHT_PX - finalH) / 2) / ROW_HEIGHT_PX);
 
                 worksheet.addImage(imageId, {
-                  tl: { col: 1 + colOffset, row: rIdx - 1 + rowOffset } as any,
-                  ext: { width: finalW, height: finalH } as any,
+                  tl: { col: 1 + colOffset, row: rIdx - 1 + rowOffset },
+                  ext: { width: finalW, height: finalH },
                   editAs: "oneCell",
                 });
               }

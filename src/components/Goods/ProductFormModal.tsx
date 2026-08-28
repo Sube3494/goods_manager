@@ -44,7 +44,7 @@ function normalizeJdSkuPreview(value: string) {
   return Array.from(
     new Set(
       String(value || "")
-        .split(/[，,]+/g)
+        .split(/[\s,，;；、]+/g)
         .map((item) => item.trim())
         .filter(Boolean)
     )
@@ -63,7 +63,7 @@ function normalizeMeituanSkuPreview(value: string) {
   return Array.from(
     new Set(
       String(value || "")
-        .split(/[，,]+/g)
+        .split(/[\s,，;；、]+/g)
         .map((item) => item.trim())
         .filter(Boolean)
     )
@@ -1230,15 +1230,15 @@ export function ProductFormModal({
                                       <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                                           <FileText size={16} className="text-rose-500" /> JD SKU ID
                                       </label>
-                                      <input
-                                          type="text"
+                                      <textarea
+                                          rows={3}
                                           value={formData.jdSkuId}
-                                          onChange={(e) => setFormData({ ...formData, jdSkuId: e.target.value.replace(/[\r\n]+/g, ",") })}
-                                          className="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all font-mono dark:hover:bg-white/10"
+                                          onChange={(e) => setFormData({ ...formData, jdSkuId: e.target.value })}
+                                          className="min-h-24 w-full resize-y rounded-2xl bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-4 py-3 text-foreground outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all font-mono dark:hover:bg-white/10"
                                           placeholder="用逗号分隔多个 JD SKU，例如：123456,234567,345678"
                                       />
                                       <div className="flex items-start justify-between gap-3 text-[11px] text-muted-foreground">
-                                        <span>只支持逗号分隔多个 JD SKU，保存时会自动去重。</span>
+                                        <span>支持逗号、空格、换行、分号或顿号分隔多个 JD SKU，保存时会自动去重。</span>
                                         <span className="shrink-0 font-mono">{jdSkuPreview.length} 条</span>
                                       </div>
                                   </div>
@@ -1249,15 +1249,15 @@ export function ProductFormModal({
                                       <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                                           <Tag size={16} className="text-amber-500" /> 美团商品 ID (Meituan SKU ID)
                                       </label>
-                                      <input
-                                          type="text"
+                                      <textarea
+                                          rows={3}
                                           value={formData.meituanSkuId}
-                                          onChange={(e) => setFormData({ ...formData, meituanSkuId: e.target.value.replace(/[\r\n]+/g, ",") })}
-                                          className="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all font-mono dark:hover:bg-white/10"
+                                          onChange={(e) => setFormData({ ...formData, meituanSkuId: e.target.value })}
+                                          className="min-h-24 w-full resize-y rounded-2xl bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-4 py-3 text-foreground outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all font-mono dark:hover:bg-white/10"
                                           placeholder="用逗号分隔多个美团商品 ID，例如：100234,100235"
                                       />
                                       <div className="flex items-start justify-between gap-3 text-[11px] text-muted-foreground">
-                                        <span>支持逗号分隔多个美团 ID，保存时将与美团配对池联动更新。</span>
+                                        <span>支持逗号、空格、换行、分号或顿号分隔多个美团 ID，保存时将与美团配对池联动更新。</span>
                                         <span className="shrink-0 font-mono text-amber-500 font-bold">{meituanSkuPreview.length} 条</span>
                                       </div>
                                   </div>

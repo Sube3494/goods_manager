@@ -98,7 +98,7 @@ export function ImportModal({
         const workbook = XLSX.read(data, { type: "binary" });
         const sheetName = workbook.SheetNames[0];
         const sheet = workbook.Sheets[sheetName];
-        const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet);
+        const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { raw: false, defval: "" });
         setPreviewData(json.slice(0, 5)); // Preview first sheet items
       } catch (err) {
         console.error(err);
@@ -140,14 +140,14 @@ export function ImportModal({
               const result: Record<string, unknown[]> = {};
               workbook.SheetNames.forEach(name => {
                   const sheet = workbook.Sheets[name];
-                  const rawData = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet);
+                  const rawData = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { raw: false, defval: "" });
                   result[name] = rawData.map(filterRow);
               });
               importData = result;
             } else {
               const sheetName = workbook.SheetNames[0];
               const sheet = workbook.Sheets[sheetName];
-              const rawData = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet);
+              const rawData = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { raw: false, defval: "" });
               importData = rawData.map((row) => ({
                 ...filterRow(row),
                 __sheetName: sheetName,
