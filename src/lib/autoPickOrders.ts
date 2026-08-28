@@ -1537,7 +1537,9 @@ function parseAmountsFromRawValues(platform: string, rawValues: {
 }) {
   const actualPaid = parseCentsValue(rawValues.userFee ?? rawValues.totalPrice);
   const isDoudian = normalizePlatformName(platform) === "抖店";
-  const parsedExpectedIncome = parseOptionalCentsValue(rawValues.shopFee ?? rawValues.balancePrice);
+  const parsedExpectedIncome = isDoudian
+    ? undefined
+    : parseOptionalCentsValue(rawValues.shopFee ?? rawValues.balancePrice);
   const explicitCommission = parseOptionalCentsValue(rawValues.commission);
   const computedCommission = parsedExpectedIncome === undefined ? 0 : Math.max(0, actualPaid - parsedExpectedIncome);
   const fallbackCommission = isDoudian && parsedExpectedIncome === undefined
