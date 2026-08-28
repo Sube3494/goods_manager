@@ -3,8 +3,6 @@ import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
 import { hasPermission, SessionUser } from "@/lib/permissions";
 import { pinyin } from "pinyin-pro";
-import { normalizeJdSkuIds, replaceProductJdSkuMappings } from "@/lib/productJdSku";
-import { normalizeMeituanSkuIds, replaceProductMeituanSkuMappings } from "@/lib/productMeituanSku";
 
 function generatePinyinSearchText(name: string): string {
   if (!name) return "";
@@ -150,14 +148,6 @@ export async function POST(request: Request) {
             const isDiscontinuedText = String(extractRowValue(item, ["生产状态", "isDiscontinued"]) || "");
             const isDiscontinued = isDiscontinuedText === "已停产" || isDiscontinuedText === "是" || isDiscontinuedText === "true" ? true : false;
             
-            const jdSkuText = String(extractRowValue(item, ["JD SKU ID", "JD SKU", "JDSKU", "jdSkuId", "jdSkuIds", "京东编码", "京东SKU", "京东商品ID", "京东ID"]) || "");
-            const meituanSkuText = String(extractRowValue(item, [
-              "美团商品 ID", "美团商品ID", "美团商品Id", "美团商品id", 
-              "美团ID", "美团Id", "美团id", "美团编码", "美团sku", "美团SKU", 
-              "商品ID", "商品Id", "商品id", "平台商品ID", "平台商品id",
-              "meituanSkuId", "meituanSkuIds", "meituanId"
-            ]) || "");
-
             const remarkText = String(extractRowValue(item, ["备注", "remark"]) || "");
 
             const isShelfLifeText = String(extractRowValue(item, ["是否管理保质期", "是否保质期管理", "保质期管理", "isShelfLife"]) || "");
@@ -292,13 +282,6 @@ export async function POST(request: Request) {
                     data: updateData
                 });
 
-                if (jdSkuText) {
-                    await replaceProductJdSkuMappings(prisma, product.id, userId, normalizeJdSkuIds(jdSkuText));
-                }
-                if (meituanSkuText) {
-                    await replaceProductMeituanSkuMappings(prisma, product.id, userId, normalizeMeituanSkuIds(meituanSkuText));
-                }
-
                 // 处理图库同步 (Sync Gallery)
                 if (galleryUrls.length > 0) {
                     for (const gUrl of galleryUrls) {
@@ -423,13 +406,6 @@ export async function POST(request: Request) {
                         libraryId: libraryId || undefined
                     }
                 });
-
-                if (jdSkuText) {
-                    await replaceProductJdSkuMappings(prisma, newProduct.id, userId, normalizeJdSkuIds(jdSkuText));
-                }
-                if (meituanSkuText) {
-                    await replaceProductMeituanSkuMappings(prisma, newProduct.id, userId, normalizeMeituanSkuIds(meituanSkuText));
-                }
 
                 // 处理图库 (Gallery)
                 const allGalleryToCreate = [...galleryUrls];
