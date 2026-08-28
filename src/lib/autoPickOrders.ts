@@ -1537,17 +1537,18 @@ function parseAmountsFromRawValues(platform: string, rawValues: {
 }) {
   const actualPaid = parseCentsValue(rawValues.userFee ?? rawValues.totalPrice);
   const isDoudian = normalizePlatformName(platform) === "抖店";
-  const expectedIncome = parseOptionalCentsValue(rawValues.shopFee ?? rawValues.balancePrice);
+  const parsedExpectedIncome = parseOptionalCentsValue(rawValues.shopFee ?? rawValues.balancePrice);
   const explicitCommission = parseOptionalCentsValue(rawValues.commission);
-  const computedCommission = expectedIncome === undefined ? 0 : Math.max(0, actualPaid - expectedIncome);
-  const fallbackCommission = isDoudian && expectedIncome === undefined
+  const computedCommission = parsedExpectedIncome === undefined ? 0 : Math.max(0, actualPaid - parsedExpectedIncome);
+  const fallbackCommission = isDoudian && parsedExpectedIncome === undefined
     ? getDefaultPlatformCommission(platform, actualPaid)
-    : explicitCommission ?? (expectedIncome === undefined ? getDefaultPlatformCommission(platform, actualPaid) : computedCommission);
+    : explicitCommission ?? (parsedExpectedIncome === undefined ? getDefaultPlatformCommission(platform, actualPaid) : computedCommission);
   const platformCommission = applyJDPlatformCommissionFallback(
     platform,
     actualPaid,
     fallbackCommission,
   );
+  const expectedIncome = parsedExpectedIncome ?? (isDoudian ? Math.max(0, actualPaid - platformCommission) : undefined);
 
   return {
     actualPaid,
