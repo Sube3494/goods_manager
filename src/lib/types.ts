@@ -118,6 +118,8 @@ export interface ShopCatalogItem {
   jdSkuIds?: string[];
   meituanSkuId?: string | null;
   meituanSkuIds?: string[];
+  shopMeituanSkuId?: string | null;
+  shopMeituanSkuIds?: string[];
   taobaoSkuId?: string | null;
   doudianSkuId?: string | null;
   name: string;

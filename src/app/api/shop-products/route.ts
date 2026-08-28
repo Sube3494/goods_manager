@@ -174,6 +174,8 @@ export async function GET(request: NextRequest) {
             jdSkuId: item.jdSkuId || null,
             meituanSkuId: meituanSkuIds.join(",") || null,
             meituanSkuIds,
+            shopMeituanSkuId: item.meituanSkuId || null,
+            shopMeituanSkuIds: normalizeMeituanSkuIds(item.meituanSkuId),
             taobaoSkuId: item.taobaoSkuId || null,
             doudianSkuId: item.doudianSkuId || null,
             name: item.productName || item.product?.name || "未命名商品",
@@ -251,6 +253,8 @@ export async function GET(request: NextRequest) {
           jdSkuId: item.jdSkuId || null,
           meituanSkuId: meituanSkuIds.join(",") || null,
           meituanSkuIds,
+          shopMeituanSkuId: item.meituanSkuId || null,
+          shopMeituanSkuIds: normalizeMeituanSkuIds(item.meituanSkuId),
           taobaoSkuId: item.taobaoSkuId || null,
           doudianSkuId: item.doudianSkuId || null,
           name: item.productName || item.product?.name || "未命名商品",
@@ -350,12 +354,17 @@ export async function GET(request: NextRequest) {
       const storage = await getStorageStrategy();
       const resolved = orderedItems.map((item) => {
         const sourceImage = item.sourceProductId ? sourceProductsMap.get(item.sourceProductId)?.image : null;
+        const meituanSkuIds = resolveMeituanSkuIds(item);
         return {
           id: item.id,
           sourceProductId: item.sourceProductId || item.productId || item.id,
           productId: item.productId || null,
           sku: item.sku || null,
           jdSkuId: item.jdSkuId || null,
+          meituanSkuId: meituanSkuIds.join(",") || null,
+          meituanSkuIds,
+          shopMeituanSkuId: item.meituanSkuId || null,
+          shopMeituanSkuIds: normalizeMeituanSkuIds(item.meituanSkuId),
           taobaoSkuId: item.taobaoSkuId || null,
           doudianSkuId: item.doudianSkuId || null,
           name: item.productName || item.product?.name || "未命名商品",
@@ -453,6 +462,8 @@ export async function GET(request: NextRequest) {
       jdSkuId: item.jdSkuId || null,
       meituanSkuId: meituanSkuIds.join(",") || null,
       meituanSkuIds,
+      shopMeituanSkuId: item.meituanSkuId || null,
+      shopMeituanSkuIds: normalizeMeituanSkuIds(item.meituanSkuId),
       taobaoSkuId: item.taobaoSkuId || null,
       doudianSkuId: item.doudianSkuId || null,
       name: item.productName || item.product?.name || "未命名商品",

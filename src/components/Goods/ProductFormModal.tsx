@@ -25,21 +25,6 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-function resolveImageUrl(url?: string | null): string {
-  if (!url) return "";
-  const trimmed = url.trim();
-  if (!trimmed) return "";
-  if (trimmed.startsWith("//")) return `https:${trimmed}`;
-  if (trimmed.startsWith("http://") || trimmed.startsWith("https://") || trimmed.startsWith("data:")) return trimmed;
-  if (trimmed.startsWith("/api/uploads/")) return trimmed;
-  if (trimmed.startsWith("api/uploads/")) return `/${trimmed}`;
-  let clean = trimmed;
-  if (clean.startsWith("/uploads/")) clean = clean.substring(9);
-  else if (clean.startsWith("uploads/")) clean = clean.substring(8);
-  else if (clean.startsWith("/")) clean = clean.substring(1);
-  return `/api/uploads/${clean}`;
-}
-
 function normalizeJdSkuPreview(value: string) {
   return Array.from(
     new Set(
@@ -54,7 +39,7 @@ function normalizeJdSkuPreview(value: string) {
 function formatInitialJdSkuValue(initialData?: Product | null) {
   const jdSkuIds = initialData && Array.isArray(initialData.jdSkuIds) ? initialData.jdSkuIds.filter(Boolean) : [];
   if (jdSkuIds.length > 0) {
-    return jdSkuIds.join("\n");
+    return jdSkuIds.join(",");
   }
   return initialData?.jdSkuId || "";
 }
@@ -73,9 +58,17 @@ function normalizeMeituanSkuPreview(value: string) {
 function formatInitialMeituanSkuValue(initialData?: Product | null) {
   const meituanSkuIds = initialData && Array.isArray(initialData.meituanSkuIds) ? initialData.meituanSkuIds.filter(Boolean) : [];
   if (meituanSkuIds.length > 0) {
-    return meituanSkuIds.join("\n");
+    return meituanSkuIds.join(",");
   }
   return initialData?.meituanSkuId || "";
+}
+
+function normalizePlatformIdInput(value: string) {
+  return value
+    .split(/[\s,，;；、]+/g)
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .join(",");
 }
 
 function formatInitialTaobaoSkuValue(initialData?: Product | null) {
@@ -1230,11 +1223,19 @@ export function ProductFormModal({
                                       <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                                           <FileText size={16} className="text-rose-500" /> JD SKU ID
                                       </label>
-                                      <textarea
-                                          rows={3}
+                                      <input
+                                          type="text"
                                           value={formData.jdSkuId}
                                           onChange={(e) => setFormData({ ...formData, jdSkuId: e.target.value })}
-                                          className="min-h-24 w-full resize-y rounded-2xl bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-4 py-3 text-foreground outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all font-mono dark:hover:bg-white/10"
+                                          onBlur={(e) => setFormData({ ...formData, jdSkuId: normalizePlatformIdInput(e.target.value) })}
+                                          onPaste={(e) => {
+                                            const text = e.clipboardData.getData("text");
+                                            if (/[\r\n\t;；、，\s]/.test(text)) {
+                                              e.preventDefault();
+                                              setFormData({ ...formData, jdSkuId: normalizePlatformIdInput(text) });
+                                            }
+                                          }}
+                                          className="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all font-mono dark:hover:bg-white/10"
                                           placeholder="用逗号分隔多个 JD SKU，例如：123456,234567,345678"
                                       />
                                       <div className="flex items-start justify-between gap-3 text-[11px] text-muted-foreground">
@@ -1249,11 +1250,19 @@ export function ProductFormModal({
                                       <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                                           <Tag size={16} className="text-amber-500" /> 美团商品 ID (Meituan SKU ID)
                                       </label>
-                                      <textarea
-                                          rows={3}
+                                      <input
+                                          type="text"
                                           value={formData.meituanSkuId}
                                           onChange={(e) => setFormData({ ...formData, meituanSkuId: e.target.value })}
-                                          className="min-h-24 w-full resize-y rounded-2xl bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-4 py-3 text-foreground outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all font-mono dark:hover:bg-white/10"
+                                          onBlur={(e) => setFormData({ ...formData, meituanSkuId: normalizePlatformIdInput(e.target.value) })}
+                                          onPaste={(e) => {
+                                            const text = e.clipboardData.getData("text");
+                                            if (/[\r\n\t;；、，\s]/.test(text)) {
+                                              e.preventDefault();
+                                              setFormData({ ...formData, meituanSkuId: normalizePlatformIdInput(text) });
+                                            }
+                                          }}
+                                          className="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all font-mono dark:hover:bg-white/10"
                                           placeholder="用逗号分隔多个美团商品 ID，例如：100234,100235"
                                       />
                                       <div className="flex items-start justify-between gap-3 text-[11px] text-muted-foreground">
