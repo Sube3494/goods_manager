@@ -786,6 +786,11 @@ export function formatCompactDateTime(value: string | null | undefined) {
   const text = String(value || "").trim();
   if (!text) return "-";
 
+  const datedRangeMatch = text.match(/((?:\d{4}[-/])?\d{2}[-/]\d{2}\s+\d{1,2}:\d{2}(?::\d{2})?)\s*[-~至]\s*((?:\d{4}[-/])?\d{2}[-/]\d{2}\s+\d{1,2}:\d{2}(?::\d{2})?|\d{1,2}:\d{2}(?::\d{2})?)/);
+  if (datedRangeMatch) {
+    return `${datedRangeMatch[1]}-${datedRangeMatch[2]}`;
+  }
+
   // 如果包含时间区间，比如 08-24 18:45-19:15 或 18:45-19:15
   const rangeMatch = text.match(/(\d{4}[-/])?(\d{2}[-/]\d{2}\s+)?(\d{1,2}:\d{2}(?::\d{2})?\s*[-~至]\s*\d{1,2}:\d{2}(?::\d{2})?)/);
   if (rangeMatch) {
@@ -843,6 +848,26 @@ export function shiftTimeMinutes(timeStr: string, deltaMinutes: number): string 
   return `${String(newHours).padStart(2, "0")}:${String(newMinutes).padStart(2, "0")}`;
 }
 
+function parseDeliveryRangeSegments(text: string) {
+  const datedRangeMatch = text.match(/((?:\d{4}[-/])?\d{2}[-/]\d{2}\s+\d{1,2}:\d{2}(?::\d{2})?)\s*[-~至]\s*((?:\d{4}[-/])?\d{2}[-/]\d{2}\s+\d{1,2}:\d{2}(?::\d{2})?|\d{1,2}:\d{2}(?::\d{2})?)/);
+  if (datedRangeMatch) {
+    return {
+      start: datedRangeMatch[1].trim(),
+      end: datedRangeMatch[2].trim(),
+    };
+  }
+
+  const timeRangeMatch = text.match(/(\d{1,2}:\d{2}(?::\d{2})?)\s*[-~至]\s*(\d{1,2}:\d{2}(?::\d{2})?)/);
+  if (timeRangeMatch) {
+    return {
+      start: timeRangeMatch[1].trim(),
+      end: timeRangeMatch[2].trim(),
+    };
+  }
+
+  return null;
+}
+
 export function getDeadlineDisplay(order: Pick<AutoPickOrder, "isPickup" | "isSubscribe" | "deliveryDeadline" | "deliveryTimeRange" | "orderTime" | "createdAt"> & { platform?: string | null; channelTag?: string | null }) {
   const deadlineText = String(order.deliveryDeadline || "").trim();
   const rangeText = String(order.deliveryTimeRange || "").trim();
@@ -882,20 +907,20 @@ export function getDeadlineDisplay(order: Pick<AutoPickOrder, "isPickup" | "isSu
     }
   }
 
-  // 优先匹配标准时间段: HH:mm-HH:mm, HH:mm~HH:mm, HH:mm至HH:mm 等
-  const rangeMatch = text.match(/(\d{1,2}:\d{2}(?::\d{2})?)\s*[-~至]\s*(\d{1,2}:\d{2}(?::\d{2})?)/);
+  // 优先匹配标准时间段，支持跨天的 08-28 23:05-08-29 00:05。
+  const rangeMatch = parseDeliveryRangeSegments(text);
   if (rangeMatch) {
     if (isSubscribe) {
-      return `${datePrefix}${rangeMatch[1]}-${rangeMatch[2]}`;
+      return `${datePrefix}${rangeMatch.start}-${rangeMatch.end}`;
     }
-    const startTime = rangeMatch[1];
-    const endTime = rangeMatch[2];
-    const targetTime = isJd ? endTime : startTime;
-    return `${datePrefix}${targetTime}`;
+    const targetTime = isJd ? rangeMatch.end : rangeMatch.start;
+    return /^\d{2}[-/]\d{2}\s+\d{1,2}:\d{2}/.test(targetTime) || /^\d{4}[-/]\d{2}[-/]\d{2}\s+\d{1,2}:\d{2}/.test(targetTime)
+      ? targetTime
+      : `${datePrefix}${targetTime}`;
   }
 
-  // 如果包含范围连字符
-  const parts = text.split(/\s*[-~至]\s*/);
+  // 如果包含范围分隔符但不是日期短横线，再按普通文本兜底拆分。
+  const parts = text.split(/\s*[~至]\s*/);
   if (parts.length > 1) {
     if (isSubscribe) {
       return text;
