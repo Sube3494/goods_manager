@@ -1150,6 +1150,7 @@ function OrderAmountEditModal({
   const [expectedIncome, setExpectedIncome] = useState(() => formatCurrencyInputFromCents(getExpectedIncome(order.expectedIncome, order.actualPaid, order.platformCommission, order.platform)));
   const [isSaving, setIsSaving] = useState(false);
   const isJd = String(order.platform || "").includes("京东");
+  const isDoudian = isDoudianOrder(order.platform);
 
   const handleSave = async () => {
     const nextExpectedIncome = parseCurrencyInputToCents(expectedIncome);
@@ -1176,7 +1177,7 @@ function OrderAmountEditModal({
         <div className="flex items-start justify-between gap-3 px-6 pb-4 pt-6">
           <div>
             <h3 className="text-xl font-semibold tracking-tight text-foreground">修改商家到手</h3>
-            <p className="mt-2 text-xs leading-5 text-muted-foreground">{isJd ? "只覆盖京东订单的到手金额，实付保持系统原值不变。" : isOffline ? "修改线下订单金额（实付与到手保持一致）。" : "手动记录这张手工配送单的商家到手金额，实付保持系统原值不变。"}</p>
+            <p className="mt-2 text-xs leading-5 text-muted-foreground">{isJd || isDoudian ? "只覆盖订单的到手金额，实付保持系统原值不变。" : isOffline ? "修改线下订单金额（实付与到手保持一致）。" : "手动记录这张手工配送单的商家到手金额，实付保持系统原值不变。"}</p>
           </div>
           <button
             type="button"
@@ -1918,7 +1919,7 @@ export const OrderCard = memo(function OrderCard({
         body: JSON.stringify({ expectedIncome }),
       });
       if (res.ok) {
-        showToast("京东到手金额修改成功", "success");
+        showToast("到手金额修改成功", "success");
         onRefresh?.();
         return true;
       }
@@ -2096,8 +2097,9 @@ export const OrderCard = memo(function OrderCard({
   const canEditProductCost = order.productCostStatus === "pending-backfill" || productCostBreakdown.length > 0;
   const settlementAfterRate = Math.round(expectedIncome * (1 - serviceFeeRate));
   const isJdOrder = String(order.platform || "").includes("京东");
+  const isDoudianPlatformOrder = isDoudianOrder(order.platform);
   const isMeituanPlatformOrder = isMeituanOrder(order.platform);
-  const canEditExpectedIncome = isJdOrder || legacyManualDeliveryPlaceholderOrder;
+  const canEditExpectedIncome = isJdOrder || isDoudianPlatformOrder || legacyManualDeliveryPlaceholderOrder;
   const pureProfitTooltipRows: Array<{ label: string; value: string; editable?: boolean; onEdit?: () => void }> = hasPureProfit
     ? (showManualDeliveryMarker
       ? [
@@ -2940,7 +2942,7 @@ export const OrderCard = memo(function OrderCard({
                 <h3 className="mb-3 text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground sm:mb-3">金额信息</h3>
                 <div className="grid grid-cols-2 gap-2 sm:gap-2.5">
                   <DetailStat label="顾客实付" value={toCurrency(order.actualPaid)} />
-                  <DetailStat label={isJdOrder ? "京东到手" : "预计到手"} value={expectedIncomeDisplay} />
+                  <DetailStat label={isJdOrder ? "京东到手" : isDoudianPlatformOrder ? "抖店到手" : "预计到手"} value={expectedIncomeDisplay} />
                   <DetailStat label="货品成本" value={order.productCostStatus === "ready" ? toCurrency(order.productCost) : (productCostStatusText || "-")} />
                   <DetailStat label="纯利润" value={pureProfitDisplay} />
                   {hasRefundAmount ? (

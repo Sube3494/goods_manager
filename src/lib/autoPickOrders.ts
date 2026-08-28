@@ -1475,6 +1475,14 @@ function parseCentsValue(rawValue: string | number | undefined) {
   return Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0;
 }
 
+function parseOptionalCentsValue(rawValue: string | number | undefined) {
+  if (rawValue === undefined || rawValue === null || rawValue === "") {
+    return undefined;
+  }
+  const value = Number(rawValue);
+  return Number.isFinite(value) ? Math.max(0, Math.round(value)) : undefined;
+}
+
 function pickFirstValidTimeValue(...candidates: unknown[]) {
   for (const candidate of candidates) {
     if (typeof candidate === "number") {
@@ -1507,6 +1515,19 @@ function applyJDPlatformCommissionFallback(platform: string, actualPaid: number,
   return -Math.round((actualPaid - 100) * 0.06 + 100);
 }
 
+function getDefaultPlatformCommission(platform: string, actualPaid: number) {
+  if (!Number.isFinite(actualPaid) || actualPaid <= 0) {
+    return 0;
+  }
+
+  const normalizedPlatform = normalizePlatformName(platform);
+  if (normalizedPlatform === "抖店") {
+    return Math.round(actualPaid * 0.006);
+  }
+
+  return 0;
+}
+
 function parseAmountsFromRawValues(platform: string, rawValues: {
   commission?: string | number;
   userFee?: string | number;
@@ -1515,16 +1536,13 @@ function parseAmountsFromRawValues(platform: string, rawValues: {
   balancePrice?: string | number;
 }) {
   const actualPaid = parseCentsValue(rawValues.userFee ?? rawValues.totalPrice);
-  const isDoudian = normalizePlatformName(platform) === "抖店";
-  const expectedIncome = isDoudian
-    ? Math.max(0, Math.round(actualPaid * 0.95))
-    : parseCentsValue(rawValues.shopFee ?? rawValues.balancePrice);
-  const explicitCommission = Number(rawValues.commission);
-  const computedCommission = Math.max(0, actualPaid - expectedIncome);
+  const expectedIncome = parseOptionalCentsValue(rawValues.shopFee ?? rawValues.balancePrice);
+  const explicitCommission = parseOptionalCentsValue(rawValues.commission);
+  const computedCommission = expectedIncome === undefined ? 0 : Math.max(0, actualPaid - expectedIncome);
   const platformCommission = applyJDPlatformCommissionFallback(
     platform,
     actualPaid,
-    isDoudian ? computedCommission : (Number.isFinite(explicitCommission) ? Math.round(explicitCommission) : computedCommission),
+    explicitCommission ?? (expectedIncome === undefined ? getDefaultPlatformCommission(platform, actualPaid) : computedCommission),
   );
 
   return {
