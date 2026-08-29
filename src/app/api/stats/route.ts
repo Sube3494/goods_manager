@@ -358,7 +358,7 @@ export async function GET(request: NextRequest) {
         firstBrush?.date,
         firstSettlement?.date,
         firstShopProduct?.createdAt,
-        !shopName || resolveAutoPickMatchedShopName(firstAutoPickOrder || {}, user.permissions) === shopName
+        !shopName || resolveAutoPickMatchedShopName(firstAutoPickOrder || {}, permissionsObj) === shopName
           ? firstAutoPickOrder?.orderTime
           : null,
       ].filter((value): value is Date => value instanceof Date && !Number.isNaN(value.getTime()));
@@ -541,7 +541,7 @@ export async function GET(request: NextRequest) {
     );
 
     const filteredAutoPickOrdersInRange = shopName
-      ? autoPickOrdersInRange.filter((order) => resolveAutoPickMatchedShopName(order, user.permissions) === shopName)
+      ? autoPickOrdersInRange.filter((order) => resolveAutoPickMatchedShopName(order, permissionsObj) === shopName)
       : autoPickOrdersInRange;
 
     const pendingOrderCount = pendingOrders.length;
@@ -589,7 +589,7 @@ export async function GET(request: NextRequest) {
 
     // 先获取收货地址库中的店铺抽出率
     const userDb = await prisma.user.findUnique({
-      where: { id: user.id },
+      where: { id: targetUserId },
       select: { shippingAddresses: true }
     });
     const userAddresses = userDb && Array.isArray(userDb.shippingAddresses) 
@@ -810,7 +810,7 @@ export async function GET(request: NextRequest) {
         const incomeYuan = (manualAmountOverride || isOffline) ? expectedIncomeYuan : adjustedPaidYuan;
 
         const isBrush = readMainSystemSelfDeliveryFlag(order.rawPayload);
-        const matchedShopName = resolveAutoPickMatchedShopName(order, user.permissions) || order.shopAddress || order.shopId || "未匹配店铺";
+        const matchedShopName = resolveAutoPickMatchedShopName(order, permissionsObj) || order.shopAddress || order.shopId || "未匹配店铺";
         const customCommission = order.orderNo ? customBrushCommissionMap.get(order.orderNo) : undefined;
         const orderBrushCommission = typeof customCommission === "number" && customCommission >= 0
           ? customCommission
@@ -917,7 +917,7 @@ export async function GET(request: NextRequest) {
         || isAutoPickOrderDeletedStatus(order.status)
         || isVoidedOfflineOrder(order);
       const orderCostMeta = outboundMetaByOrderNo.get(String(order.orderNo || "").trim());
-      const matchedShopName = resolveAutoPickMatchedShopName(order, user.permissions) || order.shopAddress || order.shopId || "未匹配店铺";
+      const matchedShopName = resolveAutoPickMatchedShopName(order, permissionsObj) || order.shopAddress || order.shopId || "未匹配店铺";
       const addShopPureProfit = (target: ReturnType<typeof createTrendBucket> | undefined, amount: number) => {
         if (!target || amount === 0) return;
         target.shopPureProfit[matchedShopName] = FinanceMath.add(target.shopPureProfit[matchedShopName] || 0, amount);
