@@ -841,11 +841,6 @@ export async function GET(request: NextRequest) {
     );
     const otherExpense = 0;
 
-    const netProfit = FinanceMath.add(
-      userPaid,
-      -platformCommission - deliveryExpense - productCost - returnExtraExpense - promotionExpense - brushExpense - otherExpense
-    );
-
     const dateSeries = buildDateSeries(startDate, endDate);
     const createTrendBucket = () => ({
       trueOrderCount: 0,
@@ -1163,6 +1158,10 @@ export async function GET(request: NextRequest) {
     };
 
     const businessTrend = buildTrendSeries(businessTrendMap);
+    const netProfit = businessTrend.reduce(
+      (sum, point) => FinanceMath.add(sum, point.netProfit || 0),
+      0
+    );
     const platformBusinessTrend = Object.fromEntries(
       DASHBOARD_PLATFORMS.map((platform) => [platform, buildTrendSeries(platformTrendMaps.get(platform)!)])
     );
