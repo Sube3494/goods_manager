@@ -638,8 +638,9 @@ export function DataOverview({
           </div>
         </div>
 
-        <div className="mt-3.5 grid grid-cols-1 gap-2.5 sm:grid-cols-3">
-          <CompactMetric label="平台扣费" value={money(data?.platformCommission)} hint="平台佣金与扣点" />
+        <div className="mt-3.5 grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
+          <CompactMetric label="平台扣点" value={money(data?.platformCommission)} hint="真单平台佣金" />
+          <CompactMetric label="公司抽点" value={money(data?.companyCommission)} hint="真单店铺抽点" />
           <CompactMetric
             label="配送支出"
             value={money(data?.deliveryExpense)}

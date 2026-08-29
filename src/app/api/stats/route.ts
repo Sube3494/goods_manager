@@ -752,6 +752,7 @@ export async function GET(request: NextRequest) {
 
     let userPaid = 0;
     let platformCommission = 0;
+    let companyCommission = 0;
     let deliveryExpense = 0;
     let productCost = 0;
     let returnExtraExpense = 0;
@@ -807,6 +808,7 @@ export async function GET(request: NextRequest) {
         const incomeYuan = (manualAmountOverride || isOffline) ? expectedIncomeYuan : adjustedPaidYuan;
 
         const isBrush = readMainSystemSelfDeliveryFlag(order.rawPayload);
+        const matchedShopName = resolveAutoPickMatchedShopName(order, user.permissions) || order.shopAddress || order.shopId || "未匹配店铺";
         const customCommission = order.orderNo ? customBrushCommissionMap.get(order.orderNo) : undefined;
         const orderBrushCommission = typeof customCommission === "number" && customCommission >= 0
           ? customCommission
@@ -817,14 +819,16 @@ export async function GET(request: NextRequest) {
               rawPayload: order.rawPayload,
             });
         if (!isBrush) {
+          const companyRate = isOffline ? 0 : (shopRateMap.get(matchedShopName) ?? 0.06);
           userPaid = FinanceMath.add(userPaid, incomeYuan);
+          platformCommission = FinanceMath.add(platformCommission, commissionYuan);
+          companyCommission = FinanceMath.add(companyCommission, FinanceMath.multiply(expectedIncomeYuan, companyRate));
           productCost = FinanceMath.add(productCost, orderCostYuan);
           returnExtraExpense = FinanceMath.add(returnExtraExpense, returnExtraExpenseYuan);
         } else {
-          brushExpense = FinanceMath.add(brushExpense, orderBrushCommission);
+          brushExpense = FinanceMath.add(brushExpense, commissionYuan + orderBrushCommission);
           returnExtraExpense = FinanceMath.add(returnExtraExpense, returnExtraExpenseYuan);
         }
-        platformCommission = FinanceMath.add(platformCommission, commissionYuan);
         deliveryExpense = FinanceMath.add(deliveryExpense, deliveryYuan);
       } else {
         if (orderCostMeta && !isRefundableMeituanDelivery(order.platform, order.delivery)) {
@@ -1265,6 +1269,7 @@ export async function GET(request: NextRequest) {
       duplicateSourceProductCount,
       userPaid,
       platformCommission,
+      companyCommission,
       deliveryExpense,
       productCost,
       promotionExpense,

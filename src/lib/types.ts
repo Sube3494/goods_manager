@@ -584,6 +584,7 @@ export interface StatsData {
   alerts?: DashboardAlertItem[];
   userPaid?: number;
   platformCommission?: number;
+  companyCommission?: number;
   deliveryExpense?: number;
   productCost?: number;
   promotionExpense?: number;
