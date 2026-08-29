@@ -222,7 +222,9 @@ function resolveDashboardIncomeMetrics(
     const derivedCommission = Math.max(0, paid - resolvedExpectedIncome);
     return {
       expectedIncome: resolvedExpectedIncome,
-      platformCommission: Math.max(derivedCommission, explicitCommission),
+      platformCommission: isJDPlatform(platform)
+        ? Math.max(derivedCommission, explicitCommission)
+        : derivedCommission,
     };
   }
 

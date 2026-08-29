@@ -695,7 +695,9 @@ function resolveIncomeMetrics(
     const derivedCommission = Math.max(0, Math.round(Number(actualPaid || 0) - resolvedExpectedIncome));
     return {
       expectedIncome: resolvedExpectedIncome,
-      platformCommission: Math.max(derivedCommission, Math.max(0, Math.round(Number(fallbackCommission || 0)))),
+      platformCommission: isJDPlatform(platform)
+        ? Math.max(derivedCommission, Math.max(0, Math.round(Number(fallbackCommission || 0))))
+        : derivedCommission,
     };
   }
 

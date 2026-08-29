@@ -2049,13 +2049,18 @@ export const OrderCard = memo(function OrderCard({
   const showBrushMarker = !pickup && !showManualDeliveryMarker && order.isMainSystemSelfDelivery;
   const orderTypeLabel = getOrderTypeLabel(order);
   const platformMeta = getPlatformBadgeMeta(order.platform, order.rawPayload);
-  const commissionDisplay = getCommissionDisplay(order.platformCommission);
   const expectedIncome = getExpectedIncome(order.expectedIncome, order.actualPaid, order.platformCommission, order.platform);
   const effectiveActualPaid = (displayAsOfflineOrder || String(order.platform || "").toLowerCase() === "other")
     && (!order.actualPaid || Number(order.actualPaid) <= 0)
     && expectedIncome > 0
       ? expectedIncome
       : order.actualPaid;
+  const displayedPlatformCommission = !isJdOrder(order.platform)
+    && Number.isFinite(Number(expectedIncome))
+    && Number.isFinite(Number(effectiveActualPaid))
+    ? Math.max(0, Math.round(Number(effectiveActualPaid || 0) - Number(expectedIncome || 0)))
+    : order.platformCommission;
+  const commissionDisplay = getCommissionDisplay(displayedPlatformCommission);
   const hasPureProfit = typeof order.pureProfit === "number" && Number.isFinite(order.pureProfit);
   const pureProfit = hasPureProfit ? Number(order.pureProfit) : 0;
   const productCostStatusText = getProductCostStatusText(order);
@@ -2121,10 +2126,10 @@ export const OrderCard = memo(function OrderCard({
   }, new Map<string, Array<{ createdAt: string; reason: string; quantity: number; refundAmount?: number; extraExpense?: number }>>());
   const canEditProductCost = order.productCostStatus === "pending-backfill" || productCostBreakdown.length > 0;
   const settlementAfterRate = Math.round(expectedIncome * (1 - serviceFeeRate));
-  const isJdOrder = String(order.platform || "").includes("京东");
+  const isJdPlatformOrder = isJdOrder(order.platform);
   const isDoudianPlatformOrder = isDoudianOrder(order.platform);
   const isMeituanPlatformOrder = isMeituanOrder(order.platform);
-  const canEditExpectedIncome = isJdOrder || isDoudianPlatformOrder || legacyManualDeliveryPlaceholderOrder;
+  const canEditExpectedIncome = isJdPlatformOrder || isDoudianPlatformOrder || legacyManualDeliveryPlaceholderOrder;
   const pureProfitTooltipRows: Array<{ label: string; value: string; editable?: boolean; onEdit?: () => void }> = hasPureProfit
     ? (showManualDeliveryMarker
       ? [
@@ -2629,7 +2634,7 @@ export const OrderCard = memo(function OrderCard({
                     showMatchStatus={displayIndex === 0}
                     returnedQuantity={returnedItemQuantityMap.get(getReturnedProductKey(item)) || 0}
                     returnedDetails={returnedItemDetailsMap.get(getReturnedProductKey(item)) || []}
-                    isJdOrder={isJdOrder}
+                    isJdOrder={isJdPlatformOrder}
                     isMeituanOrder={isMeituanPlatformOrder}
                     isTaobaoOrder={isTaobaoOrder(order.platform)}
                     isDoudianOrder={isDoudianOrder(order.platform)}
@@ -2967,7 +2972,7 @@ export const OrderCard = memo(function OrderCard({
                 <h3 className="mb-3 text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground sm:mb-3">金额信息</h3>
                 <div className="grid grid-cols-2 gap-2 sm:gap-2.5">
                   <DetailStat label="顾客实付" value={toCurrency(order.actualPaid)} />
-                  <DetailStat label={isJdOrder ? "京东到手" : isDoudianPlatformOrder ? "抖店到手" : "预计到手"} value={expectedIncomeDisplay} />
+                  <DetailStat label={isJdPlatformOrder ? "京东到手" : isDoudianPlatformOrder ? "抖店到手" : "预计到手"} value={expectedIncomeDisplay} />
                   <DetailStat label="货品成本" value={order.productCostStatus === "ready" ? toCurrency(order.productCost) : (productCostStatusText || "-")} />
                   <DetailStat label="纯利润" value={pureProfitDisplay} />
                   {hasRefundAmount ? (
