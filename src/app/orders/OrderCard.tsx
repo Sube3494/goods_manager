@@ -164,7 +164,7 @@ export function formatPercent(value: number | null | undefined) {
 }
 
 export function getCommissionDisplay(value: number | null | undefined) {
-  const amount = Math.abs(Number(value || 0));
+  const amount = Number(value || 0);
   return {
     label: "佣金",
     value: toCurrency(amount),
@@ -228,7 +228,7 @@ export function summarizeOrders(orders: AutoPickOrder[]) {
         acc.realReceivedAmount += expectedIncome;
         acc.realPaidAmount += actualPaid;
       }
-      acc.platformCommission += Math.max(0, Number(order.platformCommission || 0));
+      acc.platformCommission += Number(order.platformCommission || 0);
       acc.validOrderCount += 1;
       const deliveryFee = getDeliveryFee(order.delivery);
       acc.totalDeliveryFee += deliveryFee;
@@ -266,7 +266,7 @@ export function summarizeOrders(orders: AutoPickOrder[]) {
       acc.shopProfit[shopKey].count += 1;
       acc.shopProfit[shopKey].deliveryFee += deliveryFee;
       acc.shopProfit[shopKey].productCost += Math.max(0, Number(order.productCost || 0));
-      acc.shopProfit[shopKey].platformCommission += Math.max(0, Number(order.platformCommission || 0));
+      acc.shopProfit[shopKey].platformCommission += Number(order.platformCommission || 0);
       const profitPlatform = normalizeProfitPlatform(order.platform);
       acc.shopProfit[shopKey].platformProfit[profitPlatform] = (acc.shopProfit[shopKey].platformProfit[profitPlatform] || 0) + orderPureProfit;
 
@@ -2058,7 +2058,7 @@ export const OrderCard = memo(function OrderCard({
   const displayedPlatformCommission = !isJdOrder(order.platform)
     && Number.isFinite(Number(expectedIncome))
     && Number.isFinite(Number(effectiveActualPaid))
-    ? Math.max(0, Math.round(Number(effectiveActualPaid || 0) - Number(expectedIncome || 0)))
+    ? Math.round(Number(effectiveActualPaid || 0) - Number(expectedIncome || 0))
     : order.platformCommission;
   const commissionDisplay = getCommissionDisplay(displayedPlatformCommission);
   const hasPureProfit = typeof order.pureProfit === "number" && Number.isFinite(order.pureProfit);
@@ -2141,12 +2141,12 @@ export const OrderCard = memo(function OrderCard({
           { label: "扣平台佣金", value: toCurrency(order.platformCommission) },
           {
             label: "扣刷单佣金",
-            value: toCurrency(- (typeof order.brushCommission === "number" ? Math.round(order.brushCommission * 100) : Math.abs(pureProfit) - Math.abs(Number(order.platformCommission || 0)))),
+            value: toCurrency(- (typeof order.brushCommission === "number" ? Math.round(order.brushCommission * 100) : -pureProfit - Number(order.platformCommission || 0))),
             editable: true,
             onEdit: () => {
               const currentVal = typeof order.brushCommission === "number"
                 ? order.brushCommission
-                : (Math.abs(pureProfit) - Math.abs(Number(order.platformCommission || 0))) / 100;
+                : (-pureProfit - Number(order.platformCommission || 0)) / 100;
               setEditCommissionValue(String(currentVal > 0 ? currentVal : ""));
               setIsProfitTooltipOpen(false);
               setIsCommissionEditorOpen(true);

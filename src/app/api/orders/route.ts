@@ -692,10 +692,10 @@ function resolveIncomeMetrics(
 
   if (Number.isFinite(Number(expectedIncome))) {
     const resolvedExpectedIncome = Math.round(Number(expectedIncome));
-    const derivedCommission = Math.max(0, Math.round(Number(actualPaid || 0) - resolvedExpectedIncome));
+    const derivedCommission = Math.round(Number(actualPaid || 0) - resolvedExpectedIncome);
     return {
       expectedIncome: resolvedExpectedIncome,
-      platformCommission: isJDPlatform(platform)
+      platformCommission: isJDPlatform(platform) && derivedCommission >= 0
         ? Math.max(derivedCommission, Math.max(0, Math.round(Number(fallbackCommission || 0))))
         : derivedCommission,
     };
@@ -724,7 +724,7 @@ function resolveRefundAdjustedIncomeMetrics(options: {
   refundAmount: number | null | undefined;
 }) {
   const expectedIncome = Math.max(0, Number(options.expectedIncome || 0));
-  const platformCommission = Math.max(0, Number(options.platformCommission || 0));
+  const platformCommission = Number(options.platformCommission || 0);
   const actualPaid = Math.max(0, Number(options.actualPaid || 0));
   const refundAmount = Math.max(0, Number(options.refundAmount || 0));
 
@@ -1924,7 +1924,7 @@ export async function GET(request: NextRequest) {
               : isManualDeliveryLoss
               ? -deliveryFee
               : isBrush
-              ? - (Math.abs(Number(adjustedMetrics.platformCommission || 0)) + orderBrushCommission + returnExtraExpense)
+              ? -Number(adjustedMetrics.platformCommission || 0) - orderBrushCommission - returnExtraExpense
               : (productCostStatus === "ready"
                 ? Math.round(Number(safeExpectedIncome || 0) * (1 - serviceFeeRate)) - deliveryFee - productCost - returnExtraExpense
                 : null);
@@ -2250,7 +2250,7 @@ export async function GET(request: NextRequest) {
         : manualDeliveryLoss
         ? -deliveryFee
         : order.isMainSystemSelfDelivery
-        ? - (Math.abs(Number(order.platformCommission || 0)) + orderBrushCommission + returnExtraExpense)
+        ? -Number(order.platformCommission || 0) - orderBrushCommission - returnExtraExpense
         : (productCostStatus === "ready"
           ? Math.round(Number(safeExpectedIncome || 0) * (1 - serviceFeeRate)) - deliveryFee - productCost - returnExtraExpense
           : null);

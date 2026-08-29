@@ -160,7 +160,7 @@ function resolveRefundAdjustedIncomeMetrics(options: {
   refundAmount: number | null | undefined;
 }) {
   const expectedIncome = Math.max(0, Number(options.expectedIncome || 0));
-  const platformCommission = Math.max(0, Number(options.platformCommission || 0));
+  const platformCommission = Number(options.platformCommission || 0);
   const actualPaid = Math.max(0, Number(options.actualPaid || 0));
   const refundAmount = Math.max(0, Number(options.refundAmount || 0));
 
@@ -219,10 +219,10 @@ function resolveDashboardIncomeMetrics(
 
   if (Number.isFinite(explicitExpectedIncome)) {
     const resolvedExpectedIncome = Math.max(0, explicitExpectedIncome);
-    const derivedCommission = Math.max(0, paid - resolvedExpectedIncome);
+    const derivedCommission = FinanceMath.add(paid, -resolvedExpectedIncome);
     return {
       expectedIncome: resolvedExpectedIncome,
-      platformCommission: isJDPlatform(platform)
+      platformCommission: isJDPlatform(platform) && derivedCommission >= 0
         ? Math.max(derivedCommission, explicitCommission)
         : derivedCommission,
     };
