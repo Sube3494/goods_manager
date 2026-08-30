@@ -166,10 +166,12 @@ export async function PATCH(
     if (hasShopEdit) {
       const inputMaiyatianShopName = String(body.maiyatianShopName || body.shopName || "").trim();
       const inputShopId = body.shopId ? String(body.shopId).trim() : null;
+      const inputShopAddress = String(body.shopAddress || "").trim();
 
       if (inputMaiyatianShopName || inputShopId) {
         targetShopName = inputMaiyatianShopName;
         targetShopId = inputShopId;
+        targetShopAddress = inputShopAddress || null;
 
         // 尝试从用户的麦芽田映射配置中反查绑定的系统本地门店
         const userConfig = await getAutoPickIntegrationConfigByUserId(user.id);
@@ -198,7 +200,7 @@ export async function PATCH(
 
           if (matchedDbShop) {
             targetShopId = matchedDbShop.id;
-            targetShopAddress = matchedDbShop.address || null;
+            targetShopAddress = inputShopAddress || matchedDbShop.address || null;
           }
         }
       }
@@ -373,7 +375,7 @@ export async function PATCH(
           ...(hasShopEdit
             ? {
                 shopId: targetShopId,
-                ...(targetShopAddress !== null ? { shopAddress: targetShopAddress } : {}),
+                shopAddress: targetShopAddress,
               }
             : {}),
           ...(offlineEdit

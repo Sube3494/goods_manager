@@ -2918,7 +2918,7 @@ export const OrderCard = memo(function OrderCard({
                         <span className="truncate">{order.matchedShopName || "未绑定门店"}</span>
                       </button>
                     }
-                    value={order.rawShopAddress || order.shopAddress || "-"}
+                    value={order.shopAddress || order.rawShopAddress || "-"}
                     className="sm:col-span-2"
                   />
                   <DetailBlock
@@ -3215,6 +3215,7 @@ function OrderShopEditModal({
         body: JSON.stringify({
           shopId: targetShop?.id || selectedShopId || null,
           maiyatianShopName: targetShop?.name || selectedShopName || null,
+          shopAddress: targetShop?.address || null,
         }),
       });
       const data = await res.json();
