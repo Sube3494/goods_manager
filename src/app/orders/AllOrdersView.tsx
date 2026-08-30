@@ -183,6 +183,7 @@ export function AllOrdersView({
 
   const [platforms, setPlatforms] = useState<string[]>([]);
   const [statuses, setStatuses] = useState<string[]>([]);
+  const [matchedShopOptions, setMatchedShopOptions] = useState<Array<{ value: string; label: string }>>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
@@ -279,6 +280,16 @@ export function AllOrdersView({
         setPlatforms(Array.from(new Set(data.filters.platforms.map(normalizeDisplayPlatform))));
       }
       if (Array.isArray(data.filters?.statuses)) setStatuses(data.filters.statuses);
+      if (Array.isArray(data.filters?.shops)) {
+        setMatchedShopOptions(
+          data.filters.shops
+            .map((item: { value?: unknown; label?: unknown }) => ({
+              value: String(item.value || "").trim(),
+              label: String(item.label || item.value || "").trim(),
+            }))
+            .filter((item: { value: string; label: string }) => item.value && item.label)
+        );
+      }
 
       if (data.summary) setSummary(data.summary);
       if (data.overview) setOverview(data.overview);
@@ -524,9 +535,12 @@ export function AllOrdersView({
 
   // 数据统计与过滤处理
   const shopOptions = useMemo(() => {
-    const list = localShops.map((item) => ({ value: item.name, label: item.name }));
-    return [{ value: "all", label: "全部店铺" }, ...list];
-  }, [localShops]);
+    const options = [...matchedShopOptions];
+    if (shop !== "all" && !options.some((item) => item.value === shop)) {
+      options.unshift({ value: shop, label: shop });
+    }
+    return [{ value: "all", label: "全部店铺" }, ...options];
+  }, [matchedShopOptions, shop]);
 
   const platformOptions = useMemo(
     () => [{ value: "all", label: "全部平台" }, ...platforms.map((item) => ({ value: item, label: item }))],

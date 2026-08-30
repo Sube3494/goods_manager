@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Package2, Search, X, ChevronUp, ChevronDown } from "lucide-react";
+import { ArrowUp, Package2, Search, X, ChevronUp, ChevronDown } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -158,6 +158,8 @@ export function TodayOrdersView({
   });
   const [platforms, setPlatforms] = useState<string[]>([]);
   const [statuses, setStatuses] = useState<string[]>([]);
+  const [matchedShopOptions, setMatchedShopOptions] = useState<Array<{ value: string; label: string }>>([]);
+  const [showScrollTop, setShowScrollTop] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   
   // 筛选状态
@@ -227,6 +229,16 @@ export function TodayOrdersView({
         setPlatforms(Array.from(new Set(data.filters.platforms.map(normalizeDisplayPlatform))));
       }
       if (Array.isArray(data.filters?.statuses)) setStatuses(data.filters.statuses);
+      if (Array.isArray(data.filters?.shops)) {
+        setMatchedShopOptions(
+          data.filters.shops
+            .map((item: { value?: unknown; label?: unknown }) => ({
+              value: String(item.value || "").trim(),
+              label: String(item.label || item.value || "").trim(),
+            }))
+            .filter((item: { value: string; label: string }) => item.value && item.label)
+        );
+      }
       if (data.summary) setSummary(data.summary);
       if (data.overview) setOverview(data.overview);
       if (onDataLoadRef.current) {
@@ -261,6 +273,23 @@ export function TodayOrdersView({
   useEffect(() => {
     void fetchOrders();
   }, [platform, query, shop, status, fetchOrders]);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollTop = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
+      setShowScrollTop(scrollTop > 240);
+    };
+
+    handleScroll();
+    window.addEventListener("scroll", handleScroll, true);
+    return () => window.removeEventListener("scroll", handleScroll, true);
+  }, []);
+
+  const scrollToTop = useCallback(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    document.documentElement.scrollTo({ top: 0, behavior: "smooth" });
+    document.body.scrollTo({ top: 0, behavior: "smooth" });
+  }, []);
 
   // 2. SSE 与轮询监听逻辑
   useEffect(() => {
@@ -485,9 +514,12 @@ export function TodayOrdersView({
 
   // 4. 数据统计与过滤处理
   const shopOptions = useMemo(() => {
-    const list = localShops.map((item) => ({ value: item.name, label: item.name }));
-    return [{ value: "all", label: "全部店铺" }, ...list];
-  }, [localShops]);
+    const options = [...matchedShopOptions];
+    if (shop !== "all" && !options.some((item) => item.value === shop)) {
+      options.unshift({ value: shop, label: shop });
+    }
+    return [{ value: "all", label: "全部店铺" }, ...options];
+  }, [matchedShopOptions, shop]);
 
   const platformOptions = useMemo(
     () => [{ value: "all", label: "全部平台" }, ...platforms.map((item) => ({ value: item, label: item }))],
@@ -766,6 +798,18 @@ export function TodayOrdersView({
           )}
         </AnimatePresence>
       </main>
+
+      {showScrollTop ? (
+        <button
+          type="button"
+          onClick={scrollToTop}
+          className="group fixed bottom-24 right-4 z-9999 flex h-11 w-11 items-center justify-center rounded-full border border-black/10 bg-white text-foreground shadow-[0_20px_50px_rgba(0,0,0,0.3)] backdrop-blur-xl transition-all hover:scale-110 active:scale-95 dark:border-white/10 dark:bg-white/10 sm:bottom-12 sm:right-12 sm:h-12 sm:w-12"
+          aria-label="返回顶部"
+          title="返回顶部"
+        >
+          <ArrowUp size={20} className="transition-transform group-hover:-translate-y-1" />
+        </button>
+      ) : null}
     </div>
   );
 }

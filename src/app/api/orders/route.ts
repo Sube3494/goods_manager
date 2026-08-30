@@ -1090,9 +1090,8 @@ export async function GET(request: NextRequest) {
       shopWhereFilter = { OR: shopClauses };
     }
 
-    const baseWhere: Prisma.AutoPickOrderWhereInput = {
+    const baseWhereWithoutShop: Prisma.AutoPickOrderWhereInput = {
       userId: targetUserId,
-      ...(shopWhereFilter || {}),
       ...(startDate || endDate ? {
         orderTime: {
           ...(startDate ? { gte: parseAsShanghaiTime(startDate) } : {}),
@@ -1127,6 +1126,10 @@ export async function GET(request: NextRequest) {
         },
       } : {}),
     };
+    const baseWhere: Prisma.AutoPickOrderWhereInput = {
+      ...baseWhereWithoutShop,
+      ...(shopWhereFilter || {}),
+    };
 
     const platformWhere: Prisma.AutoPickOrderWhereInput | undefined = platform
       ? platform === "线下交易" || platform.toLowerCase() === "other"
@@ -1153,7 +1156,13 @@ export async function GET(request: NextRequest) {
     const cancelledWhere = buildStatusWhere("已取消");
     const deletedWhere = buildStatusWhere("已删除");
 
-    const [orders, total, platformRows, statusRows, userProfile, localShops, cancelledTotal, brushTotal, summaryOrders] = await Promise.all([
+    const shopOptionsWhere: Prisma.AutoPickOrderWhereInput = {
+      ...baseWhereWithoutShop,
+      ...(platformWhere || {}),
+      ...(productCostStatusFilter ? {} : (buildStatusWhere(status) || {})),
+    };
+
+    const [orders, total, platformRows, statusRows, userProfile, localShops, shopFilterRows, cancelledTotal, brushTotal, summaryOrders] = await Promise.all([
       prisma.autoPickOrder.findMany({
         where,
         select: {
@@ -1236,6 +1245,16 @@ export async function GET(request: NextRequest) {
         where: { userId: targetUserId },
         select: { id: true, name: true },
       }),
+      liteMode
+        ? Promise.resolve([])
+        : prisma.autoPickOrder.findMany({
+            where: shopOptionsWhere,
+            select: {
+              shopId: true,
+              shopAddress: true,
+              rawPayload: true,
+            },
+          }),
       !includeMetrics
         ? Promise.resolve(0)
         : prisma.autoPickOrder.count({
@@ -1308,6 +1327,24 @@ export async function GET(request: NextRequest) {
       }
       return null;
     };
+    const resolveOrderLocalShop = (order: { shopId?: string | null; shopAddress?: string | null; rawPayload?: unknown }) => {
+      const lockedResolvedShop = readResolvedAutoPickShop(order.rawPayload);
+      const mappingDebug = resolveMappedShopDebug(
+        order.shopId || null,
+        readShopNameFromRawPayload(order.rawPayload) || null,
+        readShopAddressFromRawPayload(order.rawPayload) || order.shopAddress || null,
+        userProfile?.permissions
+      );
+      return resolveExistingLocalShop(lockedResolvedShop) || resolveExistingLocalShop({ name: mappingDebug.localShopName });
+    };
+    const shopFilterOptions = Array.from(
+      new Map(
+        shopFilterRows
+          .map((order) => resolveOrderLocalShop(order))
+          .filter((shop): shop is NonNullable<ReturnType<typeof resolveOrderLocalShop>> => Boolean(shop))
+          .map((shop) => [shop.id, { value: shop.name, label: shop.name }] as const)
+      ).values()
+    ).sort((a, b) => a.label.localeCompare(b.label, "zh-Hans-CN"));
 
     const allOrdersForCost = [...orders, ...(summaryOrders || [])];
     const orderTimes = allOrdersForCost.map((o) => o.orderTime).filter(Boolean);
@@ -2426,6 +2463,7 @@ export async function GET(request: NextRequest) {
         filters: {
           platforms: platformRows.map((item) => item.platform).filter(Boolean),
           statuses: statusRows.map((item) => item.status).filter((item): item is string => Boolean(item)),
+          shops: shopFilterOptions,
         },
         ...(includeMetrics ? {
           summary,

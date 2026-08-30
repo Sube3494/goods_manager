@@ -2599,99 +2599,98 @@ export default function OrdersPage() {
                 <div className="overflow-y-auto px-4 py-3 sm:px-6 sm:py-4">
                   {shopProfitEntries.length > 0 ? (
                     <>
-                    <div className="overflow-hidden rounded-2xl border border-black/8 bg-slate-50/80 dark:border-white/10 dark:bg-white/[0.035]">
+                    <div className="overflow-hidden rounded-2xl border border-black/8 bg-slate-50/80 text-sm dark:border-white/10 dark:bg-white/[0.035]">
+                      <div className="hidden grid-cols-[3rem_minmax(9rem,1fr)_5.5rem_7rem_6.5rem_6.5rem_6.5rem_minmax(10rem,1fr)] border-b border-black/6 bg-slate-100/80 px-4 py-2 text-[11px] font-bold text-muted-foreground dark:border-white/8 dark:bg-white/5 xl:grid">
+                        <div>排名</div>
+                        <div>店铺</div>
+                        <div className="text-right">订单</div>
+                        <div className="text-right">纯利润</div>
+                        <div className="text-right">货品</div>
+                        <div className="text-right">配送</div>
+                        <div className="text-right">佣金</div>
+                        <div>平台</div>
+                      </div>
                       {shopProfitEntries.map((shop, index) => {
                         const isUnmatchedShop = shop.name === "未匹配店铺";
                         const platformEntries = SHOP_PROFIT_PLATFORMS
                           .map((platform) => ({ platform, amount: shop.platformProfit?.[platform] || 0 }))
                           .filter((item) => item.amount !== 0);
-                        const totalCost = shop.productCost + shop.deliveryFee + shop.platformCommission;
-                        const platformTotal = platformEntries.reduce((sum, item) => sum + Math.abs(item.amount), 0);
                         const displayShopName = shop.name === "未匹配店铺" ? shop.name : simplifyShopName(shop.name) || shop.name;
 
                         return (
-                          <div key={shop.key} className="border-b border-black/6 px-3 py-3 last:border-b-0 dark:border-white/8 sm:px-4">
-                            <div className="grid gap-3 xl:grid-cols-[minmax(15rem,1fr)_7.5rem_16rem_minmax(13rem,0.8fr)] xl:items-center">
-                              <div className="flex min-w-0 items-center gap-2.5">
-                                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-black tabular-nums text-slate-600 dark:bg-white/10 dark:text-slate-300">
-                                  {index + 1}
-                                </span>
-                                <div className="min-w-0 flex-1">
-                                  <div className="flex min-w-0 items-center gap-2">
-                                    <div className="truncate text-base font-black leading-5" title={shop.name}>{displayShopName}</div>
-                                    {isUnmatchedShop ? (
-                                      <button
-                                        type="button"
-                                        onClick={handleFilterUnmatchedShopOrders}
-                                        className="shrink-0 rounded-md border border-amber-500/25 bg-amber-500/10 px-2 py-1 text-[11px] font-bold text-amber-600 transition hover:bg-amber-500/15 dark:text-amber-300"
-                                      >
-                                        查看
-                                      </button>
-                                    ) : null}
-                                  </div>
-                                  <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-muted-foreground">
-                                    <span>{shop.count} 单</span>
-                                    <span>成本 {toCurrency(totalCost)}</span>
-                                    <span>均利 {toCurrency(shop.count > 0 ? shop.amount / shop.count : 0)}</span>
-                                  </div>
+                          <div key={shop.key} className="border-b border-black/6 px-3 py-3 last:border-b-0 dark:border-white/8 sm:px-4 xl:grid xl:grid-cols-[3rem_minmax(9rem,1fr)_5.5rem_7rem_6.5rem_6.5rem_6.5rem_minmax(10rem,1fr)] xl:items-center xl:gap-0 xl:py-2.5">
+                            <div className="hidden text-xs font-black tabular-nums text-muted-foreground xl:block">
+                              #{index + 1}
+                            </div>
+
+                            <div className="flex min-w-0 items-center gap-2 xl:pr-3">
+                              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-200 text-[11px] font-black tabular-nums text-slate-600 dark:bg-white/10 dark:text-slate-300 xl:hidden">
+                                {index + 1}
+                              </span>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex min-w-0 items-center gap-2">
+                                  <div className="truncate text-base font-black leading-5 xl:text-sm" title={shop.name}>{displayShopName}</div>
+                                  {isUnmatchedShop ? (
+                                    <button
+                                      type="button"
+                                      onClick={handleFilterUnmatchedShopOrders}
+                                      className="shrink-0 rounded-md border border-amber-500/25 bg-amber-500/10 px-2 py-0.5 text-[11px] font-bold text-amber-600 transition hover:bg-amber-500/15 dark:text-amber-300"
+                                    >
+                                      查看
+                                    </button>
+                                  ) : null}
+                                </div>
+                                <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground xl:hidden">
+                                  <span>{shop.count} 单</span>
+                                  <span>均利 {toCurrency(shop.count > 0 ? shop.amount / shop.count : 0)}</span>
                                 </div>
                               </div>
-
-                              <div className="flex items-center justify-between rounded-xl bg-slate-200/45 px-3 py-2 dark:bg-white/6 xl:block xl:bg-transparent xl:p-0 xl:text-right dark:xl:bg-transparent">
-                                <div className="text-[11px] font-medium text-muted-foreground xl:mb-1">纯利润</div>
-                                <div className={cn("text-lg font-black tabular-nums leading-none", shop.amount < 0 ? "text-rose-500" : "text-emerald-500")}>
-                                  {toCurrency(shop.amount)}
-                                </div>
+                              <div className={cn("shrink-0 text-lg font-black tabular-nums leading-none xl:hidden", shop.amount < 0 ? "text-rose-500" : "text-emerald-500")}>
+                                {toCurrency(shop.amount)}
                               </div>
+                            </div>
 
-                              <div className="grid grid-cols-3 overflow-hidden rounded-xl border border-black/6 bg-white text-xs dark:border-white/8 dark:bg-white/5">
-                                {[
-                                  ["货品", shop.productCost],
-                                  ["配送", shop.deliveryFee],
-                                  ["佣金", shop.platformCommission],
-                                ].map(([label, value], itemIndex) => (
-                                  <div key={label} className={cn("px-2.5 py-2", itemIndex > 0 && "border-l border-black/6 dark:border-white/8")}>
-                                    <div className="text-muted-foreground">{label}</div>
-                                    <div className="mt-0.5 font-bold tabular-nums">{toCurrency(Number(value))}</div>
+                            <div className="hidden text-right font-bold tabular-nums xl:block">{shop.count}</div>
+                            <div className={cn("hidden text-right text-base font-black tabular-nums xl:block", shop.amount < 0 ? "text-rose-500" : "text-emerald-500")}>
+                              {toCurrency(shop.amount)}
+                            </div>
+                            <div className="hidden text-right font-bold tabular-nums xl:block">{toCurrency(shop.productCost)}</div>
+                            <div className="hidden text-right font-bold tabular-nums xl:block">{toCurrency(shop.deliveryFee)}</div>
+                            <div className="hidden text-right font-bold tabular-nums xl:block">{toCurrency(shop.platformCommission)}</div>
+
+                            <div className="mt-2 grid grid-cols-3 gap-2 text-xs xl:hidden">
+                              <div className="rounded-lg bg-slate-200/50 px-2 py-1.5 dark:bg-white/6">
+                                <div className="text-muted-foreground">货品</div>
+                                <div className="font-bold tabular-nums">{toCurrency(shop.productCost)}</div>
+                              </div>
+                              <div className="rounded-lg bg-slate-200/50 px-2 py-1.5 dark:bg-white/6">
+                                <div className="text-muted-foreground">配送</div>
+                                <div className="font-bold tabular-nums">{toCurrency(shop.deliveryFee)}</div>
+                              </div>
+                              <div className="rounded-lg bg-slate-200/50 px-2 py-1.5 dark:bg-white/6">
+                                <div className="text-muted-foreground">佣金</div>
+                                <div className="font-bold tabular-nums">{toCurrency(shop.platformCommission)}</div>
+                              </div>
+                            </div>
+
+                            <div className="mt-2 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 xl:mt-0 xl:pl-4">
+                              {platformEntries.length > 0 ? (
+                                platformEntries.map(({ platform, amount }) => (
+                                  <div key={platform} className="flex min-w-0 items-center gap-1.5 text-xs">
+                                    <Image
+                                      src={SHOP_PROFIT_PLATFORM_ICONS[platform]}
+                                      alt=""
+                                      width={18}
+                                      height={18}
+                                      className="h-4 w-4 shrink-0 rounded-md"
+                                    />
+                                    <span className="text-muted-foreground">{platform}</span>
+                                    <span className={cn("font-black tabular-nums", amount < 0 ? "text-rose-500" : "text-emerald-500")}>{toCurrency(amount)}</span>
                                   </div>
-                                ))}
-                              </div>
-
-                              <div className="min-w-0 rounded-xl bg-slate-200/50 px-2.5 py-2 dark:bg-white/6">
-                                {platformEntries.length > 0 ? (
-                                  <>
-                                    <div className="flex h-1.5 overflow-hidden rounded-full bg-white/80 dark:bg-black/20">
-                                      {platformEntries.map(({ platform, amount }) => (
-                                        <div
-                                          key={platform}
-                                          className="h-full"
-                                          style={{
-                                            width: `${platformTotal > 0 ? Math.max((Math.abs(amount) / platformTotal) * 100, 5) : 0}%`,
-                                            backgroundColor: SHOP_PROFIT_PLATFORM_COLORS[platform],
-                                          }}
-                                        />
-                                      ))}
-                                    </div>
-                                    <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
-                                      {platformEntries.map(({ platform, amount }) => (
-                                        <div key={platform} className="flex min-w-0 items-center gap-1.5 text-xs">
-                                          <Image
-                                            src={SHOP_PROFIT_PLATFORM_ICONS[platform]}
-                                            alt=""
-                                            width={18}
-                                            height={18}
-                                            className="h-4 w-4 shrink-0 rounded-md"
-                                          />
-                                          <span className="max-w-12 truncate text-muted-foreground">{platform}</span>
-                                          <span className={cn("font-black tabular-nums", amount < 0 ? "text-rose-500" : "text-emerald-500")}>{toCurrency(amount)}</span>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </>
-                                ) : (
-                                  <div className="text-xs text-muted-foreground">暂无平台利润</div>
-                                )}
-                              </div>
+                                ))
+                              ) : (
+                                <div className="text-xs text-muted-foreground">暂无平台利润</div>
+                              )}
                             </div>
                           </div>
                         );
