@@ -220,8 +220,8 @@ export function AllOrdersView({
   const hasMore = meta.page < meta.totalPages;
 
   // 获取全部订单列表
-  const fetchOrders = useCallback(async (options?: { silent?: boolean; append?: boolean; targetPage?: number }) => {
-    if (isFetchingRef.current) return;
+  const fetchOrders = useCallback(async (options?: { silent?: boolean; append?: boolean; targetPage?: number; force?: boolean; refreshMetrics?: boolean }) => {
+    if (isFetchingRef.current && !options?.force) return;
     isFetchingRef.current = true;
 
     const silent = Boolean(options?.silent);
@@ -245,10 +245,10 @@ export function AllOrdersView({
       if (startDate) params.set("startDate", startDate);
       if (endDate) params.set("endDate", endDate);
       if (shop !== "all") params.set("shop", shop);
-      if (!silent) {
+      if (!silent || options?.refreshMetrics) {
         params.set("_metrics", "1");
       }
-      if (silent) params.set("_lite", "1");
+      if (silent && !options?.refreshMetrics) params.set("_lite", "1");
 
       const response = await fetch(`/api/orders?${params.toString()}`, { cache: "no-store" });
       const data = await response.json().catch(() => ({}));
@@ -414,7 +414,7 @@ export function AllOrdersView({
   }, [ensureOrderDetail]);
 
   const handleRefreshOrder = useCallback(() => {
-    void fetchOrders({ silent: true });
+    void fetchOrders({ silent: true, force: true, refreshMetrics: true });
   }, [fetchOrders]);
 
   const runAction = useCallback(async (orderId: string, action: OrderAction) => {

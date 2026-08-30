@@ -189,8 +189,8 @@ export function TodayOrdersView({
   const todayDate = useMemo(() => formatLocalDate(new Date()), []);
 
   // 1. 获取订单列表
-  const fetchOrders = useCallback(async (options?: { silent?: boolean }) => {
-    if (isFetchingRef.current) return;
+  const fetchOrders = useCallback(async (options?: { silent?: boolean; force?: boolean }) => {
+    if (isFetchingRef.current && !options?.force) return;
     isFetchingRef.current = true;
     
     const silent = Boolean(options?.silent);
@@ -247,6 +247,10 @@ export function TodayOrdersView({
       setIsLoading(false);
     }
   }, [platform, query, shop, status, todayDate, showToast, userId]);
+
+  const handleRefreshOrder = useCallback(() => {
+    void fetchOrders({ silent: true, force: true });
+  }, [fetchOrders]);
 
   // 外部刷新信号监听
   useEffect(() => {
@@ -678,7 +682,7 @@ export function TodayOrdersView({
                         onRunAction={runAction}
                         onOpenCostBackfill={onOpenCostBackfill}
                         onOpenMatchEditor={onOpenMatchEditor}
-                        onRefresh={() => fetchOrders({ silent: true })}
+                        onRefresh={handleRefreshOrder}
                       />
                     </OrderCardErrorBoundary>
                   ))}
@@ -713,7 +717,7 @@ export function TodayOrdersView({
                             onRunAction={runAction}
                             onOpenCostBackfill={onOpenCostBackfill}
                             onOpenMatchEditor={onOpenMatchEditor}
-                            onRefresh={() => fetchOrders({ silent: true })}
+                            onRefresh={handleRefreshOrder}
                           />
                         </OrderCardErrorBoundary>
                       ))}
@@ -750,7 +754,7 @@ export function TodayOrdersView({
                             onRunAction={runAction}
                             onOpenCostBackfill={onOpenCostBackfill}
                             onOpenMatchEditor={onOpenMatchEditor}
-                            onRefresh={() => fetchOrders({ silent: true })}
+                            onRefresh={handleRefreshOrder}
                           />
                         </OrderCardErrorBoundary>
                       ))}
