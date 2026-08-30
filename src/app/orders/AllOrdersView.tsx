@@ -525,7 +525,7 @@ export function AllOrdersView({
   // 数据统计与过滤处理
   const shopOptions = useMemo(() => {
     const list = localShops.map((item) => ({ value: item.name, label: item.name }));
-    return [{ value: "all", label: "全部店铺" }, { value: UNMATCHED_SHOP_FILTER, label: "未匹配店铺" }, ...list];
+    return [{ value: "all", label: "全部店铺" }, ...list];
   }, [localShops]);
 
   const platformOptions = useMemo(

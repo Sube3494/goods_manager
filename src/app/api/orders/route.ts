@@ -1763,8 +1763,8 @@ export async function GET(request: NextRequest) {
           const matchedShopName = String(
             String(lockedResolvedShop?.name || "").trim() || mappingDebug.localShopName || ""
           ).trim();
-          const shopProfitKey = matchedShopId || matchedShopName || order.shopId || order.shopAddress || "未匹配店铺";
-          const shopProfitName = matchedShopName || order.shopAddress || "未匹配店铺";
+          const shopProfitKey = matchedShopId || matchedShopName || "未匹配店铺";
+          const shopProfitName = matchedShopName || "未匹配店铺";
           const ensureShopProfit = () => {
             if (!acc.shopProfit[shopProfitKey]) {
               acc.shopProfit[shopProfitKey] = {
