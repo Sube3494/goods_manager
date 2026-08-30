@@ -2637,7 +2637,7 @@ export default function OrdersPage() {
                                 {index + 1}
                               </span>
                               <div className="min-w-0 flex-1">
-                                <div className="flex min-w-0 items-center gap-2">
+                                <div className="flex min-w-0 items-center gap-2 xl:justify-center">
                                   <div className="truncate text-base font-black leading-5 xl:text-center xl:text-sm" title={shop.name}>{displayShopName}</div>
                                   {isUnmatchedShop ? (
                                     <button
