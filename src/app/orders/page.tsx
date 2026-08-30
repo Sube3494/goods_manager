@@ -2601,15 +2601,15 @@ export default function OrdersPage() {
                     <div className="overflow-hidden rounded-xl border border-black/8 bg-slate-50/80 text-sm dark:border-white/10 dark:bg-white/[0.035]">
                       <div className="overflow-x-auto">
                         <div className="hidden min-w-[1040px] grid-cols-[2.75rem_minmax(8.5rem,1.15fr)_4.25rem_6.75rem_5.75rem_5.75rem_5.75rem_repeat(5,5.75rem)] border-b border-black/6 bg-slate-100/80 px-3 py-2 text-[11px] font-bold text-muted-foreground dark:border-white/8 dark:bg-white/5 xl:grid">
-                          <div>#</div>
-                          <div>店铺</div>
-                          <div className="text-right">订单</div>
-                          <div className="text-right">纯利润</div>
-                          <div className="text-right">货品</div>
-                          <div className="text-right">配送</div>
-                          <div className="text-right">佣金</div>
+                          <div className="text-center">#</div>
+                          <div className="text-center">店铺</div>
+                          <div className="text-center">订单</div>
+                          <div className="text-center">纯利润</div>
+                          <div className="text-center">货品</div>
+                          <div className="text-center">配送</div>
+                          <div className="text-center">佣金</div>
                           {SHOP_PROFIT_PLATFORMS.map((platform) => (
-                            <div key={platform} className="flex items-center justify-end gap-1.5">
+                            <div key={platform} className="flex items-center justify-center gap-1.5">
                               <Image
                                 src={SHOP_PROFIT_PLATFORM_ICONS[platform]}
                                 alt=""
@@ -2628,17 +2628,17 @@ export default function OrdersPage() {
 
                         return (
                           <div key={shop.key} className="border-b border-black/6 px-3 py-2.5 last:border-b-0 dark:border-white/8 xl:grid xl:min-w-[1040px] xl:grid-cols-[2.75rem_minmax(8.5rem,1.15fr)_4.25rem_6.75rem_5.75rem_5.75rem_5.75rem_repeat(5,5.75rem)] xl:items-center xl:px-3 xl:py-2">
-                            <div className="hidden text-xs font-black tabular-nums text-muted-foreground xl:block">
+                            <div className="hidden text-center text-xs font-black tabular-nums text-muted-foreground xl:block">
                               #{index + 1}
                             </div>
 
-                            <div className="flex min-w-0 items-center gap-2 xl:pr-3">
+                            <div className="flex min-w-0 items-center gap-2 xl:justify-center xl:px-2">
                               <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-200 text-[11px] font-black tabular-nums text-slate-600 dark:bg-white/10 dark:text-slate-300 xl:hidden">
                                 {index + 1}
                               </span>
                               <div className="min-w-0 flex-1">
                                 <div className="flex min-w-0 items-center gap-2">
-                                  <div className="truncate text-base font-black leading-5 xl:text-sm" title={shop.name}>{displayShopName}</div>
+                                  <div className="truncate text-base font-black leading-5 xl:text-center xl:text-sm" title={shop.name}>{displayShopName}</div>
                                   {isUnmatchedShop ? (
                                     <button
                                       type="button"
@@ -2659,20 +2659,20 @@ export default function OrdersPage() {
                               </div>
                             </div>
 
-                            <div className="hidden text-right font-bold tabular-nums xl:block">{shop.count}</div>
-                            <div className={cn("hidden text-right text-base font-black tabular-nums xl:block", shop.amount < 0 ? "text-rose-500" : "text-emerald-500")}>
+                            <div className="hidden text-center font-bold tabular-nums xl:block">{shop.count}</div>
+                            <div className={cn("hidden text-center text-base font-black tabular-nums xl:block", shop.amount < 0 ? "text-rose-500" : "text-emerald-500")}>
                               {toCurrency(shop.amount)}
                             </div>
-                            <div className="hidden text-right font-bold tabular-nums xl:block">{toCurrency(shop.productCost)}</div>
-                            <div className="hidden text-right font-bold tabular-nums xl:block">{toCurrency(shop.deliveryFee)}</div>
-                            <div className="hidden text-right font-bold tabular-nums xl:block">{toCurrency(shop.platformCommission)}</div>
+                            <div className="hidden text-center font-bold tabular-nums xl:block">{toCurrency(shop.productCost)}</div>
+                            <div className="hidden text-center font-bold tabular-nums xl:block">{toCurrency(shop.deliveryFee)}</div>
+                            <div className="hidden text-center font-bold tabular-nums xl:block">{toCurrency(shop.platformCommission)}</div>
                             {SHOP_PROFIT_PLATFORMS.map((platform) => {
                               const amount = shop.platformProfit?.[platform] || 0;
                               return (
                                 <div
                                   key={platform}
                                   className={cn(
-                                    "hidden text-right text-xs font-black tabular-nums xl:block",
+                                    "hidden text-center text-xs font-black tabular-nums xl:block",
                                     amount < 0 ? "text-rose-500" : amount > 0 ? "text-emerald-500" : "text-muted-foreground/55"
                                   )}
                                 >
