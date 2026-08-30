@@ -406,78 +406,6 @@ function readGoodsExtraRecord(rawPayload: unknown) {
     : {};
 }
 
-function readPlatformProductIdForMatch(
-  platform: string | null | undefined,
-  rawPayload: unknown,
-  productNo?: string | null,
-  platformSkuId?: string | null,
-) {
-  const normalizedPlatformSkuId = normalizeSkuDigits(platformSkuId);
-  if (normalizedPlatformSkuId) {
-    return normalizedPlatformSkuId;
-  }
-
-  if (isMeituanPlatform(platform)) {
-    const record = rawPayload && typeof rawPayload === "object" && !Array.isArray(rawPayload)
-      ? rawPayload as Record<string, unknown>
-      : {};
-    const goodsExtra = readGoodsExtraRecord(record);
-    return normalizeSkuDigits(String(
-      goodsExtra.original_sku_id
-      || record.source_id
-      || record.sourceId
-      || productNo
-      || ""
-    ));
-  }
-
-  if (isJDPlatform(platform)) {
-    const record = rawPayload && typeof rawPayload === "object" && !Array.isArray(rawPayload)
-      ? rawPayload as Record<string, unknown>
-      : {};
-    return normalizeSkuDigits(String(
-      record.source_id
-      || record.sourceId
-      || record.sku_code
-      || record.skuCode
-      || productNo
-      || ""
-    ));
-  }
-
-  if (isTaobaoPlatform(platform)) {
-    const record = rawPayload && typeof rawPayload === "object" && !Array.isArray(rawPayload)
-      ? rawPayload as Record<string, unknown>
-      : {};
-    return normalizeSkuDigits(String(
-      record.sku_id
-      || record.skuId
-      || record.source_id
-      || record.sourceId
-      || productNo
-      || ""
-    ));
-  }
-
-  if (isDoudianPlatform(platform)) {
-    const record = rawPayload && typeof rawPayload === "object" && !Array.isArray(rawPayload)
-      ? rawPayload as Record<string, unknown>
-      : {};
-    return normalizeSkuDigits(String(
-      record.sku_id
-      || record.skuId
-      || record.source_id
-      || record.sourceId
-      || record.goods_id
-      || record.goodsId
-      || productNo
-      || ""
-    ));
-  }
-
-  return "";
-}
-
 function readStrictPlatformProductId(
   platform: string | null | undefined,
   rawPayload: unknown,
@@ -498,6 +426,16 @@ function readStrictPlatformProductId(
       goodsExtra.original_sku_id
       || record.source_id
       || record.sourceId
+      || ""
+    ));
+  }
+
+  if (isJDPlatform(platform)) {
+    return normalizeSkuDigits(String(
+      record.source_id
+      || record.sourceId
+      || record.sku_code
+      || record.skuCode
       || ""
     ));
   }
@@ -2021,8 +1959,8 @@ export async function GET(request: NextRequest) {
     ));
     const productSkuCandidates = Array.from(new Set(
       responseOrders.flatMap((order) => order.items.flatMap((item) => {
-        const platformProductId = readPlatformProductIdForMatch(order.platform, item.rawPayload, item.productNo, item.platformSkuId);
-        return platformProductId ? [platformProductId, ...buildSkuMatchCandidates(item.productNo)] : buildSkuMatchCandidates(item.productNo);
+        const platformProductId = readStrictPlatformProductId(order.platform, item.rawPayload, item.platformSkuId);
+        return platformProductId ? [platformProductId] : buildSkuMatchCandidates(item.productNo);
       }))
     ));
 
@@ -2286,7 +2224,7 @@ export async function GET(request: NextRequest) {
           const manualMatchedProduct = readManualMatchedProduct(item.rawPayload);
           const isCompositeSku = /[+＋]/.test(String(item.productNo || ""));
           const strictPlatformProductId = isCompositeSku ? null : readStrictPlatformProductId(order.platform, item.rawPayload, item.platformSkuId);
-          const platformProductId = isCompositeSku ? null : readPlatformProductIdForMatch(order.platform, item.rawPayload, item.productNo, item.platformSkuId);
+          const platformProductId = isCompositeSku ? null : readStrictPlatformProductId(order.platform, item.rawPayload, item.platformSkuId);
           const skuFallbacks = splitCompositeSkuSegments(item.productNo);
           const normalizedSkuCandidates = skuFallbacks.length > 0
             ? skuFallbacks
@@ -2318,10 +2256,10 @@ export async function GET(request: NextRequest) {
             return strictCandidates[0] || null;
           };
           const platformStrictMatch = platformProductId ? resolveStrictSkuMatch(platformProductId) : null;
-          const fallbackStrictMatches = normalizedSkuCandidates
+          const fallbackStrictMatches = !platformProductId ? normalizedSkuCandidates
             .map((candidate) => resolveStrictSkuMatch(candidate))
-            .filter((product): product is typeof mappedShopProducts[number] => Boolean(product));
-          const hasStrictMatchForAllSegments = normalizedSkuCandidates.length > 0
+            .filter((product): product is typeof mappedShopProducts[number] => Boolean(product)) : [];
+          const hasStrictMatchForAllSegments = !platformProductId && normalizedSkuCandidates.length > 0
             && normalizedSkuCandidates.every((candidate) => Boolean(resolveStrictSkuMatch(candidate)));
           const matchedProduct = manualMatchedProduct || platformStrictMatch || (hasStrictMatchForAllSegments ? (fallbackStrictMatches[0] || null) : null);
           if (matchedProduct) {

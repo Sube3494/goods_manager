@@ -5,8 +5,12 @@ import { getStorageStrategy } from "@/lib/storage";
 import { Prisma } from "../../../../../../../../prisma/generated-client";
 import {
   syncAutoOutboundFromCompletedAutoPickOrder,
+  syncJdSkuIdForShopProduct,
   syncMeituanSkuIdForShopProduct,
+  syncTaobaoSkuIdForShopProduct,
+  unbindJdSkuIdForShopProduct,
   unbindMeituanSkuIdForShopProduct,
+  unbindTaobaoSkuIdForShopProduct,
 } from "@/lib/autoPickOrders";
 
 function readRawPayloadRecord(rawPayload: unknown) {
@@ -102,6 +106,26 @@ function readMeituanSkuId(rawPayload: Record<string, unknown>) {
   ).trim();
 }
 
+function readJdSkuId(rawPayload: Record<string, unknown>) {
+  return String(
+    rawPayload.source_id ||
+      rawPayload.sourceId ||
+      rawPayload.sku_code ||
+      rawPayload.skuCode ||
+      ""
+  ).trim();
+}
+
+function readTaobaoSkuId(rawPayload: Record<string, unknown>) {
+  return String(
+    rawPayload.sku_id ||
+      rawPayload.skuId ||
+      rawPayload.source_id ||
+      rawPayload.sourceId ||
+      ""
+  ).trim();
+}
+
 function readOrderItemPlatformSkuId(
   platform: string | null | undefined,
   platformSkuId: string | null | undefined,
@@ -120,6 +144,14 @@ function readOrderItemPlatformSkuId(
     );
   }
 
+  if (isJDPlatform(platform)) {
+    return readJdSkuId(rawPayload) || (fallbackRawPayload ? readJdSkuId(fallbackRawPayload) : "");
+  }
+
+  if (isTaobaoPlatform(platform)) {
+    return readTaobaoSkuId(rawPayload) || (fallbackRawPayload ? readTaobaoSkuId(fallbackRawPayload) : "");
+  }
+
   return "";
 }
 
@@ -131,6 +163,16 @@ function isMeituanPlatform(platform: string | null | undefined) {
     normalized.includes("闪购") ||
     normalized.includes("shangou")
   );
+}
+
+function isJDPlatform(platform: string | null | undefined) {
+  const normalized = String(platform || "").trim().toLowerCase();
+  return normalized.includes("jd") || normalized.includes("jingdong") || normalized.includes("京东");
+}
+
+function isTaobaoPlatform(platform: string | null | undefined) {
+  const normalized = String(platform || "").trim().toLowerCase();
+  return normalized.includes("taobao") || normalized.includes("淘宝") || normalized.includes("天猫");
 }
 
 function readArray(value: unknown) {
@@ -203,6 +245,40 @@ async function syncMeituanIdForMatchedShopProduct(
   }
 
   await syncMeituanSkuIdForShopProduct(tx, userId, shopProduct.id, meituanId);
+}
+
+async function syncPlatformIdForMatchedShopProduct(
+  tx: Prisma.TransactionClient,
+  userId: string,
+  shopProductId: string,
+  platform: string | null | undefined,
+  sourceId: string
+) {
+  if (!sourceId || !shopProductId) return;
+  if (isMeituanPlatform(platform)) {
+    await syncMeituanSkuIdForShopProduct(tx, userId, shopProductId, sourceId);
+  } else if (isJDPlatform(platform)) {
+    await syncJdSkuIdForShopProduct(tx, userId, shopProductId, sourceId);
+  } else if (isTaobaoPlatform(platform)) {
+    await syncTaobaoSkuIdForShopProduct(tx, userId, shopProductId, sourceId);
+  }
+}
+
+async function unbindPlatformIdForShopProduct(
+  tx: Prisma.TransactionClient,
+  userId: string,
+  shopProductId: string,
+  platform: string | null | undefined,
+  sourceId: string
+) {
+  if (!sourceId || !shopProductId) return;
+  if (isMeituanPlatform(platform)) {
+    await unbindMeituanSkuIdForShopProduct(tx, userId, shopProductId, sourceId);
+  } else if (isJDPlatform(platform)) {
+    await unbindJdSkuIdForShopProduct(tx, userId, shopProductId, sourceId);
+  } else if (isTaobaoPlatform(platform)) {
+    await unbindTaobaoSkuIdForShopProduct(tx, userId, shopProductId, sourceId);
+  }
 }
 
 export async function PATCH(
@@ -299,9 +375,7 @@ export async function PATCH(
       ...extractShopProductIdsFromCandidate(autoMatchedProduct),
     ]));
 
-    const currentMeituanSkuId = isMeituanPlatform(orderItem.order.platform)
-      ? readOrderItemPlatformSkuId(orderItem.order.platform, orderItem.platformSkuId, basePayload, fallbackItemPayload)
-      : "";
+    const currentPlatformSkuId = readOrderItemPlatformSkuId(orderItem.order.platform, orderItem.platformSkuId, basePayload, fallbackItemPayload);
 
     if (shouldClear) {
       const nextPayload = {
@@ -320,9 +394,9 @@ export async function PATCH(
         await deleteLegacyOutbound(tx, orderItem.order.orderNo);
       });
 
-      if (currentMeituanSkuId && previousShopProductIds.length > 0) {
+      if (currentPlatformSkuId && previousShopProductIds.length > 0) {
         for (const oldShopProductId of previousShopProductIds) {
-          await unbindMeituanSkuIdForShopProduct(prisma, targetUserId, oldShopProductId, currentMeituanSkuId).catch(() => null);
+          await unbindPlatformIdForShopProduct(prisma, targetUserId, oldShopProductId, orderItem.order.platform, currentPlatformSkuId).catch(() => null);
         }
       }
 
@@ -426,25 +500,22 @@ export async function PATCH(
       });
 
       const newShopProductIds = new Set(shopProducts.map((p) => p.id));
-      if (currentMeituanSkuId && previousShopProductIds.length > 0) {
+      if (currentPlatformSkuId && previousShopProductIds.length > 0) {
         const unbindOldIds = previousShopProductIds.filter((oldId) => !newShopProductIds.has(oldId));
         for (const oldShopProductId of unbindOldIds) {
-          await unbindMeituanSkuIdForShopProduct(prisma, targetUserId, oldShopProductId, currentMeituanSkuId).catch(() => null);
+          await unbindPlatformIdForShopProduct(prisma, targetUserId, oldShopProductId, orderItem.order.platform, currentPlatformSkuId).catch(() => null);
         }
       }
 
       const isCompositeItemSku = /[+＋]/.test(String(orderItem.productNo || ""));
       if (!isCompositeItemSku) {
         for (const shopProduct of shopProducts) {
-          await syncMeituanIdForMatchedShopProduct(
+          await syncPlatformIdForMatchedShopProduct(
             prisma,
             targetUserId,
-            shopProduct,
-            basePayload,
-            fallbackItemPayload,
+            shopProduct.id,
             orderItem.order.platform,
-            orderItem.productNo,
-            orderItem.platformSkuId
+            currentPlatformSkuId
           ).catch(() => null);
         }
       }
@@ -517,15 +588,12 @@ export async function PATCH(
 
       const isCompositeItemSku = /[+＋]/.test(String(orderItem.productNo || ""));
       if (!isCompositeItemSku) {
-        await syncMeituanIdForMatchedShopProduct(
+        await syncPlatformIdForMatchedShopProduct(
           prisma,
           targetUserId,
-          shopProduct,
-          basePayload,
-          fallbackItemPayload,
+          shopProduct.id,
           orderItem.order.platform,
-          orderItem.productNo,
-          orderItem.platformSkuId
+          currentPlatformSkuId
         ).catch(() => null);
       }
 
@@ -576,24 +644,21 @@ export async function PATCH(
       await deleteLegacyOutbound(tx, orderItem.order.orderNo);
     });
 
-    if (currentMeituanSkuId && previousShopProductIds.length > 0) {
+    if (currentPlatformSkuId && previousShopProductIds.length > 0) {
       const unbindOldIds = previousShopProductIds.filter((oldId) => oldId !== shopProduct.id);
       for (const oldShopProductId of unbindOldIds) {
-        await unbindMeituanSkuIdForShopProduct(prisma, targetUserId, oldShopProductId, currentMeituanSkuId).catch(() => null);
+        await unbindPlatformIdForShopProduct(prisma, targetUserId, oldShopProductId, orderItem.order.platform, currentPlatformSkuId).catch(() => null);
       }
     }
 
     const isCompositeItemSku = /[+＋]/.test(String(orderItem.productNo || ""));
     if (!isCompositeItemSku) {
-      await syncMeituanIdForMatchedShopProduct(
+      await syncPlatformIdForMatchedShopProduct(
         prisma,
         targetUserId,
-        shopProduct,
-        basePayload,
-        fallbackItemPayload,
+        shopProduct.id,
         orderItem.order.platform,
-        orderItem.productNo,
-        orderItem.platformSkuId
+        currentPlatformSkuId
       ).catch(() => null);
     }
 

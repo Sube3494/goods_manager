@@ -7269,6 +7269,61 @@ export async function syncJdSkuIdForShopProduct(
   }
 }
 
+export async function unbindJdSkuIdForShopProduct(
+  tx: Prisma.TransactionClient,
+  userId: string,
+  shopProductId: string,
+  sourceId: string
+) {
+  const cleanSourceId = String(sourceId || "").trim();
+  if (!shopProductId || !cleanSourceId) return;
+
+  const shopProduct = await tx.shopProduct.findFirst({
+    where: { id: shopProductId, shop: { userId } },
+    select: { id: true, productId: true, jdSkuId: true },
+  });
+
+  if (!shopProduct) return;
+
+  const existingIds = normalizeJdSkuIds(shopProduct.jdSkuId);
+  const nextJdSkuIds = existingIds.filter((id) => id !== cleanSourceId);
+
+  if (existingIds.includes(cleanSourceId)) {
+    await tx.shopProduct.update({
+      where: { id: shopProduct.id },
+      data: { jdSkuId: nextJdSkuIds.length > 0 ? nextJdSkuIds.join(",") : null },
+    });
+  }
+
+  if (shopProduct.productId) {
+    const otherShopProducts = await tx.shopProduct.findMany({
+      where: {
+        productId: shopProduct.productId,
+        id: { not: shopProduct.id },
+        shop: { userId },
+      },
+      select: { jdSkuId: true },
+    });
+    const isStillUsedByOtherShops = otherShopProducts.some((p) =>
+      normalizeJdSkuIds(p.jdSkuId).includes(cleanSourceId)
+    );
+    if (!isStillUsedByOtherShops) {
+      const existingProductSkus = await tx.productJdSku.findMany({
+        where: { productId: shopProduct.productId },
+        select: { jdSkuId: true },
+      });
+      const remainingProductJdSkuIds = existingProductSkus
+        .map((i) => i.jdSkuId)
+        .filter((id) => id !== cleanSourceId);
+      await replaceProductJdSkuMappings(tx, shopProduct.productId, userId, remainingProductJdSkuIds);
+      await tx.product.update({
+        where: { id: shopProduct.productId },
+        data: { jdSkuId: remainingProductJdSkuIds[0] || null },
+      });
+    }
+  }
+}
+
 export async function syncMeituanSkuIdForShopProduct(
   tx: Prisma.TransactionClient,
   userId: string,
@@ -7463,7 +7518,7 @@ export async function syncTaobaoSkuIdForShopProduct(
 
   const shopProduct = await tx.shopProduct.findFirst({
     where: { id: shopProductId, shop: { userId } },
-    select: { id: true, productId: true, taobaoSkuId: true },
+    select: { id: true, shopId: true, productId: true, taobaoSkuId: true },
   });
 
   if (!shopProduct) {
@@ -7483,6 +7538,14 @@ export async function syncTaobaoSkuIdForShopProduct(
   }
 
   try {
+    await tx.shopProduct.updateMany({
+      where: {
+        shopId: shopProduct.shopId,
+        id: { not: shopProduct.id },
+        taobaoSkuId: cleanSourceId,
+      },
+      data: { taobaoSkuId: null },
+    });
     await tx.shopProduct.update({
       where: { id: shopProduct.id },
       data: { taobaoSkuId: cleanSourceId },
@@ -7509,6 +7572,25 @@ export async function syncTaobaoSkuIdForShopProduct(
       shopFieldError,
     };
   }
+}
+
+export async function unbindTaobaoSkuIdForShopProduct(
+  tx: Prisma.TransactionClient,
+  userId: string,
+  shopProductId: string,
+  sourceId: string
+) {
+  const cleanSourceId = String(sourceId || "").trim();
+  if (!shopProductId || !cleanSourceId) return;
+
+  await tx.shopProduct.updateMany({
+    where: {
+      id: shopProductId,
+      taobaoSkuId: cleanSourceId,
+      shop: { userId },
+    },
+    data: { taobaoSkuId: null },
+  });
 }
 
 export async function backfillJdSkuIdForManualMatchedShopProducts(
