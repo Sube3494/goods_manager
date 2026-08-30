@@ -3262,7 +3262,7 @@ function OrderShopEditModal({
               <span className="text-xs">正在读取麦芽田门店列表...</span>
             </div>
           ) : (
-            <div className="max-h-60 overflow-y-auto space-y-1.5 pr-1">
+            <div className="max-h-60 overflow-y-auto space-y-2 px-0.5 pb-0.5">
               <label
                 onClick={() => {
                   setSelectedShopName("");
@@ -3271,7 +3271,7 @@ function OrderShopEditModal({
                 className={cn(
                   "flex items-center justify-between rounded-xl border p-3 text-xs font-medium cursor-pointer transition-all",
                   selectedShopName === "" && selectedShopId === ""
-                    ? "border-sky-500 bg-sky-500/10 text-sky-600 dark:text-sky-300 font-semibold"
+                    ? "border-sky-500 bg-sky-500/10 text-sky-600 ring-1 ring-sky-500/70 dark:text-sky-300 font-semibold"
                     : "border-black/5 bg-black/2 hover:bg-black/4 dark:border-white/5 dark:bg-white/2 dark:hover:bg-white/4 text-muted-foreground"
                 )}
               >
@@ -3303,7 +3303,7 @@ function OrderShopEditModal({
                       className={cn(
                         "flex items-center justify-between rounded-xl border p-3 text-xs font-medium cursor-pointer transition-all",
                         isSelected
-                          ? "border-sky-500 bg-sky-500/10 text-sky-600 dark:text-sky-300 font-semibold"
+                          ? "border-sky-500 bg-sky-500/10 text-sky-600 ring-1 ring-sky-500/70 dark:text-sky-300 font-semibold"
                           : "border-black/5 bg-black/2 hover:bg-black/4 dark:border-white/5 dark:bg-white/2 dark:hover:bg-white/4 text-foreground"
                       )}
                     >
