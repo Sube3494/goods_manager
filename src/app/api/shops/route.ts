@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
-import { getAddressDetail } from "@/lib/addressBook";
+import { getAddressDetail, isAddressDisabled } from "@/lib/addressBook";
 import { buildShopDedupeKey, findMatchingShopRecord, normalizeExternalId, normalizeShopAddress, normalizeShopName, isShopNameMatch } from "@/lib/shopIdentity";
 
 function sameNullableNumber(left: number | null | undefined, right: number | null | undefined) {
@@ -68,6 +68,7 @@ export async function GET(request: NextRequest) {
       : [];
 
     const normalizedAddresses = shippingAddresses
+      .filter((item) => !isAddressDisabled(item))
       .map((item, index) => ({
         id: String(item?.id || `address-${index}`),
         addressBookId: String(item?.id || `address-${index}`),

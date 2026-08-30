@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthorizedUser } from "@/lib/auth";
-import { getAddressDetail } from "@/lib/addressBook";
+import { getAddressDetail, isAddressDisabled } from "@/lib/addressBook";
 import prisma from "@/lib/prisma";
 import { fetchMaiyatianShippingShopsByCookie, getAutoPickIntegrationConfigByUserId } from "@/lib/autoPickOrders";
 
@@ -12,6 +12,8 @@ type ShippingAddress = {
   address?: string;
   detailAddress?: string;
   isDefault?: boolean;
+  disabled?: boolean;
+  isDisabled?: boolean;
 };
 
 export async function GET(_request: NextRequest) {
@@ -85,6 +87,7 @@ export async function POST(request: NextRequest) {
 
     const localShops = Array.isArray(user?.shippingAddresses)
       ? (user.shippingAddresses as ShippingAddress[])
+          .filter((item) => !isAddressDisabled(item))
           .map((item, index) => {
             const addressBookId = String(item?.id || `shipping-${index}`);
             const dbShop = dbShops.find((shop) => shop.addressBookId === addressBookId);

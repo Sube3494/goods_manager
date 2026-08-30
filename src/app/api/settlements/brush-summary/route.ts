@@ -6,6 +6,7 @@ import { FinanceMath } from "@/lib/math";
 import { getDisplayedMetrics, normalizeBrushSettlementPlatform } from "@/lib/brushDisplay";
 import { resolveAutoPickMatchedShopName } from "@/lib/autoPickOrders";
 import { isAutoPickOrderCancelledStatus, isAutoPickOrderDeletedStatus } from "@/lib/autoPickOrderStatus";
+import { isAddressDisabled } from "@/lib/addressBook";
 
 function readDeliveryFee(delivery: unknown) {
   if (!delivery || typeof delivery !== "object" || Array.isArray(delivery)) {
@@ -188,7 +189,8 @@ export async function GET(req: NextRequest) {
         },
       });
 
-      const userAddresses = (profile?.shippingAddresses as Array<{ id: string; label?: string | null; address?: string | null }>) || [];
+      const userAddresses = ((profile?.shippingAddresses as Array<{ id: string; label?: string | null; address?: string | null; disabled?: boolean | null; isDisabled?: boolean | null }>) || [])
+        .filter((address) => !isAddressDisabled(address));
 
       for (const order of autoPickOrders) {
         if (isAutoPickOrderCancelledStatus(order.status) || isAutoPickOrderDeletedStatus(order.status)) {

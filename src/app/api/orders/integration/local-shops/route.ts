@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAuthorizedUser } from "@/lib/auth";
-import { getAddressDetail } from "@/lib/addressBook";
+import { getAddressDetail, isAddressDisabled } from "@/lib/addressBook";
 import prisma from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -11,6 +11,8 @@ type ShippingAddress = {
   address?: string;
   detailAddress?: string;
   isDefault?: boolean;
+  disabled?: boolean;
+  isDisabled?: boolean;
 };
 
 export async function GET(request: Request) {
@@ -45,6 +47,7 @@ export async function GET(request: Request) {
     });
 
     const localShops = addresses
+      .filter((item) => !isAddressDisabled(item))
       .map((item, index) => {
         const addressBookId = String(item?.id || `shipping-${index}`);
         const dbShop = dbShops.find((s) => s.addressBookId === addressBookId);

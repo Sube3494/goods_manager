@@ -27,6 +27,8 @@ export interface AddressItem {
   contactName?: string;
   contactPhone?: string;
   isDefault: boolean;
+  disabled?: boolean;
+  isDisabled?: boolean;
   serviceFeeRate?: number;
   longitude?: number;
   latitude?: number;

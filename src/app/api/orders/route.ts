@@ -34,6 +34,7 @@ import {
   getOutboundReturnedQuantityMap,
   parseOutboundReturnMeta,
 } from "@/lib/outboundReturnMeta";
+import { isAddressDisabled } from "@/lib/addressBook";
 
 export const dynamic = "force-dynamic";
 
@@ -1426,7 +1427,7 @@ export async function GET(request: NextRequest) {
     perf.lap("outbound-lookup");
 
     const userAddresses = userProfile && Array.isArray(userProfile.shippingAddresses)
-      ? userProfile.shippingAddresses as Array<Record<string, unknown>>
+      ? (userProfile.shippingAddresses as Array<Record<string, unknown>>).filter((address) => !isAddressDisabled(address))
       : [];
     const shopRateMap = new Map<string, number>();
     userAddresses.forEach((addr) => {

@@ -10,6 +10,7 @@ import { ProductService } from "@/services/productService";
 import { AddressItem, BrushShopItem } from "@/lib/types";
 import { Prisma } from "../../../../../prisma/generated-client";
 import { FinanceMath } from "@/lib/math";
+import { isAddressDisabled } from "@/lib/addressBook";
 
 interface UserImportProfile {
   shippingAddresses?: AddressItem[] | null;
@@ -424,8 +425,11 @@ export async function POST(req: NextRequest) {
     const userProfile = userDb as UserImportProfile | null;
     const internalShops = new Set<string>();
     const brushShopNames = new Set<string>();
+    const activeShippingAddresses = userProfile && Array.isArray(userProfile.shippingAddresses)
+      ? userProfile.shippingAddresses.filter((address) => !isAddressDisabled(address))
+      : [];
     if (userProfile && Array.isArray(userProfile.shippingAddresses)) {
-      userProfile.shippingAddresses.forEach((a) => {
+      activeShippingAddresses.forEach((a) => {
         if (a.label) internalShops.add(a.label);
       });
     }
@@ -560,11 +564,11 @@ export async function POST(req: NextRequest) {
 
           // 3. 如果还是没匹配上（比如“私人定制优选礼品”、“帮我取货”这种不包含地名的），
           // 我们通过 Excel 表里可能存在的“地址”列，结合系统配置的真实物理地址来进行逆向推导
-          if (!matchedInternalShop && shopAddress && userProfile && Array.isArray(userProfile.shippingAddresses)) {
+          if (!matchedInternalShop && shopAddress && activeShippingAddresses.length > 0) {
             const shopAddrStr = String(shopAddress).trim();
             // 优先：用系统存储的物理地址与配送门店做互向子串匹配
             // 例: 配送门店="粤顺商务中心4楼423", 系统地址="...粤顺商务中心4楼423..." → 匹配白云店
-            const foundByAddress = shopAddrStr ? userProfile.shippingAddresses.find((addr) => {
+            const foundByAddress = shopAddrStr ? activeShippingAddresses.find((addr) => {
               const sysAddress = String(addr.address || "").trim();
               if (!sysAddress) return false;
               return sysAddress.includes(shopAddrStr) || shopAddrStr.includes(sysAddress);
@@ -574,7 +578,7 @@ export async function POST(req: NextRequest) {
               matchedInternalShop = foundByAddress.label;
             } else if (shopAddrStr) {
               // 降级：用 label 核心地名匹配配送门店
-              const fallback = userProfile.shippingAddresses.find((addr) => {
+              const fallback = activeShippingAddresses.find((addr) => {
                 const label = addr.label || "";
                 const coreLocation = label.replace(/(店|一店|二店|分店|总店)$/, '');
                 return coreLocation.length >= 2 && shopAddrStr.includes(coreLocation);

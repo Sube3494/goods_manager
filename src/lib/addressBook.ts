@@ -3,7 +3,13 @@ type AddressLike = {
   detailAddress?: string | null;
   contactName?: string | null;
   contactPhone?: string | null;
+  disabled?: boolean | null;
+  isDisabled?: boolean | null;
 };
+
+export function isAddressDisabled(item: AddressLike | null | undefined) {
+  return Boolean(item?.disabled || item?.isDisabled);
+}
 
 export function getAddressDetail(item: AddressLike | null | undefined) {
   const detailAddress = String(item?.detailAddress || "").trim();

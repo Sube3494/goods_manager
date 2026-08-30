@@ -22,6 +22,7 @@ import { useUser } from "@/hooks/useUser";
 import { hasPermission } from "@/lib/permissions";
 import { SessionUser } from "@/lib/permissions";
 import { BrushDisplaySettings, getDisplayedMetrics } from "@/lib/brushDisplay";
+import { isAddressDisabled } from "@/lib/addressBook";
 
 export default function BrushOrdersPage() {
   const { showToast } = useToast();
@@ -135,7 +136,7 @@ export default function BrushOrdersPage() {
   }, [orders, searchQuery, startDate, endDate, selectedType, selectedShop]);
 
   const allShopNames = useMemo(() => {
-    const addressLabels = typedUser?.shippingAddresses?.map(a => a.label) || [];
+    const addressLabels = typedUser?.shippingAddresses?.filter((a) => !isAddressDisabled(a)).map(a => a.label) || [];
     const existingOrderShops = orders.map(o => o.shopName).filter(Boolean) as string[];
     return Array.from(new Set([...addressLabels, ...existingOrderShops])).sort();
   }, [typedUser?.shippingAddresses, orders]);

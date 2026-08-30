@@ -9,6 +9,7 @@ import { DatePicker } from "@/components/ui/DatePicker";
 import { useUser } from "@/hooks/useUser";
 import { hasPermission, SessionUser } from "@/lib/permissions";
 import { getDailyFixedOperatingCost, getDailyUtilityCost, normalizeMonthKey } from "@/lib/operatingCosts";
+import { isAddressDisabled } from "@/lib/addressBook";
 import type { AddressItem, User } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -161,7 +162,7 @@ export default function OperatingCostsPage() {
   const { showToast } = useToast();
   const { user, isLoading: userLoading } = useUser();
   const canManage = hasPermission(user as SessionUser | null, "operating-costs:manage");
-  const shops = useMemo(() => (((user as User | null)?.shippingAddresses as AddressItem[] | undefined) || []).filter((item) => item.label?.trim()), [user]);
+  const shops = useMemo(() => (((user as User | null)?.shippingAddresses as AddressItem[] | undefined) || []).filter((item) => item.label?.trim() && !isAddressDisabled(item)), [user]);
   const [monthKey, setMonthKey] = useState(() => normalizeMonthKey(new Date()));
   const [activeShop, setActiveShop] = useState("");
   const [isLoading, setIsLoading] = useState(true);

@@ -17,6 +17,7 @@ import {
   Home,
   ChevronDown,
   CheckCircle2,
+  Power,
 } from "lucide-react";
 import { useUser } from "@/hooks/useUser";
 import { useToast } from "@/components/ui/Toast";
@@ -93,13 +94,21 @@ export default function ProfilePage() {
 
   const normalizeAddressDefaults = (list: AddressItem[]) => {
     let defaultAssigned = false;
-    return list.map((item) => {
-      const shouldBeDefault = Boolean(item.isDefault) && !defaultAssigned;
+    const normalized = list.map((item) => {
+      const disabled = Boolean(item.disabled || item.isDisabled);
+      const shouldBeDefault = !disabled && Boolean(item.isDefault) && !defaultAssigned;
       if (shouldBeDefault) {
         defaultAssigned = true;
       }
-      return { ...item, isDefault: shouldBeDefault };
+      return { ...item, disabled, isDisabled: undefined, isDefault: shouldBeDefault };
     });
+    if (!defaultAssigned) {
+      const firstEnabledIndex = normalized.findIndex((item) => !item.disabled);
+      if (firstEnabledIndex >= 0) {
+        normalized[firstEnabledIndex] = { ...normalized[firstEnabledIndex], isDefault: true };
+      }
+    }
+    return normalized;
   };
 
   useEffect(() => {
@@ -114,12 +123,14 @@ export default function ProfilePage() {
     const addresses = typedUser?.shippingAddresses;
     if (Array.isArray(addresses)) {
       nextAddressList = normalizeAddressDefaults(addresses.map((item) => ({
-        ...item,
-        address: item.detailAddress || item.address || "",
-        detailAddress: item.detailAddress || item.address || "",
-        contactName: "",
-        contactPhone: "",
-      })));
+          ...item,
+          address: item.detailAddress || item.address || "",
+          detailAddress: item.detailAddress || item.address || "",
+          contactName: "",
+          contactPhone: "",
+          disabled: Boolean(item.disabled || item.isDisabled),
+          isDisabled: undefined,
+        })));
     } else if (typeof typedUser?.shippingAddress === "string" && typedUser.shippingAddress) {
       nextAddressList = [
         {
@@ -639,7 +650,7 @@ export default function ProfilePage() {
                 </button>
                 <button
                   onClick={() => {
-                    const newAddress = { id: Math.random().toString(36).slice(2, 11), label: "", address: "", detailAddress: "", contactName: "", contactPhone: "", isDefault: addressList.length === 0, libraryId: libraries[0]?.id || "" };
+                    const newAddress = { id: Math.random().toString(36).slice(2, 11), label: "", address: "", detailAddress: "", contactName: "", contactPhone: "", isDefault: addressList.every((item) => item.disabled), disabled: false, libraryId: libraries[0]?.id || "" };
                     setAddressList([newAddress, ...addressList]);
                     setExpandedAddressId(newAddress.id);
                   }}
@@ -663,7 +674,11 @@ export default function ProfilePage() {
             ) : (
               <div className="grid gap-3.5 sm:gap-4">
                 {addressList.map((item, index) => (
-                  <div key={item.id} className="rounded-[20px] border border-border/60 bg-white/78 p-3.5 shadow-sm dark:bg-white/[0.05] sm:rounded-[22px] sm:p-4">
+                  <div key={item.id} className={`rounded-[20px] border p-3.5 shadow-sm sm:rounded-[22px] sm:p-4 ${
+                    item.disabled
+                      ? "border-border/50 bg-muted/35 opacity-75 dark:bg-white/[0.03]"
+                      : "border-border/60 bg-white/78 dark:bg-white/[0.05]"
+                  }`}>
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
                       <div className="flex min-w-0 items-start gap-3">
                       <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-border/60 bg-white/80 text-sm font-black text-foreground dark:bg-white/[0.05]">
@@ -685,6 +700,12 @@ export default function ProfilePage() {
                                   默认
                                 </span>
                               )}
+                              {item.disabled && (
+                                <span className="inline-flex items-center gap-1 rounded-md border border-zinc-500/20 bg-zinc-500/10 px-2 py-0.5 text-[10px] font-black text-muted-foreground">
+                                  <Power size={11} />
+                                  已禁用
+                                </span>
+                              )}
                               {libraries.length > 1 && (() => {
                                 const matchedLib = libraries.find((lib) => lib.id === item.libraryId);
                                 if (!matchedLib) return null;
@@ -702,23 +723,45 @@ export default function ProfilePage() {
                           </button>
                       </div>
                       </div>
-                          <div className="grid grid-cols-3 gap-2 sm:ml-auto sm:flex sm:shrink-0 sm:items-center">
+                          <div className="grid grid-cols-4 gap-2 sm:ml-auto sm:flex sm:shrink-0 sm:items-center">
                             <button
                               type="button"
                               onClick={() => {
-                                const newList = addressList.map((address, addressIndex) => ({
-                                  ...address,
-                                  isDefault: addressIndex === index,
-                                }));
+                                const newList = normalizeAddressDefaults(addressList.map((address, addressIndex) =>
+                                  addressIndex === index
+                                    ? { ...address, disabled: !address.disabled, isDisabled: undefined, isDefault: address.disabled ? address.isDefault : false }
+                                    : address
+                                ));
                                 setAddressList(newList);
                               }}
-                              disabled={Boolean(item.isDefault)}
+                              className={`inline-flex h-10 min-w-0 items-center justify-center gap-1.5 rounded-2xl border px-3 text-xs font-black transition-all sm:w-auto ${
+                                item.disabled
+                                  ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/15 dark:text-emerald-400"
+                                  : "border-zinc-500/20 bg-zinc-500/8 text-muted-foreground hover:border-zinc-500/35 hover:text-foreground"
+                              }`}
+                              title={item.disabled ? "启用地址" : "禁用地址"}
+                            >
+                              <Power size={14} />
+                              <span className="truncate">{item.disabled ? "启用" : "禁用"}</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newList = normalizeAddressDefaults(addressList.map((address, addressIndex) => ({
+                                  ...address,
+                                  isDefault: addressIndex === index,
+                                })));
+                                setAddressList(newList);
+                              }}
+                              disabled={Boolean(item.isDefault) || Boolean(item.disabled)}
                               className={`inline-flex h-10 min-w-0 items-center justify-center gap-1.5 rounded-2xl border px-3 text-xs font-black transition-all sm:w-auto ${
                                 item.isDefault
                                   ? "cursor-default border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                                  : item.disabled
+                                  ? "cursor-not-allowed border-border/50 bg-muted/30 text-muted-foreground/50"
                                   : "border-border/60 bg-white text-muted-foreground hover:border-primary/30 hover:text-primary dark:bg-white/5"
                               }`}
-                              title={item.isDefault ? "当前默认地址" : "设为默认地址"}
+                              title={item.disabled ? "禁用地址不能设为默认" : item.isDefault ? "当前默认地址" : "设为默认地址"}
                             >
                               <CheckCircle2 size={14} />
                               <span className="truncate">{item.isDefault ? "默认" : "设默认"}</span>

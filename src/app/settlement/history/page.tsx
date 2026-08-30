@@ -31,6 +31,7 @@ import { Pagination } from "@/components/ui/Pagination";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { SettlementDetailModal } from "@/components/Settlement/SettlementDetailModal";
 import { Settlement, AddressItem } from "@/lib/types";
+import { isAddressDisabled } from "@/lib/addressBook";
 
 const formatCurrency = (value: number) =>
   `¥${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -87,7 +88,7 @@ export default function SettlementHistoryPage() {
   const canManage = hasPermission(user as SessionUser | null, "settlement:manage");
   
   const profileShopLabels = useMemo(
-    () => ((user?.shippingAddresses as AddressItem[] | undefined) || []).map((shop) => shop.label).filter(Boolean),
+    () => ((user?.shippingAddresses as AddressItem[] | undefined) || []).filter((shop) => !isAddressDisabled(shop)).map((shop) => shop.label).filter(Boolean),
     [user?.shippingAddresses]
   );
 

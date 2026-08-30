@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getFreshSession } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { hasPermission, SessionUser } from "@/lib/permissions";
-import { getAddressDetail } from "@/lib/addressBook";
+import { getAddressDetail, isAddressDisabled } from "@/lib/addressBook";
 
 type ShippingAddressInput = {
   id?: string;
@@ -12,19 +12,29 @@ type ShippingAddressInput = {
   contactName?: string;
   contactPhone?: string;
   isDefault?: boolean;
+  disabled?: boolean;
+  isDisabled?: boolean;
   serviceFeeRate?: number;
   libraryId?: string;
 };
 
 function normalizeDefaultShippingAddresses(items: ShippingAddressInput[]) {
   let defaultAssigned = false;
-  return items.map((item) => {
-    const isDefault = Boolean(item.isDefault) && !defaultAssigned;
+  const normalized = items.map((item) => {
+    const disabled = isAddressDisabled(item);
+    const isDefault = !disabled && Boolean(item.isDefault) && !defaultAssigned;
     if (isDefault) {
       defaultAssigned = true;
     }
-    return { ...item, isDefault };
+    return { ...item, disabled, isDisabled: undefined, isDefault };
   });
+  if (!defaultAssigned) {
+    const firstEnabledIndex = normalized.findIndex((item) => !item.disabled);
+    if (firstEnabledIndex >= 0) {
+      normalized[firstEnabledIndex] = { ...normalized[firstEnabledIndex], isDefault: true };
+    }
+  }
+  return normalized;
 }
 
 export async function PATCH(req: Request) {
@@ -58,6 +68,7 @@ export async function PATCH(req: Request) {
           detailAddress,
           contactName: String(item.contactName || "").trim(),
           contactPhone: String(item.contactPhone || "").trim(),
+          disabled: isAddressDisabled(item),
         };
         return {
           ...normalizedItem,
