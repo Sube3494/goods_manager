@@ -57,6 +57,7 @@ import { AutoPickIntegrationConfig, AutoPickMaiyatianShop, AutoPickOrder, AutoPi
 import { cn } from "@/lib/utils";
 import { formatLocalDate, formatLocalDateTime } from "@/lib/dateUtils";
 import { ORDER_SHORTAGE_PURCHASE_NOTE_KEYWORD } from "@/lib/purchaseOrderTypes";
+import { simplifyShopName } from "@/lib/shopIdentity";
 
 type OrderAction = "self-delivery" | "complete-delivery" | "pickup-complete" | "sync" | "outbound";
 type OrdersTab = "today" | "all";
@@ -2606,17 +2607,18 @@ export default function OrdersPage() {
                           .filter((item) => item.amount !== 0);
                         const totalCost = shop.productCost + shop.deliveryFee + shop.platformCommission;
                         const platformTotal = platformEntries.reduce((sum, item) => sum + Math.abs(item.amount), 0);
+                        const displayShopName = shop.name === "未匹配店铺" ? shop.name : simplifyShopName(shop.name) || shop.name;
 
                         return (
                           <div key={shop.key} className="border-b border-black/6 px-3 py-3 last:border-b-0 dark:border-white/8 sm:px-4">
-                            <div className="grid gap-3 xl:grid-cols-[minmax(0,1.15fr)_17rem_minmax(14rem,0.85fr)] xl:items-center">
+                            <div className="grid gap-3 xl:grid-cols-[minmax(15rem,1fr)_7.5rem_16rem_minmax(13rem,0.8fr)] xl:items-center">
                               <div className="flex min-w-0 items-center gap-2.5">
                                 <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-black tabular-nums text-slate-600 dark:bg-white/10 dark:text-slate-300">
                                   {index + 1}
                                 </span>
                                 <div className="min-w-0 flex-1">
                                   <div className="flex min-w-0 items-center gap-2">
-                                    <div className="truncate text-base font-black leading-5">{shop.name}</div>
+                                    <div className="truncate text-base font-black leading-5" title={shop.name}>{displayShopName}</div>
                                     {isUnmatchedShop ? (
                                       <button
                                         type="button"
@@ -2633,7 +2635,11 @@ export default function OrdersPage() {
                                     <span>均利 {toCurrency(shop.count > 0 ? shop.amount / shop.count : 0)}</span>
                                   </div>
                                 </div>
-                                <div className={cn("shrink-0 text-right text-lg font-black tabular-nums leading-none", shop.amount < 0 ? "text-rose-500" : "text-emerald-500")}>
+                              </div>
+
+                              <div className="flex items-center justify-between rounded-xl bg-slate-200/45 px-3 py-2 dark:bg-white/6 xl:block xl:bg-transparent xl:p-0 xl:text-right dark:xl:bg-transparent">
+                                <div className="text-[11px] font-medium text-muted-foreground xl:mb-1">纯利润</div>
+                                <div className={cn("text-lg font-black tabular-nums leading-none", shop.amount < 0 ? "text-rose-500" : "text-emerald-500")}>
                                   {toCurrency(shop.amount)}
                                 </div>
                               </div>

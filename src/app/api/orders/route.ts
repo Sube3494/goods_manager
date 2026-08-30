@@ -1153,7 +1153,7 @@ export async function GET(request: NextRequest) {
     const cancelledWhere = buildStatusWhere("已取消");
     const deletedWhere = buildStatusWhere("已删除");
 
-    const [orders, total, platformRows, statusRows, userProfile, cancelledTotal, brushTotal, summaryOrders] = await Promise.all([
+    const [orders, total, platformRows, statusRows, userProfile, localShops, cancelledTotal, brushTotal, summaryOrders] = await Promise.all([
       prisma.autoPickOrder.findMany({
         where,
         select: {
@@ -1232,6 +1232,10 @@ export async function GET(request: NextRequest) {
           shippingAddresses: true,
         },
       }),
+      prisma.shop.findMany({
+        where: { userId: targetUserId },
+        select: { id: true, name: true },
+      }),
       !includeMetrics
         ? Promise.resolve(0)
         : prisma.autoPickOrder.count({
@@ -1290,6 +1294,20 @@ export async function GET(request: NextRequest) {
           }),
     ]);
     perf.lap("core-queries");
+
+    const localShopById = new Map(localShops.map((shop) => [shop.id, shop]));
+    const localShopByNameKey = new Map(localShops.map((shop) => [normalizeShopNameKey(shop.name), shop]));
+    const resolveExistingLocalShop = (candidate: { id?: string | null; name?: string | null } | null | undefined) => {
+      const id = String(candidate?.id || "").trim();
+      if (id && localShopById.has(id)) {
+        return localShopById.get(id) || null;
+      }
+      const nameKey = normalizeShopNameKey(candidate?.name);
+      if (nameKey && localShopByNameKey.has(nameKey)) {
+        return localShopByNameKey.get(nameKey) || null;
+      }
+      return null;
+    };
 
     const allOrdersForCost = [...orders, ...(summaryOrders || [])];
     const orderTimes = allOrdersForCost.map((o) => o.orderTime).filter(Boolean);
@@ -1759,10 +1777,10 @@ export async function GET(request: NextRequest) {
             readShopAddressFromRawPayload(order.rawPayload) || order.shopAddress || null,
             userProfile?.permissions
           );
-          const matchedShopId = lockedResolvedShop?.id || null;
-          const matchedShopName = String(
-            String(lockedResolvedShop?.name || "").trim() || mappingDebug.localShopName || ""
-          ).trim();
+          const existingLockedShop = resolveExistingLocalShop(lockedResolvedShop);
+          const existingMappedShop = resolveExistingLocalShop({ name: mappingDebug.localShopName });
+          const matchedShopId = existingLockedShop?.id || existingMappedShop?.id || null;
+          const matchedShopName = String(existingLockedShop?.name || existingMappedShop?.name || "").trim();
           const shopProfitKey = matchedShopId || matchedShopName || "未匹配店铺";
           const shopProfitName = matchedShopName || "未匹配店铺";
           const ensureShopProfit = () => {
@@ -2131,10 +2149,10 @@ export async function GET(request: NextRequest) {
         order.rawShopAddress,
         userProfile?.permissions
       );
-      const matchedShopId = lockedResolvedShop?.id || null;
-      const matchedShopName = String(
-        String(lockedResolvedShop?.name || "").trim() || mappingDebug.localShopName || ""
-      ).trim();
+      const existingLockedShop = resolveExistingLocalShop(lockedResolvedShop);
+      const existingMappedShop = resolveExistingLocalShop({ name: mappingDebug.localShopName });
+      const matchedShopId = existingLockedShop?.id || existingMappedShop?.id || null;
+      const matchedShopName = String(existingLockedShop?.name || existingMappedShop?.name || "").trim();
       const autoOutboundMeta = readAutoOutboundMeta(order.rawPayload);
       const outboundMeta = outboundByOrderNo.get(order.orderNo) || null;
       const hiddenDeletedOfflineIncome = order.isDeleted && order.platform === "线下交易";

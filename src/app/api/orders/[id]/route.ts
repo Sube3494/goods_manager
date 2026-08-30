@@ -169,10 +169,6 @@ export async function PATCH(
       const inputShopAddress = String(body.shopAddress || "").trim();
 
       if (inputMaiyatianShopName || inputShopId) {
-        targetShopName = inputMaiyatianShopName;
-        targetShopId = inputShopId;
-        targetShopAddress = inputShopAddress || null;
-
         // 尝试从用户的麦芽田映射配置中反查绑定的系统本地门店
         const userConfig = await getAutoPickIntegrationConfigByUserId(user.id);
 
@@ -188,18 +184,21 @@ export async function PATCH(
 
         const localShopNameToMatch = matchedMapping?.localShopName || inputMaiyatianShopName;
 
-        if (localShopNameToMatch) {
-          targetShopName = localShopNameToMatch;
+        if (localShopNameToMatch || inputShopId) {
           const matchedDbShop = await prisma.shop.findFirst({
             where: {
               userId: user.id,
-              name: localShopNameToMatch,
+              OR: [
+                ...(inputShopId ? [{ id: inputShopId }] : []),
+                ...(localShopNameToMatch ? [{ name: localShopNameToMatch }] : []),
+              ],
             },
             select: { id: true, name: true, address: true },
           });
 
           if (matchedDbShop) {
             targetShopId = matchedDbShop.id;
+            targetShopName = matchedDbShop.name;
             targetShopAddress = inputShopAddress || matchedDbShop.address || null;
           }
         }

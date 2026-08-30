@@ -22,6 +22,7 @@ import { getOutboundReturnTotals, parseOutboundReturnMeta } from "@/lib/outbound
 import { getDailyFixedOperatingCost, getDailyUtilityCost, normalizeMonthKey } from "@/lib/operatingCosts";
 import { AUTO_INBOUND_TYPE } from "@/lib/purchaseOrderTypes";
 import { isAddressDisabled } from "@/lib/addressBook";
+import { normalizeShopNameKey } from "@/lib/shopIdentity";
 
 const SHANGHAI_DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -370,13 +371,17 @@ export async function GET(request: NextRequest) {
     }
     perf.lap("range-bootstrap");
 
-    const [shopCount, shopProductRows, recentInboundItems, purchaseOrdersInRange, outboundOrdersInRange, pendingOrders, autoPickOrdersInRange] = await Promise.all([
+    const [shopCount, localShops, shopProductRows, recentInboundItems, purchaseOrdersInRange, outboundOrdersInRange, pendingOrders, autoPickOrdersInRange] = await Promise.all([
       prisma.shop.count({
         where: {
           userId: targetUserId,
           isSource: true,
           ...(shopName ? { name: shopName } : {}),
         },
+      }),
+      prisma.shop.findMany({
+        where: { userId: targetUserId },
+        select: { name: true },
       }),
       prisma.shopProduct.findMany({
         where: {
@@ -492,6 +497,12 @@ export async function GET(request: NextRequest) {
       }),
     ]);
     perf.lap("core-queries");
+    const localShopByNameKey = new Map(localShops.map((shop) => [normalizeShopNameKey(shop.name), shop.name]));
+    const resolveExistingMatchedShopName = (order: Parameters<typeof resolveAutoPickMatchedShopName>[0]) => {
+      const matchedName = resolveAutoPickMatchedShopName(order, permissionsObj);
+      const nameKey = normalizeShopNameKey(matchedName);
+      return nameKey ? localShopByNameKey.get(nameKey) || null : null;
+    };
 
     const [brushOrdersInRange, promotionExpensesInRange] = await Promise.all([
       prisma.brushOrder.findMany({
@@ -542,7 +553,7 @@ export async function GET(request: NextRequest) {
     );
 
     const filteredAutoPickOrdersInRange = shopName
-      ? autoPickOrdersInRange.filter((order) => resolveAutoPickMatchedShopName(order, permissionsObj) === shopName)
+      ? autoPickOrdersInRange.filter((order) => resolveExistingMatchedShopName(order) === shopName)
       : autoPickOrdersInRange;
 
     const pendingOrderCount = pendingOrders.length;
@@ -811,7 +822,7 @@ export async function GET(request: NextRequest) {
         const incomeYuan = (manualAmountOverride || isOffline) ? expectedIncomeYuan : adjustedPaidYuan;
 
         const isBrush = readMainSystemSelfDeliveryFlag(order.rawPayload);
-        const matchedShopName = resolveAutoPickMatchedShopName(order, permissionsObj) || order.shopAddress || order.shopId || "未匹配店铺";
+        const matchedShopName = resolveExistingMatchedShopName(order) || "未匹配店铺";
         const customCommission = order.orderNo ? customBrushCommissionMap.get(order.orderNo) : undefined;
         const orderBrushCommission = typeof customCommission === "number" && customCommission >= 0
           ? customCommission
@@ -918,7 +929,7 @@ export async function GET(request: NextRequest) {
         || isAutoPickOrderDeletedStatus(order.status)
         || isVoidedOfflineOrder(order);
       const orderCostMeta = outboundMetaByOrderNo.get(String(order.orderNo || "").trim());
-      const matchedShopName = resolveAutoPickMatchedShopName(order, permissionsObj) || order.shopAddress || order.shopId || "未匹配店铺";
+      const matchedShopName = resolveExistingMatchedShopName(order) || "未匹配店铺";
       const addShopPureProfit = (target: ReturnType<typeof createTrendBucket> | undefined, amount: number) => {
         if (!target || amount === 0) return;
         target.shopPureProfit[matchedShopName] = FinanceMath.add(target.shopPureProfit[matchedShopName] || 0, amount);
