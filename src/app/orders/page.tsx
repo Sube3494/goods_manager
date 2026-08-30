@@ -2557,10 +2557,10 @@ export default function OrdersPage() {
         ? createPortal(
             <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/45 p-2 backdrop-blur-sm sm:p-4" onMouseDown={() => setIsShopProfitOpen(false)}>
               <div
-                className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-[22px] border border-black/10 bg-white text-slate-950 shadow-2xl dark:border-white/10 dark:bg-[#111827] dark:text-white sm:max-h-[86vh] sm:rounded-[24px]"
+                className="flex max-h-[94vh] w-full max-w-6xl flex-col overflow-hidden rounded-[18px] border border-black/10 bg-white text-slate-950 shadow-2xl dark:border-white/10 dark:bg-[#111827] dark:text-white sm:max-h-[88vh] sm:rounded-[20px]"
                 onMouseDown={(event) => event.stopPropagation()}
               >
-                <div className="flex items-start justify-between gap-3 border-b border-black/8 px-4 py-4 dark:border-white/10 sm:gap-4 sm:px-6 sm:py-5">
+                <div className="flex items-start justify-between gap-3 border-b border-black/8 px-4 py-3 dark:border-white/10 sm:gap-4 sm:px-5 sm:py-4">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 text-lg font-bold sm:text-xl">
                       <Store className="h-5 w-5 text-emerald-500" />
@@ -2580,45 +2580,54 @@ export default function OrdersPage() {
                   </button>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 border-b border-black/8 px-4 py-3 dark:border-white/10 sm:grid-cols-4 sm:gap-3 sm:px-6 sm:py-4">
+                <div className="grid grid-cols-2 gap-2 border-b border-black/8 px-4 py-2.5 dark:border-white/10 sm:grid-cols-4 sm:px-5 sm:py-3">
                   {[
                     { label: "总纯利润", value: toCurrency(activeSummary.pureProfit), tone: activeSummary.pureProfit < 0 ? "text-rose-500" : "text-emerald-500" },
                     { label: "店铺", value: `${shopProfitEntries.length} 家`, tone: "text-foreground" },
                     { label: "订单", value: `${activeSummary.validOrderCount} 单`, tone: "text-foreground" },
                     { label: "配送费", value: toCurrency(activeSummary.totalDeliveryFee), tone: "text-foreground" },
                   ].map((item) => (
-                    <div key={item.label} className="rounded-2xl border border-black/6 bg-slate-100/80 px-3 py-2.5 dark:border-white/8 dark:bg-white/6 sm:py-3">
-                      <div className="text-[11px] font-medium text-muted-foreground">{item.label}</div>
-                      <div className={cn("mt-1 text-lg font-black tabular-nums leading-tight sm:text-xl", item.tone)}>
+                    <div key={item.label} className="rounded-xl border border-black/6 bg-slate-100/80 px-3 py-2 dark:border-white/8 dark:bg-white/6">
+                      <div className="text-[10px] font-bold text-muted-foreground">{item.label}</div>
+                      <div className={cn("mt-0.5 text-base font-black tabular-nums leading-tight sm:text-lg", item.tone)}>
                         {item.value}
                       </div>
                     </div>
                   ))}
                 </div>
 
-                <div className="overflow-y-auto px-4 py-3 sm:px-6 sm:py-4">
+                <div className="overflow-y-auto px-3 py-3 sm:px-5">
                   {shopProfitEntries.length > 0 ? (
-                    <>
-                    <div className="overflow-hidden rounded-2xl border border-black/8 bg-slate-50/80 text-sm dark:border-white/10 dark:bg-white/[0.035]">
-                      <div className="hidden grid-cols-[3rem_minmax(9rem,1fr)_5.5rem_7rem_6.5rem_6.5rem_6.5rem_minmax(10rem,1fr)] border-b border-black/6 bg-slate-100/80 px-4 py-2 text-[11px] font-bold text-muted-foreground dark:border-white/8 dark:bg-white/5 xl:grid">
-                        <div>排名</div>
-                        <div>店铺</div>
-                        <div className="text-right">订单</div>
-                        <div className="text-right">纯利润</div>
-                        <div className="text-right">货品</div>
-                        <div className="text-right">配送</div>
-                        <div className="text-right">佣金</div>
-                        <div>平台</div>
-                      </div>
+                    <div className="overflow-hidden rounded-xl border border-black/8 bg-slate-50/80 text-sm dark:border-white/10 dark:bg-white/[0.035]">
+                      <div className="overflow-x-auto">
+                        <div className="hidden min-w-[1040px] grid-cols-[2.75rem_minmax(8.5rem,1.15fr)_4.25rem_6.75rem_5.75rem_5.75rem_5.75rem_repeat(5,5.75rem)] border-b border-black/6 bg-slate-100/80 px-3 py-2 text-[11px] font-bold text-muted-foreground dark:border-white/8 dark:bg-white/5 xl:grid">
+                          <div>#</div>
+                          <div>店铺</div>
+                          <div className="text-right">订单</div>
+                          <div className="text-right">纯利润</div>
+                          <div className="text-right">货品</div>
+                          <div className="text-right">配送</div>
+                          <div className="text-right">佣金</div>
+                          {SHOP_PROFIT_PLATFORMS.map((platform) => (
+                            <div key={platform} className="flex items-center justify-end gap-1.5">
+                              <Image
+                                src={SHOP_PROFIT_PLATFORM_ICONS[platform]}
+                                alt=""
+                                width={16}
+                                height={16}
+                                className="h-3.5 w-3.5 shrink-0 rounded"
+                              />
+                              <span>{platform}</span>
+                            </div>
+                          ))}
+                        </div>
                       {shopProfitEntries.map((shop, index) => {
                         const isUnmatchedShop = shop.name === "未匹配店铺";
-                        const platformEntries = SHOP_PROFIT_PLATFORMS
-                          .map((platform) => ({ platform, amount: shop.platformProfit?.[platform] || 0 }))
-                          .filter((item) => item.amount !== 0);
                         const displayShopName = shop.name === "未匹配店铺" ? shop.name : simplifyShopName(shop.name) || shop.name;
+                        const averageProfit = shop.count > 0 ? shop.amount / shop.count : 0;
 
                         return (
-                          <div key={shop.key} className="border-b border-black/6 px-3 py-3 last:border-b-0 dark:border-white/8 sm:px-4 xl:grid xl:grid-cols-[3rem_minmax(9rem,1fr)_5.5rem_7rem_6.5rem_6.5rem_6.5rem_minmax(10rem,1fr)] xl:items-center xl:gap-0 xl:py-2.5">
+                          <div key={shop.key} className="border-b border-black/6 px-3 py-2.5 last:border-b-0 dark:border-white/8 xl:grid xl:min-w-[1040px] xl:grid-cols-[2.75rem_minmax(8.5rem,1.15fr)_4.25rem_6.75rem_5.75rem_5.75rem_5.75rem_repeat(5,5.75rem)] xl:items-center xl:px-3 xl:py-2">
                             <div className="hidden text-xs font-black tabular-nums text-muted-foreground xl:block">
                               #{index + 1}
                             </div>
@@ -2642,7 +2651,7 @@ export default function OrdersPage() {
                                 </div>
                                 <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground xl:hidden">
                                   <span>{shop.count} 单</span>
-                                  <span>均利 {toCurrency(shop.count > 0 ? shop.amount / shop.count : 0)}</span>
+                                  <span>均利 {toCurrency(averageProfit)}</span>
                                 </div>
                               </div>
                               <div className={cn("shrink-0 text-lg font-black tabular-nums leading-none xl:hidden", shop.amount < 0 ? "text-rose-500" : "text-emerald-500")}>
@@ -2657,8 +2666,22 @@ export default function OrdersPage() {
                             <div className="hidden text-right font-bold tabular-nums xl:block">{toCurrency(shop.productCost)}</div>
                             <div className="hidden text-right font-bold tabular-nums xl:block">{toCurrency(shop.deliveryFee)}</div>
                             <div className="hidden text-right font-bold tabular-nums xl:block">{toCurrency(shop.platformCommission)}</div>
+                            {SHOP_PROFIT_PLATFORMS.map((platform) => {
+                              const amount = shop.platformProfit?.[platform] || 0;
+                              return (
+                                <div
+                                  key={platform}
+                                  className={cn(
+                                    "hidden text-right text-xs font-black tabular-nums xl:block",
+                                    amount < 0 ? "text-rose-500" : amount > 0 ? "text-emerald-500" : "text-muted-foreground/55"
+                                  )}
+                                >
+                                  {toCurrency(amount)}
+                                </div>
+                              );
+                            })}
 
-                            <div className="mt-2 grid grid-cols-3 gap-2 text-xs xl:hidden">
+                            <div className="mt-2 grid grid-cols-4 gap-1.5 text-xs xl:hidden">
                               <div className="rounded-lg bg-slate-200/50 px-2 py-1.5 dark:bg-white/6">
                                 <div className="text-muted-foreground">货品</div>
                                 <div className="font-bold tabular-nums">{toCurrency(shop.productCost)}</div>
@@ -2671,32 +2694,37 @@ export default function OrdersPage() {
                                 <div className="text-muted-foreground">佣金</div>
                                 <div className="font-bold tabular-nums">{toCurrency(shop.platformCommission)}</div>
                               </div>
+                              <div className="rounded-lg bg-slate-200/50 px-2 py-1.5 dark:bg-white/6">
+                                <div className="text-muted-foreground">均利</div>
+                                <div className={cn("font-bold tabular-nums", averageProfit < 0 ? "text-rose-500" : "text-emerald-500")}>{toCurrency(averageProfit)}</div>
+                              </div>
                             </div>
 
-                            <div className="mt-2 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 xl:mt-0 xl:pl-4">
-                              {platformEntries.length > 0 ? (
-                                platformEntries.map(({ platform, amount }) => (
-                                  <div key={platform} className="flex min-w-0 items-center gap-1.5 text-xs">
-                                    <Image
-                                      src={SHOP_PROFIT_PLATFORM_ICONS[platform]}
-                                      alt=""
-                                      width={18}
-                                      height={18}
-                                      className="h-4 w-4 shrink-0 rounded-md"
-                                    />
-                                    <span className="text-muted-foreground">{platform}</span>
-                                    <span className={cn("font-black tabular-nums", amount < 0 ? "text-rose-500" : "text-emerald-500")}>{toCurrency(amount)}</span>
+                            <div className="mt-2 grid grid-cols-2 gap-1.5 text-xs sm:grid-cols-5 xl:hidden">
+                              {SHOP_PROFIT_PLATFORMS.map((platform) => {
+                                const amount = shop.platformProfit?.[platform] || 0;
+                                return (
+                                  <div key={platform} className="flex min-w-0 items-center justify-between gap-1 rounded-lg bg-slate-200/50 px-2 py-1.5 dark:bg-white/6">
+                                    <span className="flex min-w-0 items-center gap-1 text-muted-foreground">
+                                      <Image
+                                        src={SHOP_PROFIT_PLATFORM_ICONS[platform]}
+                                        alt=""
+                                        width={16}
+                                        height={16}
+                                        className="h-3.5 w-3.5 shrink-0 rounded"
+                                      />
+                                      <span className="truncate">{platform}</span>
+                                    </span>
+                                    <span className={cn("shrink-0 font-black tabular-nums", amount < 0 ? "text-rose-500" : amount > 0 ? "text-emerald-500" : "text-muted-foreground/55")}>{toCurrency(amount)}</span>
                                   </div>
-                                ))
-                              ) : (
-                                <div className="text-xs text-muted-foreground">暂无平台利润</div>
-                              )}
+                                );
+                              })}
                             </div>
                           </div>
                         );
                       })}
+                      </div>
                     </div>
-                    </>
                   ) : (
                     <div className="rounded-2xl border border-dashed border-black/12 py-12 text-center text-sm text-muted-foreground dark:border-white/12">
                       暂无店铺利润明细
