@@ -69,6 +69,7 @@ function OrderListSkeleton({ count = 3 }: { count?: number }) {
 type OrderAction = "self-delivery" | "complete-delivery" | "pickup-complete" | "sync" | "outbound" | "sync-brush";
 type PurchaseDraftPayload = PurchaseOrder & { sourceOrderId?: string };
 type ShopProfitInfo = { id: string | null; name: string; amount: number; count: number; deliveryFee: number; productCost: number; platformCommission: number };
+const UNMATCHED_SHOP_FILTER = "__unmatched__";
 
 function normalizeDisplayPlatform(platform?: string | null) {
   const raw = String(platform || "").trim();
@@ -94,6 +95,7 @@ interface TodayOrdersViewProps {
   }) => void;
   localShops: Array<{ id: string; name: string; address: string }>;
   userId?: string | null;
+  shopFilterSignal?: { value: string; nonce: number } | null;
 }
 
 const TODAY_TAB_PAGE_SIZE = 100;
@@ -106,6 +108,7 @@ export function TodayOrdersView({
   localShops,
   onOpenPurchaseDraft,
   userId,
+  shopFilterSignal,
 }: TodayOrdersViewProps) {
   const { showToast } = useToast();
   const [orders, setOrders] = useState<AutoPickOrder[]>([]);
@@ -177,6 +180,11 @@ export function TodayOrdersView({
   useEffect(() => {
     onDataLoadRef.current = onDataLoad;
   }, [onDataLoad]);
+
+  useEffect(() => {
+    if (!shopFilterSignal?.value) return;
+    setShop(shopFilterSignal.value);
+  }, [shopFilterSignal?.nonce, shopFilterSignal?.value]);
 
   const todayDate = useMemo(() => formatLocalDate(new Date()), []);
 
@@ -474,7 +482,7 @@ export function TodayOrdersView({
   // 4. 数据统计与过滤处理
   const shopOptions = useMemo(() => {
     const list = localShops.map((item) => ({ value: item.name, label: item.name }));
-    return [{ value: "all", label: "全部店铺" }, ...list];
+    return [{ value: "all", label: "全部店铺" }, { value: UNMATCHED_SHOP_FILTER, label: "未匹配店铺" }, ...list];
   }, [localShops]);
 
   const platformOptions = useMemo(

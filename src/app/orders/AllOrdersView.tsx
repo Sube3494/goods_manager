@@ -68,6 +68,7 @@ function OrderListSkeleton({ count = 3 }: { count?: number }) {
 type OrderAction = "self-delivery" | "complete-delivery" | "pickup-complete" | "sync" | "outbound" | "sync-brush";
 type PurchaseDraftPayload = PurchaseOrder & { sourceOrderId?: string };
 type ShopProfitInfo = { id: string | null; name: string; amount: number; count: number; deliveryFee: number; productCost: number; platformCommission: number };
+const UNMATCHED_SHOP_FILTER = "__unmatched__";
 
 function normalizeDisplayPlatform(platform?: string | null) {
   const raw = String(platform || "").trim();
@@ -113,6 +114,7 @@ interface AllOrdersViewProps {
     promotionDate?: string;
   }) => void;
   localShops: Array<{ id: string; name: string; address: string }>;
+  shopFilterSignal?: { value: string; nonce: number } | null;
 }
 
 const ALL_ORDERS_BATCH_SIZE = 30;
@@ -124,6 +126,7 @@ export function AllOrdersView({
   onDataLoad,
   localShops,
   onOpenPurchaseDraft,
+  shopFilterSignal,
 }: AllOrdersViewProps) {
   const { showToast } = useToast();
   const [orders, setOrders] = useState<AutoPickOrder[]>([]);
@@ -206,6 +209,12 @@ export function AllOrdersView({
     }, 300);
     return () => clearTimeout(timer);
   }, [query]);
+
+  useEffect(() => {
+    if (!shopFilterSignal?.value) return;
+    setShop(shopFilterSignal.value);
+    setCurrentPage(1);
+  }, [shopFilterSignal?.nonce, shopFilterSignal?.value]);
 
   const todayDate = useMemo(() => formatLocalDate(new Date()), []);
   const hasMore = meta.page < meta.totalPages;
@@ -516,7 +525,7 @@ export function AllOrdersView({
   // 数据统计与过滤处理
   const shopOptions = useMemo(() => {
     const list = localShops.map((item) => ({ value: item.name, label: item.name }));
-    return [{ value: "all", label: "全部店铺" }, ...list];
+    return [{ value: "all", label: "全部店铺" }, { value: UNMATCHED_SHOP_FILTER, label: "未匹配店铺" }, ...list];
   }, [localShops]);
 
   const platformOptions = useMemo(

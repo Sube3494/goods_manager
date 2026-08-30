@@ -62,6 +62,14 @@ type OrderAction = "self-delivery" | "complete-delivery" | "pickup-complete" | "
 type OrdersTab = "today" | "all";
 type PurchaseDraftPayload = PurchaseOrder & { sourceOrderId?: string };
 const SHOP_PROFIT_PLATFORMS = ["美团", "京东", "淘宝", "抖店", "线下交易"] as const;
+const UNMATCHED_SHOP_FILTER = "__unmatched__";
+const SHOP_PROFIT_PLATFORM_ICONS: Record<(typeof SHOP_PROFIT_PLATFORMS)[number], string> = {
+  美团: "/platform/美团.svg",
+  京东: "/platform/京东.svg",
+  淘宝: "/platform/淘宝.svg",
+  抖店: "/platform/doudian.svg",
+  线下交易: "/platform/线下交易.svg",
+};
 type ShopProfitInfo = {
   id: string | null;
   name: string;
@@ -1458,6 +1466,7 @@ export default function OrdersPage() {
   const activeEligibleBrushSyncOrders = tabData[activeTab].eligibleBrushSyncOrders;
   const isSubComponentLoading = tabData[activeTab].isLoading;
   const [isShopProfitOpen, setIsShopProfitOpen] = useState(false);
+  const [shopFilterSignal, setShopFilterSignal] = useState<{ value: string; nonce: number } | null>(null);
   const shopProfitEntries = useMemo(() => {
     return Object.entries(activeSummary.shopProfit || {})
       .map(([key, info]) => ({ key, ...info }))
@@ -1466,6 +1475,11 @@ export default function OrdersPage() {
   }, [activeSummary.shopProfit]);
 
   const [allOrdersMounted, setAllOrdersMounted] = useState(false);
+
+  const handleFilterUnmatchedShopOrders = useCallback(() => {
+    setShopFilterSignal({ value: UNMATCHED_SHOP_FILTER, nonce: Date.now() });
+    setIsShopProfitOpen(false);
+  }, []);
 
   useEffect(() => {
     if (activeTab === "all" && !allOrdersMounted) {
@@ -1718,7 +1732,7 @@ export default function OrdersPage() {
   }, [isIntegrationOpen]);
 
   useEffect(() => {
-    if (!isIntegrationOpen && !isBrushSyncPickerOpen) {
+    if (!isIntegrationOpen && !isBrushSyncPickerOpen && !isShopProfitOpen) {
       return;
     }
 
@@ -1733,7 +1747,7 @@ export default function OrdersPage() {
       body.style.overflow = previousBodyOverflow;
       documentElement.style.overflow = previousHtmlOverflow;
     };
-  }, [isBrushSyncPickerOpen, isIntegrationOpen]);
+  }, [isBrushSyncPickerOpen, isIntegrationOpen, isShopProfitOpen]);
 
   const fetchLocalShops = useCallback(async (options?: { silent?: boolean }) => {
     try {
@@ -2513,6 +2527,7 @@ export default function OrdersPage() {
             onOpenPurchaseDraft={setPurchaseDraft}
             onDataLoad={handleTodayDataLoad}
             localShops={localShops}
+            shopFilterSignal={shopFilterSignal}
           />
         </div>
         {allOrdersMounted && (
@@ -2524,6 +2539,7 @@ export default function OrdersPage() {
               onOpenPurchaseDraft={setPurchaseDraft}
               onDataLoad={handleAllDataLoad}
               localShops={localShops}
+              shopFilterSignal={shopFilterSignal}
             />
           </div>
         )}
@@ -2577,6 +2593,7 @@ export default function OrdersPage() {
                     <>
                     <div className="space-y-3">
                       {shopProfitEntries.map((shop) => {
+                        const isUnmatchedShop = shop.name === "未匹配店铺";
                         const platformEntries = SHOP_PROFIT_PLATFORMS
                           .map((platform) => ({ platform, amount: shop.platformProfit?.[platform] || 0 }))
                           .filter((item) => item.amount !== 0);
@@ -2591,6 +2608,15 @@ export default function OrdersPage() {
                                   <span>配送 {toCurrency(shop.deliveryFee)}</span>
                                   <span>佣金 {toCurrency(shop.platformCommission)}</span>
                                 </div>
+                                {isUnmatchedShop ? (
+                                  <button
+                                    type="button"
+                                    onClick={handleFilterUnmatchedShopOrders}
+                                    className="mt-2 inline-flex h-8 items-center rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 text-xs font-bold text-amber-600 transition hover:bg-amber-500/15 dark:text-amber-300"
+                                  >
+                                    查看订单
+                                  </button>
+                                ) : null}
                               </div>
                               <div className="shrink-0 text-right">
                                 <div className="text-[11px] text-muted-foreground">纯利润</div>
@@ -2621,7 +2647,16 @@ export default function OrdersPage() {
                                 <div className="flex flex-wrap gap-2">
                                   {platformEntries.map(({ platform, amount }) => (
                                     <div key={platform} className="flex min-w-[8.5rem] flex-1 items-center justify-between gap-2 rounded-xl bg-slate-200/60 px-3 py-2 text-xs dark:bg-white/6">
-                                      <span className="font-medium text-muted-foreground">{platform}</span>
+                                      <span className="flex min-w-0 items-center gap-1.5 font-medium text-muted-foreground">
+                                        <Image
+                                          src={SHOP_PROFIT_PLATFORM_ICONS[platform]}
+                                          alt=""
+                                          width={18}
+                                          height={18}
+                                          className="h-4.5 w-4.5 shrink-0 rounded-md"
+                                        />
+                                        <span className="truncate">{platform}</span>
+                                      </span>
                                       <span className={cn("font-black tabular-nums", amount < 0 ? "text-rose-500" : "text-emerald-500")}>{toCurrency(amount)}</span>
                                     </div>
                                   ))}

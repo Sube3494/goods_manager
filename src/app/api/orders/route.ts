@@ -38,6 +38,8 @@ import { isAddressDisabled } from "@/lib/addressBook";
 
 export const dynamic = "force-dynamic";
 
+const UNMATCHED_SHOP_FILTER = "__unmatched__";
+
 type OutboundLookupRow = {
   id: string;
   note: string | null;
@@ -1063,7 +1065,14 @@ export async function GET(request: NextRequest) {
 
     const shopFilter = String(searchParams.get("shop") || "").trim();
     let shopWhereFilter: Prisma.AutoPickOrderWhereInput | undefined = undefined;
-    if (shopFilter && shopFilter !== "all") {
+    if (shopFilter === UNMATCHED_SHOP_FILTER) {
+      shopWhereFilter = {
+        AND: [
+          { OR: [{ shopId: null }, { shopId: "" }] },
+          { OR: [{ shopAddress: null }, { shopAddress: "" }] },
+        ],
+      };
+    } else if (shopFilter && shopFilter !== "all") {
       const targetShop = await prisma.shop.findFirst({
         where: {
           userId: targetUserId,
