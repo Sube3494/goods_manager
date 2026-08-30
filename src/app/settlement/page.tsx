@@ -14,6 +14,7 @@ import { useToast } from "@/components/ui/Toast";
 import { useUser } from "@/hooks/useUser";
 import { hasPermission, SessionUser } from "@/lib/permissions";
 import { User } from "@/lib/types";
+import { isAddressDisabled } from "@/lib/addressBook";
 
 interface PlatformData {
   id: string;
@@ -48,7 +49,7 @@ const money = (value: number) => `¥${value.toLocaleString(undefined, { minimumF
 
 export default function SettlementPage() {
   const { user, isLoading: userLoading } = useUser();
-  const shops = useMemo(() => (user as unknown as User)?.shippingAddresses || [], [user]);
+  const shops = useMemo(() => ((user as unknown as User)?.shippingAddresses || []).filter((address) => !isAddressDisabled(address)), [user]);
   const { showToast } = useToast();
   const router = useRouter();
   const pathname = usePathname();

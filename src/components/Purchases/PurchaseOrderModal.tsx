@@ -18,6 +18,7 @@ import { useRouter } from "next/navigation";
 import { AUTO_INBOUND_TYPE } from "@/lib/purchaseOrderTypes";
 import { formatLocalDateTime } from "@/lib/dateUtils";
 import { isShopNameMatch } from "@/lib/shopIdentity";
+import { isAddressDisabled } from "@/lib/addressBook";
 
 interface PurchaseOrderModalProps {
   isOpen: boolean;
@@ -370,10 +371,15 @@ export function PurchaseOrderModal({
   const { user } = useUser();
   const router = useRouter();
   const typedUser = user as unknown as UserType;
+  const activeShippingAddresses = useMemo(
+    () => (typedUser?.shippingAddresses || []).filter((address) => !isAddressDisabled(address)),
+    [typedUser?.shippingAddresses]
+  );
   
   const [formData, setFormData] = useState<PurchaseOrder>(() => {
     if (initialData) return initialData;
     const today = new Date();
+    const defaultAddress = activeShippingAddresses.find((address) => address.isDefault) || activeShippingAddresses[0];
     return {
       id: `PO-${today.toISOString().slice(0, 10).replace(/-/g, "")}-${Math.floor(Math.random() * 1000).toString().padStart(3, "0")}`,
       status: "Confirmed",
@@ -384,8 +390,8 @@ export function PurchaseOrderModal({
       extraFees: 0,
       totalAmount: 0,
       discountAmount: 0,
-      shippingAddress: (user as unknown as UserType)?.shippingAddresses?.find(a => a.isDefault)?.address || (user as unknown as UserType)?.shippingAddresses?.[0]?.address || "",
-      shopName: (user as unknown as UserType)?.shippingAddresses?.find(a => a.isDefault)?.label || (user as unknown as UserType)?.shippingAddresses?.[0]?.label || ""
+      shippingAddress: defaultAddress?.address || "",
+      shopName: defaultAddress?.label || ""
     };
   });
   
@@ -393,8 +399,8 @@ export function PurchaseOrderModal({
   const [hasFetchedData, setHasFetchedData] = useState(false);
 
   const addressList = useMemo(() => {
-    return typedUser?.shippingAddresses || [];
-  }, [typedUser]);
+    return activeShippingAddresses;
+  }, [activeShippingAddresses]);
 
 
   // Only 'Received' status or system-generated records are truly read-only for core product/price info
@@ -644,7 +650,8 @@ export function PurchaseOrderModal({
         } else {
             const newId = `PO-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${Math.floor(Math.random() * 1000).toString().padStart(3, "0")}`;
             
-            const defaultAddr = (typedUser?.shippingAddresses || []).find(a => a.isDefault)?.address || "";
+            const defaultAddress = activeShippingAddresses.find((address) => address.isDefault) || activeShippingAddresses[0];
+            const defaultAddr = defaultAddress?.address || "";
 
             setFormData(() => ({
                 id: newId,
@@ -658,7 +665,7 @@ export function PurchaseOrderModal({
                 trackingData: undefined,
                 paymentVouchers: [],
                 shippingAddress: defaultAddr,
-                shopName: (typedUser?.shippingAddresses || []).find(a => a.isDefault)?.label || ""
+                shopName: defaultAddress?.label || ""
             }));
             setShippingFeeInput("0");
             setExtraFeeInput("0");
@@ -668,7 +675,7 @@ export function PurchaseOrderModal({
     }, 0);
 
     return () => clearTimeout(timeoutId);
-  }, [defaultType, isOpen, initialData, user, typedUser?.shippingAddresses]);
+  }, [defaultType, isOpen, initialData, user, activeShippingAddresses]);
 
   // Auto-select default address if empty and list is available
   useEffect(() => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Package, Plus, Trash2, Search, Circle, Store, ChevronDown, ChevronRight, LayoutGrid } from "lucide-react";
@@ -11,6 +11,7 @@ import { CustomSelect } from "@/components/ui/CustomSelect";
 import { ProductSelectionModal } from "../Purchases/ProductSelectionModal";
 import { useToast } from "@/components/ui/Toast";
 import { useUser } from "@/hooks/useUser";
+import { isAddressDisabled } from "@/lib/addressBook";
 
 interface PlanModalProps {
   isOpen: boolean;
@@ -29,6 +30,10 @@ export function PlanModal({ isOpen, onClose, onSubmit, initialData, readOnly = f
     const [isSelectionModalOpen, setIsSelectionModalOpen] = useState(false);
 
     const { user } = useUser();
+    const activeShippingAddresses = useMemo(
+        () => (user?.shippingAddresses || []).filter((address: AddressItem) => !isAddressDisabled(address)),
+        [user?.shippingAddresses]
+    );
     const [expandedPlatforms, setExpandedPlatforms] = useState<Record<string, boolean>>({
         "美团": true,
         "淘宝": true,
@@ -54,17 +59,17 @@ export function PlanModal({ isOpen, onClose, onSubmit, initialData, readOnly = f
 
     // 默认选择第一个店铺
     useEffect(() => {
-        if (!initialData && !formData.shopName && user?.shippingAddresses && user.shippingAddresses.length > 0) {
+        if (!initialData && !formData.shopName && activeShippingAddresses.length > 0) {
             // 使用 setTimeout 避免同步触发 cascading renders 警告
             const timeoutId = setTimeout(() => {
                 setFormData((prev: Partial<BrushOrderPlan>) => ({ 
                     ...prev, 
-                    shopName: user.shippingAddresses![0].label
+                    shopName: activeShippingAddresses[0].label
                 }));
             }, 0);
             return () => clearTimeout(timeoutId);
         }
-    }, [user, initialData, formData.shopName]);
+    }, [activeShippingAddresses, initialData, formData.shopName]);
 
     const handleBatchAdd = (selectedProducts: Product[], platform: string) => {
         const newItems = [...(formData.items || [])];
@@ -192,7 +197,7 @@ export function PlanModal({ isOpen, onClose, onSubmit, initialData, readOnly = f
                                             </label>
                                             <CustomSelect
                                                 options={[
-                                                    ...(user?.shippingAddresses?.map((addr: AddressItem) => ({
+                                                    ...(activeShippingAddresses.map((addr: AddressItem) => ({
                                                         value: addr.label,
                                                         label: addr.label
                                                     })) || [])

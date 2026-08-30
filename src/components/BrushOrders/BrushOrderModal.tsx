@@ -11,6 +11,7 @@ import { CustomSelect } from "@/components/ui/CustomSelect";
 import { ProductSelectionModal } from "../Purchases/ProductSelectionModal";
 import { useToast } from "@/components/ui/Toast";
 import { useUser } from "@/hooks/useUser";
+import { isAddressDisabled } from "@/lib/addressBook";
 
 interface BrushOrderModalProps {
   isOpen: boolean;
@@ -28,7 +29,7 @@ export function BrushOrderModal({ isOpen, onClose, onSubmit, initialData, readOn
     const typedUser = user as unknown as UserType;
     // 直接将地址库的 Label 作为店铺列表
     const shopList = useMemo(
-      () => typedUser?.shippingAddresses?.map(addr => ({ id: addr.id, name: addr.label, isDefault: addr.isDefault })) || [],
+      () => typedUser?.shippingAddresses?.filter((addr) => !isAddressDisabled(addr)).map(addr => ({ id: addr.id, name: addr.label, isDefault: addr.isDefault })) || [],
       [typedUser?.shippingAddresses]
     );
 

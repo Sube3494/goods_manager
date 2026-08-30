@@ -24,6 +24,7 @@ import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { formatLocalDateTime, formatLocalDate } from "@/lib/dateUtils";
 import { sortPurchaseItems } from "@/lib/pinyin";
 import { isPurchaseStatusFilter, PurchaseStatusFilter } from "@/lib/purchases";
+import { isAddressDisabled } from "@/lib/addressBook";
 
 function sortPurchasesByRecency(items: PurchaseOrder[]) {
   return [...items].sort((a, b) => {
@@ -771,7 +772,8 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
           if (specificPO) {
             displayAddress = specificPO.shippingAddress || "";
           } else if (targets.length > 0) {
-            const defaultAddr = (typedUser?.shippingAddresses || []).find((a) => a.isDefault)?.address;
+            const activeAddresses = (typedUser?.shippingAddresses || []).filter((address) => !isAddressDisabled(address));
+            const defaultAddr = activeAddresses.find((a) => a.isDefault)?.address || activeAddresses[0]?.address;
             displayAddress = targets[0].shippingAddress || defaultAddr || "";
           }
         }
@@ -1268,7 +1270,8 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
         if (specificPO) {
           displayAddress = specificPO.shippingAddress || "";
         } else if (targets.length > 0) {
-          const defaultAddr = (typedUser?.shippingAddresses || []).find(a => a.isDefault)?.address;
+          const activeAddresses = (typedUser?.shippingAddresses || []).filter((address) => !isAddressDisabled(address));
+          const defaultAddr = activeAddresses.find(a => a.isDefault)?.address || activeAddresses[0]?.address;
           displayAddress = targets[0].shippingAddress || defaultAddr || "";
         }
       }

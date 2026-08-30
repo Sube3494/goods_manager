@@ -13,6 +13,7 @@ import { DatePicker } from "@/components/ui/DatePicker";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { useUser } from "@/hooks/useUser";
 import { hasPermission, SessionUser } from "@/lib/permissions";
+import { isAddressDisabled } from "@/lib/addressBook";
 
 
 export default function BrushPlansPage() {
@@ -27,6 +28,10 @@ export default function BrushPlansPage() {
     const [filterDate, setFilterDate] = useState("");
     const [filterShop, setFilterShop] = useState("");
     const [filterPlatform, setFilterPlatform] = useState("");
+    const activeShippingAddresses = useMemo(
+        () => (user?.shippingAddresses || []).filter((address) => !isAddressDisabled(address)),
+        [user?.shippingAddresses]
+    );
 
     const [confirmConfig, setConfirmConfig] = useState<{
         isOpen: boolean;
@@ -276,12 +281,12 @@ export default function BrushPlansPage() {
                             triggerClassName="rounded-full h-full text-sm"
                         />
                     </div>
-                    {user?.shippingAddresses && user.shippingAddresses.length > 0 ? (
+                    {activeShippingAddresses.length > 0 ? (
                         <div className="h-12 min-w-0">
                             <CustomSelect
                                 options={[
                                     { value: "", label: "所有店铺" },
-                                    ...user.shippingAddresses.map(addr => ({ value: addr.label, label: addr.label }))
+                                    ...activeShippingAddresses.map(addr => ({ value: addr.label, label: addr.label }))
                                 ]}
                                 value={filterShop}
                                 onChange={(val) => setFilterShop(val)}
