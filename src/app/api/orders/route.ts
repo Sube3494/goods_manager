@@ -1047,6 +1047,12 @@ export async function GET(request: NextRequest) {
     const page = Math.max(1, Number(searchParams.get("page") || 1));
     const pageSize = Math.min(10000, Math.max(1, Number(searchParams.get("pageSize") || 20)));
     const query = String(searchParams.get("query") || "").trim();
+    const requestedOrderIds = Array.from(new Set(
+      String(searchParams.get("ids") || "")
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean)
+    )).slice(0, 100);
     const platform = String(searchParams.get("platform") || "").trim();
     const status = String(searchParams.get("status") || "").trim();
     const productCostStatusFilter = status === "pending-outbound" || status === "pending-backfill"
@@ -1096,6 +1102,7 @@ export async function GET(request: NextRequest) {
 
     const baseWhereWithoutShop: Prisma.AutoPickOrderWhereInput = {
       userId: targetUserId,
+      ...(requestedOrderIds.length > 0 ? { id: { in: requestedOrderIds } } : {}),
       ...(startDate || endDate ? {
         orderTime: {
           ...(startDate ? { gte: parseAsShanghaiTime(startDate) } : {}),
