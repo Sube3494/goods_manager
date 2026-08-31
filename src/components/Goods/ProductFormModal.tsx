@@ -96,21 +96,43 @@ type BatchOutboundTrace = {
     netQuantity: number;
     totalCost: number;
   };
-  items: Array<{
-    outboundOrderId: string;
-    outboundOrderItemId: string;
+  orders: Array<{
+    key: string;
+    orderNo?: string | null;
     date: string;
     status: string;
-    orderNo?: string | null;
     platform?: string | null;
     shopName?: string | null;
-    productName: string;
-    sku?: string | null;
-    quantity: number;
+    outboundOrderId: string;
+    batchQuantity: number;
     returnedQuantity: number;
     netQuantity: number;
-    unitCost: number;
-    totalCost: number;
+    batchCost: number;
+    salesOrder?: {
+      id: string;
+      platform: string;
+      dailyPlatformSequence: number;
+      orderNo: string;
+      orderTime: string;
+      status?: string | null;
+      actualPaid: number;
+      expectedIncome?: number | null;
+      userAddress: string;
+      customerRemark?: string | null;
+      items: Array<{
+        id: string;
+        productName: string;
+        productNo?: string | null;
+        quantity: number;
+        thumb?: string | null;
+      }>;
+    } | null;
+    outboundItems: Array<{
+      outboundOrderItemId: string;
+      productName: string;
+      sku?: string | null;
+      quantity: number;
+    }>;
   }>;
 };
 
@@ -262,12 +284,12 @@ export function ProductFormModal({
       const res = await fetch(`/api/purchases/items/${purchaseOrderItemId}/outbounds`, { cache: "no-store" });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
-        throw new Error(data?.error || "查询批次出库记录失败");
+        throw new Error(data?.error || "查询关联订单失败");
       }
       setViewingBatchTrace(data);
     } catch (error) {
       console.error("Failed to fetch batch outbound trace:", error);
-      showToast(error instanceof Error ? error.message : "查询批次出库记录失败", "error");
+      showToast(error instanceof Error ? error.message : "查询关联订单失败", "error");
       setIsBatchTraceOpen(false);
     } finally {
       setIsLoadingBatchTrace(false);
@@ -2313,7 +2335,7 @@ export function ProductFormModal({
                     <div className="flex max-h-[88dvh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-border bg-white shadow-2xl dark:border-white/10 dark:bg-gray-900">
                         <div className="flex items-start justify-between gap-4 border-b border-border/70 px-5 py-4 dark:border-white/10 sm:px-6">
                             <div className="min-w-0">
-                                <h3 className="text-base font-black text-foreground">批次出库记录</h3>
+                                <h3 className="text-base font-black text-foreground">关联销售订单</h3>
                                 <p className="mt-1 line-clamp-2 text-xs font-bold leading-relaxed text-muted-foreground">
                                     {viewingBatchTrace?.purchaseItem?.shopProduct?.productName || viewingBatchTrace?.purchaseItem?.product?.name || "入库批次"}
                                     {viewingBatchTrace?.purchaseItem?.shopProduct?.sku || viewingBatchTrace?.purchaseItem?.product?.sku
@@ -2334,7 +2356,7 @@ export function ProductFormModal({
                         {isLoadingBatchTrace ? (
                             <div className="flex h-56 items-center justify-center text-xs font-medium text-muted-foreground">
                                 <RotateCw size={16} className="mr-2 animate-spin" />
-                                正在查询出库流向...
+                                正在筛选关联订单...
                             </div>
                         ) : viewingBatchTrace ? (
                             <>
@@ -2353,55 +2375,77 @@ export function ProductFormModal({
                                 </div>
 
                                 <div className="overflow-y-auto p-4 sm:p-5">
-                                    {viewingBatchTrace.items.length > 0 ? (
+                                    {viewingBatchTrace.orders.length > 0 ? (
                                         <div className="space-y-3">
-                                            {viewingBatchTrace.items.map((item) => (
-                                                <div key={`${item.outboundOrderId}-${item.outboundOrderItemId}`} className="rounded-2xl border border-border/70 bg-muted/30 p-4 text-xs shadow-sm dark:border-white/10 dark:bg-white/5">
-                                                    <div className="flex flex-col gap-4 md:flex-row md:items-stretch md:justify-between">
-                                                        <div className="min-w-0 flex-1">
-                                                            <div className="flex flex-wrap items-start gap-2">
-                                                                <span className="line-clamp-2 text-sm font-black leading-snug text-foreground">{item.productName}</span>
-                                                                {item.status === "Returned" ? (
-                                                                    <span className="shrink-0 rounded bg-slate-500/10 px-2 py-0.5 text-[10px] font-bold text-slate-600 dark:text-slate-300">已退回</span>
-                                                                ) : item.returnedQuantity > 0 ? (
-                                                                    <span className="shrink-0 rounded bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold text-amber-600 dark:text-amber-300">部分退回</span>
-                                                                ) : null}
-                                                            </div>
-                                                            {item.sku ? (
-                                                                <div className="mt-2">
-                                                                    <span className="rounded bg-muted px-2 py-0.5 font-mono text-[11px] font-bold text-muted-foreground dark:bg-white/10">#{item.sku}</span>
-                                                                </div>
+                                            {viewingBatchTrace.orders.map((entry) => (
+                                                <article key={entry.key} className="overflow-hidden rounded-2xl border border-border/70 bg-muted/30 shadow-sm dark:border-white/10 dark:bg-white/5">
+                                                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 px-4 py-3 dark:border-white/10">
+                                                        <div className="flex min-w-0 flex-wrap items-center gap-2">
+                                                            <span className="rounded-full border border-border bg-background px-2.5 py-1 text-xs font-black text-foreground dark:border-white/10 dark:bg-black/20">
+                                                                #{entry.salesOrder?.dailyPlatformSequence || 0}
+                                                            </span>
+                                                            <span className="text-xs font-bold text-foreground">{entry.salesOrder?.platform || entry.platform || "销售订单"}</span>
+                                                            {entry.shopName ? <span className="text-xs text-muted-foreground">{entry.shopName}</span> : null}
+                                                            {entry.returnedQuantity > 0 ? (
+                                                                <span className="rounded bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold text-amber-600 dark:text-amber-300">已退 {entry.returnedQuantity}</span>
                                                             ) : null}
-                                                            <div className="mt-3 space-y-1 text-[11px] font-medium leading-relaxed text-muted-foreground">
-                                                                <div>{new Date(item.date).toLocaleString()}</div>
-                                                                {(item.platform || item.shopName) ? (
-                                                                    <div>{[item.platform, item.shopName].filter(Boolean).join(" · ")}</div>
-                                                                ) : null}
-                                                                {item.orderNo ? <div>平台单号 {item.orderNo}</div> : null}
-                                                                <div className="break-all font-mono text-[10px]">出库单 {item.outboundOrderId}</div>
-                                                            </div>
                                                         </div>
-                                                        <div className="grid grid-cols-3 gap-2 md:w-[270px] md:shrink-0">
-                                                            <div className="rounded-xl bg-white/70 px-3 py-3 text-right dark:bg-gray-950/25">
-                                                                <div className="text-[10px] font-bold text-muted-foreground">扣批次</div>
-                                                                <div className="mt-1 text-lg font-black leading-none tabular-nums text-foreground">{item.quantity}</div>
+                                                        <span className="text-[11px] font-medium text-muted-foreground">
+                                                            {new Date(entry.salesOrder?.orderTime || entry.date).toLocaleString()}
+                                                        </span>
+                                                    </div>
+
+                                                    <div className="p-4">
+                                                        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                                                            <div className="min-w-0 flex-1">
+                                                                <div className="text-sm font-black text-foreground">订单号 {entry.salesOrder?.orderNo || entry.orderNo || "未关联平台单号"}</div>
+                                                                {entry.salesOrder?.items?.length ? (
+                                                                    <div className="mt-3 space-y-2">
+                                                                        {entry.salesOrder.items.map((orderItem) => (
+                                                                            <div key={orderItem.id} className="flex items-center justify-between gap-3 text-xs">
+                                                                                <div className="min-w-0">
+                                                                                    <div className="truncate font-bold text-foreground">{orderItem.productName}</div>
+                                                                                    {orderItem.productNo ? <div className="mt-0.5 truncate text-[10px] text-muted-foreground">{orderItem.productNo}</div> : null}
+                                                                                </div>
+                                                                                <span className="shrink-0 font-black tabular-nums text-foreground">x{orderItem.quantity}</span>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="mt-3 space-y-2">
+                                                                        {entry.outboundItems.map((outboundItem) => (
+                                                                            <div key={outboundItem.outboundOrderItemId} className="flex items-center justify-between gap-3 text-xs">
+                                                                                <span className="min-w-0 truncate font-bold text-foreground">{outboundItem.productName}</span>
+                                                                                <span className="shrink-0 font-black tabular-nums text-foreground">x{outboundItem.quantity}</span>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                )}
+                                                                {entry.salesOrder?.userAddress ? <div className="mt-3 line-clamp-2 text-[11px] leading-relaxed text-muted-foreground">{entry.salesOrder.userAddress}</div> : null}
                                                             </div>
-                                                            <div className="rounded-xl bg-white/70 px-3 py-3 text-right dark:bg-gray-950/25">
-                                                                <div className="text-[10px] font-bold text-muted-foreground">已退</div>
-                                                                <div className="mt-1 text-lg font-black leading-none tabular-nums text-foreground">{item.returnedQuantity}</div>
-                                                            </div>
-                                                            <div className="rounded-xl bg-white/70 px-3 py-3 text-right dark:bg-gray-950/25">
-                                                                <div className="text-[10px] font-bold text-muted-foreground">成本</div>
-                                                                <div className="mt-1 text-lg font-black leading-none tabular-nums text-foreground">￥{item.totalCost.toFixed(2)}</div>
+
+                                                            <div className="grid grid-cols-3 gap-2 md:w-[270px] md:shrink-0">
+                                                                <div className="rounded-xl bg-background/80 px-3 py-3 text-right dark:bg-black/20">
+                                                                    <div className="text-[10px] font-bold text-muted-foreground">本批次</div>
+                                                                    <div className="mt-1 text-lg font-black leading-none tabular-nums text-foreground">{entry.batchQuantity}</div>
+                                                                </div>
+                                                                <div className="rounded-xl bg-background/80 px-3 py-3 text-right dark:bg-black/20">
+                                                                    <div className="text-[10px] font-bold text-muted-foreground">订单金额</div>
+                                                                    <div className="mt-1 text-base font-black leading-none tabular-nums text-foreground">￥{((entry.salesOrder?.expectedIncome ?? entry.salesOrder?.actualPaid ?? 0) / 100).toFixed(2)}</div>
+                                                                </div>
+                                                                <div className="rounded-xl bg-background/80 px-3 py-3 text-right dark:bg-black/20">
+                                                                    <div className="text-[10px] font-bold text-muted-foreground">批次成本</div>
+                                                                    <div className="mt-1 text-base font-black leading-none tabular-nums text-foreground">￥{entry.batchCost.toFixed(2)}</div>
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     </div>
-                                                </div>
+                                                </article>
                                             ))}
                                         </div>
                                     ) : (
                                         <div className="rounded-xl border border-dashed border-border py-10 text-center text-xs text-muted-foreground dark:border-white/10">
-                                            这批货还没有关联到任何出库记录
+                                            这批货还没有关联到任何销售订单
                                         </div>
                                     )}
                                 </div>

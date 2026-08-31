@@ -163,6 +163,78 @@ export async function GET(
       });
     });
 
+    const orderNos = Array.from(new Set(rows.map((row) => row.orderNo).filter((value): value is string => Boolean(value))));
+    const salesOrders = orderNos.length > 0 ? await prisma.autoPickOrder.findMany({
+      where: {
+        userId: user.id,
+        orderNo: { in: orderNos },
+      },
+      select: {
+        id: true,
+        platform: true,
+        dailyPlatformSequence: true,
+        orderNo: true,
+        orderTime: true,
+        status: true,
+        actualPaid: true,
+        expectedIncome: true,
+        userAddress: true,
+        customerRemark: true,
+        items: {
+          select: {
+            id: true,
+            productName: true,
+            productNo: true,
+            quantity: true,
+            thumb: true,
+          },
+        },
+      },
+    }) : [];
+    const salesOrderByNo = new Map(salesOrders.map((order) => [order.orderNo, order]));
+    const groupedOrders = Array.from(rows.reduce((map, row) => {
+      const key = row.orderNo || row.outboundOrderId;
+      const current = map.get(key);
+      if (current) {
+        current.batchQuantity += row.quantity;
+        current.returnedQuantity += row.returnedQuantity;
+        current.netQuantity += row.netQuantity;
+        current.batchCost += row.totalCost;
+        current.outboundItems.push(row);
+        return map;
+      }
+      map.set(key, {
+        key,
+        salesOrder: row.orderNo ? salesOrderByNo.get(row.orderNo) || null : null,
+        orderNo: row.orderNo,
+        platform: row.platform,
+        shopName: row.shopName,
+        date: row.date,
+        status: row.status,
+        outboundOrderId: row.outboundOrderId,
+        batchQuantity: row.quantity,
+        returnedQuantity: row.returnedQuantity,
+        netQuantity: row.netQuantity,
+        batchCost: row.totalCost,
+        outboundItems: [row],
+      });
+      return map;
+    }, new Map<string, {
+      key: string;
+      salesOrder: (typeof salesOrders)[number] | null;
+      orderNo: string | null;
+      platform: string | null;
+      shopName: string | null;
+      date: Date;
+      status: string;
+      outboundOrderId: string;
+      batchQuantity: number;
+      returnedQuantity: number;
+      netQuantity: number;
+      batchCost: number;
+      outboundItems: typeof rows;
+    }>()).values()).sort((a, b) => new Date(b.salesOrder?.orderTime || b.date).getTime() - new Date(a.salesOrder?.orderTime || a.date).getTime());
+
     const totals = rows.reduce((acc, row) => {
       acc.outboundQuantity += row.quantity;
       acc.returnedQuantity += row.returnedQuantity;
@@ -181,7 +253,7 @@ export async function GET(
     return NextResponse.json({
       purchaseItem,
       totals,
-      items: rows,
+      orders: groupedOrders,
     });
   } catch (error) {
     console.error("Failed to fetch purchase item outbound trace:", error);
