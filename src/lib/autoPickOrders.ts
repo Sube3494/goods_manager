@@ -2,7 +2,7 @@ import prisma from "@/lib/prisma";
 import { formatLocalDate, parseAsShanghaiTime } from "@/lib/dateUtils";
 import { getBaseAutoPickStatusDisplay, hasAutoPickCompletionProof, isAutoPickOrderAbnormalStatus, isAutoPickOrderCancelledStatus, isAutoPickOrderCompletedStatus, isAutoPickOrderDeletedStatus, isAutoPickOrderDeliveringStatus, isAutoPickOrderTerminalStatus, isAutoPickOtherPickupOrder, isAutoPickPickupOrder, resolveAutoPickBusinessStatus } from "@/lib/autoPickOrderStatus";
 import { Prisma } from "../../prisma/generated-client";
-import { createHash, randomBytes } from "crypto";
+import { createHash, randomBytes, randomUUID } from "crypto";
 import { AutoPickIntegrationConfig, AutoPickMaiyatianShop, AutoPickMaiyatianShopMapping, AutoPickSelfDeliveryTimingConfig } from "@/lib/types";
 import { InventoryService } from "@/services/inventoryService";
 import { emitAutoPickOrderEvent } from "@/lib/autoPickOrderEvents";
@@ -3415,6 +3415,7 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
         rawPayload: true,
         items: {
           select: {
+            id: true,
             productName: true,
             productNo: true,
             platformSkuId: true,
@@ -3529,9 +3530,11 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
       ...nextRawPayload,
       systemMeta: nextSystemMeta,
     };
-    const exactQueue = new Map<string, Array<unknown>>();
-    const productNoQueue = new Map<string, Array<unknown>>();
-    const fallbackQueue: Array<unknown> = [];
+    type ExistingSyncedItem = NonNullable<typeof existing>["items"][number];
+    const exactQueue = new Map<string, ExistingSyncedItem[]>();
+    const productNoQueue = new Map<string, ExistingSyncedItem[]>();
+    const fallbackQueue: ExistingSyncedItem[] = [];
+    const usedExistingItemIds = new Set<string>();
 
     for (const currentItem of existing?.items || []) {
       const pName = String(currentItem.productName || "").trim().toLowerCase();
@@ -3542,20 +3545,31 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
       const exactKey = `${pName}::${pNo}::${pQty}`;
 
       if (!exactQueue.has(exactKey)) exactQueue.set(exactKey, []);
-      exactQueue.get(exactKey)!.push(currentItem.rawPayload);
+      exactQueue.get(exactKey)!.push(currentItem);
 
       if (pNo) {
         if (!productNoQueue.has(pNo)) productNoQueue.set(pNo, []);
-        productNoQueue.get(pNo)!.push(currentItem.rawPayload);
+        productNoQueue.get(pNo)!.push(currentItem);
       }
 
       if (platformSkuId) {
         if (!productNoQueue.has(platformSkuId)) productNoQueue.set(platformSkuId, []);
-        productNoQueue.get(platformSkuId)!.push(currentItem.rawPayload);
+        productNoQueue.get(platformSkuId)!.push(currentItem);
       }
 
-      fallbackQueue.push(currentItem.rawPayload);
+      fallbackQueue.push(currentItem);
     }
+
+    const takeUnusedItem = (queue: ExistingSyncedItem[] | undefined) => {
+      while (queue?.length) {
+        const candidate = queue.shift();
+        if (candidate && !usedExistingItemIds.has(candidate.id)) {
+          usedExistingItemIds.add(candidate.id);
+          return candidate;
+        }
+      }
+      return undefined;
+    };
 
     const items = normalizedItems.map((item) => {
       const pName = String(item.productName || "").trim().toLowerCase();
@@ -3564,12 +3578,14 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
 
       const exactKey = `${pName}::${pNo}::${pQty}`;
 
-      const preservedRawPayload =
-        exactQueue.get(exactKey)?.shift() ||
-        (pNo ? productNoQueue.get(pNo)?.shift() : undefined) ||
-        (normalizedItems.length === (existing?.items?.length || 0) ? fallbackQueue.shift() : undefined);
+      const preservedItem =
+        takeUnusedItem(exactQueue.get(exactKey)) ||
+        (pNo ? takeUnusedItem(productNoQueue.get(pNo)) : undefined) ||
+        (normalizedItems.length === (existing?.items?.length || 0) ? takeUnusedItem(fallbackQueue) : undefined);
+      const preservedRawPayload = preservedItem?.rawPayload;
 
       return {
+        id: preservedItem?.id,
         productName: item.productName,
         productNo: item.productNo,
         platformSkuId: item.platformSkuId || resolveAutoPickItemPlatformSkuId(normalized.platform, item.rawPayload) || (
@@ -3659,8 +3675,14 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
       data: {
         ...updateData,
         items: {
-          deleteMany: {},
-          create: items,
+          deleteMany: {
+            id: { notIn: items.map((item) => item.id).filter((id): id is string => Boolean(id)) },
+          },
+          upsert: items.map(({ id: existingItemId, ...item }) => ({
+            where: { id: existingItemId || randomUUID() },
+            update: item,
+            create: item,
+          })),
         },
       },
       include: {
