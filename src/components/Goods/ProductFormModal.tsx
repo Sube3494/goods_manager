@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
-import { X, Check, CheckCircle, Package, Tag, Truck, FileText, Camera, Plus, ChevronLeft, ChevronRight, ChevronDown, Eye, Crown, Activity, RotateCw, Trash2, Calendar, Pencil } from "lucide-react";
+import { X, Check, CheckCircle, Package, Tag, Truck, FileText, Camera, Plus, ChevronLeft, ChevronRight, ChevronDown, Eye, Crown, Activity, RotateCw, Trash2, Calendar, Pencil, ArrowUpRight } from "lucide-react";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { Switch } from "@/components/ui/Switch";
 import { DatePicker } from "@/components/ui/DatePicker";
@@ -78,6 +78,41 @@ function formatInitialTaobaoSkuValue(initialData?: Product | null) {
 function formatInitialDoudianSkuValue(initialData?: Product | null) {
   return initialData?.doudianSkuId || "";
 }
+
+type BatchOutboundTrace = {
+  purchaseItem?: {
+    id: string;
+    quantity: number;
+    remainingQuantity?: number | null;
+    costPrice: number;
+    product?: { name?: string | null; sku?: string | null } | null;
+    shopProduct?: { productName?: string | null; sku?: string | null; shop?: { name?: string | null } | null } | null;
+  };
+  totals: {
+    inboundQuantity: number;
+    remainingQuantity?: number | null;
+    outboundQuantity: number;
+    returnedQuantity: number;
+    netQuantity: number;
+    totalCost: number;
+  };
+  items: Array<{
+    outboundOrderId: string;
+    outboundOrderItemId: string;
+    date: string;
+    status: string;
+    orderNo?: string | null;
+    platform?: string | null;
+    shopName?: string | null;
+    productName: string;
+    sku?: string | null;
+    quantity: number;
+    returnedQuantity: number;
+    netQuantity: number;
+    unitCost: number;
+    totalCost: number;
+  }>;
+};
 
 function parseShelfLife(daysStr: string): { value: string; unit: "天" | "月" | "年" } {
   const days = parseInt(daysStr, 10);
@@ -214,6 +249,30 @@ export function ProductFormModal({
   const [editingCostValue, setEditingCostValue] = useState<string>("");
   const [isSavingCost, setIsSavingCost] = useState<boolean>(false);
   const [viewingPurchase, setViewingPurchase] = useState<PurchaseOrder | null>(null);
+  const [viewingBatchTrace, setViewingBatchTrace] = useState<BatchOutboundTrace | null>(null);
+  const [isBatchTraceOpen, setIsBatchTraceOpen] = useState(false);
+  const [isLoadingBatchTrace, setIsLoadingBatchTrace] = useState(false);
+
+  const openBatchTrace = async (purchaseOrderItemId: string) => {
+    if (!purchaseOrderItemId) return;
+    setIsBatchTraceOpen(true);
+    setIsLoadingBatchTrace(true);
+    setViewingBatchTrace(null);
+    try {
+      const res = await fetch(`/api/purchases/items/${purchaseOrderItemId}/outbounds`, { cache: "no-store" });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(data?.error || "查询批次出库记录失败");
+      }
+      setViewingBatchTrace(data);
+    } catch (error) {
+      console.error("Failed to fetch batch outbound trace:", error);
+      showToast(error instanceof Error ? error.message : "查询批次出库记录失败", "error");
+      setIsBatchTraceOpen(false);
+    } finally {
+      setIsLoadingBatchTrace(false);
+    }
+  };
 
   const handleSaveCost = async (purchaseOrderItemId: string, orderId: string) => {
     const costPrice = Number(editingCostValue);
@@ -1570,6 +1629,17 @@ export function ProductFormModal({
                                                                 </span>
                                                             )}
                                                         </div>
+                                                        {order.status === "Received" && itemId ? (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => void openBatchTrace(itemId)}
+                                                                className="inline-flex items-center gap-1 rounded-full border border-sky-500/15 bg-sky-500/10 px-2 py-0.5 text-[10px] font-bold text-sky-600 transition hover:bg-sky-500/15 dark:text-sky-300"
+                                                                title="查看这批入库货的出库流向"
+                                                            >
+                                                                出库
+                                                                <ArrowUpRight size={10} />
+                                                            </button>
+                                                        ) : null}
                                                         {order.status === "Received" ? (
                                                             editingItemId === itemId ? (
                                                                 <div className="flex items-center gap-1 mt-0.5 justify-end" onClick={(e) => e.stopPropagation()}>
@@ -2235,6 +2305,104 @@ export function ProductFormModal({
                 onClose={() => setIsSupplierModalOpen(false)}
                 onSubmit={handleCreateSupplier}
             />
+
+            {isBatchTraceOpen && (
+                <div className="fixed inset-0 z-100000 flex items-center justify-center bg-black/50 p-3 backdrop-blur-sm sm:p-4">
+                    <div className="flex max-h-[86dvh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-border bg-white shadow-2xl dark:border-white/10 dark:bg-gray-900">
+                        <div className="flex items-start justify-between gap-3 border-b border-border/70 px-4 py-3 dark:border-white/10 sm:px-5">
+                            <div className="min-w-0">
+                                <h3 className="text-sm font-black text-foreground">批次出库记录</h3>
+                                <p className="mt-1 truncate text-xs text-muted-foreground">
+                                    {viewingBatchTrace?.purchaseItem?.shopProduct?.productName || viewingBatchTrace?.purchaseItem?.product?.name || "入库批次"}
+                                    {viewingBatchTrace?.purchaseItem?.shopProduct?.sku || viewingBatchTrace?.purchaseItem?.product?.sku
+                                        ? ` · ${viewingBatchTrace?.purchaseItem?.shopProduct?.sku || viewingBatchTrace?.purchaseItem?.product?.sku}`
+                                        : ""}
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setIsBatchTraceOpen(false)}
+                                className="rounded-full p-2 text-muted-foreground transition hover:bg-black/5 hover:text-foreground dark:hover:bg-white/10"
+                                aria-label="关闭"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        {isLoadingBatchTrace ? (
+                            <div className="flex h-56 items-center justify-center text-xs font-medium text-muted-foreground">
+                                <RotateCw size={16} className="mr-2 animate-spin" />
+                                正在查询出库流向...
+                            </div>
+                        ) : viewingBatchTrace ? (
+                            <>
+                                <div className="grid grid-cols-4 gap-2 border-b border-border/70 p-3 text-xs dark:border-white/10 sm:p-4">
+                                    {[
+                                        { label: "入库", value: viewingBatchTrace.totals.inboundQuantity },
+                                        { label: "剩余", value: viewingBatchTrace.totals.remainingQuantity ?? "-" },
+                                        { label: "出库", value: viewingBatchTrace.totals.outboundQuantity },
+                                        { label: "净出库", value: viewingBatchTrace.totals.netQuantity },
+                                    ].map((item) => (
+                                        <div key={item.label} className="rounded-xl border border-border/70 bg-muted/30 px-3 py-2 dark:border-white/10 dark:bg-white/5">
+                                            <div className="text-[10px] font-bold text-muted-foreground">{item.label}</div>
+                                            <div className="mt-0.5 text-base font-black tabular-nums text-foreground">{item.value}</div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <div className="overflow-y-auto p-3 sm:p-4">
+                                    {viewingBatchTrace.items.length > 0 ? (
+                                        <div className="space-y-2">
+                                            {viewingBatchTrace.items.map((item) => (
+                                                <div key={`${item.outboundOrderId}-${item.outboundOrderItemId}`} className="rounded-xl border border-border/70 bg-white p-3 text-xs dark:border-white/10 dark:bg-white/5">
+                                                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                                                        <div className="min-w-0">
+                                                            <div className="flex flex-wrap items-center gap-1.5">
+                                                                <span className="font-bold text-foreground">{item.productName}</span>
+                                                                {item.sku ? <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">#{item.sku}</span> : null}
+                                                                {item.status === "Returned" ? (
+                                                                    <span className="rounded bg-slate-500/10 px-1.5 py-0.5 text-[10px] font-bold text-slate-600 dark:text-slate-300">已退回</span>
+                                                                ) : item.returnedQuantity > 0 ? (
+                                                                    <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-bold text-amber-600 dark:text-amber-300">部分退回</span>
+                                                                ) : null}
+                                                            </div>
+                                                            <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
+                                                                <span>{new Date(item.date).toLocaleString()}</span>
+                                                                {item.platform ? <span>{item.platform}</span> : null}
+                                                                {item.shopName ? <span>{item.shopName}</span> : null}
+                                                                {item.orderNo ? <span>平台单号 {item.orderNo}</span> : null}
+                                                            </div>
+                                                            <div className="mt-1 truncate font-mono text-[10px] text-muted-foreground">出库单 {item.outboundOrderId}</div>
+                                                        </div>
+                                                        <div className="grid grid-cols-3 gap-1.5 text-right sm:min-w-[220px]">
+                                                            <div className="rounded-lg bg-muted/40 px-2 py-1.5">
+                                                                <div className="text-[10px] text-muted-foreground">扣批次</div>
+                                                                <div className="font-black tabular-nums text-foreground">{item.quantity}</div>
+                                                            </div>
+                                                            <div className="rounded-lg bg-muted/40 px-2 py-1.5">
+                                                                <div className="text-[10px] text-muted-foreground">已退</div>
+                                                                <div className="font-black tabular-nums text-foreground">{item.returnedQuantity}</div>
+                                                            </div>
+                                                            <div className="rounded-lg bg-muted/40 px-2 py-1.5">
+                                                                <div className="text-[10px] text-muted-foreground">成本</div>
+                                                                <div className="font-black tabular-nums text-foreground">￥{item.totalCost.toFixed(2)}</div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="rounded-xl border border-dashed border-border py-10 text-center text-xs text-muted-foreground dark:border-white/10">
+                                            这批货还没有关联到任何出库记录
+                                        </div>
+                                    )}
+                                </div>
+                            </>
+                        ) : null}
+                    </div>
+                </div>
+            )}
 
             <PurchaseOrderModal
                 isOpen={Boolean(viewingPurchase)}

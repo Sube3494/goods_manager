@@ -12,6 +12,7 @@ import {
   unbindMeituanSkuIdForShopProduct,
   unbindTaobaoSkuIdForShopProduct,
 } from "@/lib/autoPickOrders";
+import { returnOutboundOrderById } from "@/lib/outboundReturns";
 
 function readRawPayloadRecord(rawPayload: unknown) {
   return rawPayload && typeof rawPayload === "object" && !Array.isArray(rawPayload)
@@ -338,10 +339,13 @@ export async function PATCH(
 
     const targetUserId = orderItem.order.userId || user.id;
 
-    const deleteLegacyOutbound = async (tx: any, orderNo: string) => {
-      const existingOutbounds = await tx.outboundOrder.findMany({
+    const returnLegacyOutbound = async (orderNo: string) => {
+      const existingOutbounds = await prisma.outboundOrder.findMany({
         where: {
           userId: targetUserId,
+          status: {
+            not: "Returned",
+          },
           note: {
             contains: `平台单号: ${orderNo}`,
             mode: "insensitive",
@@ -356,12 +360,8 @@ export async function PATCH(
         return match[1].toLowerCase() === orderNo.toLowerCase();
       });
 
-      if (filteredOutbounds.length > 0) {
-        await tx.outboundOrder.deleteMany({
-          where: {
-            id: { in: filteredOutbounds.map((o: any) => o.id) },
-          },
-        });
+      for (const outbound of filteredOutbounds) {
+        await returnOutboundOrderById(targetUserId, outbound.id, "订单商品重匹配自动回滚旧出库");
       }
     };
     const basePayload = readRawPayloadRecord(orderItem.rawPayload);
@@ -398,10 +398,11 @@ export async function PATCH(
             rawPayload: (Object.keys(nextPayload).length > 0 ? nextPayload : Prisma.JsonNull) as Prisma.InputJsonValue,
           },
         });
-        if (!deferAutoOutbound) {
-          await deleteLegacyOutbound(tx, orderItem.order.orderNo);
-        }
       });
+
+      if (!deferAutoOutbound) {
+        await returnLegacyOutbound(orderItem.order.orderNo);
+      }
 
       if (currentPlatformSkuId && previousShopProductIds.length > 0) {
         for (const oldShopProductId of previousShopProductIds) {
@@ -505,8 +506,9 @@ export async function PATCH(
             } as Prisma.InputJsonValue,
           },
         });
-        await deleteLegacyOutbound(tx, orderItem.order.orderNo);
       });
+
+      await returnLegacyOutbound(orderItem.order.orderNo);
 
       const newShopProductIds = new Set(shopProducts.map((p) => p.id));
       if (currentPlatformSkuId && previousShopProductIds.length > 0) {
@@ -584,8 +586,9 @@ export async function PATCH(
             rawPayload: (Object.keys(restPayload).length > 0 ? restPayload : Prisma.JsonNull) as Prisma.InputJsonValue,
           },
         });
-        await deleteLegacyOutbound(tx, orderItem.order.orderNo);
       });
+
+      await returnLegacyOutbound(orderItem.order.orderNo);
 
       const isCompositeItemSku = /[+＋]/.test(String(orderItem.productNo || ""));
       if (!isCompositeItemSku) {
@@ -645,10 +648,11 @@ export async function PATCH(
           } as Prisma.InputJsonValue,
         },
       });
-      if (!deferAutoOutbound) {
-        await deleteLegacyOutbound(tx, orderItem.order.orderNo);
-      }
     });
+
+    if (!deferAutoOutbound) {
+      await returnLegacyOutbound(orderItem.order.orderNo);
+    }
 
     if (currentPlatformSkuId && previousShopProductIds.length > 0) {
       const unbindOldIds = previousShopProductIds.filter((oldId) => oldId !== shopProduct.id);
