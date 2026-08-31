@@ -1551,20 +1551,20 @@ function FactoryShipmentFilters({
   productFilter: string[];
   productOptions: { value: string; label: string }[];
   viewSwitcher?: ReactNode;
-  customerGroupFilter: string;
+  customerGroupFilter: string[];
   customerGroupOptions: { value: string; label: string }[];
   shippingFilter: string[];
-  paymentFilter: string;
-  compensationFilter: string;
+  paymentFilter: string[];
+  compensationFilter: string[];
   startDate: string;
   endDate: string;
   hasActiveFilters: boolean;
   onSearchChange: (value: string) => void;
   onProductFilterChange: (value: string[]) => void;
-  onCustomerGroupChange: (value: string) => void;
+  onCustomerGroupChange: (value: string[]) => void;
   onShippingChange: (value: string[]) => void;
-  onPaymentChange: (value: string) => void;
-  onCompensationChange: (value: string) => void;
+  onPaymentChange: (value: string[]) => void;
+  onCompensationChange: (value: string[]) => void;
   onStartDateChange: (value: string) => void;
   onEndDateChange: (value: string) => void;
   onReset: () => void;
@@ -1573,10 +1573,10 @@ function FactoryShipmentFilters({
   const selectedProductOptionCount = productOptions.filter((option) => productFilter.includes(option.value)).length;
   const advancedFilterCount = [
     productFilter.length !== productOptions.length,
-    customerGroupFilter !== "all",
+    !customerGroupFilter.includes("all") && customerGroupFilter.length > 0,
     !shippingFilter.includes("all") && shippingFilter.length > 0,
-    paymentFilter !== "all",
-    compensationFilter !== "all",
+    !paymentFilter.includes("all") && paymentFilter.length > 0,
+    !compensationFilter.includes("all") && compensationFilter.length > 0,
     Boolean(startDate),
     Boolean(endDate),
   ].filter(Boolean).length;
@@ -1659,17 +1659,20 @@ function FactoryShipmentFilters({
             />
           </div>
           <div className="h-10 min-w-0 lg:h-11">
-            <CustomSelect
+            <CustomMultiSelect
               value={customerGroupFilter}
               onChange={onCustomerGroupChange}
               options={customerGroupOptions}
               className="h-full"
               triggerClassName={cn(
                 "h-full rounded-full border px-3 text-xs shadow-none lg:text-sm",
-                customerGroupFilter !== "all"
-                  ? "border-primary/20 bg-primary/8 text-primary dark:border-primary/25 dark:bg-primary/12"
-                  : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5 font-normal"
+                customerGroupFilter.length === 1 && customerGroupFilter[0] !== "all"
+                  ? "border-primary/20 bg-primary/8 text-primary dark:border-primary/25 dark:bg-primary/12 font-normal"
+                  : customerGroupFilter.length > 1 && !customerGroupFilter.includes("all")
+                    ? "bg-primary/8 border-primary/15 text-primary dark:bg-primary/12 dark:border-primary/25 font-bold"
+                    : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5 font-normal"
               )}
+              placeholder="客户分组"
             />
           </div>
           <div className="h-10 min-w-0 lg:h-11">
@@ -1690,31 +1693,37 @@ function FactoryShipmentFilters({
             />
           </div>
           <div className="h-10 min-w-0 lg:h-11">
-            <CustomSelect
+            <CustomMultiSelect
               value={paymentFilter}
               onChange={onPaymentChange}
-              options={[{ value: "all", label: "货款状态" }, ...paymentStatusOptions]}
+              options={[{ value: "all", label: "全部货款状态" }, ...paymentStatusOptions]}
               className="h-full"
               triggerClassName={cn(
                 "h-full rounded-full border px-3 text-xs shadow-none lg:text-sm",
-                paymentFilter !== "all"
-                  ? `${getPaymentTone(paymentFilter)} font-normal`
-                  : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5 font-normal"
+                paymentFilter.length === 1 && paymentFilter[0] !== "all"
+                  ? `${getPaymentTone(paymentFilter[0])} font-normal`
+                  : paymentFilter.length > 1 && !paymentFilter.includes("all")
+                    ? "bg-primary/8 border-primary/15 text-primary dark:bg-primary/12 dark:border-primary/25 font-bold"
+                    : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5 font-normal"
               )}
+              placeholder="货款状态"
             />
           </div>
           <div className="h-10 min-w-0 lg:h-11">
-            <CustomSelect
+            <CustomMultiSelect
               value={compensationFilter}
               onChange={onCompensationChange}
-              options={[{ value: "all", label: "补偿状态" }, ...compensationStatusOptions]}
+              options={[{ value: "all", label: "全部补偿状态" }, ...compensationStatusOptions]}
               className="h-full"
               triggerClassName={cn(
                 "h-full rounded-full border px-3 text-xs shadow-none lg:text-sm",
-                compensationFilter !== "all"
-                  ? `${getCompensationTone(compensationFilter)} font-normal`
-                  : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5 font-normal"
+                compensationFilter.length === 1 && compensationFilter[0] !== "all"
+                  ? `${getCompensationTone(compensationFilter[0])} font-normal`
+                  : compensationFilter.length > 1 && !compensationFilter.includes("all")
+                    ? "bg-primary/8 border-primary/15 text-primary dark:bg-primary/12 dark:border-primary/25 font-bold"
+                    : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5 font-normal"
               )}
+              placeholder="补偿状态"
             />
           </div>
           <DatePicker
@@ -3343,7 +3352,7 @@ export default function FactoryShipmentsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [productFilter, setProductFilter] = useState<string[]>([]);
-  const [customerGroupFilter, setCustomerGroupFilter] = useState("all");
+  const [customerGroupFilter, setCustomerGroupFilter] = useState<string[]>(["all"]);
   const [exportGroupValue, setExportGroupValue] = useState("all");
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isExportProgressOpen, setIsExportProgressOpen] = useState(false);
@@ -3352,8 +3361,8 @@ export default function FactoryShipmentsPage() {
   const [exportStartDate, setExportStartDate] = useState("");
   const [exportEndDate, setExportEndDate] = useState("");
   const [shippingFilter, setShippingFilter] = useState<string[]>(["all"]);
-  const [paymentFilter, setPaymentFilter] = useState("all");
-  const [compensationFilter, setCompensationFilter] = useState("all");
+  const [paymentFilter, setPaymentFilter] = useState<string[]>(["all"]);
+  const [compensationFilter, setCompensationFilter] = useState<string[]>(["all"]);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -3422,7 +3431,7 @@ export default function FactoryShipmentsPage() {
 
   const customerGroupOptions = useMemo(
     () => [
-      { value: "all", label: "客户分组" },
+      { value: "all", label: "全部客户分组" },
       { value: "__ungrouped", label: "未分组客户" },
       ...customerGroups.map((group) => ({ value: group, label: group })),
     ],
@@ -3733,16 +3742,16 @@ export default function FactoryShipmentsPage() {
         itemNames.some((name) => pinyinMatch(name, query));
       const matchesShipping = shippingFilter.includes("all") || shippingFilter.length === 0 || shippingFilter.includes(derivedStatus);
       const matchesProduct = productFilter.length === 0 || order.items.some((item) => productFilterSet.has(getShipmentProductFilterKey(item)));
-      const matchesPayment = paymentFilter === "all" || parsed.paymentStatus === paymentFilter;
+      const matchesPayment = paymentFilter.includes("all") || paymentFilter.length === 0 || paymentFilter.includes(parsed.paymentStatus || "");
       const matchesCompensation =
-        compensationFilter === "all" || parsed.compensationStatus === compensationFilter;
+        compensationFilter.includes("all") || compensationFilter.length === 0 || compensationFilter.includes(parsed.compensationStatus || "");
       const recipientGroup = customerGroupByIdentity.get(getCustomerAddressIdentity({
         contactName: parsed.recipientName,
         contactPhone: parsed.recipientPhone,
         address: parsed.recipientAddress,
       })) || "";
-      const matchesCustomerGroup = customerGroupFilter === "all"
-        || (customerGroupFilter === "__ungrouped" ? !recipientGroup : recipientGroup === customerGroupFilter);
+      const matchesCustomerGroup = customerGroupFilter.includes("all") || customerGroupFilter.length === 0
+        || customerGroupFilter.some((group) => group === "__ungrouped" ? !recipientGroup : recipientGroup === group);
       const matchesStart = !startDate || orderDate >= startDate;
       const matchesEnd = !endDate || orderDate <= endDate;
       return matchesSearch && matchesShipping && matchesProduct && matchesPayment && matchesCompensation && matchesCustomerGroup && matchesStart && matchesEnd;
@@ -4500,10 +4509,10 @@ export default function FactoryShipmentsPage() {
   const hasActiveFilters = Boolean(
     searchQuery || 
     productFilter.length !== shipmentProductOptions.length ||
-    customerGroupFilter !== "all" ||
+    (!customerGroupFilter.includes("all") && customerGroupFilter.length > 0) ||
     (!shippingFilter.includes("all") && shippingFilter.length > 0) || 
-    paymentFilter !== "all" || 
-    compensationFilter !== "all" || 
+    (!paymentFilter.includes("all") && paymentFilter.length > 0) || 
+    (!compensationFilter.includes("all") && compensationFilter.length > 0) || 
     startDate || 
     endDate
   );
@@ -4652,10 +4661,10 @@ export default function FactoryShipmentsPage() {
             onReset={() => {
               setSearchQuery("");
               setProductFilter(shipmentProductOptions.map((option) => option.value));
-              setCustomerGroupFilter("all");
+              setCustomerGroupFilter(["all"]);
               setShippingFilter(["all"]);
-              setPaymentFilter("all");
-              setCompensationFilter("all");
+              setPaymentFilter(["all"]);
+              setCompensationFilter(["all"]);
               setStartDate("");
               setEndDate("");
             }}
