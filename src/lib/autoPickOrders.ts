@@ -1014,6 +1014,31 @@ function normalizeMaiyatianShopMapping(input: unknown): AutoPickMaiyatianShopMap
   };
 }
 
+function getMaiyatianShopMappingIdentity(mapping: AutoPickMaiyatianShopMapping) {
+  const id = String(mapping.maiyatianShopId || "").trim();
+  if (id) return `id:${id}`;
+  return `text:${String(mapping.maiyatianShopName || "").trim()}|${String(mapping.maiyatianShopAddress || "").trim()}`;
+}
+
+function dedupeMaiyatianShopMappings(mappings: AutoPickMaiyatianShopMapping[]) {
+  const map = new Map<string, AutoPickMaiyatianShopMapping>();
+  for (const mapping of mappings) {
+    const key = getMaiyatianShopMappingIdentity(mapping);
+    if (!map.has(key)) {
+      map.set(key, mapping);
+      continue;
+    }
+
+    map.set(key, {
+      ...mapping,
+      ...map.get(key),
+      brushCommission: map.get(key)?.brushCommission ?? mapping.brushCommission,
+      selfDeliveryTiming: map.get(key)?.selfDeliveryTiming ?? mapping.selfDeliveryTiming,
+    });
+  }
+  return Array.from(map.values());
+}
+
 
 function normalizeTimingMinutes(value: unknown, fallback: number, options?: { min?: number; max?: number }) {
   const min = options?.min ?? 0;
@@ -1048,15 +1073,17 @@ export function normalizeAutoPickSelfDeliveryTimingConfig(input: unknown): AutoP
 
 export function normalizeAutoPickIntegrationConfig(input: unknown): AutoPickIntegrationConfig {
   const payload = input && typeof input === "object" ? input as Record<string, unknown> : {};
+  const maiyatianShopMappings = Array.isArray(payload.maiyatianShopMappings)
+    ? payload.maiyatianShopMappings
+        .map((item) => normalizeMaiyatianShopMapping(item))
+        .filter((item): item is AutoPickMaiyatianShopMapping => Boolean(item))
+    : [];
+
   return {
     pluginBaseUrl: normalizePluginBaseUrl(String(payload.pluginBaseUrl || "")),
     inboundApiKey: normalizeInboundApiKey(String(payload.inboundApiKey || "")),
     maiyatianCookie: normalizeMaiyatianCookie(String(payload.maiyatianCookie || "")),
-    maiyatianShopMappings: Array.isArray(payload.maiyatianShopMappings)
-      ? payload.maiyatianShopMappings
-          .map((item) => normalizeMaiyatianShopMapping(item))
-          .filter((item): item is AutoPickMaiyatianShopMapping => Boolean(item))
-      : [],
+    maiyatianShopMappings: dedupeMaiyatianShopMappings(maiyatianShopMappings),
     selfDeliveryTiming: normalizeAutoPickSelfDeliveryTimingConfig(payload.selfDeliveryTiming),
     defaultBrushCommission: typeof payload.defaultBrushCommission === "number"
       ? payload.defaultBrushCommission

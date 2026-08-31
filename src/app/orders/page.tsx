@@ -53,7 +53,7 @@ import {
   readShopNameFromRawPayload,
   readShopAddressFromRawPayload,
 } from "@/lib/shopCommission";
-import { AutoPickIntegrationConfig, AutoPickMaiyatianShop, AutoPickOrder, AutoPickOrderItem, AutoPickSelfDeliveryTimingConfig, PurchaseOrder, PurchaseOrderItem } from "@/lib/types";
+import { AutoPickIntegrationConfig, AutoPickMaiyatianShop, AutoPickMaiyatianShopMapping, AutoPickOrder, AutoPickOrderItem, AutoPickSelfDeliveryTimingConfig, PurchaseOrder, PurchaseOrderItem } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { formatLocalDate, formatLocalDateTime } from "@/lib/dateUtils";
 import { ORDER_SHORTAGE_PURCHASE_NOTE_KEYWORD } from "@/lib/purchaseOrderTypes";
@@ -144,6 +144,36 @@ type LocalShopOption = {
 };
 
 type TimingFieldKey = keyof AutoPickIntegrationConfig["selfDeliveryTiming"];
+
+function getMaiyatianShopIdentity(input: Pick<AutoPickMaiyatianShop, "id" | "name" | "address"> | Pick<AutoPickMaiyatianShopMapping, "maiyatianShopId" | "maiyatianShopName" | "maiyatianShopAddress">) {
+  const record = input as Partial<AutoPickMaiyatianShop & AutoPickMaiyatianShopMapping>;
+  const id = String(record.id || record.maiyatianShopId || "").trim();
+  if (id) return `id:${id}`;
+  return `text:${String(record.name || record.maiyatianShopName || "").trim()}|${String(record.address || record.maiyatianShopAddress || "").trim()}`;
+}
+
+function dedupeMaiyatianShops(shops: AutoPickMaiyatianShop[]) {
+  const seen = new Set<string>();
+  return shops.filter((shop) => {
+    const key = getMaiyatianShopIdentity(shop);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function dedupeMaiyatianShopMappings(mappings: AutoPickMaiyatianShopMapping[]) {
+  const map = new Map<string, AutoPickMaiyatianShopMapping>();
+  for (const mapping of mappings) {
+    const key = getMaiyatianShopIdentity(mapping);
+    if (!map.has(key)) {
+      map.set(key, mapping);
+    } else {
+      map.set(key, { ...mapping, ...map.get(key) });
+    }
+  }
+  return Array.from(map.values());
+}
 
 import {
   OrderCard,
@@ -370,6 +400,13 @@ function IntegrationModal({
   const showCookieEditor = !integrationConfig.maiyatianCookie.trim() || isEditingCookie;
   const timing = integrationConfig.selfDeliveryTiming;
   const timingTotalLabel = `${formatTimingNumber(Number(timingDraft.pickupMinutes || 0))} + 距离 × ${formatTimingNumber(Number(timingDraft.minutesPerKm || 0))} + ${formatTimingNumber(Number(timingDraft.riderUpstairsMinutes || 0))}`;
+  const visibleCommissionMappings = useMemo(() => {
+    const deduped = dedupeMaiyatianShopMappings(integrationConfig.maiyatianShopMappings);
+    if (maiyatianShops.length === 0) return deduped;
+
+    const liveShopKeys = new Set(maiyatianShops.map((shop) => getMaiyatianShopIdentity(shop)));
+    return deduped.filter((mapping) => liveShopKeys.has(getMaiyatianShopIdentity(mapping)));
+  }, [integrationConfig.maiyatianShopMappings, maiyatianShops]);
 
   useEffect(() => {
     setTimingDraft({
@@ -638,12 +675,13 @@ function IntegrationModal({
                                         cityName: shop.cityName || undefined,
                                         libraryId: defaultLib ? defaultLib.id : undefined,
                                         libraryName: defaultLib ? defaultLib.name : undefined,
+                                        brushCommission: previousMapping?.brushCommission ?? undefined,
                                         selfDeliveryTiming: previousMapping?.selfDeliveryTiming || undefined,
                                       });
                                     }
                                     onChange({
                                       ...integrationConfig,
-                                      maiyatianShopMappings: nextMappings,
+                                      maiyatianShopMappings: dedupeMaiyatianShopMappings(nextMappings),
                                     });
                                   }}
                                 />
@@ -834,9 +872,9 @@ function IntegrationModal({
                   <span className="text-[11px] text-muted-foreground">留空时自动继承全局默认佣金</span>
                 </div>
 
-                {integrationConfig.maiyatianShopMappings.length > 0 ? (
+                {visibleCommissionMappings.length > 0 ? (
                   <div className="space-y-2">
-                    {integrationConfig.maiyatianShopMappings.map((mapping) => {
+                    {visibleCommissionMappings.map((mapping) => {
                       const shopCommission = mapping.brushCommission ?? "";
                       return (
                         <div
@@ -866,7 +904,7 @@ function IntegrationModal({
                                 const val = e.target.value;
                                 const parsed = val === "" ? undefined : parseFloat(val);
                                 const safeVal = typeof parsed === "number" && !isNaN(parsed) && parsed >= 0 ? parsed : undefined;
-                                const nextMappings = integrationConfig.maiyatianShopMappings.map((m) =>
+                                const nextMappings = dedupeMaiyatianShopMappings(integrationConfig.maiyatianShopMappings).map((m) =>
                                   m.maiyatianShopId === mapping.maiyatianShopId ? { ...m, brushCommission: safeVal } : m
                                 );
                                 onChange({ ...integrationConfig, maiyatianShopMappings: nextMappings });
@@ -1800,7 +1838,11 @@ export default function OrdersPage() {
         throw new Error(data?.error || "加载对接配置失败");
       }
 
-      const nextConfig = readIntegrationConfigResponse(data);
+      const loadedConfig = readIntegrationConfigResponse(data);
+      const nextConfig = {
+        ...loadedConfig,
+        maiyatianShopMappings: dedupeMaiyatianShopMappings(loadedConfig.maiyatianShopMappings),
+      };
       setIntegrationConfig(nextConfig);
       setHasUnresolvedShops(Boolean(data?.hasUnresolvedShops));
       setSavedIntegrationDigest(serializeIntegrationConfig({
@@ -1846,7 +1888,7 @@ export default function OrdersPage() {
         throw new Error(data?.error || "读取麦芽田门店失败");
       }
 
-      setMaiyatianShops(Array.isArray(data.shops) ? data.shops : []);
+      setMaiyatianShops(Array.isArray(data.shops) ? dedupeMaiyatianShops(data.shops) : []);
       if (Array.isArray(data.localShops)) {
         setLocalShops(
           data.localShops
@@ -1881,8 +1923,8 @@ export default function OrdersPage() {
   ) => {
     try {
       const payload = nextConfig && typeof nextConfig === "object" && !("nativeEvent" in (nextConfig as object))
-        ? nextConfig
-        : integrationConfig;
+        ? { ...nextConfig, maiyatianShopMappings: dedupeMaiyatianShopMappings(nextConfig.maiyatianShopMappings) }
+        : { ...integrationConfig, maiyatianShopMappings: dedupeMaiyatianShopMappings(integrationConfig.maiyatianShopMappings) };
       const shouldRefreshOrders = serializeMaiyatianMappings(payload) !== savedMappingsDigest;
       const response = await fetch("/api/orders/integration", {
         method: "POST",
