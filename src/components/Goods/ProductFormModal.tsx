@@ -1621,25 +1621,27 @@ export function ProductFormModal({
                                                         </button>
                                                     </div>
                                                     <div className="text-right flex flex-col items-end gap-0.5">
-                                                        <div className="text-xs font-semibold text-foreground">
-                                                            x{item.quantity} 
-                                                            {item.remainingQuantity !== undefined && item.remainingQuantity !== null && order.status === 'Received' && (
-                                                                <span className="text-[10px] font-normal text-muted-foreground ml-1">
-                                                                     (余: <span className={cn("font-medium", item.remainingQuantity > 0 ? "text-primary" : "text-muted-foreground")}>{item.remainingQuantity}</span>)
-                                                                </span>
-                                                            )}
+                                                        <div className="flex items-center justify-end gap-1.5">
+                                                            <div className="text-xs font-semibold text-foreground">
+                                                                x{item.quantity} 
+                                                                {item.remainingQuantity !== undefined && item.remainingQuantity !== null && order.status === 'Received' && (
+                                                                    <span className="text-[10px] font-normal text-muted-foreground ml-1">
+                                                                         (余: <span className={cn("font-medium", item.remainingQuantity > 0 ? "text-primary" : "text-muted-foreground")}>{item.remainingQuantity}</span>)
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            {order.status === "Received" && itemId ? (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => void openBatchTrace(itemId)}
+                                                                    className="inline-flex items-center gap-1 rounded-full border border-sky-500/15 bg-sky-500/10 px-2 py-0.5 text-[10px] font-bold text-sky-600 transition hover:bg-sky-500/15 dark:text-sky-300"
+                                                                    title="查看这批入库货的出库流向"
+                                                                >
+                                                                    出库
+                                                                    <ArrowUpRight size={10} />
+                                                                </button>
+                                                            ) : null}
                                                         </div>
-                                                        {order.status === "Received" && itemId ? (
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => void openBatchTrace(itemId)}
-                                                                className="inline-flex items-center gap-1 rounded-full border border-sky-500/15 bg-sky-500/10 px-2 py-0.5 text-[10px] font-bold text-sky-600 transition hover:bg-sky-500/15 dark:text-sky-300"
-                                                                title="查看这批入库货的出库流向"
-                                                            >
-                                                                出库
-                                                                <ArrowUpRight size={10} />
-                                                            </button>
-                                                        ) : null}
                                                         {order.status === "Received" ? (
                                                             editingItemId === itemId ? (
                                                                 <div className="flex items-center gap-1 mt-0.5 justify-end" onClick={(e) => e.stopPropagation()}>
@@ -2308,14 +2310,14 @@ export function ProductFormModal({
 
             {isBatchTraceOpen && (
                 <div className="fixed inset-0 z-100000 flex items-center justify-center bg-black/50 p-3 backdrop-blur-sm sm:p-4">
-                    <div className="flex max-h-[86dvh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-border bg-white shadow-2xl dark:border-white/10 dark:bg-gray-900">
-                        <div className="flex items-start justify-between gap-3 border-b border-border/70 px-4 py-3 dark:border-white/10 sm:px-5">
+                    <div className="flex max-h-[88dvh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-border bg-white shadow-2xl dark:border-white/10 dark:bg-gray-900">
+                        <div className="flex items-start justify-between gap-4 border-b border-border/70 px-5 py-4 dark:border-white/10 sm:px-6">
                             <div className="min-w-0">
-                                <h3 className="text-sm font-black text-foreground">批次出库记录</h3>
-                                <p className="mt-1 truncate text-xs text-muted-foreground">
+                                <h3 className="text-base font-black text-foreground">批次出库记录</h3>
+                                <p className="mt-1 line-clamp-2 text-xs font-bold leading-relaxed text-muted-foreground">
                                     {viewingBatchTrace?.purchaseItem?.shopProduct?.productName || viewingBatchTrace?.purchaseItem?.product?.name || "入库批次"}
                                     {viewingBatchTrace?.purchaseItem?.shopProduct?.sku || viewingBatchTrace?.purchaseItem?.product?.sku
-                                        ? ` · ${viewingBatchTrace?.purchaseItem?.shopProduct?.sku || viewingBatchTrace?.purchaseItem?.product?.sku}`
+                                        ? ` - ${viewingBatchTrace?.purchaseItem?.shopProduct?.sku || viewingBatchTrace?.purchaseItem?.product?.sku}`
                                         : ""}
                                 </p>
                             </div>
@@ -2336,56 +2338,61 @@ export function ProductFormModal({
                             </div>
                         ) : viewingBatchTrace ? (
                             <>
-                                <div className="grid grid-cols-4 gap-2 border-b border-border/70 p-3 text-xs dark:border-white/10 sm:p-4">
+                                <div className="grid grid-cols-2 gap-2 border-b border-border/70 p-4 text-xs dark:border-white/10 sm:grid-cols-4 sm:p-5">
                                     {[
                                         { label: "入库", value: viewingBatchTrace.totals.inboundQuantity },
                                         { label: "剩余", value: viewingBatchTrace.totals.remainingQuantity ?? "-" },
                                         { label: "出库", value: viewingBatchTrace.totals.outboundQuantity },
                                         { label: "净出库", value: viewingBatchTrace.totals.netQuantity },
                                     ].map((item) => (
-                                        <div key={item.label} className="rounded-xl border border-border/70 bg-muted/30 px-3 py-2 dark:border-white/10 dark:bg-white/5">
-                                            <div className="text-[10px] font-bold text-muted-foreground">{item.label}</div>
-                                            <div className="mt-0.5 text-base font-black tabular-nums text-foreground">{item.value}</div>
+                                        <div key={item.label} className="rounded-xl border border-border/70 bg-muted/40 px-4 py-3 dark:border-white/10 dark:bg-white/5">
+                                            <div className="text-[11px] font-bold text-muted-foreground">{item.label}</div>
+                                            <div className="mt-1 text-2xl font-black leading-none tabular-nums text-foreground">{item.value}</div>
                                         </div>
                                     ))}
                                 </div>
 
-                                <div className="overflow-y-auto p-3 sm:p-4">
+                                <div className="overflow-y-auto p-4 sm:p-5">
                                     {viewingBatchTrace.items.length > 0 ? (
-                                        <div className="space-y-2">
+                                        <div className="space-y-3">
                                             {viewingBatchTrace.items.map((item) => (
-                                                <div key={`${item.outboundOrderId}-${item.outboundOrderItemId}`} className="rounded-xl border border-border/70 bg-white p-3 text-xs dark:border-white/10 dark:bg-white/5">
-                                                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                                                        <div className="min-w-0">
-                                                            <div className="flex flex-wrap items-center gap-1.5">
-                                                                <span className="font-bold text-foreground">{item.productName}</span>
-                                                                {item.sku ? <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">#{item.sku}</span> : null}
+                                                <div key={`${item.outboundOrderId}-${item.outboundOrderItemId}`} className="rounded-2xl border border-border/70 bg-muted/30 p-4 text-xs shadow-sm dark:border-white/10 dark:bg-white/5">
+                                                    <div className="flex flex-col gap-4 md:flex-row md:items-stretch md:justify-between">
+                                                        <div className="min-w-0 flex-1">
+                                                            <div className="flex flex-wrap items-start gap-2">
+                                                                <span className="line-clamp-2 text-sm font-black leading-snug text-foreground">{item.productName}</span>
                                                                 {item.status === "Returned" ? (
-                                                                    <span className="rounded bg-slate-500/10 px-1.5 py-0.5 text-[10px] font-bold text-slate-600 dark:text-slate-300">已退回</span>
+                                                                    <span className="shrink-0 rounded bg-slate-500/10 px-2 py-0.5 text-[10px] font-bold text-slate-600 dark:text-slate-300">已退回</span>
                                                                 ) : item.returnedQuantity > 0 ? (
-                                                                    <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-bold text-amber-600 dark:text-amber-300">部分退回</span>
+                                                                    <span className="shrink-0 rounded bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold text-amber-600 dark:text-amber-300">部分退回</span>
                                                                 ) : null}
                                                             </div>
-                                                            <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
-                                                                <span>{new Date(item.date).toLocaleString()}</span>
-                                                                {item.platform ? <span>{item.platform}</span> : null}
-                                                                {item.shopName ? <span>{item.shopName}</span> : null}
-                                                                {item.orderNo ? <span>平台单号 {item.orderNo}</span> : null}
+                                                            {item.sku ? (
+                                                                <div className="mt-2">
+                                                                    <span className="rounded bg-muted px-2 py-0.5 font-mono text-[11px] font-bold text-muted-foreground dark:bg-white/10">#{item.sku}</span>
+                                                                </div>
+                                                            ) : null}
+                                                            <div className="mt-3 space-y-1 text-[11px] font-medium leading-relaxed text-muted-foreground">
+                                                                <div>{new Date(item.date).toLocaleString()}</div>
+                                                                {(item.platform || item.shopName) ? (
+                                                                    <div>{[item.platform, item.shopName].filter(Boolean).join(" · ")}</div>
+                                                                ) : null}
+                                                                {item.orderNo ? <div>平台单号 {item.orderNo}</div> : null}
+                                                                <div className="break-all font-mono text-[10px]">出库单 {item.outboundOrderId}</div>
                                                             </div>
-                                                            <div className="mt-1 truncate font-mono text-[10px] text-muted-foreground">出库单 {item.outboundOrderId}</div>
                                                         </div>
-                                                        <div className="grid grid-cols-3 gap-1.5 text-right sm:min-w-[220px]">
-                                                            <div className="rounded-lg bg-muted/40 px-2 py-1.5">
-                                                                <div className="text-[10px] text-muted-foreground">扣批次</div>
-                                                                <div className="font-black tabular-nums text-foreground">{item.quantity}</div>
+                                                        <div className="grid grid-cols-3 gap-2 md:w-[270px] md:shrink-0">
+                                                            <div className="rounded-xl bg-white/70 px-3 py-3 text-right dark:bg-gray-950/25">
+                                                                <div className="text-[10px] font-bold text-muted-foreground">扣批次</div>
+                                                                <div className="mt-1 text-lg font-black leading-none tabular-nums text-foreground">{item.quantity}</div>
                                                             </div>
-                                                            <div className="rounded-lg bg-muted/40 px-2 py-1.5">
-                                                                <div className="text-[10px] text-muted-foreground">已退</div>
-                                                                <div className="font-black tabular-nums text-foreground">{item.returnedQuantity}</div>
+                                                            <div className="rounded-xl bg-white/70 px-3 py-3 text-right dark:bg-gray-950/25">
+                                                                <div className="text-[10px] font-bold text-muted-foreground">已退</div>
+                                                                <div className="mt-1 text-lg font-black leading-none tabular-nums text-foreground">{item.returnedQuantity}</div>
                                                             </div>
-                                                            <div className="rounded-lg bg-muted/40 px-2 py-1.5">
-                                                                <div className="text-[10px] text-muted-foreground">成本</div>
-                                                                <div className="font-black tabular-nums text-foreground">￥{item.totalCost.toFixed(2)}</div>
+                                                            <div className="rounded-xl bg-white/70 px-3 py-3 text-right dark:bg-gray-950/25">
+                                                                <div className="text-[10px] font-bold text-muted-foreground">成本</div>
+                                                                <div className="mt-1 text-lg font-black leading-none tabular-nums text-foreground">￥{item.totalCost.toFixed(2)}</div>
                                                             </div>
                                                         </div>
                                                     </div>
