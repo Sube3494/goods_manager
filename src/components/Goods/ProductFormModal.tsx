@@ -97,6 +97,19 @@ type BatchOutboundTrace = {
     netQuantity: number;
     totalCost: number;
   };
+  reconciliation?: {
+    actualRemainingQuantity: number;
+    expectedRemainingQuantity: number;
+    adjustmentQuantity: number;
+  };
+  adjustments?: Array<{
+    id: string;
+    quantity: number;
+    beforeQuantity: number;
+    afterQuantity: number;
+    reason: string;
+    createdAt: string;
+  }>;
   orders: Array<{
     key: string;
     orderNo?: string | null;
@@ -240,6 +253,8 @@ export function ProductFormModal({
     onConfirm: () => void;
     message: string;
     variant?: "danger" | "warning";
+    title?: string;
+    confirmLabel?: string;
   }>({
     isOpen: false,
     onConfirm: () => {},
@@ -275,6 +290,7 @@ export function ProductFormModal({
   const [viewingBatchTrace, setViewingBatchTrace] = useState<BatchOutboundTrace | null>(null);
   const [isBatchTraceOpen, setIsBatchTraceOpen] = useState(false);
   const [isLoadingBatchTrace, setIsLoadingBatchTrace] = useState(false);
+  const [isReconcilingBatch, setIsReconcilingBatch] = useState(false);
   const [batchSalesOrders, setBatchSalesOrders] = useState<AutoPickOrder[]>([]);
   const [expandedBatchOrderIds, setExpandedBatchOrderIds] = useState<string[]>([]);
 
@@ -312,6 +328,34 @@ export function ProductFormModal({
       setIsBatchTraceOpen(false);
     } finally {
       setIsLoadingBatchTrace(false);
+    }
+  };
+
+  const reconcileBatchInventory = async () => {
+    const purchaseOrderItemId = viewingBatchTrace?.purchaseItem?.id;
+    if (!purchaseOrderItemId || isReconcilingBatch) return;
+    setIsReconcilingBatch(true);
+    try {
+      const res = await fetch(`/api/purchases/items/${purchaseOrderItemId}/outbounds`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: "历史订单改匹配遗留库存修复" }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error || "库存校准失败");
+      setInboundHistory((current) => current.map((order) => ({
+        ...order,
+        items: order.items.map((item) => item.id === purchaseOrderItemId
+          ? { ...item, remainingQuantity: data.expectedRemainingQuantity }
+          : item),
+      })));
+      showToast(`库存校准成功，批次剩余已更新为 ${data.expectedRemainingQuantity}`, "success");
+      await openBatchTrace(purchaseOrderItemId);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "库存校准失败", "error");
+    } finally {
+      setIsReconcilingBatch(false);
+      setConfirmConfig((current) => ({ ...current, isOpen: false }));
     }
   };
 
@@ -2333,8 +2377,8 @@ export function ProductFormModal({
                onConfirm={confirmConfig.onConfirm}
                message={confirmConfig.message}
                variant={confirmConfig.variant}
-               confirmLabel="确认删除"
-               title="移除实拍项"
+               confirmLabel={confirmConfig.confirmLabel || "确认删除"}
+               title={confirmConfig.title || "移除实拍项"}
             />
 
             <CategoryModal 
@@ -2371,6 +2415,41 @@ export function ProductFormModal({
                                 <X size={18} />
                             </button>
                         </div>
+
+                        {!isLoadingBatchTrace && viewingBatchTrace?.reconciliation && viewingBatchTrace.reconciliation.adjustmentQuantity !== 0 ? (
+                            <div className="flex flex-col gap-3 border-b border-amber-500/20 bg-amber-500/8 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+                                <div className="min-w-0">
+                                    <div className="text-sm font-black text-amber-700 dark:text-amber-300">检测到批次库存差异</div>
+                                    <div className="mt-1 text-xs leading-relaxed text-amber-700/80 dark:text-amber-200/75">
+                                        当前剩余 {viewingBatchTrace.reconciliation.actualRemainingQuantity}，按有效出库记录应剩 {viewingBatchTrace.reconciliation.expectedRemainingQuantity}，建议校准 {viewingBatchTrace.reconciliation.adjustmentQuantity > 0 ? "+" : ""}{viewingBatchTrace.reconciliation.adjustmentQuantity} 件。校准不产生采购金额。
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    disabled={isReconcilingBatch}
+                                    onClick={() => setConfirmConfig({
+                                        isOpen: true,
+                                        title: "确认库存校准",
+                                        confirmLabel: "确认校准",
+                                        variant: "warning",
+                                        message: `将该批次剩余库存从 ${viewingBatchTrace.reconciliation?.actualRemainingQuantity} 调整为 ${viewingBatchTrace.reconciliation?.expectedRemainingQuantity}，并同步商品总库存。该操作不会修改采购金额。`,
+                                        onConfirm: () => void reconcileBatchInventory(),
+                                    })}
+                                    className="inline-flex h-9 shrink-0 items-center justify-center rounded-lg border border-amber-500/25 bg-amber-500/15 px-4 text-xs font-black text-amber-700 transition hover:bg-amber-500/25 disabled:opacity-50 dark:text-amber-200"
+                                >
+                                    {isReconcilingBatch ? "校准中..." : "校准库存"}
+                                </button>
+                            </div>
+                        ) : null}
+
+                        {!isLoadingBatchTrace && viewingBatchTrace?.adjustments?.[0] ? (
+                            <div className="border-b border-emerald-500/15 bg-emerald-500/6 px-4 py-2.5 text-xs text-emerald-700 dark:text-emerald-300 sm:px-5">
+                                最近校准：{viewingBatchTrace.adjustments[0].beforeQuantity} → {viewingBatchTrace.adjustments[0].afterQuantity}
+                                <span className="mx-2 text-emerald-600/40 dark:text-emerald-300/35">|</span>
+                                {viewingBatchTrace.adjustments[0].reason}
+                                <span className="ml-2 text-emerald-600/60 dark:text-emerald-300/55">{new Date(viewingBatchTrace.adjustments[0].createdAt).toLocaleString()}</span>
+                            </div>
+                        ) : null}
 
                         {isLoadingBatchTrace ? (
                             <div className="flex h-56 items-center justify-center text-xs font-medium text-muted-foreground">
