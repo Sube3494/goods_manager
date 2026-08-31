@@ -277,6 +277,18 @@ export function ProductSelectionModal({
   }, [debouncedSearch, selectedCategoryName, showUnselectedOnly]);
 
   useEffect(() => {
+    if (!isOpen || disableAlreadySelected || selectedIds.length === 0 || products.length === 0) return;
+    setSelectedProducts((current) => {
+      const currentKeys = new Set(current.map((product) => getSelectionKey(product)));
+      const missingSelectedProducts = products.filter((product) => {
+        const key = getSelectionKey(product);
+        return selectedIds.includes(key) && !currentKeys.has(key);
+      });
+      return missingSelectedProducts.length > 0 ? [...current, ...missingSelectedProducts] : current;
+    });
+  }, [disableAlreadySelected, getSelectionKey, isOpen, products, selectedIds]);
+
+  useEffect(() => {
     if (!usesPrefetchedData) return;
     setProducts(prefetchedProducts || []);
   }, [prefetchedProducts, usesPrefetchedData]);
@@ -423,14 +435,14 @@ export function ProductSelectionModal({
       const isVisible = matchesVisibility && !(p.isDiscontinued ?? false);
       const productCategoryName = p.category?.name || (p as Product & { categoryName?: string | null }).categoryName || "";
       const matchesCategory = categoryName === "all" || productCategoryName === categoryName;
-      const matchesUnselected = !showUnselectedOnly || !selectedIds.includes(getSelectionKey(p));
+      const matchesUnselected = !showUnselectedOnly || !disableAlreadySelected || !selectedIds.includes(getSelectionKey(p));
       const searchableText = [p.name, p.sku, p.jdSkuId].filter(Boolean).join(" ").toLowerCase();
       const matchesSearch = !normalizedSearch || searchableText.includes(normalizedSearch);
       const matchesShop = !scopedShopName || isShopNameMatch(p.shopName, scopedShopName);
 
       return isVisible && matchesCategory && matchesUnselected && matchesSearch && matchesShop;
     });
-  }, [debouncedSearch, getSelectionKey, respectPublicVisibility, selectedCategoryName, selectedIds, showUnselectedOnly]);
+  }, [debouncedSearch, disableAlreadySelected, getSelectionKey, respectPublicVisibility, selectedCategoryName, selectedIds, showUnselectedOnly]);
 
   const displayCategoryName = selectedCategoryName;
 
@@ -469,8 +481,10 @@ export function ProductSelectionModal({
   }, [fetchData, hasMore, isLoading, isNextPageLoading, isOpen, isSearching, usesPrefetchedData, hasMoreLocal]);
 
   const selectableProducts = useMemo(() => {
-    return filteredProducts.filter((product: Product) => !selectedIds.includes(getSelectionKey(product)));
-  }, [filteredProducts, selectedIds, getSelectionKey]);
+    return disableAlreadySelected
+      ? filteredProducts.filter((product: Product) => !selectedIds.includes(getSelectionKey(product)))
+      : filteredProducts;
+  }, [disableAlreadySelected, filteredProducts, selectedIds, getSelectionKey]);
 
   const allFilteredSelected = useMemo(() => {
     return (
@@ -690,9 +704,7 @@ export function ProductSelectionModal({
                         onChange={(e) => {
                           const isMultiple = e.target.checked;
                           setLocalSingleSelect(!isMultiple);
-                          setTempSelectedIds([]);
-                          setSelectedProducts([]);
-                          setShowUnselectedOnly(!isMultiple ? false : true);
+                          setShowUnselectedOnly(disableAlreadySelected && isMultiple);
                         }}
                         className="peer sr-only"
                       />
