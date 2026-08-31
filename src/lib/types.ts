@@ -184,6 +184,7 @@ export interface AutoPickOrderItem {
     productId?: string | null;
     shopName?: string | null;
     isManual?: boolean;
+    pendingOutboundMatch?: boolean;
   } | null;
   createdAt?: string;
   updatedAt?: string;
@@ -198,6 +199,7 @@ export interface AutoPickMatchedProductRef {
   shopProductId?: string | null;
   shopName?: string | null;
   isManual?: boolean;
+  pendingOutboundMatch?: boolean;
 }
 
 export interface AutoPickOrder {

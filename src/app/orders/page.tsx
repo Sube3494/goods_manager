@@ -1549,6 +1549,7 @@ export default function OrdersPage() {
     shopId: string;
     libraryId: string;
     currentMatchedProductId: string;
+    originalQuantity: number;
   } | null>(null);
 
   const [brushSyncPool, setBrushSyncPool] = useState<AutoPickOrder[]>([]);
@@ -1995,6 +1996,7 @@ export default function OrdersPage() {
       shopId: resolvedShopId,
       libraryId: resolvedLibraryId,
       currentMatchedProductId: item.matchedProduct?.shopProductId || item.matchedProduct?.id || "",
+      originalQuantity: Math.max(1, Number(item.quantity || 1) || 1),
     });
     setIsMatchPickerOpen(true);
   }, [integrationConfig.maiyatianShopMappings, localShops]);
@@ -2005,7 +2007,7 @@ export default function OrdersPage() {
     setMatchEditorTarget(null);
   }, [isSavingMatch]);
 
-  const saveManualMatch = useCallback(async (productId: string, items?: Array<{ id: string; quantity: number }>, options?: { clear?: boolean }) => {
+  const saveManualMatch = useCallback(async (productId: string, items?: Array<{ id: string; quantity: number }>, options?: { clear?: boolean; deferAutoOutbound?: boolean }) => {
     if (!matchEditorTarget?.orderId || !matchEditorTarget.itemId) return;
 
     setIsSavingMatch(true);
@@ -2014,7 +2016,7 @@ export default function OrdersPage() {
       const response = await fetch(`/api/orders/${matchEditorTarget.orderId}/items/${matchEditorTarget.itemId}/match`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(isClear ? { clear: true } : { productId, items }),
+        body: JSON.stringify(isClear ? { clear: true } : { productId, items, deferAutoOutbound: Boolean(options?.deferAutoOutbound) }),
       });
       const data = await response.json().catch(() => ({}));
 
@@ -2022,7 +2024,14 @@ export default function OrdersPage() {
         throw new Error(data?.error || (isClear ? "解除商品匹配失败" : "更新商品匹配失败"));
       }
 
-      showToast(isClear ? "已标记为无需出库，解除商品绑定" : "商品匹配已更新", "success");
+      showToast(
+        isClear
+          ? "已标记为无需出库，解除商品绑定"
+          : options?.deferAutoOutbound
+            ? "已临时更新匹配，不会自动出库"
+            : "商品匹配已更新",
+        "success"
+      );
       setIsMatchPickerOpen(false);
       setMatchEditorTarget(null);
       triggerParentRefresh();
@@ -2819,7 +2828,10 @@ export default function OrdersPage() {
             void saveManualMatch("", [], { clear: true });
             return;
           }
-          void saveManualMatch(resolvedIds.join("+"), items);
+          const isSingleSameQuantity =
+            items.length === 1 &&
+            items[0].quantity === Math.max(1, Number(matchEditorTarget?.originalQuantity || 1) || 1);
+          void saveManualMatch(resolvedIds.join("+"), items, { deferAutoOutbound: isSingleSameQuantity });
         }}
         selectedIds={matchEditorTarget?.currentMatchedProductId ? matchEditorTarget.currentMatchedProductId.split("+").filter(Boolean) : []}
         singleSelect={true}

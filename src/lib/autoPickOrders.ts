@@ -6294,7 +6294,7 @@ async function resolveOutboundItemsForAutoPickOrder(
       resolvedItems.push({
         productId: manualResolvedProductId,
         shopProductId: manualShopProductId,
-        quantity: Math.max(1, Number(item.quantity || 1) || 1),
+        quantity: Math.max(1, Number((manualMatchedProduct as any).quantity || item.quantity || 1) || 1),
         price: priceShare,
       });
       continue;

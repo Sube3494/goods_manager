@@ -170,6 +170,8 @@ type MatchedCatalogProduct = {
   shopId?: string | null;
   shopName?: string | null;
   isManual?: boolean;
+  quantity?: number;
+  pendingOutboundMatch?: boolean;
   bundleItems?: any[];
 };
 
@@ -326,7 +328,8 @@ function readManualMatchedProduct(rawPayload: unknown): MatchedCatalogProduct | 
   }
 
   const payloadObj = rawPayload as Record<string, unknown>;
-  if (payloadObj.ignoreOutbound === true || payloadObj.isManualIgnored === true) {
+  const candidate = payloadObj.manualMatchedProduct;
+  if ((payloadObj.ignoreOutbound === true || payloadObj.isManualIgnored === true) && !candidate) {
     return {
       id: "__ignored__",
       name: "无需出库（纯取货/跑腿）",
@@ -340,7 +343,6 @@ function readManualMatchedProduct(rawPayload: unknown): MatchedCatalogProduct | 
     } as any;
   }
 
-  const candidate = payloadObj.manualMatchedProduct;
   if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
     return null;
   }
@@ -364,6 +366,8 @@ function readManualMatchedProduct(rawPayload: unknown): MatchedCatalogProduct | 
     shopProductId: shopProductId || id,
     shopName: String(record.shopName || "").trim() || null,
     isManual: true,
+    quantity: Number(record.quantity || 0) > 0 ? Math.max(1, Number(record.quantity || 1) || 1) : undefined,
+    pendingOutboundMatch: payloadObj.pauseAutoOutbound === true || record.pendingOutboundMatch === true,
     bundleItems: Array.isArray(record.bundleItems) ? record.bundleItems : undefined,
   };
 }
