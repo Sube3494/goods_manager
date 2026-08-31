@@ -63,4 +63,5 @@ next-env.d.ts
 /tmp
 /backups
 /rank
+/.rank
 
