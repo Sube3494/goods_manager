@@ -2329,10 +2329,11 @@ export async function GET(request: NextRequest) {
             return strictCandidates[0] || null;
           };
           const platformStrictMatch = platformProductId ? resolveStrictSkuMatch(platformProductId) : null;
-          const fallbackStrictMatches = !platformProductId ? normalizedSkuCandidates
+          const shouldTrySkuFallback = !platformStrictMatch;
+          const fallbackStrictMatches = shouldTrySkuFallback ? normalizedSkuCandidates
             .map((candidate) => resolveStrictSkuMatch(candidate))
             .filter((product): product is typeof mappedShopProducts[number] => Boolean(product)) : [];
-          const hasStrictMatchForAllSegments = !platformProductId && normalizedSkuCandidates.length > 0
+          const hasStrictMatchForAllSegments = shouldTrySkuFallback && normalizedSkuCandidates.length > 0
             && normalizedSkuCandidates.every((candidate) => Boolean(resolveStrictSkuMatch(candidate)));
           const matchedProduct = manualMatchedProduct || platformStrictMatch || (hasStrictMatchForAllSegments ? (fallbackStrictMatches[0] || null) : null);
           if (matchedProduct) {
