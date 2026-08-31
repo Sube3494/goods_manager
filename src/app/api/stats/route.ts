@@ -20,7 +20,7 @@ import { formatLocalDate, parseAsShanghaiTime } from "@/lib/dateUtils";
 import { isPrismaMissingColumnError } from "@/lib/prismaSchemaCompat";
 import { getOutboundReturnTotals, parseOutboundReturnMeta } from "@/lib/outboundReturnMeta";
 import { getDailyFixedOperatingCost, getDailyUtilityCost, normalizeMonthKey } from "@/lib/operatingCosts";
-import { AUTO_INBOUND_TYPE } from "@/lib/purchaseOrderTypes";
+import { AUTO_INBOUND_NOTE_KEYWORD, AUTO_INBOUND_TYPE, ORDER_SHORTAGE_PURCHASE_NOTE_KEYWORD } from "@/lib/purchaseOrderTypes";
 import { isAddressDisabled } from "@/lib/addressBook";
 import { normalizeShopNameKey } from "@/lib/shopIdentity";
 
@@ -411,6 +411,8 @@ export async function GET(request: NextRequest) {
             NOT: [
               { type: AUTO_INBOUND_TYPE },
               { id: { startsWith: "PO-AUTO-" } },
+              { note: { contains: AUTO_INBOUND_NOTE_KEYWORD, mode: "insensitive" } },
+              { note: { contains: ORDER_SHORTAGE_PURCHASE_NOTE_KEYWORD, mode: "insensitive" } },
             ],
             ...(shopName ? { shopName } : {}),
           },
@@ -426,6 +428,12 @@ export async function GET(request: NextRequest) {
         where: {
           userId: targetUserId,
           ...(shopName ? { shopName } : {}),
+          NOT: [
+            { type: AUTO_INBOUND_TYPE },
+            { id: { startsWith: "PO-AUTO-" } },
+            { note: { contains: AUTO_INBOUND_NOTE_KEYWORD, mode: "insensitive" } },
+            { note: { contains: ORDER_SHORTAGE_PURCHASE_NOTE_KEYWORD, mode: "insensitive" } },
+          ],
           date: { gte: startDate, lte: endDate },
         },
         select: {
@@ -461,6 +469,12 @@ export async function GET(request: NextRequest) {
           userId: targetUserId,
           status: "Ordered",
           ...(shopName ? { shopName } : {}),
+          NOT: [
+            { type: AUTO_INBOUND_TYPE },
+            { id: { startsWith: "PO-AUTO-" } },
+            { note: { contains: AUTO_INBOUND_NOTE_KEYWORD, mode: "insensitive" } },
+            { note: { contains: ORDER_SHORTAGE_PURCHASE_NOTE_KEYWORD, mode: "insensitive" } },
+          ],
         },
         select: {
           id: true,
