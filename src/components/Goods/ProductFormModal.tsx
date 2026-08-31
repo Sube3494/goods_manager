@@ -2347,10 +2347,10 @@ export function ProductFormModal({
                 onSubmit={handleCreateSupplier}
             />
 
-            {isBatchTraceOpen && (
-                <div className="fixed inset-0 z-100000 flex items-center justify-center bg-black/50 p-3 backdrop-blur-sm sm:p-4">
-                    <div className="flex max-h-[88dvh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-border bg-white shadow-2xl dark:border-white/10 dark:bg-gray-900">
-                        <div className="flex items-start justify-between gap-4 border-b border-border/70 px-5 py-4 dark:border-white/10 sm:px-6">
+            {mounted && isBatchTraceOpen ? createPortal(
+                <div className="fixed inset-0 z-100000 flex items-center justify-center bg-black/65 p-2 backdrop-blur-sm sm:p-4">
+                    <div className="flex max-h-[94dvh] w-[min(96vw,1280px)] flex-col overflow-hidden rounded-2xl border border-border bg-white shadow-2xl dark:border-white/10 dark:bg-gray-900">
+                        <div className="flex items-start justify-between gap-4 border-b border-border/70 px-4 py-3.5 dark:border-white/10 sm:px-5">
                             <div className="min-w-0">
                                 <h3 className="text-base font-black text-foreground">关联销售订单</h3>
                                 <p className="mt-1 line-clamp-2 text-xs font-bold leading-relaxed text-muted-foreground">
@@ -2376,7 +2376,7 @@ export function ProductFormModal({
                                 正在筛选关联订单...
                             </div>
                         ) : viewingBatchTrace ? (
-                            <div className="overflow-y-auto bg-black/2 p-4 dark:bg-black/15 sm:p-5">
+                            <div className="overflow-y-auto overscroll-contain bg-black/2 p-2.5 dark:bg-black/15 sm:p-4">
                                 {batchSalesOrders.length > 0 ? (
                                     <div className="grid gap-4">
                                         {batchSalesOrders.map((order) => (
@@ -2403,8 +2403,9 @@ export function ProductFormModal({
                             </div>
                         ) : null}
                     </div>
-                </div>
-            )}
+                </div>,
+                document.body
+            ) : null}
 
             <PurchaseOrderModal
                 isOpen={Boolean(viewingPurchase)}
