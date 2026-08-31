@@ -171,7 +171,6 @@ type MatchedCatalogProduct = {
   shopName?: string | null;
   isManual?: boolean;
   quantity?: number;
-  pendingOutboundMatch?: boolean;
   bundleItems?: any[];
 };
 
@@ -367,7 +366,6 @@ function readManualMatchedProduct(rawPayload: unknown): MatchedCatalogProduct | 
     shopName: String(record.shopName || "").trim() || null,
     isManual: true,
     quantity: Number(record.quantity || 0) > 0 ? Math.max(1, Number(record.quantity || 1) || 1) : undefined,
-    pendingOutboundMatch: payloadObj.pauseAutoOutbound === true || record.pendingOutboundMatch === true,
     bundleItems: Array.isArray(record.bundleItems) ? record.bundleItems : undefined,
   };
 }

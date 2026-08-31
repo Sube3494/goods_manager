@@ -722,9 +722,7 @@ function isUnmatchedOrIgnoredItem(item: AutoPickOrderItem) {
   const isIgnored = rawPayload.ignoreOutbound === true
     || rawPayload.isManualIgnored === true
     || (item.matchedProduct as any)?.ignoreOutbound === true;
-  const isPausedManualMatch = rawPayload.pauseAutoOutbound === true
-    || (item.matchedProduct as any)?.pendingOutboundMatch === true;
-  if (isIgnored && !isPausedManualMatch) {
+  if (isIgnored) {
     return true;
   }
   const hasDisplayItems = Array.isArray(item.displayItems) && item.displayItems.length > 0;
@@ -1710,16 +1708,12 @@ export function ProductStripItem({
               "inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none whitespace-nowrap",
               (matchedProduct as any)?.ignoreOutbound
                 ? "bg-slate-500/10 text-slate-700 dark:text-slate-400"
-                : (matchedProduct as any)?.pendingOutboundMatch
-                ? "bg-amber-500/10 text-amber-700 dark:text-amber-300"
                 : matchedProduct
                 ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
                 : "bg-rose-500/10 text-rose-700 dark:text-rose-400"
             )}>
               {(matchedProduct as any)?.ignoreOutbound
                 ? "无需出库"
-                : (matchedProduct as any)?.pendingOutboundMatch
-                ? "待确认"
                 : matchedProduct ? (matchedProduct.isManual ? "手动" : "自动") : (display.optionalMatch ? "可选" : "未匹配")}
             </span>
           ) : null}

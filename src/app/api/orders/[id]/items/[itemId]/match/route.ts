@@ -295,8 +295,7 @@ export async function PATCH(
     const { id, itemId } = await context.params;
     const body = await request.json().catch(() => ({}));
     const shouldClear = Boolean(body?.clear);
-    const deferAutoOutbound = body?.deferAutoOutbound === true;
-    const productId = String(body?.productId || "").trim();
+        const productId = String(body?.productId || "").trim();
 
     if (!shouldClear && !productId) {
       return NextResponse.json({ error: "请选择要匹配的商品" }, { status: 400 });
@@ -400,9 +399,7 @@ export async function PATCH(
         });
       });
 
-      if (!deferAutoOutbound) {
-        await returnLegacyOutbound(orderItem.order.orderNo);
-      }
+      await returnLegacyOutbound(orderItem.order.orderNo);
 
       if (currentPlatformSkuId && previousShopProductIds.length > 0) {
         for (const oldShopProductId of previousShopProductIds) {
@@ -521,11 +518,9 @@ export async function PATCH(
       // 组合匹配只是把一个平台订单项拆成多个本地出库商品。
       // 平台 SKU 仍然只代表原始订单项，不能写到组合里的每个商品上，否则会把无关商品标成“已占用”。
 
-      if (!deferAutoOutbound) {
-        await syncAutoOutboundFromCompletedAutoPickOrder(targetUserId, id).catch((error) => {
-          console.error("Failed to auto-create outbound after manual product match:", error);
-        });
-      }
+      await syncAutoOutboundFromCompletedAutoPickOrder(targetUserId, id).catch((error) => {
+        console.error("Failed to auto-create outbound after manual product match:", error);
+      });
 
       return NextResponse.json({ ok: true, matchedProduct });
     }
@@ -632,7 +627,6 @@ export async function PATCH(
         data: {
           rawPayload: {
             ...restPayload,
-            ...(deferAutoOutbound ? { ignoreOutbound: true, pauseAutoOutbound: true } : {}),
             manualMatchedProduct: {
               id: matchedProduct.id,
               name: matchedProduct.name,
@@ -642,7 +636,6 @@ export async function PATCH(
               shopProductId: matchedProduct.shopProductId,
               shopName: matchedProduct.shopName,
               ...(singleQty && singleQty > 0 ? { quantity: singleQty } : {}),
-              ...(deferAutoOutbound ? { pendingOutboundMatch: true } : {}),
               ...(autoMatchedProduct ? { autoMatchedProduct } : {}),
             },
           } as Prisma.InputJsonValue,
@@ -650,9 +643,7 @@ export async function PATCH(
       });
     });
 
-    if (!deferAutoOutbound) {
-      await returnLegacyOutbound(orderItem.order.orderNo);
-    }
+    await returnLegacyOutbound(orderItem.order.orderNo);
 
     if (currentPlatformSkuId && previousShopProductIds.length > 0) {
       const unbindOldIds = previousShopProductIds.filter((oldId) => oldId !== shopProduct.id);
@@ -672,18 +663,13 @@ export async function PATCH(
       ).catch(() => null);
     }
 
-    if (!deferAutoOutbound) {
-      await syncAutoOutboundFromCompletedAutoPickOrder(targetUserId, id).catch((error) => {
+    await syncAutoOutboundFromCompletedAutoPickOrder(targetUserId, id).catch((error) => {
         console.error("Failed to auto-create outbound after manual product match:", error);
       });
-    }
 
     return NextResponse.json({
       ok: true,
-      matchedProduct: {
-        ...matchedProduct,
-        ...(deferAutoOutbound ? { pendingOutboundMatch: true } : {}),
-      },
+      matchedProduct,
     });
   } catch (error) {
     console.error("Failed to patch auto-pick order item match:", error);

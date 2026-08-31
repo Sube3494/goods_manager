@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUserAny } from "@/lib/auth";
-import { getOutboundReturnedQuantityMap, parseOutboundReturnMeta } from "@/lib/outboundReturnMeta";
+import { getOutboundReturnedBatchQuantityMap, getOutboundReturnedQuantityMap, parseOutboundReturnMeta } from "@/lib/outboundReturnMeta";
 import { parseOutboundNote } from "@/lib/utils";
+import { InventoryService } from "@/services/inventoryService";
 
 function parseCostSnapshot(value: unknown) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
@@ -249,10 +250,24 @@ export async function GET(
       netQuantity: 0,
       totalCost: 0,
     });
+    const actualRemainingQuantity = purchaseItem.remainingQuantity ?? purchaseItem.quantity;
+    const expectedRemainingQuantity = Math.max(0, purchaseItem.quantity - totals.netQuantity);
+    const adjustments = await prisma.inventoryAdjustment.findMany({
+      where: { userId: user.id, purchaseOrderItemId: purchaseItemId },
+      select: { id: true, quantity: true, beforeQuantity: true, afterQuantity: true, reason: true, createdAt: true },
+      orderBy: { createdAt: "desc" },
+      take: 20,
+    });
 
     return NextResponse.json({
       purchaseItem,
       totals,
+      reconciliation: {
+        actualRemainingQuantity,
+        expectedRemainingQuantity,
+        adjustmentQuantity: expectedRemainingQuantity - actualRemainingQuantity,
+      },
+      adjustments,
       orders: groupedOrders,
     });
   } catch (error) {

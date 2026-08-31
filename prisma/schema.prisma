@@ -164,9 +164,26 @@ model PurchaseOrderItem {
   purchaseOrder     PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
   supplier          Supplier?     @relation(fields: [supplierId], references: [id])
   batches           ProductBatch[]
+  inventoryAdjustments InventoryAdjustment[]
 
   @@index([productId])
   @@index([shopProductId])
+}
+
+model InventoryAdjustment {
+  id                  String            @id @default(cuid())
+  userId              String
+  purchaseOrderItemId String
+  quantity            Int
+  beforeQuantity      Int
+  afterQuantity       Int
+  reason              String
+  createdAt           DateTime          @default(now())
+  user                User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  purchaseOrderItem   PurchaseOrderItem @relation(fields: [purchaseOrderItemId], references: [id], onDelete: Restrict)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([purchaseOrderItemId, createdAt(sort: Desc)])
 }
 
 model OutboundOrder {
@@ -260,6 +277,7 @@ model User {
   dailyPromotionExpenses DailyPromotionExpense[]
   operatingCostProfiles OperatingCostProfile[]
   operatingCostMonthlyBills OperatingCostMonthlyBill[]
+  inventoryAdjustments InventoryAdjustment[]
   meituanSkuMappings    ProductMeituanSku[]
   meituanImportBatches  MeituanImportBatch[]
   meituanImportItems    MeituanImportItem[]
