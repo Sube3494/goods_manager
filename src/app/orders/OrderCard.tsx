@@ -1866,6 +1866,7 @@ export const OrderCard = memo(function OrderCard({
   order,
   expanded,
   actingId,
+  readOnly = false,
   onToggleExpanded,
   onRunAction,
   onOpenCostBackfill,
@@ -1875,6 +1876,7 @@ export const OrderCard = memo(function OrderCard({
   order: AutoPickOrder;
   expanded: boolean;
   actingId: string;
+  readOnly?: boolean;
   onToggleExpanded: (id: string) => void;
   onRunAction: (orderId: string, action: OrderAction) => void;
   onOpenCostBackfill: (order: AutoPickOrder) => void;
@@ -2634,7 +2636,7 @@ export const OrderCard = memo(function OrderCard({
                   <ProductStripItem
                     key={`${item.productNo || item.productName}-${index}-${display.sku}-${displayIndex}`}
                     display={display}
-                    showEditMatch={displayIndex === 0 && !deleted}
+                    showEditMatch={displayIndex === 0 && !deleted && !readOnly}
                     onEditMatch={() => onOpenMatchEditor(order, item)}
                     matchedProduct={item.matchedProduct}
                     showMatchStatus={displayIndex === 0}
@@ -2652,7 +2654,7 @@ export const OrderCard = memo(function OrderCard({
           ) : (
             <div className="flex items-center justify-between rounded-2xl border border-dashed border-black/10 bg-black/[0.015] px-4 py-2.5 text-xs text-muted-foreground dark:border-white/10 dark:bg-white/[0.015]">
               <span>纯配送 / 跑腿订单（无关联商品）</span>
-              {order.items && order.items.length > 0 && !deleted ? (
+              {order.items && order.items.length > 0 && !deleted && !readOnly ? (
                 <button
                   type="button"
                   onClick={() => onOpenMatchEditor(order, order.items[0])}
@@ -2724,7 +2726,7 @@ export const OrderCard = memo(function OrderCard({
                 </span>
               </span>
             ) : null}
-            {showPlatformActions && !displayAsOfflineOrder && !deleted ? (
+            {showPlatformActions && !displayAsOfflineOrder && !deleted && !readOnly ? (
               <button
                 type="button"
                 onClick={() => onRunAction(order.id, "self-delivery")}
@@ -2748,7 +2750,9 @@ export const OrderCard = memo(function OrderCard({
 
           <div className={cn(
             "grid gap-2 lg:min-w-110",
-            deleted
+            readOnly
+              ? "grid-cols-1 lg:min-w-0 lg:w-36 ml-auto"
+            : deleted
               ? "grid-cols-1 sm:grid-cols-1 lg:min-w-0 lg:w-32 ml-auto"
             : showManualDeliveryMarker || displayAsOfflineOrder
               ? "grid-cols-3 sm:grid-cols-3 lg:min-w-0 lg:w-96 ml-auto"
@@ -2761,7 +2765,7 @@ export const OrderCard = memo(function OrderCard({
               mobileIconOnly={!displayAsOfflineOrder}
               title={expanded ? "收起详情" : "展开详情"}
             />
-            {displayAsOfflineOrder && !deleted ? (
+            {displayAsOfflineOrder && !deleted && !readOnly ? (
               <ActionButton
                 label={isSavingOfflineEdit ? "保存中" : "修改"}
                 icon={isSavingOfflineEdit ? <Loader2 size={14} className="animate-spin" /> : <Pencil size={14} />}
@@ -2770,7 +2774,7 @@ export const OrderCard = memo(function OrderCard({
                 title="修改这张线下订单的金额、配送支出、地址和备注"
               />
             ) : null}
-            {displayAsOfflineOrder && !deleted ? (
+            {displayAsOfflineOrder && !deleted && !readOnly ? (
               <ActionButton
                 label={isDeletingOffline ? "作废中" : "作废"}
                 icon={isDeletingOffline ? <Loader2 size={14} className="animate-spin" /> : <X size={14} />}
@@ -2779,7 +2783,7 @@ export const OrderCard = memo(function OrderCard({
                 title="作废这张录错的线下订单，并自动回滚关联出库库存"
               />
             ) : null}
-            {showPlatformActions && (
+            {showPlatformActions && !readOnly && (
               <>
                 <ActionButton
                   label="同步"
@@ -2840,7 +2844,7 @@ export const OrderCard = memo(function OrderCard({
               正在加载订单详情...
             </div>
           ) : null}
-          {unmatchedPlaceholderItem ? (
+          {unmatchedPlaceholderItem && !readOnly ? (
             <div className="mb-3 flex items-center justify-between gap-3 rounded-2xl border border-dashed border-black/15 bg-white/80 p-3 dark:border-white/15 dark:bg-white/4 sm:px-4 sm:py-3">
               <div className="min-w-0">
                 <div className="text-xs font-semibold text-foreground">发货货品（可选）</div>

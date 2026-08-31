@@ -276,6 +276,7 @@ export function ProductFormModal({
   const [isBatchTraceOpen, setIsBatchTraceOpen] = useState(false);
   const [isLoadingBatchTrace, setIsLoadingBatchTrace] = useState(false);
   const [batchSalesOrders, setBatchSalesOrders] = useState<AutoPickOrder[]>([]);
+  const [expandedBatchOrderIds, setExpandedBatchOrderIds] = useState<string[]>([]);
 
   const openBatchTrace = async (purchaseOrderItemId: string) => {
     if (!purchaseOrderItemId) return;
@@ -283,6 +284,7 @@ export function ProductFormModal({
     setIsLoadingBatchTrace(true);
     setViewingBatchTrace(null);
     setBatchSalesOrders([]);
+    setExpandedBatchOrderIds([]);
     try {
       const res = await fetch(`/api/purchases/items/${purchaseOrderItemId}/outbounds`, { cache: "no-store" });
       const data = await res.json().catch(() => null);
@@ -2380,13 +2382,18 @@ export function ProductFormModal({
                                 {batchSalesOrders.length > 0 ? (
                                     <div className="grid gap-4">
                                         {batchSalesOrders.map((order) => (
-                                            <div key={order.id} className="pointer-events-none">
+                                            <div key={order.id}>
                                                 <OrderCardErrorBoundary orderNo={order.orderNo || order.id}>
                                                     <OrderCard
                                                         order={order}
-                                                        expanded={false}
+                                                        expanded={expandedBatchOrderIds.includes(order.id)}
                                                         actingId=""
-                                                        onToggleExpanded={() => {}}
+                                                        readOnly
+                                                        onToggleExpanded={(orderId) => setExpandedBatchOrderIds((current) => (
+                                                            current.includes(orderId)
+                                                                ? current.filter((id) => id !== orderId)
+                                                                : [...current, orderId]
+                                                        ))}
                                                         onRunAction={() => {}}
                                                         onOpenCostBackfill={() => {}}
                                                         onOpenMatchEditor={() => {}}
