@@ -2033,7 +2033,7 @@ export async function GET(request: NextRequest) {
     const productSkuCandidates = Array.from(new Set(
       responseOrders.flatMap((order) => order.items.flatMap((item) => {
         const platformProductId = readStrictPlatformProductId(order.platform, item.rawPayload, item.platformSkuId);
-        return platformProductId ? [platformProductId] : buildSkuMatchCandidates(item.productNo);
+        return [platformProductId, ...buildSkuMatchCandidates(item.productNo)].filter(Boolean);
       }))
     ));
 
@@ -2062,6 +2062,10 @@ export async function GET(request: NextRequest) {
                   { jdSkuId: { in: productSkuCandidates } },
                   { meituanSkuId: { in: productSkuCandidates } },
                   { taobaoSkuId: { in: productSkuCandidates } },
+                  { doudianSkuId: { in: productSkuCandidates } },
+                  ...productSkuCandidates.map((candidate) => ({
+                    meituanSkuId: { contains: candidate, mode: "insensitive" as const },
+                  })),
                   { product: { jdSkuMappings: { some: { jdSkuId: { in: productSkuCandidates } } } } },
                 ] : []),
                 ...(manualMatchedProductIds.length > 0 ? [
@@ -2076,6 +2080,7 @@ export async function GET(request: NextRequest) {
               jdSkuId: true,
               meituanSkuId: true,
               taobaoSkuId: true,
+              doudianSkuId: true,
               productId: true,
               sourceProductId: true,
               productName: true,
@@ -2105,6 +2110,7 @@ export async function GET(request: NextRequest) {
         jdSkuId: item.jdSkuId,
         meituanSkuId: item.meituanSkuId,
         taobaoSkuId: item.taobaoSkuId,
+        doudianSkuId: item.doudianSkuId,
         image: rawImage ? storage.resolveUrl(rawImage) : null,
         sourceType: "shopProduct" as const,
         productId: item.productId || item.sourceProductId || null,
