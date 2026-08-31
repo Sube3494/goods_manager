@@ -62,4 +62,5 @@ next-env.d.ts
 # Temporary directories
 /tmp
 /backups
+/rank
 
