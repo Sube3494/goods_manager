@@ -44,7 +44,7 @@ interface BrushSummaryItem {
   amount: number;
 }
 
-const DEFAULT_PLATFORMS = ["美团闪购", "京东秒送", "淘宝闪购"];
+const DEFAULT_PLATFORMS = ["美团闪购", "京东秒送", "淘宝闪购", "抖店"];
 const money = (value: number) => `¥${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export default function SettlementPage() {
@@ -650,6 +650,7 @@ export default function SettlementPage() {
                 if (entry.platformName.includes('美团')) brandBadge = "bg-[#FFD000]/15 text-[#b39200] dark:text-[#FFD000]";
                 if (entry.platformName.includes('淘宝')) brandBadge = "bg-[#FF5000]/10 text-[#FF5000]";
                 if (entry.platformName.includes('京东')) brandBadge = "bg-[#E1251B]/10 text-[#E1251B]";
+                if (entry.platformName.includes('抖店') || entry.platformName.includes('抖音')) brandBadge = "bg-cyan-500/10 text-cyan-600 dark:text-cyan-300";
 
                 return (
                   <div key={entry.id} className={`overflow-hidden rounded-[24px] border transition-all duration-300 shadow-sm ${

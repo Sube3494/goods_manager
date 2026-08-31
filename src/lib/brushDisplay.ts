@@ -21,6 +21,7 @@ export function resolvePlatformFeeRate(type: string) {
   if (type.includes("美团")) return normalizeDisplayRate(0.06);
   if (type.includes("淘宝")) return normalizeDisplayRate(0.06);
   if (type.includes("京东")) return normalizeDisplayRate(0.06);
+  if (type.includes("抖店") || type.includes("抖音")) return normalizeDisplayRate(0.06);
   return 0.06;
 }
 
@@ -50,5 +51,6 @@ export function normalizeBrushSettlementPlatform(type: string) {
   if (type.includes("美团")) return "美团闪购";
   if (type.includes("京东")) return "京东秒送";
   if (type.includes("淘宝")) return "淘宝闪购";
+  if (type.includes("抖店") || type.includes("抖音")) return "抖店";
   return type.trim();
 }
