@@ -520,8 +520,8 @@ export async function DELETE(request: NextRequest) {
     }
 
     const body = await request.json().catch(() => null);
-    const ids = Array.isArray(body?.ids)
-      ? Array.from(new Set(body.ids.map((item: unknown) => String(item).trim()).filter(Boolean)))
+    const ids: string[] = Array.isArray(body?.ids)
+      ? Array.from(new Set(body.ids.map((item: unknown) => String(item).trim()).filter((id: string) => id.length > 0)))
       : [];
 
     if (ids.length === 0) {
