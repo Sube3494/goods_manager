@@ -699,6 +699,31 @@ function readRefundAmountFromRawPayload(rawPayload: unknown) {
   return Number(record.refundAmount || record.refund_amount || 0) || 0;
 }
 
+function resolveCancelReasonFromDetails(cancelDetails: unknown) {
+  if (!Array.isArray(cancelDetails) || cancelDetails.length === 0) return null;
+  const records = cancelDetails.filter((item): item is Record<string, unknown> => (
+    item != null && typeof item === "object" && !Array.isArray(item)
+  ));
+  const effectiveCancel = [...records]
+    .reverse()
+    .find((item) => String(item.status || "").trim() === "1")
+    || records[records.length - 1]
+    || records[0];
+  const title = String(effectiveCancel?.title || "").trim();
+  const reason = String(effectiveCancel?.reason || "").trim();
+  return [title, reason]
+    .filter(Boolean)
+    .filter((part, index, arr) => arr.indexOf(part) === index)
+    .join("：") || null;
+}
+
+function readCancelReasonFromRawPayload(rawPayload: unknown) {
+  if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) return null;
+  const record = rawPayload as Record<string, unknown>;
+  const direct = String(record.cancelReason || record.cancel_reason || "").trim();
+  return direct || resolveCancelReasonFromDetails(record.cancelDetails || record.cancel_details);
+}
+
 function readShopNameFromRawPayload(rawPayload: unknown) {
   if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
     return null;
@@ -2278,6 +2303,7 @@ export async function GET(request: NextRequest) {
         actualPaid: order.actualPaid,
         expectedIncome: safeExpectedIncome,
         refundAmount,
+        cancelReason: readCancelReasonFromRawPayload(order.rawPayload),
         returnExtraExpense,
         platformCommission: adjustedMetrics.platformCommission,
         brushCommission: orderBrushCommissionYuan,

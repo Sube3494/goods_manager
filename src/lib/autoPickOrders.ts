@@ -62,6 +62,7 @@ export type AutoPickInboundOrder = {
   expectedIncome?: number;
   platformCommission?: number;
   refundAmount?: number;
+  cancelReason?: string;
   cancelDetails?: Array<Record<string, unknown>>;
   delivery?: {
     logisticName?: string;
@@ -2061,6 +2062,21 @@ async function fetchMaiyatianCancelDetailByCookie(cookie: string, orderId: strin
   return [];
 }
 
+function resolveMaiyatianCancelReason(cancelDetails: Array<Record<string, unknown>> | undefined | null) {
+  if (!Array.isArray(cancelDetails) || cancelDetails.length === 0) return "";
+  const effectiveCancel = [...cancelDetails]
+    .reverse()
+    .find((item) => String(item.status || "").trim() === "1")
+    || cancelDetails[cancelDetails.length - 1]
+    || cancelDetails[0];
+  const title = String(effectiveCancel?.title || "").trim();
+  const reason = String(effectiveCancel?.reason || "").trim();
+  return [title, reason]
+    .filter(Boolean)
+    .filter((part, index, arr) => arr.indexOf(part) === index)
+    .join("：");
+}
+
 async function enrichMaiyatianOrderByCookie(cookie: string, order: AutoPickInboundOrder) {
   const rawOrderId = String(order.id || "").trim();
   if (!rawOrderId) {
@@ -2286,11 +2302,15 @@ async function enrichMaiyatianOrderByCookie(cookie: string, order: AutoPickInbou
       detailStatus = "已取消";
     }
 
+    const cancelReason = resolveMaiyatianCancelReason(cancelDetails);
+    order.cancelDetails = cancelDetails;
+    order.cancelReason = cancelReason || undefined;
+    orderObj.cancelDetails = cancelDetails;
+    orderObj.cancelReason = cancelReason || undefined;
+
     if (refundAmountYuan > 0) {
       order.refundAmount = Math.round(refundAmountYuan * 100);
-      order.cancelDetails = cancelDetails;
       orderObj.refundAmount = Math.round(refundAmountYuan * 100);
-      orderObj.cancelDetails = cancelDetails;
     }
   }
 
@@ -3181,6 +3201,7 @@ export function normalizeAutoPickOrderPayload(payload: unknown): AutoPickInbound
     expectedIncome: Number.isFinite(Number(input.expectedIncome)) ? Number(input.expectedIncome) : parsedAmounts.expectedIncome,
     platformCommission: Number.isFinite(Number(input.platformCommission)) ? Number(input.platformCommission) : parsedAmounts.platformCommission,
     refundAmount: Number.isFinite(Number(input.refundAmount ?? input.refund_amount)) ? Math.round(Number(input.refundAmount ?? input.refund_amount)) : undefined,
+    cancelReason: String(input.cancelReason || input.cancel_reason || resolveMaiyatianCancelReason(Array.isArray(input.cancelDetails) ? input.cancelDetails as Array<Record<string, unknown>> : null) || "").trim() || undefined,
     cancelDetails: Array.isArray(input.cancelDetails) ? input.cancelDetails as Array<Record<string, unknown>> : undefined,
     delivery: (() => {
       const deliveryRecord = input.delivery && typeof input.delivery === "object"

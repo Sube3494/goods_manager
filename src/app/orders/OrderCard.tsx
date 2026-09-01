@@ -733,6 +733,35 @@ function getVisibleOrderItems(items: AutoPickOrderItem[]) {
   return (items || []).filter((item) => !isUnmatchedOrIgnoredItem(item));
 }
 
+function resolveCancelReasonFromDetails(cancelDetails: unknown) {
+  if (!Array.isArray(cancelDetails) || cancelDetails.length === 0) return "";
+  const records = cancelDetails.filter((item): item is Record<string, unknown> => (
+    item != null && typeof item === "object" && !Array.isArray(item)
+  ));
+  const effectiveCancel = [...records]
+    .reverse()
+    .find((item) => String(item.status || "").trim() === "1")
+    || records[records.length - 1]
+    || records[0];
+  const title = String(effectiveCancel?.title || "").trim();
+  const reason = String(effectiveCancel?.reason || "").trim();
+  return [title, reason]
+    .filter(Boolean)
+    .filter((part, index, arr) => arr.indexOf(part) === index)
+    .join("：");
+}
+
+function getCancelReason(order: Pick<AutoPickOrder, "cancelReason" | "rawPayload">) {
+  const direct = String(order.cancelReason || "").trim();
+  if (direct) return direct;
+  const rawPayload = order.rawPayload && typeof order.rawPayload === "object" && !Array.isArray(order.rawPayload)
+    ? order.rawPayload as Record<string, unknown>
+    : null;
+  if (!rawPayload) return "";
+  return String(rawPayload.cancelReason || rawPayload.cancel_reason || "").trim()
+    || resolveCancelReasonFromDetails(rawPayload.cancelDetails || rawPayload.cancel_details);
+}
+
 function isLegacyManualDeliveryPlaceholderOrder(order: AutoPickOrder) {
   return order.platform === "线下交易" && order.items.some(isManualDeliveryPlaceholderItem);
 }
@@ -2044,6 +2073,7 @@ export const OrderCard = memo(function OrderCard({
   const itemCount = getItemCount(visibleItems);
   const completed = isCompletedStatus(order.status);
   const cancelled = isCancelledStatus(order.status);
+  const cancelReason = cancelled ? getCancelReason(order) : "";
   const deleted = getBaseAutoPickStatusDisplay(order.status) === "已删除";
   const terminal = isTerminalStatus(order.status);
   const abnormal = isAbnormalStatus(order.status);
@@ -2690,9 +2720,21 @@ export const OrderCard = memo(function OrderCard({
               </span>
             ) : null}
             {cancelled ? (
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-500/15 bg-slate-500/10 px-2.5 py-1 text-[11px] font-medium text-slate-600 dark:text-slate-400 sm:gap-2 sm:px-3 sm:py-1.5 sm:text-xs">
-                <X size={12} />
-                订单已取消
+              <span className="group/cancel relative inline-flex">
+                <span
+                  title={cancelReason || undefined}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-slate-500/15 bg-slate-500/10 px-2.5 py-1 text-[11px] font-medium text-slate-600 dark:text-slate-400 sm:gap-2 sm:px-3 sm:py-1.5 sm:text-xs"
+                >
+                  <X size={12} />
+                  订单已取消
+                </span>
+                {cancelReason ? (
+                  <span className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 hidden w-72 -translate-x-1/2 rounded-xl border border-slate-200/90 bg-white/98 px-3.5 py-2.5 text-left text-[11px] leading-5 text-slate-600 opacity-0 shadow-xl transition-all duration-200 group-hover/cancel:block group-hover/cancel:opacity-100 dark:border-white/12 dark:bg-[#171b22]/96 dark:text-slate-300">
+                    <span className="absolute top-full left-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1 rotate-45 border-r border-b border-slate-200/90 bg-white dark:border-white/12 dark:bg-[#171b22]" />
+                    <span className="mb-1 block font-semibold text-slate-800 dark:text-white">取消理由</span>
+                    {cancelReason}
+                  </span>
+                ) : null}
               </span>
             ) : null}
             {deleted ? (

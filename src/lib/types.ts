@@ -257,6 +257,7 @@ export interface AutoPickOrder {
   serviceFeeRate?: number | null;
   productCost?: number | null;
   refundAmount?: number | null;
+  cancelReason?: string | null;
   returnExtraExpense?: number | null;
   outboundReturnDetails?: Array<{
     id: string;
