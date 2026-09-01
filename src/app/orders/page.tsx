@@ -1620,7 +1620,12 @@ export default function OrdersPage() {
     ));
     window.setTimeout(() => {
       setProfitUpdatingOrderIds((current) => current.filter((id) => id !== orderId));
-    }, 5000);
+    }, 15000);
+  }, []);
+
+  const clearProfitUpdating = useCallback((orderId: string) => {
+    if (!orderId) return;
+    setProfitUpdatingOrderIds((current) => current.filter((id) => id !== orderId));
   }, []);
 
   const handleDataLoad = useCallback((tab: OrdersTab, data: {
@@ -2196,30 +2201,34 @@ export default function OrdersPage() {
     const sourceOrderId = String(data.sourceOrderId || "").trim();
     if (sourceOrderId) {
       markProfitUpdating(sourceOrderId);
-      const outboundResponse = await fetch(`/api/orders/${sourceOrderId}/outbound`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          matchedShopName: data.shopName || "",
-        }),
-      });
-      const outboundPayload = await outboundResponse.json().catch(() => ({}));
+      try {
+        const outboundResponse = await fetch(`/api/orders/${sourceOrderId}/outbound`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            matchedShopName: data.shopName || "",
+          }),
+        });
+        const outboundPayload = await outboundResponse.json().catch(() => ({}));
 
-      if (!outboundResponse.ok) {
-        const outboundMessage = getOrderActionErrorMessage(
-          outboundPayload?.error || outboundPayload?.message || "自动出库失败"
-        );
-        showToast(`采购单已创建并入库，请手动重试出库：${outboundMessage}`, "warning");
-        setPurchaseDraft(null);
-        triggerParentRefresh();
-        return;
+        if (!outboundResponse.ok) {
+          const outboundMessage = getOrderActionErrorMessage(
+            outboundPayload?.error || outboundPayload?.message || "自动出库失败"
+          );
+          showToast(`采购单已创建并入库，请手动重试出库：${outboundMessage}`, "warning");
+          setPurchaseDraft(null);
+          triggerParentRefresh();
+          return;
+        }
+      } finally {
+        clearProfitUpdating(sourceOrderId);
       }
     }
 
     showToast(sourceOrderId ? "采购单已创建入库，并已自动出库" : "采购单已创建并入库", "success");
     setPurchaseDraft(null);
     triggerParentRefresh();
-  }, [markProfitUpdating, showToast, triggerParentRefresh]);
+  }, [clearProfitUpdating, markProfitUpdating, showToast, triggerParentRefresh]);
 
   return (
     <div className="relative px-2 sm:px-1">
@@ -2662,7 +2671,7 @@ export default function OrdersPage() {
                   {shopProfitEntries.length > 0 ? (
                     <div className="overflow-hidden rounded-xl border border-black/8 bg-slate-50/80 text-sm dark:border-white/10 dark:bg-white/[0.035]">
                       <div className="overflow-x-auto">
-                        <div className="hidden min-w-[1220px] grid-cols-[2.75rem_minmax(8.5rem,1.15fr)_4.25rem_6.75rem_5.75rem_5.75rem_5.75rem_repeat(5,7rem)] border-b border-black/6 bg-slate-100/80 px-3 py-2 text-[11px] font-bold text-muted-foreground dark:border-white/8 dark:bg-white/5 xl:grid">
+                        <div className="hidden min-w-[1140px] grid-cols-[2.75rem_6.5rem_4.25rem_6.75rem_5.75rem_5.75rem_5.75rem_repeat(5,7rem)] border-b border-black/6 bg-slate-100/80 px-3 py-2 text-[11px] font-bold text-muted-foreground dark:border-white/8 dark:bg-white/5 xl:grid">
                           <div className="text-center">#</div>
                           <div className="text-center">店铺</div>
                           <div className="text-center">订单</div>
@@ -2689,7 +2698,7 @@ export default function OrdersPage() {
                         const averageProfit = shop.count > 0 ? shop.amount / shop.count : 0;
 
                         return (
-                          <div key={shop.key} className="border-b border-black/6 px-3 py-2.5 last:border-b-0 dark:border-white/8 xl:grid xl:min-w-[1220px] xl:grid-cols-[2.75rem_minmax(8.5rem,1.15fr)_4.25rem_6.75rem_5.75rem_5.75rem_5.75rem_repeat(5,7rem)] xl:items-center xl:px-3 xl:py-2.5">
+                          <div key={shop.key} className="border-b border-black/6 px-3 py-2.5 last:border-b-0 dark:border-white/8 xl:grid xl:min-w-[1140px] xl:grid-cols-[2.75rem_6.5rem_4.25rem_6.75rem_5.75rem_5.75rem_5.75rem_repeat(5,7rem)] xl:items-center xl:px-3 xl:py-2.5">
                             <div className="hidden text-center text-xs font-black tabular-nums text-muted-foreground xl:block">
                               #{index + 1}
                             </div>
