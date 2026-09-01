@@ -868,6 +868,11 @@ function parseDeliveryRangeSegments(text: string) {
   return null;
 }
 
+function hasDatePrefix(text: string) {
+  return /^\d{2}[-/]\d{2}\s+\d{1,2}:\d{2}/.test(text)
+    || /^\d{4}[-/]\d{2}[-/]\d{2}\s+\d{1,2}:\d{2}/.test(text);
+}
+
 export function getDeadlineDisplay(order: Pick<AutoPickOrder, "isPickup" | "isSubscribe" | "deliveryDeadline" | "deliveryTimeRange" | "orderTime" | "createdAt"> & { platform?: string | null; channelTag?: string | null }) {
   const deadlineText = String(order.deliveryDeadline || "").trim();
   const rangeText = String(order.deliveryTimeRange || "").trim();
@@ -911,10 +916,12 @@ export function getDeadlineDisplay(order: Pick<AutoPickOrder, "isPickup" | "isSu
   const rangeMatch = parseDeliveryRangeSegments(text);
   if (rangeMatch) {
     if (isSubscribe) {
-      return `${datePrefix}${rangeMatch.start}-${rangeMatch.end}`;
+      return hasDatePrefix(rangeMatch.start)
+        ? `${rangeMatch.start}-${rangeMatch.end}`
+        : `${datePrefix}${rangeMatch.start}-${rangeMatch.end}`;
     }
     const targetTime = isJd ? rangeMatch.end : rangeMatch.start;
-    return /^\d{2}[-/]\d{2}\s+\d{1,2}:\d{2}/.test(targetTime) || /^\d{4}[-/]\d{2}[-/]\d{2}\s+\d{1,2}:\d{2}/.test(targetTime)
+    return hasDatePrefix(targetTime)
       ? targetTime
       : `${datePrefix}${targetTime}`;
   }
