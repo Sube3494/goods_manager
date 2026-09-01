@@ -80,7 +80,6 @@ export class ProductService {
       const lib = await prisma.productLibrary.findUnique({
         where: { id: libId },
         select: { 
-          isPublic: true,
           authorizedUsers: {
             where: { id: userId },
             select: { id: true }
@@ -88,7 +87,7 @@ export class ProductService {
         }
       });
       if (!lib) return false;
-      return lib.isPublic || lib.authorizedUsers.length > 0;
+      return lib.authorizedUsers.length > 0;
     };
 
     // 针对不同商品库进行权限判定与数据过滤
@@ -105,15 +104,11 @@ export class ProductService {
       }
       andConditions.push({ libraryId });
     } else {
-      // 若未显式传入 libraryId，过滤出用户有权查看的库
+      // 若未显式传入 libraryId，过滤出用户被显式授权查看的库
       if (!isSuperAdmin) {
         if (userId) {
           andConditions.push({
-            OR: [
-              { libraryId: null },
-              { library: { isPublic: true } },
-              { library: { authorizedUsers: { some: { id: userId } } } }
-            ]
+            library: { authorizedUsers: { some: { id: userId } } }
           });
         } else {
           // 未登录：只能看到公开库或无库商品

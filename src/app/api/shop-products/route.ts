@@ -93,7 +93,6 @@ export async function GET(request: NextRequest) {
       andConditions.push({
         OR: [
           { productId: null },
-          { product: { library: { code: "public" } } },
           { product: { library: { authorizedUsers: { some: { id: user.id } } } } }
         ]
       });

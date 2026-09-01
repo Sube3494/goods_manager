@@ -50,7 +50,7 @@ export async function GET() {
     // 强制执行初始化以确保基础数据存在
     await ensureDefaultLibraries();
 
-    // 默认所有人都可以访问公开库。如果未登录或无有效账号，仅返回公开库。
+    // 未登录或无有效账号时，仅返回公开库。
     if (!session || !session.id) {
       const publicLibs = await prisma.productLibrary.findMany({
         where: { isPublic: true },
@@ -77,17 +77,12 @@ export async function GET() {
       return NextResponse.json(allLibs);
     }
 
-    // 获取公开库 + 显式被授权可见的私有库
+    // 普通用户仅获取成员管理中显式授权的商品库。
     const libraries = await prisma.productLibrary.findMany({
       where: {
-        OR: [
-          { isPublic: true },
-          {
-            authorizedUsers: {
-              some: { id: session.id }
-            }
-          }
-        ]
+        authorizedUsers: {
+          some: { id: session.id }
+        }
       },
       include: {
         _count: {
@@ -111,7 +106,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const { name, isPublic } = await request.json();
+    const { name } = await request.json();
     if (!name || typeof name !== "string" || !name.trim()) {
       return NextResponse.json({ error: "商品库名称不能为空" }, { status: 400 });
     }
