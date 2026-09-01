@@ -1164,13 +1164,26 @@ export function PromotionMetricCard({
 }
 
 
-export function StatusBadge({ order }: { order: Pick<AutoPickOrder, "isPickup" | "status" | "platform" | "isPickCompleted"> }) {
+export function StatusBadge({ order }: { order: Pick<AutoPickOrder, "isPickup" | "status" | "platform" | "isPickCompleted" | "cancelReason" | "rawPayload"> }) {
   const display = getDisplayStatus(order);
   const tone = getStatusTone(display);
+  const cancelReason = display === "已取消" ? getCancelReason(order) : "";
   return (
-    <span className={cn("inline-flex h-7 items-center gap-1 rounded-full border px-1.5 text-[10px] font-black sm:h-8 sm:gap-2 sm:px-3 sm:text-xs", tone.badge)}>
-      <span className={cn("h-1 w-1 rounded-full sm:h-2 sm:w-2", tone.dot)} />
-      {display}
+    <span className="group/status relative inline-flex">
+      <span
+        title={cancelReason || undefined}
+        className={cn("inline-flex h-7 items-center gap-1 rounded-full border px-1.5 text-[10px] font-black sm:h-8 sm:gap-2 sm:px-3 sm:text-xs", tone.badge)}
+      >
+        <span className={cn("h-1 w-1 rounded-full sm:h-2 sm:w-2", tone.dot)} />
+        {display}
+      </span>
+      {cancelReason ? (
+        <span className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 hidden w-72 -translate-x-1/2 rounded-xl border border-slate-200/90 bg-white/98 px-3.5 py-2.5 text-left text-[11px] font-medium leading-5 text-slate-600 opacity-0 shadow-xl transition-all duration-200 group-hover/status:block group-hover/status:opacity-100 dark:border-white/12 dark:bg-[#171b22]/96 dark:text-slate-300">
+          <span className="absolute top-full left-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1 rotate-45 border-r border-b border-slate-200/90 bg-white dark:border-white/12 dark:bg-[#171b22]" />
+          <span className="mb-1 block font-semibold text-slate-800 dark:text-white">取消理由</span>
+          {cancelReason}
+        </span>
+      ) : null}
     </span>
   );
 }
@@ -2720,21 +2733,9 @@ export const OrderCard = memo(function OrderCard({
               </span>
             ) : null}
             {cancelled ? (
-              <span className="group/cancel relative inline-flex">
-                <span
-                  title={cancelReason || undefined}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-slate-500/15 bg-slate-500/10 px-2.5 py-1 text-[11px] font-medium text-slate-600 dark:text-slate-400 sm:gap-2 sm:px-3 sm:py-1.5 sm:text-xs"
-                >
-                  <X size={12} />
-                  订单已取消
-                </span>
-                {cancelReason ? (
-                  <span className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 hidden w-72 -translate-x-1/2 rounded-xl border border-slate-200/90 bg-white/98 px-3.5 py-2.5 text-left text-[11px] leading-5 text-slate-600 opacity-0 shadow-xl transition-all duration-200 group-hover/cancel:block group-hover/cancel:opacity-100 dark:border-white/12 dark:bg-[#171b22]/96 dark:text-slate-300">
-                    <span className="absolute top-full left-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1 rotate-45 border-r border-b border-slate-200/90 bg-white dark:border-white/12 dark:bg-[#171b22]" />
-                    <span className="mb-1 block font-semibold text-slate-800 dark:text-white">取消理由</span>
-                    {cancelReason}
-                  </span>
-                ) : null}
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-500/15 bg-slate-500/10 px-2.5 py-1 text-[11px] font-medium text-slate-600 dark:text-slate-400 sm:gap-2 sm:px-3 sm:py-1.5 sm:text-xs">
+                <X size={12} />
+                订单已取消
               </span>
             ) : null}
             {deleted ? (
