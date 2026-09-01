@@ -705,10 +705,12 @@ function resolveCancelReasonFromDetails(cancelDetails: unknown) {
     item != null && typeof item === "object" && !Array.isArray(item)
   ));
   const effectiveCancel = [...records]
-    .reverse()
-    .find((item) => String(item.status || "").trim() === "1")
-    || records[records.length - 1]
-    || records[0];
+    .sort((left, right) => {
+      const leftConfirmed = String(left.status || "").trim() === "1" ? 1 : 0;
+      const rightConfirmed = String(right.status || "").trim() === "1" ? 1 : 0;
+      if (leftConfirmed !== rightConfirmed) return rightConfirmed - leftConfirmed;
+      return String(right.reason || "").trim().length - String(left.reason || "").trim().length;
+    })[0];
   const title = String(effectiveCancel?.title || "").trim();
   const reason = String(effectiveCancel?.reason || "").trim();
   return [title, reason]

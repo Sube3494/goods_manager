@@ -739,10 +739,12 @@ function resolveCancelReasonFromDetails(cancelDetails: unknown) {
     item != null && typeof item === "object" && !Array.isArray(item)
   ));
   const effectiveCancel = [...records]
-    .reverse()
-    .find((item) => String(item.status || "").trim() === "1")
-    || records[records.length - 1]
-    || records[0];
+    .sort((left, right) => {
+      const leftConfirmed = String(left.status || "").trim() === "1" ? 1 : 0;
+      const rightConfirmed = String(right.status || "").trim() === "1" ? 1 : 0;
+      if (leftConfirmed !== rightConfirmed) return rightConfirmed - leftConfirmed;
+      return String(right.reason || "").trim().length - String(left.reason || "").trim().length;
+    })[0];
   const title = String(effectiveCancel?.title || "").trim();
   const reason = String(effectiveCancel?.reason || "").trim();
   return [title, reason]
@@ -1178,10 +1180,17 @@ export function StatusBadge({ order }: { order: Pick<AutoPickOrder, "isPickup" |
         {display}
       </span>
       {cancelReason ? (
-        <span className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 hidden w-72 -translate-x-1/2 rounded-xl border border-slate-200/90 bg-white/98 px-3.5 py-2.5 text-left text-[11px] font-medium leading-5 text-slate-600 opacity-0 shadow-xl transition-all duration-200 group-hover/status:block group-hover/status:opacity-100 dark:border-white/12 dark:bg-[#171b22]/96 dark:text-slate-300">
-          <span className="absolute top-full left-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1 rotate-45 border-r border-b border-slate-200/90 bg-white dark:border-white/12 dark:bg-[#171b22]" />
-          <span className="mb-1 block font-semibold text-slate-800 dark:text-white">取消理由</span>
-          {cancelReason}
+        <span className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 hidden w-[min(19rem,calc(100vw-2rem))] -translate-x-1/2 opacity-0 transition-all duration-200 group-hover/status:block group-hover/status:opacity-100">
+          <span className="block rounded-xl border border-slate-200/90 bg-white/98 p-3 text-left shadow-[0_16px_40px_rgba(15,23,42,0.18)] dark:border-white/12 dark:bg-[#171b22]/96 dark:shadow-[0_18px_44px_rgba(0,0,0,0.38)]">
+            <span className="absolute left-1/2 top-full h-2.5 w-2.5 -translate-x-1/2 -translate-y-1.5 rotate-45 border-r border-b border-slate-200/90 bg-white dark:border-white/12 dark:bg-[#171b22]" />
+            <span className="flex items-center gap-2 border-b border-slate-200/80 pb-2 dark:border-white/8">
+              <span className={cn("h-1.5 w-1.5 rounded-full", tone.dot)} />
+              <span className="text-[11px] font-semibold text-slate-900 dark:text-white">取消原因</span>
+            </span>
+            <span className="mt-2 block whitespace-normal break-words text-[12px] font-medium leading-5 text-slate-600 dark:text-slate-300">
+              {cancelReason}
+            </span>
+          </span>
         </span>
       ) : null}
     </span>
