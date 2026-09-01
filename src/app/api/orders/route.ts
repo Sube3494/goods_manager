@@ -1907,15 +1907,17 @@ export async function GET(request: NextRequest) {
             } else {
               acc.realReceivedAmount += expected;
               acc.realPaidAmount += Number(actualPaid || 0);
+              acc.validOrderCount += 1;
             }
             acc.platformCommission += adjustedMetrics.platformCommission;
-            acc.validOrderCount += 1;
 
             if (!acc.platformReceived[platform]) {
               acc.platformReceived[platform] = { amount: 0, count: 0 };
             }
             acc.platformReceived[platform].amount += expected;
-            acc.platformReceived[platform].count += 1;
+            if (!isBrush) {
+              acc.platformReceived[platform].count += 1;
+            }
 
             acc.totalDeliveryFee += deliveryFee;
             if (deliveryFee > 0) {
@@ -1975,15 +1977,21 @@ export async function GET(request: NextRequest) {
               acc.platformProfit[platform] = { amount: 0, count: 0 };
             }
             acc.platformProfit[platform].amount += profitValue;
-            acc.platformProfit[platform].count += 1;
+            if (!isBrush) {
+              acc.platformProfit[platform].count += 1;
+            }
             const shopProfit = ensureShopProfit();
             shopProfit.amount += profitValue;
-            shopProfit.count += 1;
+            if (!isBrush) {
+              shopProfit.count += 1;
+            }
             shopProfit.deliveryFee += deliveryFee;
             shopProfit.productCost += productCost;
             shopProfit.platformCommission += adjustedMetrics.platformCommission;
             shopProfit.platformProfit[platform] = (shopProfit.platformProfit[platform] || 0) + profitValue;
-            shopProfit.platformCount[platform] = (shopProfit.platformCount[platform] || 0) + 1;
+            if (!isBrush) {
+              shopProfit.platformCount[platform] = (shopProfit.platformCount[platform] || 0) + 1;
+            }
           }
           acc.itemCount += order.items.reduce((sum: number, item) => sum + item.quantity, 0);
           return acc;
