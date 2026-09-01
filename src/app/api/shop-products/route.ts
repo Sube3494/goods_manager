@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
 import { getStorageStrategy } from "@/lib/storage";
 import { normalizeMeituanSkuIds } from "@/lib/productMeituanSku";
+import { Prisma } from "../../../../prisma/generated-client";
 
 function buildOrderBy(sortBy: string) {
   if (sortBy === "createdAt-desc") return [{ createdAt: "desc" as const }, { id: "asc" as const }];
@@ -53,7 +54,7 @@ export async function GET(request: NextRequest) {
 
     const canViewAllShops = user.role === "SUPER_ADMIN" && scope === "all";
 
-    const where: any = {
+    const where: Prisma.ShopProductWhereInput = {
       ...(canViewAllShops ? {} : { shop: { userId: user.id } }),
       ...(explicitIds.length > 0 ? { id: { in: explicitIds } } : {}),
       ...(shopId !== "all" ? { shopId } : {}),
@@ -62,7 +63,7 @@ export async function GET(request: NextRequest) {
     };
 
     const libraryId = request.nextUrl.searchParams.get("libraryId") || "all";
-    const andConditions: any[] = [];
+    const andConditions: Prisma.ShopProductWhereInput[] = [];
 
     if (search) {
       andConditions.push({
@@ -508,5 +509,39 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error("Failed to fetch aggregated shop products:", error);
     return NextResponse.json({ error: "Failed to fetch shop products" }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const user = await getAuthorizedUser("product:update");
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized or insufficient permissions" }, { status: 401 });
+    }
+
+    const body = await request.json().catch(() => null);
+    const ids = Array.isArray(body?.ids)
+      ? Array.from(new Set(body.ids.map((item: unknown) => String(item).trim()).filter(Boolean)))
+      : [];
+
+    if (ids.length === 0) {
+      return NextResponse.json({ error: "Missing shop product IDs" }, { status: 400 });
+    }
+
+    const result = await prisma.shopProduct.deleteMany({
+      where: {
+        id: { in: ids },
+        ...(user.role === "SUPER_ADMIN" ? {} : { shop: { userId: user.id } }),
+      },
+    });
+
+    return NextResponse.json({
+      success: true,
+      count: result.count,
+      message: `已删除 ${result.count} 个店铺商品`,
+    });
+  } catch (error) {
+    console.error("Failed to delete aggregated shop products:", error);
+    return NextResponse.json({ error: "Failed to delete shop products" }, { status: 500 });
   }
 }

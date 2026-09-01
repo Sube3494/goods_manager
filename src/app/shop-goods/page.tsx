@@ -1764,30 +1764,16 @@ export default function ShopGoodsPage() {
 
   const handleRemoveSelected = useCallback(async () => {
     if (selectedIds.length === 0) return;
-    const selectedItems = (await fetchSelectedItems()).filter((item) => item.shopId);
-    const grouped = selectedItems.reduce<Record<string, string[]>>((acc, item) => {
-      const shopId = item.shopId!;
-      if (!acc[shopId]) acc[shopId] = [];
-      acc[shopId].push(item.id);
-      return acc;
-    }, {});
-    const shopIds = Object.keys(grouped);
-    if (shopIds.length === 0) {
-      showToast("未找到可删除的店铺商品", "error");
-      return;
-    }
     try {
-      const results = await Promise.all(shopIds.map(async (shopId) => {
-        const res = await fetch(`/api/shops/${shopId}/products`, {
-          method: "DELETE",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ productIds: grouped[shopId] }),
-        });
-        const data = await res.json().catch(() => null);
-        if (!res.ok) throw new Error(data?.error || "删除商品失败");
-        return data;
-      }));
-      const removedCount = results.reduce((sum, result) => sum + Number(result?.count || 0), 0);
+      showToast(`正在删除 ${selectedIds.length} 个店铺商品...`, "info");
+      const res = await fetch("/api/shop-products", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: selectedIds }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error || "删除商品失败");
+      const removedCount = Number(data?.count || 0);
       showToast(`已删除 ${removedCount} 个店铺商品`, "success");
       setSelectedIds([]);
       void fetchShopProducts(true);
@@ -1795,7 +1781,7 @@ export default function ShopGoodsPage() {
       console.error("Failed to remove products from shops:", error);
       showToast(error instanceof Error ? error.message : "删除商品失败", "error");
     }
-  }, [fetchSelectedItems, fetchShopProducts, selectedIds, showToast]);
+  }, [fetchShopProducts, selectedIds, showToast]);
 
   const openEditModal = useCallback(async (item: ShopCatalogItem) => {
     editScrollTopRef.current = window.scrollY;
