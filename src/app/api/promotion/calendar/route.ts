@@ -111,6 +111,7 @@ export async function GET(request: NextRequest) {
       realOrderMeituan: number;
       realOrderJingdong: number;
       realOrderTaobao: number;
+      realOrderDoudian: number;
       brushOrderCount: number;
       cancelledOrderCount: number;
       // 各店铺的推广费明细（仅在未过滤时携带，用于悬停展示）
@@ -131,6 +132,7 @@ export async function GET(request: NextRequest) {
         realOrderMeituan: 0,
         realOrderJingdong: 0,
         realOrderTaobao: 0,
+        realOrderDoudian: 0,
         brushOrderCount: 0,
         cancelledOrderCount: 0,
         shopBreakdown: {},
@@ -182,6 +184,8 @@ export async function GET(request: NextRequest) {
             dataMap[key].realOrderJingdong += 1;
           } else if (order.platform === "淘宝") {
             dataMap[key].realOrderTaobao += 1;
+          } else if (String(order.platform || "").includes("抖店") || String(order.platform || "").includes("抖音") || String(order.platform || "").toLowerCase() === "doudian" || String(order.platform || "").toLowerCase() === "douyin") {
+            dataMap[key].realOrderDoudian += 1;
           }
         }
       }

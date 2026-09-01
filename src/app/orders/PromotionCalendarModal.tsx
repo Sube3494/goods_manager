@@ -21,7 +21,7 @@ import {
 interface CustomTooltipProps {
   active?: boolean;
   payload?: any[];
-  platform: "amountMeituan" | "amountJingdong" | "amountTaobao";
+  platform: PromotionPlatformKey;
 }
 
 function CustomTooltip({ active, payload, platform }: CustomTooltipProps) {
@@ -29,8 +29,7 @@ function CustomTooltip({ active, payload, platform }: CustomTooltipProps) {
     const dateStr = payload[0].payload.dateStr;
     const promoVal = payload[0].value;
     const orderVal = payload[1]?.value ?? 0;
-    const platformLabel = platform === "amountMeituan" ? "美团" : platform === "amountJingdong" ? "京东" : "淘宝";
-    const dotColor = platform === "amountMeituan" ? "bg-[#FFB800]" : platform === "amountJingdong" ? "bg-[#DF1E1D]" : "bg-[#FF5500]";
+    const platformMeta = PROMOTION_PLATFORM_META[platform];
     
     return (
       <div className="rounded-xl border border-black/8 bg-white/95 p-3 shadow-md dark:border-white/10 dark:bg-slate-900/95 backdrop-blur-xs">
@@ -38,8 +37,8 @@ function CustomTooltip({ active, payload, platform }: CustomTooltipProps) {
         <div className="mt-1.5 space-y-1 text-xs">
           <div className="flex items-center justify-between gap-4">
             <span className="flex items-center gap-1.5 text-muted-foreground">
-              <span className={`h-2 w-2 rounded-full ${dotColor}`} />
-              {platformLabel}推广费:
+              <span className={`h-2 w-2 rounded-full ${platformMeta.dotClassName}`} />
+              {platformMeta.label}推广费:
             </span>
             <span className="text-foreground">¥{Number(promoVal).toFixed(2)}</span>
           </div>
@@ -57,14 +56,13 @@ function CustomTooltip({ active, payload, platform }: CustomTooltipProps) {
   return null;
 }
 
-function CustomLegend({ platform }: { platform: "amountMeituan" | "amountJingdong" | "amountTaobao" }) {
-  const platformLabel = platform === "amountMeituan" ? "美团" : platform === "amountJingdong" ? "京东" : "淘宝";
-  const color = platform === "amountMeituan" ? "bg-[#FFB800]" : platform === "amountJingdong" ? "bg-[#DF1E1D]" : "bg-[#FF5500]";
+function CustomLegend({ platform }: { platform: PromotionPlatformKey }) {
+  const platformMeta = PROMOTION_PLATFORM_META[platform];
   return (
     <div className="flex justify-center gap-6 text-[11px] text-muted-foreground pt-2">
       <span className="flex items-center gap-2">
-        <span className={`h-2.5 w-2.5 rounded-full ${color}`} />
-        {platformLabel}推广费用 (左轴)
+        <span className={`h-2.5 w-2.5 rounded-full ${platformMeta.dotClassName}`} />
+        {platformMeta.label}推广费用 (左轴)
       </span>
       <span className="flex items-center gap-2">
         <span className="h-2.5 w-2.5 rounded-md bg-[#10B981]" style={{ clipPath: "polygon(0 40%, 100% 40%, 100% 60%, 0 60%)" }} />
@@ -74,13 +72,27 @@ function CustomLegend({ platform }: { platform: "amountMeituan" | "amountJingdon
   );
 }
 
-// 对应推广费平台配置，包含官方Logo与字段映射
-const PROMOTION_PLATFORM_ROWS = [
-  { key: "amountMeituan" as const, label: "美团", logo: "/platform/美团.svg" },
-  { key: "amountJingdong" as const, label: "京东", logo: "/platform/京东.svg" },
-  { key: "amountTaobao" as const, label: "淘宝", logo: "/platform/淘宝.svg" },
-  { key: "amountOther" as const, label: "线下交易", logo: "/platform/其他.svg" },
+type PromotionPlatformKey = "amountMeituan" | "amountJingdong" | "amountTaobao" | "amountOther";
+
+// 对应推广费平台配置，amountOther 复用历史兜底字段，当前用于抖店推广费。
+const PROMOTION_PLATFORM_ROWS: Array<{
+  key: PromotionPlatformKey;
+  label: string;
+  logo: string;
+  activeColor: string;
+  stroke: string;
+  dotClassName: string;
+  orderKey: "orderMeituan" | "orderJingdong" | "orderTaobao" | "orderDoudian";
+}> = [
+  { key: "amountMeituan", label: "美团", logo: "/platform/美团.svg", activeColor: "border-[#FFB800] bg-[#FFB800]/5 text-[#FFB800]", stroke: "#FFB800", dotClassName: "bg-[#FFB800]", orderKey: "orderMeituan" },
+  { key: "amountJingdong", label: "京东", logo: "/platform/京东.svg", activeColor: "border-[#DF1E1D] bg-[#DF1E1D]/5 text-[#DF1E1D]", stroke: "#DF1E1D", dotClassName: "bg-[#DF1E1D]", orderKey: "orderJingdong" },
+  { key: "amountTaobao", label: "淘宝", logo: "/platform/淘宝.svg", activeColor: "border-[#FF5500] bg-[#FF5500]/5 text-[#FF5500]", stroke: "#FF5500", dotClassName: "bg-[#FF5500]", orderKey: "orderTaobao" },
+  { key: "amountOther", label: "抖店", logo: "/platform/doudian.svg", activeColor: "border-[#38BDF8] bg-[#38BDF8]/5 text-[#38BDF8]", stroke: "#38BDF8", dotClassName: "bg-[#38BDF8]", orderKey: "orderDoudian" },
 ];
+
+const PROMOTION_PLATFORM_META = Object.fromEntries(
+  PROMOTION_PLATFORM_ROWS.map((item) => [item.key, item])
+) as Record<PromotionPlatformKey, (typeof PROMOTION_PLATFORM_ROWS)[number]>;
 
 interface PromotionPlatformAmounts {
   amountMeituan: number;
@@ -115,6 +127,7 @@ interface DayData {
   realOrderMeituan: number;
   realOrderJingdong: number;
   realOrderTaobao: number;
+  realOrderDoudian: number;
   brushOrderCount: number;
   cancelledOrderCount: number;
   shopBreakdown?: Record<string, number>;
@@ -169,7 +182,7 @@ export function PromotionCalendarModal({
   // 当前活动 Tab: 'calendar' (日历) 或 'chart' (趋势图)
   const [activeTab, setActiveTab] = useState<"calendar" | "chart">("calendar");
   // 当前展示趋势图的平台
-  const [chartPlatform, setChartPlatform] = useState<"amountMeituan" | "amountJingdong" | "amountTaobao">("amountMeituan");
+  const [chartPlatform, setChartPlatform] = useState<PromotionPlatformKey>("amountMeituan");
   // 趋势图当前选择的店铺（空字符串 = 全部汇总）
   const [chartShopName, setChartShopName] = useState<string>("");
 
@@ -246,9 +259,11 @@ export function PromotionCalendarModal({
         amountMeituan: data?.amountMeituan || 0,
         amountJingdong: data?.amountJingdong || 0,
         amountTaobao: data?.amountTaobao || 0,
+        amountOther: data?.amountOther || 0,
         orderMeituan: data?.realOrderMeituan || 0,
         orderJingdong: data?.realOrderJingdong || 0,
         orderTaobao: data?.realOrderTaobao || 0,
+        orderDoudian: data?.realOrderDoudian || 0,
       };
     });
   }, [gridDays, currentMonth, calendarData]);
@@ -259,16 +274,9 @@ export function PromotionCalendarModal({
     let totalOrders = 0;
     
     chartData.forEach((day) => {
-      if (chartPlatform === "amountMeituan") {
-        totalPromo += day.amountMeituan;
-        totalOrders += day.orderMeituan;
-      } else if (chartPlatform === "amountJingdong") {
-        totalPromo += day.amountJingdong;
-        totalOrders += day.orderJingdong;
-      } else if (chartPlatform === "amountTaobao") {
-        totalPromo += day.amountTaobao;
-        totalOrders += day.orderTaobao;
-      }
+      const platformMeta = PROMOTION_PLATFORM_META[chartPlatform];
+      totalPromo += day[chartPlatform];
+      totalOrders += day[platformMeta.orderKey];
     });
     
     const avgCostPerOrder = totalOrders > 0 ? totalPromo / totalOrders : 0;
@@ -693,11 +701,7 @@ export function PromotionCalendarModal({
               <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 overflow-visible">
                 {/* 左：平台选择 */}
                 <div className="flex gap-2 flex-wrap">
-                  {[
-                    { key: "amountMeituan" as const, label: "美团", logo: "/platform/美团.svg", activeColor: "border-[#FFB800] bg-[#FFB800]/5 text-[#FFB800]" },
-                    { key: "amountJingdong" as const, label: "京东", logo: "/platform/京东.svg", activeColor: "border-[#DF1E1D] bg-[#DF1E1D]/5 text-[#DF1E1D]" },
-                    { key: "amountTaobao" as const, label: "淘宝", logo: "/platform/淘宝.svg", activeColor: "border-[#FF5500] bg-[#FF5500]/5 text-[#FF5500]" },
-                  ].map((p) => (
+                  {PROMOTION_PLATFORM_ROWS.map((p) => (
                     <button
                       key={p.key}
                       onClick={() => setChartPlatform(p.key)}
@@ -778,7 +782,7 @@ export function PromotionCalendarModal({
                       yAxisId="left"
                       type="monotone"
                       dataKey={chartPlatform}
-                      stroke={chartPlatform === "amountMeituan" ? "#FFB800" : chartPlatform === "amountJingdong" ? "#DF1E1D" : "#FF5500"}
+                      stroke={PROMOTION_PLATFORM_META[chartPlatform].stroke}
                       strokeWidth={2.5}
                       dot={{ r: 2, strokeWidth: 1 }}
                       activeDot={{ r: 4 }}
@@ -789,7 +793,7 @@ export function PromotionCalendarModal({
                     <Line
                       yAxisId="right"
                       type="monotone"
-                      dataKey={chartPlatform === "amountMeituan" ? "orderMeituan" : chartPlatform === "amountJingdong" ? "orderJingdong" : "orderTaobao"}
+                      dataKey={PROMOTION_PLATFORM_META[chartPlatform].orderKey}
                       stroke="#10B981"
                       strokeWidth={2}
                       strokeDasharray="4 4"

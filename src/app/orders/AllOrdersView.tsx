@@ -67,7 +67,7 @@ function OrderListSkeleton({ count = 3 }: { count?: number }) {
 
 type OrderAction = "self-delivery" | "complete-delivery" | "pickup-complete" | "sync" | "outbound" | "sync-brush";
 type PurchaseDraftPayload = PurchaseOrder & { sourceOrderId?: string };
-type ShopProfitInfo = { id: string | null; name: string; amount: number; count: number; deliveryFee: number; productCost: number; platformCommission: number };
+type ShopProfitInfo = { id: string | null; name: string; amount: number; count: number; deliveryFee: number; productCost: number; platformCommission: number; platformProfit?: Record<string, number>; platformCount?: Record<string, number> };
 const UNMATCHED_SHOP_FILTER = "__unmatched__";
 
 function normalizeDisplayPlatform(platform?: string | null) {

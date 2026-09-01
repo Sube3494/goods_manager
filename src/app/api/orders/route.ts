@@ -1867,6 +1867,7 @@ export async function GET(request: NextRequest) {
                 productCost: 0,
                 platformCommission: 0,
                 platformProfit: {} as Record<string, number>,
+                platformCount: {} as Record<string, number>,
               };
             }
             return acc.shopProfit[shopProfitKey];
@@ -1982,6 +1983,7 @@ export async function GET(request: NextRequest) {
             shopProfit.productCost += productCost;
             shopProfit.platformCommission += adjustedMetrics.platformCommission;
             shopProfit.platformProfit[platform] = (shopProfit.platformProfit[platform] || 0) + profitValue;
+            shopProfit.platformCount[platform] = (shopProfit.platformCount[platform] || 0) + 1;
           }
           acc.itemCount += order.items.reduce((sum: number, item) => sum + item.quantity, 0);
           return acc;
@@ -1999,7 +2001,7 @@ export async function GET(request: NextRequest) {
           platformDelivery: {} as Record<string, number>,
           pureProfit: 0,
           platformProfit: {} as Record<string, { amount: number; count: number }>,
-          shopProfit: {} as Record<string, { id: string | null; name: string; amount: number; count: number; deliveryFee: number; productCost: number; platformCommission: number; platformProfit: Record<string, number> }>,
+          shopProfit: {} as Record<string, { id: string | null; name: string; amount: number; count: number; deliveryFee: number; productCost: number; platformCommission: number; platformProfit: Record<string, number>; platformCount: Record<string, number> }>,
         });
 
     const truePlatformCounts: Record<string, number> = {};

@@ -87,6 +87,7 @@ type ShopProfitInfo = {
   productCost: number;
   platformCommission: number;
   platformProfit?: Record<string, number>;
+  platformCount?: Record<string, number>;
 };
 
 function normalizeDisplayPlatform(platform?: string | null) {
@@ -1282,6 +1283,7 @@ type PromotionPlatformAmounts = {
   amountMeituan: number;
   amountJingdong: number;
   amountTaobao: number;
+  amountOther: number;
 };
 
 function PromotionMetricCard({
@@ -1539,6 +1541,7 @@ export default function OrdersPage() {
     amountMeituan: 0,
     amountJingdong: 0,
     amountTaobao: 0,
+    amountOther: 0,
   });
   const [promotionDate, setPromotionDate] = useState("");
 
@@ -1671,8 +1674,9 @@ export default function OrdersPage() {
         const meituan = data.amountMeituan ?? 0;
         const jingdong = data.amountJingdong ?? 0;
         const taobao = data.amountTaobao ?? 0;
-        setPromotionPlatforms({ amountMeituan: meituan, amountJingdong: jingdong, amountTaobao: taobao });
-        setPromotionAmount(data.amount ?? (meituan + jingdong + taobao));
+        const other = data.amountOther ?? 0;
+        setPromotionPlatforms({ amountMeituan: meituan, amountJingdong: jingdong, amountTaobao: taobao, amountOther: other });
+        setPromotionAmount(data.amount ?? (meituan + jingdong + taobao + other));
       }
     } catch (error) {
       console.error("Failed to fetch promotion amount:", error);
@@ -1694,6 +1698,7 @@ export default function OrdersPage() {
           amountMeituan: vals.amountMeituan,
           amountJingdong: vals.amountJingdong,
           amountTaobao: vals.amountTaobao,
+          amountOther: vals.amountOther,
         }),
       });
       if (res.ok) {
@@ -1701,8 +1706,9 @@ export default function OrdersPage() {
         const meituan = data.amountMeituan ?? vals.amountMeituan;
         const jingdong = data.amountJingdong ?? vals.amountJingdong;
         const taobao = data.amountTaobao ?? vals.amountTaobao;
-        setPromotionPlatforms({ amountMeituan: meituan, amountJingdong: jingdong, amountTaobao: taobao });
-        setPromotionAmount(data.amount ?? (meituan + jingdong + taobao));
+        const other = data.amountOther ?? vals.amountOther;
+        setPromotionPlatforms({ amountMeituan: meituan, amountJingdong: jingdong, amountTaobao: taobao, amountOther: other });
+        setPromotionAmount(data.amount ?? (meituan + jingdong + taobao + other));
         showToast(`${promotionDate} 推广费已保存`, "success");
         return true;
       } else {
@@ -2724,6 +2730,7 @@ export default function OrdersPage() {
                             <div className="hidden text-center font-bold tabular-nums xl:block">{toCurrency(shop.platformCommission)}</div>
                             {SHOP_PROFIT_PLATFORMS.map((platform) => {
                               const amount = shop.platformProfit?.[platform] || 0;
+                              const count = shop.platformCount?.[platform] || 0;
                               return (
                                 <div
                                   key={platform}
@@ -2732,7 +2739,17 @@ export default function OrdersPage() {
                                     amount < 0 ? "text-rose-500" : amount > 0 ? "text-emerald-500" : "text-muted-foreground/55"
                                   )}
                                 >
-                                  {toCurrency(amount)}
+                                  <span className="inline-flex max-w-full items-center justify-center gap-1.5">
+                                    <span className="min-w-0 truncate">{toCurrency(amount)}</span>
+                                    <span className={cn(
+                                      "shrink-0 rounded-md border px-1 py-0.5 text-[10px] leading-none",
+                                      count > 0
+                                        ? "border-white/10 bg-white/8 text-muted-foreground"
+                                        : "border-transparent text-muted-foreground/40"
+                                    )}>
+                                      {count}单
+                                    </span>
+                                  </span>
                                 </div>
                               );
                             })}
@@ -2759,6 +2776,7 @@ export default function OrdersPage() {
                             <div className="mt-2 grid grid-cols-2 gap-1.5 text-xs sm:grid-cols-5 xl:hidden">
                               {SHOP_PROFIT_PLATFORMS.map((platform) => {
                                 const amount = shop.platformProfit?.[platform] || 0;
+                                const count = shop.platformCount?.[platform] || 0;
                                 return (
                                   <div key={platform} className="flex min-w-0 items-center justify-between gap-1 rounded-lg bg-slate-200/50 px-2 py-1.5 dark:bg-white/6">
                                     <span className="flex min-w-0 items-center gap-1 text-muted-foreground">
@@ -2771,7 +2789,10 @@ export default function OrdersPage() {
                                       />
                                       <span className="truncate">{platform}</span>
                                     </span>
-                                    <span className={cn("shrink-0 font-black tabular-nums", amount < 0 ? "text-rose-500" : amount > 0 ? "text-emerald-500" : "text-muted-foreground/55")}>{toCurrency(amount)}</span>
+                                    <span className="shrink-0 text-right tabular-nums">
+                                      <span className={cn("font-black", amount < 0 ? "text-rose-500" : amount > 0 ? "text-emerald-500" : "text-muted-foreground/55")}>{toCurrency(amount)}</span>
+                                      <span className="ml-1 rounded-md border border-white/10 bg-white/8 px-1 py-0.5 text-[10px] font-bold leading-none text-muted-foreground">{count}单</span>
+                                    </span>
                                   </div>
                                 );
                               })}
