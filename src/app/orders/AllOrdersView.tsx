@@ -84,6 +84,7 @@ interface AllOrdersViewProps {
   onOpenCostBackfill: (order: AutoPickOrder) => void;
   onOpenMatchEditor: (order: AutoPickOrder, item: AutoPickOrderItem) => void;
   onOpenPurchaseDraft?: (draft: PurchaseDraftPayload) => void;
+  profitUpdatingOrderIds?: string[];
   onDataLoad: (data: {
     summary: {
       receivedAmount: number;
@@ -126,6 +127,7 @@ export function AllOrdersView({
   onDataLoad,
   localShops,
   onOpenPurchaseDraft,
+  profitUpdatingOrderIds = [],
   shopFilterSignal,
 }: AllOrdersViewProps) {
   const { showToast } = useToast();
@@ -738,6 +740,7 @@ export function AllOrdersView({
                       onOpenCostBackfill={onOpenCostBackfill}
                       onOpenMatchEditor={onOpenMatchEditor}
                       onRefresh={handleRefreshOrder}
+                      isProfitUpdating={profitUpdatingOrderIds.includes(order.id)}
                     />
                   </OrderCardErrorBoundary>
                 ))}

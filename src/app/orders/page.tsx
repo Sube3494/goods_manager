@@ -1576,6 +1576,7 @@ export default function OrdersPage() {
   const [isCreateOfflineOpen, setIsCreateOfflineOpen] = useState(false);
   const [backfillTarget, setBackfillTarget] = useState<AutoPickOrder | null>(null);
   const [purchaseDraft, setPurchaseDraft] = useState<PurchaseDraftPayload | null>(null);
+  const [profitUpdatingOrderIds, setProfitUpdatingOrderIds] = useState<string[]>([]);
   
   const [isMatchPickerOpen, setIsMatchPickerOpen] = useState(false);
   const [isSavingMatch, setIsSavingMatch] = useState(false);
@@ -1607,6 +1608,16 @@ export default function OrdersPage() {
 
   const triggerParentRefresh = useCallback(() => {
     setRefreshTrigger((prev) => prev + 1);
+  }, []);
+
+  const markProfitUpdating = useCallback((orderId: string) => {
+    if (!orderId) return;
+    setProfitUpdatingOrderIds((current) => (
+      current.includes(orderId) ? current : [...current, orderId]
+    ));
+    window.setTimeout(() => {
+      setProfitUpdatingOrderIds((current) => current.filter((id) => id !== orderId));
+    }, 5000);
   }, []);
 
   const handleDataLoad = useCallback((tab: OrdersTab, data: {
@@ -2178,6 +2189,7 @@ export default function OrdersPage() {
 
     const sourceOrderId = String(data.sourceOrderId || "").trim();
     if (sourceOrderId) {
+      markProfitUpdating(sourceOrderId);
       const outboundResponse = await fetch(`/api/orders/${sourceOrderId}/outbound`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -2201,7 +2213,7 @@ export default function OrdersPage() {
     showToast(sourceOrderId ? "采购单已创建入库，并已自动出库" : "采购单已创建并入库", "success");
     setPurchaseDraft(null);
     triggerParentRefresh();
-  }, [showToast, triggerParentRefresh]);
+  }, [markProfitUpdating, showToast, triggerParentRefresh]);
 
   return (
     <div className="relative px-2 sm:px-1">
@@ -2575,6 +2587,7 @@ export default function OrdersPage() {
             onOpenCostBackfill={setBackfillTarget}
             onOpenMatchEditor={openMatchEditor}
             onOpenPurchaseDraft={setPurchaseDraft}
+            profitUpdatingOrderIds={profitUpdatingOrderIds}
             onDataLoad={handleTodayDataLoad}
             localShops={localShops}
             shopFilterSignal={shopFilterSignal}
@@ -2587,6 +2600,7 @@ export default function OrdersPage() {
               onOpenCostBackfill={setBackfillTarget}
               onOpenMatchEditor={openMatchEditor}
               onOpenPurchaseDraft={setPurchaseDraft}
+              profitUpdatingOrderIds={profitUpdatingOrderIds}
               onDataLoad={handleAllDataLoad}
               localShops={localShops}
               shopFilterSignal={shopFilterSignal}
@@ -2814,8 +2828,8 @@ export default function OrdersPage() {
           isOpen={Boolean(purchaseDraft)}
           initialData={purchaseDraft}
           onClose={() => setPurchaseDraft(null)}
-          onSubmit={(data) => {
-            void savePurchaseDraft(data).catch((error) => {
+          onSubmit={async (data) => {
+            await savePurchaseDraft(data).catch((error) => {
               console.error("Failed to create purchase draft:", error);
               showToast(error instanceof Error ? error.message : "创建采购单失败", "error");
             });

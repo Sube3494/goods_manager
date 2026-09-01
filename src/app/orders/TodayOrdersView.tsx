@@ -85,6 +85,7 @@ interface TodayOrdersViewProps {
   onOpenCostBackfill: (order: AutoPickOrder) => void;
   onOpenMatchEditor: (order: AutoPickOrder, item: AutoPickOrderItem) => void;
   onOpenPurchaseDraft?: (draft: PurchaseDraftPayload) => void;
+  profitUpdatingOrderIds?: string[];
     onDataLoad: (data: {
       summary: { receivedAmount: number; platformCommission: number; validOrderCount: number; itemCount: number; totalDeliveryFee: number; platformReceived?: Record<string, { amount: number; count: number }>; platformDelivery?: Record<string, number>; pureProfit: number; platformProfit?: Record<string, { amount: number; count: number }>; shopProfit?: Record<string, ShopProfitInfo> };
     overview: { totalCount: number; trueOrderCount: number; brushCount: number; cancelledCount: number; platformBreakdown?: { truePlatformCounts: Record<string, number>; brushPlatformCounts: Record<string, number>; cancelledPlatformCounts: Record<string, number> } };
@@ -107,6 +108,7 @@ export function TodayOrdersView({
   onDataLoad,
   localShops,
   onOpenPurchaseDraft,
+  profitUpdatingOrderIds = [],
   userId,
   shopFilterSignal,
 }: TodayOrdersViewProps) {
@@ -715,6 +717,7 @@ export function TodayOrdersView({
                         onOpenCostBackfill={onOpenCostBackfill}
                         onOpenMatchEditor={onOpenMatchEditor}
                         onRefresh={handleRefreshOrder}
+                        isProfitUpdating={profitUpdatingOrderIds.includes(order.id)}
                       />
                     </OrderCardErrorBoundary>
                   ))}
@@ -750,6 +753,7 @@ export function TodayOrdersView({
                             onOpenCostBackfill={onOpenCostBackfill}
                             onOpenMatchEditor={onOpenMatchEditor}
                             onRefresh={handleRefreshOrder}
+                            isProfitUpdating={profitUpdatingOrderIds.includes(order.id)}
                           />
                         </OrderCardErrorBoundary>
                       ))}
@@ -787,6 +791,7 @@ export function TodayOrdersView({
                             onOpenCostBackfill={onOpenCostBackfill}
                             onOpenMatchEditor={onOpenMatchEditor}
                             onRefresh={handleRefreshOrder}
+                            isProfitUpdating={profitUpdatingOrderIds.includes(order.id)}
                           />
                         </OrderCardErrorBoundary>
                       ))}

@@ -1868,6 +1868,7 @@ export const OrderCard = memo(function OrderCard({
   expanded,
   actingId,
   readOnly = false,
+  isProfitUpdating = false,
   onToggleExpanded,
   onRunAction,
   onOpenCostBackfill,
@@ -1878,6 +1879,7 @@ export const OrderCard = memo(function OrderCard({
   expanded: boolean;
   actingId: string;
   readOnly?: boolean;
+  isProfitUpdating?: boolean;
   onToggleExpanded: (id: string) => void;
   onRunAction: (orderId: string, action: OrderAction) => void;
   onOpenCostBackfill: (order: AutoPickOrder) => void;
@@ -2477,6 +2479,12 @@ export const OrderCard = memo(function OrderCard({
                         </>
                       ) : null}
                     </div>
+                  ) : null}
+                  {isProfitUpdating ? (
+                    <span className="inline-flex h-7 min-w-0 items-center gap-1 rounded-full border border-sky-500/20 bg-sky-500/10 px-1.5 text-[11px] font-medium leading-none text-sky-700 dark:text-sky-300 sm:h-8 sm:gap-1.5 sm:px-2.5 sm:text-[13px]">
+                      <Loader2 size={11} className="animate-spin sm:h-3 sm:w-3" />
+                      <span className="truncate">更新利润中...</span>
+                    </span>
                   ) : null}
                 </div>
 
