@@ -1151,18 +1151,16 @@ export function UserManager() {
           message={
             <div className="space-y-4 py-2">
               <p className="text-xs text-muted-foreground">
-                请选择并授权该成员可以访问的商品模板库。默认普通商品库所有人均可访问。
+                请选择该成员可以访问的商品模板库。可单选、多选，也可以不选择。
               </p>
               <div className="space-y-2.5 max-h-[300px] overflow-y-auto pr-1">
                 {allLibraries.map((lib) => {
-                  const isDefault = lib.code === "public";
-                  const isChecked = isDefault || selectedLibraryIds.includes(lib.id);
+                  const isChecked = selectedLibraryIds.includes(lib.id);
                   
                   return (
                     <div
                       key={lib.id}
                       onClick={() => {
-                        if (isDefault) return;
                         if (isChecked) {
                           setSelectedLibraryIds(prev => prev.filter(id => id !== lib.id));
                         } else {
@@ -1184,11 +1182,6 @@ export function UserManager() {
                         </div>
                         <span className="font-semibold">{lib.name}</span>
                       </div>
-                      {isDefault && (
-                        <span className="text-[10px] px-2 py-0.5 rounded-md font-bold border bg-emerald-500/5 text-emerald-600 border-emerald-500/10">
-                          默认全员可见
-                        </span>
-                      )}
                     </div>
                   );
                 })}
