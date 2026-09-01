@@ -2628,7 +2628,7 @@ export default function OrdersPage() {
         ? createPortal(
             <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/45 p-2 backdrop-blur-sm sm:p-4" onMouseDown={() => setIsShopProfitOpen(false)}>
               <div
-                className="flex max-h-[94vh] w-full max-w-[92rem] flex-col overflow-hidden rounded-[18px] border border-black/10 bg-white text-slate-950 shadow-2xl dark:border-white/10 dark:bg-[#111827] dark:text-white sm:max-h-[88vh] sm:rounded-[20px]"
+                className="flex max-h-[94vh] w-full max-w-6xl flex-col overflow-hidden rounded-[18px] border border-black/10 bg-white text-slate-950 shadow-2xl dark:border-white/10 dark:bg-[#111827] dark:text-white sm:max-h-[88vh] sm:rounded-[20px]"
                 onMouseDown={(event) => event.stopPropagation()}
               >
                 <div className="flex items-start justify-between gap-3 border-b border-black/8 px-4 py-3 dark:border-white/10 sm:gap-4 sm:px-5 sm:py-4">
@@ -2671,7 +2671,7 @@ export default function OrdersPage() {
                   {shopProfitEntries.length > 0 ? (
                     <div className="overflow-hidden rounded-xl border border-black/8 bg-slate-50/80 text-sm dark:border-white/10 dark:bg-white/[0.035]">
                       <div className="overflow-x-auto">
-                        <div className="hidden min-w-[1140px] grid-cols-[2.75rem_6.5rem_4.25rem_6.75rem_5.75rem_5.75rem_5.75rem_repeat(5,7rem)] border-b border-black/6 bg-slate-100/80 px-3 py-2 text-[11px] font-bold text-muted-foreground dark:border-white/8 dark:bg-white/5 xl:grid">
+                        <div className="hidden min-w-[1040px] grid-cols-[2.75rem_6.5rem_4.25rem_6.75rem_5.75rem_5.75rem_5.75rem_repeat(5,5.75rem)] border-b border-black/6 bg-slate-100/80 px-3 py-2 text-[11px] font-bold text-muted-foreground dark:border-white/8 dark:bg-white/5 xl:grid">
                           <div className="text-center">#</div>
                           <div className="text-center">店铺</div>
                           <div className="text-center">订单</div>
@@ -2698,7 +2698,7 @@ export default function OrdersPage() {
                         const averageProfit = shop.count > 0 ? shop.amount / shop.count : 0;
 
                         return (
-                          <div key={shop.key} className="border-b border-black/6 px-3 py-2.5 last:border-b-0 dark:border-white/8 xl:grid xl:min-w-[1140px] xl:grid-cols-[2.75rem_6.5rem_4.25rem_6.75rem_5.75rem_5.75rem_5.75rem_repeat(5,7rem)] xl:items-center xl:px-3 xl:py-2.5">
+                          <div key={shop.key} className="border-b border-black/6 px-3 py-2.5 last:border-b-0 dark:border-white/8 xl:grid xl:min-w-[1040px] xl:grid-cols-[2.75rem_6.5rem_4.25rem_6.75rem_5.75rem_5.75rem_5.75rem_repeat(5,5.75rem)] xl:items-center xl:px-3 xl:py-2">
                             <div className="hidden text-center text-xs font-black tabular-nums text-muted-foreground xl:block">
                               #{index + 1}
                             </div>
@@ -2748,10 +2748,14 @@ export default function OrdersPage() {
                                     amount < 0 ? "text-rose-500" : amount > 0 ? "text-emerald-500" : "text-muted-foreground/55"
                                   )}
                                 >
-                                  <div className="truncate">{toCurrency(amount)}</div>
-                                  <div className={cn("mt-1 text-[10px] font-bold", count > 0 ? "text-muted-foreground" : "text-muted-foreground/40")}>
-                                    {count} 单
-                                  </div>
+                                  {amount !== 0 || count > 0 ? (
+                                    <>
+                                      <div className="truncate">{toCurrency(amount)}</div>
+                                      <div className="mt-0.5 text-[10px] font-bold text-muted-foreground">{count} 单</div>
+                                    </>
+                                  ) : (
+                                    <span className="text-muted-foreground/35">-</span>
+                                  )}
                                 </div>
                               );
                             })}
