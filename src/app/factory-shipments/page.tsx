@@ -147,6 +147,17 @@ type CustomerAddressBookResponse = {
   groups?: string[];
 };
 
+type ShipmentFilterInput = {
+  searchQuery: string;
+  productFilter: string[];
+  customerGroupFilter: string[];
+  shippingFilter: string[];
+  paymentFilter: string[];
+  compensationFilter: string[];
+  startDate: string;
+  endDate: string;
+};
+
 function formatCustomerAddressDisplay(customer: CustomerAddressOption) {
   return [customer.contactName, customer.contactPhone, customer.address].filter(Boolean).join(" ");
 }
@@ -1262,6 +1273,52 @@ function getShipmentProductFilterLabel(item: Parameters<typeof getShipmentProduc
   const displayName = resolveShipmentSummaryItemName(item);
   const split = splitShipmentDisplayName(displayName);
   return [split.baseName, split.variantLabel].filter(Boolean).join(" ");
+}
+
+function matchesFactoryShipmentFilters(
+  order: OutboundOrder,
+  filters: ShipmentFilterInput,
+  customerGroupByIdentity: Map<string, string>
+) {
+  const parsed = parseFactoryShipmentNote(order.note);
+  const derivedStatus = deriveFactoryShipmentStatusFromOrder(order, parsed);
+  const orderDate = order.date ? format(parseSafeDate(order.date), "yyyy-MM-dd") : "";
+  const query = filters.searchQuery.trim();
+  const itemNames = order.items.map(
+    (item) => item.shopProduct?.name || item.product?.name || ""
+  );
+  const productFilterSet = new Set(filters.productFilter);
+
+  const matchesSearch =
+    !query ||
+    pinyinMatch(order.id || "", query) ||
+    pinyinMatch(parsed.recipientName || "", query) ||
+    pinyinMatch(parsed.recipientPhone || "", query) ||
+    pinyinMatch(parsed.recipientAddress || "", query) ||
+    pinyinMatch(derivedStatus, query) ||
+    pinyinMatch(parsed.paymentStatus || "", query) ||
+    pinyinMatch(parsed.compensationStatus || "", query) ||
+    pinyinMatch(parsed.remark || "", query) ||
+    parsed.trackingEntries.some((entry) =>
+      pinyinMatch(entry.logisticsName || "", query) ||
+      pinyinMatch(entry.trackingNumber || "", query)
+    ) ||
+    itemNames.some((name) => pinyinMatch(name, query));
+  const matchesShipping = filters.shippingFilter.includes("all") || filters.shippingFilter.length === 0 || filters.shippingFilter.includes(derivedStatus);
+  const matchesProduct = filters.productFilter.length === 0 || order.items.some((item) => productFilterSet.has(getShipmentProductFilterKey(item)));
+  const matchesPayment = filters.paymentFilter.includes("all") || filters.paymentFilter.length === 0 || filters.paymentFilter.includes(parsed.paymentStatus || "");
+  const matchesCompensation =
+    filters.compensationFilter.includes("all") || filters.compensationFilter.length === 0 || filters.compensationFilter.includes(parsed.compensationStatus || "");
+  const recipientGroup = customerGroupByIdentity.get(getCustomerAddressIdentity({
+    contactName: parsed.recipientName,
+    contactPhone: parsed.recipientPhone,
+    address: parsed.recipientAddress,
+  })) || "";
+  const matchesCustomerGroup = filters.customerGroupFilter.includes("all") || filters.customerGroupFilter.length === 0
+    || filters.customerGroupFilter.some((group) => group === "__ungrouped" ? !recipientGroup : recipientGroup === group);
+  const matchesStart = !filters.startDate || orderDate >= filters.startDate;
+  const matchesEnd = !filters.endDate || orderDate <= filters.endDate;
+  return matchesSearch && matchesShipping && matchesProduct && matchesPayment && matchesCompensation && matchesCustomerGroup && matchesStart && matchesEnd;
 }
 
 function getOrderTotalAmount(order: OutboundOrder) {
@@ -3353,7 +3410,6 @@ export default function FactoryShipmentsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [productFilter, setProductFilter] = useState<string[]>([]);
   const [customerGroupFilter, setCustomerGroupFilter] = useState<string[]>(["all"]);
-  const [exportGroupValue, setExportGroupValue] = useState("all");
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isExportProgressOpen, setIsExportProgressOpen] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
@@ -3373,6 +3429,12 @@ export default function FactoryShipmentsPage() {
   const [isExporting, setIsExporting] = useState(false);
   const [detailOrder, setDetailOrder] = useState<OutboundOrder | null>(null);
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
+  const [exportSearchQuery, setExportSearchQuery] = useState("");
+  const [exportProductFilter, setExportProductFilter] = useState<string[]>([]);
+  const [exportCustomerGroupFilter, setExportCustomerGroupFilter] = useState<string[]>(["all"]);
+  const [exportShippingFilter, setExportShippingFilter] = useState<string[]>(["all"]);
+  const [exportPaymentFilter, setExportPaymentFilter] = useState<string[]>(["all"]);
+  const [exportCompensationFilter, setExportCompensationFilter] = useState<string[]>(["all"]);
   const [confirmConfig, setConfirmConfig] = useState<{
     isOpen: boolean;
     title: string;
@@ -3721,41 +3783,16 @@ export default function FactoryShipmentsPage() {
   }, [shipmentOrders, selectedOrderIds, fetchOrders, showToast]);
 
   const filteredOrders = useMemo(() => {
-    return shipmentOrders.filter((order) => {
-      const parsed = parseFactoryShipmentNote(order.note);
-      const derivedStatus = deriveFactoryShipmentStatusFromOrder(order, parsed);
-      const orderDate = order.date ? format(parseSafeDate(order.date), "yyyy-MM-dd") : "";
-      const query = searchQuery.trim();
-      const itemNames = order.items.map(
-        (item) => item.shopProduct?.name || item.product?.name || ""
-      );
-      const productFilterSet = new Set(productFilter);
-
-      const matchesSearch =
-        !query ||
-        pinyinMatch(parsed.recipientName || "", query) ||
-        pinyinMatch(parsed.recipientPhone || "", query) ||
-        pinyinMatch(parsed.recipientAddress || "", query) ||
-        pinyinMatch(derivedStatus, query) ||
-        pinyinMatch(parsed.paymentStatus || "", query) ||
-        pinyinMatch(parsed.compensationStatus || "", query) ||
-        itemNames.some((name) => pinyinMatch(name, query));
-      const matchesShipping = shippingFilter.includes("all") || shippingFilter.length === 0 || shippingFilter.includes(derivedStatus);
-      const matchesProduct = productFilter.length === 0 || order.items.some((item) => productFilterSet.has(getShipmentProductFilterKey(item)));
-      const matchesPayment = paymentFilter.includes("all") || paymentFilter.length === 0 || paymentFilter.includes(parsed.paymentStatus || "");
-      const matchesCompensation =
-        compensationFilter.includes("all") || compensationFilter.length === 0 || compensationFilter.includes(parsed.compensationStatus || "");
-      const recipientGroup = customerGroupByIdentity.get(getCustomerAddressIdentity({
-        contactName: parsed.recipientName,
-        contactPhone: parsed.recipientPhone,
-        address: parsed.recipientAddress,
-      })) || "";
-      const matchesCustomerGroup = customerGroupFilter.includes("all") || customerGroupFilter.length === 0
-        || customerGroupFilter.some((group) => group === "__ungrouped" ? !recipientGroup : recipientGroup === group);
-      const matchesStart = !startDate || orderDate >= startDate;
-      const matchesEnd = !endDate || orderDate <= endDate;
-      return matchesSearch && matchesShipping && matchesProduct && matchesPayment && matchesCompensation && matchesCustomerGroup && matchesStart && matchesEnd;
-    });
+    return shipmentOrders.filter((order) => matchesFactoryShipmentFilters(order, {
+      searchQuery,
+      productFilter,
+      customerGroupFilter,
+      shippingFilter,
+      paymentFilter,
+      compensationFilter,
+      startDate,
+      endDate,
+    }, customerGroupByIdentity));
   }, [compensationFilter, customerGroupByIdentity, customerGroupFilter, endDate, paymentFilter, productFilter, searchQuery, shipmentOrders, shippingFilter, startDate]);
 
   const stats = useMemo(() => {
@@ -3801,14 +3838,28 @@ export default function FactoryShipmentsPage() {
     })) || "";
   }, [customerGroupByIdentity]);
 
-  const filterOrdersByExportDate = useCallback((orders: OutboundOrder[]) => {
-    if (!exportStartDate && !exportEndDate) return orders;
-    return orders.filter((order) => {
-      const orderDate = order.date ? format(parseSafeDate(order.date), "yyyy-MM-dd") : "";
-      if (!orderDate) return false;
-      return (!exportStartDate || orderDate >= exportStartDate) && (!exportEndDate || orderDate <= exportEndDate);
-    });
-  }, [exportEndDate, exportStartDate]);
+  const filterOrdersForExport = useCallback((orders: OutboundOrder[]) => {
+    return orders.filter((order) => matchesFactoryShipmentFilters(order, {
+      searchQuery: exportSearchQuery,
+      productFilter: exportProductFilter,
+      customerGroupFilter: exportCustomerGroupFilter,
+      shippingFilter: exportShippingFilter,
+      paymentFilter: exportPaymentFilter,
+      compensationFilter: exportCompensationFilter,
+      startDate: exportStartDate,
+      endDate: exportEndDate,
+    }, customerGroupByIdentity));
+  }, [
+    customerGroupByIdentity,
+    exportCompensationFilter,
+    exportCustomerGroupFilter,
+    exportEndDate,
+    exportPaymentFilter,
+    exportProductFilter,
+    exportSearchQuery,
+    exportShippingFilter,
+    exportStartDate,
+  ]);
 
   const handleExportShipments = useCallback(async (exportOrders: OutboundOrder[], fileLabel: string) => {
     if (exportOrders.length === 0) {
@@ -4029,9 +4080,24 @@ export default function FactoryShipmentsPage() {
         amount: number;
         shippingFee: number;
       }>();
+      const exportProductFilterSet = new Set(exportProductFilter);
+      const shouldFilterExportItems = exportProductFilter.length > 0 && exportProductFilter.length !== shipmentProductOptions.length;
+      const getExportItemKey = (item: OutboundOrder["items"][number]) => getItemKey({
+        productId: item.productId || item.shopProduct?.productId || item.product?.id || null,
+        productVariantId: item.productVariantId || item.productVariant?.id || item.shopProductVariant?.productVariantId || null,
+        shopProductId: item.shopProductId || item.shopProduct?.id || undefined,
+        shopProductVariantId: item.shopProductVariantId || item.shopProductVariant?.id || undefined,
+      });
+      const getExportOrderItems = (order: OutboundOrder) => (
+        shouldFilterExportItems
+          ? order.items.filter((item) => exportProductFilterSet.has(getShipmentProductFilterKey(item)))
+          : order.items
+      );
 
       exportOrders.forEach((order) => {
         const parsed = parseFactoryShipmentNote(order.note);
+        const exportItems = getExportOrderItems(order);
+        if (exportItems.length === 0) return;
         const customerGroup = getShipmentCustomerGroup(order) || "未分组";
         const customerKey = getCustomerAddressIdentity({
           contactName: parsed.recipientName,
@@ -4049,14 +4115,8 @@ export default function FactoryShipmentsPage() {
         };
         customerStat.orderIds.add(order.id);
 
-        order.items.forEach((item) => {
-          const normalizedItemIds = {
-            productId: item.productId || item.shopProduct?.productId || item.product?.id || null,
-            productVariantId: item.productVariantId || item.productVariant?.id || item.shopProductVariant?.productVariantId || null,
-            shopProductId: item.shopProductId || item.shopProduct?.id || undefined,
-            shopProductVariantId: item.shopProductVariantId || item.shopProductVariant?.id || undefined,
-          };
-          const itemKey = getItemKey(normalizedItemIds);
+        exportItems.forEach((item) => {
+          const itemKey = getExportItemKey(item);
           const trackingEntry = parsed.trackingEntries.find((entry) => entry.itemKey === itemKey);
           const productName =
             item.shopProductVariant?.variantName
@@ -4136,19 +4196,34 @@ export default function FactoryShipmentsPage() {
       let detailIndex = 1;
       exportOrders.forEach((order, orderIndex) => {
         const parsed = parseFactoryShipmentNote(order.note);
+        const exportItems = getExportOrderItems(order);
+        if (exportItems.length === 0) return;
         const displayStatus = deriveFactoryShipmentStatusFromOrder(order, parsed);
         const formattedDate = order.createdAt ? format(parseSafeDate(order.createdAt), "yyyy-MM-dd HH:mm") : "";
+        const exportItemKeys = new Set(exportItems.map((item) => getExportItemKey(item)));
+        const exportTrackingEntries = (parsed.trackingEntries || []).filter((entry) => exportItemKeys.has(String(entry.itemKey || "")));
         const logisticsNames = Array.from(new Set(
-          (parsed.trackingEntries || []).map((entry) => String(entry.logisticsName || "").trim()).filter(Boolean)
+          exportTrackingEntries.map((entry) => String(entry.logisticsName || "").trim()).filter(Boolean)
         )).join(" / ");
         const trackingNumbers = Array.from(new Set(
-          (parsed.trackingEntries || []).map((entry) => String(entry.trackingNumber || "").trim()).filter(Boolean)
+          exportTrackingEntries.map((entry) => String(entry.trackingNumber || "").trim()).filter(Boolean)
         )).join(" / ");
-        const totalQuantity = order.items.reduce((sum, item) => sum + (item.quantity || 0), 0);
-        const totalAmount = getOrderTotalAmount(order);
+        const totalQuantity = exportItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
+        const totalAmount = exportItems.reduce((sum, item) => {
+          const itemKey = getExportItemKey(item);
+          const trackingEntry = parsed.trackingEntries.find((entry) => entry.itemKey === itemKey);
+          const itemPrice =
+            Number(item.price) ||
+            Number(item.shopProductVariant?.salePrice) ||
+            Number(item.productVariant?.salePrice) ||
+            Number(item.shopProduct?.costPrice) ||
+            Number(item.product?.costPrice) ||
+            0;
+          return sum + (item.quantity || 0) * itemPrice + (Number(trackingEntry?.shippingFee) || 0);
+        }, 0);
 
         const summaryRow = summarySheet.addRow([
-          orderIndex + 1,
+          summarySheet.rowCount,
           formattedDate,
           order.id,
           displayStatus,
@@ -4159,7 +4234,7 @@ export default function FactoryShipmentsPage() {
           parsed.compensationStatus || "",
           logisticsNames,
           trackingNumbers,
-          order.items.length,
+          exportItems.length,
           totalQuantity,
           totalAmount,
           parsed.remark || "",
@@ -4172,14 +4247,8 @@ export default function FactoryShipmentsPage() {
           72
         );
 
-        order.items.forEach((item) => {
-          const normalizedItemIds = {
-            productId: item.productId || item.shopProduct?.productId || item.product?.id || null,
-            productVariantId: item.productVariantId || item.productVariant?.id || item.shopProductVariant?.productVariantId || null,
-            shopProductId: item.shopProductId || item.shopProduct?.id || undefined,
-            shopProductVariantId: item.shopProductVariantId || item.shopProductVariant?.id || undefined,
-          };
-          const itemKey = getItemKey(normalizedItemIds);
+        exportItems.forEach((item) => {
+          const itemKey = getExportItemKey(item);
           const trackingEntry = parsed.trackingEntries.find((entry) => entry.itemKey === itemKey);
           const imageUrl =
             item.shopProductVariant?.image ||
@@ -4427,28 +4496,36 @@ export default function FactoryShipmentsPage() {
     }
   }, [getShipmentCustomerGroup, showToast]);
 
-  const handleConfirmGroupedExport = useCallback(() => {
-    const targetGroup = exportGroupValue === "all" ? customerGroups[0] : exportGroupValue;
-    if (!targetGroup) {
-      showToast("暂无客户分组可导出", "info");
-      return;
-    }
-    const exportOrders = filterOrdersByExportDate(shipmentOrders.filter((order) => getShipmentCustomerGroup(order) === targetGroup));
-    setIsExportModalOpen(false);
-    void handleExportShipments(exportOrders, `_${targetGroup}_分组导出`);
-  }, [customerGroups, exportGroupValue, filterOrdersByExportDate, getShipmentCustomerGroup, handleExportShipments, shipmentOrders, showToast]);
-
   const handleConfirmFullExport = useCallback(() => {
-    const exportOrders = filterOrdersByExportDate(shipmentOrders);
+    const exportOrders = filterOrdersForExport(shipmentOrders);
     setIsExportModalOpen(false);
-    void handleExportShipments(exportOrders, "_全量导出");
-  }, [filterOrdersByExportDate, handleExportShipments, shipmentOrders]);
+    void handleExportShipments(exportOrders, "_筛选导出");
+  }, [filterOrdersForExport, handleExportShipments, shipmentOrders]);
 
   const openExportModal = useCallback(() => {
+    setExportSearchQuery(searchQuery);
+    setExportProductFilter(productFilter);
+    setExportCustomerGroupFilter(customerGroupFilter);
+    setExportShippingFilter(shippingFilter);
+    setExportPaymentFilter(paymentFilter);
+    setExportCompensationFilter(compensationFilter);
     setExportStartDate(startDate);
     setExportEndDate(endDate);
     setIsExportModalOpen(true);
-  }, [endDate, startDate]);
+  }, [compensationFilter, customerGroupFilter, endDate, paymentFilter, productFilter, searchQuery, shippingFilter, startDate]);
+
+  const exportPreviewOrders = useMemo(() => filterOrdersForExport(shipmentOrders), [filterOrdersForExport, shipmentOrders]);
+  const exportProductOptionCount = shipmentProductOptions.filter((option) => exportProductFilter.includes(option.value)).length;
+  const hasExportFilters = Boolean(
+    exportSearchQuery ||
+    exportProductFilter.length !== shipmentProductOptions.length ||
+    (!exportCustomerGroupFilter.includes("all") && exportCustomerGroupFilter.length > 0) ||
+    (!exportShippingFilter.includes("all") && exportShippingFilter.length > 0) ||
+    (!exportPaymentFilter.includes("all") && exportPaymentFilter.length > 0) ||
+    (!exportCompensationFilter.includes("all") && exportCompensationFilter.length > 0) ||
+    exportStartDate ||
+    exportEndDate
+  );
 
   const totalItems = filteredOrders.length;
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
@@ -4680,7 +4757,7 @@ export default function FactoryShipmentsPage() {
             exit={{ opacity: 0 }}
           >
             <motion.div
-              className="relative z-10 w-full max-w-[460px] overflow-hidden rounded-[28px] border border-white/10 bg-white text-card-foreground shadow-2xl backdrop-blur-xl dark:bg-[#101722]/95"
+              className="relative z-10 w-full max-w-[460px] rounded-[28px] border border-white/10 bg-white text-card-foreground shadow-2xl backdrop-blur-xl dark:bg-[#101722]/95"
               initial={{ opacity: 0, y: 18, scale: 0.98 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 18, scale: 0.98 }}
@@ -4689,7 +4766,7 @@ export default function FactoryShipmentsPage() {
               <div className="flex items-start justify-between border-b border-border/10 px-6 pb-5 pt-6 dark:border-white/10">
                 <div className="min-w-0">
                   <h3 className="text-xl font-bold leading-none text-foreground">导出发货记录</h3>
-                  <p className="mt-2 text-sm leading-5 text-muted-foreground">选择分组导出，或导出全部发货单。</p>
+                  <p className="mt-2 text-sm leading-5 text-muted-foreground">打开时会带入当前页面筛选，也可以在这里单独调整。</p>
                 </div>
                 <button
                   type="button"
@@ -4717,36 +4794,89 @@ export default function FactoryShipmentsPage() {
                     triggerClassName="rounded-full border-border bg-zinc-50 px-4 text-sm font-semibold shadow-none dark:border-white/10 dark:bg-white/[0.06]"
                   />
                 </div>
-                <div className="grid grid-cols-[minmax(0,1fr)_116px] items-center gap-2">
-                  <div className="min-w-0">
-                    <CustomSelect
-                      value={exportGroupValue === "all" ? (customerGroups[0] || "all") : exportGroupValue}
-                      onChange={setExportGroupValue}
+                <div className="grid grid-cols-2 gap-2">
+                  <CustomMultiSelect
+                    value={exportProductFilter}
+                    onChange={setExportProductFilter}
+                    options={shipmentProductOptions}
+                    placeholder="商品种类"
+                    displayLabel={`商品种类 ${exportProductOptionCount}`}
+                    disabled={isExporting || shipmentProductOptions.length === 0}
+                    allowEmpty
+                    inlineDropdown
+                    triggerClassName="h-12 rounded-full border-border bg-zinc-50 px-4 text-sm font-semibold shadow-none dark:border-white/10 dark:bg-white/[0.06]"
+                  />
+                  <CustomMultiSelect
+                    value={exportCustomerGroupFilter}
+                    onChange={setExportCustomerGroupFilter}
+                    options={customerGroupOptions}
+                    placeholder="客户分组"
+                    disabled={isExporting}
+                    inlineDropdown
+                    triggerClassName="h-12 rounded-full border-border bg-zinc-50 px-4 text-sm font-semibold shadow-none dark:border-white/10 dark:bg-white/[0.06]"
+                  />
+                  <CustomMultiSelect
+                    value={exportShippingFilter}
+                    onChange={setExportShippingFilter}
+                    options={[{ value: "all", label: "全部发货状态" }, ...shippingStatusOptions]}
+                    placeholder="发货状态"
+                    disabled={isExporting}
+                    inlineDropdown
+                    triggerClassName="h-12 rounded-full border-border bg-zinc-50 px-4 text-sm font-semibold shadow-none dark:border-white/10 dark:bg-white/[0.06]"
+                  />
+                  <CustomMultiSelect
+                    value={exportPaymentFilter}
+                    onChange={setExportPaymentFilter}
+                    options={[{ value: "all", label: "全部货款状态" }, ...paymentStatusOptions]}
+                    placeholder="货款状态"
+                    disabled={isExporting}
+                    inlineDropdown
+                    triggerClassName="h-12 rounded-full border-border bg-zinc-50 px-4 text-sm font-semibold shadow-none dark:border-white/10 dark:bg-white/[0.06]"
+                  />
+                  <div className="col-span-2">
+                    <CustomMultiSelect
+                      value={exportCompensationFilter}
+                      onChange={setExportCompensationFilter}
+                      options={[{ value: "all", label: "全部补偿状态" }, ...compensationStatusOptions]}
+                      placeholder="补偿状态"
                       disabled={isExporting}
-                      options={customerGroups.length > 0
-                        ? customerGroups.map((group) => ({ value: group, label: group }))
-                        : [{ value: "all", label: "暂无分组" }]}
-                      triggerClassName="h-12 rounded-full border border-border bg-zinc-50 px-4 text-sm font-semibold shadow-none dark:border-white/10 dark:bg-white/[0.06]"
+                      inlineDropdown
+                      triggerClassName="h-12 rounded-full border-border bg-zinc-50 px-4 text-sm font-semibold shadow-none dark:border-white/10 dark:bg-white/[0.06]"
                     />
                   </div>
+                </div>
+                {hasExportFilters ? (
                   <button
                     type="button"
-                    onClick={handleConfirmGroupedExport}
-                    disabled={isExporting || customerGroups.length === 0}
-                    className="flex h-12 shrink-0 items-center justify-center gap-2 rounded-full border border-border bg-zinc-900 px-4 text-sm font-bold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:bg-white/[0.08] dark:text-foreground dark:hover:bg-white/[0.12]"
+                    onClick={() => {
+                      setExportSearchQuery("");
+                      setExportProductFilter(shipmentProductOptions.map((option) => option.value));
+                      setExportCustomerGroupFilter(["all"]);
+                      setExportShippingFilter(["all"]);
+                      setExportPaymentFilter(["all"]);
+                      setExportCompensationFilter(["all"]);
+                      setExportStartDate("");
+                      setExportEndDate("");
+                    }}
+                    disabled={isExporting}
+                    className="flex h-10 w-full items-center justify-center rounded-full border border-primary/20 bg-primary/5 px-4 text-xs font-bold text-primary transition hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    {isExporting ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
-                    {isExporting ? "导出中" : "分组导出"}
+                    清空导出筛选
                   </button>
-                </div>
+                ) : null}
+                {exportPreviewOrders.length === 0 ? (
+                  <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-center text-sm font-semibold text-amber-700 dark:text-amber-300">
+                    当前筛选无发货记录，请调整筛选条件
+                  </div>
+                ) : null}
                 <button
                   type="button"
                   onClick={handleConfirmFullExport}
-                  disabled={isExporting || shipmentOrders.length === 0}
-                  className="flex h-12 w-full items-center justify-center gap-2 rounded-full border border-border bg-zinc-50 px-4 text-sm font-bold text-foreground shadow-sm transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:bg-white/[0.04] dark:hover:bg-white/[0.08]"
+                  disabled={isExporting || exportPreviewOrders.length === 0}
+                  className="flex h-12 w-full items-center justify-center gap-2 rounded-full border border-border bg-zinc-900 px-4 text-sm font-bold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:bg-white/[0.08] dark:text-foreground dark:hover:bg-white/[0.12]"
                 >
                   {isExporting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
-                  {isExporting ? "导出中" : "全量导出"}
+                  {isExporting ? "导出中" : exportPreviewOrders.length === 0 ? "当前筛选无数据" : "导出当前筛选"}
                 </button>
               </div>
             </motion.div>
