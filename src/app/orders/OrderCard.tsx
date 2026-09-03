@@ -764,6 +764,87 @@ function getCancelReason(order: Pick<AutoPickOrder, "cancelReason" | "rawPayload
     || resolveCancelReasonFromDetails(rawPayload.cancelDetails || rawPayload.cancel_details);
 }
 
+function readRecord(value: unknown): Record<string, unknown> | null {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+        ? parsed as Record<string, unknown>
+        : null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+function readCustomerTypeFromOrderPayload(rawPayload: unknown): "new" | "returning" | null {
+  const readTypeFromRecord = (record: Record<string, unknown>): "new" | "returning" | null => {
+    const fee = readRecord(record.fee);
+    const candidates = [
+      record.customerType,
+      record.customer_type,
+      record.userType,
+      record.user_type,
+      record.buyerType,
+      record.buyer_type,
+      record.isFirst,
+      record.is_first,
+      fee?.isFirst,
+      fee?.is_first,
+    ];
+
+    for (const candidate of candidates) {
+      const value = String(candidate ?? "").trim().toLowerCase();
+      if (!value) continue;
+      if (["1", "true", "yes", "new", "first", "first_order", "new_customer"].includes(value) || value.includes("新客")) {
+        return "new";
+      }
+      if (["0", "false", "no", "old", "returning", "repeat", "regular"].includes(value) || value.includes("老客")) {
+        return "returning";
+      }
+    }
+
+    const extras = fee?.extras ?? record.extras;
+    const extrasText = typeof extras === "string" ? extras : JSON.stringify(extras || "");
+    if (/新客|首单|首次/.test(extrasText)) return "new";
+    if (/老客|复购/.test(extrasText)) return "returning";
+    return null;
+  };
+
+  const root = readRecord(rawPayload);
+  if (!root) return null;
+  const directValue = readTypeFromRecord(root);
+  if (directValue) return directValue;
+
+  for (const candidate of [
+    root.data,
+    root.order,
+    root.orderInfo,
+    root.order_info,
+    root.payload,
+    root.rawPayload,
+    root.raw_payload,
+    root.raw,
+    root.original,
+    root.originalPayload,
+    root.original_payload,
+    root.detail,
+    root.detailData,
+    root.detail_data,
+  ]) {
+    const nested = readRecord(candidate);
+    if (!nested) continue;
+    const nestedValue = readTypeFromRecord(nested);
+    if (nestedValue) return nestedValue;
+  }
+
+  return null;
+}
+
 function isLegacyManualDeliveryPlaceholderOrder(order: AutoPickOrder) {
   return order.platform === "线下交易" && order.items.some(isManualDeliveryPlaceholderItem);
 }
@@ -2150,9 +2231,10 @@ export const OrderCard = memo(function OrderCard({
   const customerPrivacyPhone = customerPhoneExtension !== "-"
     ? `${customerPhone}${customerPhone !== "-" ? "_" : ""}${customerPhoneExtension}`
     : customerPhone;
-  const customerTypeText = order.customerType === "new"
+  const resolvedCustomerType = order.customerType || readCustomerTypeFromOrderPayload(order.rawPayload);
+  const customerTypeText = resolvedCustomerType === "new"
     ? "新客"
-    : order.customerType === "returning"
+    : resolvedCustomerType === "returning"
       ? "老客"
       : "-";
   const showCustomerTypeBadge = customerTypeText !== "-";

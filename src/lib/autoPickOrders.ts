@@ -777,10 +777,25 @@ export function readCustomerTypeFromRawPayload(rawPayload: unknown): "new" | "re
     return null;
   }
 
+  const readRecord = (value: unknown): Record<string, unknown> | null => {
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      return value as Record<string, unknown>;
+    }
+    if (typeof value === "string") {
+      try {
+        const parsed = JSON.parse(value);
+        return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+          ? parsed as Record<string, unknown>
+          : null;
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  };
+
   const readTypeFromRecord = (record: Record<string, unknown>): "new" | "returning" | null => {
-    const fee = record.fee && typeof record.fee === "object" && !Array.isArray(record.fee)
-      ? record.fee as Record<string, unknown>
-      : null;
+    const fee = readRecord(record.fee);
     const candidates = [
       record.customerType,
       record.customer_type,
