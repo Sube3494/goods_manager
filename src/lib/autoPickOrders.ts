@@ -81,6 +81,7 @@ export type AutoPickInboundOrder = {
   customerPhone?: string;
   customerMaskedPhone?: string;
   customerPhoneExtension?: string;
+  customerType?: "new" | "returning";
   customerRemark?: string;
   [key: string]: unknown;
 };

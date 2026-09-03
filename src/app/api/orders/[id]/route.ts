@@ -6,6 +6,7 @@ import { returnOutboundOrderById } from "@/lib/outboundReturns";
 import { cancelAutoCompleteJob } from "@/lib/autoPickAutoComplete";
 import {
   getAutoPickIntegrationConfigByUserId,
+  normalizeAutoPickOrderPayload,
   readCustomerMaskedPhoneFromRawPayload,
   readCustomerNameFromRawPayload,
   readCustomerPhoneFromRawPayload,
@@ -48,6 +49,10 @@ export async function GET(
     if (!order) {
       return NextResponse.json({ error: "订单不存在" }, { status: 404 });
     }
+    const normalized = normalizeAutoPickOrderPayload(order.rawPayload);
+    const customerType = readCustomerTypeFromRawPayload(order.rawPayload)
+      || normalized?.customerType
+      || null;
 
     return NextResponse.json({
       order: {
@@ -65,7 +70,7 @@ export async function GET(
         customerPhone: readCustomerPhoneFromRawPayload(order.rawPayload),
         customerMaskedPhone: readCustomerMaskedPhoneFromRawPayload(order.rawPayload),
         customerPhoneExtension: readCustomerPhoneExtensionFromRawPayload(order.rawPayload),
-        customerType: readCustomerTypeFromRawPayload(order.rawPayload),
+        customerType,
         customerRemark: order.customerRemark || readCustomerRemarkFromRawPayload(order.rawPayload),
         detailLoaded: true,
         detailLoading: false,

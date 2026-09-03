@@ -152,6 +152,10 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
       computedPlatformCommission = Math.max(0, Math.round(Number(refreshedOrder.platformCommission || 0)));
     }
 
+    const customerType = readCustomerTypeFromRawPayload(refreshedOrder.rawPayload)
+      || normalized?.customerType
+      || null;
+
     const syncedOrder = {
       ...refreshedOrder,
       expectedIncome: computedExpectedIncome,
@@ -161,7 +165,7 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
       customerPhone: readCustomerPhoneFromRawPayload(refreshedOrder.rawPayload),
       customerMaskedPhone: readCustomerMaskedPhoneFromRawPayload(refreshedOrder.rawPayload),
       customerPhoneExtension: readCustomerPhoneExtensionFromRawPayload(refreshedOrder.rawPayload),
-      customerType: readCustomerTypeFromRawPayload(refreshedOrder.rawPayload),
+      customerType,
       delivery: refreshedOrder.delivery && typeof refreshedOrder.delivery === "object"
         ? {
             ...(refreshedOrder.delivery as Record<string, unknown>),

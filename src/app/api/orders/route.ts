@@ -6,6 +6,7 @@ import {
   backfillJdSkuIdForManualMatchedShopProducts,
   backfillMeituanSkuIdForManualMatchedShopProducts,
   backfillPlatformIdsForSyncedAutoPickOrder,
+  normalizeAutoPickOrderPayload,
   normalizeAutoPickIntegrationConfig,
   readCustomerMaskedPhoneFromRawPayload,
   readCustomerNameFromRawPayload,
@@ -2196,6 +2197,10 @@ export async function GET(request: NextRequest) {
       const pickup = isAutoPickPickupOrder(order.rawPayload, order.userAddress, order.shopAddress);
       const otherPickup = isAutoPickOtherPickupOrder(order.rawPayload);
       const businessStatus = resolveAutoPickBusinessStatus(order.status, order.rawPayload, order.userAddress, order.shopAddress);
+      const normalized = normalizeAutoPickOrderPayload(order.rawPayload);
+      const customerType = readCustomerTypeFromRawPayload(order.rawPayload)
+        || normalized?.customerType
+        || null;
       return {
         ...order,
         shopId: order.shopId || readShopIdFromRawPayload(order.rawPayload),
@@ -2223,7 +2228,7 @@ export async function GET(request: NextRequest) {
         customerPhone: readCustomerPhoneFromRawPayload(order.rawPayload),
         customerMaskedPhone: readCustomerMaskedPhoneFromRawPayload(order.rawPayload),
         customerPhoneExtension: readCustomerPhoneExtensionFromRawPayload(order.rawPayload),
-        customerType: readCustomerTypeFromRawPayload(order.rawPayload),
+        customerType,
         customerRemark: order.customerRemark || readCustomerRemarkFromRawPayload(order.rawPayload),
         delivery: order.delivery && typeof order.delivery === "object"
           ? {
