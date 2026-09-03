@@ -3107,10 +3107,38 @@ export function normalizeAutoPickOrderPayload(payload: unknown): AutoPickInbound
     return null;
   }
 
+  const readRecord = (value: unknown): Record<string, unknown> | null => {
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      return value as Record<string, unknown>;
+    }
+    if (typeof value === "string") {
+      try {
+        const parsed = JSON.parse(value);
+        return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+          ? parsed as Record<string, unknown>
+          : null;
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  };
+
   const root = payload as Record<string, unknown>;
-  const input = root.data && typeof root.data === "object" && !Array.isArray(root.data)
+  const payloadInput = root.data && typeof root.data === "object" && !Array.isArray(root.data)
     ? root.data as Record<string, unknown>
     : root;
+  const rawPayloadRecord = readRecord(payloadInput.rawPayload)
+    || readRecord(payloadInput.raw_payload)
+    || readRecord(payloadInput.detail)
+    || readRecord(payloadInput.detailData)
+    || readRecord(payloadInput.detail_data);
+  const input = rawPayloadRecord
+    ? {
+        ...rawPayloadRecord,
+        ...payloadInput,
+      }
+    : payloadInput;
   const extend = input.extend && typeof input.extend === "object" && !Array.isArray(input.extend)
     ? input.extend as Record<string, unknown>
     : null;
@@ -3145,9 +3173,7 @@ export function normalizeAutoPickOrderPayload(payload: unknown): AutoPickInbound
   const realName = String(input.customerName || input.real_name || userInfo?.real_name || userInfo?.realName || "").trim();
   const nickName = String(input.nick_name || userInfo?.nick_name || userInfo?.nickName || "").trim();
 
-  const fee = input.fee && typeof input.fee === "object" && !Array.isArray(input.fee)
-    ? input.fee as Record<string, unknown>
-    : null;
+  const fee = readRecord(input.fee);
   const platform = String(input.platform || input.platform_name || "").trim();
   const channelTag = String(input.channelTag || input.channel_tag || "").trim();
   const isJD = platform === "京东" || channelTag === "daojia" || String(input.source_tag || "").trim().toLowerCase() === "daojia" || String(input.goods_channel_tag || "").trim().toLowerCase() === "daojia";
@@ -3378,6 +3404,7 @@ export function normalizeAutoPickOrderPayload(payload: unknown): AutoPickInbound
     customerMaskedPhone: maskedPhone || undefined,
     customerPhoneExtension: phoneExtension || undefined,
     customerType: readCustomerTypeFromRawPayload(input) || undefined,
+    rawPayload: rawPayloadRecord || input,
   };
 
   normalized.status = resolveAutoPickBusinessStatus(
@@ -3624,8 +3651,14 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
     const nextDeliveryValue = mergedDelivery
       ? asPrismaJsonValue(mergedDelivery)
       : Prisma.DbNull;
+    const normalizedRawPayload = normalized.rawPayload && typeof normalized.rawPayload === "object" && !Array.isArray(normalized.rawPayload)
+      ? normalized.rawPayload as Record<string, unknown>
+      : normalized as unknown as Record<string, unknown>;
     const nextRawPayload = mergeAutoPickSystemMeta(
-      normalized as unknown as Record<string, unknown>,
+      {
+        ...normalizedRawPayload,
+        customerType: normalized.customerType || (normalizedRawPayload.customerType as unknown),
+      },
       existing?.rawPayload
     );
     const existingSystemMeta = readAutoPickSystemMeta(existing?.rawPayload) || {};
