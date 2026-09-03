@@ -817,7 +817,22 @@ export function readCustomerTypeFromRawPayload(rawPayload: unknown): "new" | "re
     return directValue;
   }
 
-  for (const candidate of [root.data, root.order, root.orderInfo, root.order_info, root.payload]) {
+  for (const candidate of [
+    root.data,
+    root.order,
+    root.orderInfo,
+    root.order_info,
+    root.payload,
+    root.rawPayload,
+    root.raw_payload,
+    root.raw,
+    root.original,
+    root.originalPayload,
+    root.original_payload,
+    root.detail,
+    root.detailData,
+    root.detail_data,
+  ]) {
     if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
       continue;
     }
@@ -3346,6 +3361,7 @@ export function normalizeAutoPickOrderPayload(payload: unknown): AutoPickInbound
     customerPhone: unencryptedPhone || maskedPhone || splitInputPhone.phone || splitUserPhone.phone || undefined,
     customerMaskedPhone: maskedPhone || undefined,
     customerPhoneExtension: phoneExtension || undefined,
+    customerType: readCustomerTypeFromRawPayload(input) || undefined,
   };
 
   normalized.status = resolveAutoPickBusinessStatus(

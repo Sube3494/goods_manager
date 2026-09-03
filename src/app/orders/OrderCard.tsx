@@ -1663,18 +1663,23 @@ function OfflineOrderEditModal({
 
 export function DetailStat({
   label,
+  labelAccessory,
   value,
   valueClassName,
   className,
 }: {
   label: string;
+  labelAccessory?: ReactNode;
   value: string;
   valueClassName?: string;
   className?: string;
 }) {
   return (
     <div className={cn("rounded-2xl border border-black/6 bg-black/2 px-3 py-2.5 dark:border-white/8 dark:bg-white/3 sm:px-3 sm:py-2", className)}>
-      <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">{label}</div>
+      <div className="flex items-start justify-between gap-2">
+        <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">{label}</div>
+        {labelAccessory}
+      </div>
       <div className={cn("mt-1 text-sm font-medium text-foreground", valueClassName)}>{value}</div>
     </div>
   );
@@ -2150,6 +2155,7 @@ export const OrderCard = memo(function OrderCard({
     : order.customerType === "returning"
       ? "老客"
       : "-";
+  const showCustomerTypeBadge = customerTypeText !== "-";
   const logisticPlatform = getDisplayText(order.delivery?.logisticName || "第三方平台");
   const riderName = getDisplayText(order.delivery?.riderName);
   const riderPhone = getDisplayText(order.delivery?.riderPhone);
@@ -2637,6 +2643,16 @@ export const OrderCard = memo(function OrderCard({
                         <span className="truncate text-foreground/80 font-normal" title={order.userAddress}>
                           {order.userAddress}
                         </span>
+                        {showCustomerTypeBadge ? (
+                          <span className={cn(
+                            "shrink-0 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold leading-none",
+                            order.customerType === "new"
+                              ? "border-rose-500/20 bg-rose-500/10 text-rose-600 dark:text-rose-300"
+                              : "border-slate-400/20 bg-slate-500/8 text-slate-500 dark:text-slate-300"
+                          )}>
+                            {customerTypeText}
+                          </span>
+                        ) : null}
                       </>
                     ) : null}
                   </span>
@@ -2681,6 +2697,16 @@ export const OrderCard = memo(function OrderCard({
                       <span className="line-clamp-2 break-all text-left w-full leading-normal">
                         {order.userAddress || "地址待同步"}
                       </span>
+                      {showCustomerTypeBadge ? (
+                        <span className={cn(
+                          "mt-0.5 shrink-0 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold leading-none",
+                          order.customerType === "new"
+                            ? "border-rose-500/20 bg-rose-500/10 text-rose-600 dark:text-rose-300"
+                            : "border-slate-400/20 bg-slate-500/8 text-slate-500 dark:text-slate-300"
+                        )}>
+                          {customerTypeText}
+                        </span>
+                      ) : null}
                     </div>
                   </div>
                 )}
@@ -3020,12 +3046,18 @@ export const OrderCard = memo(function OrderCard({
                     valueClassName="break-all text-[13px] sm:text-sm"
                   />
                   <DetailStat
-                    label="顾客类型"
-                    value={customerTypeText}
-                  />
-                  <DetailStat
                     label="顾客电话"
                     value={customerMaskedPhone}
+                    labelAccessory={showCustomerTypeBadge ? (
+                      <span className={cn(
+                        "shrink-0 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold leading-none",
+                        order.customerType === "new"
+                          ? "border-rose-500/20 bg-rose-500/10 text-rose-600 dark:text-rose-300"
+                          : "border-slate-400/20 bg-slate-500/8 text-slate-500 dark:text-slate-300"
+                      )}>
+                        {customerTypeText}
+                      </span>
+                    ) : null}
                     valueClassName="break-all text-[13px] sm:text-sm"
                   />
                   <DetailStat
