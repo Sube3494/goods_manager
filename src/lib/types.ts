@@ -239,6 +239,7 @@ export interface AutoPickOrder {
   customerPhone?: string | null;
   customerMaskedPhone?: string | null;
   customerPhoneExtension?: string | null;
+  customerType?: "new" | "returning" | null;
   customerRemark?: string | null;
   items: AutoPickOrderItem[];
   autoCompleteAt?: string | null;

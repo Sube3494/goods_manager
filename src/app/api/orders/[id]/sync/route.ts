@@ -10,6 +10,7 @@ import {
   readCustomerNameFromRawPayload,
   readCustomerPhoneExtensionFromRawPayload,
   readCustomerPhoneFromRawPayload,
+  readCustomerTypeFromRawPayload,
   readRiderPhoneFromDelivery,
   readRiderPhoneFromRawPayload,
   refreshAutoPickOrderFromPlugin,
@@ -160,6 +161,7 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
       customerPhone: readCustomerPhoneFromRawPayload(refreshedOrder.rawPayload),
       customerMaskedPhone: readCustomerMaskedPhoneFromRawPayload(refreshedOrder.rawPayload),
       customerPhoneExtension: readCustomerPhoneExtensionFromRawPayload(refreshedOrder.rawPayload),
+      customerType: readCustomerTypeFromRawPayload(refreshedOrder.rawPayload),
       delivery: refreshedOrder.delivery && typeof refreshedOrder.delivery === "object"
         ? {
             ...(refreshedOrder.delivery as Record<string, unknown>),

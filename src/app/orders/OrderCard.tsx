@@ -2145,6 +2145,11 @@ export const OrderCard = memo(function OrderCard({
   const customerPrivacyPhone = customerPhoneExtension !== "-"
     ? `${customerPhone}${customerPhone !== "-" ? "_" : ""}${customerPhoneExtension}`
     : customerPhone;
+  const customerTypeText = order.customerType === "new"
+    ? "新客"
+    : order.customerType === "returning"
+      ? "老客"
+      : "-";
   const logisticPlatform = getDisplayText(order.delivery?.logisticName || "第三方平台");
   const riderName = getDisplayText(order.delivery?.riderName);
   const riderPhone = getDisplayText(order.delivery?.riderPhone);
@@ -3013,6 +3018,10 @@ export const OrderCard = memo(function OrderCard({
                     label="顾客昵称"
                     value={customerName}
                     valueClassName="break-all text-[13px] sm:text-sm"
+                  />
+                  <DetailStat
+                    label="顾客类型"
+                    value={customerTypeText}
                   />
                   <DetailStat
                     label="顾客电话"

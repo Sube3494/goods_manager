@@ -12,6 +12,7 @@ import {
   readCustomerPhoneFromRawPayload,
   readCustomerPhoneExtensionFromRawPayload,
   readCustomerRemarkFromRawPayload,
+  readCustomerTypeFromRawPayload,
   readRiderPhoneFromDelivery,
   readRiderPhoneFromRawPayload,
   syncMeituanSkuIdForShopProduct,
@@ -2222,6 +2223,7 @@ export async function GET(request: NextRequest) {
         customerPhone: readCustomerPhoneFromRawPayload(order.rawPayload),
         customerMaskedPhone: readCustomerMaskedPhoneFromRawPayload(order.rawPayload),
         customerPhoneExtension: readCustomerPhoneExtensionFromRawPayload(order.rawPayload),
+        customerType: readCustomerTypeFromRawPayload(order.rawPayload),
         customerRemark: order.customerRemark || readCustomerRemarkFromRawPayload(order.rawPayload),
         delivery: order.delivery && typeof order.delivery === "object"
           ? {

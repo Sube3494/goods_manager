@@ -771,6 +771,65 @@ export function readCustomerPhoneExtensionFromRawPayload(rawPayload: unknown): s
   return null;
 }
 
+export function readCustomerTypeFromRawPayload(rawPayload: unknown): "new" | "returning" | null {
+  if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
+    return null;
+  }
+
+  const readTypeFromRecord = (record: Record<string, unknown>): "new" | "returning" | null => {
+    const fee = record.fee && typeof record.fee === "object" && !Array.isArray(record.fee)
+      ? record.fee as Record<string, unknown>
+      : null;
+    const candidates = [
+      record.customerType,
+      record.customer_type,
+      record.userType,
+      record.user_type,
+      record.buyerType,
+      record.buyer_type,
+      record.isFirst,
+      record.is_first,
+      fee?.isFirst,
+      fee?.is_first,
+    ];
+
+    for (const candidate of candidates) {
+      const value = String(candidate ?? "").trim().toLowerCase();
+      if (!value) continue;
+      if (["1", "true", "yes", "new", "first", "first_order", "new_customer"].includes(value) || value.includes("新客")) {
+        return "new";
+      }
+      if (["0", "false", "no", "old", "returning", "repeat", "regular"].includes(value) || value.includes("老客")) {
+        return "returning";
+      }
+    }
+
+    const extras = fee?.extras ?? record.extras;
+    const extrasText = typeof extras === "string" ? extras : JSON.stringify(extras || "");
+    if (/新客|首单|首次/.test(extrasText)) return "new";
+    if (/老客|复购/.test(extrasText)) return "returning";
+    return null;
+  };
+
+  const root = rawPayload as Record<string, unknown>;
+  const directValue = readTypeFromRecord(root);
+  if (directValue) {
+    return directValue;
+  }
+
+  for (const candidate of [root.data, root.order, root.orderInfo, root.order_info, root.payload]) {
+    if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
+      continue;
+    }
+    const nestedValue = readTypeFromRecord(candidate as Record<string, unknown>);
+    if (nestedValue) {
+      return nestedValue;
+    }
+  }
+
+  return null;
+}
+
 export function readRiderPhoneFromDelivery(delivery: unknown): string | null {
   if (!delivery || typeof delivery !== "object" || Array.isArray(delivery)) {
     return null;
