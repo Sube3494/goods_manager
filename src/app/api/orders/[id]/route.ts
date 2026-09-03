@@ -14,6 +14,7 @@ import {
   readRiderPhoneFromDelivery,
   readRiderPhoneFromRawPayload,
   syncAutoOutboundFromCompletedAutoPickOrder,
+  syncBrushOrderFromCompletedAutoPickOrder,
 } from "@/lib/autoPickOrders";
 
 export async function GET(
@@ -469,16 +470,37 @@ export async function PATCH(
       });
     }
 
-    if (hasBrushToggle && !Boolean(body.isMainSystemSelfDelivery)) {
-      await cancelAutoCompleteJob(order.id, "manual-unmark-brush").catch((error) => {
-        console.error("Failed to cancel auto complete job after unmarking brush:", error);
-      });
+    let brushSyncResult: Awaited<ReturnType<typeof syncBrushOrderFromCompletedAutoPickOrder>> | null = null;
+    let removedBrushOrderCount = 0;
+
+    if (hasBrushToggle) {
+      if (Boolean(body.isMainSystemSelfDelivery)) {
+        brushSyncResult = await syncBrushOrderFromCompletedAutoPickOrder(user.id, order.id, {
+          allowSelfDeliveryFallback: true,
+          forceInclude: true,
+          overwriteExisting: true,
+        });
+      } else {
+        const deleteResult = await prisma.brushOrder.deleteMany({
+          where: {
+            userId: user.id,
+            platformOrderId: order.orderNo,
+          },
+        });
+        removedBrushOrderCount = deleteResult.count;
+
+        await cancelAutoCompleteJob(order.id, "manual-unmark-brush").catch((error) => {
+          console.error("Failed to cancel auto complete job after unmarking brush:", error);
+        });
+      }
     }
 
     return NextResponse.json({
       ok: true,
       isMainSystemSelfDelivery: hasBrushToggle ? Boolean(body.isMainSystemSelfDelivery) : undefined,
       autoCompleteAt: hasBrushToggle && !Boolean(body.isMainSystemSelfDelivery) ? null : undefined,
+      brushSync: brushSyncResult,
+      removedBrushOrderCount: hasBrushToggle && !Boolean(body.isMainSystemSelfDelivery) ? removedBrushOrderCount : undefined,
       actualPaid,
       expectedIncome,
       platformCommission,

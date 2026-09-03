@@ -1983,7 +1983,12 @@ export const OrderCard = memo(function OrderCard({
         body: JSON.stringify({ isMainSystemSelfDelivery: val }),
       });
       if (res.ok) {
-        showToast("刷单标记修改成功", "success");
+        const data = await res.json().catch(() => ({}));
+        if (val && data?.brushSync?.ok === false) {
+          showToast(`刷单标记已更新，但暂未同步到刷单列表：${getBrushSyncSkippedReasonText(data.brushSync.reason) || "当前订单不符合刷单同步条件"}`, "error");
+        } else {
+          showToast(val ? "刷单标记修改成功，已同步刷单列表" : "刷单标记已取消，刷单列表已同步清理", "success");
+        }
         onRefresh?.();
       } else {
         const data = await res.json().catch(() => ({}));
