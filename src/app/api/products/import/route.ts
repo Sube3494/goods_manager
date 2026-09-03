@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
 import { hasPermission, SessionUser } from "@/lib/permissions";
+import { getPrimaryJdSkuId, normalizeJdSkuIds, replaceProductJdSkuMappings } from "@/lib/productJdSku";
+import { normalizeMeituanSkuIds, replaceProductMeituanSkuMappings } from "@/lib/productMeituanSku";
 import { pinyin } from "pinyin-pro";
 
 function generatePinyinSearchText(name: string): string {
@@ -135,7 +137,18 @@ export async function POST(request: Request) {
     for (const item of products) {
         try {
             // Map keys for SKU and Quantity (Supporting both internal formats and exported headers)
-            const sku = String(extractRowValue(item, ["sku", "SKU/店内码", "SKU", "店内码", "店内编码", "商品编码", "编码", "货号"]) || "");
+            // "商品编码/编码" is intentionally not treated as local SKU: many Meituan exports use it for platform SKU IDs.
+            const sku = String(extractRowValue(item, ["sku", "SKU/店内码", "SKU", "店内码", "店内编码", "货号"]) || "");
+            const jdSkuText = String(extractRowValue(item, ["JD SKU ID", "JD SKU", "JDSKU", "jdSkuId", "jdSkuIds", "京东编码", "京东SKU", "京东商品ID", "京东ID"]) || "");
+            const meituanSkuText = String(extractRowValue(item, [
+              "美团商品 ID", "美团商品ID", "美团商品Id", "美团商品id",
+              "美团ID", "美团Id", "美团id", "美团编码", "美团sku", "美团SKU",
+              "商品编码", "编码", "商品ID", "商品Id", "商品id", "平台商品ID", "平台商品id",
+              "meituanSkuId", "meituanSkuIds", "meituanId"
+            ]) || "");
+            const normalizedJdSkuIds = normalizeJdSkuIds(jdSkuText);
+            const normalizedMeituanSkuIds = normalizeMeituanSkuIds(meituanSkuText);
+            const primaryJdSkuId = getPrimaryJdSkuId(normalizedJdSkuIds);
             const costPrice = Number(extractRowValue(item, ["进货单价", "成本价", "成本价格", "costPrice", "Cost Price"]) || 0);
             // 1. 基础数据解析
             const name = String(extractRowValue(item, ["商品名称", "name", "名称"]) || "");
@@ -205,26 +218,29 @@ export async function POST(request: Request) {
                   nextAutoNumber = num + 1;
                 }
               }
-              globalExistingSkuSet.add(finalSku);
             }
 
-            // Find existing product by SKU GLOBALLY
-            const product = await prisma.product.findUnique({
-                where: { sku: finalSku }
-            });
+            const productIdWhere = normalizedMeituanSkuIds.length > 0
+                ? [
+                    { meituanSkuMappings: { some: { meituanSkuId: { in: normalizedMeituanSkuIds } } } },
+                ]
+                : [];
+            const product = productIdWhere.length > 0
+                ? await prisma.product.findFirst({
+                    where: {
+                        userId,
+                        OR: productIdWhere,
+                    }
+                })
+                : null;
 
             if (product) {
-                if (session.role !== "SUPER_ADMIN" && product.userId !== userId) {
-                    failCount++;
-                    errors.push({ sku, reason: "该 SKU 属于其他用户，无法更新" });
-                    continue;
-                }
-
                 // UPDATE: Replenishment & metadata update
                 const currentCost = product.costPrice || 0;
 
                 const updateData: Record<string, unknown> = {
                     costPrice: costPrice > 0 ? costPrice : currentCost,
+                    jdSkuId: primaryJdSkuId || undefined,
                     pinyin: name ? generatePinyinSearchText(name) : undefined,
                     isPublic,
                     isDiscontinued,
@@ -282,6 +298,11 @@ export async function POST(request: Request) {
                     data: updateData
                 });
 
+                await prisma.$transaction(async (tx) => {
+                    await replaceProductJdSkuMappings(tx, product.id, userId, normalizedJdSkuIds);
+                    await replaceProductMeituanSkuMappings(tx, product.id, userId, normalizedMeituanSkuIds);
+                });
+
                 // 处理图库同步 (Sync Gallery)
                 if (galleryUrls.length > 0) {
                     for (const gUrl of galleryUrls) {
@@ -308,8 +329,13 @@ export async function POST(request: Request) {
                 // CREATE: If SKU doesn't exist, create a new product
                 if (!name) {
                     failCount++;
-                    errors.push({ sku, reason: "系统内未找到该 SKU，且导入数据中缺少商品名称，无法创建商品" });
+                    errors.push({ sku, reason: "系统内未找到平台商品 ID，且导入数据中缺少商品名称，无法创建商品" });
                     continue;
+                }
+                if (globalExistingSkuSet.has(finalSku)) {
+                    finalSku = generateNextSku();
+                } else {
+                    globalExistingSkuSet.add(finalSku);
                 }
 
                 // Handle Category
@@ -389,6 +415,7 @@ export async function POST(request: Request) {
                 const newProduct = await prisma.product.create({
                     data: {
                         sku: finalSku,
+                        jdSkuId: primaryJdSkuId,
                         name,
                         categoryId: finalCategoryId as string,
                         supplierId: finalSupplierId,
@@ -405,6 +432,11 @@ export async function POST(request: Request) {
                         shelfLifeDays: isShelfLife && Number.isFinite(shelfLifeDays) ? shelfLifeDays : null,
                         libraryId: libraryId || undefined
                     }
+                });
+
+                await prisma.$transaction(async (tx) => {
+                    await replaceProductJdSkuMappings(tx, newProduct.id, userId, normalizedJdSkuIds);
+                    await replaceProductMeituanSkuMappings(tx, newProduct.id, userId, normalizedMeituanSkuIds);
                 });
 
                 // 处理图库 (Gallery)

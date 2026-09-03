@@ -766,7 +766,6 @@ export async function POST(
         libraryId: true,
         category: { select: { name: true } },
         supplier: { select: { name: true } },
-        meituanSkuMappings: { select: { meituanSkuId: true } },
       },
     });
 
@@ -862,7 +861,6 @@ export async function POST(
       return [{
         ...product,
         sku: nextSku,
-        meituanSkuId: product.meituanSkuMappings[0]?.meituanSkuId || null,
       }];
     });
     const skippedCount = skippedAssignmentCount;
@@ -873,7 +871,10 @@ export async function POST(
         productId: product.id,
         sourceProductId: product.id,
         sku: product.sku,
-        meituanSkuId: product.meituanSkuId,
+        jdSkuId: null,
+        meituanSkuId: null,
+        taobaoSkuId: null,
+        doudianSkuId: null,
         productName: product.name,
         pinyin: generatePinyinSearchText(product.name),
         productImage: product.image || null,
