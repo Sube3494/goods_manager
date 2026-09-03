@@ -1003,12 +1003,14 @@ type PromotionPlatformAmounts = {
   amountMeituan: number;
   amountJingdong: number;
   amountTaobao: number;
+  amountOther: number;
 };
 
 const PROMOTION_PLATFORM_ROWS: { key: keyof PromotionPlatformAmounts; label: string; icon: string }[] = [
   { key: "amountMeituan", label: "美团", icon: "/platform/美团.svg" },
   { key: "amountJingdong", label: "京东", icon: "/platform/京东.svg" },
   { key: "amountTaobao", label: "淘宝", icon: "/platform/淘宝.svg" },
+  { key: "amountOther", label: "抖店", icon: "/platform/doudian.svg" },
 ];
 
 export function PromotionEditModal({
@@ -1024,7 +1026,7 @@ export function PromotionEditModal({
 }) {
   const [vals, setVals] = useState<PromotionPlatformAmounts>({ ...platforms });
   const [isSaving, setIsSaving] = useState(false);
-  const total = vals.amountMeituan + vals.amountJingdong + vals.amountTaobao;
+  const total = vals.amountMeituan + vals.amountJingdong + vals.amountTaobao + vals.amountOther;
 
   const setField = (key: keyof PromotionPlatformAmounts, raw: string) => {
     const v = parseFloat(raw);
