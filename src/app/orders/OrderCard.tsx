@@ -781,7 +781,67 @@ function readRecord(value: unknown): Record<string, unknown> | null {
   return null;
 }
 
+function isUnsupportedCustomerTypePayload(rawPayload: unknown): boolean {
+  if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
+    return false;
+  }
+
+  const root = readRecord(rawPayload);
+  if (!root) return false;
+
+  const checkRecord = (record: Record<string, unknown>): boolean => {
+    const channelTag = String(
+      record.channel_tag ||
+      record.channelTag ||
+      record.source_tag ||
+      record.sourceTag ||
+      record.goods_channel_tag ||
+      record.goodsChannelTag ||
+      ""
+    ).trim().toLowerCase();
+    const platform = String(record.platform || "").trim().toLowerCase();
+    const orderCopy = String(record.order_copy || record.orderCopy || "");
+    const isTaobao = (
+      channelTag === "ebai" ||
+      channelTag === "taobao" ||
+      platform === "淘宝" ||
+      platform.includes("淘宝") ||
+      orderCopy.includes("淘宝闪购") ||
+      orderCopy.includes("淘宝")
+    );
+    const isJD = (
+      channelTag === "daojia" ||
+      platform === "京东" ||
+      platform.includes("京东") ||
+      platform.includes("jd") ||
+      orderCopy.includes("京东")
+    );
+    return isTaobao || isJD;
+  };
+
+  if (checkRecord(root)) return true;
+  for (const candidate of [
+    root.data,
+    root.order,
+    root.orderInfo,
+    root.order_info,
+    root.payload,
+    root.rawPayload,
+    root.raw_payload,
+    root.detail,
+    root.detailData,
+    root.detail_data,
+  ]) {
+    const nested = readRecord(candidate);
+    if (nested && checkRecord(nested)) return true;
+  }
+  return false;
+}
+
 function readCustomerTypeFromOrderPayload(rawPayload: unknown): "new" | "returning" | null {
+  if (isUnsupportedCustomerTypePayload(rawPayload)) {
+    return null;
+  }
   const readTypeFromRecord = (record: Record<string, unknown>): "new" | "returning" | null => {
     const fee = readRecord(record.fee);
     const candidates = [
@@ -2231,7 +2291,12 @@ export const OrderCard = memo(function OrderCard({
   const customerPrivacyPhone = customerPhoneExtension !== "-"
     ? `${customerPhone}${customerPhone !== "-" ? "_" : ""}${customerPhoneExtension}`
     : customerPhone;
-  const resolvedCustomerType = order.customerType || readCustomerTypeFromOrderPayload(order.rawPayload);
+  const isUnsupportedPlatform = order.platform === "淘宝"
+    || order.platform === "京东"
+    || isUnsupportedCustomerTypePayload(order.rawPayload);
+  const resolvedCustomerType = isUnsupportedPlatform
+    ? null
+    : (order.customerType || readCustomerTypeFromOrderPayload(order.rawPayload));
   const customerTypeText = resolvedCustomerType === "new"
     ? "新客"
     : resolvedCustomerType === "returning"

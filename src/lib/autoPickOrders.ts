@@ -772,8 +772,88 @@ export function readCustomerPhoneExtensionFromRawPayload(rawPayload: unknown): s
   return null;
 }
 
+export function isUnsupportedCustomerTypePayload(rawPayload: unknown): boolean {
+  if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
+    return false;
+  }
+
+  const readRecord = (value: unknown): Record<string, unknown> | null => {
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      return value as Record<string, unknown>;
+    }
+    if (typeof value === "string") {
+      try {
+        const parsed = JSON.parse(value);
+        return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+          ? parsed as Record<string, unknown>
+          : null;
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  };
+
+  const root = readRecord(rawPayload);
+  if (!root) return false;
+
+  const checkRecord = (record: Record<string, unknown>): boolean => {
+    const channelTag = String(
+      record.channel_tag ||
+      record.channelTag ||
+      record.source_tag ||
+      record.sourceTag ||
+      record.goods_channel_tag ||
+      record.goodsChannelTag ||
+      ""
+    ).trim().toLowerCase();
+    const platform = String(record.platform || "").trim().toLowerCase();
+    const orderCopy = String(record.order_copy || record.orderCopy || "");
+    const isTaobao = (
+      channelTag === "ebai" ||
+      channelTag === "taobao" ||
+      platform === "淘宝" ||
+      platform.includes("淘宝") ||
+      orderCopy.includes("淘宝闪购") ||
+      orderCopy.includes("淘宝")
+    );
+    const isJD = (
+      channelTag === "daojia" ||
+      platform === "京东" ||
+      platform.includes("京东") ||
+      platform.includes("jd") ||
+      orderCopy.includes("京东")
+    );
+    return isTaobao || isJD;
+  };
+
+  if (checkRecord(root)) return true;
+  for (const candidate of [
+    root.data,
+    root.order,
+    root.orderInfo,
+    root.order_info,
+    root.payload,
+    root.rawPayload,
+    root.raw_payload,
+    root.detail,
+    root.detailData,
+    root.detail_data,
+  ]) {
+    const nested = readRecord(candidate);
+    if (nested && checkRecord(nested)) return true;
+  }
+  return false;
+}
+
+export const isTaobaoOrderPayload = isUnsupportedCustomerTypePayload;
+
 export function readCustomerTypeFromRawPayload(rawPayload: unknown): "new" | "returning" | null {
   if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
+    return null;
+  }
+
+  if (isUnsupportedCustomerTypePayload(rawPayload)) {
     return null;
   }
 
