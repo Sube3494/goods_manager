@@ -1164,10 +1164,9 @@ export async function GET(request: NextRequest) {
         },
       } : {}),
     };
-    const baseWhere: Prisma.AutoPickOrderWhereInput = {
-      ...baseWhereWithoutShop,
-      ...(shopWhereFilter || {}),
-    };
+    const baseWhere: Prisma.AutoPickOrderWhereInput = shopWhereFilter
+      ? { AND: [baseWhereWithoutShop, shopWhereFilter] }
+      : baseWhereWithoutShop;
 
     const platformWhere: Prisma.AutoPickOrderWhereInput | undefined = platform
       ? platform === "线下交易" || platform.toLowerCase() === "other"
@@ -1175,29 +1174,44 @@ export async function GET(request: NextRequest) {
         : { platform }
       : undefined;
 
-    const where: Prisma.AutoPickOrderWhereInput = {
-      ...baseWhere,
-      ...(platformWhere || {}),
-      ...(productCostStatusFilter ? {} : (buildStatusWhere(status) || {})),
-    };
+    const statusWhere = productCostStatusFilter ? undefined : buildStatusWhere(status);
 
-    const platformFilterWhere: Prisma.AutoPickOrderWhereInput = {
-      ...baseWhere,
-      ...(productCostStatusFilter ? {} : (buildStatusWhere(status) || {})),
-    };
+    const whereConditions: Prisma.AutoPickOrderWhereInput[] = [baseWhere];
+    if (platformWhere) whereConditions.push(platformWhere);
+    if (statusWhere) whereConditions.push(statusWhere);
+    const where: Prisma.AutoPickOrderWhereInput = whereConditions.length === 1 ? whereConditions[0] : { AND: whereConditions };
 
-    const statusFilterWhere: Prisma.AutoPickOrderWhereInput = {
-      ...baseWhere,
-      ...(platformWhere || {}),
-    };
+    const platformFilterConditions: Prisma.AutoPickOrderWhereInput[] = [baseWhere];
+    if (statusWhere) platformFilterConditions.push(statusWhere);
+    const platformFilterWhere: Prisma.AutoPickOrderWhereInput = platformFilterConditions.length === 1 ? platformFilterConditions[0] : { AND: platformFilterConditions };
+
+    const statusFilterConditions: Prisma.AutoPickOrderWhereInput[] = [baseWhere];
+    if (platformWhere) statusFilterConditions.push(platformWhere);
+    const statusFilterWhere: Prisma.AutoPickOrderWhereInput = statusFilterConditions.length === 1 ? statusFilterConditions[0] : { AND: statusFilterConditions };
 
     const cancelledWhere = buildStatusWhere("已取消");
     const deletedWhere = buildStatusWhere("已删除");
 
-    const shopOptionsWhere: Prisma.AutoPickOrderWhereInput = {
-      ...baseWhereWithoutShop,
-      ...(platformWhere || {}),
-      ...(productCostStatusFilter ? {} : (buildStatusWhere(status) || {})),
+    const shopOptionsConditions: Prisma.AutoPickOrderWhereInput[] = [baseWhereWithoutShop];
+    if (platformWhere) shopOptionsConditions.push(platformWhere);
+    if (statusWhere) shopOptionsConditions.push(statusWhere);
+    const shopOptionsWhere: Prisma.AutoPickOrderWhereInput = shopOptionsConditions.length === 1 ? shopOptionsConditions[0] : { AND: shopOptionsConditions };
+
+    const cancelledOrDeletedList: Prisma.AutoPickOrderWhereInput[] = [
+      ...(cancelledWhere ? [cancelledWhere] : []),
+      ...(deletedWhere ? [deletedWhere] : []),
+    ];
+
+    const cancelledQueryWhere: Prisma.AutoPickOrderWhereInput = cancelledOrDeletedList.length > 0
+      ? { AND: [where, { OR: cancelledOrDeletedList }] }
+      : { AND: [where, { id: "__impossible__" }] };
+
+    const brushQueryWhere: Prisma.AutoPickOrderWhereInput = {
+      AND: [
+        where,
+        { rawPayload: { path: ["systemMeta", "mainSystemSelfDelivery", "triggered"], equals: true } },
+        ...(cancelledOrDeletedList.length > 0 ? [{ NOT: { OR: cancelledOrDeletedList } }] : []),
+      ],
     };
 
     const [orders, total, platformRows, statusRows, userProfile, localShops, shopFilterRows, cancelledTotal, brushTotal, summaryOrders] = await Promise.all([
@@ -1296,31 +1310,12 @@ export async function GET(request: NextRequest) {
       !includeMetrics
         ? Promise.resolve(0)
         : prisma.autoPickOrder.count({
-            where: {
-              ...where,
-              OR: [
-                ...(cancelledWhere ? [cancelledWhere] : []),
-                ...(deletedWhere ? [deletedWhere] : []),
-              ],
-            },
+            where: cancelledQueryWhere,
           }),
       !includeMetrics
         ? Promise.resolve(0)
         : prisma.autoPickOrder.count({
-            where: {
-              ...where,
-              ...(cancelledWhere || deletedWhere
-                ? {
-                    NOT: {
-                      OR: [
-                        ...(cancelledWhere ? [cancelledWhere] : []),
-                        ...(deletedWhere ? [deletedWhere] : []),
-                      ],
-                    },
-                  }
-                : {}),
-              rawPayload: { path: ["systemMeta", "mainSystemSelfDelivery", "triggered"], equals: true },
-            },
+            where: brushQueryWhere,
           }),
       !includeMetrics
         ? Promise.resolve([])
@@ -2035,21 +2030,17 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    const calculatedCancelledCount = Object.values(cancelledPlatformCounts).reduce((sum, count) => sum + count, 0);
+    const calculatedBrushCount = Object.values(brushPlatformCounts).reduce((sum, count) => sum + count, 0);
+    const calculatedTrueOrderCount = Object.values(truePlatformCounts).reduce((sum, count) => sum + count, 0);
+
     const overview = !includeMetrics
       ? null
       : {
           totalCount: responseTotal,
-          cancelledCount: productCostStatusFilter
-            ? metricOrders.filter((order) => isAutoPickOrderCancelledStatus(order.status) || isAutoPickOrderDeletedStatus(order.status)).length
-            : cancelledTotal,
-          brushCount: productCostStatusFilter
-            ? metricOrders.filter((order) => !isAutoPickOrderCancelledStatus(order.status) && !isAutoPickOrderDeletedStatus(order.status) && readMainSystemSelfDeliveryFlag(order.rawPayload)).length
-            : brushTotal,
-          trueOrderCount: Math.max(0, responseTotal - (productCostStatusFilter
-            ? metricOrders.filter((order) => isAutoPickOrderCancelledStatus(order.status) || isAutoPickOrderDeletedStatus(order.status)).length
-            : cancelledTotal) - (productCostStatusFilter
-            ? metricOrders.filter((order) => !isAutoPickOrderCancelledStatus(order.status) && !isAutoPickOrderDeletedStatus(order.status) && readMainSystemSelfDeliveryFlag(order.rawPayload)).length
-            : brushTotal)),
+          cancelledCount: calculatedCancelledCount,
+          brushCount: calculatedBrushCount,
+          trueOrderCount: calculatedTrueOrderCount,
           platformBreakdown: {
             truePlatformCounts,
             brushPlatformCounts,
