@@ -2113,6 +2113,20 @@ function FactoryShipmentDetailModal({
     setIsReplaceModalOpen(true);
   }, []);
 
+  const detailReplaceBlockedIds = useMemo(() => {
+    if (!replacingItemKey) return [];
+    return editItems
+      .filter((item) => (getItemKey(item) || getStableShipmentActionKey(item)) !== replacingItemKey)
+      .flatMap((item) => [
+        item.shopProductVariantId,
+        item.productVariantId,
+        item.shopProductId,
+        item.productId,
+        getItemKey(item),
+      ])
+      .filter(Boolean) as string[];
+  }, [editItems, replacingItemKey]);
+
   const handleConfirmReplace = useCallback((pickedProducts: Product[]) => {
     const product = pickedProducts[0];
     if (!product || !replacingItemKey) {
@@ -2121,7 +2135,6 @@ function FactoryShipmentDetailModal({
       return;
     }
 
-    const newDisplayName = buildShipmentItemDisplayName(product);
     const nextProductId =
       product.productId ||
       product.sourceProductId ||
@@ -2129,6 +2142,32 @@ function FactoryShipmentDetailModal({
     const nextProductVariantId = product.productVariantId || null;
     const nextShopProductId = product.shopProductId || undefined;
     const nextShopProductVariantId = product.shopProductVariantId || null;
+
+    const nextItemKey = getItemKey({
+      productId: nextProductId,
+      productVariantId: nextProductVariantId,
+      shopProductId: nextShopProductId,
+      shopProductVariantId: nextShopProductVariantId,
+    });
+
+    // 严禁替换为当前发货单已有的其它商品/规格
+    const isDuplicate = editItems.some((item) => {
+      const currentKey = getItemKey(item) || getStableShipmentActionKey(item);
+      if (currentKey === replacingItemKey) return false;
+      const itemKey = getItemKey(item);
+      return (
+        itemKey === nextItemKey ||
+        (nextProductVariantId && item.productVariantId === nextProductVariantId) ||
+        (!nextProductVariantId && !item.productVariantId && nextProductId && item.productId === nextProductId)
+      );
+    });
+
+    if (isDuplicate) {
+      showToast("当前发货单已包含该商品或规格，不允许替换为已有商品", "error");
+      return;
+    }
+
+    const newDisplayName = buildShipmentItemDisplayName(product);
     const nextPrice = product.salePrice ?? product.costPrice ?? 0;
 
     setEditItems((prev) =>
@@ -2154,7 +2193,7 @@ function FactoryShipmentDetailModal({
     showToast(`已替换为「${newDisplayName}」`, "success");
     setIsReplaceModalOpen(false);
     setReplacingItemKey(null);
-  }, [replacingItemKey, showToast]);
+  }, [editItems, replacingItemKey, showToast]);
 
   const handleAddCompensationBox = useCallback((item: SelectedShipmentItem) => {
     const itemKey = `${item.shopProductId || item.productId || ""}-box`;
@@ -2850,7 +2889,8 @@ function FactoryShipmentDetailModal({
         singleSelect
         title="替换发货商品"
         showPrice={false}
-        selectedIds={[]}
+        selectedIds={detailReplaceBlockedIds}
+        selectedBadgeLabel="单据中已有"
         fetchPath="/api/products"
         showPlatformSelector={false}
         query={{
@@ -3029,6 +3069,20 @@ function FactoryShipmentCreateModal({
     setIsReplaceModalOpen(true);
   }, []);
 
+  const createReplaceBlockedIds = useMemo(() => {
+    if (!replacingItemKey) return [];
+    return selectedItems
+      .filter((item) => getItemKey(item) !== replacingItemKey)
+      .flatMap((item) => [
+        item.shopProductVariantId,
+        item.productVariantId,
+        item.shopProductId,
+        item.productId,
+        getItemKey(item),
+      ])
+      .filter(Boolean) as string[];
+  }, [selectedItems, replacingItemKey]);
+
   const handleConfirmReplace = useCallback((pickedProducts: Product[]) => {
     const product = pickedProducts[0];
     if (!product || !replacingItemKey) {
@@ -3037,7 +3091,6 @@ function FactoryShipmentCreateModal({
       return;
     }
 
-    const newDisplayName = buildShipmentItemDisplayName(product);
     const nextProductId =
       product.productId ||
       product.sourceProductId ||
@@ -3045,6 +3098,32 @@ function FactoryShipmentCreateModal({
     const nextProductVariantId = product.productVariantId || null;
     const nextShopProductId = product.shopProductId || undefined;
     const nextShopProductVariantId = product.shopProductVariantId || null;
+
+    const nextItemKey = getItemKey({
+      productId: nextProductId,
+      productVariantId: nextProductVariantId,
+      shopProductId: nextShopProductId,
+      shopProductVariantId: nextShopProductVariantId,
+    });
+
+    // 严禁替换为当前发货单已有的其它商品/规格
+    const isDuplicate = selectedItems.some((item) => {
+      const currentKey = getItemKey(item);
+      if (currentKey === replacingItemKey) return false;
+      const itemKey = getItemKey(item);
+      return (
+        itemKey === nextItemKey ||
+        (nextProductVariantId && item.productVariantId === nextProductVariantId) ||
+        (!nextProductVariantId && !item.productVariantId && nextProductId && item.productId === nextProductId)
+      );
+    });
+
+    if (isDuplicate) {
+      showToast("当前发货单已包含该商品或规格，不允许替换为已有商品", "error");
+      return;
+    }
+
+    const newDisplayName = buildShipmentItemDisplayName(product);
     const nextPrice = product.salePrice ?? product.costPrice ?? 0;
 
     setSelectedItems((prev) =>
@@ -3070,7 +3149,7 @@ function FactoryShipmentCreateModal({
     showToast(`已替换为「${newDisplayName}」`, "success");
     setIsReplaceModalOpen(false);
     setReplacingItemKey(null);
-  }, [replacingItemKey, showToast]);
+  }, [replacingItemKey, selectedItems, showToast]);
 
   const handleSubmit = async () => {
     const finalForm = {
@@ -3404,7 +3483,8 @@ function FactoryShipmentCreateModal({
         singleSelect
         title="替换发货商品"
         showPrice={false}
-        selectedIds={[]}
+        selectedIds={createReplaceBlockedIds}
+        selectedBadgeLabel="单据中已有"
         fetchPath="/api/products"
         showPlatformSelector={false}
         query={{
