@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { motion } from "framer-motion";
-import { ChevronDown, Check } from "lucide-react";
+import { ChevronDown, Check, Minus } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Option {
@@ -23,6 +23,7 @@ interface CustomMultiSelectProps {
   disabled?: boolean;
   allowEmpty?: boolean;
   inlineDropdown?: boolean;
+  showSelectAll?: boolean;
 }
 
 export function CustomMultiSelect({
@@ -36,6 +37,7 @@ export function CustomMultiSelect({
   disabled = false,
   allowEmpty = false,
   inlineDropdown = false,
+  showSelectAll,
 }: CustomMultiSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [dropdownPosition, setDropdownPosition] = useState<{
@@ -100,7 +102,7 @@ export function CustomMultiSelect({
     const spaceBelow = windowHeight - rect.bottom;
     const showAbove = spaceBelow < dropdownHeight && rect.top > dropdownHeight;
 
-    const width = Math.max(rect.width, 140);
+    const width = Math.max(rect.width, 180);
     const windowWidth = window.innerWidth;
     let left = rect.left;
 
@@ -129,6 +131,43 @@ export function CustomMultiSelect({
     };
   }, [isOpen, updatePosition]);
 
+  const selectableOptions = useMemo(() => {
+    return options.filter((opt) => opt.value !== "all");
+  }, [options]);
+
+  const selectedCount = useMemo(() => {
+    return selectableOptions.filter((opt) => value.includes(opt.value)).length;
+  }, [selectableOptions, value]);
+
+  const isAllSelected = selectableOptions.length > 0 && selectedCount === selectableOptions.length;
+  const isPartiallySelected = selectedCount > 0 && selectedCount < selectableOptions.length;
+
+  const canShowSelectAll = showSelectAll !== undefined
+    ? showSelectAll
+    : (selectableOptions.length > 1 && !options.some((opt) => opt.value === "all"));
+
+  const handleToggleAll = () => {
+    if (isAllSelected) {
+      onChange([]);
+    } else {
+      onChange(selectableOptions.map((opt) => opt.value));
+    }
+  };
+
+  const handleClearAll = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onChange([]);
+  };
+
+  const handleInvertSelect = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const currentSet = new Set(value);
+    const invertedValues = selectableOptions
+      .filter((opt) => !currentSet.has(opt.value))
+      .map((opt) => opt.value);
+    onChange(invertedValues);
+  };
+
   const handleToggleOption = (optValue: string) => {
     if (optValue === "all") {
       onChange(["all"]);
@@ -150,6 +189,54 @@ export function CustomMultiSelect({
     }
 
     onChange(newValue);
+  };
+
+  const renderSelectAllBar = () => {
+    if (!canShowSelectAll) return null;
+    return (
+      <div className="flex items-center justify-between px-3 py-2 border-b border-black/5 dark:border-white/10 text-xs select-none bg-muted/20 dark:bg-white/[0.02] shrink-0">
+        <button
+          type="button"
+          onClick={handleToggleAll}
+          className="flex items-center gap-2 text-foreground font-medium hover:text-primary transition-colors cursor-pointer group"
+        >
+          <div
+            className={cn(
+              "flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border transition-all duration-200",
+              isAllSelected || isPartiallySelected
+                ? "border-primary bg-primary text-primary-foreground"
+                : "border-gray-300 bg-white dark:border-white/20 dark:bg-white/5 group-hover:border-primary/50"
+            )}
+          >
+            {isAllSelected && <Check size={10} strokeWidth={4} className="text-white dark:text-zinc-950" />}
+            {isPartiallySelected && <Minus size={10} strokeWidth={4} className="text-white dark:text-zinc-950" />}
+          </div>
+          <span>全选</span>
+          <span className="text-[10px] text-muted-foreground font-normal">
+            ({selectedCount}/{selectableOptions.length})
+          </span>
+        </button>
+        <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground font-normal">
+          <button
+            type="button"
+            onClick={handleInvertSelect}
+            className="hover:text-primary transition-colors px-1 py-0.5 rounded hover:bg-black/5 dark:hover:bg-white/10 cursor-pointer"
+            title="反选未勾选项"
+          >
+            反选
+          </button>
+          <span className="text-muted-foreground/30">|</span>
+          <button
+            type="button"
+            onClick={handleClearAll}
+            className="hover:text-primary transition-colors px-1 py-0.5 rounded hover:bg-black/5 dark:hover:bg-white/10 cursor-pointer"
+            title="清空所有选择"
+          >
+            清空
+          </button>
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -177,6 +264,7 @@ export function CustomMultiSelect({
 
       {inlineDropdown && isOpen ? (
         <div className="absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-2xl border border-black/8 bg-white/98 shadow-2xl backdrop-blur-2xl dark:border-white/10 dark:bg-[#202733]/98 dark:shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)]">
+          {renderSelectAllBar()}
           <div className="max-h-52 overflow-auto p-1.5 py-2 space-y-1">
             {options.map((option, index) => {
               const isChecked = value.includes(option.value);
@@ -230,6 +318,7 @@ export function CustomMultiSelect({
           } as React.CSSProperties}
           className="rounded-2xl border border-black/8 bg-white/98 shadow-2xl backdrop-blur-2xl focus:outline-none dark:border-white/10 dark:bg-[#202733]/98 dark:shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col"
         >
+          {renderSelectAllBar()}
           <div className="max-h-52 overflow-auto p-1.5 py-2 space-y-1">
             {options.map((option, index) => {
               const isChecked = value.includes(option.value);
