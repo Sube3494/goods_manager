@@ -2167,6 +2167,11 @@ function FactoryShipmentDetailModal({
       return;
     }
 
+    if (Number(product.stock || 0) <= 0) {
+      showToast("所选商品暂无可用库存，无法替换", "error");
+      return;
+    }
+
     const newDisplayName = buildShipmentItemDisplayName(product);
     const nextPrice = product.salePrice ?? product.costPrice ?? 0;
 
@@ -2900,6 +2905,7 @@ function FactoryShipmentDetailModal({
           includePublic: "true",
         }}
         loadAllOnOpen
+        inStockOnly={true}
       />
     </AnimatePresence>,
     document.body
@@ -3120,6 +3126,11 @@ function FactoryShipmentCreateModal({
 
     if (isDuplicate) {
       showToast("当前发货单已包含该商品或规格，不允许替换为已有商品", "error");
+      return;
+    }
+
+    if (Number(product.stock || 0) <= 0) {
+      showToast("所选商品暂无可用库存，无法替换", "error");
       return;
     }
 
@@ -3494,6 +3505,7 @@ function FactoryShipmentCreateModal({
           includePublic: "true",
         }}
         loadAllOnOpen
+        inStockOnly={true}
       />
     </AnimatePresence>,
     document.body
