@@ -154,7 +154,6 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
 
     const customerType = readCustomerTypeFromRawPayload(refreshedOrder.rawPayload)
       || normalized?.customerType
-      || readCustomerTypeFromRawPayload(order.rawPayload)
       || null;
 
     const syncedOrder = {
