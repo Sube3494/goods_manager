@@ -28,6 +28,7 @@ interface BackupPayload {
   systemSettings?: Record<string, unknown>[];
   whitelists?: Record<string, unknown>[];
   users?: Record<string, unknown>[];
+  userDeviceSessions?: Record<string, unknown>[];
   invitations?: Record<string, unknown>[];
   registrationRequests?: Record<string, unknown>[];
   pageViews?: Record<string, unknown>[];
@@ -53,6 +54,7 @@ interface BackupPayload {
   brushOrders?: BackupOrderWithItems[];
   galleryItems?: Record<string, unknown>[];
   autoPickOrders?: BackupOrderWithItems[];
+  autoPickAutoCompleteJobs?: Record<string, unknown>[];
   autoPickApiKeys?: Record<string, unknown>[];
 }
 
@@ -132,9 +134,11 @@ export class BackupService {
       storeOpeningBatches: await prisma.storeOpeningBatch.findMany({ where: scopedWhere, include: { items: true } }),
       galleryItems: await prisma.galleryItem.findMany({ where: scopedWhere }),
       autoPickOrders: await prisma.autoPickOrder.findMany({ where: scopedWhere, include: { items: true } }),
+      autoPickAutoCompleteJobs: await prisma.autoPickAutoCompleteJob.findMany({ where: scopedWhere }),
       autoPickApiKeys: await prisma.autoPickApiKey.findMany({ where: scopedWhere }),
       systemSettings: userId ? [] : await prisma.systemSetting.findMany(),
       users: userId ? [] : await prisma.user.findMany(),
+      userDeviceSessions: await prisma.userDeviceSession.findMany({ where: scopedWhere }),
       roleProfiles: userId ? [] : await prisma.roleProfile.findMany(),
       whitelists: userId ? [] : await prisma.emailWhitelist.findMany(),
       invitations: userId ? [] : await prisma.invitation.findMany(),
@@ -384,14 +388,17 @@ export class BackupService {
       await tx.registrationRequest.deleteMany();
       await tx.pageView.deleteMany();
       await tx.verificationCode.deleteMany();
-      await tx.systemSetting.deleteMany(); 
-      await tx.userDeviceSession.deleteMany();
-      await tx.user.deleteMany();
-      await tx.roleProfile.deleteMany();
+      if (data.users?.length) {
+        await tx.systemSetting.deleteMany(); 
+        await tx.userDeviceSession.deleteMany();
+        await tx.user.deleteMany();
+        await tx.roleProfile.deleteMany();
+      }
 
       // 2. 导入用户与配置
       if (data.roleProfiles?.length) await tx.roleProfile.createMany({ data: castMany<Prisma.RoleProfileCreateManyInput>(data.roleProfiles) });
       if (data.users?.length) await tx.user.createMany({ data: castMany<Prisma.UserCreateManyInput>(data.users) });
+      if (data.userDeviceSessions?.length) await tx.userDeviceSession.createMany({ data: castMany<Prisma.UserDeviceSessionCreateManyInput>(data.userDeviceSessions) });
       if (data.systemSettings?.length) await tx.systemSetting.createMany({ data: castMany<Prisma.SystemSettingCreateManyInput>(data.systemSettings) });
       if (data.whitelists?.length) await tx.emailWhitelist.createMany({ data: castMany<Prisma.EmailWhitelistCreateManyInput>(data.whitelists) });
       if (data.invitations?.length) await tx.invitation.createMany({ data: castMany<Prisma.InvitationCreateManyInput>(data.invitations) });
@@ -479,6 +486,9 @@ export class BackupService {
           await tx.autoPickOrder.create({ data: orderData as Prisma.AutoPickOrderCreateInput });
           if (items?.length) await tx.autoPickOrderItem.createMany({ data: castMany<Prisma.AutoPickOrderItemCreateManyInput>(items) });
         }
+      }
+      if (data.autoPickAutoCompleteJobs?.length) {
+        await tx.autoPickAutoCompleteJob.createMany({ data: castMany<Prisma.AutoPickAutoCompleteJobCreateManyInput>(data.autoPickAutoCompleteJobs) });
       }
     }, {
       timeout: 60000 // 恢复全量数据增加超时时间至 60 秒
