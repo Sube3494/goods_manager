@@ -29,6 +29,7 @@ import {
   Eye,
   Trash2,
   Loader2,
+  ArrowLeftRight,
 } from "lucide-react";
 import { format } from "date-fns";
 import { zhCN } from "date-fns/locale/zh-CN";
@@ -67,6 +68,7 @@ interface SelectedShipmentItem {
   logisticsName?: string;
   price?: number;
   shippingFee?: number;
+  shippedAt?: string;
 }
 
 async function blobToDataUrl(blob: Blob) {
@@ -323,6 +325,7 @@ const ShipmentItemRow = memo(({
   isChecked,
   onToggle,
   onRemove,
+  onReplaceItem,
   onUpdateManualQuantity,
   onUpdatePrice,
   onUpdateShippingFee,
@@ -342,6 +345,7 @@ const ShipmentItemRow = memo(({
   isChecked: boolean;
   onToggle: (key: string) => void;
   onRemove: (key: string) => void;
+  onReplaceItem?: (item: SelectedShipmentItem) => void;
   onUpdateManualQuantity: (key: string, val: string) => void;
   onUpdatePrice?: (key: string, val: string) => void;
   onUpdateShippingFee?: (key: string, val: string) => void;
@@ -545,6 +549,16 @@ const ShipmentItemRow = memo(({
                         <Copy size={15} className="shrink-0" />
                       </button>
                     ) : null}
+                    {!disabled && onReplaceItem ? (
+                      <button
+                        type="button"
+                        onClick={() => onReplaceItem(item)}
+                        className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-all hover:bg-amber-500/10 hover:text-amber-600 active:scale-95 dark:hover:text-amber-400"
+                        title="替换为其他商品"
+                      >
+                        <ArrowLeftRight size={15} className="shrink-0" />
+                      </button>
+                    ) : null}
                     {!disabled ? (
                       <button
                         type="button"
@@ -572,7 +586,7 @@ const ShipmentItemRow = memo(({
             onClick={(e) => e.stopPropagation()}
           >
             {/* 上面一行：商品、数量、单价、操作 */}
-            <div className="grid w-full grid-cols-[minmax(150px,1.8fr)_minmax(70px,0.7fr)_minmax(90px,1.1fr)_80px] items-center gap-2.5">
+            <div className="grid w-full grid-cols-[minmax(150px,1.8fr)_minmax(70px,0.7fr)_minmax(90px,1.1fr)_116px] items-center gap-2.5">
               {/* 商品信息 */}
               <div className="flex min-w-0 items-start gap-2.5">
                 <div className="h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-border/50 bg-background shadow-sm">
@@ -649,6 +663,16 @@ const ShipmentItemRow = memo(({
                         title="复制此货品"
                       >
                         <Copy size={15} className="shrink-0" />
+                      </button>
+                    ) : null}
+                    {!disabled && onReplaceItem ? (
+                      <button
+                        type="button"
+                        onClick={() => onReplaceItem(item)}
+                        className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-all hover:bg-amber-500/10 hover:text-amber-600 active:scale-95 dark:hover:text-amber-400"
+                        title="替换为其他商品"
+                      >
+                        <ArrowLeftRight size={15} className="shrink-0" />
                       </button>
                     ) : null}
                     {!disabled ? (
@@ -1835,6 +1859,8 @@ function FactoryShipmentDetailModal({
   const [isSaving, setIsSaving] = useState(false);
   const [editItems, setEditItems] = useState<SelectedShipmentItem[]>([]);
   const [isSelectionModalOpen, setIsSelectionModalOpen] = useState(false);
+  const [replacingItemKey, setReplacingItemKey] = useState<string | null>(null);
+  const [isReplaceModalOpen, setIsReplaceModalOpen] = useState(false);
   
   const [editForm, setEditForm] = useState({
     status: "",
@@ -1934,6 +1960,7 @@ function FactoryShipmentDetailModal({
           logisticsName: trackingEntry?.logisticsName || "",
           price: item.price || item.shopProductVariant?.salePrice || item.productVariant?.salePrice || item.shopProduct?.costPrice || item.product?.costPrice || 0,
           shippingFee: trackingEntry?.shippingFee || 0,
+          shippedAt: trackingEntry?.shippedAt,
         };
       })
     );
@@ -2079,6 +2106,55 @@ function FactoryShipmentDetailModal({
       return next;
     });
   }, []);
+
+  const handleOpenReplace = useCallback((item: SelectedShipmentItem) => {
+    const key = getItemKey(item) || getStableShipmentActionKey(item);
+    setReplacingItemKey(key);
+    setIsReplaceModalOpen(true);
+  }, []);
+
+  const handleConfirmReplace = useCallback((pickedProducts: Product[]) => {
+    const product = pickedProducts[0];
+    if (!product || !replacingItemKey) {
+      setIsReplaceModalOpen(false);
+      setReplacingItemKey(null);
+      return;
+    }
+
+    const newDisplayName = buildShipmentItemDisplayName(product);
+    const nextProductId =
+      product.productId ||
+      product.sourceProductId ||
+      (product.sourceType === "shopProduct" ? null : product.id);
+    const nextProductVariantId = product.productVariantId || null;
+    const nextShopProductId = product.shopProductId || undefined;
+    const nextShopProductVariantId = product.shopProductVariantId || null;
+    const nextPrice = product.salePrice ?? product.costPrice ?? 0;
+
+    setEditItems((prev) =>
+      prev.map((item) => {
+        const currentKey = getItemKey(item) || getStableShipmentActionKey(item);
+        if (currentKey !== replacingItemKey) return item;
+
+        return {
+          ...item,
+          productId: nextProductId,
+          productVariantId: nextProductVariantId,
+          shopProductId: nextShopProductId,
+          shopProductVariantId: nextShopProductVariantId,
+          name: newDisplayName,
+          sku: product.sku || "",
+          image: product.image || "",
+          stock: Number(product.stock || 0),
+          price: Number(item.price) > 0 ? item.price : nextPrice,
+        };
+      })
+    );
+
+    showToast(`已替换为「${newDisplayName}」`, "success");
+    setIsReplaceModalOpen(false);
+    setReplacingItemKey(null);
+  }, [replacingItemKey, showToast]);
 
   const handleAddCompensationBox = useCallback((item: SelectedShipmentItem) => {
     const itemKey = `${item.shopProductId || item.productId || ""}-box`;
@@ -2698,6 +2774,7 @@ function FactoryShipmentDetailModal({
                             onUpdateTrackingNumber={updateEditTrackingNumber}
                             onUpdateLogisticsName={updateEditLogisticsName}
                             onCopyItem={copyEditItem}
+                            onReplaceItem={handleOpenReplace}
                             disabled={!isEditing}
                             logisticsOptions={getSingleRowLogisticsOptions(item.logisticsName)}
                             onAddNewLogistics={onAddNewLogistics}
@@ -2762,6 +2839,28 @@ function FactoryShipmentDetailModal({
         title="选择发货商品"
         inStockOnly={true}
       />
+      <ProductSelectionModal
+        key="factory-shipment-detail-product-replace"
+        isOpen={isReplaceModalOpen}
+        onClose={() => {
+          setIsReplaceModalOpen(false);
+          setReplacingItemKey(null);
+        }}
+        onSelect={(pickedProducts) => handleConfirmReplace(pickedProducts)}
+        singleSelect
+        title="替换发货商品"
+        showPrice={false}
+        selectedIds={[]}
+        fetchPath="/api/products"
+        showPlatformSelector={false}
+        query={{
+          sortBy: "stock-desc",
+          view: "picker",
+          includeShopOnly: "true",
+          includePublic: "true",
+        }}
+        loadAllOnOpen
+      />
     </AnimatePresence>,
     document.body
   );
@@ -2789,6 +2888,8 @@ function FactoryShipmentCreateModal({
   const [batchMode, setBatchMode] = useState(false);
   const [batchSelected, setBatchSelected] = useState<Set<string>>(new Set());
   const [batchConfirming, setBatchConfirming] = useState(false);
+  const [replacingItemKey, setReplacingItemKey] = useState<string | null>(null);
+  const [isReplaceModalOpen, setIsReplaceModalOpen] = useState(false);
 
   useEffect(() => {
     if (!isOpen) {
@@ -2798,6 +2899,8 @@ function FactoryShipmentCreateModal({
       setBatchMode(false);
       setBatchSelected(new Set());
       setBatchConfirming(false);
+      setReplacingItemKey(null);
+      setIsReplaceModalOpen(false);
     }
   }, [isOpen]);
 
@@ -2919,6 +3022,55 @@ function FactoryShipmentCreateModal({
   const removeItem = (itemKey: string) => {
     setSelectedItems((prev) => prev.filter((item) => getItemKey(item) !== itemKey));
   };
+
+  const handleOpenReplace = useCallback((item: SelectedShipmentItem) => {
+    const key = getItemKey(item);
+    setReplacingItemKey(key);
+    setIsReplaceModalOpen(true);
+  }, []);
+
+  const handleConfirmReplace = useCallback((pickedProducts: Product[]) => {
+    const product = pickedProducts[0];
+    if (!product || !replacingItemKey) {
+      setIsReplaceModalOpen(false);
+      setReplacingItemKey(null);
+      return;
+    }
+
+    const newDisplayName = buildShipmentItemDisplayName(product);
+    const nextProductId =
+      product.productId ||
+      product.sourceProductId ||
+      (product.sourceType === "shopProduct" ? null : product.id);
+    const nextProductVariantId = product.productVariantId || null;
+    const nextShopProductId = product.shopProductId || undefined;
+    const nextShopProductVariantId = product.shopProductVariantId || null;
+    const nextPrice = product.salePrice ?? product.costPrice ?? 0;
+
+    setSelectedItems((prev) =>
+      prev.map((item) => {
+        const currentKey = getItemKey(item);
+        if (currentKey !== replacingItemKey) return item;
+
+        return {
+          ...item,
+          productId: nextProductId,
+          productVariantId: nextProductVariantId,
+          shopProductId: nextShopProductId,
+          shopProductVariantId: nextShopProductVariantId,
+          name: newDisplayName,
+          sku: product.sku || "",
+          image: product.image || "",
+          stock: Number(product.stock || 0),
+          price: Number(item.price) > 0 ? item.price : nextPrice,
+        };
+      })
+    );
+
+    showToast(`已替换为「${newDisplayName}」`, "success");
+    setIsReplaceModalOpen(false);
+    setReplacingItemKey(null);
+  }, [replacingItemKey, showToast]);
 
   const handleSubmit = async () => {
     const finalForm = {
@@ -3185,6 +3337,7 @@ function FactoryShipmentCreateModal({
                         disabled={false}
                         logisticsOptions={logisticsOptions}
                         onAddNewLogistics={onAddNewLogistics}
+                        onReplaceItem={handleOpenReplace}
                       />
                     ))}
                     <div className="flex items-center justify-end gap-3 rounded-2xl border border-border/70 bg-linear-to-br from-white to-slate-50/70 p-4 dark:border-white/8 dark:from-white/10 dark:to-white/4 shadow-sm mt-3">
@@ -3239,6 +3392,28 @@ function FactoryShipmentCreateModal({
         loadAllOnOpen
         title="选择发货商品"
         inStockOnly={true}
+      />
+      <ProductSelectionModal
+        key="factory-shipment-create-product-replace"
+        isOpen={isReplaceModalOpen}
+        onClose={() => {
+          setIsReplaceModalOpen(false);
+          setReplacingItemKey(null);
+        }}
+        onSelect={(pickedProducts) => handleConfirmReplace(pickedProducts)}
+        singleSelect
+        title="替换发货商品"
+        showPrice={false}
+        selectedIds={[]}
+        fetchPath="/api/products"
+        showPlatformSelector={false}
+        query={{
+          sortBy: "stock-desc",
+          view: "picker",
+          includeShopOnly: "true",
+          includePublic: "true",
+        }}
+        loadAllOnOpen
       />
     </AnimatePresence>,
     document.body
@@ -3861,7 +4036,11 @@ export default function FactoryShipmentsPage() {
     exportStartDate,
   ]);
 
-  const handleExportShipments = useCallback(async (exportOrders: OutboundOrder[], fileLabel: string) => {
+  const handleExportShipments = useCallback(async (
+    exportOrders: OutboundOrder[],
+    fileLabel: string,
+    targetProductFilter?: string[]
+  ) => {
     if (exportOrders.length === 0) {
       showToast("暂无发货记录可导出", "info");
       return;
@@ -4080,8 +4259,11 @@ export default function FactoryShipmentsPage() {
         amount: number;
         shippingFee: number;
       }>();
-      const exportProductFilterSet = new Set(exportProductFilter);
-      const shouldFilterExportItems = exportProductFilter.length > 0 && exportProductFilter.length !== shipmentProductOptions.length;
+      const activeProductFilter = targetProductFilter ?? exportProductFilter;
+      const exportProductFilterSet = new Set(activeProductFilter);
+      const shouldFilterExportItems =
+        activeProductFilter.length > 0 &&
+        activeProductFilter.length !== shipmentProductOptions.length;
       const getExportItemKey = (item: OutboundOrder["items"][number]) => getItemKey({
         productId: item.productId || item.shopProduct?.productId || item.product?.id || null,
         productVariantId: item.productVariantId || item.productVariant?.id || item.shopProductVariant?.productVariantId || null,
@@ -4494,13 +4676,13 @@ export default function FactoryShipmentsPage() {
         setExportProgressLabel("");
       }, 900);
     }
-  }, [getShipmentCustomerGroup, showToast]);
+  }, [exportProductFilter, getShipmentCustomerGroup, shipmentProductOptions.length, showToast]);
 
   const handleConfirmFullExport = useCallback(() => {
     const exportOrders = filterOrdersForExport(shipmentOrders);
     setIsExportModalOpen(false);
-    void handleExportShipments(exportOrders, "_筛选导出");
-  }, [filterOrdersForExport, handleExportShipments, shipmentOrders]);
+    void handleExportShipments(exportOrders, "_筛选导出", exportProductFilter);
+  }, [exportProductFilter, filterOrdersForExport, handleExportShipments, shipmentOrders]);
 
   const openExportModal = useCallback(() => {
     setExportSearchQuery(searchQuery);
