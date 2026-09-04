@@ -2191,7 +2191,7 @@ function FactoryShipmentDetailModal({
           sku: product.sku || "",
           image: product.image || "",
           stock: Number(product.stock || 0),
-          price: Number(item.price) > 0 ? item.price : nextPrice,
+          price: nextPrice,
         };
       })
     );
@@ -3153,7 +3153,7 @@ function FactoryShipmentCreateModal({
           sku: product.sku || "",
           image: product.image || "",
           stock: Number(product.stock || 0),
-          price: Number(item.price) > 0 ? item.price : nextPrice,
+          price: nextPrice,
         };
       })
     );
