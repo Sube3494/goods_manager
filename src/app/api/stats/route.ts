@@ -5,6 +5,7 @@ import { hasAdminAccess } from "@/lib/permissions";
 import { FinanceMath } from "@/lib/math";
 import {
   normalizeAutoPickIntegrationConfig,
+  readCustomerTypeFromRawPayload,
   resolveAutoPickMatchedShopName,
 } from "@/lib/autoPickOrders";
 import {
@@ -1208,6 +1209,78 @@ export async function GET(request: NextRequest) {
       };
     });
 
+    const customerDailyMap = new Map(
+      dateSeries.map((item) => [
+        item.date,
+        {
+          date: item.date,
+          label: item.label,
+          newCustomerOrders: 0,
+          returningCustomerOrders: 0,
+          unknownCustomerOrders: 0,
+        },
+      ])
+    );
+    const returningProductMap = new Map<string, { productName: string; sku: string | null; quantity: number; orderNos: Set<string> }>();
+    let newCustomerOrders = 0;
+    let returningCustomerOrders = 0;
+    let unknownCustomerOrders = 0;
+
+    filteredAutoPickOrdersInRange.forEach((order) => {
+      const isBrush = readMainSystemSelfDeliveryFlag(order.rawPayload);
+      const isOther = isAutoPickOrderCancelledStatus(order.status)
+        || isAutoPickOrderDeletedStatus(order.status)
+        || isVoidedOfflineOrder(order);
+      if (isBrush || isOther) return;
+
+      const dateKey = resolveAutoPickOrderDateKey(order);
+      const daily = customerDailyMap.get(dateKey);
+      const customerType = readCustomerTypeFromRawPayload(order.rawPayload);
+      if (customerType === "new") {
+        newCustomerOrders += 1;
+        if (daily) daily.newCustomerOrders += 1;
+      } else if (customerType === "returning") {
+        returningCustomerOrders += 1;
+        if (daily) daily.returningCustomerOrders += 1;
+        order.items.forEach((item) => {
+          const productName = String(item.productName || "").trim() || "未命名商品";
+          const sku = String(item.productNo || "").trim() || null;
+          const key = `${sku || ""}::${productName}`;
+          const current = returningProductMap.get(key) || {
+            productName,
+            sku,
+            quantity: 0,
+            orderNos: new Set<string>(),
+          };
+          current.quantity += Math.max(1, Number(item.quantity || 1) || 1);
+          current.orderNos.add(order.orderNo);
+          returningProductMap.set(key, current);
+        });
+      } else {
+        unknownCustomerOrders += 1;
+        if (daily) daily.unknownCustomerOrders += 1;
+      }
+    });
+    const totalKnownOrders = newCustomerOrders + returningCustomerOrders;
+    const customerAnalysis = {
+      totalKnownOrders,
+      newCustomerOrders,
+      returningCustomerOrders,
+      unknownCustomerOrders,
+      newRate: totalKnownOrders > 0 ? newCustomerOrders / totalKnownOrders : 0,
+      returningRate: totalKnownOrders > 0 ? returningCustomerOrders / totalKnownOrders : 0,
+      daily: Array.from(customerDailyMap.values()),
+      returningCustomerTopProducts: Array.from(returningProductMap.values())
+        .map((item) => ({
+          productName: item.productName,
+          sku: item.sku,
+          quantity: item.quantity,
+          orderCount: item.orderNos.size,
+        }))
+        .sort((a, b) => b.quantity - a.quantity || b.orderCount - a.orderCount)
+        .slice(0, 5),
+    };
+
     const shopBreakdownMap = new Map<string, { shopId: string; shopName: string; skuCount: number; stock: number; lowStockCount: number; value: number }>();
     shopProductRows.forEach((item) => {
       const current = shopBreakdownMap.get(item.shopId) || {
@@ -1310,6 +1383,7 @@ export async function GET(request: NextRequest) {
         brushOrderTotal: platformMatrixColumns.reduce((sum, item) => sum + item.brushOrderCount, 0),
         grandTotal: platformMatrixColumns.reduce((sum, item) => sum + item.totalCount, 0),
       },
+      customerAnalysis,
       businessTrend,
       platformBusinessTrend,
       shopBreakdown,

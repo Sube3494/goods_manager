@@ -150,7 +150,7 @@ export default function Home() {
       setEndDate(format(today, "yyyy-MM-dd"));
       return;
     }
-    const days = rangePreset === "7d" ? 7 : rangePreset === "90d" ? 90 : 30;
+    const days = rangePreset === "7d" ? 7 : rangePreset === "15d" ? 15 : rangePreset === "90d" ? 90 : 30;
     const today = new Date();
     setEndDate(format(today, "yyyy-MM-dd"));
     setStartDate(format(new Date(today.getTime() - (days - 1) * 24 * 60 * 60 * 1000), "yyyy-MM-dd"));

@@ -599,6 +599,7 @@ export interface StatsData {
   platformMatrix?: DashboardPlatformMatrix;
   businessTrend?: DashboardBusinessTrendPoint[];
   platformBusinessTrend?: Record<string, DashboardBusinessTrendPoint[]>;
+  customerAnalysis?: DashboardCustomerAnalysis;
 }
 
 export interface DashboardTrendPoint {
@@ -658,6 +659,32 @@ export interface DashboardBusinessTrendPoint {
   productCost: number;
   brushExpense: number;
   operatingExpense?: number;
+}
+
+export interface DashboardCustomerTrendPoint {
+  date: string;
+  label: string;
+  newCustomerOrders: number;
+  returningCustomerOrders: number;
+  unknownCustomerOrders: number;
+}
+
+export interface DashboardCustomerTopProduct {
+  productName: string;
+  sku?: string | null;
+  quantity: number;
+  orderCount: number;
+}
+
+export interface DashboardCustomerAnalysis {
+  totalKnownOrders: number;
+  newCustomerOrders: number;
+  returningCustomerOrders: number;
+  unknownCustomerOrders: number;
+  newRate: number;
+  returningRate: number;
+  daily: DashboardCustomerTrendPoint[];
+  returningCustomerTopProducts: DashboardCustomerTopProduct[];
 }
 
 export type BrushStatus = "Draft" | "Completed";

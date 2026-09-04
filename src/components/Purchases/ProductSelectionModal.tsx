@@ -83,6 +83,7 @@ interface ProductSelectionModalProps {
   loadAllOnOpen?: boolean;
   respectPublicVisibility?: boolean;
   lockLibraryId?: string;
+  allowLibrarySwitch?: boolean;
   showQuantityControls?: boolean;
   disableAlreadySelected?: boolean;
   defaultViewMode?: "grid" | "list";
@@ -130,6 +131,7 @@ export function ProductSelectionModal({
   respectPublicVisibility = true,
   allowMultipleToggle = false,
   lockLibraryId,
+  allowLibrarySwitch = true,
   showQuantityControls = false,
   disableAlreadySelected = true,
   defaultViewMode,
@@ -161,7 +163,7 @@ export function ProductSelectionModal({
   const [isInitialized, setIsInitialized] = useState(false);
   const [libraries, setLibraries] = useState<any[]>([]);
   const [activeLibraryId, setActiveLibraryId] = useState<string>(lockLibraryId || "all");
-  const isShopScopedPicker = Boolean(query?.shopId || query?.shopName);
+  const shouldLockLibraryScope = !allowLibrarySwitch || Boolean(lockLibraryId);
 
   const [viewMode, setViewMode] = useState<"grid" | "list">(() => {
     if (defaultViewMode) return defaultViewMode;
@@ -186,13 +188,13 @@ export function ProductSelectionModal({
       if (defaultViewMode) {
         setViewMode(defaultViewMode);
       }
-      setActiveLibraryId(isShopScopedPicker ? "all" : lockLibraryId || "all");
+      setActiveLibraryId(shouldLockLibraryScope ? lockLibraryId || "all" : activeLibraryId || "all");
     }
-  }, [defaultViewMode, isOpen, isShopScopedPicker, lockLibraryId]);
+  }, [activeLibraryId, defaultViewMode, isOpen, lockLibraryId, shouldLockLibraryScope]);
 
   useEffect(() => {
     if (isOpen) {
-      if (isShopScopedPicker) {
+      if (!allowLibrarySwitch) {
         setLibraries([]);
         setActiveLibraryId("all");
         return;
@@ -215,7 +217,7 @@ export function ProductSelectionModal({
         })
         .catch(() => {});
     }
-  }, [isOpen, isShopScopedPicker, lockLibraryId]);
+  }, [allowLibrarySwitch, isOpen, lockLibraryId]);
 
   const [showUnselectedOnly, setShowUnselectedOnly] = useState(true);
   const [localVisibleCount, setLocalVisibleCount] = useState(50);
@@ -225,8 +227,8 @@ export function ProductSelectionModal({
   const [targetPlatform, setTargetPlatform] = useState("美团");
   const PLATFORMS = ["美团", "淘宝", "京东"];
   const shouldShowCategoryFilter = !imageOnly && (!minimalView || showCategoryFilter);
-  const effectiveLibraryId = isShopScopedPicker ? "all" : activeLibraryId;
-  const shouldShowLibraryTabs = libraries.length > 1 && !lockLibraryId && !isShopScopedPicker;
+  const effectiveLibraryId = allowLibrarySwitch ? activeLibraryId : "all";
+  const shouldShowLibraryTabs = allowLibrarySwitch && libraries.length > 1 && !lockLibraryId;
   const loadingDelayRef = useRef<NodeJS.Timeout | null>(null);
   const lastLoadedSignatureRef = useRef("");
   const usesPrefetchedData = Array.isArray(prefetchedProducts);

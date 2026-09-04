@@ -7,7 +7,7 @@ import { Shop, StatsData } from "@/lib/types";
 import { PromotionCalendarModal } from "@/app/orders/PromotionCalendarModal";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { DatePicker } from "@/components/ui/DatePicker";
-import { RefreshCw, Maximize2, Minimize2 } from "lucide-react";
+import { RefreshCw, Maximize2, Minimize2, X } from "lucide-react";
 import { format } from "date-fns";
 import { cn, getPlatformMeta } from "@/lib/utils";
 import { OverviewAiPanel } from "@/components/Dashboard/OverviewAiPanel";
@@ -46,14 +46,16 @@ function HeroMetric({
   value,
   hint,
   tone = "default",
+  className,
 }: {
   label: string;
   value: string;
   hint: string;
   tone?: "default" | "danger" | "success";
+  className?: string;
 }) {
   return (
-    <div className="min-w-0 overflow-hidden rounded-[20px] border border-black/8 bg-white/80 px-3.5 py-3.5 dark:border-white/10 dark:bg-white/5 sm:px-4 sm:py-4">
+    <div className={cn("min-w-0 overflow-hidden rounded-[20px] border border-black/8 bg-white/80 px-3.5 py-3.5 dark:border-white/10 dark:bg-white/5 sm:px-4 sm:py-4", className)}>
       <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">{label}</div>
       <div
         className={cn(
@@ -74,19 +76,22 @@ function CompactMetric({
   hint,
   tone = "default",
   onClick,
+  className,
 }: {
   label: string;
   value: string;
   hint?: string;
   tone?: "default" | "danger" | "success";
   onClick?: () => void;
+  className?: string;
 }) {
   return (
     <div
       onClick={onClick}
       className={cn(
         "min-w-0 overflow-hidden rounded-[18px] border border-black/8 bg-white/72 px-3 py-3 dark:border-white/10 dark:bg-white/4 sm:px-4 sm:py-3.5 transition-all duration-200",
-        onClick ? "cursor-pointer hover:bg-black/[0.03] active:scale-[0.98] dark:hover:bg-white/[0.08]" : ""
+        onClick ? "cursor-pointer hover:bg-black/[0.03] active:scale-[0.98] dark:hover:bg-white/[0.08]" : "",
+        className
       )}
     >
       <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">{label}</div>
@@ -442,6 +447,7 @@ export function DataOverview({
   const [orderPlatform, setOrderPlatform] = useState("all");
   const [orderScope, setOrderScope] = useState<"all" | "true">("all");
   const [isChartsFullWidth, setIsChartsFullWidth] = useState(false);
+  const [isCustomerDetailOpen, setIsCustomerDetailOpen] = useState(false);
 
   const businessTrend = data?.businessTrend || [];
   const rangeDays = useMemo(() => countDays(startDate, endDate), [endDate, startDate]);
@@ -482,6 +488,15 @@ export function DataOverview({
   const trueShare = totalOrders > 0 ? (trueOrders / totalOrders) * 100 : 0;
   const brushShare = totalOrders > 0 ? (brushOrders / totalOrders) * 100 : 0;
   const contextLabel = selectedShopName ? `${selectedShopName} · ${int(rangeDays)} 天` : `全部店铺 · ${int(rangeDays)} 天`;
+  const customerAnalysis = data?.customerAnalysis;
+  const customerKnownTotal = customerAnalysis?.totalKnownOrders || 0;
+  const customerTotal = customerKnownTotal + (customerAnalysis?.unknownCustomerOrders || 0);
+  const newCustomerShare = (customerAnalysis?.newRate || 0) * 100;
+  const returningCustomerShare = (customerAnalysis?.returningRate || 0) * 100;
+  const newCustomerTotalShare = customerTotal > 0 ? ((customerAnalysis?.newCustomerOrders || 0) / customerTotal) * 100 : 0;
+  const returningCustomerTotalShare = customerTotal > 0 ? ((customerAnalysis?.returningCustomerOrders || 0) / customerTotal) * 100 : 0;
+  const unknownCustomerShare = customerTotal > 0 ? ((customerAnalysis?.unknownCustomerOrders || 0) / customerTotal) * 100 : 0;
+  const customerDaily = customerAnalysis?.daily || [];
 
   return (
     <div className="space-y-5 sm:space-y-8">
@@ -542,6 +557,7 @@ export function DataOverview({
               options={[
                 { value: "all", label: "全部" },
                 { value: "7d", label: "最近 7 天" },
+                { value: "15d", label: "最近 15 天" },
                 { value: "30d", label: "最近 30 天" },
                 { value: "90d", label: "最近 90 天" },
                 { value: "custom", label: "自定义" },
@@ -602,8 +618,8 @@ export function DataOverview({
               </div>
             </div>
 
-            <div className="mt-4 grid gap-2.5 md:grid-cols-2 2xl:grid-cols-3">
-              <HeroMetric label="用户实付" value={money(data?.userPaid)} hint="当前范围收入" />
+            <div className="mt-4 grid grid-cols-2 gap-2.5 2xl:grid-cols-3">
+              <HeroMetric className="col-span-2 2xl:col-span-1" label="用户实付" value={money(data?.userPaid)} hint="当前范围收入" />
               <HeroMetric label="商品成本" value={money(data?.productCost)} hint="已出库商品成本" />
               <HeroMetric label="刷单支出" value={money(data?.brushExpense)} hint="刷单相关支出" tone={Number(data?.brushExpense || 0) > 0 ? "danger" : "default"} />
             </div>
@@ -630,15 +646,15 @@ export function DataOverview({
               </div>
             </div>
 
-            <div className="mt-4 grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+            <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
               <CompactMetric label="真单" value={int(trueOrders)} hint={`占比 ${percent(trueShare)}`} tone="success" />
               <CompactMetric label="刷单" value={int(brushOrders)} hint={`占比 ${percent(brushShare)}`} tone="danger" />
-              <CompactMetric label="其他" value={int(cancelledLikeGap)} hint="取消/未归类" />
+              <CompactMetric className="col-span-2 sm:col-span-1" label="其他" value={int(cancelledLikeGap)} hint="取消/未归类" />
             </div>
           </div>
         </div>
 
-        <div className="mt-3.5 grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="mt-3.5 grid grid-cols-2 gap-2.5 xl:grid-cols-4">
           <CompactMetric label="平台扣点" value={money(data?.platformCommission)} hint="真单平台佣金" />
           <CompactMetric label="公司抽点" value={money(data?.companyCommission)} hint="真单店铺抽点" />
           <CompactMetric
@@ -655,6 +671,86 @@ export function DataOverview({
           />
         </div>
       </section>
+
+      <Panel
+        title="客户分析"
+        subtitle="新老客占比与老客常买商品"
+        action={
+          <button
+            type="button"
+            onClick={() => setIsCustomerDetailOpen(true)}
+            className="h-9 shrink-0 rounded-xl border border-black/8 bg-white/80 px-3 text-xs font-bold text-foreground transition-all hover:border-primary/30 hover:text-primary dark:border-white/10 dark:bg-white/5"
+          >
+            每日明细
+          </button>
+        }
+      >
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+          <div className="min-w-0 rounded-[22px] border border-black/6 bg-black/2 p-4 dark:border-white/10 dark:bg-white/3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">已识别客户订单</div>
+                <div className="mt-2 text-3xl font-black leading-none text-foreground tabular-nums">{int(customerKnownTotal)}</div>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  未识别 {int(customerAnalysis?.unknownCustomerOrders)} 单
+                </p>
+              </div>
+              <div className="rounded-2xl border border-rose-500/15 bg-rose-500/10 px-3 py-2 text-right">
+                <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-rose-500/80">新客占比</div>
+                <div className="mt-1 text-lg font-black text-rose-500">{percent(newCustomerShare)}</div>
+              </div>
+            </div>
+
+            <div className="mt-5 h-3 overflow-hidden rounded-full bg-black/6 dark:bg-white/10">
+              <div className="flex h-full">
+                <div className="bg-rose-500" style={{ width: `${newCustomerTotalShare}%` }} />
+                <div className="bg-sky-500" style={{ width: `${returningCustomerTotalShare}%` }} />
+                <div className="bg-slate-300 dark:bg-slate-600" style={{ width: `${unknownCustomerShare}%` }} />
+              </div>
+            </div>
+
+            <div className="mt-4 grid grid-cols-3 gap-2">
+              <CompactMetric label="新客" value={int(customerAnalysis?.newCustomerOrders)} hint={percent(newCustomerShare)} tone="danger" />
+              <CompactMetric label="老客" value={int(customerAnalysis?.returningCustomerOrders)} hint={percent(returningCustomerShare)} />
+              <CompactMetric label="未知" value={int(customerAnalysis?.unknownCustomerOrders)} hint="待同步识别" />
+            </div>
+          </div>
+
+          <div className="min-w-0 rounded-[22px] border border-black/6 bg-white/70 p-4 dark:border-white/10 dark:bg-white/4">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">老客常买</div>
+                <div className="mt-1 text-sm font-black text-foreground">商品 Top 5</div>
+              </div>
+              <div className="text-xs font-medium text-muted-foreground">按件数排序</div>
+            </div>
+            <div className="space-y-2">
+              {(customerAnalysis?.returningCustomerTopProducts || []).length > 0 ? (
+                customerAnalysis!.returningCustomerTopProducts.map((item, index) => (
+                  <div key={`${item.sku || item.productName}-${index}`} className="flex items-center gap-3 rounded-[16px] border border-black/6 bg-black/2 px-3 py-2.5 dark:border-white/10 dark:bg-white/3">
+                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-sky-500/10 text-xs font-black text-sky-600 dark:text-sky-300">
+                      {index + 1}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-bold text-foreground" title={item.productName}>{item.productName}</div>
+                      <div className="mt-0.5 text-[11px] text-muted-foreground">{item.sku ? `#${item.sku}` : "无编号"} · {int(item.orderCount)} 单</div>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <div className="text-base font-black tabular-nums text-foreground">{int(item.quantity)}</div>
+                      <div className="text-[10px] text-muted-foreground">件</div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="rounded-[16px] border border-dashed border-black/10 px-4 py-8 text-center text-sm text-muted-foreground dark:border-white/10">
+                  当前范围还没有可统计的老客商品
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+      </Panel>
 
       <Panel title="平台结构" subtitle="按平台查看真单与刷单的订单构成">
         <div className="space-y-3 sm:hidden">
@@ -867,6 +963,66 @@ export function DataOverview({
           onClose={() => setIsCalendarOpen(false)}
         />
       )}
+      {isMounted && isCustomerDetailOpen ? (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 px-3 py-4 backdrop-blur-sm sm:items-center">
+          <div className="w-full max-w-3xl overflow-hidden rounded-[26px] border border-black/8 bg-white shadow-2xl dark:border-white/10 dark:bg-slate-950">
+            <div className="flex items-start justify-between gap-3 border-b border-black/6 px-4 py-4 dark:border-white/10 sm:px-5">
+              <div className="min-w-0">
+                <h3 className="text-base font-black text-foreground">客户每日明细</h3>
+                <p className="mt-1 text-xs text-muted-foreground">{contextLabel}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCustomerDetailOpen(false)}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-all hover:bg-black/5 hover:text-foreground dark:hover:bg-white/10"
+                aria-label="关闭"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="max-h-[68dvh] overflow-y-auto p-4 sm:p-5">
+              {customerDaily.length > 0 ? (
+                <div className="space-y-2">
+                  {customerDaily.map((item) => {
+                    const total = item.newCustomerOrders + item.returningCustomerOrders + item.unknownCustomerOrders;
+                    const newWidth = total > 0 ? (item.newCustomerOrders / total) * 100 : 0;
+                    const returningWidth = total > 0 ? (item.returningCustomerOrders / total) * 100 : 0;
+                    const unknownWidth = total > 0 ? (item.unknownCustomerOrders / total) * 100 : 0;
+                    return (
+                      <div key={item.date} className="rounded-[16px] border border-black/6 bg-black/2 px-3 py-2.5 dark:border-white/10 dark:bg-white/3">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="text-sm font-black text-foreground">{item.label}</div>
+                            <div className="mt-0.5 text-[11px] text-muted-foreground">{item.date}</div>
+                          </div>
+                          <div className="shrink-0 text-right text-xs font-bold text-muted-foreground">{int(total)} 单</div>
+                        </div>
+                        <div className="mt-2 h-2 overflow-hidden rounded-full bg-black/6 dark:bg-white/10">
+                          <div className="flex h-full">
+                            <div className="bg-rose-500" style={{ width: `${newWidth}%` }} />
+                            <div className="bg-sky-500" style={{ width: `${returningWidth}%` }} />
+                            <div className="bg-slate-300 dark:bg-slate-600" style={{ width: `${unknownWidth}%` }} />
+                          </div>
+                        </div>
+                        <div className="mt-2 grid grid-cols-3 gap-2 text-[11px] text-muted-foreground">
+                          <span>新 {int(item.newCustomerOrders)}</span>
+                          <span className="text-center">老 {int(item.returningCustomerOrders)}</span>
+                          <span className="text-right">未知 {int(item.unknownCustomerOrders)}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="rounded-[18px] border border-dashed border-black/10 px-4 py-10 text-center text-sm text-muted-foreground dark:border-white/10">
+                  当前范围还没有客户明细
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

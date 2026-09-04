@@ -1880,44 +1880,53 @@ export function ProductStripItem({
   isDoudianOrder?: boolean;
 }) {
   const [imgError, setImgError] = useState(false);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const platformSourceLabel = isJdOrder ? "JD SKU" : isMeituanOrder ? "美团 SKU ID" : isTaobaoOrder ? "淘宝 SKU ID" : isDoudianOrder ? "抖店 SKU ID" : "";
   const platformSourceShortLabel = isJdOrder ? "JD" : isMeituanOrder ? "MT" : isTaobaoOrder ? "TB" : isDoudianOrder ? "DD" : "";
 
   return (
-    <div className="flex items-center gap-2.5 rounded-2xl border border-black/6 bg-white/70 px-2.5 py-2 dark:border-white/8 dark:bg-white/4 sm:gap-3 sm:rounded-[18px] sm:px-3 sm:py-2.5">
-      <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-white dark:bg-white/6 sm:h-11 sm:w-11 sm:rounded-xl">
-        {display.image && !imgError ? (
-          <Image
-            src={display.image}
-            alt={display.name}
-            width={44}
-            height={44}
-            className="h-full w-full object-cover"
-            unoptimized
-            onError={() => setImgError(true)}
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center text-muted-foreground/30">
-            <Package2 size={16} />
-          </div>
-        )}
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="line-clamp-2 wrap-break-word text-[13px] font-medium leading-4.5 text-foreground sm:text-sm sm:leading-5 sm:line-clamp-1">
-          {display.name}
+    <>
+      <div className="flex items-center gap-2.5 rounded-2xl border border-black/6 bg-white/70 px-2.5 py-2 dark:border-white/8 dark:bg-white/4 sm:gap-3 sm:rounded-[18px] sm:px-3 sm:py-2.5">
+        <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-white dark:bg-white/6 sm:h-11 sm:w-11 sm:rounded-xl">
+          {display.image && !imgError ? (
+            <button
+              type="button"
+              onClick={() => setIsPreviewOpen(true)}
+              className="group h-full w-full cursor-zoom-in overflow-hidden rounded-lg outline-none ring-0 transition-transform active:scale-95 sm:rounded-xl"
+              title="查看大图"
+            >
+              <Image
+                src={display.image}
+                alt={display.name}
+                width={44}
+                height={44}
+                className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
+                unoptimized
+                onError={() => setImgError(true)}
+              />
+            </button>
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-muted-foreground/30">
+              <Package2 size={16} />
+            </div>
+          )}
         </div>
-        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-medium text-muted-foreground sm:mt-1 sm:gap-x-2.5">
-          <span className="shrink-0">{display.sku}</span>
-          <span className="shrink-0">x{display.quantity}</span>
-          {showMatchStatus ? (
-            <span className={cn(
-              "inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none whitespace-nowrap",
-              (matchedProduct as any)?.ignoreOutbound
-                ? "bg-slate-500/10 text-slate-700 dark:text-slate-400"
-                : matchedProduct
-                ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
-                : "bg-rose-500/10 text-rose-700 dark:text-rose-400"
-            )}>
+        <div className="min-w-0 flex-1">
+          <div className="line-clamp-2 wrap-break-word text-[13px] font-medium leading-4.5 text-foreground sm:text-sm sm:leading-5 sm:line-clamp-1">
+            {display.name}
+          </div>
+          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-medium text-muted-foreground sm:mt-1 sm:gap-x-2.5">
+            <span className="shrink-0">{display.sku}</span>
+            <span className="shrink-0">x{display.quantity}</span>
+            {showMatchStatus ? (
+              <span className={cn(
+                "inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none whitespace-nowrap",
+                (matchedProduct as any)?.ignoreOutbound
+                  ? "bg-slate-500/10 text-slate-700 dark:text-slate-400"
+                  : matchedProduct
+                  ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                  : "bg-rose-500/10 text-rose-700 dark:text-rose-400"
+              )}>
               {(matchedProduct as any)?.ignoreOutbound
                 ? "无需出库"
                 : matchedProduct ? (matchedProduct.isManual ? "手动" : "自动") : (display.optionalMatch ? "可选" : "未匹配")}
@@ -1988,7 +1997,38 @@ export function ProductStripItem({
           </button>
         ) : null}
       </div>
-    </div>
+      </div>
+      {isPreviewOpen && display.image && typeof document !== "undefined" ? createPortal(
+        <div
+          className="fixed inset-0 z-60000 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+          onClick={() => setIsPreviewOpen(false)}
+        >
+          <button
+            type="button"
+            onClick={() => setIsPreviewOpen(false)}
+            className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/12 text-white transition-all hover:bg-white/20"
+            aria-label="关闭大图"
+          >
+            <X size={20} />
+          </button>
+          <div
+            className="relative max-h-[86dvh] w-full max-w-4xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <Image
+              src={display.image}
+              alt={display.name}
+              width={1200}
+              height={1200}
+              className="max-h-[86dvh] w-full rounded-2xl object-contain"
+              unoptimized
+            />
+            <div className="mt-3 truncate text-center text-sm font-medium text-white/90">{display.name}</div>
+          </div>
+        </div>,
+        document.body
+      ) : null}
+    </>
   );
 }
 
