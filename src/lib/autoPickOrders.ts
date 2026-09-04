@@ -2497,6 +2497,13 @@ async function enrichMaiyatianOrderByCookie(cookie: string, order: AutoPickInbou
     order.completedAt = readMaiyatianCompletedAt((detailData || {}) as Record<string, unknown>);
   }
 
+  order.rawPayload = {
+    ...((detailData || {}) as Record<string, unknown>),
+    ...((order.rawPayload && typeof order.rawPayload === "object" && !Array.isArray(order.rawPayload))
+      ? order.rawPayload as Record<string, unknown>
+      : {}),
+  };
+
   return order;
 }
 
