@@ -9,21 +9,27 @@ export class InventoryService {
     productVariantId?: string | null;
     shopProductId?: string | null;
     shopProductVariantId?: string | null;
-  }) {
-    if (item.shopProductVariantId) {
-      return { shopProductVariantId: item.shopProductVariantId };
+  }): Prisma.PurchaseOrderItemWhereInput | null {
+    const variantIds = [item.shopProductVariantId, item.productVariantId].filter(Boolean) as string[];
+    if (variantIds.length > 0) {
+      return {
+        OR: [
+          { shopProductVariantId: { in: variantIds } },
+          { productVariantId: { in: variantIds } },
+        ],
+      };
     }
 
-    if (item.productVariantId) {
-      return { productVariantId: item.productVariantId };
-    }
-
-    if (item.shopProductId) {
-      return { shopProductId: item.shopProductId };
-    }
-
-    if (item.productId) {
-      return { productId: item.productId };
+    const productIds = [item.shopProductId, item.productId].filter(Boolean) as string[];
+    if (productIds.length > 0) {
+      return {
+        productVariantId: null,
+        shopProductVariantId: null,
+        OR: [
+          { shopProductId: { in: productIds } },
+          { productId: { in: productIds } },
+        ],
+      };
     }
 
     return null;
@@ -247,9 +253,19 @@ export class InventoryService {
     shopProductVariantId: string | null = null
   ) {
     if (shopProductVariantId) {
+      const shopVariant = await tx.shopProductVariant.findUnique({
+        where: { id: shopProductVariantId },
+        select: { shopProductId: true, productVariantId: true }
+      });
+      const relatedVariantId = shopVariant?.productVariantId;
+      const ids = [shopProductVariantId, relatedVariantId].filter(Boolean) as string[];
+
       const aggregateResult = await tx.purchaseOrderItem.aggregate({
         where: {
-          shopProductVariantId,
+          OR: [
+            { shopProductVariantId: { in: ids } },
+            { productVariantId: { in: ids } }
+          ],
           remainingQuantity: { gt: 0 },
           purchaseOrder: { status: "Received" }
         },
@@ -264,22 +280,36 @@ export class InventoryService {
         data: { stock: sum }
       });
 
-      const shopVariant = await tx.shopProductVariant.findUnique({
-        where: { id: shopProductVariantId },
-        select: { shopProductId: true, productVariantId: true }
-      });
+      if (relatedVariantId) {
+        await tx.productVariant.update({
+          where: { id: relatedVariantId },
+          data: { stock: sum }
+        });
+        const baseVariant = await tx.productVariant.findUnique({
+          where: { id: relatedVariantId },
+          select: { productId: true }
+        });
+        if (baseVariant?.productId) {
+          await this.syncStockFromBatches(tx, baseVariant.productId, null, null, null);
+        }
+      }
 
       if (shopVariant?.shopProductId) {
         await this.syncStockFromBatches(tx, null, shopVariant.shopProductId, null, null);
       }
-
-      if (shopVariant?.productVariantId) {
-        await this.syncStockFromBatches(tx, null, null, shopVariant.productVariantId, null);
-      }
     } else if (productVariantId) {
+      const shopVariants = await tx.shopProductVariant.findMany({
+        where: { productVariantId },
+        select: { id: true, shopProductId: true }
+      });
+      const ids = [productVariantId, ...shopVariants.map((sv) => sv.id)];
+
       const aggregateResult = await tx.purchaseOrderItem.aggregate({
         where: {
-          productVariantId,
+          OR: [
+            { productVariantId: { in: ids } },
+            { shopProductVariantId: { in: ids } }
+          ],
           remainingQuantity: { gt: 0 },
           purchaseOrder: { status: "Received" }
         },
@@ -294,6 +324,16 @@ export class InventoryService {
         data: { stock: sum }
       });
 
+      for (const sv of shopVariants) {
+        await tx.shopProductVariant.update({
+          where: { id: sv.id },
+          data: { stock: sum }
+        });
+        if (sv.shopProductId) {
+          await this.syncStockFromBatches(tx, null, sv.shopProductId, null, null);
+        }
+      }
+
       const variant = await tx.productVariant.findUnique({
         where: { id: productVariantId },
         select: { productId: true }
@@ -303,50 +343,101 @@ export class InventoryService {
         await this.syncStockFromBatches(tx, variant.productId, null, null, null);
       }
     } else if (shopProductId) {
-      // 聚合所有有效的店铺采购批次
-      const aggregateResult = await tx.purchaseOrderItem.aggregate({
-        where: {
-          shopProductId,
-          remainingQuantity: { gt: 0 },
-          purchaseOrder: { status: "Received" }
-        },
-        _sum: {
-          remainingQuantity: true
-        }
-      });
-      const sum = aggregateResult._sum.remainingQuantity || 0;
-
-      await tx.shopProduct.update({
-        where: { id: shopProductId },
-        data: { stock: sum }
-      });
-
-      // 联动同步主库商品
       const sp = await tx.shopProduct.findUnique({
         where: { id: shopProductId },
-        select: { productId: true }
+        select: { productId: true, hasVariants: true }
       });
+
+      if (sp?.hasVariants) {
+        const variantSum = await tx.shopProductVariant.aggregate({
+          where: { shopProductId, isActive: true },
+          _sum: { stock: true }
+        });
+        const totalStock = variantSum._sum.stock || 0;
+        await tx.shopProduct.update({
+          where: { id: shopProductId },
+          data: { stock: totalStock }
+        });
+      } else {
+        const ids = [shopProductId, sp?.productId].filter(Boolean) as string[];
+        const aggregateResult = await tx.purchaseOrderItem.aggregate({
+          where: {
+            productVariantId: null,
+            shopProductVariantId: null,
+            OR: [
+              { shopProductId: { in: ids } },
+              { productId: { in: ids } }
+            ],
+            remainingQuantity: { gt: 0 },
+            purchaseOrder: { status: "Received" }
+          },
+          _sum: {
+            remainingQuantity: true
+          }
+        });
+        const sum = aggregateResult._sum.remainingQuantity || 0;
+
+        await tx.shopProduct.update({
+          where: { id: shopProductId },
+          data: { stock: sum }
+        });
+      }
+
       if (sp?.productId) {
-        await this.syncStockFromBatches(tx, sp.productId, null);
+        await this.syncStockFromBatches(tx, sp.productId, null, null, null);
       }
     } else if (productId) {
-      // 聚合所有有效的全局采购批次（包括所有店铺的）
-      const aggregateResult = await tx.purchaseOrderItem.aggregate({
-        where: {
-          productId,
-          remainingQuantity: { gt: 0 },
-          purchaseOrder: { status: "Received" }
-        },
-        _sum: {
-          remainingQuantity: true
-        }
-      });
-      const sum = aggregateResult._sum.remainingQuantity || 0;
-
-      await tx.product.update({
+      const prod = await tx.product.findUnique({
         where: { id: productId },
-        data: { stock: sum }
+        select: { hasVariants: true }
       });
+
+      if (prod?.hasVariants) {
+        const variantSum = await tx.productVariant.aggregate({
+          where: { productId, isActive: true },
+          _sum: { stock: true }
+        });
+        const totalStock = variantSum._sum.stock || 0;
+        await tx.product.update({
+          where: { id: productId },
+          data: { stock: totalStock }
+        });
+      } else {
+        const shopProds = await tx.shopProduct.findMany({
+          where: { productId },
+          select: { id: true }
+        });
+        const ids = [productId, ...shopProds.map((item) => item.id)];
+
+        const aggregateResult = await tx.purchaseOrderItem.aggregate({
+          where: {
+            productVariantId: null,
+            shopProductVariantId: null,
+            OR: [
+              { productId: { in: ids } },
+              { shopProductId: { in: ids } }
+            ],
+            remainingQuantity: { gt: 0 },
+            purchaseOrder: { status: "Received" }
+          },
+          _sum: {
+            remainingQuantity: true
+          }
+        });
+        const sum = aggregateResult._sum.remainingQuantity || 0;
+
+        await tx.product.update({
+          where: { id: productId },
+          data: { stock: sum }
+        });
+
+        for (const sp of shopProds) {
+          await tx.shopProduct.update({
+            where: { id: sp.id },
+            data: { stock: sum }
+          });
+        }
+      }
     }
   }
 }

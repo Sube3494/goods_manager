@@ -146,8 +146,8 @@ function deriveFactoryShipmentStatusFromTrackingEntries(
       .map((entry) => entry.itemKey)
   );
   const shippedCount = items.filter((item) => {
-    const itemKey = getShipmentItemKey(item);
-    return itemKey ? shippedKeys.has(itemKey) : false;
+    const aliases = getShipmentItemAliases(item);
+    return aliases.some((alias) => shippedKeys.has(alias));
   }).length;
 
   if (shippedCount === 0) return "待发货";
@@ -520,20 +520,51 @@ export async function PUT(
         if (wasDeducted) {
           for (const item of existingOrder.items) {
             let amountToRestore = item.quantity;
+            
+            const variantIds = [item.shopProductVariantId, item.productVariantId].filter(Boolean) as string[];
+            if (item.shopProductVariantId && !item.productVariantId) {
+              const spv = await tx.shopProductVariant.findUnique({
+                where: { id: item.shopProductVariantId },
+                select: { productVariantId: true },
+              });
+              if (spv?.productVariantId) variantIds.push(spv.productVariantId);
+            }
+
+            const productIds = [item.shopProductId, item.productId].filter(Boolean) as string[];
+            if (item.shopProductId && !item.productId) {
+              const sp = await tx.shopProduct.findUnique({
+                where: { id: item.shopProductId },
+                select: { productId: true },
+              });
+              if (sp?.productId) productIds.push(sp.productId);
+            }
+
+            const batchWhere: Prisma.PurchaseOrderItemWhereInput = variantIds.length > 0
+              ? {
+                  OR: [
+                    { shopProductVariantId: { in: variantIds } },
+                    { productVariantId: { in: variantIds } },
+                  ],
+                  purchaseOrder: {
+                    userId: session.id,
+                    status: "Received",
+                  },
+                }
+              : {
+                  productVariantId: null,
+                  shopProductVariantId: null,
+                  OR: [
+                    { shopProductId: { in: productIds } },
+                    { productId: { in: productIds } },
+                  ],
+                  purchaseOrder: {
+                    userId: session.id,
+                    status: "Received",
+                  },
+                };
+
             const batches = await tx.purchaseOrderItem.findMany({
-              where: {
-                ...(item.shopProductVariantId
-                  ? { shopProductVariantId: item.shopProductVariantId }
-                  : item.productVariantId
-                    ? { productVariantId: item.productVariantId }
-                    : item.shopProductId
-                      ? { shopProductId: item.shopProductId }
-                      : { productId: item.productId }),
-                purchaseOrder: {
-                  userId: session.id,
-                  status: "Received",
-                },
-              },
+              where: batchWhere,
               orderBy: {
                 purchaseOrder: {
                   date: "desc",
@@ -541,6 +572,7 @@ export async function PUT(
               },
             });
 
+            // 1. 优先按历史采购记录的剩余空间回填
             for (const batch of batches) {
               if (amountToRestore <= 0) break;
               const currentRemaining = batch.remainingQuantity || 0;
@@ -569,6 +601,27 @@ export async function PUT(
 
                 amountToRestore -= restoreToThisBatch;
               }
+            }
+
+            // 2. 兜底保护：若批次已满额或无可用空间，直接累加给最新批次，绝不吞掉库存
+            if (amountToRestore > 0 && batches.length > 0) {
+              await tx.purchaseOrderItem.update({
+                where: { id: batches[0].id },
+                data: {
+                  remainingQuantity: {
+                    increment: amountToRestore,
+                  },
+                },
+              });
+              await tx.productBatch.updateMany({
+                where: { purchaseOrderItemId: batches[0].id },
+                data: {
+                  remainingStock: {
+                    increment: amountToRestore,
+                  },
+                },
+              });
+              amountToRestore = 0;
             }
           }
         }
