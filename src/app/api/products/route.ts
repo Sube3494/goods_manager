@@ -15,6 +15,7 @@ type VariantInput = {
   optionSummary?: string | null;
   costPrice?: number | string | null;
   salePrice?: number | string | null;
+  stock?: number | string | null;
   image?: string | null;
   specs?: Record<string, string> | null;
   isDefault?: boolean;
@@ -58,6 +59,7 @@ function normalizeVariants(rawVariants: unknown, defaultCostPrice: number, defau
         optionSummary: normalizedOptionSummary || normalizedVariantName || null,
         costPrice: Math.max(0, Number(record.costPrice) || defaultCostPrice),
         salePrice: Math.max(0, Number(record.salePrice) || defaultSalePrice),
+        stock: record.stock !== undefined && record.stock !== null ? Math.max(0, Number(record.stock) || 0) : undefined,
         image: typeof record.image === "string" && record.image.trim() ? record.image.trim() : null,
         specs: record.specs && typeof record.specs === "object" ? record.specs : null,
         isDefault: Boolean(record.isDefault ?? index === 0),
@@ -427,7 +429,7 @@ export async function POST(request: Request) {
                       variantImage: storage.stripUrl(variant.image),
                       costPrice: variant.costPrice,
                       salePrice: variant.salePrice,
-                      stock: 0,
+                      stock: Number(variant.stock || 0),
                       sortOrder: variant.sortOrder,
                       isDefault: variant.isDefault,
                       isActive: variant.isActive,
@@ -545,27 +547,126 @@ export async function PUT(request: Request) {
         },
       });
 
-      await tx.productVariant.deleteMany({
-        where: { productId: id },
-      });
-
       if (hasVariants) {
-        await tx.productVariant.createMany({
-          data: normalizedVariants.map((variant) => ({
-            productId: id,
-            sku: variant.sku,
-            jdSkuId: variant.jdSkuId,
-            variantName: variant.variantName,
-            optionSummary: variant.optionSummary,
-            image: storage.stripUrl(variant.image),
-            costPrice: variant.costPrice,
-            salePrice: variant.salePrice,
-            stock: 0,
-            specs: variant.specs ?? Prisma.JsonNull,
-            sortOrder: variant.sortOrder,
-            isDefault: variant.isDefault,
-            isActive: variant.isActive,
-          })),
+        const existingVariants = await tx.productVariant.findMany({
+          where: { productId: id },
+        });
+        const existingById = new Map(existingVariants.map((v) => [v.id, v]));
+        const existingBySku = new Map(
+          existingVariants.filter((v) => v.sku).map((v) => [v.sku!, v])
+        );
+        const existingByName = new Map(
+          existingVariants.filter((v) => v.variantName).map((v) => [v.variantName!, v])
+        );
+
+        const keptVariantIds = new Set<string>();
+
+        for (const variant of normalizedVariants) {
+          const matched =
+            (variant.id ? existingById.get(variant.id) : null) ||
+            (variant.sku ? existingBySku.get(variant.sku) : null) ||
+            (variant.variantName ? existingByName.get(variant.variantName) : null);
+
+          if (matched) {
+            // 已有规格：绝不重置清空库存！
+            // 检查是否有对应的采购入库批次剩余库存（优先恢复因旧bug被误清空的库存）
+            const batchStockAgg = await tx.purchaseOrderItem.aggregate({
+              where: {
+                productVariantId: matched.id,
+                remainingQuantity: { gt: 0 },
+                purchaseOrder: { status: "Received" },
+              },
+              _sum: { remainingQuantity: true },
+            });
+            const batchRemaining = batchStockAgg._sum.remainingQuantity;
+            const preservedStock =
+              batchRemaining !== null && batchRemaining > 0
+                ? batchRemaining
+                : matched.stock > 0
+                  ? matched.stock
+                  : (variant.stock ?? matched.stock);
+
+            await tx.productVariant.update({
+              where: { id: matched.id },
+              data: {
+                sku: variant.sku,
+                jdSkuId: variant.jdSkuId,
+                variantName: variant.variantName,
+                optionSummary: variant.optionSummary,
+                image: storage.stripUrl(variant.image),
+                costPrice: variant.costPrice,
+                salePrice: variant.salePrice,
+                stock: preservedStock,
+                specs: variant.specs ?? Prisma.JsonNull,
+                sortOrder: variant.sortOrder,
+                isDefault: variant.isDefault,
+                isActive: variant.isActive,
+              },
+            });
+            keptVariantIds.add(matched.id);
+          } else {
+            // 新增规格
+            const initialStock = variant.stock !== undefined ? Math.max(0, variant.stock) : 0;
+            const created = await tx.productVariant.create({
+              data: {
+                productId: id,
+                sku: variant.sku,
+                jdSkuId: variant.jdSkuId,
+                variantName: variant.variantName,
+                optionSummary: variant.optionSummary,
+                image: storage.stripUrl(variant.image),
+                costPrice: variant.costPrice,
+                salePrice: variant.salePrice,
+                stock: initialStock,
+                specs: variant.specs ?? Prisma.JsonNull,
+                sortOrder: variant.sortOrder,
+                isDefault: variant.isDefault,
+                isActive: variant.isActive,
+              },
+            });
+            keptVariantIds.add(created.id);
+          }
+        }
+
+        // 处理未保留的旧规格
+        const removedVariants = existingVariants.filter((v) => !keptVariantIds.has(v.id));
+        for (const removed of removedVariants) {
+          const hasPurchase = await tx.purchaseOrderItem.findFirst({
+            where: { productVariantId: removed.id },
+            select: { id: true },
+          });
+          const hasOutbound = await tx.outboundOrderItem.findFirst({
+            where: { productVariantId: removed.id },
+            select: { id: true },
+          });
+
+          if (hasPurchase || hasOutbound || (Number(removed.stock) || 0) > 0) {
+            await tx.productVariant.update({
+              where: { id: removed.id },
+              data: { isActive: false },
+            });
+          } else {
+            await tx.productVariant.delete({
+              where: { id: removed.id },
+            });
+          }
+        }
+
+        // 重新汇总有效规格的库存，回写更新到主商品的 stock
+        const variantStockSum = await tx.productVariant.aggregate({
+          where: { productId: id, isActive: true },
+          _sum: { stock: true },
+        });
+        const totalStock = variantStockSum._sum.stock || 0;
+        await tx.product.update({
+          where: { id },
+          data: { stock: totalStock },
+        });
+      } else {
+        // 如果取消多规格变为单品
+        await tx.productVariant.updateMany({
+          where: { productId: id },
+          data: { isActive: false },
         });
       }
 
