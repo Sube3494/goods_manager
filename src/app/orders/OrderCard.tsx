@@ -2792,7 +2792,7 @@ export const OrderCard = memo(function OrderCard({
                         </span>
                         {showCustomerTypeBadge ? (
                           <span className={cn(
-                            "inline-flex h-4 shrink-0 items-center rounded-full border px-1.5 text-[10px] font-semibold leading-none",
+                            "inline-flex h-[18px] shrink-0 items-center justify-center rounded-full border px-1.5 text-[10px] font-semibold leading-[16px] align-middle",
                             resolvedCustomerType === "new"
                               ? "border-rose-500/20 bg-rose-500/10 text-rose-600 dark:text-rose-300"
                               : "border-slate-400/20 bg-slate-500/8 text-slate-500 dark:text-slate-300"
@@ -2846,7 +2846,7 @@ export const OrderCard = memo(function OrderCard({
                       </span>
                       {showCustomerTypeBadge ? (
                         <span className={cn(
-                          "inline-flex h-4 shrink-0 items-center rounded-full border px-1.5 text-[10px] font-semibold leading-none",
+                          "inline-flex h-[18px] shrink-0 items-center justify-center rounded-full border px-1.5 text-[10px] font-semibold leading-[16px] align-middle",
                           resolvedCustomerType === "new"
                             ? "border-rose-500/20 bg-rose-500/10 text-rose-600 dark:text-rose-300"
                             : "border-slate-400/20 bg-slate-500/8 text-slate-500 dark:text-slate-300"
@@ -3197,7 +3197,7 @@ export const OrderCard = memo(function OrderCard({
                     value={customerMaskedPhone}
                     labelAccessory={showCustomerTypeBadge ? (
                       <span className={cn(
-                        "inline-flex h-4 shrink-0 items-center rounded-full border px-1.5 text-[10px] font-semibold leading-none",
+                        "inline-flex h-[18px] shrink-0 items-center justify-center rounded-full border px-1.5 text-[10px] font-semibold leading-[16px] align-middle",
                         resolvedCustomerType === "new"
                           ? "border-rose-500/20 bg-rose-500/10 text-rose-600 dark:text-rose-300"
                           : "border-slate-400/20 bg-slate-500/8 text-slate-500 dark:text-slate-300"

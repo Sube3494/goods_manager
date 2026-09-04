@@ -161,6 +161,7 @@ export function ProductSelectionModal({
   const [isInitialized, setIsInitialized] = useState(false);
   const [libraries, setLibraries] = useState<any[]>([]);
   const [activeLibraryId, setActiveLibraryId] = useState<string>(lockLibraryId || "all");
+  const isShopScopedPicker = Boolean(query?.shopId || query?.shopName);
 
   const [viewMode, setViewMode] = useState<"grid" | "list">(() => {
     if (defaultViewMode) return defaultViewMode;
@@ -185,12 +186,18 @@ export function ProductSelectionModal({
       if (defaultViewMode) {
         setViewMode(defaultViewMode);
       }
-      setActiveLibraryId(lockLibraryId || "all");
+      setActiveLibraryId(isShopScopedPicker ? "all" : lockLibraryId || "all");
     }
-  }, [defaultViewMode, isOpen, lockLibraryId]);
+  }, [defaultViewMode, isOpen, isShopScopedPicker, lockLibraryId]);
 
   useEffect(() => {
     if (isOpen) {
+      if (isShopScopedPicker) {
+        setLibraries([]);
+        setActiveLibraryId("all");
+        return;
+      }
+
       fetch("/api/product-libraries")
         .then((res) => (res.ok ? res.json() : []))
         .then((data) => {
@@ -208,7 +215,7 @@ export function ProductSelectionModal({
         })
         .catch(() => {});
     }
-  }, [isOpen, lockLibraryId]);
+  }, [isOpen, isShopScopedPicker, lockLibraryId]);
 
   const [showUnselectedOnly, setShowUnselectedOnly] = useState(true);
   const [localVisibleCount, setLocalVisibleCount] = useState(50);
@@ -218,7 +225,8 @@ export function ProductSelectionModal({
   const [targetPlatform, setTargetPlatform] = useState("美团");
   const PLATFORMS = ["美团", "淘宝", "京东"];
   const shouldShowCategoryFilter = !imageOnly && (!minimalView || showCategoryFilter);
-  const shouldShowLibraryTabs = libraries.length > 1 && !lockLibraryId;
+  const effectiveLibraryId = isShopScopedPicker ? "all" : activeLibraryId;
+  const shouldShowLibraryTabs = libraries.length > 1 && !lockLibraryId && !isShopScopedPicker;
   const loadingDelayRef = useRef<NodeJS.Timeout | null>(null);
   const lastLoadedSignatureRef = useRef("");
   const usesPrefetchedData = Array.isArray(prefetchedProducts);
@@ -230,7 +238,7 @@ export function ProductSelectionModal({
     query: query || {},
     selectedCategoryName: remoteCategoryName,
     debouncedSearch: remoteSearch,
-    activeLibraryId,
+    activeLibraryId: effectiveLibraryId,
   });
 
   const getSelectionKey = useCallback((product: Product) => {
@@ -333,7 +341,7 @@ export function ProductSelectionModal({
         ...(loadAllOnOpen ? { all: "true" } : { pageSize: "20" }),
         ...(remoteSearch ? { search: remoteSearch } : {}),
         ...(queryRef.current || {}),
-        ...(activeLibraryId && activeLibraryId !== "all" ? { libraryId: activeLibraryId } : {}),
+        ...(effectiveLibraryId && effectiveLibraryId !== "all" ? { libraryId: effectiveLibraryId } : {}),
         ...(remoteCategoryName !== "all" ? { category: remoteCategoryName, categoryName: remoteCategoryName } : {}),
       });
 
@@ -383,7 +391,7 @@ export function ProductSelectionModal({
         setIsNextPageLoading(false);
       }
     }
-  }, [fetchPath, loadAllOnOpen, querySignature, remoteCategoryName, remoteSearch, shouldShowCategoryFilter]);
+  }, [effectiveLibraryId, fetchPath, loadAllOnOpen, querySignature, remoteCategoryName, remoteSearch, shouldShowCategoryFilter]);
 
   useEffect(() => {
     if (loadingDelayRef.current) {
@@ -522,6 +530,7 @@ export function ProductSelectionModal({
         all: "true",
         search: debouncedSearch,
         ...(query || {}),
+        ...(effectiveLibraryId && effectiveLibraryId !== "all" ? { libraryId: effectiveLibraryId } : {}),
         category: selectedCategoryName,
       });
       const res = await fetch(`${fetchPath}?${queryParams.toString()}`);
