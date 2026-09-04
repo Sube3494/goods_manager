@@ -35,7 +35,15 @@ interface BackupPayload {
   categories?: Record<string, unknown>[];
   suppliers?: Record<string, unknown>[];
   products?: Record<string, unknown>[];
+  productVariants?: Record<string, unknown>[];
+  productJdSkus?: Record<string, unknown>[];
+  galleryFaqs?: Record<string, unknown>[];
   shops?: Record<string, unknown>[];
+  shopProducts?: Record<string, unknown>[];
+  shopProductVariants?: Record<string, unknown>[];
+  logisticsCompanies?: Record<string, unknown>[];
+  dailyPromotionExpenses?: Record<string, unknown>[];
+  productBatches?: Record<string, unknown>[];
   brushProducts?: Record<string, unknown>[];
   brushOrderPlans?: BackupOrderWithItems[];
   settlements?: BackupOrderWithItems[];
@@ -44,6 +52,8 @@ interface BackupPayload {
   outboundOrders?: BackupOrderWithItems[];
   brushOrders?: BackupOrderWithItems[];
   galleryItems?: Record<string, unknown>[];
+  autoPickOrders?: BackupOrderWithItems[];
+  autoPickApiKeys?: Record<string, unknown>[];
 }
 
 function castMany<T>(value: unknown): T[] {
@@ -88,12 +98,31 @@ export class BackupService {
     const scopedWhere = this.buildUserScopedWhere(userId);
 
     return {
-      version: "2.0",
+      version: "2.1",
       timestamp: new Date().toISOString(),
       userId,
       categories: await prisma.category.findMany({ where: scopedWhere }),
       products: await prisma.product.findMany({ where: scopedWhere }),
+      productVariants: await prisma.productVariant.findMany({
+        where: userId ? { product: { userId } } : undefined,
+      }),
+      productJdSkus: await prisma.productJdSku.findMany({ where: scopedWhere }),
+      galleryFaqs: await prisma.galleryFaq.findMany({ where: scopedWhere }),
       suppliers: await prisma.supplier.findMany({ where: scopedWhere }),
+      shops: await prisma.shop.findMany({ where: scopedWhere }),
+      shopProducts: await prisma.shopProduct.findMany({
+        where: userId ? { shop: { userId } } : undefined,
+      }),
+      shopProductVariants: await prisma.shopProductVariant.findMany({
+        where: userId ? { shopProduct: { shop: { userId } } } : undefined,
+      }),
+      logisticsCompanies: await prisma.logisticsCompany.findMany({
+        where: userId ? { OR: [{ userId }, { userId: null }] } : undefined,
+      }),
+      dailyPromotionExpenses: await prisma.dailyPromotionExpense.findMany({ where: scopedWhere }),
+      productBatches: await prisma.productBatch.findMany({
+        where: userId ? { product: { userId } } : undefined,
+      }),
       purchaseOrders: await prisma.purchaseOrder.findMany({ where: scopedWhere, include: { items: true } }),
       outboundOrders: await prisma.outboundOrder.findMany({ where: scopedWhere, include: { items: true } }),
       brushOrders: await prisma.brushOrder.findMany({ where: scopedWhere, include: { items: true } }),
@@ -101,8 +130,9 @@ export class BackupService {
       brushOrderPlans: await prisma.brushOrderPlan.findMany({ where: scopedWhere, include: { items: true } }),
       settlements: await prisma.settlement.findMany({ where: scopedWhere, include: { items: true } }),
       storeOpeningBatches: await prisma.storeOpeningBatch.findMany({ where: scopedWhere, include: { items: true } }),
-      shops: await prisma.shop.findMany({ where: scopedWhere }),
       galleryItems: await prisma.galleryItem.findMany({ where: scopedWhere }),
+      autoPickOrders: await prisma.autoPickOrder.findMany({ where: scopedWhere, include: { items: true } }),
+      autoPickApiKeys: await prisma.autoPickApiKey.findMany({ where: scopedWhere }),
       systemSettings: userId ? [] : await prisma.systemSetting.findMany(),
       users: userId ? [] : await prisma.user.findMany(),
       roleProfiles: userId ? [] : await prisma.roleProfile.findMany(),
@@ -318,96 +348,140 @@ export class BackupService {
    */
   static async restoreFromData(data: BackupPayload) {
     await prisma.$transaction(async (tx) => {
-      // 1. 清空现有数据 (按外键依赖顺序逆序删除)
+      // 1. 清空现有数据 (按外键依赖顺序：从最底层子表逆序删除到顶层父表)
+      await tx.autoPickOrderItem.deleteMany();
+      await tx.autoPickAutoCompleteJob.deleteMany();
+      await tx.autoPickOrder.deleteMany();
+      await tx.autoPickApiKey.deleteMany();
       await tx.settlementItem.deleteMany();
       await tx.settlement.deleteMany();
       await tx.storeOpeningItem.deleteMany();
       await tx.storeOpeningBatch.deleteMany();
       await tx.brushOrderPlanItem.deleteMany();
       await tx.brushOrderPlan.deleteMany();
-      await tx.brushProduct.deleteMany();
       await tx.brushOrderItem.deleteMany();
       await tx.brushOrder.deleteMany();
-      await tx.shop.deleteMany();
-      await tx.galleryItem.deleteMany();
+      await tx.brushProduct.deleteMany();
+      await tx.productBatch.deleteMany();
       await tx.outboundOrderItem.deleteMany();
       await tx.outboundOrder.deleteMany();
       await tx.purchaseOrderItem.deleteMany();
       await tx.purchaseOrder.deleteMany();
+      await tx.shopProductVariant.deleteMany();
+      await tx.shopProduct.deleteMany();
+      await tx.shop.deleteMany();
+      await tx.productJdSku.deleteMany();
+      await tx.productVariant.deleteMany();
+      await tx.galleryItem.deleteMany();
+      await tx.galleryFaq.deleteMany();
       await tx.product.deleteMany();
       await tx.supplier.deleteMany();
       await tx.category.deleteMany();
+      await tx.logisticsCompany.deleteMany();
+      await tx.dailyPromotionExpense.deleteMany();
       await tx.invitation.deleteMany();
       await tx.emailWhitelist.deleteMany();
       await tx.registrationRequest.deleteMany();
       await tx.pageView.deleteMany();
       await tx.verificationCode.deleteMany();
       await tx.systemSetting.deleteMany(); 
+      await tx.userDeviceSession.deleteMany();
       await tx.user.deleteMany();
-      // 在一些 Prisma 配置中，roleProfile 可能被 user 依赖，所以级联删除通常足够，但显式清理更稳
       await tx.roleProfile.deleteMany();
 
-      // 2. 导入数据 (按依赖顺序顺序插入)
-      if (data.roleProfiles) await tx.roleProfile.createMany({ data: castMany<Prisma.RoleProfileCreateManyInput>(data.roleProfiles) });
-      if (data.systemSettings) await tx.systemSetting.createMany({ data: castMany<Prisma.SystemSettingCreateManyInput>(data.systemSettings) });
-      if (data.whitelists) await tx.emailWhitelist.createMany({ data: castMany<Prisma.EmailWhitelistCreateManyInput>(data.whitelists) });
-      if (data.users) await tx.user.createMany({ data: castMany<Prisma.UserCreateManyInput>(data.users) });
-      if (data.invitations) await tx.invitation.createMany({ data: castMany<Prisma.InvitationCreateManyInput>(data.invitations) });
-      if (data.registrationRequests) await tx.registrationRequest.createMany({ data: castMany<Prisma.RegistrationRequestCreateManyInput>(data.registrationRequests) });
-      if (data.pageViews) await tx.pageView.createMany({ data: castMany<Prisma.PageViewCreateManyInput>(data.pageViews) });
-      if (data.verificationCodes) await tx.verificationCode.createMany({ data: castMany<Prisma.VerificationCodeCreateManyInput>(data.verificationCodes) });
-      if (data.categories) await tx.category.createMany({ data: castMany<Prisma.CategoryCreateManyInput>(data.categories) });
-      if (data.suppliers) await tx.supplier.createMany({ data: castMany<Prisma.SupplierCreateManyInput>(data.suppliers) });
-      if (data.products) await tx.product.createMany({ data: castMany<Prisma.ProductCreateManyInput>(data.products) });
-      if (data.shops) await tx.shop.createMany({ data: castMany<Prisma.ShopCreateManyInput>(data.shops) });
-      if (data.brushProducts) await tx.brushProduct.createMany({ data: castMany<Prisma.BrushProductCreateManyInput>(data.brushProducts) });
-      
-      // 3. 级联订单处理
-      if (data.purchaseOrders) {
-        for (const order of data.purchaseOrders) {
-            const { items, ...orderData } = order;
-            await tx.purchaseOrder.create({ data: orderData as Prisma.PurchaseOrderCreateInput });
-            if (items?.length) await tx.purchaseOrderItem.createMany({ data: castMany<Prisma.PurchaseOrderItemCreateManyInput>(items) });
-        }
-      }
-      if (data.outboundOrders) {
-        for (const order of data.outboundOrders) {
-            const { items, ...orderData } = order;
-            await tx.outboundOrder.create({ data: orderData as Prisma.OutboundOrderCreateInput });
-            if (items?.length) await tx.outboundOrderItem.createMany({ data: castMany<Prisma.OutboundOrderItemCreateManyInput>(items) });
-        }
-      }
-      if (data.brushOrders) {
+      // 2. 导入用户与配置
+      if (data.roleProfiles?.length) await tx.roleProfile.createMany({ data: castMany<Prisma.RoleProfileCreateManyInput>(data.roleProfiles) });
+      if (data.users?.length) await tx.user.createMany({ data: castMany<Prisma.UserCreateManyInput>(data.users) });
+      if (data.systemSettings?.length) await tx.systemSetting.createMany({ data: castMany<Prisma.SystemSettingCreateManyInput>(data.systemSettings) });
+      if (data.whitelists?.length) await tx.emailWhitelist.createMany({ data: castMany<Prisma.EmailWhitelistCreateManyInput>(data.whitelists) });
+      if (data.invitations?.length) await tx.invitation.createMany({ data: castMany<Prisma.InvitationCreateManyInput>(data.invitations) });
+      if (data.registrationRequests?.length) await tx.registrationRequest.createMany({ data: castMany<Prisma.RegistrationRequestCreateManyInput>(data.registrationRequests) });
+      if (data.pageViews?.length) await tx.pageView.createMany({ data: castMany<Prisma.PageViewCreateManyInput>(data.pageViews) });
+      if (data.verificationCodes?.length) await tx.verificationCode.createMany({ data: castMany<Prisma.VerificationCodeCreateManyInput>(data.verificationCodes) });
+      if (data.logisticsCompanies?.length) await tx.logisticsCompany.createMany({ data: castMany<Prisma.LogisticsCompanyCreateManyInput>(data.logisticsCompanies) });
+      if (data.dailyPromotionExpenses?.length) await tx.dailyPromotionExpense.createMany({ data: castMany<Prisma.DailyPromotionExpenseCreateManyInput>(data.dailyPromotionExpenses) });
+
+      // 3. 导入商品、规格、分类
+      if (data.categories?.length) await tx.category.createMany({ data: castMany<Prisma.CategoryCreateManyInput>(data.categories) });
+      if (data.suppliers?.length) await tx.supplier.createMany({ data: castMany<Prisma.SupplierCreateManyInput>(data.suppliers) });
+      if (data.products?.length) await tx.product.createMany({ data: castMany<Prisma.ProductCreateManyInput>(data.products) });
+      if (data.productVariants?.length) await tx.productVariant.createMany({ data: castMany<Prisma.ProductVariantCreateManyInput>(data.productVariants) });
+      if (data.productJdSkus?.length) await tx.productJdSku.createMany({ data: castMany<Prisma.ProductJdSkuCreateManyInput>(data.productJdSkus) });
+      if (data.galleryFaqs?.length) await tx.galleryFaq.createMany({ data: castMany<Prisma.GalleryFaqCreateManyInput>(data.galleryFaqs) });
+      if (data.galleryItems?.length) await tx.galleryItem.createMany({ data: castMany<Prisma.GalleryItemCreateManyInput>(data.galleryItems) });
+
+      // 4. 导入店铺与店铺商品、规格
+      if (data.shops?.length) await tx.shop.createMany({ data: castMany<Prisma.ShopCreateManyInput>(data.shops) });
+      if (data.shopProducts?.length) await tx.shopProduct.createMany({ data: castMany<Prisma.ShopProductCreateManyInput>(data.shopProducts) });
+      if (data.shopProductVariants?.length) await tx.shopProductVariant.createMany({ data: castMany<Prisma.ShopProductVariantCreateManyInput>(data.shopProductVariants) });
+
+      // 5. 导入刷单相关
+      if (data.brushProducts?.length) await tx.brushProduct.createMany({ data: castMany<Prisma.BrushProductCreateManyInput>(data.brushProducts) });
+      if (data.brushOrders?.length) {
         for (const order of data.brushOrders) {
-            const { items, ...orderData } = order;
-            await tx.brushOrder.create({ data: orderData as Prisma.BrushOrderCreateInput });
-            if (items?.length) await tx.brushOrderItem.createMany({ data: castMany<Prisma.BrushOrderItemCreateManyInput>(items) });
+          const { items, ...orderData } = order;
+          await tx.brushOrder.create({ data: orderData as Prisma.BrushOrderCreateInput });
+          if (items?.length) await tx.brushOrderItem.createMany({ data: castMany<Prisma.BrushOrderItemCreateManyInput>(items) });
         }
       }
-      if (data.brushOrderPlans) {
+      if (data.brushOrderPlans?.length) {
         for (const plan of data.brushOrderPlans) {
-            const { items, ...planData } = plan;
-            await tx.brushOrderPlan.create({ data: planData as Prisma.BrushOrderPlanCreateInput });
-            if (items?.length) await tx.brushOrderPlanItem.createMany({ data: castMany<Prisma.BrushOrderPlanItemCreateManyInput>(items) });
+          const { items, ...planData } = plan;
+          await tx.brushOrderPlan.create({ data: planData as Prisma.BrushOrderPlanCreateInput });
+          if (items?.length) await tx.brushOrderPlanItem.createMany({ data: castMany<Prisma.BrushOrderPlanItemCreateManyInput>(items) });
         }
       }
-      if (data.settlements) {
+
+      // 6. 导入结算与开店
+      if (data.settlements?.length) {
         for (const settlement of data.settlements) {
-            const { items, ...settlementData } = settlement;
-            await tx.settlement.create({ data: settlementData as Prisma.SettlementCreateInput });
-            if (items?.length) await tx.settlementItem.createMany({ data: castMany<Prisma.SettlementItemCreateManyInput>(items) });
+          const { items, ...settlementData } = settlement;
+          await tx.settlement.create({ data: settlementData as Prisma.SettlementCreateInput });
+          if (items?.length) await tx.settlementItem.createMany({ data: castMany<Prisma.SettlementItemCreateManyInput>(items) });
         }
       }
-      if (data.storeOpeningBatches) {
+      if (data.storeOpeningBatches?.length) {
         for (const batch of data.storeOpeningBatches) {
-            const { items, ...batchData } = batch;
-            await tx.storeOpeningBatch.create({ data: batchData as Prisma.StoreOpeningBatchCreateInput });
-            if (items?.length) await tx.storeOpeningItem.createMany({ data: castMany<Prisma.StoreOpeningItemCreateManyInput>(items) });
+          const { items, ...batchData } = batch;
+          await tx.storeOpeningBatch.create({ data: batchData as Prisma.StoreOpeningBatchCreateInput });
+          if (items?.length) await tx.storeOpeningItem.createMany({ data: castMany<Prisma.StoreOpeningItemCreateManyInput>(items) });
         }
       }
-      if (data.galleryItems) await tx.galleryItem.createMany({ data: castMany<Prisma.GalleryItemCreateManyInput>(data.galleryItems) });
+
+      // 7. 导入核心订单（进货/出库，依赖前面就绪的商品与规格）
+      if (data.purchaseOrders?.length) {
+        for (const order of data.purchaseOrders) {
+          const { items, ...orderData } = order;
+          await tx.purchaseOrder.create({ data: orderData as Prisma.PurchaseOrderCreateInput });
+          if (items?.length) await tx.purchaseOrderItem.createMany({ data: castMany<Prisma.PurchaseOrderItemCreateManyInput>(items) });
+        }
+      }
+      if (data.outboundOrders?.length) {
+        for (const order of data.outboundOrders) {
+          const { items, ...orderData } = order;
+          await tx.outboundOrder.create({ data: orderData as Prisma.OutboundOrderCreateInput });
+          if (items?.length) await tx.outboundOrderItem.createMany({ data: castMany<Prisma.OutboundOrderItemCreateManyInput>(items) });
+        }
+      }
+
+      // 8. 导入批次（依赖 purchaseOrderItem）
+      if (data.productBatches?.length) {
+        await tx.productBatch.createMany({ data: castMany<Prisma.ProductBatchCreateManyInput>(data.productBatches) });
+      }
+
+      // 9. 导入自动拿货
+      if (data.autoPickApiKeys?.length) {
+        await tx.autoPickApiKey.createMany({ data: castMany<Prisma.AutoPickApiKeyCreateManyInput>(data.autoPickApiKeys) });
+      }
+      if (data.autoPickOrders?.length) {
+        for (const order of data.autoPickOrders) {
+          const { items, ...orderData } = order;
+          await tx.autoPickOrder.create({ data: orderData as Prisma.AutoPickOrderCreateInput });
+          if (items?.length) await tx.autoPickOrderItem.createMany({ data: castMany<Prisma.AutoPickOrderItemCreateManyInput>(items) });
+        }
+      }
     }, {
-      timeout: 30000 // 恢复操作可能较重，增加超时时间
+      timeout: 60000 // 恢复全量数据增加超时时间至 60 秒
     });
   }
 
