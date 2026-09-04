@@ -2781,18 +2781,18 @@ export const OrderCard = memo(function OrderCard({
                     <Clock3 size={13} />
                     {formatLocalDateTime(order.orderTime)}
                   </span>
-                  <span className="inline-flex items-center gap-1.5 max-w-[280px] md:max-w-[420px] lg:max-w-[560px] min-w-0">
+                  <span className="inline-flex items-center gap-1.5 max-w-[280px] md:max-w-[420px] lg:max-w-[560px] min-w-0 leading-[18px]">
                     <MapPin size={13} className="shrink-0 text-slate-400 dark:text-zinc-500" />
                     <span className="truncate shrink-0">{pickup ? "-" : (order.distanceKm != null ? formatDistanceKm(order.distanceKm) : "距离待同步")}</span>
                     {!pickup && order.userAddress ? (
                       <>
                         <span className="mx-1 text-slate-300 dark:text-zinc-700 font-normal shrink-0">·</span>
-                        <span className="truncate text-foreground/80 font-normal" title={order.userAddress}>
+                        <span className="truncate text-foreground/80 font-normal leading-[18px]" title={order.userAddress}>
                           {order.userAddress}
                         </span>
                         {showCustomerTypeBadge ? (
                           <span className={cn(
-                            "inline-flex h-[18px] shrink-0 items-center justify-center rounded-full border px-1.5 text-[10px] font-semibold leading-[16px] align-middle",
+                            "relative top-px inline-flex h-[18px] shrink-0 items-center justify-center rounded-full border px-1.5 text-[10px] font-semibold leading-[16px] align-middle",
                             resolvedCustomerType === "new"
                               ? "border-rose-500/20 bg-rose-500/10 text-rose-600 dark:text-rose-300"
                               : "border-slate-400/20 bg-slate-500/8 text-slate-500 dark:text-slate-300"
@@ -2846,7 +2846,7 @@ export const OrderCard = memo(function OrderCard({
                       </span>
                       {showCustomerTypeBadge ? (
                         <span className={cn(
-                          "inline-flex h-[18px] shrink-0 items-center justify-center rounded-full border px-1.5 text-[10px] font-semibold leading-[16px] align-middle",
+                          "relative top-px inline-flex h-[18px] shrink-0 items-center justify-center rounded-full border px-1.5 text-[10px] font-semibold leading-[16px] align-middle",
                           resolvedCustomerType === "new"
                             ? "border-rose-500/20 bg-rose-500/10 text-rose-600 dark:text-rose-300"
                             : "border-slate-400/20 bg-slate-500/8 text-slate-500 dark:text-slate-300"

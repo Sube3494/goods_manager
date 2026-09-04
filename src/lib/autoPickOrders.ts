@@ -3734,10 +3734,14 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
     const normalizedRawPayload = normalized.rawPayload && typeof normalized.rawPayload === "object" && !Array.isArray(normalized.rawPayload)
       ? normalized.rawPayload as Record<string, unknown>
       : normalized as unknown as Record<string, unknown>;
+    const customerType = normalized.customerType
+      || (normalizedRawPayload.customerType as "new" | "returning" | undefined)
+      || readCustomerTypeFromRawPayload(existing?.rawPayload)
+      || null;
     const nextRawPayload = mergeAutoPickSystemMeta(
       {
         ...normalizedRawPayload,
-        customerType: normalized.customerType || (normalizedRawPayload.customerType as unknown),
+        customerType,
       },
       existing?.rawPayload
     );
