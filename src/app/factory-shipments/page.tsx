@@ -382,9 +382,6 @@ const ShipmentItemRow = memo(({
   const valueGridClass = showShippingFee
     ? "grid w-full grid-cols-[minmax(0,1fr)_72px] gap-2 min-[390px]:grid-cols-[minmax(0,1fr)_76px_92px_86px] md:grid-cols-[minmax(180px,1fr)_78px_minmax(120px,0.8fr)_minmax(112px,0.75fr)_108px_24px] md:grid-rows-[auto_36px] md:gap-x-2.5 md:gap-y-1 lg:grid-cols-[minmax(220px,1fr)_88px_156px_136px_112px_28px] lg:gap-x-3"
     : "grid w-full grid-cols-[minmax(0,1fr)_72px] gap-2 min-[390px]:grid-cols-[minmax(0,1fr)_76px_92px_86px] md:grid-cols-[minmax(180px,1fr)_78px_minmax(120px,0.8fr)_108px_24px] md:grid-rows-[auto_36px] md:gap-x-2.5 md:gap-y-1 lg:grid-cols-[minmax(220px,1fr)_88px_156px_112px_28px] lg:gap-x-3";
-  const trackingValueGridClass = showShippingFee
-    ? "grid w-full grid-cols-[58px_minmax(0,1.45fr)_76px] gap-2 min-[430px]:grid-cols-[58px_minmax(0,1.45fr)_76px_96px_68px] md:grid-cols-[58px_minmax(120px,1.45fr)_92px_112px_80px] md:items-end"
-    : "grid w-full grid-cols-[58px_minmax(0,1.45fr)_76px] gap-2 min-[430px]:grid-cols-[58px_minmax(0,1.45fr)_96px_68px] md:grid-cols-[58px_minmax(120px,1.45fr)_112px_80px] md:items-end";
 
   return (
     <div
@@ -471,7 +468,8 @@ const ShipmentItemRow = memo(({
               </div>
             </div>
 
-            <div className={trackingValueGridClass}>
+            {/* 数量、单价、运费 */}
+            <div className={cn("grid w-full gap-2", showShippingFee ? "grid-cols-3" : "grid-cols-2")}>
               <div className="flex flex-col gap-1">
                 <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">数量</span>
                 <input
@@ -519,19 +517,22 @@ const ShipmentItemRow = memo(({
                   </div>
                 </div>
               ) : null}
+            </div>
 
-              <div className="col-span-2 flex flex-col gap-1 min-[430px]:col-span-1">
-                <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">小计</span>
-                <div className="flex h-9 min-w-0 items-center justify-end rounded-xl border border-border/50 bg-background/70 px-2.5 text-right dark:border-white/8 dark:bg-white/4">
-                  <div className="overflow-x-auto scrollbar-none whitespace-nowrap font-mono text-[15px] font-black leading-none text-foreground">￥{totalPrice.toFixed(2)}</div>
+            {/* 小计与操作栏（收缩总金额宽度，预留充裕操作空间） */}
+            <div className="flex w-full items-center justify-between gap-2 pt-1 border-t border-border/40 dark:border-white/5">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">小计</span>
+                <div className="flex h-8 items-center rounded-lg border border-border/50 bg-background/70 px-2.5 font-mono text-[13px] font-black text-foreground dark:border-white/8 dark:bg-white/4">
+                  ￥{totalPrice.toFixed(2)}
                 </div>
               </div>
 
-              <div className="relative flex h-9 items-end justify-end gap-1 self-end">
+              <div className="flex h-8 items-center justify-end gap-1 shrink-0">
                 {isBatchMode ? (
                   <div
                     className={cn(
-                      "mb-2 flex h-5 w-5 items-center justify-center rounded-md border-2 transition-all",
+                      "flex h-5 w-5 items-center justify-center rounded-md border-2 transition-all",
                       isChecked ? "bg-rose-500 border-rose-500 text-white" : "border-border dark:border-white/20"
                     )}
                   >
@@ -543,20 +544,20 @@ const ShipmentItemRow = memo(({
                       <button
                         type="button"
                         onClick={() => onCopyItem(item)}
-                        className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-all hover:bg-primary/10 hover:text-primary active:scale-95"
+                        className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-all hover:bg-primary/10 hover:text-primary active:scale-95"
                         title="复制此货品"
                       >
-                        <Copy size={15} className="shrink-0" />
+                        <Copy size={14} className="shrink-0" />
                       </button>
                     ) : null}
                     {!disabled && onReplaceItem ? (
                       <button
                         type="button"
                         onClick={() => onReplaceItem(item)}
-                        className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-all hover:bg-amber-500/10 hover:text-amber-600 active:scale-95 dark:hover:text-amber-400"
+                        className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-all hover:bg-amber-500/10 hover:text-amber-600 active:scale-95 dark:hover:text-amber-400"
                         title="替换为其他商品"
                       >
-                        <ArrowLeftRight size={15} className="shrink-0" />
+                        <ArrowLeftRight size={14} className="shrink-0" />
                       </button>
                     ) : null}
                     {!disabled ? (
@@ -564,14 +565,14 @@ const ShipmentItemRow = memo(({
                         type="button"
                         onClick={handleDeleteClick}
                         className={cn(
-                          "inline-flex h-9 shrink-0 items-center justify-center rounded-xl transition-all active:scale-95 flex-nowrap",
+                          "inline-flex h-8 shrink-0 items-center justify-center rounded-lg transition-all active:scale-95 flex-nowrap",
                           confirmingDelete
-                            ? "w-14 bg-rose-500 px-2 text-white shadow-sm"
-                            : "w-9 text-muted-foreground hover:bg-rose-500/10 hover:text-rose-500"
+                            ? "w-12 bg-rose-500 px-1 text-white shadow-sm"
+                            : "w-8 text-muted-foreground hover:bg-rose-500/10 hover:text-rose-500"
                         )}
                         title="移除项目"
                       >
-                        {confirmingDelete ? <span className="text-[10px] font-bold whitespace-nowrap">确认</span> : <X size={16} className="shrink-0" />}
+                        {confirmingDelete ? <span className="text-[10px] font-bold whitespace-nowrap">确认</span> : <X size={15} className="shrink-0" />}
                       </button>
                     ) : null}
                   </>
