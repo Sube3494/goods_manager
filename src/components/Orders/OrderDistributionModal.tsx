@@ -183,7 +183,9 @@ function createOrderMarkerDom(order: DistributionOrder, platformTheme: ReturnTyp
       align-items: center;
       gap: 2.5px;
     ">
-      <img src="${platformTheme.icon}" style="width: 13px; height: 13px; object-fit: contain; border-radius: 2px;" alt="" />
+      <span style="display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;background:#ffffff;flex-shrink:0;">
+        <img src="${platformTheme.icon}" style="width: 11px; height: 11px; object-fit: contain;" alt="" />
+      </span>
       ${seqText ? `<span style="font-size: 10px; font-weight: 800; line-height: 1; letter-spacing: -0.2px;">${seqText}</span>` : ""}
     </div>
     <div style="
