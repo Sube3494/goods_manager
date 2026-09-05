@@ -17,6 +17,7 @@ import {
   Minus,
   Crosshair,
   Info,
+  Layers,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CustomSelect } from "@/components/ui/CustomSelect";
@@ -255,6 +256,7 @@ export function OrderDistributionModal({ onClose, initialShopName, localShops, u
   const [selectedOrder, setSelectedOrder] = useState<DistributionOrder | null>(null);
   const [isMobileSummaryOpen, setIsMobileSummaryOpen] = useState<boolean>(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [enableCluster, setEnableCluster] = useState<boolean>(false);
 
   // 提取最佳视野自适应的目标 Markers（优先聚焦订单集群，自动剔除跨省千里的无关异地门店，防止全国大地图）
   const getSmartFitTargets = useCallback((allMarkers: AmapMarkerInstance[]) => {
@@ -529,11 +531,11 @@ export function OrderDistributionModal({ onClose, initialShopName, localShops, u
         const orderMarkers: AmapMarkerInstance[] = [];
         const shopMarkers: AmapMarkerInstance[] = [];
 
-        // 1. 【核心优化】点聚合 (AMap.MarkerCluster) 技术：当有效订单 >= 35 单时，远景智能合并为数量气泡，彻底避免千级 DOM 导致浏览器卡死崩溃
+        // 1. 点聚合 (AMap.MarkerCluster) 技术：当用户主动开启聚合模式时，远景智能合并为数量气泡，彻底避免千级 DOM 导致浏览器卡死崩溃
         const validOrders = orders.filter((o) => typeof o.lng === "number" && typeof o.lat === "number" && o.lng > 0 && o.lat > 0);
         let usedCluster = false;
 
-        if (validOrders.length >= 35) {
+        if (enableCluster && validOrders.length > 0) {
           try {
             await new Promise<void>((resolve) => sdk.plugin(["AMap.MarkerCluster"], resolve));
             if (!isDisposed && sdk.MarkerCluster) {
@@ -821,7 +823,7 @@ export function OrderDistributionModal({ onClose, initialShopName, localShops, u
         }
       }
     };
-  }, [orders, currentShop, availableShops, selectedShop, isDark, getSmartFitTargets]);
+  }, [orders, currentShop, availableShops, selectedShop, isDark, getSmartFitTargets, enableCluster]);
 
   const shopOptions = useMemo(() => {
     return availableShops.map((s) => ({
@@ -1218,10 +1220,10 @@ export function OrderDistributionModal({ onClose, initialShopName, localShops, u
               </div>
             )}
 
-            {orders.length >= 35 && (
+            {enableCluster && (
               <div className="text-[10px] text-primary/90 flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
-                <span>密集区域已启用点聚合，点击数字圆圈可放大展开</span>
+                <span>聚合模式已开启，点击数字气泡可放大展开</span>
               </div>
             )}
 
@@ -1232,6 +1234,21 @@ export function OrderDistributionModal({ onClose, initialShopName, localShops, u
 
           {/* 右侧悬浮地图操作栏：缩放与一键视野聚焦（专为移动端单手操作优化） */}
           <div className="absolute right-3.5 bottom-6 sm:bottom-6 sm:right-5 z-20 flex flex-col items-center gap-2 select-none pointer-events-auto">
+            {/* 聚合 / 散点 模式切换 */}
+            <button
+              type="button"
+              onClick={() => setEnableCluster((v) => !v)}
+              className={cn(
+                "flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-2xl border shadow-lg backdrop-blur-md transition-all active:scale-90 cursor-pointer",
+                enableCluster
+                  ? "border-primary/40 bg-primary text-white hover:bg-primary/90 dark:border-primary/30"
+                  : "border-black/10 bg-white/95 text-foreground hover:bg-black/5 dark:border-white/10 dark:bg-zinc-900/95 dark:hover:bg-white/10"
+              )}
+              title={enableCluster ? "关闭聚合（切换为散点模式）" : "开启聚合（大量标记时不卡顿）"}
+            >
+              <Layers size={18} />
+            </button>
+
             {/* 智能视野自适应聚焦（居中并自适应当前订单） */}
             <button
               type="button"
