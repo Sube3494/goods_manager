@@ -11,10 +11,8 @@ import {
   readShopIdFromRawPayload,
 } from "@/lib/shopCommission";
 import {
-  buildShopDedupeKey,
   normalizeExternalId,
   normalizeShopNameKey,
-  simplifyShopName,
 } from "@/lib/shopIdentity";
 import { normalizeAutoPickIntegrationConfig } from "@/lib/autoPickOrders";
 
@@ -67,7 +65,7 @@ export async function GET(request: NextRequest) {
       where: { id: targetUserId },
       select: { permissions: true, shippingAddresses: true },
     });
-    const permissions = (user?.permissions && typeof user.permissions === "object") ? (user.permissions as any) : {};
+    const permissions = (user?.permissions && typeof user.permissions === "object") ? (user.permissions as Record<string, unknown>) : {};
     const integrationConfig = normalizeAutoPickIntegrationConfig(permissions.autoPickIntegration);
     const mappings = integrationConfig.maiyatianShopMappings || [];
 
@@ -99,8 +97,9 @@ export async function GET(request: NextRequest) {
       shopAddress?: string | null;
       rawPayload?: unknown;
     }) => {
-      const payloadObj = (order.rawPayload && typeof order.rawPayload === "object") ? (order.rawPayload as any) : null;
-      const resolvedShop = payloadObj?.systemMeta?.resolvedShop;
+      const payloadObj = (order.rawPayload && typeof order.rawPayload === "object") ? (order.rawPayload as Record<string, unknown>) : null;
+      const systemMeta = (payloadObj?.systemMeta && typeof payloadObj.systemMeta === "object") ? (payloadObj.systemMeta as Record<string, unknown>) : null;
+      const resolvedShop = (systemMeta?.resolvedShop && typeof systemMeta.resolvedShop === "object") ? (systemMeta.resolvedShop as { name?: string; id?: string }) : null;
 
       // 优先：系统自动/手动匹配识别好的本地门店
       if (resolvedShop?.name && String(resolvedShop.name).trim()) {
@@ -144,6 +143,7 @@ export async function GET(request: NextRequest) {
       id: string;
       name: string;
       address: string;
+      isDefault: boolean;
       orderCount: number;
       locatedOrderCount: number;
       longitude: number | null;
@@ -156,9 +156,11 @@ export async function GET(request: NextRequest) {
     );
     const hasMaiyatianFilter = mappedShopNames.size > 0;
 
-    const rawAddresses = Array.isArray((user as any)?.shippingAddresses) ? ((user as any).shippingAddresses as any[]) : [];
-    for (const addr of rawAddresses) {
-      const label = String(addr?.label || "").trim();
+    const rawAddresses = Array.isArray(user?.shippingAddresses) ? (user?.shippingAddresses as unknown[]) : [];
+    for (const rawAddr of rawAddresses) {
+      const addr = (rawAddr && typeof rawAddr === "object") ? (rawAddr as Record<string, unknown>) : null;
+      if (!addr) continue;
+      const label = String(addr.label || "").trim();
       if (!label || isAddressDisabled(addr)) continue;
       // 有麦芽田映射时只录入白名单门店；无映射时全量录入（兜底）
       if (hasMaiyatianFilter && !mappedShopNames.has(normalizeShopNameKey(label))) continue;
@@ -166,6 +168,7 @@ export async function GET(request: NextRequest) {
         id: String(addr?.id || label),
         name: label,
         address: getAddressDetail(addr),
+        isDefault: Boolean(addr.isDefault),
         orderCount: 0,
         locatedOrderCount: 0,
         longitude: typeof addr?.longitude === "number" ? addr.longitude : null,
@@ -190,6 +193,7 @@ export async function GET(request: NextRequest) {
           id: storeInfo.id,
           name: storeInfo.name,
           address: storeInfo.address,
+          isDefault: false,
           orderCount: 1,
           locatedOrderCount: hasLocation ? 1 : 0,
           longitude: null,
@@ -227,28 +231,34 @@ export async function GET(request: NextRequest) {
     const startDate = String(searchParams.get("startDate") || "").trim();
     const endDate = String(searchParams.get("endDate") || "").trim();
 
-    const isAllShops = !requestedShopName || requestedShopName === "all" || requestedShopName === "全部店铺";
-
-    // 确定当前查看的店铺：支持“全部店铺”全景视图，或指定单店聚焦视图
-    let currentShop = isAllShops
-      ? {
-          id: "all",
-          name: "全部店铺",
-          address: "",
-          longitude: null,
-          latitude: null,
-        }
-      : (availableShops.find((s) => s.name === requestedShopName)
+    // 优先锁定系统地址库中的默认门店（isDefault 为 true），若无标记则默认锁定单量第一的门店
+    const defaultShop = availableShops.find((s) => s.isDefault) || availableShops[0];
+    const currentShop = (requestedShopName && requestedShopName !== "all" && requestedShopName !== "全部店铺")
+      ? (availableShops.find((s) => s.name === requestedShopName)
           || availableShops.find((s) => normalizeShopNameKey(s.name) === normalizeShopNameKey(requestedShopName))
-          || availableShops[0]);
+          || defaultShop)
+      : defaultShop;
 
-    // 4. 构建当前门店的订单匹配逻辑
+    if (!currentShop) {
+      return NextResponse.json({
+        currentShop: null,
+        availableShops: [],
+        orders: [],
+        summary: {
+          totalOrders: 0,
+          totalPaid: 0,
+          avgDistanceKm: 0,
+          platformStats: {},
+        },
+      });
+    }
+
+    // 4. 构建当前单店的订单匹配逻辑
     const doesOrderMatchCurrentShop = (order: {
       shopId?: string | null;
       shopAddress?: string | null;
       rawPayload?: unknown;
     }) => {
-      if (isAllShops) return true;
       const storeInfo = resolveStoreForOrder(order);
       if (storeInfo.name === currentShop.name) return true;
       if (normalizeShopNameKey(storeInfo.name) === normalizeShopNameKey(currentShop.name)) return true;
@@ -381,6 +391,10 @@ export async function GET(request: NextRequest) {
       },
     });
 
+    const MAX_MAP_ORDERS = 800;
+    const isCapped = orders.length > MAX_MAP_ORDERS;
+    const renderableOrders = isCapped ? orders.slice(0, MAX_MAP_ORDERS) : orders;
+
     return NextResponse.json({
       currentShop: {
         id: currentShop.id,
@@ -393,12 +407,13 @@ export async function GET(request: NextRequest) {
         id: s.id,
         name: s.name,
         address: s.address,
+        isDefault: s.isDefault,
         orderCount: s.orderCount,
         locatedOrderCount: s.locatedOrderCount,
         longitude: s.longitude,
         latitude: s.latitude,
       })),
-      orders: orders.map((o) => ({
+      orders: renderableOrders.map((o) => ({
         id: o.id,
         orderNo: o.orderNo,
         seq: o.dailyPlatformSequence,
@@ -420,6 +435,8 @@ export async function GET(request: NextRequest) {
       })),
       summary: {
         totalOrders: orders.length,
+        renderedCount: renderableOrders.length,
+        isCapped,
         totalPaid: totalPaidCents,
         avgDistanceKm,
         platformStats,

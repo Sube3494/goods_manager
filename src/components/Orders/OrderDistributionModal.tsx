@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
 import { useEffect, useRef, useState, useMemo, useCallback } from "react";
@@ -7,20 +8,15 @@ import {
   X,
   RefreshCw,
   Store,
-  Calendar,
-  Layers,
   ShoppingBag,
   Clock,
-  Navigation,
   Loader2,
-  ChevronRight,
   ChevronDown,
   BarChart2,
   Plus,
   Minus,
   Crosshair,
-  Sparkles,
-  ExternalLink,
+  Info,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CustomSelect } from "@/components/ui/CustomSelect";
@@ -58,6 +54,8 @@ interface DistributionSummary {
   totalRealOrders?: number;
   totalBrushOrders?: number;
   orderType?: string;
+  renderedCount?: number;
+  isCapped?: boolean;
 }
 
 interface CurrentShopInfo {
@@ -72,6 +70,7 @@ interface ShopDistributionItem {
   id: string;
   name: string;
   address: string;
+  isDefault?: boolean;
   orderCount?: number;
   locatedOrderCount?: number;
   longitude?: number | null;
@@ -81,7 +80,7 @@ interface ShopDistributionItem {
 interface OrderDistributionModalProps {
   onClose: () => void;
   initialShopName?: string;
-  localShops?: Array<{ id: string; name: string; address?: string }>;
+  localShops?: Array<{ id: string; name: string; address?: string; isDefault?: boolean }>;
   userId?: string | null;
 }
 
@@ -112,28 +111,135 @@ function getPlatformTheme(platform?: string | null) {
   };
 }
 
+interface AmapLngLat {
+  getLng: () => number;
+  getLat: () => number;
+}
+
+interface AmapMarkerInstance {
+  getExtData?: () => unknown;
+  getPosition: () => AmapLngLat | null;
+  setContent?: (content: HTMLElement | string) => void;
+  setOffset?: (offset: unknown) => void;
+  setExtData?: (data: unknown) => void;
+  on: (event: string, handler: () => void) => void;
+}
+
+interface AmapMapInstance {
+  setZoom: (zoom: number) => void;
+  setCenter: (center: [number, number]) => void;
+  setZoomAndCenter: (zoom: number, center: [number, number]) => void;
+  setFitView: (overlays?: unknown[], immediately?: boolean, avoid?: number[], maxZoom?: number) => void;
+  setBounds?: (bounds: unknown, immediately?: boolean, avoid?: number[]) => void;
+  setMapStyle?: (style: string) => void;
+  panTo?: (position: [number, number]) => void;
+  clearMap: () => void;
+  remove: (overlays: unknown[]) => void;
+  add: (overlays: unknown[]) => void;
+  resize: () => void;
+  zoomIn: () => void;
+  zoomOut: () => void;
+  destroy?: () => void;
+}
+
+interface AmapMarkerClusterInstance {
+  setMap: (map: AmapMapInstance | null) => void;
+  setData?: (data: unknown[]) => void;
+  clearMarkers?: () => void;
+}
+
+interface AmapGeocoderResult {
+  geocodes?: Array<{
+    location?: {
+      lng: number;
+      lat: number;
+    };
+  }>;
+}
+
+interface AmapGeocoderInstance {
+  getLocation: (
+    address: string,
+    callback: (status: string, result: AmapGeocoderResult) => void
+  ) => void;
+}
+
+function createOrderMarkerDom(order: DistributionOrder, platformTheme: ReturnType<typeof getPlatformTheme>) {
+  const markerDom = document.createElement("div");
+  markerDom.className = "flex flex-col items-center cursor-pointer transition-transform hover:scale-125 select-none";
+  markerDom.style.zIndex = "100";
+
+  const seqText = order.seq ? `#${order.seq}` : "";
+  markerDom.innerHTML = `
+    <div style="
+      background: ${platformTheme.pinBg};
+      color: #ffffff;
+      padding: 1.5px 5px 1.5px 2px;
+      border-radius: 9999px;
+      border: 1.5px solid #ffffff;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.28);
+      display: inline-flex;
+      align-items: center;
+      gap: 2.5px;
+    ">
+      <img src="${platformTheme.icon}" style="width: 13px; height: 13px; object-fit: contain; border-radius: 2px;" alt="" />
+      ${seqText ? `<span style="font-size: 10px; font-weight: 800; line-height: 1; letter-spacing: -0.2px;">${seqText}</span>` : ""}
+    </div>
+    <div style="
+      width: 0;
+      height: 0;
+      border-left: 4px solid transparent;
+      border-right: 4px solid transparent;
+      border-top: 5px solid ${platformTheme.pinBg};
+      margin-top: -1px;
+    "></div>
+  `;
+  return markerDom;
+}
+
 export function OrderDistributionModal({ onClose, initialShopName, localShops, userId }: OrderDistributionModalProps) {
   const [mounted, setMounted] = useState(false);
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark" || (typeof document !== "undefined" && document.documentElement.classList.contains("dark"));
 
   const mapContainerRef = useRef<HTMLDivElement>(null);
-  const mapInstanceRef = useRef<any>(null);
-  const markersRef = useRef<any[]>([]);
+  const mapInstanceRef = useRef<AmapMapInstance | null>(null);
+  const markersRef = useRef<AmapMarkerInstance[]>([]);
+  const clusterInstanceRef = useRef<AmapMarkerClusterInstance | null>(null);
 
   // 筛选状态：根据订单实际关联的门店动态呈现
   const [availableShops, setAvailableShops] = useState<ShopDistributionItem[]>(() => {
     if (Array.isArray(localShops) && localShops.length > 0) {
-      return localShops.map((s) => ({ id: s.id, name: s.name, address: s.address || "" }));
+      return localShops.map((s) => ({
+        id: s.id,
+        name: s.name,
+        address: s.address || "",
+        isDefault: Boolean(s.isDefault),
+      }));
     }
     return [];
   });
-  const [selectedShop, setSelectedShop] = useState<string>(initialShopName || "all");
+  const [selectedShop, setSelectedShop] = useState<string>(() => {
+    if (initialShopName && initialShopName !== "all" && initialShopName !== "全部店铺") {
+      return initialShopName;
+    }
+    // 优先锁定系统地址库中的默认门店（isDefault 为 true）
+    if (Array.isArray(localShops) && localShops.length > 0) {
+      const defaultShop = localShops.find((s) => s.isDefault);
+      if (defaultShop?.name) {
+        return defaultShop.name;
+      }
+      if (localShops[0]?.name) {
+        return localShops[0].name;
+      }
+    }
+    return "";
+  });
   const [selectedPlatform, setSelectedPlatform] = useState<string>("all");
   const [orderType, setOrderType] = useState<"all" | "real" | "brush">("all");
-  const [datePreset, setDatePreset] = useState<"all" | "today" | "yesterday" | "7d" | "30d" | "custom">("all");
-  const [startDate, setStartDate] = useState<string>("");
-  const [endDate, setEndDate] = useState<string>("");
+  const [datePreset, setDatePreset] = useState<"all" | "today" | "yesterday" | "7d" | "30d" | "custom">("today");
+  const [startDate, setStartDate] = useState<string>(() => formatLocalDate(new Date()));
+  const [endDate, setEndDate] = useState<string>(() => formatLocalDate(new Date()));
 
   // 数据状态
   const [currentShop, setCurrentShop] = useState<CurrentShopInfo | null>(null);
@@ -151,7 +257,7 @@ export function OrderDistributionModal({ onClose, initialShopName, localShops, u
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   // 提取最佳视野自适应的目标 Markers（优先聚焦订单集群，自动剔除跨省千里的无关异地门店，防止全国大地图）
-  const getSmartFitTargets = useCallback((allMarkers: any[]) => {
+  const getSmartFitTargets = useCallback((allMarkers: AmapMarkerInstance[]) => {
     if (!allMarkers || allMarkers.length === 0) return [];
 
     // 区分订单点（带有 extData）与门店点
@@ -213,11 +319,31 @@ export function OrderDistributionModal({ onClose, initialShopName, localShops, u
     const targets = getSmartFitTargets(markersRef.current);
     if (targets && targets.length > 0) {
       map.setFitView(targets, false, fitViewPadding, 15);
+    } else if (orders.length > 0) {
+      let minLng = 180, maxLng = -180, minLat = 90, maxLat = -90;
+      for (const o of orders) {
+        if (o.lng && o.lat) {
+          if (o.lng < minLng) minLng = o.lng;
+          if (o.lng > maxLng) maxLng = o.lng;
+          if (o.lat < minLat) minLat = o.lat;
+          if (o.lat > maxLat) maxLat = o.lat;
+        }
+      }
+      if (currentShop?.longitude && currentShop?.latitude) {
+        minLng = Math.min(minLng, currentShop.longitude);
+        maxLng = Math.max(maxLng, currentShop.longitude);
+        minLat = Math.min(minLat, currentShop.latitude);
+        maxLat = Math.max(maxLat, currentShop.latitude);
+      }
+      if (minLng < maxLng && minLat < maxLat) {
+        map.setCenter([(minLng + maxLng) / 2, (minLat + maxLat) / 2]);
+        map.setZoom(13);
+      }
     } else if (currentShop?.longitude && currentShop?.latitude) {
       map.setCenter([currentShop.longitude, currentShop.latitude]);
       map.setZoom(14);
     }
-  }, [currentShop, getSmartFitTargets]);
+  }, [currentShop, getSmartFitTargets, orders]);
 
   useEffect(() => {
     setMounted(true);
@@ -250,7 +376,7 @@ export function OrderDistributionModal({ onClose, initialShopName, localShops, u
   useEffect(() => {
     if (mapInstanceRef.current) {
       try {
-        mapInstanceRef.current.setMapStyle(isDark ? "amap://styles/dark" : "amap://styles/normal");
+        mapInstanceRef.current.setMapStyle?.(isDark ? "amap://styles/dark" : "amap://styles/normal");
       } catch {
         // 忽略样式切换异常
       }
@@ -307,15 +433,27 @@ export function OrderDistributionModal({ onClose, initialShopName, localShops, u
       const nextShops = Array.isArray(data.availableShops) ? data.availableShops : [];
       setAvailableShops(nextShops);
 
-      if (selectedShop !== "all") {
-        const isSelectedValid = selectedShop && nextShops.some((s: any) => s.name === selectedShop);
-        if (!isSelectedValid) {
-          if (initialShopName && (initialShopName === "all" || nextShops.some((s: any) => s.name === initialShopName))) {
-            setSelectedShop(initialShopName);
+      const isSelectedValid = Boolean(
+        selectedShop &&
+        selectedShop !== "all" &&
+        nextShops.some((s: ShopDistributionItem) => s.name === selectedShop)
+      );
+      if (!isSelectedValid) {
+        if (
+          initialShopName &&
+          initialShopName !== "all" &&
+          initialShopName !== "全部店铺" &&
+          nextShops.some((s: ShopDistributionItem) => s.name === initialShopName)
+        ) {
+          setSelectedShop(initialShopName);
+        } else {
+          const defaultShop = nextShops.find((s: ShopDistributionItem) => s.isDefault);
+          if (defaultShop?.name) {
+            setSelectedShop(defaultShop.name);
+          } else if (data.currentShop?.name) {
+            setSelectedShop(data.currentShop.name);
           } else if (nextShops.length > 0) {
             setSelectedShop(nextShops[0].name);
-          } else {
-            setSelectedShop("all");
           }
         }
       }
@@ -369,8 +507,17 @@ export function OrderDistributionModal({ onClose, initialShopName, localShops, u
         }
 
         const map = mapInstanceRef.current;
+        if (!map) return;
 
-        // 彻底清空地图上的所有历史标记与覆盖物，绝不残留旧标
+        // 彻底清空地图上的所有历史标记与聚合覆盖物，绝不残留旧标
+        if (clusterInstanceRef.current) {
+          try {
+            clusterInstanceRef.current.setMap(null);
+          } catch {
+            // ignore
+          }
+          clusterInstanceRef.current = null;
+        }
         try {
           map.clearMap();
         } catch {
@@ -379,108 +526,117 @@ export function OrderDistributionModal({ onClose, initialShopName, localShops, u
           }
         }
         markersRef.current = [];
-        const orderMarkers: any[] = [];
-        const shopMarkers: any[] = [];
+        const orderMarkers: AmapMarkerInstance[] = [];
+        const shopMarkers: AmapMarkerInstance[] = [];
 
-        // 1. 【第一优先级】优先极速绘制所有订单 Marker（订单自带经纬度，纯内存批量生成，毫秒级呈现，绝不被门店异步网络所阻塞）
-        for (const order of orders) {
-          if (!order.lng || !order.lat) continue;
-          const platformTheme = getPlatformTheme(order.platform);
+        // 1. 【核心优化】点聚合 (AMap.MarkerCluster) 技术：当有效订单 >= 35 单时，远景智能合并为数量气泡，彻底避免千级 DOM 导致浏览器卡死崩溃
+        const validOrders = orders.filter((o) => typeof o.lng === "number" && typeof o.lat === "number" && o.lng > 0 && o.lat > 0);
+        let usedCluster = false;
 
-          const markerDom = document.createElement("div");
-          markerDom.className = "flex flex-col items-center cursor-pointer transition-transform hover:scale-125 select-none";
-          markerDom.style.zIndex = "100";
+        if (validOrders.length >= 35) {
+          try {
+            await new Promise<void>((resolve) => sdk.plugin(["AMap.MarkerCluster"], resolve));
+            if (!isDisposed && sdk.MarkerCluster) {
+              const clusterPoints = validOrders.map((order) => ({
+                lnglat: [order.lng, order.lat] as [number, number],
+                weight: 1,
+                order,
+              }));
 
-          const seqText = order.seq ? `#${order.seq}` : "";
-          markerDom.innerHTML = `
-            <div style="
-              background: ${platformTheme.pinBg};
-              color: #ffffff;
-              padding: 1.5px 5px 1.5px 2px;
-              border-radius: 9999px;
-              border: 1.5px solid #ffffff;
-              box-shadow: 0 2px 8px rgba(0,0,0,0.28);
-              display: inline-flex;
-              align-items: center;
-              gap: 2.5px;
-              line-height: 12px;
-              white-space: nowrap;
-            ">
-              <div style="
-                width: 15px;
-                height: 15px;
-                border-radius: 50%;
-                background: #ffffff;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                overflow: hidden;
-                flex-shrink: 0;
-                box-shadow: 0 1px 2px rgba(0,0,0,0.15);
-              ">
-                <img 
-                  src="${platformTheme.icon}" 
-                  alt="${order.platform}" 
-                  style="width: 12px; height: 12px; object-fit: contain; display: block;" 
-                />
-              </div>
-              ${seqText ? `
-                <span style="
-                  font-size: 10px;
-                  font-weight: 800;
-                  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-                  letter-spacing: -0.2px;
-                ">${seqText}</span>
-              ` : ""}
-            </div>
-            <div style="
-              width: 0; height: 0;
-              border-left: 3.5px solid transparent;
-              border-right: 3.5px solid transparent;
-              border-top: 4.5px solid ${platformTheme.pinBg};
-            "></div>
-          `;
+              const cluster = new sdk.MarkerCluster(map, clusterPoints, {
+                gridSize: 55,
+                maxZoom: 16,
+                renderClusterMarker: (context: { count: number; marker: AmapMarkerInstance }) => {
+                  const count = context.count;
+                  const div = document.createElement("div");
+                  div.className = "amap-cluster-bubble flex items-center justify-center font-bold text-white cursor-pointer select-none transition-transform hover:scale-110 active:scale-95";
+                  let size = 32;
+                  let bg = isDark ? "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)" : "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)";
+                  let ring = isDark ? "rgba(59, 130, 246, 0.45)" : "rgba(37, 99, 235, 0.35)";
+                  if (count >= 100) {
+                    size = 44;
+                    bg = isDark ? "linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)" : "linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%)";
+                    ring = "rgba(124, 58, 237, 0.4)";
+                  } else if (count >= 30) {
+                    size = 38;
+                    bg = isDark ? "linear-gradient(135deg, #0ea5e9 0%, #0369a1 100%)" : "linear-gradient(135deg, #0284c7 0%, #0369a1 100%)";
+                    ring = "rgba(14, 165, 233, 0.4)";
+                  }
+                  div.style.width = `${size}px`;
+                  div.style.height = `${size}px`;
+                  div.style.borderRadius = "9999px";
+                  div.style.background = bg;
+                  div.style.boxShadow = `0 4px 14px ${ring}, inset 0 1px 2px rgba(255,255,255,0.6)`;
+                  div.style.border = "2px solid #ffffff";
+                  div.style.fontSize = count >= 100 ? "13px" : "12px";
+                  div.style.lineHeight = "1";
+                  div.innerHTML = `<span>${count}</span>`;
 
-          const marker = new sdk.Marker({
-            position: [order.lng, order.lat],
-            content: markerDom,
-            offset: new sdk.Pixel(-12, -20),
-            zIndex: 100,
-            extData: order,
-            title: `${order.platform} ${seqText} ${order.isBrush ? "[刷单]" : "[真单]"} - ¥${(order.actualPaid / 100).toFixed(2)}`,
-          });
+                  context.marker.setContent?.(div);
+                  context.marker.setOffset?.(new sdk.Pixel(-size / 2, -size / 2));
+                },
+                renderMarker: (context: { data: Array<{ order: DistributionOrder }>; marker: AmapMarkerInstance }) => {
+                  const order = context.data?.[0]?.order;
+                  if (!order) return;
+                  const platformTheme = getPlatformTheme(order.platform);
+                  const dom = createOrderMarkerDom(order, platformTheme);
+                  context.marker.setContent?.(dom);
+                  context.marker.setOffset?.(new sdk.Pixel(-16, -26));
+                  context.marker.setExtData?.({ id: order.id, orderNo: order.orderNo });
+                  context.marker.on("click", () => {
+                    setSelectedOrder(order);
+                    map.setZoomAndCenter(16, [order.lng, order.lat]);
+                  });
+                },
+              });
 
-          marker.on("click", () => {
-            setSelectedOrder(order);
-            map.panTo([order.lng, order.lat]);
-          });
-
-          orderMarkers.push(marker);
+              clusterInstanceRef.current = cluster;
+              usedCluster = true;
+            }
+          } catch (e) {
+            console.warn("高德点聚合插件加载失败，降级为普通点位渲染:", e);
+          }
         }
 
-        // 2. 绘制门店 Marker（如果是全部店铺模式添加有效门店，若是单店模式添加当前门店）
-        const shopsToRender = (selectedShop === "all" || !selectedShop)
-          ? availableShops
-          : (currentShop && currentShop.id !== "all" ? [currentShop] : []);
+        // 降级 / 少量订单：若未启用聚合，则直接批量生成独立 Marker
+        if (!usedCluster) {
+          for (const order of validOrders) {
+            const platformTheme = getPlatformTheme(order.platform);
+            const markerDom = createOrderMarkerDom(order, platformTheme);
+            const marker = new sdk.Marker({
+              position: [order.lng, order.lat],
+              content: markerDom,
+              offset: new sdk.Pixel(-16, -26),
+              zIndex: 100,
+              extData: { id: order.id, orderNo: order.orderNo },
+              title: `${order.platform}订单 #${order.seq || ""} (${order.orderNo})`,
+            });
+            marker.on("click", () => {
+              setSelectedOrder(order);
+              map.setZoomAndCenter(16, [order.lng, order.lat]);
+            });
+            orderMarkers.push(marker);
+          }
+        }
 
-        const labelBg = isDark 
-          ? "linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%)" 
-          : "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)";
-        const labelColor = "#ffffff";
-        const labelBorder = isDark 
-          ? "rgba(255, 255, 255, 0.22)" 
-          : "rgba(255, 255, 255, 0.32)";
-        const labelDot = "#93c5fd";
+        // 2. 绘制当前选中的单家门店 Marker（仅 1 家门店，毫秒级轻量响应）
+        const shopsToRender = currentShop?.name ? [currentShop] : [];
+
+        // 统一门店标高对比配色体系：蓝白质感水滴图钉 + 精致半透明气泡文字
+        const labelBg = isDark ? "rgba(15, 23, 42, 0.92)" : "rgba(255, 255, 255, 0.96)";
+        const labelColor = isDark ? "#f8fafc" : "#0f172a";
+        const labelBorder = isDark ? "rgba(59, 130, 246, 0.4)" : "rgba(37, 99, 235, 0.25)";
         const labelShadow = isDark 
-          ? "0 6px 18px rgba(30, 58, 138, 0.5), 0 2px 6px rgba(0, 0, 0, 0.4)" 
-          : "0 6px 16px rgba(37, 99, 235, 0.35), 0 2px 4px rgba(0, 0, 0, 0.12)";
+          ? "0 4px 14px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.08)" 
+          : "0 4px 14px rgba(37, 99, 235, 0.18), 0 1px 3px rgba(0,0,0,0.06)";
+        const labelDot = isDark ? "#60a5fa" : "#2563eb";
         const pinDropShadow = isDark 
           ? "drop-shadow(0 4px 12px rgba(30, 58, 138, 0.6))" 
           : "drop-shadow(0 4px 10px rgba(37, 99, 235, 0.35))";
         const pinInnerDot = isDark ? "#1e3a8a" : "#1d4ed8";
 
         // 并发解析门店坐标（带快速超时保护，绝不阻塞整体渲染）
-        let geocoderInstance: any = null;
+        let geocoderInstance: AmapGeocoderInstance | null = null;
         if (shopsToRender.some((s) => !s.longitude || !s.latitude)) {
           try {
             await new Promise<void>((resolve) => sdk.plugin(["AMap.Geocoder"], resolve));
@@ -504,7 +660,7 @@ export function OrderDistributionModal({ onClose, initialShopName, localShops, u
             try {
               shopCoord = await Promise.race([
                 new Promise<[number, number] | null>((resolve) => {
-                  geocoderInstance.getLocation(shopItem.address, (status: string, result: any) => {
+                  geocoderInstance?.getLocation(shopItem.address, (status: string, result: AmapGeocoderResult) => {
                     const loc = result?.geocodes?.[0]?.location;
                     if (status === "complete" && loc) {
                       resolve([loc.lng, loc.lat]);
@@ -521,6 +677,7 @@ export function OrderDistributionModal({ onClose, initialShopName, localShops, u
           }
 
           if (shopCoord && !isDisposed) {
+            const finalCoord = shopCoord;
             const shopDom = document.createElement("div");
             shopDom.className = "group relative flex flex-col items-center cursor-pointer select-none transition-transform hover:scale-110";
             shopDom.style.zIndex = "300";
@@ -557,7 +714,7 @@ export function OrderDistributionModal({ onClose, initialShopName, localShops, u
               </svg>
             `;
             const shopMarker = new sdk.Marker({
-              position: shopCoord,
+              position: finalCoord,
               content: shopDom,
               offset: new sdk.Pixel(-11, -28),
               zIndex: 300,
@@ -568,7 +725,7 @@ export function OrderDistributionModal({ onClose, initialShopName, localShops, u
               if (selectedShop === "all") {
                 setSelectedShop(shopItem.name);
               }
-              map.setZoomAndCenter(14, shopCoord);
+              map.setZoomAndCenter(14, finalCoord);
             });
 
             shopMarkers.push(shopMarker);
@@ -601,6 +758,30 @@ export function OrderDistributionModal({ onClose, initialShopName, localShops, u
               }
             }
           }, 200);
+        } else if (validOrders.length > 0) {
+          // 聚合模式下 orderMarkers 由 cluster 管理，通过有效坐标范围自适应
+          let minLng = 180, maxLng = -180, minLat = 90, maxLat = -90;
+          for (const o of validOrders) {
+            if (o.lng < minLng) minLng = o.lng;
+            if (o.lng > maxLng) maxLng = o.lng;
+            if (o.lat < minLat) minLat = o.lat;
+            if (o.lat > maxLat) maxLat = o.lat;
+          }
+          if (currentShop?.longitude && currentShop?.latitude) {
+            minLng = Math.min(minLng, currentShop.longitude);
+            maxLng = Math.max(maxLng, currentShop.longitude);
+            minLat = Math.min(minLat, currentShop.latitude);
+            maxLat = Math.max(maxLat, currentShop.latitude);
+          }
+          if (minLng < maxLng && minLat < maxLat) {
+            try {
+              const bounds = new sdk.Bounds([minLng, minLat], [maxLng, maxLat]);
+              map.setBounds?.(bounds, false, fitViewPadding);
+            } catch {
+              map.setCenter([(minLng + maxLng) / 2, (minLat + maxLat) / 2]);
+              map.setZoom(13);
+            }
+          }
         } else if (currentShop?.longitude && currentShop?.latitude) {
           map.setCenter([currentShop.longitude, currentShop.latitude]);
           map.setZoom(14);
@@ -624,6 +805,14 @@ export function OrderDistributionModal({ onClose, initialShopName, localShops, u
 
     return () => {
       isDisposed = true;
+      if (clusterInstanceRef.current) {
+        try {
+          clusterInstanceRef.current.setMap(null);
+        } catch {
+          // ignore
+        }
+        clusterInstanceRef.current = null;
+      }
       if (mapInstanceRef.current) {
         try {
           mapInstanceRef.current.clearMap();
@@ -632,15 +821,13 @@ export function OrderDistributionModal({ onClose, initialShopName, localShops, u
         }
       }
     };
-  }, [orders, currentShop, availableShops, selectedShop, isDark]);
+  }, [orders, currentShop, availableShops, selectedShop, isDark, getSmartFitTargets]);
 
   const shopOptions = useMemo(() => {
-    const totalAllOrders = availableShops.reduce((sum, s) => sum + (s.orderCount || 0), 0);
-    const options = availableShops.map((s) => ({
+    return availableShops.map((s) => ({
       value: s.name,
-      label: typeof s.orderCount === "number" ? `${s.name} (${s.orderCount}单)` : s.name,
+      label: `${s.name}${s.isDefault ? "（默认）" : ""}${typeof s.orderCount === "number" ? ` (${s.orderCount}单)` : ""}`,
     }));
-    return [{ value: "all", label: `全部店铺 (共${totalAllOrders}单)` }, ...options];
   }, [availableShops]);
 
   const platformOptions = useMemo(() => [
@@ -677,8 +864,8 @@ export function OrderDistributionModal({ onClose, initialShopName, localShops, u
                   <h2 className="text-sm sm:text-base lg:text-lg font-bold text-foreground whitespace-nowrap">
                     订单地点分布
                   </h2>
-                  <span className="rounded-full border border-black/10 bg-black/4 px-1.5 py-0.5 text-[10px] sm:text-[11px] font-semibold text-muted-foreground dark:border-white/10 dark:bg-white/5 whitespace-nowrap">
-                    {selectedShop === "all" ? "全景" : "单店"}
+                  <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[10px] sm:text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
+                    单店分布
                   </span>
                 </div>
                 <p className="text-xs text-muted-foreground whitespace-nowrap hidden 2xl:block">
@@ -922,9 +1109,7 @@ export function OrderDistributionModal({ onClose, initialShopName, localShops, u
           {!isLoading && !error && availableShops.length > 0 && orders.length === 0 && (
             <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 rounded-xl border border-black/8 bg-white/90 px-4 py-2.5 text-xs font-medium text-muted-foreground shadow-md backdrop-blur-md dark:border-white/10 dark:bg-zinc-900/90">
               <MapPin size={14} className="text-muted-foreground" />
-              {selectedShop === "all"
-                ? `当前筛选条件下暂无有效定位${orderType === "real" ? "真单" : orderType === "brush" ? "刷单" : "订单"}`
-                : `当前门店【${currentShop?.name || selectedShop}】在所选筛选条件下暂无有效定位${orderType === "real" ? "真单" : orderType === "brush" ? "刷单" : "订单"}`}
+              {`当前门店【${currentShop?.name || selectedShop || "所选店铺"}】在所选筛选条件下暂无有效定位${orderType === "real" ? "真单" : orderType === "brush" ? "刷单" : "订单"}`}
             </div>
           )}
 
@@ -954,7 +1139,7 @@ export function OrderDistributionModal({ onClose, initialShopName, localShops, u
             <div className="flex items-center justify-between gap-2 border-b border-black/6 pb-2 dark:border-white/6">
               <div className="flex items-center gap-2 text-xs font-semibold text-foreground min-w-0">
                 <Store size={14} className="text-primary shrink-0" />
-                <span className="truncate">{selectedShop === "all" ? `全部店铺 (${availableShops.length}家门店)` : (currentShop?.name || "未选择店铺")}</span>
+                <span className="truncate">{currentShop?.name || selectedShop || "请选择店铺"}</span>
               </div>
               {/* 移动端收起按钮 */}
               <button
@@ -966,7 +1151,7 @@ export function OrderDistributionModal({ onClose, initialShopName, localShops, u
                 <X size={14} />
               </button>
             </div>
-            {selectedShop !== "all" && currentShop?.address && (
+            {currentShop?.address && (
               <p className="text-[11px] text-muted-foreground leading-relaxed line-clamp-2" title={currentShop.address}>
                 {currentShop.address}
               </p>
@@ -1026,8 +1211,22 @@ export function OrderDistributionModal({ onClose, initialShopName, localShops, u
               </div>
             </div>
 
-            <p className="text-[10px] text-muted-foreground/80 mt-1">
-              💡 提示：点击地图图钉可查看订单详情
+            {summary.isCapped && (
+              <div className="flex items-center gap-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 px-2 py-1 text-[10px] text-amber-600 dark:text-amber-400">
+                <Info size={12} className="shrink-0" />
+                <span>当前时段共 {summary.totalOrders} 笔订单，已聚合呈现最新 {summary.renderedCount || orders.length} 笔点位</span>
+              </div>
+            )}
+
+            {orders.length >= 35 && (
+              <div className="text-[10px] text-primary/90 flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
+                <span>密集区域已启用点聚合，点击数字圆圈可放大展开</span>
+              </div>
+            )}
+
+            <p className="text-[10px] text-muted-foreground/80 mt-0.5">
+              提示：点击地图图钉可查看订单详情
             </p>
           </div>
 
@@ -1100,7 +1299,7 @@ export function OrderDistributionModal({ onClose, initialShopName, localShops, u
                         {selectedOrder.isBrush ? "刷单" : "真单"}
                       </span>
                     )}
-                    <span className="text-xs text-muted-foreground truncate max-w-[140px]" title={selectedOrder.orderNo}>
+                    <span className="text-xs text-muted-foreground truncate max-w-35" title={selectedOrder.orderNo}>
                       {selectedOrder.orderNo}
                     </span>
                   </div>
