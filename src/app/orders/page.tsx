@@ -1052,17 +1052,31 @@ function BrushSyncPickerModal({
   }, [initialCommission]);
   const [query, setQuery] = useState("");
   const [selectedPlatform, setSelectedPlatform] = useState("all");
+  const [selectedShop, setSelectedShop] = useState("all");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const platformOptions = useMemo(
     () => [
       { value: "all", label: "全部平台" },
-      ...Array.from(new Set(orders.map((order) => normalizeDisplayPlatform(order.platform))))
+      ...Array.from(new Set(orders.map((order) => normalizeDisplayPlatform(order.platform)).filter(Boolean)))
         .sort((a, b) => a.localeCompare(b, "zh-CN"))
         .map((item) => ({ value: item, label: item })),
     ],
     [orders]
   );
+  const shopOptions = useMemo(() => {
+    const shopSet = new Set<string>();
+    for (const o of orders) {
+      const name = String(o.matchedShopName || o.rawShopName || "").trim();
+      if (name) shopSet.add(name);
+    }
+    return [
+      { value: "all", label: "全部店铺" },
+      ...Array.from(shopSet)
+        .sort((a, b) => a.localeCompare(b, "zh-CN"))
+        .map((name) => ({ value: name, label: name })),
+    ];
+  }, [orders]);
   const filteredOrders = useMemo(() => {
     const keyword = query.trim().toLowerCase();
     return orders.filter((order) => {
@@ -1070,12 +1084,21 @@ function BrushSyncPickerModal({
         return false;
       }
 
-      const orderDate = getFilterDateValue(order.orderTime);
-      if (startDate && (!orderDate || orderDate < startDate)) {
-        return false;
+      if (selectedShop !== "all") {
+        const shopName = String(order.matchedShopName || order.rawShopName || "").trim();
+        if (shopName !== selectedShop) {
+          return false;
+        }
       }
-      if (endDate && (!orderDate || orderDate > endDate)) {
-        return false;
+
+      if (scope === "all") {
+        const orderDate = getFilterDateValue(order.orderTime);
+        if (startDate && (!orderDate || orderDate < startDate)) {
+          return false;
+        }
+        if (endDate && (!orderDate || orderDate > endDate)) {
+          return false;
+        }
       }
 
       if (!keyword) {
@@ -1087,12 +1110,14 @@ function BrushSyncPickerModal({
         order.orderNo,
         order.platform || "",
         order.matchedShopName || "",
+        order.rawShopName || "",
+        order.shopAddress || "",
         order.userAddress || "",
         ...order.items.map((item) => `${item.productName} ${item.productNo || ""}`),
       ];
       return haystacks.some((item) => item.toLowerCase().includes(keyword));
     });
-  }, [endDate, orders, query, selectedPlatform, startDate]);
+  }, [endDate, orders, query, scope, selectedPlatform, selectedShop, startDate]);
   const selectedCount = selectedIds.length;
   const visibleIds = filteredOrders.map((order) => order.id);
   const allVisibleSelected = filteredOrders.length > 0 && filteredOrders.every((order) => selectedIds.includes(order.id));
@@ -1158,34 +1183,46 @@ function BrushSyncPickerModal({
             </button>
           </div>
 
-          {scope === "all" ? (
-            <div className="mt-2.5 grid gap-2.5 sm:grid-cols-3 sm:gap-3">
-              <CustomSelect
-                value={selectedPlatform}
-                onChange={setSelectedPlatform}
-                options={platformOptions}
-                className="h-11"
-                triggerClassName="h-full rounded-xl border border-black/8 bg-white px-4 text-sm shadow-none dark:border-white/10 dark:bg-white/3"
-              />
-              <DatePicker
-                value={startDate}
-                onChange={setStartDate}
-                placeholder="开始日期"
-                maxDate={endDate || todayDate}
-                className="h-11 w-full"
-                triggerClassName="h-full rounded-xl border border-black/8 bg-white px-4 text-sm shadow-none dark:border-white/10 dark:bg-white/3"
-              />
-              <DatePicker
-                value={endDate}
-                onChange={setEndDate}
-                placeholder="结束日期"
-                minDate={startDate || undefined}
-                maxDate={todayDate}
-                className="h-11 w-full"
-                triggerClassName="h-full rounded-xl border border-black/8 bg-white px-4 text-sm shadow-none dark:border-white/10 dark:bg-white/3"
-              />
-            </div>
-          ) : null}
+          <div className={cn(
+            "mt-2.5 grid gap-2.5 sm:gap-3",
+            scope === "all" ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-2"
+          )}>
+            <CustomSelect
+              value={selectedPlatform}
+              onChange={setSelectedPlatform}
+              options={platformOptions}
+              className="h-10 sm:h-11"
+              triggerClassName="h-full rounded-xl border border-black/8 bg-white px-3 sm:px-4 text-xs sm:text-sm shadow-none dark:border-white/10 dark:bg-white/3"
+            />
+            <CustomSelect
+              value={selectedShop}
+              onChange={setSelectedShop}
+              options={shopOptions}
+              className="h-10 sm:h-11"
+              triggerClassName="h-full rounded-xl border border-black/8 bg-white px-3 sm:px-4 text-xs sm:text-sm shadow-none dark:border-white/10 dark:bg-white/3"
+            />
+            {scope === "all" ? (
+              <>
+                <DatePicker
+                  value={startDate}
+                  onChange={setStartDate}
+                  placeholder="开始日期"
+                  maxDate={endDate || todayDate}
+                  className="h-10 sm:h-11 w-full"
+                  triggerClassName="h-full rounded-xl border border-black/8 bg-white px-3 sm:px-4 text-xs sm:text-sm shadow-none dark:border-white/10 dark:bg-white/3"
+                />
+                <DatePicker
+                  value={endDate}
+                  onChange={setEndDate}
+                  placeholder="结束日期"
+                  minDate={startDate || undefined}
+                  maxDate={todayDate}
+                  className="h-10 sm:h-11 w-full"
+                  triggerClassName="h-full rounded-xl border border-black/8 bg-white px-3 sm:px-4 text-xs sm:text-sm shadow-none dark:border-white/10 dark:bg-white/3"
+                />
+              </>
+            ) : null}
+          </div>
 
           <div className="mt-3 rounded-2xl border border-black/8 bg-black/2 px-3.5 py-3 text-sm dark:border-white/10 dark:bg-white/3 sm:px-4">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
