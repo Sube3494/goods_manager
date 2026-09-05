@@ -834,15 +834,17 @@ export function OrderDistributionModal({ onClose, initialShopName, localShops, u
     }));
   }, [availableShops]);
 
-  const platformOptions = useMemo(() => [
-    { value: "all", label: "全部平台" },
-    { value: "美团", label: "美团" },
-    { value: "饿了么", label: "饿了么" },
-    { value: "京东", label: "京东" },
-    { value: "淘宝", label: "淘宝" },
-    { value: "抖店", label: "抖店" },
-    { value: "线下交易", label: "线下交易" },
-  ], []);
+  const platformOptions = useMemo(() => {
+    const base: { value: string; label: string }[] = [{ value: "all", label: "全部平台" }];
+    const stats = summary.platformStats || {};
+    const platforms = Object.keys(stats);
+    // 按订单数量降序排列
+    platforms.sort((a, b) => (stats[b]?.count || 0) - (stats[a]?.count || 0));
+    for (const plat of platforms) {
+      base.push({ value: plat, label: `${plat} (${stats[plat]?.count || 0})` });
+    }
+    return base;
+  }, [summary.platformStats]);
 
   if (!mounted) return null;
 
