@@ -1241,7 +1241,7 @@ export function OrderDistributionModal({ onClose, initialShopName, localShops, u
               className={cn(
                 "flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-2xl border shadow-lg backdrop-blur-md transition-all active:scale-90 cursor-pointer",
                 enableCluster
-                  ? "border-primary/40 bg-primary text-white hover:bg-primary/90 dark:border-primary/30"
+                  ? "border-blue-500 bg-blue-600 text-white hover:bg-blue-700 shadow-blue-500/30"
                   : "border-black/10 bg-white/95 text-foreground hover:bg-black/5 dark:border-white/10 dark:bg-zinc-900/95 dark:hover:bg-white/10"
               )}
               title={enableCluster ? "关闭聚合（切换为散点模式）" : "开启聚合（大量标记时不卡顿）"}
