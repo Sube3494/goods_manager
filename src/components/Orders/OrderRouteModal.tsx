@@ -102,8 +102,30 @@ export function OrderRouteModal({ order, onClose }: { order: AutoPickOrder; onCl
           for (const [label, point, color] of [["骑手", trail?.dispatcher, "#f97316"], ["门店", trail?.sender, "#2563eb"], ["顾客", trail?.receiver, "#059669"]] as const) {
             if (!point) continue;
             const content = document.createElement("div");
-            content.textContent = label === "骑手" ? "骑手在这里" : label;
-            content.style.cssText = `background:${color};color:#fff;border:3px solid white;border-radius:18px;padding:8px 14px;font-size:14px;font-weight:700;white-space:nowrap;box-shadow:0 3px 12px #0004;`;
+            content.style.cssText = "display:flex;flex-direction:column;align-items:center;width:44px;filter:drop-shadow(0 3px 5px #0004);";
+            const caption = document.createElement("div");
+            caption.textContent = label === "骑手" ? "骑手在这里" : label;
+            caption.style.cssText = `background:${color};color:#fff;border:2px solid white;border-radius:10px;padding:5px 10px;font-size:13px;font-weight:700;white-space:nowrap;margin-bottom:3px;`;
+            const svgNamespace = "http://www.w3.org/2000/svg";
+            const pin = document.createElementNS(svgNamespace, "svg");
+            pin.setAttribute("width", "44");
+            pin.setAttribute("height", "54");
+            pin.setAttribute("viewBox", "0 0 44 54");
+            pin.setAttribute("aria-hidden", "true");
+            pin.style.display = "block";
+            const shape = document.createElementNS(svgNamespace, "path");
+            shape.setAttribute("d", "M22 52C18 46 3 31 3 22a19 19 0 1 1 38 0c0 9-15 24-19 30Z");
+            shape.setAttribute("fill", color);
+            shape.setAttribute("stroke", "white");
+            shape.setAttribute("stroke-width", "2");
+            shape.setAttribute("stroke-linejoin", "round");
+            const center = document.createElementNS(svgNamespace, "circle");
+            center.setAttribute("cx", "22");
+            center.setAttribute("cy", "22");
+            center.setAttribute("r", "7");
+            center.setAttribute("fill", "white");
+            pin.append(shape, center);
+            content.append(caption, pin);
             map!.add(new sdk.Marker({ position: [point.lng, point.lat], title: label, content, anchor: "bottom-center", zIndex: label === "骑手" ? 200 : 100 }));
           }
           map!.setFitView();
