@@ -568,18 +568,24 @@ export function OrderRouteModal({ order, onClose }: { order: AutoPickOrder; onCl
             });
             map.add(riderMarker);
             addedMarkers.push(riderMarker);
-
-            // 气泡文本：严格依据取货阶段，未取货时显示“骑手距离门店”，送货中显示“骑手距离顾客”
             const displayDistance = primaryDistanceValue
               || (phaseInfo.phase === "delivering" && customerCoord
                 ? formatMeters(calculateDistanceMeters({ lng: riderLng, lat: riderLat }, customerCoord))
                 : (hasShop ? formatMeters(calculateDistanceMeters({ lng: riderLng, lat: riderLat }, { lng: finalShopLng, lat: finalShopLat })) : ""));
 
-            const bubbleText = phaseInfo.phase === "delivering"
-              ? `骑手距离顾客：${displayDistance || "计算中…"}`
-              : (phaseInfo.phase === "arrived_shop"
-                ? (displayDistance ? `骑手已到店 · 距门店 ${displayDistance}` : `骑手已到店`)
-                : `骑手距离门店：${displayDistance || "计算中…"}`);
+            // 气泡文本：严格依据配送阶段呈现，严禁滑稽拼接
+            let bubbleText = "";
+            if (phaseInfo.phase === "delivered") {
+              bubbleText = "订单已送达";
+            } else if (phaseInfo.phase === "delivering") {
+              bubbleText = `骑手距离顾客：${displayDistance || "计算中…"}`;
+            } else if (phaseInfo.phase === "arrived_shop") {
+              bubbleText = displayDistance && displayDistance !== "已到店" ? `骑手已到店 · 距门店 ${displayDistance}` : "骑手已到店";
+            } else if (phaseInfo.phase === "assigned") {
+              bubbleText = `骑手距离门店：${displayDistance || "计算中…"}`;
+            } else {
+              bubbleText = `门店距收货地址：${displayDistance || "计算中…"}`;
+            }
 
             const bubbleMarker = new sdk.Marker({
               position: [riderLng, riderLat],
@@ -591,9 +597,12 @@ export function OrderRouteModal({ order, onClose }: { order: AutoPickOrder; onCl
             map.add(bubbleMarker);
             addedMarkers.push(bubbleMarker);
           } else if (customerCoord && primaryDistanceValue) {
+            const bubbleText = phaseInfo.phase === "delivered"
+              ? "订单已送达"
+              : `门店距收货地址：${shopToCustomerDistance || primaryDistanceValue}`;
             const bubbleMarker = new sdk.Marker({
               position: [customerCoord.lng, customerCoord.lat],
-              content: createDistanceBubbleElement(`门店距收货地址：${shopToCustomerDistance || primaryDistanceValue}`, isDark),
+              content: createDistanceBubbleElement(bubbleText, isDark),
               anchor: "bottom-center",
               offset: new sdk.Pixel(0, -72),
               zIndex: 170,
@@ -724,7 +733,7 @@ export function OrderRouteModal({ order, onClose }: { order: AutoPickOrder; onCl
               {riderAssigned && primaryDistanceValue && (
                 <div className="flex items-center justify-between pt-1 border-t border-border/40 text-[11px]">
                   <span>{phaseInfo.distanceLabel}</span>
-                  <span className={`font-semibold ${phaseInfo.phase === "delivering" ? "text-emerald-500" : "text-orange-500"}`}>
+                  <span className={`font-semibold ${phaseInfo.phase === "delivering" ? "text-emerald-500" : (phaseInfo.phase === "delivered" ? "text-blue-500" : "text-orange-500")}`}>
                     {primaryDistanceValue}
                   </span>
                 </div>
