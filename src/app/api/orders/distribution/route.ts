@@ -62,10 +62,10 @@ export async function GET(request: NextRequest) {
       || hasPermission(session, "order:manage");
     const targetUserId = (canManageMembers && requestedUserId) ? requestedUserId : session.id;
 
-    // 1. 读取麦芽田映射配置（用于将第三方原始外卖店名/ID 映射到本地业务门店）
+    // 1. 读取麦芽田映射配置 + 个人资料地址库（门店来源）
     const user = await prisma.user.findUnique({
       where: { id: targetUserId },
-      select: { permissions: true },
+      select: { permissions: true, shippingAddresses: true },
     });
     const permissions = (user?.permissions && typeof user.permissions === "object") ? (user.permissions as any) : {};
     const integrationConfig = normalizeAutoPickIntegrationConfig(permissions.autoPickIntegration);
@@ -139,7 +139,7 @@ export async function GET(request: NextRequest) {
       };
     };
 
-    // 3. 动态聚合所有产生过订单的门店，并融合用户的配置门店（如苏白、遵义店、zunyi），做到与主页面店铺选项100%对齐
+    // 3. 用个人资料地址库初始化 shopMap（只录入麦芽田有映射的门店）
     const shopMap = new Map<string, {
       id: string;
       name: string;
@@ -150,50 +150,27 @@ export async function GET(request: NextRequest) {
       latitude: number | null;
     }>();
 
-    // 先录入用户在系统 Shop 表中维护的店铺（仅限麦芽田映射中有对应 localShopName 的门店）
     const mappedShopNames = new Set(
       mappings.map((m: { localShopName?: string }) => normalizeShopNameKey(String(m.localShopName || "").trim()))
         .filter(Boolean)
     );
     const hasMaiyatianFilter = mappedShopNames.size > 0;
 
-    const userDbShops = await prisma.shop.findMany({
-      where: { userId: targetUserId },
-      select: { id: true, name: true, address: true, longitude: true, latitude: true },
-    });
-    for (const s of userDbShops) {
-      if (!s.name) continue;
-      // 只录入有麦芽田映射的门店；若用户没有配置任何映射则不过滤（兜底全量）
-      if (hasMaiyatianFilter && !mappedShopNames.has(normalizeShopNameKey(s.name))) continue;
-      shopMap.set(s.name, {
-        id: s.id,
-        name: s.name,
-        address: s.address || "",
-        orderCount: 0,
-        locatedOrderCount: 0,
-        longitude: s.longitude || null,
-        latitude: s.latitude || null,
-      });
-    }
-
-    // 录入用户个人资料地址库中的门店（仅限麦芽田映射中有对应 localShopName 的门店）
     const rawAddresses = Array.isArray((user as any)?.shippingAddresses) ? ((user as any).shippingAddresses as any[]) : [];
     for (const addr of rawAddresses) {
       const label = String(addr?.label || "").trim();
       if (!label || isAddressDisabled(addr)) continue;
+      // 有麦芽田映射时只录入白名单门店；无映射时全量录入（兜底）
       if (hasMaiyatianFilter && !mappedShopNames.has(normalizeShopNameKey(label))) continue;
-      const existing = shopMap.get(label) || Array.from(shopMap.values()).find((v) => normalizeShopNameKey(v.name) === normalizeShopNameKey(label));
-      if (!existing) {
-        shopMap.set(label, {
-          id: String(addr?.id || label),
-          name: label,
-          address: getAddressDetail(addr),
-          orderCount: 0,
-          locatedOrderCount: 0,
-          longitude: typeof addr?.longitude === "number" ? addr.longitude : null,
-          latitude: typeof addr?.latitude === "number" ? addr.latitude : null,
-        });
-      }
+      shopMap.set(label, {
+        id: String(addr?.id || label),
+        name: label,
+        address: getAddressDetail(addr),
+        orderCount: 0,
+        locatedOrderCount: 0,
+        longitude: typeof addr?.longitude === "number" ? addr.longitude : null,
+        latitude: typeof addr?.latitude === "number" ? addr.latitude : null,
+      });
     }
 
 
