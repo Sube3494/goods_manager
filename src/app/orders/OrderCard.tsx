@@ -2,6 +2,7 @@
 
 import { Component, memo, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
+import dynamic from "next/dynamic";
 import {
   Check,
   CheckCheck,
@@ -37,6 +38,8 @@ import {
   isAutoPickOrderTerminalStatus,
 } from "@/lib/autoPickOrderStatus";
 import { formatLocalDate, formatLocalDateTime } from "@/lib/dateUtils";
+
+const OrderRouteModal = dynamic(() => import("@/components/Orders/OrderRouteModal").then((module) => module.OrderRouteModal), { ssr: false });
 
 export function createDefaultSelfDeliveryTiming() {
   return {
@@ -2295,6 +2298,7 @@ export const OrderCard = memo(function OrderCard({
   const deliveryFee = getDeliveryFee(order.delivery);
   const hasDeliveryAddress = Boolean(String(order.userAddress || "").trim());
   const isPureOffline = isPureManualOfflineOrder(order);
+  const [routeOpen, setRouteOpen] = useState(false);
   const displayAsOfflineOrder = isPureOffline;
   const pickup = Boolean(order.isPickup) || (displayAsOfflineOrder && deliveryFee <= 0 && !hasDeliveryAddress);
   const showManualDeliveryMarker = displayAsOfflineOrder && !pickup;
@@ -2484,6 +2488,7 @@ export const OrderCard = memo(function OrderCard({
 
   return (
     <>
+      {routeOpen && <OrderRouteModal order={order} onClose={() => setRouteOpen(false)} />}
       <article className="overflow-visible rounded-[26px] border border-black/8 bg-white/78 shadow-xs transition-all hover:border-black/12 dark:border-white/10 dark:bg-white/4 sm:rounded-[30px]">
         <div className="border-b border-black/6 px-3.5 py-3.5 dark:border-white/6 sm:px-5 sm:py-4">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between sm:gap-4">
@@ -2822,8 +2827,10 @@ export const OrderCard = memo(function OrderCard({
                     {formatLocalDateTime(order.orderTime)}
                   </span>
                   <span className="inline-flex items-center gap-1.5 max-w-[280px] md:max-w-[420px] lg:max-w-[560px] min-w-0 leading-[18px]">
+                    <button type="button" disabled={pickup} onClick={() => setRouteOpen(true)} title="查看地点到店铺的路线" aria-label="查看地点到店铺的路线" className="inline-flex shrink-0 items-center gap-1.5 rounded enabled:cursor-pointer enabled:hover:text-primary focus-visible:outline-2 focus-visible:outline-primary">
                     <MapPin size={13} className="shrink-0 text-slate-400 dark:text-zinc-500" />
                     <span className="truncate shrink-0">{pickup ? "-" : (order.distanceKm != null ? formatDistanceKm(order.distanceKm) : "距离待同步")}</span>
+                    </button>
                     {!pickup && order.userAddress ? (
                       <>
                         <span className="mx-1 text-slate-300 dark:text-zinc-700 font-normal shrink-0">·</span>
@@ -2863,10 +2870,10 @@ export const OrderCard = memo(function OrderCard({
                         <Clock3 size={12} className="shrink-0 text-slate-400 dark:text-zinc-500" />
                         <span>{formatLocalDateTime(order.orderTime)}</span>
                       </span>
-                      <span className="flex items-center gap-1.5">
+                      <button type="button" onClick={() => setRouteOpen(true)} title="查看地点到店铺的路线" aria-label="查看地点到店铺的路线" className="flex cursor-pointer items-center gap-1.5 rounded hover:text-primary focus-visible:outline-2 focus-visible:outline-primary">
                         <MapPin size={12} className="shrink-0 text-slate-400 dark:text-zinc-500" />
                         <span>{order.distanceKm != null ? formatDistanceKm(order.distanceKm) : "距离待同步"}</span>
-                      </span>
+                      </button>
                     </div>
                     
                     <div className="flex items-center justify-between border-t border-black/6 pt-2 dark:border-white/8">

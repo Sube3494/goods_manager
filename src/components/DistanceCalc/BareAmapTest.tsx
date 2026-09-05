@@ -34,6 +34,10 @@ export function loadBareAmap(key: string, securityCode: string) {
     script.onload = () => resolve(window.AMap);
     script.onerror = () => reject(new Error("AMap script load failed"));
     document.head.appendChild(script);
+  }).catch((error) => {
+    document.querySelector('script[data-bare-amap="1"]')?.remove();
+    window.__picknoteBareAmapPromise = undefined;
+    throw error;
   });
 
   return window.__picknoteBareAmapPromise;

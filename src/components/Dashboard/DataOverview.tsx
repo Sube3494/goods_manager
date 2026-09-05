@@ -90,7 +90,7 @@ function CompactMetric({
       onClick={onClick}
       className={cn(
         "min-w-0 overflow-hidden rounded-[18px] border border-black/8 bg-white/72 px-3 py-3 dark:border-white/10 dark:bg-white/4 sm:px-4 sm:py-3.5 transition-all duration-200",
-        onClick ? "cursor-pointer hover:bg-black/[0.03] active:scale-[0.98] dark:hover:bg-white/[0.08]" : "",
+        onClick ? "cursor-pointer hover:bg-black/3 active:scale-[0.98] dark:hover:bg-white/8" : "",
         className
       )}
     >
@@ -177,7 +177,7 @@ function ChartTooltip({
   const otherExpense = Number((expectedNetProfit - netProfit).toFixed(2));
 
   return (
-    <div className="relative z-[1000] -translate-y-1/2 pointer-events-none min-w-[200px] max-w-[calc(100vw-32px)] max-h-[70vh] overflow-y-auto rounded-[22px] border border-black/8 bg-white/95 p-3 shadow-[0_18px_50px_rgba(15,23,42,0.22)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/95 font-normal sm:min-w-[210px] sm:p-3.5">
+    <div className="relative z-1000 -translate-y-1/2 pointer-events-none min-w-50 max-w-[calc(100vw-32px)] max-h-[70vh] overflow-y-auto rounded-[22px] border border-black/8 bg-white/95 p-3 shadow-[0_18px_50px_rgba(15,23,42,0.22)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/95 font-normal sm:min-w-52.5 sm:p-3.5">
       <div className="flex items-center justify-between gap-2 border-b border-black/5 dark:border-white/5 pb-2">
         <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">{label} 盈亏明细</span>
         <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">数据拆分</span>
@@ -208,7 +208,7 @@ function ChartTooltip({
             {shopEntries.map(([shop, amount]) => (
               <div key={shop} className="rounded-xl bg-white/60 px-2 py-1.5 dark:bg-slate-950/30">
                 <div className="flex items-center justify-between gap-4 text-xs font-normal">
-                  <span className="max-w-[130px] truncate text-slate-700 dark:text-slate-300 font-normal">{shop}</span>
+                  <span className="max-w-32.5 truncate text-slate-700 dark:text-slate-300 font-normal">{shop}</span>
                   <span className={cn("font-normal tabular-nums", (amount as number) < 0 ? "text-rose-500" : "text-emerald-600 dark:text-emerald-400")}>
                     {money(amount as number)}
                   </span>
@@ -312,7 +312,7 @@ function OrderTooltip({
   const otherCount = dataPoint?.otherOrderCount ?? 0;
 
   return (
-    <div className="relative z-[1000] -translate-y-1/2 pointer-events-none min-w-[180px] max-w-[calc(100vw-32px)] max-h-[70vh] overflow-y-auto rounded-[22px] border border-black/8 bg-white/95 p-3.5 shadow-[0_18px_50px_rgba(15,23,42,0.16)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/95 font-normal">
+    <div className="relative z-1000 -translate-y-1/2 pointer-events-none min-w-45 max-w-[calc(100vw-32px)] max-h-[70vh] overflow-y-auto rounded-[22px] border border-black/8 bg-white/95 p-3.5 shadow-[0_18px_50px_rgba(15,23,42,0.16)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/95 font-normal">
       <div className="flex items-center justify-between gap-2 border-b border-black/5 dark:border-white/5 pb-2">
         <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">{label} 单量明细</span>
         <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-600 dark:text-sky-400">
@@ -546,7 +546,7 @@ export function DataOverview({
               onChange={onSelectedShopNameChange}
               options={[{ value: "", label: "全部店铺" }, ...shopOptions.map((shop) => ({ value: shop.name, label: shop.name }))]}
               className="h-10"
-              triggerClassName="h-full rounded-xl border border-black/8 bg-white px-3.5 text-sm shadow-none dark:border-white/10 dark:bg-white/[0.03]"
+              triggerClassName="h-full rounded-xl border border-black/8 bg-white px-3.5 text-sm shadow-none dark:border-white/10 dark:bg-white/3"
             />
           </div>
           <div className="col-span-1 space-y-1.5">
@@ -563,7 +563,7 @@ export function DataOverview({
                 { value: "custom", label: "自定义" },
               ]}
               className="h-10"
-              triggerClassName="h-full rounded-xl border border-black/8 bg-white px-3.5 text-sm shadow-none dark:border-white/10 dark:bg-white/[0.03]"
+              triggerClassName="h-full rounded-xl border border-black/8 bg-white px-3.5 text-sm shadow-none dark:border-white/10 dark:bg-white/3"
             />
           </div>
           <div className="col-span-1 space-y-1.5">
@@ -574,7 +574,7 @@ export function DataOverview({
               maxDate={endDate || todayDate}
               showClear={false}
               className="h-10 w-full"
-              triggerClassName="h-full rounded-xl border border-black/8 bg-white px-3.5 text-sm shadow-none dark:border-white/10 dark:bg-white/[0.03]"
+              triggerClassName="h-full rounded-xl border border-black/8 bg-white px-3.5 text-sm shadow-none dark:border-white/10 dark:bg-white/3"
             />
           </div>
           <div className="col-span-1 space-y-1.5">
@@ -589,7 +589,7 @@ export function DataOverview({
               maxDate={todayDate}
               showClear={false}
               className="h-10 w-full"
-              triggerClassName="h-full rounded-xl border border-black/8 bg-white px-3.5 text-sm shadow-none dark:border-white/10 dark:bg-white/[0.03]"
+              triggerClassName="h-full rounded-xl border border-black/8 bg-white px-3.5 text-sm shadow-none dark:border-white/10 dark:bg-white/3"
             />
           </div>
         </div>
@@ -597,7 +597,7 @@ export function DataOverview({
 
       <section className="overflow-hidden rounded-[28px] border border-black/8 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.97),rgba(244,244,245,0.82)_45%,rgba(240,253,244,0.72)_100%)] p-3.5 shadow-sm dark:border-white/10 dark:bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.08),rgba(255,255,255,0.04)_40%,rgba(16,185,129,0.06)_100%)] sm:p-5 lg:p-6">
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.9fr)]">
-          <div className="min-w-0 rounded-[24px] border border-black/8 bg-white/86 p-4 shadow-xs dark:border-white/10 dark:bg-white/5 sm:p-5">
+          <div className="min-w-0 rounded-3xl border border-black/8 bg-white/86 p-4 shadow-xs dark:border-white/10 dark:bg-white/5 sm:p-5">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">
                 <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground">经营概述</div>
@@ -625,7 +625,7 @@ export function DataOverview({
             </div>
           </div>
 
-          <div className="min-w-0 rounded-[24px] border border-black/8 bg-black/2 p-4 shadow-xs dark:border-white/10 dark:bg-white/4 sm:p-5">
+          <div className="min-w-0 rounded-3xl border border-black/8 bg-black/2 p-4 shadow-xs dark:border-white/10 dark:bg-white/4 sm:p-5">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground">订单结构</div>
@@ -727,7 +727,7 @@ export function DataOverview({
             <div className="space-y-2">
               {(customerAnalysis?.returningCustomerTopProducts || []).length > 0 ? (
                 customerAnalysis!.returningCustomerTopProducts.map((item, index) => (
-                  <div key={`${item.sku || item.productName}-${index}`} className="flex items-center gap-3 rounded-[16px] border border-black/6 bg-black/2 px-3 py-2.5 dark:border-white/10 dark:bg-white/3">
+                  <div key={`${item.sku || item.productName}-${index}`} className="flex items-center gap-3 rounded-2xl border border-black/6 bg-black/2 px-3 py-2.5 dark:border-white/10 dark:bg-white/3">
                     <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-sky-500/10 text-xs font-black text-sky-600 dark:text-sky-300">
                       {index + 1}
                     </div>
@@ -742,7 +742,7 @@ export function DataOverview({
                   </div>
                 ))
               ) : (
-                <div className="rounded-[16px] border border-dashed border-black/10 px-4 py-8 text-center text-sm text-muted-foreground dark:border-white/10">
+                <div className="rounded-2xl border border-dashed border-black/10 px-4 py-8 text-center text-sm text-muted-foreground dark:border-white/10">
                   当前范围还没有可统计的老客商品
                 </div>
               )}
@@ -851,13 +851,13 @@ export function DataOverview({
                 value={profitPlatform}
                 onChange={setProfitPlatform}
                 options={platformOptions}
-                className="h-9 min-w-[116px]"
-                triggerClassName="h-full rounded-xl border border-black/8 bg-white px-3 text-sm shadow-none dark:border-white/10 dark:bg-white/[0.03]"
+                className="h-9 min-w-29"
+                triggerClassName="h-full rounded-xl border border-black/8 bg-white px-3 text-sm shadow-none dark:border-white/10 dark:bg-white/3"
               />
               <button
                 type="button"
                 onClick={() => setIsChartsFullWidth((prev) => !prev)}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-black/8 bg-white text-muted-foreground hover:text-foreground hover:bg-black/3 dark:border-white/10 dark:bg-white/[0.03] dark:hover:bg-white/10 transition-all active:scale-95 cursor-pointer"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-black/8 bg-white text-muted-foreground hover:text-foreground hover:bg-black/3 dark:border-white/10 dark:bg-white/3 dark:hover:bg-white/10 transition-all active:scale-95 cursor-pointer"
                 title={isChartsFullWidth ? "收起为单行并排" : "独占整行全宽展示"}
               >
                 {isChartsFullWidth ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
@@ -866,8 +866,8 @@ export function DataOverview({
           )}
         >
           <div className={cn(
-            "w-full [&_.recharts-wrapper]:outline-none [&_.recharts-surface]:outline-none [&_.recharts-tooltip-wrapper]:!transition-none [&_*:focus]:outline-none",
-            isChartsFullWidth ? "h-[340px] sm:h-[390px]" : "h-[260px] sm:h-[290px]"
+            "w-full [&_.recharts-wrapper]:outline-none [&_.recharts-surface]:outline-none [&_.recharts-tooltip-wrapper]:transition-none! [&_*:focus]:outline-none",
+            isChartsFullWidth ? "h-85 sm:h-97.5" : "h-65 sm:h-72.5"
           )}>
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart accessibilityLayer={false} data={profitTrend} margin={{ top: 18, right: 10, left: 0, bottom: 0 }}>
@@ -913,20 +913,20 @@ export function DataOverview({
                   { value: "all", label: "全部订单" },
                   { value: "true", label: "去除刷单" },
                 ]}
-                className="h-9 min-w-0 sm:min-w-[116px]"
-                triggerClassName="h-full rounded-xl border border-black/8 bg-white px-3 text-sm shadow-none dark:border-white/10 dark:bg-white/[0.03]"
+                className="h-9 min-w-0 sm:min-w-29"
+                triggerClassName="h-full rounded-xl border border-black/8 bg-white px-3 text-sm shadow-none dark:border-white/10 dark:bg-white/3"
               />
               <CustomSelect
                 value={orderPlatform}
                 onChange={setOrderPlatform}
                 options={platformOptions}
-                className="h-9 min-w-0 sm:min-w-[116px]"
-                triggerClassName="h-full rounded-xl border border-black/8 bg-white px-3 text-sm shadow-none dark:border-white/10 dark:bg-white/[0.03]"
+                className="h-9 min-w-0 sm:min-w-29"
+                triggerClassName="h-full rounded-xl border border-black/8 bg-white px-3 text-sm shadow-none dark:border-white/10 dark:bg-white/3"
               />
               <button
                 type="button"
                 onClick={() => setIsChartsFullWidth((prev) => !prev)}
-                className="hidden sm:inline-flex h-9 w-9 items-center justify-center rounded-xl border border-black/8 bg-white text-muted-foreground hover:text-foreground hover:bg-black/3 dark:border-white/10 dark:bg-white/[0.03] dark:hover:bg-white/10 transition-all active:scale-95 cursor-pointer shrink-0"
+                className="hidden sm:inline-flex h-9 w-9 items-center justify-center rounded-xl border border-black/8 bg-white text-muted-foreground hover:text-foreground hover:bg-black/3 dark:border-white/10 dark:bg-white/3 dark:hover:bg-white/10 transition-all active:scale-95 cursor-pointer shrink-0"
                 title={isChartsFullWidth ? "收起为单行并排" : "独占整行全宽展示"}
               >
                 {isChartsFullWidth ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
@@ -935,8 +935,8 @@ export function DataOverview({
           )}
         >
           <div className={cn(
-            "w-full [&_.recharts-wrapper]:outline-none [&_.recharts-surface]:outline-none [&_.recharts-tooltip-wrapper]:!transition-none [&_*:focus]:outline-none",
-            isChartsFullWidth ? "h-[340px] sm:h-[390px]" : "h-[260px] sm:h-[290px]"
+            "w-full [&_.recharts-wrapper]:outline-none [&_.recharts-surface]:outline-none [&_.recharts-tooltip-wrapper]:transition-none! [&_*:focus]:outline-none",
+            isChartsFullWidth ? "h-85 sm:h-97.5" : "h-65 sm:h-72.5"
           )}>
             <ResponsiveContainer width="100%" height="100%">
               <LineChart accessibilityLayer={false} data={orderTrend} margin={{ top: 18, right: 10, left: 0, bottom: 0 }}>
@@ -990,7 +990,7 @@ export function DataOverview({
                     const returningWidth = total > 0 ? (item.returningCustomerOrders / total) * 100 : 0;
                     const unknownWidth = total > 0 ? (item.unknownCustomerOrders / total) * 100 : 0;
                     return (
-                      <div key={item.date} className="rounded-[16px] border border-black/6 bg-black/2 px-3 py-2.5 dark:border-white/10 dark:bg-white/3">
+                      <div key={item.date} className="rounded-2xl border border-black/6 bg-black/2 px-3 py-2.5 dark:border-white/10 dark:bg-white/3">
                         <div className="flex items-center justify-between gap-3">
                           <div className="min-w-0">
                             <div className="text-sm font-black text-foreground">{item.label}</div>
