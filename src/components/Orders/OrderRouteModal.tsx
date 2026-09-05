@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useTheme } from "next-themes";
 import { ChevronDown, ChevronUp, Phone, RefreshCw, Store, User, X } from "lucide-react";
 import { loadBareAmap } from "@/components/DistanceCalc/BareAmapTest";
 import type { AutoPickOrder } from "@/lib/types";
@@ -54,8 +55,10 @@ function getDeliveryPhase(order: AutoPickOrder, trail: Trail | null, riderAssign
 } {
   const orderStatus = String(order.status || "").trim();
   const trailStatus = String(trail?.orderStatus || "").trim();
-  const statusCombined = `${orderStatus} ${trailStatus}`;
+  const trailStatusName = String(trail?.statusName || "").trim();
+  const statusCombined = `${orderStatus} ${trailStatus} ${trailStatusName}`;
 
+  // 1. 是否已完成/送达
   const isDelivered = /已完成|已送达|配送完成|finished|completed/i.test(statusCombined)
     || Boolean(order.delivery?.completedTime);
   if (isDelivered) {
@@ -67,9 +70,22 @@ function getDeliveryPhase(order: AutoPickOrder, trail: Trail | null, riderAssign
     };
   }
 
-  const isTakeGoods = Boolean(trail?.isTakeGoods)
-    || Boolean(order.delivery?.pickupTime)
-    || /已取货|配送中|派送中|delivering/i.test(statusCombined);
+  // 2. 是否已取货（绝对不能以订单大状态 order.status 为准，外卖呼叫骑手后大状态即显示配送中）
+  let isTakeGoods = false;
+  if (trail) {
+    if (trail.isTakeGoods === true) {
+      isTakeGoods = true;
+    } else if (trail.isTakeGoods === false) {
+      // 麦芽田明确指示尚未取货
+      isTakeGoods = false;
+    } else {
+      isTakeGoods = /已取货|取货完成|已提货/i.test(trailStatusName || trailStatus);
+    }
+  } else {
+    const deliveryTrack = String(order.delivery?.track || (order.delivery as any)?.status || "");
+    isTakeGoods = Boolean(order.delivery?.pickupTime)
+      || /已取货|取货完成/i.test(deliveryTrack);
+  }
 
   if (isTakeGoods) {
     return {
@@ -80,7 +96,9 @@ function getDeliveryPhase(order: AutoPickOrder, trail: Trail | null, riderAssign
     };
   }
 
-  const isArrivedShop = !isTakeGoods && /已到店|到店|arrival|arrived/i.test(statusCombined);
+  // 3. 未取货状态下：判断是否已到店
+  const deliveryTrack = String(order.delivery?.track || (order.delivery as any)?.status || "");
+  const isArrivedShop = /已到店|到店|arrival|arrived/i.test(`${trailStatusName} ${trailStatus} ${deliveryTrack}`);
   if (isArrivedShop) {
     return {
       phase: "arrived_shop",
@@ -90,6 +108,7 @@ function getDeliveryPhase(order: AutoPickOrder, trail: Trail | null, riderAssign
     };
   }
 
+  // 4. 未取货且未到店：骑手已接单，正赶往门店途中
   if (riderAssigned) {
     return {
       phase: "assigned",
@@ -107,15 +126,18 @@ function getDeliveryPhase(order: AutoPickOrder, trail: Trail | null, riderAssign
   };
 }
 
-/** 创建与参考图二 1:1 像素级复刻的圆形图标 Marker */
-function createPinMarkerElement(type: "shop" | "rider" | "customer") {
+/**
+ * 创建高品质圆形矢量 Marker（门店/骑手/顾客）
+ * 严格禁止使用任何 emoji 表情，统一采用高质感 SVG 矢量图标配以纯文本微胶囊
+ */
+function createPinMarkerElement(type: "shop" | "rider" | "customer", labelText?: string) {
   const container = document.createElement("div");
-  container.style.cssText = "display:flex;flex-direction:column;align-items:center;pointer-events:auto;cursor:pointer;filter:drop-shadow(0 3px 6px rgba(0,0,0,0.28));user-select:none;";
+  container.style.cssText = "display:flex;flex-direction:column;align-items:center;pointer-events:auto;cursor:pointer;filter:drop-shadow(0 3px 8px rgba(0,0,0,0.32));user-select:none;";
 
   const circle = document.createElement("div");
   circle.style.cssText = `
-    width: 38px;
-    height: 38px;
+    width: 42px;
+    height: 42px;
     border-radius: 50%;
     border: 2.5px solid #ffffff;
     display: flex;
@@ -126,38 +148,51 @@ function createPinMarkerElement(type: "shop" | "rider" | "customer") {
 
   let svgContent = "";
   let bgColor = "#0284c7";
+  let defaultLabel = "门店";
 
   if (type === "shop") {
-    // 门店：天蓝色底徽章 + 白色商铺屋檐图标（与图二一致）
+    // 门店：高德科技蓝圆徽章 + 专业实体商铺与波浪条纹遮阳篷 SVG 图标
     bgColor = "#0284c7";
-    circle.style.backgroundColor = bgColor;
-    circle.style.boxShadow = "0 3px 10px rgba(2, 132, 199, 0.45)";
+    defaultLabel = "门店";
+    circle.style.background = "linear-gradient(135deg, #0284c7 0%, #0369a1 100%)";
+    circle.style.boxShadow = "0 4px 14px rgba(2, 132, 199, 0.48)";
     svgContent = `
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
-        <path d="M4 4h16l1 5H3L4 4zm-1 6h18v2a3 3 0 0 1-3 3 3 3 0 0 1-3-3 3 3 0 0 1-3 3 3 3 0 0 1-3-3 3 3 0 0 1-3-3v-2zm2 6h14v4a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-4z"/>
+      <svg width="25" height="25" viewBox="0 0 24 24" fill="white">
+        <path d="M2 4h20v2H2z" />
+        <path d="M3 6h18l-1.3 5c-.2.8-.9 1.4-1.7 1.4s-1.5-.6-1.7-1.4L16.8 7.5h-1.6l-.8 3.5c-.2.8-.9 1.4-1.7 1.4s-1.5-.6-1.7-1.4L9.8 7.5H8.2l-.8 3.5c-.2.8-.9 1.4-1.7 1.4s-1.5-.6-1.7-1.4L4.3 6z" />
+        <path d="M4 13v7.2c0 .4.4.8.8.8h14.4c.4 0 .8-.4.8-.8V13h-2v6H6v-6H4z" />
+        <rect x="9.5" y="14" width="5" height="6.8" rx="0.5" fill="white" />
+        <circle cx="13.5" cy="17.5" r="0.6" fill="#0369a1" />
       </svg>
     `;
   } else if (type === "rider") {
-    // 骑手：暖橙色底徽章 + 白色节点放射/定位图标（与图二一致）
-    bgColor = "#f97316";
-    circle.style.backgroundColor = bgColor;
-    circle.style.boxShadow = "0 3px 12px rgba(249, 115, 22, 0.5)";
+    // 骑手：活力外卖橙圆徽章 + 头盔骑手小电驴/摩托车与后座保温外卖箱 SVG 图标
+    bgColor = "#ea580c";
+    defaultLabel = "骑手";
+    circle.style.background = "linear-gradient(135deg, #ff7300 0%, #ea580c 100%)";
+    circle.style.boxShadow = "0 4px 16px rgba(234, 88, 12, 0.55)";
     svgContent = `
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="18" cy="5" r="2.8" fill="white"/>
-        <circle cx="6" cy="12" r="2.8" fill="white"/>
-        <circle cx="18" cy="19" r="2.8" fill="white"/>
-        <line x1="8.5" y1="13.5" x2="15.5" y2="17.5"/>
-        <line x1="15.5" y1="6.5" x2="8.5" y2="10.5"/>
+      <svg width="28" height="28" viewBox="0 0 36 36" fill="white">
+        <circle cx="21" cy="7.5" r="3.4" />
+        <rect x="5" y="11.5" width="8" height="8.5" rx="1.5" fill="white" />
+        <line x1="5" y1="15" x2="13" y2="15" stroke="#ea580c" stroke-width="1.2" />
+        <path d="M17 11.5c-1 0-2 .6-2.5 1.5l-1.8 2.5h4.8l2.8-3.2c-.9-.5-2.1-.8-3.3-.8z" />
+        <path d="M20 11.8l-2.6 4.8 3.2 2.8h4.2l2.4-4c.4-.6.2-1.4-.4-1.8l-4-2c-.8-.4-1.8-.1-2.8.2z" />
+        <path d="M9 20h8l4-7h5l2.5 7" fill="none" stroke="white" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" />
+        <circle cx="9" cy="26" r="4.2" fill="none" stroke="white" stroke-width="2.8" />
+        <circle cx="9" cy="26" r="1.5" fill="white" />
+        <circle cx="27" cy="26" r="4.2" fill="none" stroke="white" stroke-width="2.8" />
+        <circle cx="27" cy="26" r="1.5" fill="white" />
       </svg>
     `;
   } else {
-    // 顾客：天蓝色底徽章 + 白色单人人像剪影图标（与图二一致）
+    // 顾客：高德科技蓝圆徽章 + 白色单人人像剪影 SVG 图标
     bgColor = "#0284c7";
-    circle.style.backgroundColor = bgColor;
-    circle.style.boxShadow = "0 3px 10px rgba(2, 132, 199, 0.45)";
+    defaultLabel = "顾客";
+    circle.style.background = "linear-gradient(135deg, #0284c7 0%, #0369a1 100%)";
+    circle.style.boxShadow = "0 4px 14px rgba(2, 132, 199, 0.48)";
     svgContent = `
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="white">
         <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
       </svg>
     `;
@@ -170,41 +205,77 @@ function createPinMarkerElement(type: "shop" | "rider" | "customer") {
   pointer.style.cssText = `
     width: 0;
     height: 0;
-    border-left: 5px solid transparent;
-    border-right: 5px solid transparent;
+    border-left: 5.5px solid transparent;
+    border-right: 5.5px solid transparent;
     border-top: 6px solid ${bgColor};
     margin-top: -1px;
   `;
 
+  // 下方纯文本微胶囊标签（严禁使用任何 emoji 表情符号）
+  const badge = document.createElement("div");
+  badge.style.cssText = `
+    margin-top: 2px;
+    padding: 1.5px 7px;
+    border-radius: 9999px;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.2;
+    color: #ffffff;
+    background-color: ${bgColor};
+    border: 1px solid rgba(255, 255, 255, 0.9);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.22);
+    white-space: nowrap;
+  `;
+  badge.textContent = labelText || defaultLabel;
+
   container.appendChild(circle);
   container.appendChild(pointer);
+  container.appendChild(badge);
   return container;
 }
 
-/** 创建与参考图二 1:1 像素级复刻的橙边白底悬浮距离气泡 */
-function createDistanceBubbleElement(text: string) {
+/**
+ * 创建橙边悬浮距离气泡（自动适配暗色与亮色主题，自带指示下箭头）
+ */
+function createDistanceBubbleElement(text: string, isDark: boolean = false) {
+  const container = document.createElement("div");
+  container.style.cssText = "display:flex;flex-direction:column;align-items:center;pointer-events:none;user-select:none;filter:drop-shadow(0 3px 8px rgba(0,0,0,0.25));";
+
   const bubble = document.createElement("div");
   bubble.style.cssText = `
-    background-color: #ffffff;
+    background: ${isDark ? "rgba(24, 24, 27, 0.96)" : "#ffffff"};
     border: 1.5px solid #ff7a18;
-    border-radius: 6px;
-    padding: 6px 14px;
-    font-size: 14px;
-    font-weight: 500;
-    color: #1f2937;
+    border-radius: 7px;
+    padding: 5px 12px;
+    font-size: 13px;
+    font-weight: 600;
+    color: ${isDark ? "#ffffff" : "#1f2937"};
     white-space: nowrap;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
-    pointer-events: none;
-    user-select: none;
+    box-shadow: ${isDark ? "0 4px 16px rgba(0, 0, 0, 0.6), 0 0 10px rgba(255, 122, 24, 0.3)" : "0 4px 12px rgba(255, 122, 24, 0.16), 0 2px 6px rgba(0, 0, 0, 0.08)"};
+    backdrop-filter: blur(6px);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", sans-serif;
   `;
   bubble.textContent = text;
-  return bubble;
+
+  const arrow = document.createElement("div");
+  arrow.style.cssText = `
+    width: 0;
+    height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 5px solid #ff7a18;
+    margin-top: -0.5px;
+  `;
+
+  container.appendChild(bubble);
+  container.appendChild(arrow);
+  return container;
 }
 
 export function OrderRouteModal({ order, onClose }: { order: AutoPickOrder; onClose: () => void }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<any>(null);
   const [attempt, setAttempt] = useState(0);
   const [trail, setTrail] = useState<Trail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -213,10 +284,14 @@ export function OrderRouteModal({ order, onClose }: { order: AutoPickOrder; onCl
   const [routeSummary, setRouteSummary] = useState("");
   const [showInfoCard, setShowInfoCard] = useState(true);
 
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === "dark" || (typeof document !== "undefined" && document.documentElement.classList.contains("dark"));
+
   const riderAssigned = Boolean(trail?.dispatcher || trail?.isTakeGoods
     || /^(pickup|delivering)$/i.test(trail?.orderStatus || "")
     || isAutoPickOrderRiderAssigned(order));
   const shopAddress = order.shopAddress?.trim() || order.rawShopAddress?.trim() || "";
+  const displayShopName = order.matchedShopName?.trim() || order.rawShopName?.trim() || "门店";
 
   const customerCoord: Point | null = (trail?.receiver ?? null) || (
     typeof order.longitude === "number" && typeof order.latitude === "number"
@@ -272,6 +347,17 @@ export function OrderRouteModal({ order, onClose }: { order: AutoPickOrder; onCl
     return () => previousFocus?.focus();
   }, []);
 
+  // 动态响应暗黑模式切换
+  useEffect(() => {
+    if (mapInstanceRef.current) {
+      try {
+        mapInstanceRef.current.setMapStyle(isDark ? "amap://styles/dark" : "amap://styles/normal");
+      } catch {
+        // 忽略样式切换异常
+      }
+    }
+  }, [isDark]);
+
   useEffect(() => {
     let disposed = false;
     let timer: ReturnType<typeof setTimeout>;
@@ -306,30 +392,29 @@ export function OrderRouteModal({ order, onClose }: { order: AutoPickOrder; onCl
         const sdk = await loadBareAmap(key, process.env.NEXT_PUBLIC_AMAP_SECURITY_CODE || "");
         if (disposed || !containerRef.current) return;
 
-        // 初始化高德地图实例（铺满整个视窗）
+        // 初始化高德地图实例（铺满全屏，适配暗色/亮色底图样式）
         map = new sdk.Map(containerRef.current, {
           zoom: 14,
           resizeEnable: true,
           viewMode: "2D",
+          mapStyle: isDark ? "amap://styles/dark" : "amap://styles/normal",
         });
+        mapInstanceRef.current = map;
 
-        // 加载并添加与参考图二一致的高德原生控件群（ControlBar罗盘、ToolBar缩放条、Scale比例尺）
+        // 添加高德原生控件群（ControlBar罗盘、ToolBar缩放条、Scale比例尺）
         sdk.plugin(["AMap.Scale", "AMap.ToolBar", "AMap.ControlBar"], () => {
           if (disposed || !map) return;
           try {
-            // 比例尺（图二位于左上角顶栏）
             const scale = new sdk.Scale({
               position: { top: "18px", left: "95px" },
             });
             map.addControl(scale);
 
-            // 罗盘 ControlBar（图二位于最左上角）
             const controlBar = new sdk.ControlBar({
               position: { top: "12px", left: "15px" },
             });
             map.addControl(controlBar);
 
-            // 缩放滑块 ToolBar（图二位于罗盘正下方）
             const toolBar = new sdk.ToolBar({
               position: { top: "115px", left: "20px" },
             });
@@ -364,20 +449,19 @@ export function OrderRouteModal({ order, onClose }: { order: AutoPickOrder; onCl
           ]);
           if (disposed) return;
 
-          // 添加图二风格的门店与顾客 Marker
           const shopMarker = new sdk.Marker({
             position: start,
-            content: createPinMarkerElement("shop"),
+            content: createPinMarkerElement("shop", displayShopName),
             anchor: "bottom-center",
             title: "门店",
-            zIndex: 110,
+            zIndex: 115,
           });
           const customerMarker = new sdk.Marker({
             position: end,
-            content: createPinMarkerElement("customer"),
+            content: createPinMarkerElement("customer", "顾客"),
             anchor: "bottom-center",
             title: "顾客",
-            zIndex: 110,
+            zIndex: 115,
           });
           map.add(shopMarker);
           map.add(customerMarker);
@@ -390,13 +474,12 @@ export function OrderRouteModal({ order, onClose }: { order: AutoPickOrder; onCl
               const distText = `${(route.distance / 1000).toFixed(1)}公里`;
               setRouteSummary(distText);
 
-              // 在顾客上方挂载图二白底橙边气泡
               const bubbleMarker = new sdk.Marker({
                 position: end,
-                content: createDistanceBubbleElement(`门店距顾客：${distText}`),
+                content: createDistanceBubbleElement(`门店距顾客：${distText}`, isDark),
                 anchor: "bottom-center",
-                offset: new sdk.Pixel(0, -48),
-                zIndex: 150,
+                offset: new sdk.Pixel(0, -68),
+                zIndex: 160,
               });
               map.add(bubbleMarker);
             } else {
@@ -404,24 +487,54 @@ export function OrderRouteModal({ order, onClose }: { order: AutoPickOrder; onCl
             }
           });
         } else {
-          // 已接单/配送中：渲染图二风格圆形实体 Marker 与橙边悬浮距离气泡
+          // 已接单/配送中状态
           const addedMarkers: any[] = [];
 
-          // 1. 门店 Marker
-          if (trail?.sender) {
-            const lng = Number(trail.sender.lng);
-            const lat = Number(trail.sender.lat);
-            if (Number.isFinite(lng) && Number.isFinite(lat)) {
-              const marker = new sdk.Marker({
-                position: [lng, lat],
-                content: createPinMarkerElement("shop"),
-                anchor: "bottom-center",
-                title: "门店",
-                zIndex: 110,
+          // 1. 获取门店真实经纬度（优先取 trail.sender，缺失时使用高德地理编码精准解析门店地址）
+          let finalShopLng = trail?.sender ? Number(trail.sender.lng) : NaN;
+          let finalShopLat = trail?.sender ? Number(trail.sender.lat) : NaN;
+
+          if ((!Number.isFinite(finalShopLng) || !Number.isFinite(finalShopLat)) && shopAddress) {
+            try {
+              await new Promise<void>((resolve) => sdk.plugin(["AMap.Geocoder"], resolve));
+              const geocoder = new sdk.Geocoder();
+              const loc = await new Promise<{ lng: number; lat: number } | null>((resolve) => {
+                geocoder.getLocation(shopAddress, (status: string, result: any) => {
+                  const location = result?.geocodes?.[0]?.location;
+                  if (status === "complete" && location) resolve({ lng: location.lng, lat: location.lat });
+                  else resolve(null);
+                });
               });
-              map.add(marker);
-              addedMarkers.push(marker);
+              if (loc && !disposed) {
+                finalShopLng = loc.lng;
+                finalShopLat = loc.lat;
+              }
+            } catch {
+              // 忽略解析失败
             }
+          }
+
+          // 判定骑手与门店是否处于近距离（如 38 米）避让范围
+          const riderLng = trail?.dispatcher ? Number(trail.dispatcher.lng) : NaN;
+          const riderLat = trail?.dispatcher ? Number(trail.dispatcher.lat) : NaN;
+          const hasRider = Number.isFinite(riderLng) && Number.isFinite(riderLat);
+          const hasShop = Number.isFinite(finalShopLng) && Number.isFinite(finalShopLat);
+
+          const isCloseProximity = hasRider && hasShop
+            && calculateDistanceMeters({ lng: riderLng, lat: riderLat }, { lng: finalShopLng, lat: finalShopLat }) < 80;
+
+          // 渲染门店 Marker（近距离时智能左偏移 22px，避免被骑手盖死）
+          if (hasShop) {
+            const marker = new sdk.Marker({
+              position: [finalShopLng, finalShopLat],
+              content: createPinMarkerElement("shop", displayShopName),
+              anchor: "bottom-center",
+              offset: isCloseProximity ? new sdk.Pixel(-22, 0) : new sdk.Pixel(0, 0),
+              title: `门店：${displayShopName}`,
+              zIndex: 115,
+            });
+            map.add(marker);
+            addedMarkers.push(marker);
           }
 
           // 2. 顾客 Marker
@@ -431,57 +544,55 @@ export function OrderRouteModal({ order, onClose }: { order: AutoPickOrder; onCl
             if (Number.isFinite(lng) && Number.isFinite(lat)) {
               const marker = new sdk.Marker({
                 position: [lng, lat],
-                content: createPinMarkerElement("customer"),
+                content: createPinMarkerElement("customer", "顾客"),
                 anchor: "bottom-center",
-                title: "顾客",
-                zIndex: 110,
+                title: "顾客收货地址",
+                zIndex: 120,
               });
               map.add(marker);
               addedMarkers.push(marker);
             }
           }
 
-          // 3. 骑手 Marker 与图二橙边白底悬浮气泡
-          if (trail?.dispatcher) {
-            const lng = Number(trail.dispatcher.lng);
-            const lat = Number(trail.dispatcher.lat);
-            if (Number.isFinite(lng) && Number.isFinite(lat)) {
-              const riderMarker = new sdk.Marker({
-                position: [lng, lat],
-                content: createPinMarkerElement("rider"),
-                anchor: "bottom-center",
-                title: "骑手",
-                zIndex: 130,
-              });
-              map.add(riderMarker);
-              addedMarkers.push(riderMarker);
+          // 3. 骑手 Marker 与悬浮距离气泡
+          if (hasRider) {
+            const riderMarker = new sdk.Marker({
+              position: [riderLng, riderLat],
+              content: createPinMarkerElement("rider", "骑手"),
+              anchor: "bottom-center",
+              offset: isCloseProximity ? new sdk.Pixel(22, 0) : new sdk.Pixel(0, 0),
+              title: "骑手实时位置",
+              zIndex: 140,
+            });
+            map.add(riderMarker);
+            addedMarkers.push(riderMarker);
 
-              // 气泡文字动态匹配：未取货时显示“骑手距离门店”，已取货时显示“骑手距离顾客”
-              const bubbleText = phaseInfo.phase === "delivering"
-                ? `骑手距离顾客：${primaryDistanceValue}`
-                : (phaseInfo.phase === "arrived_shop"
-                  ? `骑手已到店`
-                  : `骑手距离门店：${primaryDistanceValue}`);
+            // 气泡文本：严格依据取货阶段，未取货时显示“骑手距离门店”，已取货时显示“骑手距离顾客”
+            const displayDistance = primaryDistanceValue
+              || (hasShop ? formatMeters(calculateDistanceMeters({ lng: riderLng, lat: riderLat }, { lng: finalShopLng, lat: finalShopLat })) : "");
 
-              // 图二悬浮气泡挂载在骑手上空，跟随骑手坐标
-              const bubbleMarker = new sdk.Marker({
-                position: [lng, lat],
-                content: createDistanceBubbleElement(bubbleText),
-                anchor: "bottom-center",
-                offset: new sdk.Pixel(0, -48),
-                zIndex: 160,
-              });
-              map.add(bubbleMarker);
-              addedMarkers.push(bubbleMarker);
-            }
+            const bubbleText = phaseInfo.phase === "delivering"
+              ? `骑手距离顾客：${displayDistance || "计算中…"}`
+              : (phaseInfo.phase === "arrived_shop"
+                ? (displayDistance ? `骑手已到店 · 距门店 ${displayDistance}` : `骑手已到店`)
+                : `骑手距离门店：${displayDistance || "计算中…"}`);
+
+            const bubbleMarker = new sdk.Marker({
+              position: [riderLng, riderLat],
+              content: createDistanceBubbleElement(bubbleText, isDark),
+              anchor: "bottom-center",
+              offset: isCloseProximity ? new sdk.Pixel(22, -72) : new sdk.Pixel(0, -72),
+              zIndex: 170,
+            });
+            map.add(bubbleMarker);
+            addedMarkers.push(bubbleMarker);
           } else if (customerCoord && primaryDistanceValue) {
-            // 若暂无骑手坐标，气泡挂在顾客头顶
             const bubbleMarker = new sdk.Marker({
               position: [customerCoord.lng, customerCoord.lat],
-              content: createDistanceBubbleElement(`门店距收货地址：${shopToCustomerDistance || primaryDistanceValue}`),
+              content: createDistanceBubbleElement(`门店距收货地址：${shopToCustomerDistance || primaryDistanceValue}`, isDark),
               anchor: "bottom-center",
-              offset: new sdk.Pixel(0, -48),
-              zIndex: 160,
+              offset: new sdk.Pixel(0, -72),
+              zIndex: 170,
             });
             map.add(bubbleMarker);
             addedMarkers.push(bubbleMarker);
@@ -509,11 +620,12 @@ export function OrderRouteModal({ order, onClose }: { order: AutoPickOrder; onCl
       clearTimeout(timeout);
       try {
         map?.destroy();
+        mapInstanceRef.current = null;
       } catch {
         // 忽略地图销毁异常
       }
     };
-  }, [trail, riderAssigned, shopAddress, order.longitude, order.latitude, order.userAddress, attempt, customerCoord, phaseInfo.phase, primaryDistanceValue, shopToCustomerDistance]);
+  }, [trail, riderAssigned, shopAddress, displayShopName, order.longitude, order.latitude, order.userAddress, attempt, customerCoord, phaseInfo.phase, primaryDistanceValue, shopToCustomerDistance, isDark]);
 
   return createPortal(
     <dialog
@@ -523,7 +635,7 @@ export function OrderRouteModal({ order, onClose }: { order: AutoPickOrder; onCl
       onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}
       className="fixed inset-0 m-auto h-[88dvh] max-h-[860px] w-[95vw] max-w-5xl overflow-hidden rounded-2xl border border-border/80 bg-background p-0 text-foreground shadow-2xl backdrop:bg-black/60"
     >
-      {/* 沉浸式全屏高德大地图容器（彻底告别图一顶部大黑板） */}
+      {/* 沉浸式全屏高德地图容器 */}
       <div ref={containerRef} className="absolute inset-0 h-full w-full bg-muted/40" />
 
       {/* 右上角悬浮操作胶囊栏 */}
@@ -537,7 +649,7 @@ export function OrderRouteModal({ order, onClose }: { order: AutoPickOrder; onCl
           <span>{phaseInfo.statusTitle}</span>
         </div>
 
-        {/* 刷新地图按钮 */}
+        {/* 刷新按钮 */}
         <button
           type="button"
           disabled={loading}
@@ -549,7 +661,7 @@ export function OrderRouteModal({ order, onClose }: { order: AutoPickOrder; onCl
           <span className="hidden sm:inline">{loading ? "查询中…" : "刷新"}</span>
         </button>
 
-        {/* 关闭弹窗按钮 */}
+        {/* 关闭按钮 */}
         <button
           type="button"
           onClick={onClose}
@@ -560,10 +672,10 @@ export function OrderRouteModal({ order, onClose }: { order: AutoPickOrder; onCl
         </button>
       </div>
 
-      {/* 底部轻量浮动卡片（包含骑手电话、门店、收货地址，支持一键折叠） */}
+      {/* 底部轻量浮动卡片（支持点击折叠/展开，零 emoji，采用 Lucide 矢量图标） */}
       <div className="absolute bottom-4 left-4 right-4 sm:left-auto sm:right-4 z-20 sm:w-96">
         <div className="overflow-hidden rounded-xl border border-border/80 bg-background/95 shadow-xl backdrop-blur-md dark:bg-zinc-900/95 transition-all">
-          {/* 卡片头部：可点击折叠/展开 */}
+          {/* 卡片头部 */}
           <div
             onClick={() => setShowInfoCard((v) => !v)}
             className="flex items-center justify-between px-3.5 py-2.5 cursor-pointer select-none hover:bg-muted/40 transition-colors"
@@ -588,7 +700,7 @@ export function OrderRouteModal({ order, onClose }: { order: AutoPickOrder; onCl
             </button>
           </div>
 
-          {/* 展开的详情部分 */}
+          {/* 详情部分 */}
           {showInfoCard && (
             <div className="space-y-2 border-t border-border/60 px-3.5 py-2.5 text-xs text-muted-foreground">
               <div className="flex items-start gap-2">
@@ -603,14 +715,26 @@ export function OrderRouteModal({ order, onClose }: { order: AutoPickOrder; onCl
                   {order.userAddress || "暂无收货地址"}
                 </span>
               </div>
-              {shopToCustomerDistance && (
+
+              {/* 实时配送动态距离行 */}
+              {riderAssigned && primaryDistanceValue && (
                 <div className="flex items-center justify-between pt-1 border-t border-border/40 text-[11px]">
+                  <span>{phaseInfo.distanceLabel}</span>
+                  <span className={`font-semibold ${phaseInfo.phase === "delivering" ? "text-emerald-500" : "text-orange-500"}`}>
+                    {primaryDistanceValue}
+                  </span>
+                </div>
+              )}
+
+              {shopToCustomerDistance && (
+                <div className="flex items-center justify-between pt-0.5 text-[11px]">
                   <span>门店距收货地址</span>
                   <span className="font-medium text-foreground">{shopToCustomerDistance}</span>
                 </div>
               )}
+
               {riderAssigned && trail?.fetchedAt && (
-                <div className="text-[10px] text-muted-foreground/80 flex items-center justify-between pt-0.5">
+                <div className="text-[10px] text-muted-foreground/80 flex items-center justify-between pt-1 border-t border-border/30">
                   <span>最近更新：{new Date(trail.fetchedAt).toLocaleTimeString()}</span>
                   <span>30秒自动刷新</span>
                 </div>
