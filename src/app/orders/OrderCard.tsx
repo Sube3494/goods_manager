@@ -2827,7 +2827,7 @@ export const OrderCard = memo(function OrderCard({
                     {formatLocalDateTime(order.orderTime)}
                   </span>
                   <span className="inline-flex items-center gap-1.5 max-w-[280px] md:max-w-[420px] lg:max-w-[560px] min-w-0 leading-[18px]">
-                    <button type="button" disabled={pickup} onClick={() => setRouteOpen(true)} title="查看骑手位置" aria-label="查看骑手位置" className="inline-flex shrink-0 items-center gap-1.5 rounded enabled:cursor-pointer enabled:hover:text-primary focus-visible:outline-2 focus-visible:outline-primary">
+                    <button type="button" disabled={pickup} onClick={() => setRouteOpen(true)} title="查看配送地图" aria-label="查看配送地图" className="inline-flex shrink-0 items-center gap-1.5 rounded enabled:cursor-pointer enabled:hover:text-primary focus-visible:outline-2 focus-visible:outline-primary">
                     <MapPin size={13} className="shrink-0 text-slate-400 dark:text-zinc-500" />
                     <span className="truncate shrink-0">{pickup ? "-" : (order.distanceKm != null ? formatDistanceKm(order.distanceKm) : "距离待同步")}</span>
                     </button>
@@ -2870,7 +2870,7 @@ export const OrderCard = memo(function OrderCard({
                         <Clock3 size={12} className="shrink-0 text-slate-400 dark:text-zinc-500" />
                         <span>{formatLocalDateTime(order.orderTime)}</span>
                       </span>
-                      <button type="button" onClick={() => setRouteOpen(true)} title="查看骑手位置" aria-label="查看骑手位置" className="flex cursor-pointer items-center gap-1.5 rounded hover:text-primary focus-visible:outline-2 focus-visible:outline-primary">
+                      <button type="button" onClick={() => setRouteOpen(true)} title="查看配送地图" aria-label="查看配送地图" className="flex cursor-pointer items-center gap-1.5 rounded hover:text-primary focus-visible:outline-2 focus-visible:outline-primary">
                         <MapPin size={12} className="shrink-0 text-slate-400 dark:text-zinc-500" />
                         <span>{order.distanceKm != null ? formatDistanceKm(order.distanceKm) : "距离待同步"}</span>
                       </button>
