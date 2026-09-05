@@ -246,8 +246,13 @@ export function OrderRouteModal({ order, onClose }: { order: AutoPickOrder; onCl
             { label: "顾客", point: customerCoord, color: "#059669", zIndex: 100 },
           ] as const;
 
+          const addedMarkers: any[] = [];
           for (const item of markers) {
             if (!item.point) continue;
+            const lng = Number(item.point.lng);
+            const lat = Number(item.point.lat);
+            if (!Number.isFinite(lng) || !Number.isFinite(lat)) continue;
+
             const content = document.createElement("div");
             content.style.cssText = "display:flex;flex-direction:column;align-items:center;pointer-events:none;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.25));";
 
@@ -278,15 +283,29 @@ export function OrderRouteModal({ order, onClose }: { order: AutoPickOrder; onCl
 
             pin.append(shape, center);
             content.append(caption, pin);
-            map!.add(new sdk.Marker({
-              position: [item.point.lng, item.point.lat],
-              title: item.label,
-              content,
-              anchor: "bottom-center",
-              zIndex: item.zIndex,
-            }));
+
+            try {
+              const marker = new sdk.Marker({
+                position: [lng, lat],
+                title: item.label,
+                content,
+                anchor: "bottom-center",
+                zIndex: item.zIndex,
+              });
+              map!.add(marker);
+              addedMarkers.push(marker);
+            } catch {
+              // 忽略单个 Marker 创建失败
+            }
           }
-          map!.setFitView(undefined, false, [35, 35, 35, 35]);
+
+          if (addedMarkers.length > 0) {
+            try {
+              map!.setFitView(addedMarkers);
+            } catch {
+              // 忽略视野自适应异常
+            }
+          }
         }
         setMapError("");
       } catch (err) {
@@ -294,7 +313,15 @@ export function OrderRouteModal({ order, onClose }: { order: AutoPickOrder; onCl
       } finally { clearTimeout(timeout); }
     }
     void draw();
-    return () => { disposed = true; clearTimeout(timeout); map?.destroy(); };
+    return () => {
+      disposed = true;
+      clearTimeout(timeout);
+      try {
+        map?.destroy();
+      } catch {
+        // 忽略地图销毁时的偶发异常
+      }
+    };
   }, [trail, riderAssigned, shopAddress, order.longitude, order.latitude, order.userAddress, attempt, customerCoord]);
 
   return createPortal(

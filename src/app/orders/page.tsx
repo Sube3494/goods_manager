@@ -1373,12 +1373,21 @@ export default function OrdersPage() {
     };
 
     const handleError = (event: ErrorEvent) => {
+      if (!event.message || event.message === "Script error." || (!event.filename && event.lineno === 0)) {
+        console.warn("全局错误监听忽略跨域第三方脚本错误:", event);
+        return;
+      }
       const errMsg = `JavaScript 错误: ${event.message} 在 ${event.filename}:${event.lineno}`;
       setPageError(errMsg);
       showGlobalErrorDOM(errMsg);
     };
     
     const handleRejection = (event: PromiseRejectionEvent) => {
+      const reasonStr = String(event.reason || "");
+      if (reasonStr.includes("Script error") || reasonStr.includes("AMap script load failed")) {
+        console.warn("全局错误监听忽略第三方Promise异常:", event.reason);
+        return;
+      }
       const errMsg = `未捕获的 Promise 错误: ${event.reason}`;
       setPageError(errMsg);
       showGlobalErrorDOM(errMsg);
