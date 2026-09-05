@@ -29,6 +29,7 @@ import md5 from "blueimp-md5";
 import { User as UserType, AddressItem } from "@/lib/types";
 import { hasPermission, SessionUser } from "@/lib/permissions";
 import { CustomSelect } from "@/components/ui/CustomSelect";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 
 export default function ProfilePage() {
   const { user, isLoading: isUserLoading } = useUser();
@@ -77,6 +78,14 @@ export default function ProfilePage() {
   const [codeCooldown, setCodeCooldown] = useState(0);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "invalid" | "error">("idle");
   const [expandedAddressId, setExpandedAddressId] = useState<string | null>(null);
+  const [pendingDeleteAddress, setPendingDeleteAddress] = useState<{ id: string; label: string; index: number } | null>(null);
+  const [addressCheckResult, setAddressCheckResult] = useState<{
+    canDelete: boolean;
+    shopProductCount: number;
+    orderCount: number;
+    shopName?: string;
+    isLoading: boolean;
+  } | null>(null);
   const initializedRef = useRef(false);
   const lastSavedSnapshotRef = useRef("");
 
@@ -774,18 +783,29 @@ export default function ProfilePage() {
                               <ChevronDown size={16} className={`transition-transform ${expandedAddressId === item.id ? "rotate-180" : ""}`} />
                             </button>
                             <button
-                              onClick={() => {
-                                const remaining = addressList.filter((_, i) => i !== index);
-                                setAddressList(
-                                  item.isDefault && remaining.length > 0
-                                    ? remaining.map((address, addressIndex) => ({ ...address, isDefault: addressIndex === 0 }))
-                                    : remaining
-                                );
-                                if (expandedAddressId === item.id) {
-                                  setExpandedAddressId(null);
+                              type="button"
+                              onClick={async () => {
+                                const pendingInfo = {
+                                  id: item.id,
+                                  label: String(item.label || "").trim() || `地址 #${index + 1}`,
+                                  index,
+                                };
+                                setPendingDeleteAddress(pendingInfo);
+                                setAddressCheckResult({ canDelete: false, shopProductCount: 0, orderCount: 0, isLoading: true });
+                                try {
+                                  const res = await fetch(`/api/user/address-check?addressId=${encodeURIComponent(item.id)}`);
+                                  if (res.ok) {
+                                    const data = await res.json();
+                                    setAddressCheckResult({ ...data, isLoading: false });
+                                  } else {
+                                    setAddressCheckResult({ canDelete: true, shopProductCount: 0, orderCount: 0, isLoading: false });
+                                  }
+                                } catch {
+                                  setAddressCheckResult({ canDelete: true, shopProductCount: 0, orderCount: 0, isLoading: false });
                                 }
                               }}
-                              className="inline-flex h-10 min-w-0 items-center justify-center rounded-2xl border border-destructive/15 bg-destructive/5 text-destructive transition-all hover:bg-destructive/10 sm:w-10"
+                              className="inline-flex h-10 min-w-0 items-center justify-center rounded-2xl border border-destructive/15 bg-destructive/5 text-destructive transition-all hover:bg-destructive/10 sm:w-10 cursor-pointer"
+                              title="删除此地址"
                             >
                               <Trash2 size={14} />
                             </button>
@@ -868,6 +888,77 @@ export default function ProfilePage() {
           </div>
         </motion.section>
       </div>
+
+
+      {/* 门店收货地址删除二次确认弹窗 */}
+      <ConfirmModal
+        isOpen={Boolean(pendingDeleteAddress)}
+        onClose={() => { setPendingDeleteAddress(null); setAddressCheckResult(null); }}
+        onConfirm={() => {
+          if (!pendingDeleteAddress) return;
+          if (!addressCheckResult?.canDelete) return;
+          const { id, index } = pendingDeleteAddress;
+          const targetItem = addressList[index];
+          const remaining = addressList.filter((_, i) => i !== index);
+          const updatedList = normalizeAddressDefaults(
+            targetItem?.isDefault && remaining.length > 0
+              ? remaining.map((address, addressIndex) => ({ ...address, isDefault: addressIndex === 0 }))
+              : remaining
+          );
+          setAddressList(updatedList);
+          if (expandedAddressId === id) {
+            setExpandedAddressId(null);
+          }
+          setPendingDeleteAddress(null);
+          setAddressCheckResult(null);
+          showToast("地址已从列表中移除，点击右上角「保存资料」即可永久生效", "info");
+        }}
+        title={addressCheckResult?.canDelete === false && !addressCheckResult?.isLoading ? "无法删除此地址" : "确认删除收货地址"}
+        message={
+          <div className="space-y-3 text-left">
+            {addressCheckResult?.isLoading ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 size={14} className="animate-spin" />
+                <span>正在检查关联数据...</span>
+              </div>
+            ) : addressCheckResult?.canDelete === false ? (
+              <>
+                <p className="text-sm font-medium text-foreground">
+                  门店"<span className="font-bold text-destructive">{pendingDeleteAddress?.label}</span>"存在关联业务数据，无法删除。
+                </p>
+                <div className="rounded-xl border border-amber-200/60 bg-amber-50/60 px-4 py-3 dark:border-amber-900/40 dark:bg-amber-950/20">
+                  <p className="text-xs font-bold text-amber-700 dark:text-amber-400 mb-1.5">关联数据</p>
+                  <ul className="space-y-1 text-xs text-amber-700 dark:text-amber-400">
+                    {(addressCheckResult.orderCount ?? 0) > 0 && (
+                      <li className="flex justify-between"><span>外卖订单</span><span className="font-bold">{addressCheckResult.orderCount} 笔</span></li>
+                    )}
+                    {(addressCheckResult.shopProductCount ?? 0) > 0 && (
+                      <li className="flex justify-between"><span>门店商品</span><span className="font-bold">{addressCheckResult.shopProductCount} 件</span></li>
+                    )}
+                  </ul>
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed border-l-2 border-muted-foreground/20 pl-3">
+                  展开该地址修改昵称或地址内容，保存后系统自动同步全部关联数据。
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-sm font-medium text-foreground">
+                  确定要删除门店"<span className="font-bold text-destructive">{pendingDeleteAddress?.label}</span>"的收货地址吗？
+                </p>
+                <p className="text-xs text-muted-foreground leading-relaxed border-l-2 border-destructive/30 pl-3">
+                  该地址关联系统中的门店简称、采购订单、刷单计划及外卖订单分布，删除后将无法恢复。
+                </p>
+              </>
+            )}
+          </div>
+        }
+        confirmLabel={addressCheckResult?.canDelete === false ? "无法删除" : "确认删除"}
+        cancelLabel="取消"
+        variant={addressCheckResult?.canDelete === false ? "warning" : "danger"}
+        confirmDisabled={addressCheckResult?.isLoading || addressCheckResult?.canDelete === false}
+      />
+
     </div>
   );
 }

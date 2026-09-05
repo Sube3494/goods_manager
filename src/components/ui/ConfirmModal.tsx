@@ -16,6 +16,7 @@ interface ConfirmModalProps {
   cancelLabel?: string;
   variant?: "primary" | "danger" | "warning" | "info" | "success";
   className?: string;
+  confirmDisabled?: boolean;
 }
 
 export function ConfirmModal({
@@ -27,12 +28,13 @@ export function ConfirmModal({
   confirmLabel = "确定",
   cancelLabel = "取消",
   variant = "warning",
-  className
+  className,
+  confirmDisabled = false,
 }: ConfirmModalProps) {
   useEffect(() => {
     if (isOpen) {
       const originalStyle = document.body.style.overflow;
-      document.body.style.overflow = 'hidden';
+      document.body.style.overflow = "hidden";
       return () => { document.body.style.overflow = originalStyle; };
     }
   }, [isOpen]);
@@ -232,7 +234,9 @@ export function ConfirmModal({
                 {cancelLabel}
               </button>
               <button
+                disabled={confirmDisabled}
                 onClick={() => {
+                  if (confirmDisabled) return;
                   onConfirm();
                   onClose();
                 }}
@@ -240,7 +244,8 @@ export function ConfirmModal({
                   "min-w-0 px-4 text-[15px] font-black transition-all active:scale-[0.97] flex items-center justify-center gap-1.5 sm:gap-2 text-center leading-tight",
                   authPrimary
                     ? "h-14 rounded-3xl bg-white text-[#17181c] shadow-[0_12px_30px_rgba(255,255,255,0.12)] hover:bg-white/92"
-                    : cn("h-13 sm:h-14 rounded-[20px] sm:rounded-2xl sm:text-[15px]", currentStyle.confirm)
+                    : cn("h-13 sm:h-14 rounded-[20px] sm:rounded-2xl sm:text-[15px]", currentStyle.confirm),
+                  confirmDisabled && "opacity-40 cursor-not-allowed active:scale-100"
                 )}
               >
                 {confirmLabel}

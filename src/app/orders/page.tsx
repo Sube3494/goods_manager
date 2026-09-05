@@ -1656,6 +1656,7 @@ export default function OrdersPage() {
   const isSubComponentLoading = tabData[activeTab].isLoading;
   const [isShopProfitOpen, setIsShopProfitOpen] = useState(false);
   const [shopFilterSignal, setShopFilterSignal] = useState<{ value: string; nonce: number } | null>(null);
+  const [currentSelectedShop, setCurrentSelectedShop] = useState<string>("all");
   const shopProfitEntries = useMemo(() => {
     return Object.entries(activeSummary.shopProfit || {})
       .map(([key, info]) => ({ key, ...info }))
@@ -2757,6 +2758,7 @@ export default function OrdersPage() {
             onDataLoad={handleTodayDataLoad}
             localShops={localShops}
             shopFilterSignal={shopFilterSignal}
+            onShopChange={setCurrentSelectedShop}
           />
         </div>
         {allOrdersMounted && (
@@ -2770,6 +2772,7 @@ export default function OrdersPage() {
               onDataLoad={handleAllDataLoad}
               localShops={localShops}
               shopFilterSignal={shopFilterSignal}
+              onShopChange={setCurrentSelectedShop}
             />
           </div>
         )}
@@ -3005,7 +3008,11 @@ export default function OrdersPage() {
         <OrderDistributionModal
           onClose={() => setIsDistributionModalOpen(false)}
           localShops={localShops}
-          initialShopName={shopFilterSignal?.value && shopFilterSignal.value !== UNMATCHED_SHOP_FILTER ? shopFilterSignal.value : undefined}
+          initialShopName={
+            currentSelectedShop && currentSelectedShop !== "all" && currentSelectedShop !== UNMATCHED_SHOP_FILTER
+              ? currentSelectedShop
+              : (shopFilterSignal?.value && shopFilterSignal.value !== UNMATCHED_SHOP_FILTER ? shopFilterSignal.value : undefined)
+          }
         />
       ) : null}
 

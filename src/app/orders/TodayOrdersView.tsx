@@ -97,6 +97,7 @@ interface TodayOrdersViewProps {
   localShops: Array<{ id: string; name: string; address: string }>;
   userId?: string | null;
   shopFilterSignal?: { value: string; nonce: number } | null;
+  onShopChange?: (shop: string) => void;
 }
 
 const TODAY_TAB_PAGE_SIZE = 100;
@@ -111,6 +112,7 @@ export function TodayOrdersView({
   profitUpdatingOrderIds = [],
   userId,
   shopFilterSignal,
+  onShopChange,
 }: TodayOrdersViewProps) {
   const { showToast } = useToast();
   const [orders, setOrders] = useState<AutoPickOrder[]>([]);
@@ -169,6 +171,10 @@ export function TodayOrdersView({
   const [platform, setPlatform] = useState("all");
   const [shop, setShop] = useState("all");
   const [status, setStatus] = useState("all");
+
+  useEffect(() => {
+    onShopChange?.(shop);
+  }, [shop, onShopChange]);
   
   const [actingId, setActingId] = useState("");
   const [expandedIds, setExpandedIds] = useState<string[]>([]);

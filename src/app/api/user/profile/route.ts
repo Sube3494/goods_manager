@@ -81,14 +81,102 @@ export async function PATCH(req: Request) {
 
     const canUseBrushSimulation = hasPermission(session, "brush:simulate");
 
+    // ── 级联同步：检测 label（门店简称）变更 ──────────────────────────
+    if (Array.isArray(normalizedShippingAddresses)) {
+      const currentUser = await prisma.user.findUnique({
+        where: { id: session.id },
+        select: { shippingAddresses: true, permissions: true },
+      });
+      const oldAddresses = (currentUser?.shippingAddresses as ShippingAddressInput[] | null) ?? [];
+
+      const oldLabelMap = new Map<string, string>();
+      for (const addr of oldAddresses) {
+        if (addr.id && addr.label) {
+          oldLabelMap.set(addr.id, String(addr.label).trim());
+        }
+      }
+
+      const renamedAddresses: Array<{ id: string; oldLabel: string; newLabel: string }> = [];
+      for (const addr of normalizedShippingAddresses as ShippingAddressInput[]) {
+        if (!addr.id) continue;
+        const oldLabel = oldLabelMap.get(addr.id);
+        const newLabel = String(addr.label || "").trim();
+        if (oldLabel && oldLabel !== newLabel) {
+          renamedAddresses.push({ id: addr.id, oldLabel, newLabel });
+        }
+      }
+
+      if (renamedAddresses.length > 0) {
+        for (const { id: addressId, oldLabel, newLabel } of renamedAddresses) {
+          const shop = await prisma.shop.findFirst({
+            where: { userId: session.id, addressBookId: addressId },
+            select: { id: true },
+          });
+
+          if (shop) {
+            await prisma.shop.update({ where: { id: shop.id }, data: { name: newLabel } });
+
+            await prisma.$executeRawUnsafe(
+              `UPDATE "AutoPickOrder"
+               SET "rawPayload" = jsonb_set("rawPayload", '{systemMeta,resolvedShop,name}', $1::jsonb)
+               WHERE "shopId" = $2
+                 AND "rawPayload"->'systemMeta'->'resolvedShop'->>'name' = $3`,
+              JSON.stringify(newLabel),
+              shop.id,
+              oldLabel
+            );
+          }
+
+          await prisma.brushOrder.updateMany({
+            where: { userId: session.id, shopName: oldLabel },
+            data: { shopName: newLabel },
+          });
+
+          await prisma.brushOrderPlan.updateMany({
+            where: { userId: session.id, shopName: oldLabel },
+            data: { shopName: newLabel },
+          });
+        }
+
+        const perms = (currentUser?.permissions as Record<string, unknown> | null) ?? {};
+        const autoPickIntegration = (perms?.autoPickIntegration as Record<string, unknown>) ?? {};
+        const maiyatianMappings = autoPickIntegration?.maiyatianShopMappings;
+        if (Array.isArray(maiyatianMappings)) {
+          let mappingsChanged = false;
+          const updatedMappings = maiyatianMappings.map((m: Record<string, unknown>) => {
+            const renamed = renamedAddresses.find((r) => r.oldLabel === m.localShopName);
+            if (renamed) {
+              mappingsChanged = true;
+              return { ...m, localShopName: renamed.newLabel };
+            }
+            return m;
+          });
+          if (mappingsChanged) {
+            const updatedPerms = {
+              ...perms,
+              autoPickIntegration: { ...autoPickIntegration, maiyatianShopMappings: updatedMappings },
+            };
+            await prisma.user.update({
+              where: { id: session.id },
+              data: {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                permissions: updatedPerms as any,
+              },
+            });
+          }
+        }
+      }
+    }
+    // ── 级联同步结束 ──────────────────────────────────────────────────
+
     const updatedUser = await prisma.user.update({
       where: { id: session.id },
-      data: { 
+      data: {
         name: name || undefined,
         shippingAddresses: normalizedShippingAddresses !== undefined ? normalizedShippingAddresses : undefined,
         brushShops: brushShops !== undefined ? brushShops : undefined,
         brushCommissionBoostEnabled: canUseBrushSimulation && typeof brushCommissionBoostEnabled === "boolean" ? brushCommissionBoostEnabled : undefined,
-      }
+      },
     });
 
     return NextResponse.json({ user: updatedUser });

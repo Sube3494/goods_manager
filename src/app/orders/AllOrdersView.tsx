@@ -116,6 +116,7 @@ interface AllOrdersViewProps {
   }) => void;
   localShops: Array<{ id: string; name: string; address: string }>;
   shopFilterSignal?: { value: string; nonce: number } | null;
+  onShopChange?: (shop: string) => void;
 }
 
 const ALL_ORDERS_BATCH_SIZE = 30;
@@ -129,6 +130,7 @@ export function AllOrdersView({
   onOpenPurchaseDraft,
   profitUpdatingOrderIds = [],
   shopFilterSignal,
+  onShopChange,
 }: AllOrdersViewProps) {
   const { showToast } = useToast();
   const [orders, setOrders] = useState<AutoPickOrder[]>([]);
@@ -195,6 +197,10 @@ export function AllOrdersView({
   const [platform, setPlatform] = useState("all");
   const [shop, setShop] = useState("all");
   const [status, setStatus] = useState("all");
+
+  useEffect(() => {
+    onShopChange?.(shop);
+  }, [shop, onShopChange]);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
