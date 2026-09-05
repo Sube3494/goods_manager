@@ -53,74 +53,66 @@ function getDeliveryPhase(order: AutoPickOrder, trail: Trail | null, riderAssign
   statusBadgeClass: string;
   distanceLabel: string;
 } {
-  const orderStatus = String(order.status || "").trim();
-  const trailStatus = String(trail?.orderStatus || "").trim();
   const trailStatusName = String(trail?.statusName || "").trim();
-  const statusCombined = `${orderStatus} ${trailStatus} ${trailStatusName}`;
+  const trailOrderStatus = String(trail?.orderStatus || "").trim().toLowerCase();
+  const deliveryTrack = String(order.delivery?.track || (order.delivery as any)?.status || "").trim();
+  const orderStatus = String(order.status || "").trim();
 
-  // 1. 是否已完成/送达
-  const isDelivered = /已完成|已送达|配送完成|finished|completed/i.test(statusCombined)
-    || Boolean(order.delivery?.completedTime);
-  if (isDelivered) {
+  // 1. 已完成 / 已送达
+  if (
+    /已完成|已送达|配送完成|done|finished|completed/i.test(`${trailStatusName} ${trailOrderStatus} ${deliveryTrack} ${orderStatus}`)
+    || Boolean(order.delivery?.completedTime)
+  ) {
     return {
       phase: "delivered",
-      statusTitle: "订单已送达",
+      statusTitle: trailStatusName || "已送达",
       statusBadgeClass: "bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30",
       distanceLabel: "配送状态",
     };
   }
 
-  // 2. 是否已取货（绝对不能以订单大状态 order.status 为准，外卖呼叫骑手后大状态即显示配送中）
-  let isTakeGoods = false;
-  if (trail) {
-    if (trail.isTakeGoods === true) {
-      isTakeGoods = true;
-    } else if (trail.isTakeGoods === false) {
-      // 麦芽田明确指示尚未取货
-      isTakeGoods = false;
-    } else {
-      isTakeGoods = /已取货|取货完成|已提货/i.test(trailStatusName || trailStatus);
-    }
-  } else {
-    const deliveryTrack = String(order.delivery?.track || (order.delivery as any)?.status || "");
-    isTakeGoods = Boolean(order.delivery?.pickupTime)
-      || /已取货|取货完成/i.test(deliveryTrack);
-  }
-
-  if (isTakeGoods) {
+  // 2. 配送中 / 送货中（麦芽田指示正在送往顾客）
+  if (
+    /配送中|送货中|送件中|已取货|派送中/i.test(`${trailStatusName} ${deliveryTrack}`)
+    || /delivering|shipping|send|delivery/i.test(trailOrderStatus)
+    || trail?.isTakeGoods === true
+  ) {
     return {
       phase: "delivering",
-      statusTitle: "骑手已取货 · 正在配送中",
+      statusTitle: trailStatusName || "配送中",
       statusBadgeClass: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30",
       distanceLabel: "骑手距离顾客",
     };
   }
 
-  // 3. 未取货状态下：判断是否已到店
-  const deliveryTrack = String(order.delivery?.track || (order.delivery as any)?.status || "");
-  const isArrivedShop = /已到店|到店|arrival|arrived/i.test(`${trailStatusName} ${trailStatus} ${deliveryTrack}`);
-  if (isArrivedShop) {
+  // 3. 已到店（麦芽田指示骑手已到店等待取货）
+  if (/已到店|到店|arrival|arrived/i.test(`${trailStatusName} ${trailOrderStatus} ${deliveryTrack}`)) {
     return {
       phase: "arrived_shop",
-      statusTitle: "骑手已到店 · 等待取货",
+      statusTitle: trailStatusName || "已到店",
       statusBadgeClass: "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30",
       distanceLabel: "骑手距离门店",
     };
   }
 
-  // 4. 未取货且未到店：骑手已接单，正赶往门店途中
-  if (riderAssigned) {
+  // 4. 待取货 / 已接单（麦芽田指示骑手赶往门店取货）
+  if (
+    /待取货|已接单|待接单|取货中/i.test(`${trailStatusName} ${trailOrderStatus} ${deliveryTrack}`)
+    || /pickup|accepted|assign/i.test(trailOrderStatus)
+    || riderAssigned
+  ) {
     return {
       phase: "assigned",
-      statusTitle: "骑手已接单 · 赶往门店中",
+      statusTitle: trailStatusName || "待取货",
       statusBadgeClass: "bg-orange-500/15 text-orange-600 dark:text-orange-400 border-orange-500/30",
       distanceLabel: "骑手距离门店",
     };
   }
 
+  // 5. 未分配骑手
   return {
     phase: "unassigned",
-    statusTitle: "骑手未接单 · 路线规划",
+    statusTitle: trailStatusName || orderStatus || "未接单",
     statusBadgeClass: "bg-slate-500/15 text-slate-600 dark:text-slate-400 border-slate-500/30",
     distanceLabel: "门店距收货地址",
   };
@@ -287,6 +279,8 @@ export function OrderRouteModal({ order, onClose }: { order: AutoPickOrder; onCl
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark" || (typeof document !== "undefined" && document.documentElement.classList.contains("dark"));
 
+  const [resolvedShopCoord, setResolvedShopCoord] = useState<Point | null>(null);
+
   const riderAssigned = Boolean(trail?.dispatcher || trail?.isTakeGoods
     || /^(pickup|delivering)$/i.test(trail?.orderStatus || "")
     || isAutoPickOrderRiderAssigned(order));
@@ -302,6 +296,7 @@ export function OrderRouteModal({ order, onClose }: { order: AutoPickOrder; onCl
       : null
   );
   const shopCoord: Point | null = trail?.sender ?? null;
+  const effectiveShopCoord: Point | null = shopCoord || resolvedShopCoord;
   const riderCoord: Point | null = trail?.dispatcher ?? null;
 
   const phaseInfo = getDeliveryPhase(order, trail, riderAssigned);
@@ -328,8 +323,8 @@ export function OrderRouteModal({ order, onClose }: { order: AutoPickOrder; onCl
   } else if (phaseInfo.phase === "assigned") {
     if (platformDistance) {
       primaryDistanceValue = platformDistance;
-    } else if (riderCoord && shopCoord) {
-      primaryDistanceValue = `${formatMeters(calculateDistanceMeters(riderCoord, shopCoord))}`;
+    } else if (riderCoord && effectiveShopCoord) {
+      primaryDistanceValue = `${formatMeters(calculateDistanceMeters(riderCoord, effectiveShopCoord))}`;
     } else {
       primaryDistanceValue = "位置同步中";
     }
@@ -339,7 +334,7 @@ export function OrderRouteModal({ order, onClose }: { order: AutoPickOrder; onCl
 
   const shopToCustomerDistance = order.distanceKm != null
     ? `${order.distanceKm.toFixed(1)}公里`
-    : (shopCoord && customerCoord ? `${formatMeters(calculateDistanceMeters(shopCoord, customerCoord))}` : "");
+    : (effectiveShopCoord && customerCoord ? `${formatMeters(calculateDistanceMeters(effectiveShopCoord, customerCoord))}` : "");
 
   useEffect(() => {
     const previousFocus = document.activeElement as HTMLElement | null;
@@ -491,23 +486,30 @@ export function OrderRouteModal({ order, onClose }: { order: AutoPickOrder; onCl
           const addedMarkers: any[] = [];
 
           // 1. 获取门店真实经纬度（优先取 trail.sender，缺失时使用高德地理编码精准解析门店地址）
-          let finalShopLng = trail?.sender ? Number(trail.sender.lng) : NaN;
-          let finalShopLat = trail?.sender ? Number(trail.sender.lat) : NaN;
+          let finalShopLng = trail?.sender ? Number(trail.sender.lng) : (resolvedShopCoord ? Number(resolvedShopCoord.lng) : NaN);
+          let finalShopLat = trail?.sender ? Number(trail.sender.lat) : (resolvedShopCoord ? Number(resolvedShopCoord.lat) : NaN);
 
-          if ((!Number.isFinite(finalShopLng) || !Number.isFinite(finalShopLat)) && shopAddress) {
+          if ((!Number.isFinite(finalShopLng) || !Number.isFinite(finalShopLat)) && (shopAddress || displayShopName)) {
             try {
               await new Promise<void>((resolve) => sdk.plugin(["AMap.Geocoder"], resolve));
-              const geocoder = new sdk.Geocoder();
-              const loc = await new Promise<{ lng: number; lat: number } | null>((resolve) => {
-                geocoder.getLocation(shopAddress, (status: string, result: any) => {
-                  const location = result?.geocodes?.[0]?.location;
-                  if (status === "complete" && location) resolve({ lng: location.lng, lat: location.lat });
-                  else resolve(null);
-                });
+              const geocoder = new sdk.Geocoder({
+                city: order.userAddress ? order.userAddress.slice(0, 4) : undefined,
               });
-              if (loc && !disposed) {
-                finalShopLng = loc.lng;
-                finalShopLat = loc.lat;
+              const searchAddresses = [shopAddress, `${displayShopName} ${shopAddress}`.trim(), displayShopName].filter(Boolean);
+              for (const addr of searchAddresses) {
+                const loc = await new Promise<{ lng: number; lat: number } | null>((resolve) => {
+                  geocoder.getLocation(addr, (status: string, result: any) => {
+                    const location = result?.geocodes?.[0]?.location;
+                    if (status === "complete" && location) resolve({ lng: location.lng, lat: location.lat });
+                    else resolve(null);
+                  });
+                });
+                if (loc && !disposed) {
+                  finalShopLng = loc.lng;
+                  finalShopLat = loc.lat;
+                  setResolvedShopCoord(loc);
+                  break;
+                }
               }
             } catch {
               // 忽略解析失败
@@ -567,9 +569,11 @@ export function OrderRouteModal({ order, onClose }: { order: AutoPickOrder; onCl
             map.add(riderMarker);
             addedMarkers.push(riderMarker);
 
-            // 气泡文本：严格依据取货阶段，未取货时显示“骑手距离门店”，已取货时显示“骑手距离顾客”
+            // 气泡文本：严格依据取货阶段，未取货时显示“骑手距离门店”，送货中显示“骑手距离顾客”
             const displayDistance = primaryDistanceValue
-              || (hasShop ? formatMeters(calculateDistanceMeters({ lng: riderLng, lat: riderLat }, { lng: finalShopLng, lat: finalShopLat })) : "");
+              || (phaseInfo.phase === "delivering" && customerCoord
+                ? formatMeters(calculateDistanceMeters({ lng: riderLng, lat: riderLat }, customerCoord))
+                : (hasShop ? formatMeters(calculateDistanceMeters({ lng: riderLng, lat: riderLat }, { lng: finalShopLng, lat: finalShopLat })) : ""));
 
             const bubbleText = phaseInfo.phase === "delivering"
               ? `骑手距离顾客：${displayDistance || "计算中…"}`
