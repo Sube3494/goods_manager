@@ -7983,8 +7983,9 @@ export async function fetchMaiyatianDeliveryTrail(userId: string, deliveryId: st
   const data = response.data;
   return {
     dispatcher: coord(data.dispatcher), sender: coord(data.sender), receiver: coord(data.receiver),
-    distance: typeof data.distance === "string" ? data.distance : "",
-    orderStatus: String(data.order_status || ""),
+    distance: data.distance != null && data.distance !== "" ? String(data.distance) : "",
+    orderStatus: String(data.order_status || data.orderStatus || data.delivery_status || data.status || ""),
+    statusName: typeof data.status_name === "string" ? data.status_name : (typeof data.statusName === "string" ? data.statusName : ""),
     isTakeGoods: data.is_take_goods === 1 || data.is_take_goods === "1" || data.is_take_goods === true,
     fetchedAt: new Date().toISOString(),
   };
