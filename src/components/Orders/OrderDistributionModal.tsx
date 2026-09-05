@@ -504,6 +504,14 @@ export function OrderDistributionModal({ onClose, initialShopName }: OrderDistri
             </div>
           )}
 
+          {/* 无订单提示浮层 */}
+          {!isLoading && !error && orders.length === 0 && (
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 rounded-xl border border-black/8 bg-white/90 px-4 py-2.5 text-xs font-medium text-muted-foreground shadow-md backdrop-blur-md dark:border-white/10 dark:bg-zinc-900/90">
+              <MapPin size={14} className="text-muted-foreground" />
+              当前门店在所选筛选条件下暂无有效定位订单
+            </div>
+          )}
+
           {/* 左侧悬浮统计面板 */}
           <div className="absolute top-4 left-4 z-10 hidden sm:flex flex-col gap-2.5 max-w-xs rounded-2xl border border-black/10 bg-white/88 p-4 shadow-xl backdrop-blur-md dark:border-white/10 dark:bg-zinc-900/88 pointer-events-auto">
             <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
