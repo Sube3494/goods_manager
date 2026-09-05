@@ -5,6 +5,18 @@ import { hasAdminAccess, hasPermission } from "@/lib/permissions";
 import { parseAsShanghaiTime } from "@/lib/dateUtils";
 import { isAddressDisabled, getAddressDetail } from "@/lib/addressBook";
 import { Prisma } from "@prisma/client";
+import {
+  readShopNameFromRawPayload,
+  readShopAddressFromRawPayload,
+  readShopIdFromRawPayload,
+} from "@/lib/shopCommission";
+import {
+  buildShopDedupeKey,
+  normalizeExternalId,
+  normalizeShopNameKey,
+  simplifyShopName,
+} from "@/lib/shopIdentity";
+import { normalizeAutoPickIntegrationConfig } from "@/lib/autoPickOrders";
 
 export const dynamic = "force-dynamic";
 
@@ -35,7 +47,7 @@ export async function GET(request: NextRequest) {
       || hasPermission(session, "order:manage");
     const targetUserId = (canManageMembers && requestedUserId) ? requestedUserId : session.id;
 
-    // 1. 读取用户【个人资料】那边的收货地址库（必须以个人资料里的收货地址门店为主，不是调货管理）
+    // 1. 读取用户【个人资料】那边的收货地址库（100% 严格来自个人中心地址库，绝不取调货管理门店 Shop 表兜底）
     const user = await prisma.user.findUnique({
       where: { id: targetUserId },
       select: {
@@ -45,12 +57,6 @@ export async function GET(request: NextRequest) {
     });
 
     const rawAddresses = Array.isArray(user?.shippingAddresses) ? (user.shippingAddresses as any[]) : [];
-    
-    // 查询调货库以尝试获取对应的经纬度或库关联
-    const dbShops = await prisma.shop.findMany({
-      where: { userId: targetUserId },
-      select: { id: true, name: true, addressBookId: true, longitude: true, latitude: true },
-    });
 
     const personalShops = rawAddresses
       .filter((item: any) => !isAddressDisabled(item))
@@ -58,55 +64,23 @@ export async function GET(request: NextRequest) {
         const addressBookId = String(item?.id || `shipping-${index}`);
         const name = String(item?.label || "").trim();
         const address = getAddressDetail(item);
-        const matchedDbShop = dbShops.find((s) => s.addressBookId === addressBookId || s.name === name);
 
         return {
-          id: matchedDbShop?.id || addressBookId,
+          id: addressBookId,
           addressBookId,
           name: name || `门店${index + 1}`,
           address,
           isDefault: Boolean(item?.isDefault),
-          longitude: matchedDbShop?.longitude || (typeof item?.longitude === "number" ? item.longitude : null),
-          latitude: matchedDbShop?.latitude || (typeof item?.latitude === "number" ? item.latitude : null),
+          longitude: typeof item?.longitude === "number" ? item.longitude : null,
+          latitude: typeof item?.latitude === "number" ? item.latitude : null,
         };
       })
       .filter((s) => s.name);
 
-    // 兜底：若个人资料完全未录入地址，再回退到调货门店
-    let availableShops = personalShops;
+    // 严禁调货门店回退！个人资料收货地址库是唯一且排他的数据来源
+    const availableShops = personalShops;
+
     if (availableShops.length === 0) {
-      availableShops = dbShops.map((s) => ({
-        id: s.id,
-        addressBookId: s.id,
-        name: s.name,
-        address: "",
-        isDefault: false,
-        longitude: s.longitude,
-        latitude: s.latitude,
-      }));
-    }
-
-    const requestedShopName = String(searchParams.get("shop") || "").trim();
-    const platformFilter = String(searchParams.get("platform") || "").trim();
-    const startDate = String(searchParams.get("startDate") || "").trim();
-    const endDate = String(searchParams.get("endDate") || "").trim();
-
-    // 确定当前查看的单家店铺（按用户指示：必须一家一家店看）
-    let currentShop = availableShops.find((s) => s.name === requestedShopName) || availableShops[0] || null;
-
-    if (!currentShop && requestedShopName) {
-      currentShop = {
-        id: requestedShopName,
-        addressBookId: requestedShopName,
-        name: requestedShopName,
-        address: "",
-        isDefault: false,
-        longitude: null,
-        latitude: null,
-      };
-    }
-
-    if (!currentShop) {
       return NextResponse.json({
         currentShop: null,
         availableShops: [],
@@ -120,52 +94,102 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    const requestedShopName = String(searchParams.get("shop") || "").trim();
+    const platformFilter = String(searchParams.get("platform") || "").trim();
+    const startDate = String(searchParams.get("startDate") || "").trim();
+    const endDate = String(searchParams.get("endDate") || "").trim();
+
+    // 确定当前查看的单家店铺（按用户指示：必须一家一家店看）
+    let currentShop = availableShops.find((s) => s.name === requestedShopName)
+      || availableShops.find((s) => normalizeShopNameKey(s.name) === normalizeShopNameKey(requestedShopName))
+      || availableShops[0];
+
     // 2. 提取麦芽田映射关系（将第三方外卖平台门店与个人资料本地门店映射）
     const permissions = (user?.permissions && typeof user.permissions === "object") ? (user.permissions as any) : {};
-    const integrationConfig = permissions.autoPickIntegration || {};
-    const mappings: Array<any> = Array.isArray(integrationConfig.maiyatianShopMappings) ? integrationConfig.maiyatianShopMappings : [];
+    const integrationConfig = normalizeAutoPickIntegrationConfig(permissions.autoPickIntegration);
+    const mappings = integrationConfig.maiyatianShopMappings || [];
 
     // 找出所有映射到当前个人资料门店的第三方门店 ID 与名称
     const mappedMytShopIds: string[] = [];
     const mappedMytShopNames: string[] = [];
     for (const m of mappings) {
       const localName = String(m.localShopName || "").trim();
-      const localId = String(m.localShopId || "").trim();
-      if (localName === currentShop.name || (currentShop.id && localId === currentShop.id)) {
+      if (
+        localName === currentShop.name ||
+        normalizeShopNameKey(localName) === normalizeShopNameKey(currentShop.name)
+      ) {
         if (m.maiyatianShopId) mappedMytShopIds.push(String(m.maiyatianShopId).trim());
         if (m.maiyatianShopName) mappedMytShopNames.push(String(m.maiyatianShopName).trim());
       }
     }
 
-    // 3. 构建当前门店的订单匹配条件
-    const shopConditions: Prisma.AutoPickOrderWhereInput[] = [
-      { rawPayload: { path: ["systemMeta", "resolvedShop", "name"], equals: currentShop.name } },
-    ];
+    // 3. 构建当前门店的订单匹配逻辑与复合条件
+    const isSingleShopUser = availableShops.length === 1;
 
-    if (currentShop.id) {
-      shopConditions.push({ rawPayload: { path: ["systemMeta", "resolvedShop", "id"], equals: currentShop.id } });
-      shopConditions.push({ shopId: currentShop.id });
-    }
+    const doesOrderMatchCurrentShop = (order: {
+      shopId?: string | null;
+      shopAddress?: string | null;
+      rawPayload?: unknown;
+    }) => {
+      // 0. 如果用户个人资料只有 1 家门店，全量订单均归属该门店
+      if (isSingleShopUser) return true;
 
-    for (const mytId of mappedMytShopIds) {
-      shopConditions.push({ shopId: mytId });
-      shopConditions.push({ rawPayload: { path: ["shop_id"], equals: mytId } });
-    }
-
-    // 如果个人资料里只有这一家门店，或者有明确地址片段
-    if (availableShops.length === 1) {
-      // 只有一家店时，容错所有未指定冲突店铺的订单
-      shopConditions.push({ id: { not: "" } });
-    } else if (currentShop.address) {
-      // 匹配门店地址片段
-      const cleanAddr = currentShop.address.replace(/\s+/g, "");
-      if (cleanAddr.length >= 6) {
-        const searchKeywords = cleanAddr.slice(0, 15);
-        shopConditions.push({ shopAddress: { contains: searchKeywords, mode: "insensitive" } });
+      // 1. 系统标记的 resolvedShop
+      const payloadObj = (order.rawPayload && typeof order.rawPayload === "object") ? (order.rawPayload as any) : null;
+      const resolvedShop = payloadObj?.systemMeta?.resolvedShop;
+      if (resolvedShop) {
+        if (resolvedShop.name && (resolvedShop.name === currentShop.name || normalizeShopNameKey(resolvedShop.name) === normalizeShopNameKey(currentShop.name))) {
+          return true;
+        }
+        if (resolvedShop.id && (resolvedShop.id === currentShop.id || resolvedShop.id === currentShop.addressBookId)) {
+          return true;
+        }
       }
-    }
 
-    // 平台过滤
+      // 2. 麦芽田第三方门店 ID 匹配
+      const orderShopId = normalizeExternalId(order.shopId || readShopIdFromRawPayload(order.rawPayload));
+      if (orderShopId && mappedMytShopIds.some((id) => normalizeExternalId(id) === orderShopId)) {
+        return true;
+      }
+
+      // 3. 第三方原始店名模糊/包含匹配
+      const orderShopName = readShopNameFromRawPayload(order.rawPayload);
+      if (orderShopName) {
+        const normOrderShopName = normalizeShopNameKey(orderShopName);
+        const normCurrentName = normalizeShopNameKey(currentShop.name);
+        const simpOrderName = normalizeShopNameKey(simplifyShopName(orderShopName));
+        
+        if (normOrderShopName === normCurrentName || simpOrderName === normCurrentName) {
+          return true;
+        }
+        if (normOrderShopName.includes(normCurrentName) || normCurrentName.includes(normOrderShopName)) {
+          return true;
+        }
+        if (mappedMytShopNames.some((mName) => {
+          const normMName = normalizeShopNameKey(mName);
+          return normOrderShopName === normMName || normOrderShopName.includes(normMName);
+        })) {
+          return true;
+        }
+      }
+
+      // 4. 门店地址模糊路段匹配（>= 6 个字符）
+      if (currentShop.address) {
+        const orderShopAddress = String(order.shopAddress || readShopAddressFromRawPayload(order.rawPayload) || "").trim();
+        const cleanShopAddr = currentShop.address.replace(/[^\u4e00-\u9fa5a-zA-Z0-9]/g, "");
+        const cleanOrderAddr = orderShopAddress.replace(/[^\u4e00-\u9fa5a-zA-Z0-9]/g, "");
+        if (cleanShopAddr.length >= 6 && cleanOrderAddr.length >= 6) {
+          const keySegment = cleanShopAddr.slice(0, 10);
+          if (cleanOrderAddr.includes(keySegment)) {
+            return true;
+          }
+        }
+      }
+
+      return false;
+    };
+
+    // 4. 数据库层过滤构建
     let platformClause: Prisma.AutoPickOrderWhereInput | undefined = undefined;
     if (platformFilter && platformFilter !== "all") {
       if (platformFilter === "线下交易") {
@@ -185,7 +209,6 @@ export async function GET(request: NextRequest) {
 
     const where: Prisma.AutoPickOrderWhereInput = {
       userId: targetUserId,
-      OR: shopConditions,
       ...(platformClause ? platformClause : {}),
       ...(startDate || endDate ? {
         orderTime: {
@@ -202,7 +225,7 @@ export async function GET(request: NextRequest) {
       latitude: { not: null, gt: 0 },
     };
 
-    const orders = await prisma.autoPickOrder.findMany({
+    const rawOrders = await prisma.autoPickOrder.findMany({
       where,
       select: {
         id: true,
@@ -211,7 +234,9 @@ export async function GET(request: NextRequest) {
         platform: true,
         orderTime: true,
         userAddress: true,
+        shopId: true,
         shopAddress: true,
+        rawPayload: true,
         longitude: true,
         latitude: true,
         actualPaid: true,
@@ -230,6 +255,8 @@ export async function GET(request: NextRequest) {
       orderBy: { orderTime: "desc" },
       take: 3000,
     });
+
+    const orders = rawOrders.filter(doesOrderMatchCurrentShop);
 
     const platformStats: Record<string, { count: number; amount: number }> = {};
     let totalPaidCents = 0;

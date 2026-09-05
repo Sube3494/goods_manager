@@ -58,6 +58,8 @@ interface CurrentShopInfo {
 interface OrderDistributionModalProps {
   onClose: () => void;
   initialShopName?: string;
+  localShops?: Array<{ id: string; name: string; address?: string }>;
+  userId?: string | null;
 }
 
 const PLATFORM_COLOR_MAP: Record<string, { bg: string; border: string; text: string; pinBg: string }> = {
@@ -69,14 +71,19 @@ const PLATFORM_COLOR_MAP: Record<string, { bg: string; border: string; text: str
   线下交易: { bg: "bg-slate-500/15", border: "border-slate-500/30", text: "text-slate-600 dark:text-slate-400", pinBg: "#64748b" },
 };
 
-export function OrderDistributionModal({ onClose, initialShopName }: OrderDistributionModalProps) {
+export function OrderDistributionModal({ onClose, initialShopName, localShops, userId }: OrderDistributionModalProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
 
-  // 筛选状态
-  const [availableShops, setAvailableShops] = useState<Array<{ id: string; name: string; address: string }>>([]);
+  // 筛选状态：优先采用由父组件传入的个人资料门店列表
+  const [availableShops, setAvailableShops] = useState<Array<{ id: string; name: string; address: string }>>(() => {
+    if (Array.isArray(localShops) && localShops.length > 0) {
+      return localShops.map((s) => ({ id: s.id, name: s.name, address: s.address || "" }));
+    }
+    return [];
+  });
   const [selectedShop, setSelectedShop] = useState<string>(initialShopName || "");
   const [selectedPlatform, setSelectedPlatform] = useState<string>("all");
   const [datePreset, setDatePreset] = useState<"today" | "yesterday" | "7d" | "30d" | "custom">("today");
@@ -138,6 +145,7 @@ export function OrderDistributionModal({ onClose, initialShopName }: OrderDistri
       if (selectedPlatform && selectedPlatform !== "all") params.set("platform", selectedPlatform);
       if (startDate) params.set("startDate", startDate);
       if (endDate) params.set("endDate", endDate);
+      if (userId) params.set("userId", userId);
 
       const res = await fetch(`/api/orders/distribution?${params.toString()}`);
       const data = await res.json();
@@ -145,9 +153,17 @@ export function OrderDistributionModal({ onClose, initialShopName }: OrderDistri
         throw new Error(data.error || "获取订单分布数据失败");
       }
 
-      setAvailableShops(data.availableShops || []);
-      if (!selectedShop && data.currentShop?.name) {
-        setSelectedShop(data.currentShop.name);
+      const nextShops = Array.isArray(data.availableShops) ? data.availableShops : [];
+      setAvailableShops(nextShops);
+
+      if (!selectedShop) {
+        if (initialShopName && nextShops.some((s: any) => s.name === initialShopName)) {
+          setSelectedShop(initialShopName);
+        } else if (data.currentShop?.name) {
+          setSelectedShop(data.currentShop.name);
+        } else if (nextShops[0]?.name) {
+          setSelectedShop(nextShops[0].name);
+        }
       }
       setCurrentShop(data.currentShop || null);
       setOrders(data.orders || []);
@@ -163,7 +179,7 @@ export function OrderDistributionModal({ onClose, initialShopName }: OrderDistri
     } finally {
       setIsLoading(false);
     }
-  }, [selectedShop, selectedPlatform, startDate, endDate]);
+  }, [selectedShop, selectedPlatform, startDate, endDate, userId, initialShopName]);
 
   // 依赖变化重新拉取
   useEffect(() => {
@@ -504,11 +520,35 @@ export function OrderDistributionModal({ onClose, initialShopName }: OrderDistri
             </div>
           )}
 
-          {/* 无订单提示浮层 */}
-          {!isLoading && !error && orders.length === 0 && (
+          {/* 未配置个人资料门店的明确友好指引 */}
+          {!isLoading && !error && availableShops.length === 0 && (
+            <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-background/80 p-6 text-center backdrop-blur-sm">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-primary/25 bg-primary/10 text-primary shadow-sm">
+                <Store size={28} />
+              </div>
+              <h3 className="mt-4 text-base font-bold text-foreground sm:text-lg">
+                暂未在【个人中心】维护收货地址库门店
+              </h3>
+              <p className="mt-2 max-w-md text-xs sm:text-sm text-muted-foreground leading-relaxed">
+                订单分布功能以【个人中心 - 收货地址库】维护的门店作为排他归属来源。请先前往个人中心维护门店地址，以便系统将外卖订单精准匹配到对应门店。
+              </p>
+              <a
+                href="/profile#address-library"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-5 inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-xs sm:text-sm font-semibold text-primary-foreground shadow-md transition-all hover:opacity-95 active:scale-95"
+              >
+                前往个人中心添加门店地址
+                <ExternalLink size={14} />
+              </a>
+            </div>
+          )}
+
+          {/* 无订单提示浮层（仅在已选门店但无订单时展示） */}
+          {!isLoading && !error && availableShops.length > 0 && orders.length === 0 && (
             <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 rounded-xl border border-black/8 bg-white/90 px-4 py-2.5 text-xs font-medium text-muted-foreground shadow-md backdrop-blur-md dark:border-white/10 dark:bg-zinc-900/90">
               <MapPin size={14} className="text-muted-foreground" />
-              当前门店在所选筛选条件下暂无有效定位订单
+              当前门店【{currentShop?.name || selectedShop}】在所选筛选条件下暂无有效定位订单
             </div>
           )}
 

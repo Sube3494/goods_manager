@@ -3004,6 +3004,8 @@ export default function OrdersPage() {
       {isDistributionModalOpen ? (
         <OrderDistributionModal
           onClose={() => setIsDistributionModalOpen(false)}
+          localShops={localShops}
+          initialShopName={shopFilterSignal?.value && shopFilterSignal.value !== UNMATCHED_SHOP_FILTER ? shopFilterSignal.value : undefined}
         />
       ) : null}
 
