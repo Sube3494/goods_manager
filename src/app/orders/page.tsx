@@ -38,6 +38,7 @@ import { PromotionCalendarModal } from "./PromotionCalendarModal";
 import { ProductSelectionModal } from "@/components/Purchases/ProductSelectionModal";
 import { PurchaseOrderModal } from "@/components/Purchases/PurchaseOrderModal";
 import { CreateOfflineOrderModal } from "@/components/Orders/CreateOfflineOrderModal";
+import { OrderDistributionModal } from "@/components/Orders/OrderDistributionModal";
 import CostBackfillModal from "@/components/Orders/CostBackfillModal";
 import {
   getBaseAutoPickStatusDisplay,
@@ -1717,6 +1718,7 @@ export default function OrdersPage() {
   }, []);
 
   const [isCreateOfflineOpen, setIsCreateOfflineOpen] = useState(false);
+  const [isDistributionModalOpen, setIsDistributionModalOpen] = useState(false);
   const [backfillTarget, setBackfillTarget] = useState<AutoPickOrder | null>(null);
   const [purchaseDraft, setPurchaseDraft] = useState<PurchaseDraftPayload | null>(null);
   const [profitUpdatingOrderIds, setProfitUpdatingOrderIds] = useState<string[]>([]);
@@ -2424,6 +2426,15 @@ export default function OrdersPage() {
                 </button>
                 <button
                   type="button"
+                  onClick={() => setIsDistributionModalOpen(true)}
+                  className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-black/8 bg-white/80 px-3 py-2.5 text-sm text-foreground transition-all hover:bg-white sm:w-auto sm:px-4 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8"
+                  title="查看当前店铺的订单地理分布地图"
+                >
+                  <MapPin size={15} />
+                  订单分布
+                </button>
+                <button
+                  type="button"
                   onClick={() => setIsIntegrationOpen(true)}
                   className="relative inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-black/8 bg-white/80 px-3 py-2.5 text-sm text-foreground transition-all hover:bg-white sm:w-auto sm:px-4 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8"
                 >
@@ -2987,6 +2998,12 @@ export default function OrdersPage() {
           shopOptions={localShops}
           onClose={() => setIsCreateOfflineOpen(false)}
           onSuccess={() => triggerParentRefresh()}
+        />
+      ) : null}
+
+      {isDistributionModalOpen ? (
+        <OrderDistributionModal
+          onClose={() => setIsDistributionModalOpen(false)}
         />
       ) : null}
 
