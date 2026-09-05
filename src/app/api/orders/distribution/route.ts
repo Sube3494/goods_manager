@@ -150,13 +150,21 @@ export async function GET(request: NextRequest) {
       latitude: number | null;
     }>();
 
-    // 先录入用户在系统 Shop 表中维护的店铺
+    // 先录入用户在系统 Shop 表中维护的店铺（仅限麦芽田映射中有对应 localShopName 的门店）
+    const mappedShopNames = new Set(
+      mappings.map((m: { localShopName?: string }) => normalizeShopNameKey(String(m.localShopName || "").trim()))
+        .filter(Boolean)
+    );
+    const hasMaiyatianFilter = mappedShopNames.size > 0;
+
     const userDbShops = await prisma.shop.findMany({
       where: { userId: targetUserId },
       select: { id: true, name: true, address: true, longitude: true, latitude: true },
     });
     for (const s of userDbShops) {
       if (!s.name) continue;
+      // 只录入有麦芽田映射的门店；若用户没有配置任何映射则不过滤（兜底全量）
+      if (hasMaiyatianFilter && !mappedShopNames.has(normalizeShopNameKey(s.name))) continue;
       shopMap.set(s.name, {
         id: s.id,
         name: s.name,
@@ -168,11 +176,12 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // 录入用户个人资料地址库中的门店（如苏白）
+    // 录入用户个人资料地址库中的门店（仅限麦芽田映射中有对应 localShopName 的门店）
     const rawAddresses = Array.isArray((user as any)?.shippingAddresses) ? ((user as any).shippingAddresses as any[]) : [];
     for (const addr of rawAddresses) {
       const label = String(addr?.label || "").trim();
       if (!label || isAddressDisabled(addr)) continue;
+      if (hasMaiyatianFilter && !mappedShopNames.has(normalizeShopNameKey(label))) continue;
       const existing = shopMap.get(label) || Array.from(shopMap.values()).find((v) => normalizeShopNameKey(v.name) === normalizeShopNameKey(label));
       if (!existing) {
         shopMap.set(label, {
@@ -186,6 +195,7 @@ export async function GET(request: NextRequest) {
         });
       }
     }
+
 
     // 统计各门店在真实订单中的单量与定位单量
     for (const ord of orderRecords) {
