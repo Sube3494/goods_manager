@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { Loader2, RefreshCw, X } from "lucide-react";
 import { loadBareAmap } from "@/components/DistanceCalc/BareAmapTest";
 import type { AutoPickOrder } from "@/lib/types";
+import { isAutoPickOrderRiderAssigned } from "@/lib/autoPickOrderStatus";
 
 type Point = { lng: number; lat: number };
 type Trail = {
@@ -117,9 +118,7 @@ export function OrderRouteModal({ order, onClose }: { order: AutoPickOrder; onCl
   const [routeSummary, setRouteSummary] = useState("");
   const riderAssigned = Boolean(trail?.dispatcher || trail?.isTakeGoods
     || /^(pickup|delivering)$/i.test(trail?.orderStatus || "")
-    || /^(pickup|delivering)$/i.test(order.status || "")
-    || /配送已接单|骑手已接单|骑手已到店|配送中|已取货/.test(order.status || "")
-    || order.delivery?.riderName || order.delivery?.riderPhone);
+    || isAutoPickOrderRiderAssigned(order));
   const shopAddress = order.shopAddress?.trim() || order.rawShopAddress?.trim() || "";
 
   const customerCoord: Point | null = (trail?.receiver ?? null) || (

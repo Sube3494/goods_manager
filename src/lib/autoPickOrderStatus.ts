@@ -211,6 +211,16 @@ export function isAutoPickSelfDeliveryStarted(order: {
   const rawPayload = order.rawPayload && typeof order.rawPayload === "object" && !Array.isArray(order.rawPayload)
     ? order.rawPayload as Record<string, unknown>
     : {};
+  const systemMeta = rawPayload.systemMeta && typeof rawPayload.systemMeta === "object" && !Array.isArray(rawPayload.systemMeta)
+    ? rawPayload.systemMeta as Record<string, unknown>
+    : {};
+  const mainSystemSelfDelivery = systemMeta.mainSystemSelfDelivery && typeof systemMeta.mainSystemSelfDelivery === "object" && !Array.isArray(systemMeta.mainSystemSelfDelivery)
+    ? systemMeta.mainSystemSelfDelivery as Record<string, unknown>
+    : null;
+  if (mainSystemSelfDelivery?.triggered) {
+    return true;
+  }
+
   const delivery = order.delivery && typeof order.delivery === "object" && !Array.isArray(order.delivery)
     ? order.delivery as Record<string, unknown>
     : {};
@@ -345,4 +355,99 @@ export function resolveAutoPickBusinessStatus(
   }
 
   return String(status || "").trim() || undefined;
+}
+
+export function isAutoPickOrderRiderAssigned(order?: {
+  status?: string | null;
+  rawPayload?: unknown;
+  delivery?: unknown;
+} | null) {
+  if (!order) return false;
+
+  const rawPayload = order.rawPayload && typeof order.rawPayload === "object" && !Array.isArray(order.rawPayload)
+    ? order.rawPayload as Record<string, unknown>
+    : {};
+  const rawPayloadDelivery = rawPayload.delivery && typeof rawPayload.delivery === "object" && !Array.isArray(rawPayload.delivery)
+    ? rawPayload.delivery as Record<string, unknown>
+    : {};
+  const orderDelivery = order.delivery && typeof order.delivery === "object" && !Array.isArray(order.delivery)
+    ? order.delivery as Record<string, unknown>
+    : {};
+
+  // 1. 检查是否有骑手姓名
+  const riderNameCandidates = [
+    orderDelivery.riderName,
+    orderDelivery.rider_name,
+    orderDelivery.delivery_name,
+    orderDelivery.dispatcher_name,
+    rawPayloadDelivery.riderName,
+    rawPayloadDelivery.rider_name,
+    rawPayloadDelivery.delivery_name,
+    rawPayloadDelivery.dispatcher_name,
+  ];
+  if (riderNameCandidates.some((item) => String(item || "").trim().length > 0)) {
+    return true;
+  }
+
+  // 2. 检查是否有骑手电话
+  const riderPhoneCandidates = [
+    orderDelivery.riderPhone,
+    orderDelivery.rider_phone,
+    orderDelivery.dispatcher_mobile,
+    orderDelivery.delivery_phone,
+    rawPayloadDelivery.riderPhone,
+    rawPayloadDelivery.rider_phone,
+    rawPayloadDelivery.dispatcher_mobile,
+    rawPayloadDelivery.delivery_phone,
+  ];
+  if (riderPhoneCandidates.some((item) => String(item || "").trim().length > 0)) {
+    return true;
+  }
+
+  // 3. 检查是否有取货时间（已取货则必然早已接单）
+  const pickupTimeCandidates = [
+    orderDelivery.pickupTime,
+    orderDelivery.pickup_time,
+    rawPayloadDelivery.pickupTime,
+    rawPayloadDelivery.pickup_time,
+  ];
+  if (pickupTimeCandidates.some((item) => String(item || "").trim().length > 0)) {
+    return true;
+  }
+
+  // 4. 检查配送与状态轨迹文本
+  const textCandidates = [
+    order.status,
+    orderDelivery.track,
+    orderDelivery.status,
+    orderDelivery.delivery_status,
+    orderDelivery.deliveryStatus,
+    rawPayloadDelivery.track,
+    rawPayloadDelivery.status,
+    rawPayloadDelivery.delivery_status,
+    rawPayloadDelivery.deliveryStatus,
+    rawPayload.status,
+    rawPayload.tips,
+    rawPayload.orderStatus,
+    rawPayload.order_status,
+    rawPayload.deliveryStatus,
+    rawPayload.delivery_status,
+  ].map((item) => String(item || "").trim()).filter(Boolean);
+
+  const riderAssignedRegex = /配送已接单|骑手已接单|待取货|骑手已到店|已到店|已取货|配送中|派送中/;
+  const riderAssignedEnRegex = /^(pickup|delivering|assigned|accepted|accept)$/i;
+
+  for (const text of textCandidates) {
+    if (riderAssignedEnRegex.test(text)) {
+      return true;
+    }
+    if (riderAssignedRegex.test(text)) {
+      return true;
+    }
+    if (text.includes("已接单") && !/待接单|未接单/.test(text)) {
+      return true;
+    }
+  }
+
+  return false;
 }
