@@ -7961,3 +7961,31 @@ export async function backfillMeituanSkuIdForManualMatchedShopProducts(
 }
 
 
+
+
+export async function fetchMaiyatianDeliveryTrail(userId: string, deliveryId: string) {
+  const cookie = await getMaiyatianCookieForUser(userId);
+  const response = await fetchMaiyatianJson<{ errno?: number; data?: Record<string, unknown> }>(
+    `/delivery/trail/?${new URLSearchParams({ f: "json", id: deliveryId })}`, cookie,
+    { signal: AbortSignal.timeout(15000) },
+  );
+  if ((response.errno !== undefined && response.errno !== 0 && response.errno !== 1) || !response.data) {
+    throw new Error("配送轨迹暂不可用，请检查麦芽田登录状态或稍后刷新。");
+  }
+  const coord = (value: unknown) => {
+    if (!value || typeof value !== "object") return null;
+    const point = value as Record<string, unknown>;
+    if (point.longitude == null || point.latitude == null || point.longitude === "" || point.latitude === "") return null;
+    const lng = Number(point.longitude), lat = Number(point.latitude);
+    return Number.isFinite(lng) && Number.isFinite(lat) && Math.abs(lng) <= 180 && Math.abs(lat) <= 90 && (lng !== 0 || lat !== 0)
+      ? { lng, lat } : null;
+  };
+  const data = response.data;
+  return {
+    dispatcher: coord(data.dispatcher), sender: coord(data.sender), receiver: coord(data.receiver),
+    distance: typeof data.distance === "string" ? data.distance : "",
+    orderStatus: String(data.order_status || ""),
+    isTakeGoods: data.is_take_goods === 1 || data.is_take_goods === "1" || data.is_take_goods === true,
+    fetchedAt: new Date().toISOString(),
+  };
+}

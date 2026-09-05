@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Area, AreaChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Shop, StatsData } from "@/lib/types";
@@ -124,10 +124,6 @@ function countDays(startDate: string, endDate: string) {
 
 function amountTooltip(value: unknown) {
   return money(typeof value === "number" ? value : Number(value || 0));
-}
-
-function countTooltip(value: unknown) {
-  return int(typeof value === "number" ? value : Number(value || 0));
 }
 
 function ChartTooltip({
@@ -428,12 +424,7 @@ export function DataOverview({
 }) {
   const router = useRouter();
   const todayDate = new Date().toISOString().slice(0, 10);
-  const [isMounted, setIsMounted] = useState(false);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
-
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
 
   const mappedLocalShops = useMemo(() => {
     return shopOptions.map((shop) => ({
@@ -462,7 +453,10 @@ export function DataOverview({
     { value: "线下交易", label: "线下交易" },
   ];
 
-  const profitTrend = profitPlatform === "all" ? businessTrend : (platformBusinessTrend[profitPlatform] || []);
+  const profitTrend = useMemo(
+    () => profitPlatform === "all" ? (data?.businessTrend || []) : (data?.platformBusinessTrend?.[profitPlatform] || []),
+    [data?.businessTrend, data?.platformBusinessTrend, profitPlatform],
+  );
   
   const profitGradientOffset = useMemo(() => {
     if (!profitTrend || profitTrend.length === 0) return 0;
@@ -478,9 +472,6 @@ export function DataOverview({
   const orderTrend = orderPlatform === "all" ? businessTrend : (platformBusinessTrend[orderPlatform] || []);
   const orderSeriesKey = orderScope === "true" ? "trueOrderCount" : "orderCount";
   const orderSeriesColor = orderScope === "true" ? "#10b981" : "#0ea5e9";
-  const orderTooltipNameMap: Record<string, string> = orderScope === "true"
-    ? { trueOrderCount: "真单数" }
-    : { orderCount: "订单数" };
   const totalOrders = matrix?.grandTotal || 0;
   const trueOrders = matrix?.trueOrderTotal || 0;
   const brushOrders = matrix?.brushOrderTotal || 0;
@@ -956,14 +947,14 @@ export function DataOverview({
           </div>
         </Panel>
       </div>
-      {isMounted && isCalendarOpen && (
+      {isCalendarOpen && (
         <PromotionCalendarModal
           initialDate={todayDate}
           localShops={mappedLocalShops}
           onClose={() => setIsCalendarOpen(false)}
         />
       )}
-      {isMounted && isCustomerDetailOpen ? (
+      {isCustomerDetailOpen ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 px-3 py-4 backdrop-blur-sm sm:items-center">
           <div className="w-full max-w-3xl overflow-hidden rounded-[26px] border border-black/8 bg-white shadow-2xl dark:border-white/10 dark:bg-slate-950">
             <div className="flex items-start justify-between gap-3 border-b border-black/6 px-4 py-4 dark:border-white/10 sm:px-5">
