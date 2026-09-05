@@ -957,6 +957,53 @@ function IntegrationModal({
   );
 }
 
+function getOrderItemThumbnail(item: AutoPickOrderItem): string | null {
+  if (item.thumb && typeof item.thumb === "string" && item.thumb.trim()) {
+    return item.thumb.trim();
+  }
+  if (item.matchedProduct?.image && typeof item.matchedProduct.image === "string" && item.matchedProduct.image.trim()) {
+    return item.matchedProduct.image.trim();
+  }
+  if (Array.isArray(item.displayItems) && item.displayItems.length > 0) {
+    const dImg = item.displayItems.find((d) => typeof d.image === "string" && d.image.trim())?.image;
+    if (dImg) return dImg.trim();
+  }
+  if (item.rawPayload && typeof item.rawPayload === "object") {
+    const raw = item.rawPayload as Record<string, unknown>;
+    const candidates = [
+      raw.image, raw.thumb, raw.picture, raw.pic_url, raw.app_picture_url,
+      raw.goods_image, raw.product_image, raw.productImage, raw.cover_image,
+    ];
+    for (const c of candidates) {
+      if (typeof c === "string" && c.trim()) return c.trim();
+    }
+  }
+  return null;
+}
+
+function getOrderThumbnails(order: AutoPickOrder): string[] {
+  const list: string[] = [];
+  for (const item of order.items || []) {
+    const img = getOrderItemThumbnail(item);
+    if (img && !list.includes(img)) {
+      list.push(img);
+    }
+  }
+  if (list.length === 0 && order.rawPayload && typeof order.rawPayload === "object") {
+    const raw = order.rawPayload as Record<string, unknown>;
+    const rawItems = Array.isArray(raw.goods) ? raw.goods : (Array.isArray(raw.items) ? raw.items : []);
+    for (const ri of rawItems) {
+      if (ri && typeof ri === "object") {
+        const c = (ri as Record<string, unknown>).thumb || (ri as Record<string, unknown>).image || (ri as Record<string, unknown>).picture || (ri as Record<string, unknown>).pic_url;
+        if (typeof c === "string" && c.trim() && !list.includes(c.trim())) {
+          list.push(c.trim());
+        }
+      }
+    }
+  }
+  return list;
+}
+
 function BrushSyncPickerModal({
   orders,
   selectedIds,
@@ -1153,6 +1200,9 @@ function BrushSyncPickerModal({
               const selected = selectedIds.includes(order.id);
               const platformMeta = getPlatformBadgeMeta(order.platform);
               const platformLabel = platformMeta.iconAlt;
+              const thumbnails = getOrderThumbnails(order);
+              const primaryThumb = thumbnails[0] || null;
+              const totalCount = getItemCount(order.items);
               return (
                 <button
                   key={order.id}
@@ -1161,18 +1211,44 @@ function BrushSyncPickerModal({
                   className={cn(
                     "flex w-full items-start gap-3 rounded-[20px] border px-3.5 py-3 text-left transition-all sm:rounded-[22px] sm:px-4",
                     selected
-                      ? "border-primary/25 bg-primary/8"
+                      ? "border-primary/25 bg-primary/8 shadow-2xs"
                       : "border-black/8 bg-white/80 hover:border-black/12 dark:border-white/10 dark:bg-white/4"
                   )}
                 >
                   <span className={cn(
-                    "mt-1 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border",
+                    "mt-2 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-all",
                     selected
                       ? "border-primary bg-primary text-primary-foreground"
                       : "border-black/12 bg-white dark:border-white/12 dark:bg-white/4"
                   )}>
                     {selected ? <Check size={12} /> : null}
                   </span>
+
+                  {/* 商品图片缩略图 */}
+                  <div className="relative h-14 w-14 sm:h-16 sm:w-16 shrink-0 overflow-hidden rounded-xl border border-black/8 bg-black/3 dark:border-white/10 dark:bg-white/4">
+                    {primaryThumb ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img
+                        src={primaryThumb}
+                        alt=""
+                        className="h-full w-full object-cover"
+                        onError={(e) => {
+                          (e.currentTarget as HTMLImageElement).style.display = "none";
+                          const fallback = e.currentTarget.parentElement?.querySelector(".thumb-fallback") as HTMLElement | null;
+                          if (fallback) fallback.classList.remove("hidden");
+                        }}
+                      />
+                    ) : null}
+                    <div className={cn("thumb-fallback flex h-full w-full items-center justify-center text-muted-foreground/35", primaryThumb ? "hidden" : "")}>
+                      <Package2 size={22} />
+                    </div>
+                    {totalCount > 1 ? (
+                      <span className="absolute bottom-0 right-0 rounded-tl-md bg-black/65 px-1.5 py-0.5 text-[9px] font-bold text-white backdrop-blur-xs">
+                        x{totalCount}
+                      </span>
+                    ) : null}
+                  </div>
+
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                       <span className="inline-flex h-6 items-center rounded-full border border-black/8 bg-black/3 px-2 text-[12px] font-bold text-foreground dark:border-white/10 dark:bg-white/4 sm:h-7 sm:px-2.5 sm:text-sm">
@@ -1200,11 +1276,29 @@ function BrushSyncPickerModal({
                         </span>
                       ) : null}
                     </div>
-                    <div className="mt-1.5 line-clamp-2 text-[12px] leading-5 text-foreground/78 sm:text-[13px]">
+
+                    <div className="mt-1 line-clamp-2 text-[12px] font-medium leading-4.5 text-foreground/85 sm:text-[13px] sm:leading-5">
                       {order.items.slice(0, 2).map((item) => item.productName).join(" / ") || "暂无商品"}
                     </div>
+
+                    {/* 多商品缩略图微缩排布 */}
+                    {thumbnails.length > 1 ? (
+                      <div className="mt-1.5 flex items-center gap-1.5 overflow-x-auto">
+                        {thumbnails.map((img, idx) => (
+                          /* eslint-disable-next-line @next/next/no-img-element */
+                          <img
+                            key={idx}
+                            src={img}
+                            alt=""
+                            className="h-7 w-7 rounded-md border border-black/6 object-cover dark:border-white/8"
+                            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                          />
+                        ))}
+                      </div>
+                    ) : null}
+
                     <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
-                      <span>共 {getItemCount(order.items)} 件</span>
+                      <span>共 {totalCount} 件</span>
                       <span>{formatLocalDateTime(order.orderTime)}</span>
                     </div>
                   </div>
