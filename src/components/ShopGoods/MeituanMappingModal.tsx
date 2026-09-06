@@ -893,12 +893,12 @@ export function MeituanMappingModal({
             </div>
           </div>
 
-          {/* 2. 现代 SaaS 紧凑胶囊控制栏（完美双端适配） */}
-          <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-2 sm:gap-2.5 px-4 sm:px-8 py-2.5 sm:py-3 border-b border-border/60 bg-zinc-50/40 dark:bg-white/[0.015] shrink-0">
-            {/* 区域 A：平台胶囊 + 状态统计胶囊 */}
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-2.5 shrink-0">
-              {/* 平台选择胶囊外壳 */}
-              <div className="h-9 w-full sm:w-auto grid grid-cols-3 sm:inline-flex items-center gap-1 p-0.5 bg-muted/60 dark:bg-white/10 rounded-full border border-border/50 dark:border-white/10 shadow-inner box-border">
+          {/* 2. 现代 SaaS 紧凑单行控制栏（精简占位，彻底消除重叠） */}
+          <div className="flex items-center justify-between gap-2 px-4 sm:px-8 py-2.5 border-b border-border/60 bg-zinc-50/40 dark:bg-white/[0.015] shrink-0 overflow-x-auto scrollbar-none">
+            {/* 左侧：平台选择胶囊 + 紧凑状态统计胶囊 */}
+            <div className="flex items-center gap-2 shrink-0">
+              {/* 平台选择胶囊 */}
+              <div className="h-8 inline-flex items-center gap-0.5 p-0.5 bg-muted/60 dark:bg-white/10 rounded-full border border-border/50 dark:border-white/10 shadow-inner box-border">
                 {PRODUCT_MAPPING_PLATFORMS.map((platform) => {
                   const isActive = activePlatform === platform.key;
                   return (
@@ -911,31 +911,27 @@ export function MeituanMappingModal({
                         setPage(1);
                       }}
                       className={cn(
-                        "inline-flex shrink-0 items-center justify-center gap-1.5 px-3 h-7.5 rounded-full text-xs font-black transition-all cursor-pointer select-none",
+                        "inline-flex shrink-0 items-center justify-center px-2.5 h-6.5 rounded-full text-xs font-black transition-all cursor-pointer select-none",
                         isActive
                           ? "bg-white dark:bg-white/20 text-foreground shadow-sm"
                           : "text-muted-foreground hover:text-foreground"
                       )}
                     >
-                      <Tag className="h-3 w-3" />
                       <span>{platform.label}</span>
                     </button>
                   );
                 })}
               </div>
 
-              {/* 状态统计筛选胶囊外壳 */}
-              <div className={cn(
-                "h-9 w-full sm:w-auto grid p-0.5 bg-muted/60 dark:bg-white/10 rounded-full border border-border/50 dark:border-white/10 sm:inline-flex sm:items-center sm:gap-0.5 shadow-inner box-border scrollbar-none",
-                activePlatform === "meituan" ? "grid-cols-4" : "grid-cols-3"
-              )}>
+              {/* 状态统计筛选胶囊（精简文字占位） */}
+              <div className="h-8 inline-flex items-center gap-0.5 p-0.5 bg-muted/60 dark:bg-white/10 rounded-full border border-border/50 dark:border-white/10 shadow-inner box-border">
                 {[
-                  { key: "ALL", label: "全部商品", mobileLabel: "全部", count: platformStatusCounts.TOTAL || total },
-                  { key: "UNBOUND", label: activePlatform === "meituan" ? "未配对美团ID" : `未填${activePlatformConfig.idLabel}`, mobileLabel: "未配对", count: platformStatusCounts.UNBOUND || 0, color: "text-amber-500" },
+                  { key: "ALL", label: "全部", count: platformStatusCounts.TOTAL || total },
+                  { key: "UNBOUND", label: "未配对", count: platformStatusCounts.UNBOUND || 0, color: "text-amber-500" },
                   ...(activePlatform === "meituan"
-                    ? [{ key: "HAS_SUGGESTION", label: "有智能推荐", mobileLabel: "推荐", count: platformStatusCounts.HAS_SUGGESTION || 0, color: "text-sky-500" }]
+                    ? [{ key: "HAS_SUGGESTION", label: "有推荐", count: platformStatusCounts.HAS_SUGGESTION || 0, color: "text-sky-500" }]
                     : []),
-                  { key: "BOUND", label: activePlatform === "meituan" ? "已配对" : "已填写", mobileLabel: activePlatform === "meituan" ? "已配对" : "已填", count: platformStatusCounts.BOUND || 0, color: "text-emerald-500" },
+                  { key: "BOUND", label: "已配对", count: platformStatusCounts.BOUND || 0, color: "text-emerald-500" },
                 ].map((tab) => {
                   const isActive = statusFilter === tab.key;
                   return (
@@ -947,14 +943,13 @@ export function MeituanMappingModal({
                         setPage(1);
                       }}
                       className={cn(
-                        "inline-flex min-w-0 items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 h-7.5 rounded-full text-xs font-black transition-all cursor-pointer select-none",
+                        "inline-flex shrink-0 items-center justify-center gap-1 px-2.5 h-6.5 rounded-full text-xs font-black transition-all cursor-pointer select-none",
                         isActive
                           ? "bg-white dark:bg-white/20 text-foreground shadow-sm"
                           : "text-muted-foreground hover:text-foreground"
                       )}
                     >
-                      <span className="min-w-0 truncate sm:hidden">{tab.mobileLabel}</span>
-                      <span className="hidden sm:inline">{tab.label}</span>
+                      <span>{tab.label}</span>
                       <span
                         className={cn(
                           "font-number text-xs font-black",
@@ -971,20 +966,20 @@ export function MeituanMappingModal({
               </div>
             </div>
 
-            {/* 区域 B：搜索框 + 批次数据池 + 快捷操作 */}
-            <div className="flex items-center gap-2 min-w-0 flex-1 justify-between xl:justify-end shrink-0 flex-wrap sm:flex-nowrap">
-              {/* 搜索框 */}
-              <div className="relative w-full sm:w-56 md:w-64 lg:w-72 shrink-0 group order-2 sm:order-1">
-                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground group-focus-within:text-primary transition-colors pointer-events-none" />
+            {/* 右侧：紧凑搜索框 + 批次选择 + 操作按钮 */}
+            <div className="flex items-center gap-1.5 shrink-0">
+              {/* 紧凑搜索框 */}
+              <div className="relative w-36 sm:w-44 md:w-48 shrink-0 group">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground group-focus-within:text-primary transition-colors pointer-events-none" />
                 <input
                   type="text"
-                  placeholder="搜索商品名 / SKU / 拼音..."
+                  placeholder="搜索商品/SKU..."
                   value={searchQuery}
                   onChange={(e) => {
                     setSearchQuery(e.target.value);
                     setPage(1);
                   }}
-                  className="w-full pl-9 pr-8 h-9 text-xs rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:outline-none focus:ring-2 focus:ring-primary/20 text-foreground placeholder:text-muted-foreground transition-all shadow-xs"
+                  className="w-full pl-8 pr-7 h-8 text-xs rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:outline-none focus:ring-2 focus:ring-primary/20 text-foreground placeholder:text-muted-foreground transition-all shadow-xs"
                 />
                 {searchQuery && (
                   <button
@@ -993,16 +988,16 @@ export function MeituanMappingModal({
                       setSearchQuery("");
                       setPage(1);
                     }}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 rounded-full bg-muted-foreground/20 hover:bg-muted-foreground/30 text-muted-foreground text-[10px] flex items-center justify-center transition-colors cursor-pointer"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 rounded-full bg-muted-foreground/20 hover:bg-muted-foreground/30 text-muted-foreground text-[10px] flex items-center justify-center transition-colors cursor-pointer"
                   >
                     ✕
                   </button>
                 )}
               </div>
 
-              {/* 数据池批次选择 + 操作按钮组 */}
-              <div className="flex items-center gap-1.5 w-full sm:w-auto justify-between sm:justify-start order-1 sm:order-2 shrink-0">
-                <div className="flex-1 sm:w-48 md:w-56 min-w-0">
+              {/* 美团数据池选择器 */}
+              {activePlatform === "meituan" && (
+                <div className="w-36 sm:w-40 min-w-0 shrink-0">
                   <CustomSelect
                     value={currentBatchId}
                     onChange={(val) => {
@@ -1012,47 +1007,50 @@ export function MeituanMappingModal({
                     options={[
                       {
                         value: "ALL",
-                        label: `全部${activePlatformConfig.label}数据 (${batches.reduce((acc, b) => acc + b.totalCount, 0)})`,
+                        label: `全部美团数据 (${batches.reduce((acc, b) => acc + b.totalCount, 0)})`,
                       },
                       ...batches.map((b) => ({
                         value: b.id,
                         label: `${b.fileName} (${b.matchedCount}/${b.totalCount})`,
                       })),
                     ]}
-                    placeholder={`选择${activePlatformConfig.label}数据池`}
-                    triggerClassName="h-9 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 px-3.5 text-xs font-bold text-foreground hover:border-primary/40 focus:ring-2 focus:ring-primary/20 transition-all shadow-xs truncate"
+                    placeholder="选择美团数据池"
+                    triggerClassName="h-8 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 px-3 text-xs font-bold text-foreground hover:border-primary/40 focus:ring-2 focus:ring-primary/20 transition-all shadow-xs truncate"
                   />
                 </div>
+              )}
 
-                {currentBatchId !== "ALL" && (
-                  <button
-                    onClick={handleDeleteBatch}
-                    title={`删除当前${activePlatformConfig.label}数据池`}
-                    className="h-9 w-9 flex items-center justify-center text-muted-foreground hover:text-rose-500 rounded-full hover:bg-rose-500/10 border border-border dark:border-white/10 bg-white dark:bg-white/5 shadow-xs active:scale-95 transition-all shrink-0 cursor-pointer"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                )}
-
-                {activePlatform === "meituan" && statusCounts.HAS_SUGGESTION > 0 && (
-                  <button
-                    onClick={handleAcceptAllPageSuggestions}
-                    title="采纳本页推荐美团ID"
-                    className="flex items-center gap-1.5 px-3.5 h-9 text-xs font-black rounded-full bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/30 hover:bg-sky-500/20 active:scale-95 transition-all shadow-xs cursor-pointer shrink-0"
-                  >
-                    <Sparkles className="h-3.5 w-3.5" />
-                    <span className="hidden sm:inline">采纳推荐</span>
-                  </button>
-                )}
-
+              {/* 删除当前批次 */}
+              {activePlatform === "meituan" && currentBatchId !== "ALL" && (
                 <button
-                  onClick={() => fetchShopProducts()}
-                  title="刷新商品列表"
-                  className="h-9 w-9 flex shrink-0 items-center justify-center rounded-full border border-border dark:border-white/10 bg-white dark:bg-white/5 hover:bg-muted text-muted-foreground hover:text-foreground active:scale-95 transition-all shadow-xs cursor-pointer"
+                  onClick={handleDeleteBatch}
+                  title="删除当前美团数据池"
+                  className="h-8 w-8 flex items-center justify-center text-muted-foreground hover:text-rose-500 rounded-full hover:bg-rose-500/10 border border-border dark:border-white/10 bg-white dark:bg-white/5 shadow-xs active:scale-95 transition-all shrink-0 cursor-pointer"
                 >
-                  <RefreshCw className={cn("h-3.5 w-3.5", isLoading && "animate-spin")} />
+                  <Trash2 className="h-3.5 w-3.5" />
                 </button>
-              </div>
+              )}
+
+              {/* 采纳智能推荐 */}
+              {activePlatform === "meituan" && statusCounts.HAS_SUGGESTION > 0 && (
+                <button
+                  onClick={handleAcceptAllPageSuggestions}
+                  title="采纳本页推荐美团ID"
+                  className="flex items-center gap-1 px-2.5 h-8 text-xs font-black rounded-full bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/30 hover:bg-sky-500/20 active:scale-95 transition-all shadow-xs cursor-pointer shrink-0"
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">采纳推荐</span>
+                </button>
+              )}
+
+              {/* 刷新按钮 */}
+              <button
+                onClick={() => fetchShopProducts()}
+                title="刷新商品列表"
+                className="h-8 w-8 flex shrink-0 items-center justify-center rounded-full border border-border dark:border-white/10 bg-white dark:bg-white/5 hover:bg-muted text-muted-foreground hover:text-foreground active:scale-95 transition-all shadow-xs cursor-pointer"
+              >
+                <RefreshCw className={cn("h-3.5 w-3.5", isLoading && "animate-spin")} />
+              </button>
             </div>
           </div>
 
