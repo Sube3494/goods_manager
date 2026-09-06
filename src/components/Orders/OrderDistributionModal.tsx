@@ -1372,7 +1372,7 @@ export function OrderDistributionModal({ onClose, initialShopName, localShops, u
       {/* 商品大图预览模态框 */}
       {previewImage && (
         <div
-          className="fixed inset-0 z-90000 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-150"
+          className="fixed inset-0 z-[200000] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-150"
           onClick={() => setPreviewImage(null)}
         >
           <div

@@ -1014,6 +1014,67 @@ function getOrderThumbnails(order: AutoPickOrder): string[] {
   return list;
 }
 
+function getOrderItemDisplayName(item: AutoPickOrderItem, order?: AutoPickOrder): string {
+  const matchedName = String(item.matchedProduct?.name || "").trim();
+  if (matchedName && matchedName !== "手工配送占位商品") {
+    return matchedName;
+  }
+
+  if (Array.isArray(item.displayItems) && item.displayItems.length > 0) {
+    const dName = item.displayItems
+      .map((d) => String(d.name || "").trim())
+      .filter((n) => n && n !== "手工配送占位商品")
+      .join(" + ");
+    if (dName) return dName;
+  }
+
+  const currentName = String(item.productName || "").trim();
+  if (currentName && currentName !== "手工配送占位商品") {
+    return currentName;
+  }
+
+  if (item.rawPayload && typeof item.rawPayload === "object") {
+    const raw = item.rawPayload as Record<string, unknown>;
+    const candidates = [
+      raw.goods_name, raw.product_name, raw.productName, raw.title,
+      raw.item_name, raw.food_name, raw.name, raw.sku_name, raw.skuName,
+      raw.wareName, raw.item_title, raw.auction_title,
+    ];
+    for (const c of candidates) {
+      if (typeof c === "string" && c.trim() && c.trim() !== "手工配送占位商品") {
+        return c.trim();
+      }
+    }
+    const nested = (raw.product || raw.goods || raw.item || raw.detail) as Record<string, unknown> | undefined;
+    if (nested && typeof nested === "object") {
+      const nestedCandidates = [nested.name, nested.goods_name, nested.product_name, nested.title, nested.food_name];
+      for (const nc of nestedCandidates) {
+        if (typeof nc === "string" && nc.trim() && nc.trim() !== "手工配送占位商品") {
+          return nc.trim();
+        }
+      }
+    }
+  }
+
+  if (order?.rawPayload && typeof order.rawPayload === "object") {
+    const rawOrder = order.rawPayload as Record<string, unknown>;
+    const rawGoodsList = Array.isArray(rawOrder.goods)
+      ? rawOrder.goods
+      : (Array.isArray(rawOrder.items) ? rawOrder.items : []);
+    for (const rg of rawGoodsList) {
+      if (rg && typeof rg === "object") {
+        const g = rg as Record<string, unknown>;
+        const gName = g.goods_name || g.product_name || g.title || g.food_name || g.name || g.item_name || g.sku_name;
+        if (typeof gName === "string" && gName.trim() && gName.trim() !== "手工配送占位商品") {
+          return gName.trim();
+        }
+      }
+    }
+  }
+
+  return currentName || "未命名商品";
+}
+
 function BrushSyncPickerModal({
   orders,
   selectedIds,
@@ -1123,7 +1184,7 @@ function BrushSyncPickerModal({
         order.rawShopName || "",
         order.shopAddress || "",
         order.userAddress || "",
-        ...order.items.map((item) => `${item.productName} ${item.productNo || ""}`),
+        ...order.items.map((item) => `${getOrderItemDisplayName(item, order)} ${item.productNo || ""}`),
       ];
       return haystacks.some((item) => item.toLowerCase().includes(keyword));
     });
@@ -1313,7 +1374,7 @@ function BrushSyncPickerModal({
                     </div>
 
                     <div className="mt-1 line-clamp-2 text-[12px] font-medium leading-4.5 text-foreground/85 sm:text-[13px] sm:leading-5">
-                      {order.items.slice(0, 2).map((item) => item.productName).join(" / ") || "暂无商品"}
+                      {order.items.slice(0, 2).map((item) => getOrderItemDisplayName(item, order)).join(" / ") || "暂无商品"}
                     </div>
 
                     {/* 多商品缩略图微缩排布 */}

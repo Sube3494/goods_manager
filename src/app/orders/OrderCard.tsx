@@ -679,14 +679,42 @@ export function getOrderItemDisplay(item: AutoPickOrderItem, platform?: string |
     || rawPayload.isManualDeliveryPlaceholder === true
     || String(item.productName || "").trim() === MANUAL_DELIVERY_PLACEHOLDER_PRODUCT_NAME;
   const sourceId = readDisplaySourceId(item, platform, channelTag);
+  const rawNameCandidate = String(
+    rawPayload.goods_name
+    || rawPayload.product_name
+    || rawPayload.title
+    || rawPayload.name
+    || rawPayload.food_name
+    || rawPayload.item_name
+    || rawPayload.sku_name
+    || rawPayload.skuName
+    || rawPayload.wareName
+    || rawPayload.item_title
+    || ""
+  ).trim();
+  const rawThumbCandidate = String(
+    rawPayload.thumb
+    || rawPayload.image
+    || rawPayload.picture
+    || rawPayload.pic_url
+    || rawPayload.app_picture_url
+    || rawPayload.goods_image
+    || rawPayload.product_image
+    || rawPayload.cover_image
+    || ""
+  ).trim() || null;
+
+  const realResolvedName = (matchedProduct?.name && matchedProduct.name !== MANUAL_DELIVERY_PLACEHOLDER_PRODUCT_NAME ? matchedProduct.name : "")
+    || (item.productName && item.productName !== MANUAL_DELIVERY_PLACEHOLDER_PRODUCT_NAME ? item.productName : "")
+    || (rawNameCandidate && rawNameCandidate !== MANUAL_DELIVERY_PLACEHOLDER_PRODUCT_NAME ? rawNameCandidate : "");
 
   return {
-    name: matchedProduct?.name || (isManualDeliveryPlaceholder ? "可添加发货货品" : item.productName) || "未命名商品",
-    sku: matchedProduct?.sku || (isManualDeliveryPlaceholder ? "不加则只记配送费" : item.productNo) || "-",
-    image: matchedProduct?.image || item.thumb || null,
+    name: realResolvedName || (isManualDeliveryPlaceholder ? "可添加发货货品" : item.productName) || "未命名商品",
+    sku: matchedProduct?.sku || (isManualDeliveryPlaceholder && !realResolvedName ? "不加则只记配送费" : item.productNo) || "-",
+    image: matchedProduct?.image || item.thumb || rawThumbCandidate,
     quantity: Math.max(1, Number((matchedProduct as any)?.quantity || item.quantity || 1) || 1),
-    sourceId: isManualDeliveryPlaceholder ? undefined : sourceId || undefined,
-    optionalMatch: isManualDeliveryPlaceholder,
+    sourceId: isManualDeliveryPlaceholder && !realResolvedName ? undefined : sourceId || undefined,
+    optionalMatch: isManualDeliveryPlaceholder && !realResolvedName,
   };
 }
 
@@ -696,7 +724,7 @@ export function getExpandedOrderItemDisplays(item: AutoPickOrderItem, platform?:
 
   if (Array.isArray(item.displayItems) && item.displayItems.length > 0) {
     return item.displayItems.map((displayItem) => ({
-      name: displayItem.name || item.productName || "未命名商品",
+      name: displayItem.name || (item.productName !== MANUAL_DELIVERY_PLACEHOLDER_PRODUCT_NAME ? item.productName : "") || "未命名商品",
       sku: displayItem.sku || matchedProduct?.sku || item.productNo || "-",
       image: displayItem.image || item.thumb || null,
       quantity: displayItem.quantity,
@@ -2044,19 +2072,19 @@ export function ProductStripItem({
       </div>
       {isPreviewOpen && display.image && typeof document !== "undefined" ? createPortal(
         <div
-          className="fixed inset-0 z-60000 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-[200000] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
           onClick={() => setIsPreviewOpen(false)}
         >
           <button
             type="button"
             onClick={() => setIsPreviewOpen(false)}
-            className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/12 text-white transition-all hover:bg-white/20"
+            className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/12 text-white transition-all hover:bg-white/20 cursor-pointer"
             aria-label="关闭大图"
           >
             <X size={20} />
           </button>
           <div
-            className="relative max-h-[86dvh] w-full max-w-4xl"
+            className="relative max-h-[86dvh] w-full max-w-4xl flex flex-col items-center justify-center"
             onClick={(event) => event.stopPropagation()}
           >
             <Image
@@ -2064,7 +2092,7 @@ export function ProductStripItem({
               alt={display.name}
               width={1200}
               height={1200}
-              className="max-h-[86dvh] w-full rounded-2xl object-contain"
+              className="max-h-[86dvh] w-full rounded-2xl object-contain shadow-2xl"
               unoptimized
             />
             <div className="mt-3 truncate text-center text-sm font-medium text-white/90">{display.name}</div>

@@ -2502,9 +2502,59 @@ export async function GET(request: NextRequest) {
                 };
               })
             : undefined;
+          const rawItemRecord = item.rawPayload && typeof item.rawPayload === "object" && !Array.isArray(item.rawPayload)
+            ? item.rawPayload as Record<string, unknown>
+            : null;
+          const rawNameCandidate = String(
+            rawItemRecord?.goods_name
+            || rawItemRecord?.product_name
+            || rawItemRecord?.title
+            || rawItemRecord?.name
+            || rawItemRecord?.food_name
+            || rawItemRecord?.item_name
+            || rawItemRecord?.sku_name
+            || rawItemRecord?.skuName
+            || rawItemRecord?.wareName
+            || rawItemRecord?.item_title
+            || ""
+          ).trim();
+          const isPlaceholderName = !item.productName || String(item.productName).trim() === "手工配送占位商品";
+          const fallbackResolvedName = isPlaceholderName
+            ? (
+                (matchedProduct?.name && matchedProduct.name !== "手工配送占位商品" ? matchedProduct.name : "")
+                || (displayItems && displayItems.length > 0 ? displayItems.map((d: any) => d.name).filter(Boolean).join(" + ") : "")
+                || (rawNameCandidate && rawNameCandidate !== "手工配送占位商品" ? rawNameCandidate : "")
+                || item.productName
+              )
+            : item.productName;
+
+          const rawThumbCandidate = String(
+            rawItemRecord?.thumb
+            || rawItemRecord?.image
+            || rawItemRecord?.picture
+            || rawItemRecord?.pic_url
+            || rawItemRecord?.app_picture_url
+            || rawItemRecord?.goods_image
+            || rawItemRecord?.product_image
+            || rawItemRecord?.cover_image
+            || ""
+          ).trim();
+          const fallbackResolvedThumb = item.thumb
+            ? storage.resolveUrl(item.thumb)
+            : (
+                matchedProduct?.image
+                  ? storage.resolveUrl(matchedProduct.image)
+                  : (
+                      displayItems && displayItems[0]?.image
+                        ? storage.resolveUrl(displayItems[0].image)
+                        : (rawThumbCandidate ? storage.resolveUrl(rawThumbCandidate) : null)
+                    )
+              );
+
           return {
             ...item,
-            thumb: item.thumb ? storage.resolveUrl(item.thumb) : null,
+            productName: fallbackResolvedName,
+            thumb: fallbackResolvedThumb,
             displayItems,
             matchedProduct,
           };

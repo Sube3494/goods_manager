@@ -131,6 +131,7 @@ interface AllOrdersViewProps {
     promotionDate?: string;
   }) => void;
   localShops: Array<{ id: string; name: string; address: string }>;
+  userId?: string | null;
   shopFilterSignal?: { value: string; nonce: number } | null;
   onShopChange?: (shop: string) => void;
 }
@@ -143,6 +144,7 @@ export function AllOrdersView({
   onOpenMatchEditor,
   onDataLoad,
   localShops,
+  userId,
   onOpenPurchaseDraft,
   profitUpdatingOrderIds = [],
   shopFilterSignal,
@@ -270,6 +272,7 @@ export function AllOrdersView({
       if (startDate) params.set("startDate", startDate);
       if (endDate) params.set("endDate", endDate);
       if (shop !== "all") params.set("shop", shop);
+      if (userId) params.set("userId", userId);
       if (!silent || options?.refreshMetrics) {
         params.set("_metrics", "1");
       }
@@ -326,7 +329,7 @@ export function AllOrdersView({
       setIsLoading(false);
       setIsLoadingMore(false);
     }
-  }, [platform, debouncedQuery, startDate, endDate, status, shop, showToast]);
+  }, [platform, debouncedQuery, startDate, endDate, status, shop, showToast, userId]);
 
   // 外部刷新信号监听
   useEffect(() => {

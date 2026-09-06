@@ -3550,12 +3550,39 @@ export function normalizeAutoPickOrderPayload(payload: unknown): AutoPickInbound
       const targetProductNo = isJD
         ? (rawSourceId || rawProductNo)
         : (rawProductNo || rawSkuCode || rawSkuId || rawSourceId);
+      const resolvedProductName = String(
+        current.productName
+        || current.goods_name
+        || current.product_name
+        || current.title
+        || current.name
+        || current.item_name
+        || current.food_name
+        || current.sku_name
+        || current.skuName
+        || current.wareName
+        || current.item_title
+        || current.auction_title
+        || ""
+      ).trim();
+      const resolvedThumb = String(
+        current.thumb
+        || current.image
+        || current.picture
+        || current.pic_url
+        || current.app_picture_url
+        || current.goods_image
+        || current.product_image
+        || current.productImage
+        || current.cover_image
+        || ""
+      ).trim() || undefined;
       return {
         ...current,
-        productName: String(current.productName || current.goods_name || "").trim(),
+        productName: resolvedProductName,
         productNo: targetProductNo || undefined,
         quantity: Math.max(0, Number(current.quantity || current.number || 0)),
-        thumb: String(current.thumb || "").trim() || undefined,
+        thumb: resolvedThumb,
       };
     }),
     unencryptedPhone: unencryptedPhone || undefined,
