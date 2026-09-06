@@ -264,6 +264,18 @@ function createDistanceBubbleElement(text: string, isDark: boolean = false) {
   return container;
 }
 
+function extractCity(address?: string, shopName?: string): string | undefined {
+  if (address) {
+    const match = address.match(/^(?:.*?省|.*?自治区)?([^省市区县]+?[市州地区])/);
+    if (match?.[1]) return match[1];
+  }
+  if (shopName) {
+    const match = shopName.match(/^([\u4e00-\u9fa5]{2,4}?)(?:市|店|分店|仓)/);
+    if (match?.[1]) return match[1];
+  }
+  return undefined;
+}
+
 export function OrderRouteModal({ order, onClose }: { order: AutoPickOrder; onClose: () => void }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -280,12 +292,16 @@ export function OrderRouteModal({ order, onClose }: { order: AutoPickOrder; onCl
   const isDark = resolvedTheme === "dark" || (typeof document !== "undefined" && document.documentElement.classList.contains("dark"));
 
   const [resolvedShopCoord, setResolvedShopCoord] = useState<Point | null>(null);
+  const [fallbackShopAddress, setFallbackShopAddress] = useState("");
+  const [shopCity, setShopCity] = useState("");
 
   const riderAssigned = Boolean(trail?.dispatcher || trail?.isTakeGoods
     || /^(pickup|delivering)$/i.test(trail?.orderStatus || "")
     || isAutoPickOrderRiderAssigned(order));
   const shopAddress = order.shopAddress?.trim() || order.rawShopAddress?.trim() || "";
   const displayShopName = order.matchedShopName?.trim() || order.rawShopName?.trim() || "门店";
+  const effectiveShopAddress = shopAddress || fallbackShopAddress || "";
+  const derivedCity = shopCity || extractCity(order.userAddress, displayShopName) || undefined;
 
   const customerCoord: Point | null = (trail?.receiver ?? null) || (
     typeof order.longitude === "number" && typeof order.latitude === "number"
@@ -341,6 +357,39 @@ export function OrderRouteModal({ order, onClose }: { order: AutoPickOrder; onCl
     dialogRef.current?.showModal();
     return () => previousFocus?.focus();
   }, []);
+
+  // 自动从本地店铺库加载匹配店铺的地址与经纬度作为兜底
+  useEffect(() => {
+    let active = true;
+    async function loadShopInfo() {
+      try {
+        const res = await fetch("/api/shops");
+        if (!res.ok) return;
+        const data = await res.json();
+        const shops: any[] = Array.isArray(data?.shops) ? data.shops : [];
+        const matched = shops.find((s) =>
+          (order.shopId && s.id === order.shopId) ||
+          (order.matchedShopId && s.id === order.matchedShopId) ||
+          (displayShopName && s.name && (s.name.includes(displayShopName) || displayShopName.includes(s.name)))
+        );
+        if (matched && active) {
+          if (Number.isFinite(matched.longitude) && Number.isFinite(matched.latitude)) {
+            setResolvedShopCoord({ lng: Number(matched.longitude), lat: Number(matched.latitude) });
+          }
+          if (matched.address && !shopAddress) {
+            setFallbackShopAddress(matched.address);
+          }
+          if (matched.city) {
+            setShopCity(matched.city);
+          }
+        }
+      } catch {
+        // 忽略店铺接口加载异常
+      }
+    }
+    void loadShopInfo();
+    return () => { active = false; };
+  }, [order.shopId, order.matchedShopId, displayShopName, shopAddress]);
 
   // 动态响应暗黑模式切换
   useEffect(() => {
@@ -419,190 +468,118 @@ export function OrderRouteModal({ order, onClose }: { order: AutoPickOrder; onCl
           }
         });
 
-        if (!riderAssigned) {
-          // 未接单状态：解析地址并规划路线
-          await new Promise<void>((resolve) => sdk.plugin(["AMap.Geocoder", "AMap.Riding"], resolve));
-          if (disposed) return;
-          const geocoder = new sdk.Geocoder();
-          const resolvePoint = (point: Point | null | undefined, address: string) => new Promise<[number, number]>((resolve, reject) => {
-            if (point) return resolve([point.lng, point.lat]);
-            if (!address) return reject(new Error("缺少门店或收货地址，暂时无法规划路线。"));
-            geocoder.getLocation(address, (status: string, result: { geocodes?: { location: { lng: number; lat: number } }[] }) => {
-              const location = result?.geocodes?.[0]?.location;
-              if (status === "complete" && location) resolve([location.lng, location.lat]);
-              else reject(new Error("地址识别失败，请检查门店和收货地址。"));
+        // 统一加载路线规划、地理编码与折线插件
+        await new Promise<void>((resolve) => sdk.plugin(["AMap.Geocoder", "AMap.Riding", "AMap.Polyline"], resolve));
+        if (disposed) return;
+
+        // 1. 获取门店真实经纬度（优先取 trail.sender，再取已解析坐标，最后使用高德地理编码带城市候选精准解析）
+        let finalShopLng = trail?.sender ? Number(trail.sender.lng) : (effectiveShopCoord ? Number(effectiveShopCoord.lng) : NaN);
+        let finalShopLat = trail?.sender ? Number(trail.sender.lat) : (effectiveShopCoord ? Number(effectiveShopCoord.lat) : NaN);
+
+        if ((!Number.isFinite(finalShopLng) || !Number.isFinite(finalShopLat)) && (effectiveShopAddress || displayShopName)) {
+          try {
+            const geocoder = new sdk.Geocoder({
+              city: derivedCity,
             });
-          });
-          const customer = typeof order.longitude === "number" && typeof order.latitude === "number"
-            && Number.isFinite(order.longitude) && Number.isFinite(order.latitude)
-            && Math.abs(order.longitude) <= 180 && Math.abs(order.latitude) <= 90
-            && (order.longitude !== 0 || order.latitude !== 0)
-            ? { lng: order.longitude, lat: order.latitude } : null;
+            const searchAddresses = [
+              effectiveShopAddress,
+              `${derivedCity || ""} ${displayShopName} ${effectiveShopAddress}`.trim(),
+              `${derivedCity || ""} ${displayShopName}`.trim(),
+              displayShopName,
+            ].filter(Boolean);
 
-          const [start, end] = await Promise.all([
-            resolvePoint(trail?.sender, shopAddress), resolvePoint(trail?.receiver || customer, order.userAddress),
-          ]);
-          if (disposed) return;
+            for (const addr of searchAddresses) {
+              const loc = await new Promise<{ lng: number; lat: number } | null>((res) => {
+                geocoder.getLocation(addr, (status: string, result: any) => {
+                  const location = result?.geocodes?.[0]?.location;
+                  if (status === "complete" && location) res({ lng: location.lng, lat: location.lat });
+                  else res(null);
+                });
+              });
+              if (loc && !disposed) {
+                finalShopLng = loc.lng;
+                finalShopLat = loc.lat;
+                setResolvedShopCoord(loc);
+                break;
+              }
+            }
+          } catch {
+            // 忽略门店解析异常
+          }
+        }
 
+        // 2. 获取顾客真实经纬度（优先取 trail.receiver / order.longitude / order.latitude，缺失时使用地理编码精准解析）
+        let finalCustomerLng = trail?.receiver ? Number(trail.receiver.lng) : (customerCoord ? Number(customerCoord.lng) : NaN);
+        let finalCustomerLat = trail?.receiver ? Number(trail.receiver.lat) : (customerCoord ? Number(customerCoord.lat) : NaN);
+
+        if ((!Number.isFinite(finalCustomerLng) || !Number.isFinite(finalCustomerLat)) && order.userAddress) {
+          try {
+            const geocoder = new sdk.Geocoder({
+              city: derivedCity,
+            });
+            const loc = await new Promise<{ lng: number; lat: number } | null>((res) => {
+              geocoder.getLocation(order.userAddress, (status: string, result: any) => {
+                const location = result?.geocodes?.[0]?.location;
+                if (status === "complete" && location) res({ lng: location.lng, lat: location.lat });
+                else res(null);
+              });
+            });
+            if (loc && !disposed) {
+              finalCustomerLng = loc.lng;
+              finalCustomerLat = loc.lat;
+            }
+          } catch {
+            // 忽略顾客地址解析异常
+          }
+        }
+
+        const addedMarkers: any[] = [];
+        const hasShop = Number.isFinite(finalShopLng) && Number.isFinite(finalShopLat);
+        const hasCustomer = Number.isFinite(finalCustomerLng) && Number.isFinite(finalCustomerLat);
+
+        // 判定骑手与门店是否处于近距离（如 80 米）避让范围
+        const riderLng = trail?.dispatcher ? Number(trail.dispatcher.lng) : NaN;
+        const riderLat = trail?.dispatcher ? Number(trail.dispatcher.lat) : NaN;
+        const hasRider = Number.isFinite(riderLng) && Number.isFinite(riderLat);
+        const isCloseProximity = hasRider && hasShop
+          && calculateDistanceMeters({ lng: riderLng, lat: riderLat }, { lng: finalShopLng, lat: finalShopLat }) < 80;
+
+        // A. 渲染门店 Marker
+        if (hasShop) {
           const shopMarker = new sdk.Marker({
-            position: start,
+            position: [finalShopLng, finalShopLat],
             content: createPinMarkerElement("shop", displayShopName),
             anchor: "bottom-center",
-            title: "门店",
-            zIndex: 115,
-          });
-          const customerMarker = new sdk.Marker({
-            position: end,
-            content: createPinMarkerElement("customer", "顾客"),
-            anchor: "bottom-center",
-            title: "顾客",
+            offset: isCloseProximity ? new sdk.Pixel(-22, 0) : new sdk.Pixel(0, 0),
+            title: `门店：${displayShopName}`,
             zIndex: 115,
           });
           map.add(shopMarker);
-          map.add(customerMarker);
+          addedMarkers.push(shopMarker);
+        }
 
-          const riding = new sdk.Riding({ map, autoFitView: true });
-          riding.search(start, end, (status: string, result: { routes?: { distance: number; time: number }[] }) => {
-            if (disposed) return;
-            const route = result?.routes?.[0];
-            if (status === "complete" && route) {
-              const distText = `${(route.distance / 1000).toFixed(1)}公里`;
-              setRouteSummary(distText);
-
-              const bubbleMarker = new sdk.Marker({
-                position: end,
-                content: createDistanceBubbleElement(`门店距顾客：${distText}`, isDark),
-                anchor: "bottom-center",
-                offset: new sdk.Pixel(0, -68),
-                zIndex: 160,
-              });
-              map.add(bubbleMarker);
-            } else {
-              setMapError("暂未找到可用骑行路线，请刷新重试。");
-            }
+        // B. 渲染顾客 Marker
+        if (hasCustomer) {
+          const customerMarker = new sdk.Marker({
+            position: [finalCustomerLng, finalCustomerLat],
+            content: createPinMarkerElement("customer", "顾客"),
+            anchor: "bottom-center",
+            title: "顾客收货地址",
+            zIndex: 120,
           });
-        } else {
-          // 已接单/配送中状态
-          const addedMarkers: any[] = [];
+          map.add(customerMarker);
+          addedMarkers.push(customerMarker);
 
-          // 1. 获取门店真实经纬度（优先取 trail.sender，缺失时使用高德地理编码精准解析门店地址）
-          let finalShopLng = trail?.sender ? Number(trail.sender.lng) : (resolvedShopCoord ? Number(resolvedShopCoord.lng) : NaN);
-          let finalShopLat = trail?.sender ? Number(trail.sender.lat) : (resolvedShopCoord ? Number(resolvedShopCoord.lat) : NaN);
+          // 距离气泡：待处理/未分配骑手状态下，优先在顾客 Marker 头顶展示“门店距收货地址”气泡
+          const displayShopToCustomer = shopToCustomerDistance
+            || (hasShop ? formatMeters(calculateDistanceMeters({ lng: finalShopLng, lat: finalShopLat }, { lng: finalCustomerLng, lat: finalCustomerLat })) : "")
+            || (order.distanceKm != null ? `${order.distanceKm.toFixed(1)}公里` : "")
+            || primaryDistanceValue;
 
-          if ((!Number.isFinite(finalShopLng) || !Number.isFinite(finalShopLat)) && (shopAddress || displayShopName)) {
-            try {
-              await new Promise<void>((resolve) => sdk.plugin(["AMap.Geocoder"], resolve));
-              const geocoder = new sdk.Geocoder({
-                city: order.userAddress ? order.userAddress.slice(0, 4) : undefined,
-              });
-              const searchAddresses = [shopAddress, `${displayShopName} ${shopAddress}`.trim(), displayShopName].filter(Boolean);
-              for (const addr of searchAddresses) {
-                const loc = await new Promise<{ lng: number; lat: number } | null>((resolve) => {
-                  geocoder.getLocation(addr, (status: string, result: any) => {
-                    const location = result?.geocodes?.[0]?.location;
-                    if (status === "complete" && location) resolve({ lng: location.lng, lat: location.lat });
-                    else resolve(null);
-                  });
-                });
-                if (loc && !disposed) {
-                  finalShopLng = loc.lng;
-                  finalShopLat = loc.lat;
-                  setResolvedShopCoord(loc);
-                  break;
-                }
-              }
-            } catch {
-              // 忽略解析失败
-            }
-          }
-
-          // 判定骑手与门店是否处于近距离（如 38 米）避让范围
-          const riderLng = trail?.dispatcher ? Number(trail.dispatcher.lng) : NaN;
-          const riderLat = trail?.dispatcher ? Number(trail.dispatcher.lat) : NaN;
-          const hasRider = Number.isFinite(riderLng) && Number.isFinite(riderLat);
-          const hasShop = Number.isFinite(finalShopLng) && Number.isFinite(finalShopLat);
-
-          const isCloseProximity = hasRider && hasShop
-            && calculateDistanceMeters({ lng: riderLng, lat: riderLat }, { lng: finalShopLng, lat: finalShopLat }) < 80;
-
-          // 渲染门店 Marker（近距离时智能左偏移 22px，避免被骑手盖死）
-          if (hasShop) {
-            const marker = new sdk.Marker({
-              position: [finalShopLng, finalShopLat],
-              content: createPinMarkerElement("shop", displayShopName),
-              anchor: "bottom-center",
-              offset: isCloseProximity ? new sdk.Pixel(-22, 0) : new sdk.Pixel(0, 0),
-              title: `门店：${displayShopName}`,
-              zIndex: 115,
-            });
-            map.add(marker);
-            addedMarkers.push(marker);
-          }
-
-          // 2. 顾客 Marker
-          if (customerCoord) {
-            const lng = Number(customerCoord.lng);
-            const lat = Number(customerCoord.lat);
-            if (Number.isFinite(lng) && Number.isFinite(lat)) {
-              const marker = new sdk.Marker({
-                position: [lng, lat],
-                content: createPinMarkerElement("customer", "顾客"),
-                anchor: "bottom-center",
-                title: "顾客收货地址",
-                zIndex: 120,
-              });
-              map.add(marker);
-              addedMarkers.push(marker);
-            }
-          }
-
-          // 3. 骑手 Marker 与悬浮距离气泡
-          if (hasRider) {
-            const riderMarker = new sdk.Marker({
-              position: [riderLng, riderLat],
-              content: createPinMarkerElement("rider", "骑手"),
-              anchor: "bottom-center",
-              offset: isCloseProximity ? new sdk.Pixel(22, 0) : new sdk.Pixel(0, 0),
-              title: "骑手实时位置",
-              zIndex: 140,
-            });
-            map.add(riderMarker);
-            addedMarkers.push(riderMarker);
-            const displayDistance = primaryDistanceValue
-              || (phaseInfo.phase === "delivering" && customerCoord
-                ? formatMeters(calculateDistanceMeters({ lng: riderLng, lat: riderLat }, customerCoord))
-                : (hasShop ? formatMeters(calculateDistanceMeters({ lng: riderLng, lat: riderLat }, { lng: finalShopLng, lat: finalShopLat })) : ""));
-
-            // 气泡文本：严格依据配送阶段呈现，严禁滑稽拼接
-            let bubbleText = "";
-            if (phaseInfo.phase === "delivered") {
-              bubbleText = "订单已送达";
-            } else if (phaseInfo.phase === "delivering") {
-              bubbleText = `骑手距离顾客：${displayDistance || "计算中…"}`;
-            } else if (phaseInfo.phase === "arrived_shop") {
-              bubbleText = displayDistance && displayDistance !== "已到店" ? `骑手已到店 · 距门店 ${displayDistance}` : "骑手已到店";
-            } else if (phaseInfo.phase === "assigned") {
-              bubbleText = `骑手距离门店：${displayDistance || "计算中…"}`;
-            } else {
-              bubbleText = `门店距收货地址：${displayDistance || "计算中…"}`;
-            }
-
+          if (!riderAssigned && displayShopToCustomer) {
             const bubbleMarker = new sdk.Marker({
-              position: [riderLng, riderLat],
-              content: createDistanceBubbleElement(bubbleText, isDark),
-              anchor: "bottom-center",
-              offset: isCloseProximity ? new sdk.Pixel(22, -72) : new sdk.Pixel(0, -72),
-              zIndex: 170,
-            });
-            map.add(bubbleMarker);
-            addedMarkers.push(bubbleMarker);
-          } else if (customerCoord && primaryDistanceValue) {
-            const bubbleText = phaseInfo.phase === "delivered"
-              ? "订单已送达"
-              : `门店距收货地址：${shopToCustomerDistance || primaryDistanceValue}`;
-            const bubbleMarker = new sdk.Marker({
-              position: [customerCoord.lng, customerCoord.lat],
-              content: createDistanceBubbleElement(bubbleText, isDark),
+              position: [finalCustomerLng, finalCustomerLat],
+              content: createDistanceBubbleElement(`门店距收货地址：${displayShopToCustomer}`, isDark),
               anchor: "bottom-center",
               offset: new sdk.Pixel(0, -72),
               zIndex: 170,
@@ -610,15 +587,110 @@ export function OrderRouteModal({ order, onClose }: { order: AutoPickOrder; onCl
             map.add(bubbleMarker);
             addedMarkers.push(bubbleMarker);
           }
+        }
 
-          if (addedMarkers.length > 0) {
-            try {
-              map.setFitView(addedMarkers, false, [70, 70, 70, 70]);
-            } catch {
-              // 忽略视野自适应异常
-            }
+        // C. 渲染骑手 Marker 与悬浮距离气泡（已接单/配送中状态）
+        if (hasRider) {
+          const riderMarker = new sdk.Marker({
+            position: [riderLng, riderLat],
+            content: createPinMarkerElement("rider", "骑手"),
+            anchor: "bottom-center",
+            offset: isCloseProximity ? new sdk.Pixel(22, 0) : new sdk.Pixel(0, 0),
+            title: "骑手实时位置",
+            zIndex: 140,
+          });
+          map.add(riderMarker);
+          addedMarkers.push(riderMarker);
+
+          const displayDistance = primaryDistanceValue
+            || (phaseInfo.phase === "delivering" && hasCustomer
+              ? formatMeters(calculateDistanceMeters({ lng: riderLng, lat: riderLat }, { lng: finalCustomerLng, lat: finalCustomerLat }))
+              : (hasShop ? formatMeters(calculateDistanceMeters({ lng: riderLng, lat: riderLat }, { lng: finalShopLng, lat: finalShopLat })) : ""));
+
+          let bubbleText = "";
+          if (phaseInfo.phase === "delivered") {
+            bubbleText = "订单已送达";
+          } else if (phaseInfo.phase === "delivering") {
+            bubbleText = `骑手距离顾客：${displayDistance || "计算中…"}`;
+          } else if (phaseInfo.phase === "arrived_shop") {
+            bubbleText = displayDistance && displayDistance !== "已到店" ? `骑手已到店 · 距门店 ${displayDistance}` : "骑手已到店";
+          } else if (phaseInfo.phase === "assigned") {
+            bubbleText = `骑手距离门店：${displayDistance || "计算中…"}`;
+          } else {
+            bubbleText = `门店距收货地址：${displayDistance || "计算中…"}`;
+          }
+
+          const riderBubbleMarker = new sdk.Marker({
+            position: [riderLng, riderLat],
+            content: createDistanceBubbleElement(bubbleText, isDark),
+            anchor: "bottom-center",
+            offset: isCloseProximity ? new sdk.Pixel(22, -72) : new sdk.Pixel(0, -72),
+            zIndex: 170,
+          });
+          map.add(riderBubbleMarker);
+          addedMarkers.push(riderBubbleMarker);
+        } else if (riderAssigned && hasCustomer && (shopToCustomerDistance || primaryDistanceValue)) {
+          const bubbleText = phaseInfo.phase === "delivered"
+            ? "订单已送达"
+            : `门店距收货地址：${shopToCustomerDistance || primaryDistanceValue}`;
+          const bubbleMarker = new sdk.Marker({
+            position: [finalCustomerLng, finalCustomerLat],
+            content: createDistanceBubbleElement(bubbleText, isDark),
+            anchor: "bottom-center",
+            offset: new sdk.Pixel(0, -72),
+            zIndex: 170,
+          });
+          map.add(bubbleMarker);
+          addedMarkers.push(bubbleMarker);
+        }
+
+        // 关键：立即聚焦并自适应视野，确保绝对不停留在默认北京中心！
+        if (addedMarkers.length > 0) {
+          try {
+            map.setFitView(addedMarkers, false, [70, 70, 70, 70]);
+          } catch {
+            // 忽略视野自适应异常
           }
         }
+
+        // D. 路线规划与优雅降级（根据状态规划门店到顾客，或骑手路线）
+        if (!riderAssigned && hasShop && hasCustomer) {
+          const startPoint: [number, number] = [finalShopLng, finalShopLat];
+          const endPoint: [number, number] = [finalCustomerLng, finalCustomerLat];
+          const riding = new sdk.Riding({ map, showDir: true, autoFitView: false });
+          riding.search(startPoint, endPoint, (status: string, result: any) => {
+            if (disposed) return;
+            const route = result?.routes?.[0];
+            if (status === "complete" && route) {
+              const distText = `${(route.distance / 1000).toFixed(1)}公里`;
+              setRouteSummary(distText);
+              try {
+                map.setFitView(undefined, false, [70, 70, 70, 70]);
+              } catch {
+                // 忽略
+              }
+            } else {
+              // 骑行路线规划失败或距离超出限制时，优雅绘制直连虚线，绝不中断展示
+              try {
+                const polyline = new sdk.Polyline({
+                  path: [startPoint, endPoint],
+                  strokeColor: "#0284c7",
+                  strokeOpacity: 0.85,
+                  strokeWeight: 4,
+                  strokeStyle: "dashed",
+                  strokeDasharray: [10, 6],
+                  lineJoin: "round",
+                  lineCap: "round",
+                  zIndex: 50,
+                });
+                map.add(polyline);
+              } catch {
+                // 忽略虚线绘制异常
+              }
+            }
+          });
+        }
+
         setMapError("");
       } catch (err) {
         if (!disposed) setMapError(err instanceof Error ? err.message : "地图加载失败");
@@ -638,7 +710,7 @@ export function OrderRouteModal({ order, onClose }: { order: AutoPickOrder; onCl
         // 忽略地图销毁异常
       }
     };
-  }, [trail, riderAssigned, shopAddress, displayShopName, order.longitude, order.latitude, order.userAddress, attempt, customerCoord, phaseInfo.phase, primaryDistanceValue, shopToCustomerDistance, isDark]);
+  }, [trail, riderAssigned, effectiveShopAddress, displayShopName, derivedCity, order.longitude, order.latitude, order.userAddress, attempt, customerCoord, phaseInfo.phase, primaryDistanceValue, shopToCustomerDistance, effectiveShopCoord, isDark]);
 
   return createPortal(
     <dialog
