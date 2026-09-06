@@ -3228,7 +3228,7 @@ export const OrderCard = memo(function OrderCard({
                         <span className="truncate">{order.matchedShopName || "未绑定门店"}</span>
                       </button>
                     }
-                    value={(order.shopAddress && order.shopAddress !== order.rawShopName) ? order.shopAddress : (order.rawShopAddress && order.rawShopAddress !== order.rawShopName ? order.rawShopAddress : "-")}
+                    value={order.shopAddress || order.rawShopAddress || "-"}
                     className="sm:col-span-2"
                   />
                   <DetailBlock

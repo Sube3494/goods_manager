@@ -3728,13 +3728,9 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
     const sourceId = normalized.id || existing?.sourceId || "";
     const deliveryId = normalized.deliveryId || existing?.deliveryId || null;
     const shopId = normalized.shopId || existing?.shopId || null;
-    const candidateShopAddress = normalized.shopAddress && normalized.shopAddress !== normalized.rawShopName
+    const shopAddress = (normalized.shopAddress && normalized.shopAddress !== normalized.rawShopName)
       ? normalized.shopAddress
-      : null;
-    const existingSafeShopAddress = existing?.shopAddress && existing.shopAddress !== (existing as any).rawShopName
-      ? existing.shopAddress
-      : null;
-    const shopAddress = candidateShopAddress || existingSafeShopAddress || existing?.shopAddress || null;
+      : (existing?.shopAddress || null);
     const isExistingCompleted = isAutoPickOrderCompletedStatus(existing?.status);
     const isIncomingTerminal = isAutoPickOrderTerminalStatus(normalized.status);
     const shouldKeepCompletedStatus = isExistingCompleted && !isIncomingTerminal;

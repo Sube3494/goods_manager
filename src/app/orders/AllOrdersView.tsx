@@ -530,11 +530,6 @@ export function AllOrdersView({
           patchOrder(orderId, (order) => ({
             ...order,
             ...data.order,
-            matchedShopName: data.order.matchedShopName || order.matchedShopName,
-            matchedShopId: data.order.matchedShopId || order.matchedShopId,
-            shopAddress: (data.order.shopAddress && data.order.shopAddress !== (data.order.rawShopName || order.rawShopName))
-              ? data.order.shopAddress
-              : (order.shopAddress || data.order.shopAddress),
             items: data.order.items && data.order.items.some((i: any) => i.matchedProduct)
               ? data.order.items
               : order.items,
