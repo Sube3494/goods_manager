@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { RecentInboundItem, Shop } from "@/lib/types";
 import { useRouter } from "next/navigation";
 import { CustomSelect } from "@/components/ui/CustomSelect";
+import { isShopNameMatch } from "@/lib/shopIdentity";
 
 type TabKey = "inbound" | "top";
 
@@ -67,9 +68,11 @@ export function DashboardFeedPanel({
 
   const filteredInboundItems = useMemo(() => {
     if (!feedShopName) return recentInboundItems;
-    return recentInboundItems.filter(
-      (item) => item.purchaseOrder?.shopName === feedShopName
-    );
+    return recentInboundItems.filter((item) => {
+      const itemShop = item.purchaseOrder?.shopName;
+      if (!itemShop) return true;
+      return isShopNameMatch(itemShop, feedShopName);
+    });
   }, [recentInboundItems, feedShopName]);
 
   useEffect(() => {
@@ -126,7 +129,7 @@ export function DashboardFeedPanel({
       );
     }
 
-    if (!recentInboundItems.length) {
+    if (!filteredInboundItems.length) {
       return (
         <div className="flex flex-col items-center justify-center py-10 text-center opacity-35">
           <Package size={34} className="text-muted-foreground" />

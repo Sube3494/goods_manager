@@ -1512,9 +1512,9 @@ function OfflineOrderEditModal({
         id: item.id,
         productId: manualMatched?.id || item.matchedProduct?.id || "",
         shopProductId: manualMatched?.shopProductId || item.matchedProduct?.shopProductId || null,
-        productName: item.productName || "未命名商品",
-        productNo: item.productNo || item.matchedProduct?.sku || null,
-        thumb: item.thumb || item.matchedProduct?.image || null,
+        productName: manualMatched?.name || item.matchedProduct?.name || (item.productName !== "手工配送占位商品" ? item.productName : "") || "未命名商品",
+        productNo: manualMatched?.sku || item.matchedProduct?.sku || (item.productNo !== "__manual_delivery_placeholder__" ? item.productNo : null) || null,
+        thumb: manualMatched?.image || item.matchedProduct?.image || item.thumb || null,
         quantity: Math.max(1, Number(item.quantity) || 1),
         sourceType: (manualMatched?.sourceType as "product" | "shopProduct") || "shopProduct",
       };
@@ -2360,6 +2360,11 @@ export const OrderCard = memo(function OrderCard({
     : customerPhone;
   const isUnsupportedPlatform = order.platform === "淘宝"
     || order.platform === "京东"
+    || order.platform === "线下交易"
+    || String(order.platform || "").includes("线下")
+    || String(order.platform || "").toLowerCase() === "other"
+    || displayAsOfflineOrder
+    || isPureOffline
     || isUnsupportedCustomerTypePayload(order.rawPayload);
   const resolvedCustomerType = isUnsupportedPlatform
     ? null

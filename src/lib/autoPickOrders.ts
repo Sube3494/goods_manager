@@ -844,7 +844,17 @@ export function isUnsupportedCustomerTypePayload(rawPayload: unknown): boolean {
       platform.includes("jd") ||
       orderCopy.includes("京东")
     );
-    return isTaobao || isJD;
+    const isOffline = (
+      platform === "线下交易" ||
+      platform.includes("线下") ||
+      platform === "other" ||
+      record.isManualOffline === true ||
+      (record.systemMeta as any)?.isManualOffline === true ||
+      record.isManualDeliveryPlaceholder === true ||
+      String(record.orderNo || "").startsWith("OFFLINE-") ||
+      String(record.id || "").startsWith("OFFLINE-")
+    );
+    return isTaobao || isJD || isOffline;
   };
 
   if (checkRecord(root)) return true;

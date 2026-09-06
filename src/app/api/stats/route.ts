@@ -24,7 +24,7 @@ import { getOutboundReturnTotals, parseOutboundReturnMeta } from "@/lib/outbound
 import { getDailyFixedOperatingCost, getDailyUtilityCost, normalizeMonthKey } from "@/lib/operatingCosts";
 import { AUTO_INBOUND_NOTE_KEYWORD, AUTO_INBOUND_TYPE, ORDER_SHORTAGE_PURCHASE_NOTE_KEYWORD } from "@/lib/purchaseOrderTypes";
 import { isAddressDisabled } from "@/lib/addressBook";
-import { normalizeShopNameKey } from "@/lib/shopIdentity";
+import { normalizeShopNameKey, isShopNameMatch, stripShopSuffix } from "@/lib/shopIdentity";
 
 const SHANGHAI_DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -373,23 +373,38 @@ export async function GET(request: NextRequest) {
     }
     perf.lap("range-bootstrap");
 
+    const allUserShops = await prisma.shop.findMany({
+      where: { userId: targetUserId },
+      select: { id: true, name: true, address: true },
+    });
+
+    const matchedShops = shopName
+      ? allUserShops.filter((s) => isShopNameMatch(s.name, shopName))
+      : [];
+    const matchedShopNames = Array.from(
+      new Set([
+        shopName,
+        ...matchedShops.map((s) => s.name),
+        stripShopSuffix(shopName),
+      ].filter(Boolean))
+    );
+    const matchedShopIds = matchedShops.map((s) => s.id);
+    const shopCoreKeyword = stripShopSuffix(shopName) || shopName;
+
     const [shopCount, localShops, shopProductRows, recentInboundItems, purchaseOrdersInRange, outboundOrdersInRange, pendingOrders, autoPickOrdersInRange] = await Promise.all([
       prisma.shop.count({
         where: {
           userId: targetUserId,
           isSource: true,
-          ...(shopName ? { name: shopName } : {}),
+          ...(shopName ? { name: { in: matchedShopNames } } : {}),
         },
       }),
-      prisma.shop.findMany({
-        where: { userId: targetUserId },
-        select: { name: true },
-      }),
+      Promise.resolve(allUserShops),
       prisma.shopProduct.findMany({
         where: {
           shop: {
             userId: targetUserId,
-            ...(shopName ? { name: shopName } : {}),
+            ...(shopName ? { name: { in: matchedShopNames } } : {}),
           },
         },
         select: {
@@ -416,20 +431,44 @@ export async function GET(request: NextRequest) {
               { note: { contains: AUTO_INBOUND_NOTE_KEYWORD, mode: "insensitive" } },
               { note: { contains: ORDER_SHORTAGE_PURCHASE_NOTE_KEYWORD, mode: "insensitive" } },
             ],
-            ...(shopName ? { shopName } : {}),
           },
+          ...(shopName ? {
+            OR: [
+              { purchaseOrder: { shopName: { in: matchedShopNames } } },
+              ...(shopCoreKeyword ? [{ purchaseOrder: { shopName: { contains: shopCoreKeyword, mode: "insensitive" as const } } }] : []),
+              ...(matchedShopIds.length > 0 ? [{ shopProduct: { shopId: { in: matchedShopIds } } }] : []),
+              { shopProduct: { shop: { name: { in: matchedShopNames } } } },
+              ...(shopCoreKeyword ? [{ shopProduct: { shop: { name: { contains: shopCoreKeyword, mode: "insensitive" as const } } } }] : []),
+              ...(shopCoreKeyword ? [{ purchaseOrder: { shippingAddress: { contains: shopCoreKeyword, mode: "insensitive" as const } } }] : []),
+            ],
+          } : {}),
         },
         include: {
           product: { select: { id: true, name: true, sku: true, image: true } },
           supplier: { select: { id: true, name: true } },
-          purchaseOrder: { select: { id: true, date: true, status: true, shopName: true } },
+          shopProduct: {
+            select: {
+              id: true,
+              productName: true,
+              sku: true,
+              shop: { select: { id: true, name: true } },
+            },
+          },
+          purchaseOrder: { select: { id: true, date: true, status: true, shopName: true, shippingAddress: true } },
         },
         orderBy: { purchaseOrder: { date: "desc" } },
       }),
       prisma.purchaseOrder.findMany({
         where: {
           userId: targetUserId,
-          ...(shopName ? { shopName } : {}),
+          ...(shopName ? {
+            OR: [
+              { shopName: { in: matchedShopNames } },
+              ...(shopCoreKeyword ? [{ shopName: { contains: shopCoreKeyword, mode: "insensitive" as const } }] : []),
+              ...(shopCoreKeyword ? [{ shippingAddress: { contains: shopCoreKeyword, mode: "insensitive" as const } }] : []),
+              ...(matchedShopIds.length > 0 ? [{ items: { some: { shopProduct: { shopId: { in: matchedShopIds } } } } }] : []),
+            ],
+          } : {}),
           NOT: [
             { type: AUTO_INBOUND_TYPE },
             { id: { startsWith: "PO-AUTO-" } },
@@ -470,7 +509,14 @@ export async function GET(request: NextRequest) {
         where: {
           userId: targetUserId,
           status: "Ordered",
-          ...(shopName ? { shopName } : {}),
+          ...(shopName ? {
+            OR: [
+              { shopName: { in: matchedShopNames } },
+              ...(shopCoreKeyword ? [{ shopName: { contains: shopCoreKeyword, mode: "insensitive" as const } }] : []),
+              ...(shopCoreKeyword ? [{ shippingAddress: { contains: shopCoreKeyword, mode: "insensitive" as const } }] : []),
+              ...(matchedShopIds.length > 0 ? [{ items: { some: { shopProduct: { shopId: { in: matchedShopIds } } } } }] : []),
+            ],
+          } : {}),
           NOT: [
             { type: AUTO_INBOUND_TYPE },
             { id: { startsWith: "PO-AUTO-" } },
@@ -506,6 +552,7 @@ export async function GET(request: NextRequest) {
               quantity: true,
               productNo: true,
               productName: true,
+              rawPayload: true,
             },
           },
         },
@@ -1225,10 +1272,13 @@ export async function GET(request: NextRequest) {
 
     filteredAutoPickOrdersInRange.forEach((order) => {
       const isBrush = readMainSystemSelfDeliveryFlag(order.rawPayload);
+      const isOffline = isVoidedOfflineOrder(order)
+        || String(order.platform || "").trim() === "线下交易"
+        || String(order.platform || "").includes("线下")
+        || String(order.platform || "").toLowerCase() === "other";
       const isOther = isAutoPickOrderCancelledStatus(order.status)
-        || isAutoPickOrderDeletedStatus(order.status)
-        || isVoidedOfflineOrder(order);
-      if (isBrush || isOther) return;
+        || isAutoPickOrderDeletedStatus(order.status);
+      if (isBrush || isOther || isOffline) return;
 
       const dateKey = resolveAutoPickOrderDateKey(order);
       const daily = customerDailyMap.get(dateKey);
@@ -1240,8 +1290,52 @@ export async function GET(request: NextRequest) {
         returningCustomerOrders += 1;
         if (daily) daily.returningCustomerOrders += 1;
         order.items.forEach((item) => {
-          const productName = String(item.productName || "").trim() || "未命名商品";
-          const sku = String(item.productNo || "").trim() || null;
+          const payloadObj = item.rawPayload && typeof item.rawPayload === "object" && !Array.isArray(item.rawPayload)
+            ? item.rawPayload as Record<string, unknown>
+            : null;
+          const manualMatched = payloadObj?.manualMatchedProduct && typeof payloadObj.manualMatchedProduct === "object"
+            ? payloadObj.manualMatchedProduct as Record<string, unknown>
+            : null;
+
+          const isPlaceholder = String(item.productNo || "").trim() === "__manual_delivery_placeholder__"
+            || payloadObj?.isManualDeliveryPlaceholder === true
+            || String(item.productName || "").trim() === "手工配送占位商品";
+
+          // 如果是手工配送占位商品且未关联系统商品，或者是无需出库占位，绝不作为真实商品计入老客常买
+          if (isPlaceholder && !manualMatched) return;
+          if (payloadObj?.ignoreOutbound === true || payloadObj?.isManualIgnored === true) return;
+          if (manualMatched?.id === "__ignored__" || (manualMatched as any)?.ignoreOutbound === true) return;
+
+          // 如果匹配了组合商品，展开统计组合中的真实商品
+          const bundleItems = Array.isArray((manualMatched as any)?.bundleItems)
+            ? ((manualMatched as any).bundleItems as any[])
+            : null;
+
+          if (bundleItems && bundleItems.length > 0) {
+            const orderItemQty = Math.max(1, Number(item.quantity || 1) || 1);
+            bundleItems.forEach((b) => {
+              const bName = String(b?.name || "").trim() || "未命名商品";
+              const bSku = String(b?.sku || "").trim() || null;
+              const bQty = Math.max(1, Number(b?.quantity || 1) || 1);
+              const bKey = `${bSku || ""}::${bName}`;
+              const current = returningProductMap.get(bKey) || {
+                productName: bName,
+                sku: bSku,
+                quantity: 0,
+                orderNos: new Set<string>(),
+              };
+              current.quantity += bQty * orderItemQty;
+              current.orderNos.add(order.orderNo);
+              returningProductMap.set(bKey, current);
+            });
+            return;
+          }
+
+          // 优先展示匹配绑定的真实系统商品名称和货号
+          const productName = String(manualMatched?.name || (item.productName !== "手工配送占位商品" ? item.productName : "") || "").trim() || "未命名商品";
+          const sku = String(manualMatched?.sku || (item.productNo !== "__manual_delivery_placeholder__" ? item.productNo : "") || "").trim() || null;
+          if (productName === "手工配送占位商品" || sku === "__manual_delivery_placeholder__") return;
+
           const key = `${sku || ""}::${productName}`;
           const current = returningProductMap.get(key) || {
             productName,
@@ -1305,18 +1399,26 @@ export async function GET(request: NextRequest) {
     ];
 
     const transformedInboundItems = recentInboundItems.map((item) => {
-      const matchedShopProduct = shopProductRows.find((sp) =>
+      const itemShopProduct = (item as any).shopProduct;
+      const matchedShopProduct = itemShopProduct || shopProductRows.find((sp) =>
         (
           (sp.productId && sp.productId === item.productId) ||
           (sp.sourceProductId && sp.sourceProductId === item.productId) ||
           sp.id === item.productId
         ) &&
-        (!item.purchaseOrder?.shopName || sp.shop?.name === item.purchaseOrder.shopName)
+        (!item.purchaseOrder?.shopName || isShopNameMatch(sp.shop?.name, item.purchaseOrder.shopName))
       );
 
       // 店铺商品与模板库严格隔离：只能且只使用店铺本身(ShopProduct)的编号与属性
       const shopProductSku = matchedShopProduct ? (matchedShopProduct.sku || "") : "";
       const cleanSku = String(shopProductSku).replace(/\(自编\)|（自编）/gi, "").trim();
+
+      const resolvedShopName =
+        item.purchaseOrder?.shopName ||
+        itemShopProduct?.shop?.name ||
+        matchedShopProduct?.shop?.name ||
+        shopName ||
+        "";
 
       return {
         id: item.id,
@@ -1325,14 +1427,17 @@ export async function GET(request: NextRequest) {
           ? {
               ...item.product,
               name: matchedShopProduct?.productName || item.product.name,
-              sku: cleanSku || null,
+              sku: cleanSku || itemShopProduct?.sku || null,
               image: item.product.image ? storage.resolveUrl(item.product.image) : null,
             }
           : null,
         supplier: item.supplier,
         quantity: item.quantity,
         costPrice: item.costPrice,
-        purchaseOrder: item.purchaseOrder,
+        purchaseOrder: {
+          ...item.purchaseOrder,
+          shopName: resolvedShopName,
+        },
         subtotal: FinanceMath.multiply(item.costPrice, item.quantity),
       };
     });

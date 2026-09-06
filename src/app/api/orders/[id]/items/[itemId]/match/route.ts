@@ -319,6 +319,8 @@ export async function PATCH(
       select: {
         id: true,
         productNo: true,
+        productName: true,
+        thumb: true,
         platformSkuId: true,
         rawPayload: true,
         order: {
@@ -493,10 +495,24 @@ export async function PATCH(
         }),
       };
 
+      const isPlaceholderItem =
+        String(orderItem.productNo || "").trim() === "__manual_delivery_placeholder__" ||
+        String(orderItem.productName || "").trim() === "手工配送占位商品" ||
+        (basePayload && typeof basePayload === "object" && (basePayload as any).isManualDeliveryPlaceholder === true);
+
       await prisma.$transaction(async (tx) => {
+        const bundleNames = shopProducts.map((p) => p.productName).filter(Boolean).join(" + ");
+        const bundleSkus = shopProducts.map((p) => p.sku).filter(Boolean).join(" + ");
+        const firstImg = shopProducts[0]?.productImage || shopProducts[0]?.product?.image || null;
+
         await tx.autoPickOrderItem.update({
           where: { id: orderItem.id },
           data: {
+            ...(isPlaceholderItem && bundleNames ? {
+              productName: bundleNames,
+              productNo: bundleSkus || orderItem.productNo,
+              thumb: firstImg ? storage.resolveUrl(firstImg) : orderItem.thumb,
+            } : {}),
             rawPayload: {
               ...restPayload,
               manualMatchedProduct: matchedProduct,
@@ -622,9 +638,19 @@ export async function PATCH(
         });
       }
 
+      const isPlaceholderItem =
+        String(orderItem.productNo || "").trim() === "__manual_delivery_placeholder__" ||
+        String(orderItem.productName || "").trim() === "手工配送占位商品" ||
+        (basePayload && typeof basePayload === "object" && (basePayload as any).isManualDeliveryPlaceholder === true);
+
       await tx.autoPickOrderItem.update({
         where: { id: orderItem.id },
         data: {
+          ...(isPlaceholderItem && matchedProduct.name ? {
+            productName: matchedProduct.name,
+            productNo: matchedProduct.sku || orderItem.productNo,
+            thumb: matchedProduct.image || orderItem.thumb,
+          } : {}),
           rawPayload: {
             ...restPayload,
             manualMatchedProduct: {

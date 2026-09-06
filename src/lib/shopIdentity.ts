@@ -141,7 +141,7 @@ export function findMatchingShopRecord<T extends ShopIdentityRecord>(
   return null;
 }
 
-function stripShopSuffix(value: string) {
+export function stripShopSuffix(value: string) {
   return value.replace(/(门店|店铺|旗舰店|总店|分店|一店|二店|三店|四店|五店|店)$/g, "").trim();
 }
 
