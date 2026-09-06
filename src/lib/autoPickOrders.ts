@@ -1798,6 +1798,7 @@ function readPreferredMaiyatianShopAddress(rawOrder: Record<string, unknown>) {
   const extend = rawOrder.extend && typeof rawOrder.extend === "object" && !Array.isArray(rawOrder.extend)
     ? rawOrder.extend as Record<string, unknown>
     : null;
+  const shopName = String(rawOrder.shop_name || rawOrder.shopName || extend?.channel_name || "").trim();
   const candidates = [
     rawOrder.shop_address,
     rawOrder.shopAddress,
@@ -1813,12 +1814,11 @@ function readPreferredMaiyatianShopAddress(rawOrder: Record<string, unknown>) {
     extend?.merchant_address,
     extend?.channelAddress,
     extend?.channel_address,
-    rawOrder.shop_name,
   ];
 
   for (const item of candidates) {
     const value = String(item || "").trim();
-    if (value) {
+    if (value && value !== shopName) {
       return value;
     }
   }
@@ -2372,7 +2372,7 @@ async function enrichMaiyatianOrderByCookie(cookie: string, order: AutoPickInbou
   }
 
   const detailShopAddress = readPreferredMaiyatianShopAddress((detailData || {}) as Record<string, unknown>);
-  if (detailShopAddress) {
+  if (detailShopAddress && detailShopAddress !== order.rawShopName) {
     order.shopAddress = detailShopAddress;
     order.rawShopAddress = detailShopAddress;
   }
@@ -3728,7 +3728,13 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
     const sourceId = normalized.id || existing?.sourceId || "";
     const deliveryId = normalized.deliveryId || existing?.deliveryId || null;
     const shopId = normalized.shopId || existing?.shopId || null;
-    const shopAddress = normalized.shopAddress || existing?.shopAddress || null;
+    const candidateShopAddress = normalized.shopAddress && normalized.shopAddress !== normalized.rawShopName
+      ? normalized.shopAddress
+      : null;
+    const existingSafeShopAddress = existing?.shopAddress && existing.shopAddress !== (existing as any).rawShopName
+      ? existing.shopAddress
+      : null;
+    const shopAddress = candidateShopAddress || existingSafeShopAddress || existing?.shopAddress || null;
     const isExistingCompleted = isAutoPickOrderCompletedStatus(existing?.status);
     const isIncomingTerminal = isAutoPickOrderTerminalStatus(normalized.status);
     const shouldKeepCompletedStatus = isExistingCompleted && !isIncomingTerminal;

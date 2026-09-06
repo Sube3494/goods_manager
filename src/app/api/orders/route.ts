@@ -1293,7 +1293,7 @@ export async function GET(request: NextRequest) {
       }),
       prisma.shop.findMany({
         where: { userId: targetUserId },
-        select: { id: true, name: true },
+        select: { id: true, name: true, address: true },
       }),
       liteMode
         ? Promise.resolve([])
@@ -2238,6 +2238,10 @@ export async function GET(request: NextRequest) {
       const existingMappedShop = resolveExistingLocalShop({ name: mappingDebug.localShopName });
       const matchedShopId = existingLockedShop?.id || existingMappedShop?.id || null;
       const matchedShopName = String(existingLockedShop?.name || existingMappedShop?.name || "").trim();
+      const rawShopName = String(order.rawShopName || "").trim();
+      const effectiveShopAddress = (order.shopAddress && order.shopAddress !== rawShopName)
+        ? order.shopAddress
+        : (existingLockedShop?.address || existingMappedShop?.address || (order.shopAddress !== rawShopName ? order.shopAddress : null));
       const autoOutboundMeta = readAutoOutboundMeta(order.rawPayload);
       const outboundMeta = outboundByOrderNo.get(order.orderNo) || null;
       const hiddenDeletedOfflineIncome = order.isDeleted && order.platform === "线下交易";
@@ -2319,6 +2323,7 @@ export async function GET(request: NextRequest) {
 
       return {
         ...order,
+        shopAddress: effectiveShopAddress,
         delivery: normalizedDelivery,
         actualPaid: order.actualPaid,
         expectedIncome: safeExpectedIncome,

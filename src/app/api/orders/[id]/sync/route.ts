@@ -13,8 +13,10 @@ import {
   readCustomerTypeFromRawPayload,
   readRiderPhoneFromDelivery,
   readRiderPhoneFromRawPayload,
+  readShopNameFromRawPayload,
   refreshAutoPickOrderFromPlugin,
   resolveAutoPickCommandPlatform,
+  resolveAutoPickMatchedShopName,
   syncAutoOutboundFromCompletedAutoPickOrder,
   syncBrushOrderFromCompletedAutoPickOrder,
 } from "@/lib/autoPickOrders";
@@ -156,8 +158,45 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
       || normalized?.customerType
       || null;
 
+    const user = await prisma.user.findUnique({
+      where: { id: order.userId },
+      select: { permissions: true },
+    });
+    const matchedShopName = resolveAutoPickMatchedShopName(refreshedOrder, user?.permissions);
+    let matchedShopId: string | null = null;
+    let localShopAddress: string | null = null;
+    if (matchedShopName) {
+      const localShop = await prisma.shop.findFirst({
+        where: {
+          userId: order.userId,
+          name: matchedShopName,
+        },
+        select: { id: true, address: true },
+      });
+      if (localShop) {
+        matchedShopId = localShop.id;
+        localShopAddress = localShop.address;
+      }
+    }
+
+    const rawShopName = readShopNameFromRawPayload(refreshedOrder.rawPayload) || "";
+    const existingSafeAddress = (refreshedOrder.shopAddress && refreshedOrder.shopAddress !== rawShopName)
+      ? refreshedOrder.shopAddress
+      : (order.shopAddress && order.shopAddress !== rawShopName ? order.shopAddress : null);
+    const effectiveShopAddress = existingSafeAddress || localShopAddress || (refreshedOrder.shopAddress !== rawShopName ? refreshedOrder.shopAddress : null);
+
+    if (effectiveShopAddress && refreshedOrder.shopAddress !== effectiveShopAddress) {
+      await prisma.autoPickOrder.update({
+        where: { id: refreshedOrder.id },
+        data: { shopAddress: effectiveShopAddress },
+      }).catch(() => {});
+    }
+
     const syncedOrder = {
       ...refreshedOrder,
+      shopAddress: effectiveShopAddress,
+      matchedShopId,
+      matchedShopName,
       expectedIncome: computedExpectedIncome,
       platformCommission: computedPlatformCommission,
       completedAt: normalized?.completedAt || null,
