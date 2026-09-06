@@ -2397,50 +2397,62 @@ export default function OrdersPage() {
                 </p>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+              <div className="flex items-center gap-2 sm:flex-wrap">
                 <button
                   type="button"
                   onClick={syncOrders}
                   disabled={isBulkSyncing || isSubComponentLoading}
-                  className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-black/8 bg-white/80 px-3 py-2.5 text-sm text-foreground transition-all hover:bg-white disabled:opacity-50 sm:w-auto sm:px-4 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8"
+                  className="relative inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-xl border border-black/8 bg-white/80 p-0 text-sm text-foreground transition-all hover:bg-white disabled:opacity-50 sm:h-auto sm:w-auto sm:min-h-11 sm:flex-none sm:px-4 sm:py-2.5 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8"
+                  title="一键同步"
+                  aria-label="一键同步"
                 >
-                  {isBulkSyncing ? <Loader2 size={15} className="animate-spin" /> : <ArrowUpRight size={15} />}
-                  一键同步
+                  {isBulkSyncing ? <Loader2 size={16} className="animate-spin shrink-0" /> : <ArrowUpRight size={16} className="shrink-0" />}
+                  <span className="hidden sm:inline">一键同步</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={openBrushSyncPicker}
                   disabled={isBulkBrushSyncing || isSubComponentLoading}
-                  className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-black/8 bg-white/80 px-3 py-2.5 text-sm text-foreground transition-all hover:bg-white disabled:opacity-50 sm:w-auto sm:px-4 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8"
+                  className="relative inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-xl border border-black/8 bg-white/80 p-0 text-sm text-foreground transition-all hover:bg-white disabled:opacity-50 sm:h-auto sm:w-auto sm:min-h-11 sm:flex-none sm:px-4 sm:py-2.5 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8"
+                  title="同步刷单"
+                  aria-label="同步刷单"
                 >
-                  {isBulkBrushSyncing ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
-                  同步刷单
+                  {isBulkBrushSyncing ? <Loader2 size={16} className="animate-spin shrink-0" /> : <Check size={16} className="shrink-0" />}
+                  <span className="hidden sm:inline">同步刷单</span>
                 </button>
+
                 <button
                   type="button"
                   onClick={() => setIsCreateOfflineOpen(true)}
-                  className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-black/8 bg-white/80 px-3 py-2.5 text-sm text-foreground transition-all hover:bg-white sm:w-auto sm:px-4 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8"
+                  className="relative inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-xl border border-black/8 bg-white/80 p-0 text-sm text-foreground transition-all hover:bg-white sm:h-auto sm:w-auto sm:min-h-11 sm:flex-none sm:px-4 sm:py-2.5 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8"
+                  title="录入线下"
+                  aria-label="录入线下"
                 >
-                  <Plus size={15} />
-                  录入线下
+                  <Plus size={16} className="shrink-0" />
+                  <span className="hidden sm:inline">录入线下</span>
                 </button>
+
                 <button
                   type="button"
                   onClick={() => setIsDistributionModalOpen(true)}
-                  className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-black/8 bg-white/80 px-3 py-2.5 text-sm text-foreground transition-all hover:bg-white sm:w-auto sm:px-4 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8"
-                  title="查看当前店铺的订单地理分布地图"
+                  className="relative inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-xl border border-black/8 bg-white/80 p-0 text-sm text-foreground transition-all hover:bg-white sm:h-auto sm:w-auto sm:min-h-11 sm:flex-none sm:px-4 sm:py-2.5 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8"
+                  title="订单分布"
+                  aria-label="订单分布"
                 >
-                  <MapPin size={15} />
-                  订单分布
+                  <MapPin size={16} className="shrink-0" />
+                  <span className="hidden sm:inline">订单分布</span>
                 </button>
+
                 <button
                   type="button"
                   onClick={() => setIsIntegrationOpen(true)}
-                  className="relative inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-black/8 bg-white/80 px-3 py-2.5 text-sm text-foreground transition-all hover:bg-white sm:w-auto sm:px-4 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8"
+                  className="relative inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-xl border border-black/8 bg-white/80 p-0 text-sm text-foreground transition-all hover:bg-white sm:h-auto sm:w-auto sm:min-h-11 sm:flex-none sm:px-4 sm:py-2.5 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8"
+                  title="对接配置"
+                  aria-label="对接配置"
                 >
-                  <Settings2 size={15} />
-                  对接配置
+                  <Settings2 size={16} className="shrink-0" />
+                  <span className="hidden sm:inline">对接配置</span>
                   {hasUnresolvedShops && (
                     <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
