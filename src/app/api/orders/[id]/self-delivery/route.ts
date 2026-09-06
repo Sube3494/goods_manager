@@ -10,7 +10,6 @@ import {
   isAutoPickOrderDeliveringStatus,
   isAutoPickOrderRiderAssigned,
   isAutoPickPickupOrder,
-  isAutoPickSelfDeliveryStarted,
 } from "@/lib/autoPickOrderStatus";
 import { getEstimatedAutoCompleteAt } from "@/lib/autoPickSchedule";
 
@@ -83,10 +82,6 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
       return NextResponse.json({ error: "骑手已接单，不能发起自配" }, { status: 409 });
     }
 
-    if (isAutoPickSelfDeliveryStarted(order)) {
-      return NextResponse.json({ error: "订单已在自配送中，不能重复发起自配" }, { status: 409 });
-    }
-
     const commandBaseOrder = order;
     let commandOrder = commandBaseOrder;
     const shouldRefreshBeforeSelfDelivery = isAutoPickOrderAbnormalStatus(order.status)
@@ -109,9 +104,6 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
         }
         if (isAutoPickOrderDeliveringStatus(commandOrder.status)) {
           return NextResponse.json({ error: "订单已在配送中，不能发起自配" }, { status: 409 });
-        }
-        if (isAutoPickSelfDeliveryStarted(commandOrder)) {
-          return NextResponse.json({ error: "订单已在自配送中，不能重复发起自配" }, { status: 409 });
         }
       }
     }

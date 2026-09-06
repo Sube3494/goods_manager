@@ -374,7 +374,7 @@ export function isAutoPickOrderRiderAssigned(order?: {
     ? order.delivery as Record<string, unknown>
     : {};
 
-  // 1. 检查是否有真实的第三方骑手姓名（排除自配送/商家自配）
+  // 1. 检查是否有真实的第三方骑手姓名（排除自配/自配送/商家自配）
   const riderNameCandidates = [
     orderDelivery.riderName,
     orderDelivery.rider_name,
@@ -386,20 +386,20 @@ export function isAutoPickOrderRiderAssigned(order?: {
     rawPayloadDelivery.dispatcher_name,
   ].map((item) => String(item || "").trim()).filter(Boolean);
 
-  const hasThirdPartyRiderName = riderNameCandidates.some((name) => !/自配|自配送|商家自配/i.test(name));
+  const hasThirdPartyRiderName = riderNameCandidates.some((name) => !/自配|自配送|商家自配|oneself/i.test(name));
   if (hasThirdPartyRiderName) {
     return true;
   }
 
-  // 2. 检查是否有骑手电话（排除自配送物流下的自配电话）
+  // 2. 检查是否有骑手电话（排除自配送物流下的电话）
   const logisticCandidates = [
     orderDelivery.logisticName,
     orderDelivery.logistic_name,
     rawPayloadDelivery.logisticName,
     rawPayloadDelivery.logistic_name,
   ].map((item) => String(item || "").trim()).filter(Boolean);
-  const isSelfLogistic = logisticCandidates.some((name) => /自配|自配送|商家自配/i.test(name));
-  const hasSelfRiderName = riderNameCandidates.some((name) => /自配|自配送|商家自配/i.test(name));
+  const isSelfLogistic = logisticCandidates.some((name) => /自配|自配送|商家自配|oneself/i.test(name));
+  const hasSelfRiderName = riderNameCandidates.some((name) => /自配|自配送|商家自配|oneself/i.test(name));
 
   const riderPhoneCandidates = [
     orderDelivery.riderPhone,
@@ -416,34 +416,17 @@ export function isAutoPickOrderRiderAssigned(order?: {
     return true;
   }
 
-  // 3. 检查配送运单状态与运单轨迹（注意：绝不检查订单本身的商家状态 order.status 或 rawPayload.status，因为商家接单/待配送允许自配）
+  // 3. 检查配送运单轨迹：明确为“骑手已接单”、“配送已接单”、“骑手已到店”
   const deliveryTextCandidates = [
     orderDelivery.track,
-    orderDelivery.status,
-    orderDelivery.delivery_status,
-    orderDelivery.deliveryStatus,
     rawPayloadDelivery.track,
-    rawPayloadDelivery.status,
-    rawPayloadDelivery.delivery_status,
-    rawPayloadDelivery.deliveryStatus,
-    rawPayload.deliveryStatus,
-    rawPayload.delivery_status,
   ].map((item) => String(item || "").trim()).filter(Boolean);
-
-  const riderAssignedDeliveryRegex = /配送已接单|骑手已接单|待取货|骑手已到店|已到店|已取货|配送中|派送中/;
-  const riderAssignedDeliveryEnRegex = /^(delivering|assigned|accepted_by_rider|assigned_rider)$/i;
 
   for (const text of deliveryTextCandidates) {
     if (/待接单|未接单|待呼叫|呼叫中|取消/i.test(text)) {
       continue;
     }
-    if (riderAssignedDeliveryEnRegex.test(text)) {
-      return true;
-    }
-    if (riderAssignedDeliveryRegex.test(text)) {
-      return true;
-    }
-    if ((text === "已接单" || text.includes("已接单")) && !/待接单|未接单/.test(text)) {
+    if (/骑手已接单|配送已接单|骑手已到店/i.test(text)) {
       return true;
     }
   }

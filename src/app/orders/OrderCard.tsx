@@ -37,7 +37,6 @@ import {
   isAutoPickOrderDeliveringStatus,
   isAutoPickOrderRiderAssigned,
   isAutoPickOrderTerminalStatus,
-  isAutoPickSelfDeliveryStarted,
 } from "@/lib/autoPickOrderStatus";
 import { formatLocalDate, formatLocalDateTime } from "@/lib/dateUtils";
 
@@ -2308,19 +2307,16 @@ export const OrderCard = memo(function OrderCard({
   const hideDeletedOfflineIncome = deleted && displayAsOfflineOrder;
   const delivering = !pickup && isDeliveringStatus(order.status);
   const riderAssigned = isAutoPickOrderRiderAssigned(order);
-  const selfDeliveryStarted = Boolean(order.isMainSystemSelfDelivery) || isAutoPickSelfDeliveryStarted(order);
-  const cannotSelfDeliver = Boolean(actingId) || terminal || delivering || pickup || riderAssigned || selfDeliveryStarted;
+  const cannotSelfDeliver = Boolean(actingId) || terminal || delivering || pickup || riderAssigned;
   const selfDeliveryTitle = pickup
     ? "到店自取订单不需要发起自配送"
     : terminal
     ? (cancelled ? "订单已取消，不能发起自配" : "订单已完成，不能再次发起自配")
     : riderAssigned
       ? "骑手已接单，不能发起自配"
-      : selfDeliveryStarted
-        ? "订单已在自配送中，不能重复发起自配"
-        : delivering
-          ? "订单已在配送中，不能重复发起自配"
-          : "发起商家自配送";
+      : delivering
+        ? "订单已在配送中，不能重复发起自配"
+        : "发起商家自配送";
   const hasOutbound = Boolean(order.hasOutbound);
   const showBrushMarker = !pickup && !showManualDeliveryMarker && order.isMainSystemSelfDelivery;
   const orderTypeLabel = getOrderTypeLabel(order);
