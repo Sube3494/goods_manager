@@ -512,7 +512,12 @@ export function AllOrdersView({
             ...order,
             status: data.order?.status || "delivering",
             isMainSystemSelfDelivery: true,
-            delivery: data.order?.delivery ?? order.delivery,
+            delivery: {
+              ...(data.order?.delivery ?? order.delivery ?? {}),
+              sendFee: 0,
+              logisticName: "自配送",
+              riderName: "自配送",
+            },
             deliveryDeadline: data.order?.deliveryDeadline ?? order.deliveryDeadline,
             autoCompleteAt: data.order?.autoCompleteAt ?? order.autoCompleteAt,
             // 关键：保留原有的 items 及其 matchedProduct 关联信息，彻底防止商品匹配状态闪烁

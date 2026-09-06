@@ -6,6 +6,7 @@ import { FinanceMath } from "@/lib/math";
 import {
   normalizeAutoPickIntegrationConfig,
   readCustomerTypeFromRawPayload,
+  readDeliveryFeeFromValue,
   resolveAutoPickMatchedShopName,
 } from "@/lib/autoPickOrders";
 import {
@@ -629,12 +630,8 @@ export async function GET(request: NextRequest) {
         shopRateMap.set(label, addr.serviceFeeRate);
       }
     });
-    function getDeliveryFee(delivery: unknown) {
-      if (!delivery || typeof delivery !== "object" || Array.isArray(delivery)) {
-        return 0;
-      }
-      const value = Number((delivery as Record<string, unknown>).sendFee || 0);
-      return Number.isFinite(value) ? Math.max(0, value) : 0;
+    function getDeliveryFee(delivery: unknown, rawPayloadOrFlag?: unknown) {
+      return readDeliveryFeeFromValue(delivery, rawPayloadOrFlag);
     }
 
     function parseOutboundCostSnapshot(value: unknown) {
@@ -807,7 +804,7 @@ export async function GET(request: NextRequest) {
             expectedIncomeCents = Math.round(paidYuan * 100);
           }
         }
-        const deliveryYuan = getDeliveryFee(order.delivery) / 100;
+        const deliveryYuan = getDeliveryFee(order.delivery, order.rawPayload) / 100;
         const commissionCents = manualAmountOverride && Number.isFinite(Number(manualAmountOverride.platformCommission))
           ? Number(manualAmountOverride.platformCommission)
           : manualAmountOverride?.onlyExpectedIncome
@@ -861,7 +858,7 @@ export async function GET(request: NextRequest) {
         deliveryExpense = FinanceMath.add(deliveryExpense, deliveryYuan);
       } else {
         if (orderCostMeta && !isRefundableMeituanDelivery(order.platform, order.delivery)) {
-          const deliveryYuan = getDeliveryFee(order.delivery) / 100;
+          const deliveryYuan = getDeliveryFee(order.delivery, order.rawPayload) / 100;
           deliveryExpense = FinanceMath.add(deliveryExpense, deliveryYuan);
         }
       }
@@ -982,7 +979,7 @@ export async function GET(request: NextRequest) {
 
       if (isOther) {
         const deliveryYuan = orderCostMeta && !isRefundableMeituanDelivery(order.platform, order.delivery)
-          ? getDeliveryFee(order.delivery) / 100
+          ? getDeliveryFee(order.delivery, order.rawPayload) / 100
           : 0;
         if (deliveryYuan > 0) {
           if (point) {
@@ -1014,7 +1011,7 @@ export async function GET(request: NextRequest) {
             expectedIncomeCents = Math.round(paidYuan * 100);
           }
         }
-        const deliveryYuan = getDeliveryFee(order.delivery) / 100;
+        const deliveryYuan = getDeliveryFee(order.delivery, order.rawPayload) / 100;
         const commissionCents = manualAmountOverride && Number.isFinite(Number(manualAmountOverride.platformCommission))
           ? Number(manualAmountOverride.platformCommission)
           : manualAmountOverride?.onlyExpectedIncome
@@ -1094,7 +1091,7 @@ export async function GET(request: NextRequest) {
 
            const isOffline = order.platform === "线下交易";
            const rate = isOffline ? 0 : (shopRateMap.get(matchedShopName) ?? 0.06);
-           const deliveryYuan = getDeliveryFee(order.delivery) / 100;
+           const deliveryYuan = getDeliveryFee(order.delivery, order.rawPayload) / 100;
            const isManualDeliveryLoss = isOffline && deliveryYuan > 0 && paidYuan <= 0 && expectedIncomeYuan <= 0;
            const hasReadyCost = isManualDeliveryLoss || (Boolean(orderCostMeta) && (orderCostMeta?.missingCostItemCount || 0) <= 0);
            const pureProfit = isManualDeliveryLoss

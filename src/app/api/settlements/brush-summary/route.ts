@@ -4,16 +4,12 @@ import { getAuthorizedUser } from "@/lib/auth";
 import { hasPermission } from "@/lib/permissions";
 import { FinanceMath } from "@/lib/math";
 import { getDisplayedMetrics, normalizeBrushSettlementPlatform } from "@/lib/brushDisplay";
-import { resolveAutoPickMatchedShopName } from "@/lib/autoPickOrders";
+import { readDeliveryFeeFromValue, resolveAutoPickMatchedShopName } from "@/lib/autoPickOrders";
 import { isAutoPickOrderCancelledStatus, isAutoPickOrderDeletedStatus } from "@/lib/autoPickOrderStatus";
 import { isAddressDisabled } from "@/lib/addressBook";
 
 function readDeliveryFee(delivery: unknown) {
-  if (!delivery || typeof delivery !== "object" || Array.isArray(delivery)) {
-    return 0;
-  }
-  const value = Number((delivery as Record<string, unknown>).sendFee || 0);
-  return Number.isFinite(value) ? Math.max(0, value) : 0;
+  return readDeliveryFeeFromValue(delivery);
 }
 
 function resolveMonthRange(month: string) {

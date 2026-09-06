@@ -38,6 +38,7 @@ import {
   isAutoPickOrderRiderAssigned,
   isAutoPickOrderTerminalStatus,
 } from "@/lib/autoPickOrderStatus";
+import { isSelfDeliveryOrCancelledDelivery } from "@/lib/autoPickOrders";
 import { formatLocalDate, formatLocalDateTime } from "@/lib/dateUtils";
 
 const OrderRouteModal = dynamic(() => import("@/components/Orders/OrderRouteModal").then((module) => module.OrderRouteModal), { ssr: false });
@@ -199,7 +200,10 @@ export function getExpectedIncome(
   return paid - commission;
 }
 
-export function getDeliveryFee(delivery: unknown) {
+export function getDeliveryFee(delivery: unknown, order?: { isMainSystemSelfDelivery?: boolean } | null) {
+  if (isSelfDeliveryOrCancelledDelivery(delivery, order?.isMainSystemSelfDelivery)) {
+    return 0;
+  }
   if (!delivery || typeof delivery !== "object" || Array.isArray(delivery)) {
     return 0;
   }
@@ -234,7 +238,7 @@ export function summarizeOrders(orders: AutoPickOrder[]) {
       }
       acc.platformCommission += Number(order.platformCommission || 0);
       acc.validOrderCount += 1;
-      const deliveryFee = getDeliveryFee(order.delivery);
+      const deliveryFee = getDeliveryFee(order.delivery, order);
       acc.totalDeliveryFee += deliveryFee;
 
       const platform = order.platform || "其他";
@@ -286,7 +290,7 @@ export function summarizeOrders(orders: AutoPickOrder[]) {
       const isMeituanRelated = platformStr.includes("美团") || platformStr.includes("meituan") ||
                                logisticNameStr.includes("美团") || logisticNameStr.includes("meituan");
       if (order.hasOutbound && !isMeituanRelated) {
-        acc.totalDeliveryFee += getDeliveryFee(order.delivery);
+        acc.totalDeliveryFee += getDeliveryFee(order.delivery, order);
       }
     }
     acc.itemCount += getItemCount(getVisibleOrderItems(order.items));
@@ -2296,7 +2300,11 @@ export const OrderCard = memo(function OrderCard({
   const deleted = getBaseAutoPickStatusDisplay(order.status) === "已删除";
   const terminal = isTerminalStatus(order.status);
   const abnormal = isAbnormalStatus(order.status);
-  const deliveryFee = getDeliveryFee(order.delivery);
+  const deliveryFee = getDeliveryFee(order.delivery, order);
+  const isSelfDeliveryOrCancelled = isSelfDeliveryOrCancelledDelivery(order.delivery, order.isMainSystemSelfDelivery);
+  const effectiveSendFee = isSelfDeliveryOrCancelled
+    ? 0
+    : (order.delivery?.sendFee != null ? Number(order.delivery.sendFee) : null);
   const hasDeliveryAddress = Boolean(String(order.userAddress || "").trim());
   const isPureOffline = isPureManualOfflineOrder(order);
   const [routeOpen, setRouteOpen] = useState(false);
@@ -2333,8 +2341,11 @@ export const OrderCard = memo(function OrderCard({
     ? Math.round(Number(effectiveActualPaid || 0) - Number(expectedIncome || 0))
     : order.platformCommission;
   const commissionDisplay = getCommissionDisplay(displayedPlatformCommission);
+  const rawDeliveryFeeInOrder = Number((order.delivery as Record<string, unknown> | undefined)?.sendFee || 0);
   const hasPureProfit = typeof order.pureProfit === "number" && Number.isFinite(order.pureProfit);
-  const pureProfit = hasPureProfit ? Number(order.pureProfit) : 0;
+  const pureProfit = hasPureProfit
+    ? (isSelfDeliveryOrCancelled && rawDeliveryFeeInOrder > 0 ? Number(order.pureProfit) + rawDeliveryFeeInOrder : Number(order.pureProfit))
+    : 0;
   const productCostStatusText = getProductCostStatusText(order);
   const refundAmount = Math.max(0, Number(order.refundAmount || 0));
   const hasRefundAmount = refundAmount > 0;
@@ -2822,10 +2833,10 @@ export const OrderCard = memo(function OrderCard({
                     <span className="shrink-0 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">{commissionDisplay.label}</span>
                     <span className="truncate text-sm font-semibold text-foreground">{commissionDisplay.value}</span>
                   </div>
-                  {order.delivery?.sendFee != null ? (
+                  {effectiveSendFee != null ? (
                     <div className="flex min-w-0 items-center justify-between gap-2 rounded-2xl border border-black/8 bg-black/2 px-3 py-2 dark:border-white/10 dark:bg-white/3 sm:inline-flex sm:h-9 sm:justify-start sm:rounded-full sm:py-0">
                       <span className="shrink-0 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">配送费</span>
-                      <span className="truncate text-sm font-semibold text-foreground">{toCurrency(order.delivery.sendFee)}</span>
+                      <span className="truncate text-sm font-semibold text-foreground">{toCurrency(effectiveSendFee)}</span>
                     </div>
                   ) : null}
                 </div>
@@ -2894,7 +2905,7 @@ export const OrderCard = memo(function OrderCard({
                         <span>配送费</span>
                       </span>
                       <span className="font-semibold text-foreground">
-                        {order.delivery?.sendFee != null ? toCurrency(order.delivery.sendFee) : "-"}
+                        {effectiveSendFee != null ? toCurrency(effectiveSendFee) : "-"}
                       </span>
                     </div>
 
@@ -3320,7 +3331,7 @@ export const OrderCard = memo(function OrderCard({
                         : removeYear(getDeadlineDisplay(order))
                     }
                   />
-                  <DetailStat label="配送费" value={order.delivery?.sendFee != null ? toCurrency(order.delivery.sendFee) : "-"} className="col-span-2" />
+                  <DetailStat label="配送费" value={effectiveSendFee != null ? toCurrency(effectiveSendFee) : "-"} className="col-span-2" />
                 </div>
                 <div className="mt-2 sm:mt-2.5">
                   <DetailBlock label="轨迹" value={order.delivery?.track || "暂无轨迹"} />

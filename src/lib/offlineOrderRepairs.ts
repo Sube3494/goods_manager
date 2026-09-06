@@ -1,5 +1,6 @@
 import prisma from "@/lib/prisma";
 import { Prisma } from "../../prisma/generated-client";
+import { readDeliveryFeeFromValue } from "@/lib/autoPickOrders";
 
 type OfflineOrderRepairCandidate = {
   id: string;
@@ -12,11 +13,7 @@ type OfflineOrderRepairCandidate = {
 };
 
 function readDeliveryFee(delivery: Prisma.JsonValue | null): number {
-  if (!delivery || typeof delivery !== "object" || Array.isArray(delivery)) {
-    return 0;
-  }
-  const value = Number((delivery as Record<string, unknown>).sendFee || 0);
-  return Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0;
+  return readDeliveryFeeFromValue(delivery);
 }
 
 function hasManualAmountOverride(rawPayload: Prisma.JsonValue | null): boolean {

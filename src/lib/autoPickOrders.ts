@@ -1456,11 +1456,37 @@ function isManualDeliveryPlaceholderOrderItem(item: {
     || String(item.productName || "").trim() === MANUAL_DELIVERY_PLACEHOLDER_PRODUCT_NAME;
 }
 
-function readDeliveryFeeFromValue(delivery: unknown) {
+export function isSelfDeliveryOrCancelledDelivery(delivery: unknown, rawPayloadOrFlag?: unknown): boolean {
+  if (rawPayloadOrFlag === true) return true;
+  if (rawPayloadOrFlag && typeof rawPayloadOrFlag === "object" && !Array.isArray(rawPayloadOrFlag)) {
+    const raw = rawPayloadOrFlag as Record<string, unknown>;
+    const systemMeta = raw.systemMeta && typeof raw.systemMeta === "object" && !Array.isArray(raw.systemMeta)
+      ? raw.systemMeta as Record<string, unknown>
+      : null;
+    if (systemMeta?.isSelfDelivery === true || systemMeta?.isMainSystemSelfDelivery === true || raw.isMainSystemSelfDelivery === true) {
+      return true;
+    }
+  }
+  if (!delivery || typeof delivery !== "object" || Array.isArray(delivery)) return false;
+  const d = delivery as Record<string, unknown>;
+  const logisticName = String(d.logisticName || d.logistic_name || "").trim();
+  const riderName = String(d.riderName || d.delivery_name || "").trim();
+  const track = String(d.track || "").trim();
+  if (/自配|自配送|商家自配|oneself/i.test(logisticName)) return true;
+  if (/自配|自配送|商家自配/i.test(riderName)) return true;
+  if (/取消|退单/.test(track)) return true;
+  if (d.cancel_time != null || d.cancelTime != null) return true;
+  return false;
+}
+
+export function readDeliveryFeeFromValue(delivery: unknown, rawPayloadOrFlag?: unknown) {
+  if (isSelfDeliveryOrCancelledDelivery(delivery, rawPayloadOrFlag)) {
+    return 0;
+  }
   if (!delivery || typeof delivery !== "object" || Array.isArray(delivery)) {
     return 0;
   }
-  const value = Number((delivery as Record<string, unknown>).sendFee || (delivery as Record<string, unknown>).send_fee || 0);
+  const value = Number((delivery as Record<string, unknown>).sendFee ?? (delivery as Record<string, unknown>).send_fee ?? 0);
   return Number.isFinite(value) ? Math.max(0, value) : 0;
 }
 
@@ -1957,10 +1983,10 @@ function parseDeliveryInfoFromDetail(detail: MaiyatianOrderDetailResponse["data"
   }) as Record<string, unknown> | undefined;
 
   const logisticName = String(deliveryRecord?.logistic_name || deliveryRecord?.logisticName || "").trim();
+  const track = String(deliveryRecord?.track || "").trim();
+  const riderName = String(deliveryRecord?.delivery_name || deliveryRecord?.riderName || "").trim() || undefined;
   const rawSendFee = deliveryRecord?.send_fee ?? deliveryRecord?.sendFee;
-  const sendFee = typeof rawSendFee === "string" || typeof rawSendFee === "number"
-    ? parseCentsValue(rawSendFee)
-    : 0;
+  const sendFee = readDeliveryFeeFromValue(deliveryRecord);
   const jdLikePickupCandidates = [
     detail?.pickup_time,
     detail?.pickupTime,
@@ -1997,8 +2023,6 @@ function parseDeliveryInfoFromDetail(detail: MaiyatianOrderDetailResponse["data"
     : (typeof rawPickupTime === "string" || typeof rawPickupTime === "number"
         ? parseUnixTimestampToOrderTime(rawPickupTime)
         : undefined);
-  const track = String(deliveryRecord?.track || "").trim();
-  const riderName = String(deliveryRecord?.delivery_name || deliveryRecord?.riderName || "").trim() || undefined;
   const riderPhone = readRiderPhoneFromDelivery(deliveryRecord);
 
   const rawFinishedTime = deliveryRecord?.finished_time
@@ -3446,18 +3470,25 @@ export function normalizeAutoPickOrderPayload(payload: unknown): AutoPickInbound
             ? parseUnixTimestampToOrderTime(rawFinishedTime)
             : undefined);
 
+      const normalizedLogisticName = String(deliveryRecord?.logisticName || deliveryRecord?.logistic_name || "").trim() || undefined;
+      const normalizedTrack = String(deliveryRecord?.track || "").trim() || undefined;
+      const normalizedRiderName = String(deliveryRecord?.riderName || deliveryRecord?.delivery_name || "").trim() || undefined;
+      const isSelfDeliveryOrCancelled = isSelfDeliveryOrCancelledDelivery(deliveryRecord);
+      const rawSendFee = deliveryRecord?.sendFee ?? deliveryRecord?.send_fee;
+      const normalizedSendFee = isSelfDeliveryOrCancelled
+        ? 0
+        : (Number.isFinite(Number(rawSendFee)) ? Number(rawSendFee) : undefined);
+
       const normalizedDelivery = {
-        logisticName: String(deliveryRecord?.logisticName || deliveryRecord?.logistic_name || "").trim() || undefined,
-        sendFee: Number.isFinite(Number(deliveryRecord?.sendFee ?? deliveryRecord?.send_fee))
-          ? Number(deliveryRecord?.sendFee ?? deliveryRecord?.send_fee)
-          : undefined,
+        logisticName: normalizedLogisticName,
+        sendFee: normalizedSendFee,
         pickupTime: typeof rawPickupTime === "string" && rawPickupTime.includes("-")
           ? String(rawPickupTime).trim()
           : (typeof rawPickupTime === "string" || typeof rawPickupTime === "number"
               ? parseUnixTimestampToOrderTime(rawPickupTime)
               : undefined),
-        track: String(deliveryRecord?.track || "").trim() || undefined,
-        riderName: String(deliveryRecord?.riderName || deliveryRecord?.delivery_name || "").trim() || undefined,
+        track: normalizedTrack,
+        riderName: normalizedRiderName,
         riderPhone: readRiderPhoneFromDelivery(deliveryRecord) || undefined,
         completedTime,
       };

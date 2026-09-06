@@ -6,6 +6,7 @@ import {
   backfillJdSkuIdForManualMatchedShopProducts,
   backfillMeituanSkuIdForManualMatchedShopProducts,
   backfillPlatformIdsForSyncedAutoPickOrder,
+  isSelfDeliveryOrCancelledDelivery,
   normalizeAutoPickOrderPayload,
   normalizeAutoPickIntegrationConfig,
   readCustomerMaskedPhoneFromRawPayload,
@@ -14,6 +15,7 @@ import {
   readCustomerPhoneExtensionFromRawPayload,
   readCustomerRemarkFromRawPayload,
   readCustomerTypeFromRawPayload,
+  readDeliveryFeeFromValue,
   readRiderPhoneFromDelivery,
   readRiderPhoneFromRawPayload,
   syncMeituanSkuIdForShopProduct,
@@ -913,12 +915,8 @@ function readAutoOutboundMeta(rawPayload: unknown) {
   };
 }
 
-function readDeliveryFee(delivery: unknown) {
-  if (!delivery || typeof delivery !== "object" || Array.isArray(delivery)) {
-    return 0;
-  }
-  const value = Number((delivery as Record<string, unknown>).sendFee || 0);
-  return Number.isFinite(value) ? Math.max(0, value) : 0;
+function readDeliveryFee(delivery: unknown, rawPayloadOrFlag?: unknown) {
+  return readDeliveryFeeFromValue(delivery, rawPayloadOrFlag);
 }
 
 function isOfflineManualDeliveryLossOrder(input: {
@@ -1838,7 +1836,7 @@ export async function GET(request: NextRequest) {
           const cancelled = isAutoPickOrderCancelledStatus(order.status);
           const deleted = isAutoPickOrderDeletedStatus(order.status);
           const platform = normalizeOrderPlatformForSummary(order.platform);
-          const deliveryFee = readDeliveryFee(order.delivery);
+          const deliveryFee = readDeliveryFee(order.delivery, order.rawPayload);
           const outboundMeta = outboundByOrderNo.get(order.orderNo) || null;
           const lockedResolvedShop = readResolvedAutoPickShop(order.rawPayload);
           const mappingDebug = resolveMappedShopDebug(
@@ -2258,7 +2256,7 @@ export async function GET(request: NextRequest) {
         ? 0
         : (shopRateMap.get(matchedShopName) ?? 0.06);
       const productCost = outboundMeta?.productCost || 0;
-      const deliveryFee = readDeliveryFee(order.delivery);
+      const deliveryFee = readDeliveryFee(order.delivery, order.isMainSystemSelfDelivery);
       const hasOutbound = Boolean(outboundMeta);
       const hasFulfillmentItems = hasAutoPickFulfillmentItems(order.items);
       const cancelledDeliveryLoss = (isAutoPickOrderCancelledStatus(order.status) || isAutoPickOrderDeletedStatus(order.status))
@@ -2308,8 +2306,20 @@ export async function GET(request: NextRequest) {
           ? Math.round(Number(safeExpectedIncome || 0) * (1 - serviceFeeRate)) - deliveryFee - productCost - returnExtraExpense
           : null);
 
+      const normalizedDelivery = order.delivery && typeof order.delivery === "object" && !Array.isArray(order.delivery)
+        ? {
+            ...(order.delivery as Record<string, unknown>),
+            sendFee: isSelfDeliveryOrCancelledDelivery(order.delivery, order.isMainSystemSelfDelivery)
+              ? 0
+              : ((order.delivery as Record<string, unknown>).sendFee != null
+                  ? Number((order.delivery as Record<string, unknown>).sendFee)
+                  : undefined),
+          }
+        : order.delivery;
+
       return {
         ...order,
+        delivery: normalizedDelivery,
         actualPaid: order.actualPaid,
         expectedIncome: safeExpectedIncome,
         refundAmount,

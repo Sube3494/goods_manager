@@ -158,12 +158,22 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
             rawPayload: schedulingOrder.rawPayload,
           }))
         : null;
+      const baseDelivery = (schedulingOrder.delivery && typeof schedulingOrder.delivery === "object" && !Array.isArray(schedulingOrder.delivery))
+        ? schedulingOrder.delivery as Record<string, unknown>
+        : (order.delivery && typeof order.delivery === "object" && !Array.isArray(order.delivery) ? order.delivery as Record<string, unknown> : {});
+      const updatedDelivery = {
+        ...baseDelivery,
+        sendFee: 0,
+        logisticName: "自配送",
+        riderName: "自配送",
+      };
       await prisma.autoPickOrder.update({
         where: { id },
         data: {
           status: confirmedDelivering ? schedulingOrder.status : order.status,
           deliveryDeadline: schedulingOrder.deliveryDeadline || order.deliveryDeadline || null,
           autoCompleteAt: autoCompleteAt || null,
+          delivery: updatedDelivery,
         },
       });
       // 2. 最终二次固化自配标记，确保无论刷新如何均保留
