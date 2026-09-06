@@ -3754,25 +3754,30 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
     const shouldKeepCompletedStatus = isExistingCompleted && !isIncomingTerminal;
     const isExistingCancelled = isAutoPickOrderCancelledStatus(existing?.status);
     const preservedPickingStatus = resolvePreservedPickingStatus(existing || {}, normalized.status);
+    const existingSystemMeta = readAutoPickSystemMeta(existing?.rawPayload) || {};
+    const isSelfDeliveryDelivering = Boolean(
+      existingSystemMeta.mainSystemSelfDelivery?.triggered
+      && existing?.status === "delivering"
+      && !isAutoPickOrderTerminalStatus(normalized.status)
+    );
     const status = shouldKeepCompletedStatus
       ? existing?.status || null
       : isExistingCancelled && normalized.status && !isAutoPickOrderCancelledStatus(normalized.status)
         ? normalized.status
-        : preservedPickingStatus
-          ? preservedPickingStatus
-          : shouldPreserveRealtimeStatus(existing || {}, normalized.status)
-          ? existing?.status || null
-          : normalized.status || existing?.status || null;
+        : isSelfDeliveryDelivering
+          ? "delivering"
+          : preservedPickingStatus
+            ? preservedPickingStatus
+            : shouldPreserveRealtimeStatus(existing || {}, normalized.status)
+            ? existing?.status || null
+            : normalized.status || existing?.status || null;
     const deliveryDeadline = shouldKeepCompletedStatus
       ? existing?.deliveryDeadline || normalized.deliveryDeadline || null
       : normalized.deliveryDeadline || existing?.deliveryDeadline || null;
     const deliveryTimeRange = shouldKeepCompletedStatus
       ? existing?.deliveryTimeRange || normalized.deliveryTimeRange || null
       : normalized.deliveryTimeRange || existing?.deliveryTimeRange || null;
-    const mergedDelivery = mergeAutoPickDeliveryValue(normalized.delivery, existing?.delivery);
-    const nextDeliveryValue = mergedDelivery
-      ? asPrismaJsonValue(mergedDelivery)
-      : Prisma.DbNull;
+    const mergedDeliveryRaw = mergeAutoPickDeliveryValue(normalized.delivery, existing?.delivery);
     const normalizedRawPayload = normalized.rawPayload && typeof normalized.rawPayload === "object" && !Array.isArray(normalized.rawPayload)
       ? normalized.rawPayload as Record<string, unknown>
       : normalized as unknown as Record<string, unknown>;
@@ -3784,7 +3789,6 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
       },
       existing?.rawPayload
     );
-    const existingSystemMeta = readAutoPickSystemMeta(existing?.rawPayload) || {};
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { resolvedShop: _previousResolvedShop, ...systemMetaWithoutResolvedShop } = existingSystemMeta;
     const nextSystemMeta: AutoPickSystemMeta = resolvedInternalShop
@@ -3803,14 +3807,36 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
     const incomingLogisticName = String(currentIncomingDelivery?.logisticName || currentIncomingDelivery?.logistic_name || "").trim();
     const hasThirdPartyLogistic = Boolean(incomingLogisticName && !/自配|自配送|商家自配|oneself/i.test(incomingLogisticName));
 
+    const isRecentSelfDeliveryTrigger = Boolean(
+      nextSystemMeta.mainSystemSelfDelivery?.triggered &&
+      nextSystemMeta.mainSystemSelfDelivery?.triggeredAt &&
+      (Date.now() - new Date(nextSystemMeta.mainSystemSelfDelivery.triggeredAt).getTime() < 15 * 60 * 1000)
+    );
+
     if (hasThirdPartyLogistic && nextSystemMeta.mainSystemSelfDelivery?.triggered) {
-      nextSystemMeta.mainSystemSelfDelivery = {
-        ...nextSystemMeta.mainSystemSelfDelivery,
-        triggered: false,
-        clearedAt: new Date().toISOString(),
-        clearedReason: "detected-third-party-logistic",
-      };
+      // 只有在不是近期发起的自配，或者麦芽田明确有新骑手接单（dispatcher）时，才清除自配标记
+      const hasRealNewRider = Boolean((normalized.delivery as any)?.dispatcher);
+      if (!isRecentSelfDeliveryTrigger || hasRealNewRider) {
+        nextSystemMeta.mainSystemSelfDelivery = {
+          ...nextSystemMeta.mainSystemSelfDelivery,
+          triggered: false,
+          clearedAt: new Date().toISOString(),
+          clearedReason: "detected-third-party-logistic",
+        };
+      }
     }
+
+    const mergedDelivery = (nextSystemMeta.mainSystemSelfDelivery?.triggered && mergedDeliveryRaw && typeof mergedDeliveryRaw === "object")
+      ? {
+          ...(mergedDeliveryRaw as Record<string, unknown>),
+          sendFee: 0,
+          logisticName: "自配送",
+          riderName: "自配送",
+        }
+      : mergedDeliveryRaw;
+    const nextDeliveryValue = mergedDelivery
+      ? asPrismaJsonValue(mergedDelivery)
+      : Prisma.DbNull;
 
     const nextRawPayloadWithResolvedShop = {
       ...nextRawPayload,

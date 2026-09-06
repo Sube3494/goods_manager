@@ -490,15 +490,6 @@ export function readDeliveryFeeFromValue(delivery: unknown, rawPayloadOrFlag?: u
 }
 
 export function readMainSystemSelfDeliveryFlag(rawPayload: unknown, delivery?: unknown): boolean {
-  if (delivery && typeof delivery === "object" && !Array.isArray(delivery)) {
-    const d = delivery as Record<string, unknown>;
-    const logisticName = String(d.logisticName || d.logistic_name || "").trim();
-    const hasThirdPartyLogistic = Boolean(logisticName && !/自配|自配送|商家自配|oneself/i.test(logisticName));
-    if (hasThirdPartyLogistic) {
-      return false;
-    }
-  }
-
   if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
     return false;
   }
@@ -513,6 +504,25 @@ export function readMainSystemSelfDeliveryFlag(rawPayload: unknown, delivery?: u
     return false;
   }
 
-  return Boolean((marker as Record<string, unknown>).triggered);
+  const triggered = Boolean((marker as Record<string, unknown>).triggered);
+  if (!triggered) {
+    return false;
+  }
+
+  if (delivery && typeof delivery === "object" && !Array.isArray(delivery)) {
+    const d = delivery as Record<string, unknown>;
+    const logisticName = String(d.logisticName || d.logistic_name || "").trim();
+    const hasThirdPartyLogistic = Boolean(logisticName && !/自配|自配送|商家自配|oneself/i.test(logisticName));
+    const triggeredAt = (marker as Record<string, unknown>).triggeredAt;
+    const isRecent = Boolean(triggeredAt && (Date.now() - new Date(String(triggeredAt)).getTime() < 15 * 60 * 1000));
+    const hasDispatcher = Boolean(d.dispatcher);
+
+    // 只有在非近期发起的自配，或者已有明确的新骑手（dispatcher）接单时，第三方跑腿才能覆盖商家自配标记
+    if (hasThirdPartyLogistic && (!isRecent || hasDispatcher)) {
+      return false;
+    }
+  }
+
+  return true;
 }
 

@@ -145,12 +145,9 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
       });
 
       const schedulingOrder = latestOrder || commandOrder;
-      const confirmedDelivering = isAutoPickOrderDeliveringStatus(schedulingOrder.status);
-      const integrationConfig = confirmedDelivering
-        ? await getAutoPickIntegrationConfigByUserId(order.userId)
-        : null;
+      const integrationConfig = await getAutoPickIntegrationConfigByUserId(order.userId);
       const autoCompleteBlocked = isAutoPickOrderAbnormalStatus(schedulingOrder.status);
-      const autoCompleteAt = confirmedDelivering && !autoCompleteBlocked && integrationConfig
+      const autoCompleteAt = !autoCompleteBlocked && integrationConfig
         ? getEstimatedAutoCompleteAt(schedulingOrder, resolveShopSelfDeliveryTiming(integrationConfig, {
             maiyatianShopId: readShopIdFromRawPayload(schedulingOrder.rawPayload),
             shopName: readShopNameFromRawPayload(schedulingOrder.rawPayload),
@@ -166,11 +163,13 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
         sendFee: 0,
         logisticName: "自配送",
         riderName: "自配送",
+        status: "delivering",
       };
       await prisma.autoPickOrder.update({
         where: { id },
         data: {
-          status: confirmedDelivering ? schedulingOrder.status : order.status,
+          // 自配命令已成功向平台下发，系统必须直接坚决进入 delivering（配送中）状态，绝不因为平台接口延迟而写回旧状态
+          status: "delivering",
           deliveryDeadline: schedulingOrder.deliveryDeadline || order.deliveryDeadline || null,
           autoCompleteAt: autoCompleteAt || null,
           delivery: updatedDelivery,
@@ -190,9 +189,7 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
           id,
           autoCompleteBlocked
             ? "abnormal-status-no-auto-complete"
-            : confirmedDelivering
-              ? "missing-auto-complete-time"
-              : "waiting-delivering-status"
+            : "missing-auto-complete-time"
         );
       }
 
@@ -210,7 +207,9 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
         ...result.data,
         order: finalOrder ? {
           ...finalOrder,
+          status: "delivering",
           isMainSystemSelfDelivery: true,
+          autoCompleteAt: finalOrder.autoCompleteAt || autoCompleteAt || null,
         } : undefined,
       }, { status: result.status });
     }
