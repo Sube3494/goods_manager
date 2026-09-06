@@ -97,14 +97,13 @@ interface ProductSelectionModalProps {
 function ProductSkeleton({ imageOnly = false }: { imageOnly?: boolean }) {
   if (imageOnly) {
     return (
-      <div className="flex flex-col overflow-hidden rounded-2xl border border-border/60 bg-white dark:bg-white/5 animate-pulse shadow-xs">
+      <div className="flex flex-col overflow-hidden rounded-xl border border-border/60 bg-white dark:bg-white/5 animate-pulse shadow-xs">
         <div className="w-full aspect-square bg-muted/70" />
-        <div className="p-3 flex flex-col gap-2 flex-1 min-h-[72px]">
-          <div className="h-3.5 w-4/5 bg-muted/70 rounded" />
-          <div className="h-3 w-1/2 bg-muted/50 rounded" />
-          <div className="mt-auto flex items-center gap-1.5 pt-1">
-            <div className="h-4 w-12 bg-muted/40 rounded" />
-            <div className="h-4 w-10 bg-muted/40 rounded" />
+        <div className="p-2 sm:p-2.5 flex flex-col gap-1.5 flex-1 min-h-[56px]">
+          <div className="h-3 w-4/5 bg-muted/70 rounded" />
+          <div className="h-2.5 w-1/2 bg-muted/50 rounded" />
+          <div className="mt-auto flex items-center gap-1 pt-0.5">
+            <div className="h-3.5 w-10 bg-muted/40 rounded" />
           </div>
         </div>
       </div>
@@ -112,11 +111,11 @@ function ProductSkeleton({ imageOnly = false }: { imageOnly?: boolean }) {
   }
 
   return (
-    <div className="flex w-full items-center gap-3 rounded-xl border border-border/60 p-3 bg-white dark:bg-white/5 animate-pulse min-h-[64px]">
-      <div className="h-11 w-11 shrink-0 rounded-lg bg-muted/70" />
-      <div className="flex-1 space-y-2 min-w-0">
-        <div className="h-3.5 w-2/3 bg-muted/70 rounded" />
-        <div className="h-3 w-1/3 bg-muted/50 rounded" />
+    <div className="flex w-full items-center gap-2.5 rounded-xl border border-border/60 p-2.5 bg-white dark:bg-white/5 animate-pulse min-h-[54px]">
+      <div className="h-9 w-9 shrink-0 rounded-lg bg-muted/70" />
+      <div className="flex-1 space-y-1.5 min-w-0">
+        <div className="h-3 w-2/3 bg-muted/70 rounded" />
+        <div className="h-2.5 w-1/3 bg-muted/50 rounded" />
       </div>
     </div>
   );
@@ -621,7 +620,7 @@ export function ProductSelectionModal({
         onClick={onClose}
       />
       <div
-        className="fixed left-1/2 top-1/2 z-110001 flex h-[min(88dvh,820px)] w-[calc(100%-24px)] sm:w-full max-w-3xl -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-3xl border border-border/60 bg-white/98 shadow-2xl backdrop-blur-xl dark:bg-gray-900/90 dark:border-white/10 animate-modal-content"
+        className="fixed left-1/2 top-1/2 z-110001 flex h-[min(90dvh,860px)] w-[calc(100%-24px)] sm:w-full max-w-4xl -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-3xl border border-border/60 bg-white/98 shadow-2xl backdrop-blur-xl dark:bg-gray-900/90 dark:border-white/10 animate-modal-content"
       >
              <div className="flex items-center justify-between border-b border-border/50 px-5 py-4 sm:px-7 sm:py-4.5 shrink-0">
               <div className="flex items-center gap-3">
@@ -767,13 +766,13 @@ export function ProductSelectionModal({
 
               <div className={cn("relative flex-1 overflow-y-auto no-scrollbar min-h-[220px]", isGridView ? "" : "space-y-2")}>
                  {(showInitialSkeleton && products.length === 0) ? (
-                    <div className={cn(isGridView ? "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3.5" : "space-y-2")}>
-                        {[...Array(8)].map((_, i) => (
+                    <div className={cn(isGridView ? "grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2.5 sm:gap-3" : "space-y-2")}>
+                        {[...Array(12)].map((_, i) => (
                            <ProductSkeleton key={i} imageOnly={isGridView} />
                         ))}
                     </div>
                  ) : (
-                    <div className={cn(isGridView ? "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3.5" : "space-y-1.5")}>
+                    <div className={cn(isGridView ? "grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2.5 sm:gap-3" : "space-y-1.5")}>
                     {displayedProducts.map((product: Product) => {
                       const selectionKey = getSelectionKey(product);
                       const isSelected = tempSelectedIds.includes(selectionKey);
@@ -787,70 +786,70 @@ export function ProductSelectionModal({
                           disabled={isAlreadySelected}
                           className={cn(
                              isGridView
-                               ? "group relative flex flex-col overflow-hidden rounded-2xl border transition-all cursor-pointer text-left bg-white dark:bg-white/[0.04] shadow-xs"
-                               : "group relative flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-all cursor-pointer min-h-[64px]",
+                               ? "group relative flex flex-col overflow-hidden rounded-xl border transition-all cursor-pointer text-left bg-white dark:bg-white/[0.04] shadow-xs"
+                               : "group relative flex w-full items-center gap-2.5 rounded-xl border px-3 py-2 text-left transition-all cursor-pointer min-h-[54px]",
                              isSelected 
-                               ? "border-blue-500 ring-2 ring-blue-500/25 bg-blue-50/20 dark:bg-blue-500/[0.08] shadow-md" 
+                               ? "border-foreground/80 ring-2 ring-foreground/15 bg-black/[0.03] dark:border-white/80 dark:ring-white/20 dark:bg-white/[0.08] shadow-sm" 
                                : isAlreadySelected
                                ? "border-emerald-500/20 bg-emerald-50/20 dark:bg-emerald-950/10 shadow-xs opacity-75 cursor-not-allowed"
-                               : "border-border/60 shadow-xs hover:border-blue-500/40 hover:bg-zinc-50/50 dark:hover:bg-white/[0.07]"
+                               : "border-border/60 shadow-xs hover:border-foreground/30 hover:bg-zinc-50/50 dark:hover:bg-white/[0.07]"
                            )}
                         >
                           <div className={cn(
                             isGridView
-                              ? "absolute top-2.5 right-2.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border transition-all z-10"
-                              : "order-last ml-auto flex h-6 w-6 shrink-0 items-center justify-center rounded-full border transition-all",
+                              ? "absolute top-1.5 right-1.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-all z-10"
+                              : "order-last ml-auto flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-all",
                             isSelected 
-                              ? "bg-blue-600 border-blue-500 text-white shadow-md ring-2 ring-white/20 opacity-100 scale-100" 
+                              ? "bg-foreground border-foreground text-background dark:bg-white dark:border-white dark:text-black shadow-xs opacity-100 scale-100" 
                               : isAlreadySelected
                               ? "bg-emerald-500 border-emerald-500 text-white opacity-100 scale-100"
                               : "opacity-0 group-hover:opacity-100 bg-black/40 backdrop-blur-xs border-white/60 text-transparent hover:border-white scale-90 group-hover:scale-100"
                           )}>
-                            {(isSelected || isAlreadySelected) && <Check size={13} strokeWidth={3.5} />}
+                            {(isSelected || isAlreadySelected) && <Check size={11} strokeWidth={3.5} />}
                           </div>
 
                           <div 
                             className={cn(
                               isGridView
                                 ? "w-full aspect-square overflow-hidden bg-muted relative"
-                                : "h-11 w-11 shrink-0 rounded-lg overflow-hidden bg-muted border border-border/50 relative"
+                                : "h-10 w-10 shrink-0 rounded-lg overflow-hidden bg-muted border border-border/50 relative"
                             )}
                           >
                             {product.image ? (
                                 <Image 
                                    src={product.image} 
                                    alt={product.name} 
-                                    width={isGridView ? 300 : 48} 
-                                    height={isGridView ? 300 : 48} 
+                                    width={isGridView ? 220 : 40} 
+                                    height={isGridView ? 220 : 40} 
                                     className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" 
                                     unoptimized
                                 />
                             ) : (
                                 <div className="h-full w-full flex items-center justify-center text-muted-foreground">
-                                    <Package size={isGridView ? 32 : 20} />
+                                    <Package size={isGridView ? 24 : 18} />
                                 </div>
                             )}
                           </div>
                           
                           {!imageOnly && (
                             isGridView ? (
-                              <div className="p-3 flex flex-col gap-1.5 flex-1 min-w-0">
+                              <div className="p-2 sm:p-2.5 flex flex-col gap-1 flex-1 min-w-0">
                                 {isAlreadySelected && (
-                                  <div className="inline-flex w-fit rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                                  <div className="inline-flex w-fit rounded-full border border-emerald-500/20 bg-emerald-50/10 px-1.5 py-0.2 text-[9px] font-bold text-emerald-600 dark:text-emerald-400">
                                     {selectedBadgeLabel}
                                   </div>
                                 )}
-                                <span className={cn("line-clamp-2 text-xs font-bold leading-snug", isSelected ? "text-primary dark:text-foreground" : "text-foreground")}>
+                                <span className={cn("line-clamp-2 text-[11px] sm:text-xs font-semibold leading-snug", isSelected ? "text-foreground font-bold" : "text-foreground")}>
                                   {product.name}
                                 </span>
-                                <div className="mt-auto flex flex-wrap items-center gap-1 pt-1">
+                                <div className="mt-auto flex flex-wrap items-center gap-1 pt-0.5">
                                   {productCode && (
-                                    <span className="truncate max-w-full rounded bg-zinc-100 dark:bg-white/10 px-1.5 py-0.5 font-mono text-[10px] font-bold text-zinc-700 dark:text-zinc-300">
+                                    <span className="truncate max-w-full rounded bg-zinc-100 dark:bg-white/10 px-1.5 py-0.5 font-mono text-[9px] sm:text-[10px] font-bold text-zinc-700 dark:text-zinc-300">
                                       #{productCode}
                                     </span>
                                   )}
                                   {product.category?.name && (
-                                    <span className="truncate max-w-full rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                                    <span className="truncate max-w-full rounded bg-primary/10 px-1.5 py-0.5 text-[9px] sm:text-[10px] font-medium text-primary">
                                       {product.category.name}
                                     </span>
                                   )}
@@ -858,7 +857,7 @@ export function ProductSelectionModal({
                               </div>
                             ) : (
                               <div className="flex min-w-0 flex-1 flex-col justify-center gap-1 pr-1">
-                                <span className={cn("truncate text-sm font-medium leading-snug", isSelected ? "text-primary dark:text-foreground" : "text-foreground")}>{product.name}</span>
+                                <span className={cn("truncate text-xs sm:text-[13px] font-medium leading-snug", isSelected ? "text-primary dark:text-foreground" : "text-foreground")}>{product.name}</span>
                                 <div className="flex min-w-0 items-center gap-1 overflow-hidden">
                                    {showSku && productCode && (
                                      <span className="shrink-0 rounded bg-zinc-100 dark:bg-white/10 px-1.5 py-0.5 font-mono text-[10px] font-bold text-zinc-800 dark:text-zinc-200">
@@ -956,8 +955,8 @@ export function ProductSelectionModal({
                 </div>
 
                 {showQuantityControls && selectedProducts.length > 0 && (
-                  <div className="mt-3 border-t border-border/50 bg-amber-500/10 rounded-2xl p-3 shrink-0">
-                    <div className="text-xs font-bold text-amber-800 dark:text-amber-300 mb-2 flex items-center gap-1.5">
+                  <div className="mt-2.5 border-t border-border/50 bg-amber-500/10 rounded-xl p-2.5 shrink-0">
+                    <div className="text-xs font-bold text-amber-800 dark:text-amber-300 mb-1.5 flex items-center gap-1.5">
                       <span>已选商品配比数量:</span>
                       <span className="text-[11px] font-normal text-muted-foreground">（可手动调整每个商品在当前订单中的匹配数量）</span>
                     </div>
@@ -1011,16 +1010,16 @@ export function ProductSelectionModal({
                {showPlatformSelector ? (
                  <div className="flex flex-col gap-1.5 mb-3 sm:mb-4 w-full">
                    <div className="text-xs font-bold text-muted-foreground uppercase tracking-wider pl-1">添加到平台</div>
-                   <div className="flex items-center gap-1 p-1 bg-muted/50 rounded-xl border border-border/50 overflow-x-auto no-scrollbar">
+                   <div className="flex items-center gap-1 p-1 bg-muted/50 rounded-full border border-border/50 overflow-x-auto no-scrollbar">
                       {PLATFORMS.map(p => (
                         <button
                           key={p}
                           type="button"
                           onClick={() => setTargetPlatform(p)}
                           className={cn(
-                            "px-3 sm:px-4 py-1.5 rounded-lg text-xs font-black transition-all whitespace-nowrap shrink-0",
+                            "px-3 sm:px-4 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap shrink-0",
                             targetPlatform === p 
-                              ? "bg-white dark:bg-white/10 text-primary shadow-sm border border-border" 
+                              ? "bg-white dark:bg-white/10 text-primary shadow-xs border border-border/60" 
                               : "text-muted-foreground hover:text-foreground hover:bg-white/5"
                           )}
                         >
@@ -1032,9 +1031,9 @@ export function ProductSelectionModal({
                ) : null}
 
                {/* 移动端顶部信息栏 (桌面端隐藏) */}
-               <div className="flex sm:hidden items-center justify-between gap-2 pb-2 mb-2 border-b border-border/40 text-xs">
+               <div className="flex sm:hidden items-center justify-between gap-2 pb-2.5 mb-2.5 border-b border-border/40 text-xs">
                  <div className="font-medium text-muted-foreground whitespace-nowrap">
-                   已选 <span className="text-primary font-bold">{tempSelectedIds.length}</span> 项
+                   已选 <span className="text-foreground font-bold">{tempSelectedIds.length}</span> 项
                  </div>
                  <div className="flex items-center gap-2">
                    {!localSingleSelect && (
@@ -1042,7 +1041,7 @@ export function ProductSelectionModal({
                        type="button"
                        onClick={handleToggleSelectAll}
                        disabled={selectableProducts.length === 0 || isSelectingAll}
-                       className="px-2.5 py-1 rounded-lg font-medium text-muted-foreground hover:bg-black/5 hover:text-foreground active:scale-95 disabled:opacity-40 whitespace-nowrap dark:hover:bg-white/10"
+                       className="px-3 py-1 rounded-full font-medium text-muted-foreground hover:bg-black/5 hover:text-foreground active:scale-95 disabled:opacity-40 whitespace-nowrap dark:hover:bg-white/10"
                      >
                        {isSelectingAll ? "全选中..." : allFilteredSelected ? "取消全选" : "全选"}
                      </button>
@@ -1050,7 +1049,7 @@ export function ProductSelectionModal({
                    <button 
                      type="button"
                      onClick={onClose} 
-                     className="px-2.5 py-1 rounded-lg font-medium text-muted-foreground hover:bg-black/5 hover:text-foreground active:scale-95 whitespace-nowrap dark:hover:bg-white/10"
+                     className="px-3 py-1 rounded-full font-medium text-muted-foreground hover:bg-black/5 hover:text-foreground active:scale-95 whitespace-nowrap dark:hover:bg-white/10"
                    >
                      取消
                    </button>
@@ -1061,7 +1060,7 @@ export function ProductSelectionModal({
                <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-3 w-full">
                  {/* 桌面端已选计数 */}
                  <div className="hidden sm:block text-xs sm:text-sm font-medium text-muted-foreground mr-2 whitespace-nowrap">
-                   已选 <span className="text-primary font-bold">{tempSelectedIds.length}</span> 项
+                   已选 <span className="text-foreground font-bold">{tempSelectedIds.length}</span> 项
                  </div>
 
                  {/* 桌面端取消与全选按钮 */}
@@ -1069,7 +1068,7 @@ export function ProductSelectionModal({
                    <button 
                      type="button"
                      onClick={onClose} 
-                     className="rounded-xl px-4 py-2.5 text-xs sm:text-sm font-medium text-muted-foreground hover:bg-black/5 hover:text-foreground transition-all active:scale-95 whitespace-nowrap dark:hover:bg-white/10"
+                     className="rounded-full px-4 py-2 text-xs sm:text-sm font-medium text-muted-foreground hover:bg-black/5 hover:text-foreground transition-all active:scale-95 whitespace-nowrap dark:hover:bg-white/10"
                    >
                      取消
                    </button>
@@ -1078,7 +1077,7 @@ export function ProductSelectionModal({
                        type="button"
                        onClick={handleToggleSelectAll}
                        disabled={selectableProducts.length === 0 || isSelectingAll}
-                       className="rounded-xl px-4 py-2.5 text-xs sm:text-sm font-bold text-muted-foreground transition-all hover:bg-black/5 hover:text-foreground active:scale-95 disabled:cursor-not-allowed disabled:opacity-45 whitespace-nowrap dark:hover:bg-white/10"
+                       className="rounded-full px-4 py-2 text-xs sm:text-sm font-bold text-muted-foreground transition-all hover:bg-black/5 hover:text-foreground active:scale-95 disabled:cursor-not-allowed disabled:opacity-45 whitespace-nowrap dark:hover:bg-white/10"
                      >
                        {isSelectingAll ? "全选中..." : allFilteredSelected ? "取消全选" : "全选"}
                      </button>
@@ -1086,12 +1085,12 @@ export function ProductSelectionModal({
                  </div>
 
                  {/* 主操作按钮：无需出库与确认 */}
-                 <div className="flex items-center gap-2 w-full sm:w-auto">
+                 <div className="flex items-center gap-2 sm:gap-2.5 w-full sm:w-auto">
                     {onClear ? (
                       <button
                         type="button"
                         onClick={onClear}
-                        className="flex-1 sm:flex-initial rounded-xl px-3 sm:px-4 py-2.5 text-xs sm:text-sm font-medium text-rose-600 dark:text-rose-400 bg-rose-500/8 hover:bg-rose-500/15 border border-rose-500/20 transition-all active:scale-95 whitespace-nowrap text-center"
+                        className="flex-1 sm:flex-initial rounded-full px-4 sm:px-5 py-2 text-xs sm:text-sm font-semibold text-rose-600 dark:text-rose-400 bg-rose-500/10 hover:bg-rose-500/18 border border-rose-500/25 transition-all active:scale-95 whitespace-nowrap text-center"
                       >
                         {clearLabel || "无需出库 / 解除绑定"}
                       </button>
@@ -1101,10 +1100,10 @@ export function ProductSelectionModal({
                       onClick={handleConfirm}
                       disabled={tempSelectedIds.length === 0}
                       className={cn(
-                        "flex-1 sm:flex-initial px-5 sm:px-8 py-2.5 rounded-xl text-xs sm:text-sm font-bold shadow-md transition-all whitespace-nowrap text-center active:scale-[0.98]",
+                        "flex-1 sm:flex-initial px-6 sm:px-8 py-2 rounded-full text-xs sm:text-sm font-bold transition-all whitespace-nowrap text-center active:scale-[0.98]",
                         tempSelectedIds.length > 0
-                          ? "bg-blue-600 hover:bg-blue-500 text-white shadow-blue-500/25 cursor-pointer"
-                          : "bg-zinc-200 dark:bg-white/10 text-zinc-400 dark:text-zinc-500 cursor-not-allowed shadow-none"
+                          ? "bg-foreground text-background hover:opacity-90 dark:bg-white dark:text-black shadow-sm cursor-pointer"
+                          : "bg-black/6 dark:bg-white/10 text-muted-foreground/45 cursor-not-allowed shadow-none"
                       )}
                     >
                       {confirmLabel || "确认添加"}

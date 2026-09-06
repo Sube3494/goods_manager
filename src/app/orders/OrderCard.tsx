@@ -2135,6 +2135,42 @@ export const OrderCard = memo(function OrderCard({
   const [isUpdatingBrush, setIsUpdatingBrush] = useState(false);
   const [isAmountEditorOpen, setIsAmountEditorOpen] = useState(false);
   const [isSavingAmount, setIsSavingAmount] = useState(false);
+  const [isAmountUpdating, setIsAmountUpdating] = useState(false);
+  const targetExpectedIncomeRef = useRef<number | null>(null);
+  const amountUpdateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [isAmountTransitioning, setIsAmountTransitioning] = useState(false);
+  const amountTransitionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (amountUpdateTimeoutRef.current) {
+        clearTimeout(amountUpdateTimeoutRef.current);
+      }
+      if (amountTransitionTimeoutRef.current) {
+        clearTimeout(amountTransitionTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isAmountUpdating && targetExpectedIncomeRef.current != null) {
+      if (order.expectedIncome === targetExpectedIncomeRef.current) {
+        setIsAmountUpdating(false);
+        targetExpectedIncomeRef.current = null;
+        if (amountUpdateTimeoutRef.current) {
+          clearTimeout(amountUpdateTimeoutRef.current);
+          amountUpdateTimeoutRef.current = null;
+        }
+        setIsAmountTransitioning(true);
+        if (amountTransitionTimeoutRef.current) {
+          clearTimeout(amountTransitionTimeoutRef.current);
+        }
+        amountTransitionTimeoutRef.current = setTimeout(() => {
+          setIsAmountTransitioning(false);
+        }, 1500);
+      }
+    }
+  }, [order.expectedIncome, isAmountUpdating]);
   const [isOfflineEditorOpen, setIsOfflineEditorOpen] = useState(false);
   const [isSavingOfflineEdit, setIsSavingOfflineEdit] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
@@ -2195,15 +2231,27 @@ export const OrderCard = memo(function OrderCard({
     }
   }, [order.id, order.isMainSystemSelfDelivery, showToast, onRefresh]);
 
-  const handleSaveExpectedIncome = useCallback(async ({ expectedIncome }: { expectedIncome: number }) => {
+  const handleSaveExpectedIncome = useCallback(async ({ expectedIncome: nextExpectedIncome }: { expectedIncome: number }) => {
     try {
       setIsSavingAmount(true);
       const res = await fetch(`/api/orders/${order.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ expectedIncome }),
+        body: JSON.stringify({ expectedIncome: nextExpectedIncome }),
       });
       if (res.ok) {
+        // 保存成功：进入卡片到手金额加载中动效，等待后台数据刷新拉回
+        targetExpectedIncomeRef.current = nextExpectedIncome;
+        setIsAmountUpdating(true);
+        if (amountUpdateTimeoutRef.current) {
+          clearTimeout(amountUpdateTimeoutRef.current);
+        }
+        // 兜底超时保护，若后台未及时响应则自动结束加载
+        amountUpdateTimeoutRef.current = setTimeout(() => {
+          setIsAmountUpdating(false);
+          targetExpectedIncomeRef.current = null;
+        }, 6000);
+
         showToast("到手金额修改成功", "success");
         onRefresh?.();
         return true;
@@ -2332,7 +2380,9 @@ export const OrderCard = memo(function OrderCard({
   const showBrushMarker = !pickup && !showManualDeliveryMarker && order.isMainSystemSelfDelivery;
   const orderTypeLabel = getOrderTypeLabel(order);
   const platformMeta = getPlatformBadgeMeta(order.platform, order.rawPayload);
-  const expectedIncome = getExpectedIncome(order.expectedIncome, order.actualPaid, order.platformCommission, order.platform);
+  const effectiveRawExpectedIncome = order.expectedIncome;
+  const isIncomeLoading = isSavingAmount || isAmountUpdating;
+  const expectedIncome = getExpectedIncome(effectiveRawExpectedIncome, order.actualPaid, order.platformCommission, order.platform);
   const effectiveActualPaid = (displayAsOfflineOrder || String(order.platform || "").toLowerCase() === "other")
     && (!order.actualPaid || Number(order.actualPaid) <= 0)
     && expectedIncome > 0
@@ -2849,14 +2899,43 @@ export const OrderCard = memo(function OrderCard({
                         <button
                           type="button"
                           onClick={() => setIsAmountEditorOpen(true)}
-                          disabled={isSavingAmount}
-                          className="flex w-full flex-col items-end rounded-xl text-right transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-60"
+                          disabled={isIncomeLoading}
+                          className={cn(
+                            "flex w-full flex-col items-end rounded-xl p-1 -mr-1 -my-0.5 text-right transition-all duration-300 disabled:cursor-not-allowed",
+                            isAmountTransitioning
+                              ? "bg-emerald-500/15 ring-1 ring-emerald-500/35"
+                              : isIncomeLoading
+                                ? "bg-sky-500/10 ring-1 ring-sky-500/25"
+                                : "hover:opacity-85"
+                          )}
                         >
-                          <div className="flex items-center justify-end gap-2">
-                            {isSavingAmount ? <Loader2 size={11} className="animate-spin text-muted-foreground" /> : null}
-                            <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">到手</span>
+                          <div className="flex items-center justify-end gap-1.5">
+                            {isIncomeLoading ? (
+                              <Loader2 size={11} className="animate-spin text-sky-600 dark:text-sky-400" />
+                            ) : isAmountTransitioning ? (
+                              <Check size={11} className="text-emerald-600 dark:text-emerald-400 animate-in zoom-in duration-200" />
+                            ) : null}
+                            <span className={cn(
+                              "text-[10px] font-medium uppercase tracking-[0.12em] transition-colors",
+                              isAmountTransitioning
+                                ? "text-emerald-600 dark:text-emerald-400 font-semibold"
+                                : isIncomeLoading
+                                  ? "text-sky-600 dark:text-sky-400 font-medium"
+                                  : "text-muted-foreground"
+                            )}>
+                              到手
+                            </span>
                           </div>
-                          <div className="mt-0.5 truncate text-sm font-semibold text-foreground">{expectedIncomeDisplay}</div>
+                          <div className={cn(
+                            "mt-0.5 truncate text-sm font-semibold transition-all duration-300",
+                            isAmountTransitioning
+                              ? "text-emerald-700 dark:text-emerald-200 scale-105"
+                              : isIncomeLoading
+                                ? "text-xs text-sky-600 dark:text-sky-400 animate-pulse"
+                                : "text-foreground"
+                          )}>
+                            {isIncomeLoading ? "更新中..." : expectedIncomeDisplay}
+                          </div>
                         </button>
                       </div>
                     ) : (
@@ -2882,12 +2961,44 @@ export const OrderCard = memo(function OrderCard({
                     <button
                       type="button"
                       onClick={() => setIsAmountEditorOpen(true)}
-                      disabled={isSavingAmount}
-                      className="flex min-w-0 items-center justify-between gap-1.5 rounded-2xl border border-black/8 bg-black/2 px-3 py-2 text-left transition-all hover:border-black/12 hover:bg-black/3 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-white/3 dark:hover:bg-white/4 sm:inline-flex sm:h-8 sm:justify-start sm:rounded-full sm:px-2.5 sm:py-0"
+                      disabled={isIncomeLoading}
+                      className={cn(
+                        "flex min-w-0 items-center justify-between gap-1.5 rounded-2xl border px-3 py-2 text-left transition-all duration-300 disabled:cursor-not-allowed sm:inline-flex sm:h-8 sm:justify-start sm:rounded-full sm:px-2.5 sm:py-0",
+                        isAmountTransitioning
+                          ? "border-emerald-500/35 bg-emerald-500/12 text-emerald-700 shadow-[0_0_12px_rgba(16,185,129,0.18)] dark:border-emerald-500/40 dark:bg-emerald-500/18 dark:text-emerald-300"
+                          : isIncomeLoading
+                            ? "border-sky-500/30 bg-sky-500/10 text-sky-700 dark:border-sky-500/40 dark:bg-sky-500/15 dark:text-sky-300"
+                            : "border-black/8 bg-black/2 hover:border-black/12 hover:bg-black/3 dark:border-white/10 dark:bg-white/3 dark:hover:bg-white/4"
+                      )}
                     >
-                      <span className="shrink-0 text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground sm:text-[11px]">到手</span>
-                      <span className="truncate text-xs font-semibold text-foreground sm:text-[13px]">{expectedIncomeDisplay}</span>
-                      {isSavingAmount ? <Loader2 size={11} className="shrink-0 animate-spin text-muted-foreground" /> : null}
+                      <span className={cn(
+                        "shrink-0 text-[10px] font-medium uppercase tracking-[0.1em] transition-colors sm:text-[11px]",
+                        isAmountTransitioning
+                          ? "text-emerald-600 dark:text-emerald-400 font-semibold"
+                          : isIncomeLoading
+                            ? "text-sky-600 dark:text-sky-400 font-medium"
+                            : "text-muted-foreground"
+                      )}>
+                        到手
+                      </span>
+                      {isIncomeLoading ? (
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-sky-600 dark:text-sky-400 animate-pulse sm:text-[12px]">
+                          <Loader2 size={12} className="shrink-0 animate-spin" />
+                          更新中...
+                        </span>
+                      ) : (
+                        <>
+                          <span className={cn(
+                            "truncate text-xs font-semibold sm:text-[13px] transition-all duration-300",
+                            isAmountTransitioning ? "text-emerald-700 dark:text-emerald-200 scale-105" : "text-foreground"
+                          )}>
+                            {expectedIncomeDisplay}
+                          </span>
+                          {isAmountTransitioning ? (
+                            <Check size={12} className="shrink-0 text-emerald-600 dark:text-emerald-400 animate-in zoom-in duration-200" />
+                          ) : null}
+                        </>
+                      )}
                     </button>
                   ) : (
                     <div className="flex min-w-0 items-center justify-between gap-1.5 rounded-2xl border border-black/8 bg-black/2 px-3 py-2 dark:border-white/10 dark:bg-white/3 sm:inline-flex sm:h-8 sm:justify-start sm:rounded-full sm:px-2.5 sm:py-0">
@@ -3361,8 +3472,18 @@ export const OrderCard = memo(function OrderCard({
               <section className="rounded-[20px] border border-black/6 bg-white/80 p-3.5 dark:border-white/8 dark:bg-white/4 sm:rounded-3xl sm:p-4">
                 <h3 className="mb-3 text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground sm:mb-3">金额信息</h3>
                 <div className="grid grid-cols-2 gap-2 sm:gap-2.5">
-                  <DetailStat label="顾客实付" value={toCurrency(order.actualPaid)} />
-                  <DetailStat label={isJdPlatformOrder ? "京东到手" : isDoudianPlatformOrder ? "抖店到手" : "预计到手"} value={expectedIncomeDisplay} />
+                  <DetailStat
+                    label={isJdPlatformOrder ? "京东到手" : isDoudianPlatformOrder ? "抖店到手" : "预计到手"}
+                    value={isIncomeLoading ? "更新中..." : expectedIncomeDisplay}
+                    valueClassName={cn(
+                      "transition-all duration-500",
+                      isIncomeLoading
+                        ? "text-sky-600 dark:text-sky-400 animate-pulse font-medium"
+                        : isAmountTransitioning
+                          ? "text-emerald-600 dark:text-emerald-400 font-bold"
+                          : ""
+                    )}
+                  />
                   <DetailStat label="货品成本" value={order.productCostStatus === "ready" ? toCurrency(order.productCost) : (productCostStatusText || "-")} />
                   <DetailStat label="纯利润" value={pureProfitDisplay} />
                   {hasRefundAmount ? (

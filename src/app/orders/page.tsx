@@ -3223,9 +3223,9 @@ export default function OrdersPage() {
                     ) : null}
 
                     {matchEditorTarget.platformSkuId ? (
-                      <span className="inline-flex items-center gap-1.5 rounded-lg bg-black/[0.04] dark:bg-white/[0.06] border border-black/6 dark:border-white/8 px-2 py-0.5 font-mono text-[11px] text-muted-foreground shrink-0">
-                        <span className="text-[10px] font-sans">平台SKU</span>
-                        <span>{matchEditorTarget.platformSkuId}</span>
+                      <span className="inline-flex items-center gap-1.5 rounded-lg bg-black/[0.04] dark:bg-white/[0.06] border border-black/6 dark:border-white/8 px-2 py-0.5 font-mono text-[11px] shrink-0">
+                        <span className="text-[10px] text-muted-foreground font-sans">平台SKU</span>
+                        <span className="font-bold text-foreground">{matchEditorTarget.platformSkuId}</span>
                       </span>
                     ) : null}
 
