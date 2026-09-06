@@ -1615,56 +1615,72 @@ export function UserOrdersModal({
                       ) : null}
                     </div>
 
-                    {/* 3. 总配送费 */}
-                    <div className="min-w-0 h-full rounded-[20px] border border-black/8 bg-white/76 px-4 py-3.5 shadow-xs dark:border-white/10 dark:bg-white/5 flex flex-col gap-2.5">
-                      <div className="flex flex-col w-full">
-                        <div className="flex items-center justify-between sm:block">
-                          <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">总配送费</div>
-                          <div className="sm:hidden text-[22px] font-bold leading-none tracking-tight text-foreground">
-                            {toCurrency(activeSummary.totalDeliveryFee || 0)}
+                    {/* 3. 最右侧：总配送费与推广费垂直组合列（严格对齐 orders/page.tsx，填满第4列，杜绝突出折行） */}
+                    <div className={cn(
+                      "h-full lg:col-span-1",
+                      activeTab === "today-orders" ? "grid grid-cols-2 gap-2.5 sm:gap-3 lg:flex lg:flex-col" : "flex flex-col gap-3"
+                    )}>
+                      {activeTab === "today-orders" ? (
+                        <>
+                          <div className="flex-1 min-w-0 rounded-[20px] border border-black/8 bg-white/76 px-4 py-3.5 shadow-xs dark:border-white/10 dark:bg-white/5 flex flex-col justify-between">
+                            <div>
+                              <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">总配送费</div>
+                              <div className="mt-2 text-2xl sm:text-[30px] font-bold leading-none tracking-tight text-foreground">
+                                {toCurrency(activeSummary.totalDeliveryFee || 0)}
+                              </div>
+                            </div>
+                            <p className="mt-2 text-xs text-muted-foreground">今日订单汇总</p>
                           </div>
-                        </div>
-                        <div className="hidden sm:block mt-2 text-[26px] font-bold leading-none tracking-tight text-foreground">
-                          {toCurrency(activeSummary.totalDeliveryFee || 0)}
-                        </div>
-                        <div className="mt-1.5 text-xs text-muted-foreground">
-                          {activeTab === "all-orders" ? "全部订单配送费汇总" : "今日订单汇总"}
-                        </div>
-                      </div>
-                      {activeSummary.platformDelivery && Object.keys(activeSummary.platformDelivery).length > 0 ? (
-                        <div className="grid grid-cols-2 gap-2 border-t border-black/4 pt-3 dark:border-white/5">
-                          {Object.entries(activeSummary.platformDelivery)
-                            .sort(([, a], [, b]) => b - a)
-                            .map(([platform, fee]) => {
-                              const meta = getPlatformBadgeMeta(platform);
-                              return (
-                                <div key={platform} className="flex items-center justify-between min-w-0 rounded-xl bg-black/1.5 px-2.5 py-1.5 dark:bg-white/1.5 text-[11px] text-foreground/80 dark:text-white/80">
-                                  <span className="flex items-center gap-1.5 min-w-0 shrink">
-                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img src={meta.iconSrc} alt={meta.iconAlt} className="h-3.5 w-3.5 object-contain shrink-0" onError={(e) => { e.currentTarget.style.display = "none"; }} />
-                                    <span className="truncate font-medium">{platform}</span>
-                                  </span>
-                                  <span className="font-bold shrink-0 tabular-nums ml-1 text-foreground/90 dark:text-white/90">
-                                    {toCurrency(fee)}
-                                  </span>
-                                </div>
-                              );
-                            })}
-                        </div>
-                      ) : null}
-                    </div>
 
-                    {/* 4. 推广费 */}
-                    <div className="min-w-0 h-full rounded-[20px] border border-black/8 bg-white/76 px-4 py-3.5 shadow-xs dark:border-white/10 dark:bg-white/5 flex flex-col justify-between">
-                      <div>
-                        <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">推广费</div>
-                        <div className="mt-2 text-xl sm:text-[26px] font-bold leading-none tracking-tight text-foreground">
-                          ¥0.00
+                          <div className="flex-1 min-w-0 rounded-[20px] border border-black/8 bg-white/76 px-4 py-3.5 shadow-xs dark:border-white/10 dark:bg-white/5 flex flex-col justify-between">
+                            <div>
+                              <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">推广费</div>
+                              <div className="mt-2 text-2xl sm:text-[30px] font-bold leading-none tracking-tight text-foreground">
+                                ¥0.00
+                              </div>
+                            </div>
+                            <p className="mt-2 text-xs text-muted-foreground">今日推广费</p>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="min-w-0 h-full rounded-[20px] border border-black/8 bg-white/76 px-4 py-3.5 shadow-xs dark:border-white/10 dark:bg-white/5 flex flex-col gap-2.5">
+                          <div className="flex flex-col w-full">
+                            <div className="flex items-center justify-between sm:block">
+                              <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">总配送费</div>
+                              <div className="sm:hidden text-[22px] font-bold leading-none tracking-tight text-foreground">
+                                {toCurrency(activeSummary.totalDeliveryFee || 0)}
+                              </div>
+                            </div>
+                            <div className="hidden sm:block mt-2 text-[26px] font-bold leading-none tracking-tight text-foreground">
+                              {toCurrency(activeSummary.totalDeliveryFee || 0)}
+                            </div>
+                            <div className="mt-1.5 text-xs text-muted-foreground">
+                              全部订单配送费汇总
+                            </div>
+                          </div>
+                          {activeSummary.platformDelivery && Object.keys(activeSummary.platformDelivery).length > 0 ? (
+                            <div className="grid grid-cols-2 gap-2 border-t border-black/4 pt-3 dark:border-white/5">
+                              {Object.entries(activeSummary.platformDelivery)
+                                .sort(([, a], [, b]) => b - a)
+                                .map(([platform, fee]) => {
+                                  const meta = getPlatformBadgeMeta(platform);
+                                  return (
+                                    <div key={platform} className="flex items-center justify-between min-w-0 rounded-xl bg-black/1.5 px-2.5 py-1.5 dark:bg-white/1.5 text-[11px] text-foreground/80 dark:text-white/80">
+                                      <span className="flex items-center gap-1.5 min-w-0 shrink">
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img src={meta.iconSrc} alt={meta.iconAlt} className="h-3.5 w-3.5 object-contain shrink-0" onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                                        <span className="truncate font-medium">{platform}</span>
+                                      </span>
+                                      <span className="font-bold shrink-0 tabular-nums ml-1 text-foreground/90 dark:text-white/90">
+                                        {toCurrency(fee)}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                            </div>
+                          ) : null}
                         </div>
-                      </div>
-                      <div className="mt-1.5 text-xs text-muted-foreground">
-                        {activeTab === "all-orders" ? "全部订单推广费" : "今日推广费"}
-                      </div>
+                      )}
                     </div>
                   </div>
 
