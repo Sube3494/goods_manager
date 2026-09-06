@@ -1839,6 +1839,12 @@ export async function GET(request: NextRequest) {
                 id: matchedShopId || null,
                 name: shopProfitName,
                 amount: 0,
+                receivedAmount: 0,
+                realReceivedAmount: 0,
+                brushReceivedAmount: 0,
+                brushPaidAmount: 0,
+                realOrderCount: 0,
+                brushOrderCount: 0,
                 count: 0,
                 deliveryFee: 0,
                 productCost: 0,
@@ -1878,13 +1884,20 @@ export async function GET(request: NextRequest) {
             });
             const expected = Math.max(0, Number(adjustedMetrics.expectedIncome || 0));
             acc.receivedAmount += expected;
+            const shopProfitForReceived = ensureShopProfit();
+            shopProfitForReceived.receivedAmount = (shopProfitForReceived.receivedAmount || 0) + expected;
             if (isBrush) {
               acc.brushReceivedAmount += expected;
               acc.brushPaidAmount += Number(actualPaid || 0);
+              shopProfitForReceived.brushReceivedAmount = (shopProfitForReceived.brushReceivedAmount || 0) + expected;
+              shopProfitForReceived.brushPaidAmount = (shopProfitForReceived.brushPaidAmount || 0) + Number(actualPaid || 0);
+              shopProfitForReceived.brushOrderCount = (shopProfitForReceived.brushOrderCount || 0) + 1;
             } else {
               acc.realReceivedAmount += expected;
               acc.realPaidAmount += Number(actualPaid || 0);
               acc.validOrderCount += 1;
+              shopProfitForReceived.realReceivedAmount = (shopProfitForReceived.realReceivedAmount || 0) + expected;
+              shopProfitForReceived.realOrderCount = (shopProfitForReceived.realOrderCount || 0) + 1;
             }
             acc.platformCommission += adjustedMetrics.platformCommission;
 
@@ -1986,7 +1999,23 @@ export async function GET(request: NextRequest) {
           platformDelivery: {} as Record<string, number>,
           pureProfit: 0,
           platformProfit: {} as Record<string, { amount: number; count: number }>,
-          shopProfit: {} as Record<string, { id: string | null; name: string; amount: number; count: number; deliveryFee: number; productCost: number; platformCommission: number; platformProfit: Record<string, number>; platformCount: Record<string, number> }>,
+          shopProfit: {} as Record<string, {
+            id: string | null;
+            name: string;
+            amount: number;
+            receivedAmount: number;
+            realReceivedAmount: number;
+            brushReceivedAmount: number;
+            brushPaidAmount: number;
+            realOrderCount: number;
+            brushOrderCount: number;
+            count: number;
+            deliveryFee: number;
+            productCost: number;
+            platformCommission: number;
+            platformProfit: Record<string, number>;
+            platformCount: Record<string, number>;
+          }>,
         });
 
     const truePlatformCounts: Record<string, number> = {};

@@ -143,38 +143,25 @@ function createPinMarkerElement(type: "shop" | "rider" | "customer", labelText?:
   let defaultLabel = "门店";
 
   if (type === "shop") {
-    // 门店：高德科技蓝圆徽章 + 专业实体商铺与波浪条纹遮阳篷 SVG 图标
+    // 门店：高德科技蓝圆徽章 + 经典实体商铺/门市部标准矢量图标 (Material Design Storefront)
     bgColor = "#0284c7";
     defaultLabel = "门店";
     circle.style.background = "linear-gradient(135deg, #0284c7 0%, #0369a1 100%)";
     circle.style.boxShadow = "0 4px 14px rgba(2, 132, 199, 0.48)";
     svgContent = `
-      <svg width="25" height="25" viewBox="0 0 24 24" fill="white">
-        <path d="M2 4h20v2H2z" />
-        <path d="M3 6h18l-1.3 5c-.2.8-.9 1.4-1.7 1.4s-1.5-.6-1.7-1.4L16.8 7.5h-1.6l-.8 3.5c-.2.8-.9 1.4-1.7 1.4s-1.5-.6-1.7-1.4L9.8 7.5H8.2l-.8 3.5c-.2.8-.9 1.4-1.7 1.4s-1.5-.6-1.7-1.4L4.3 6z" />
-        <path d="M4 13v7.2c0 .4.4.8.8.8h14.4c.4 0 .8-.4.8-.8V13h-2v6H6v-6H4z" />
-        <rect x="9.5" y="14" width="5" height="6.8" rx="0.5" fill="white" />
-        <circle cx="13.5" cy="17.5" r="0.6" fill="#0369a1" />
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
+        <path d="M12 18H6V14H12M21 14V12L20 7H4L3 12V14H4V20H14V14H18V20H20V14M20 4H4V6H20V4Z" />
       </svg>
     `;
   } else if (type === "rider") {
-    // 骑手：活力外卖橙圆徽章 + 头盔骑手小电驴/摩托车与后座保温外卖箱 SVG 图标
+    // 骑手：活力外卖橙圆徽章 + 标准外卖电动车/踏板小电驴矢量图标 (Material Design Moped)
     bgColor = "#ea580c";
     defaultLabel = "骑手";
     circle.style.background = "linear-gradient(135deg, #ff7300 0%, #ea580c 100%)";
     circle.style.boxShadow = "0 4px 16px rgba(234, 88, 12, 0.55)";
     svgContent = `
-      <svg width="28" height="28" viewBox="0 0 36 36" fill="white">
-        <circle cx="21" cy="7.5" r="3.4" />
-        <rect x="5" y="11.5" width="8" height="8.5" rx="1.5" fill="white" />
-        <line x1="5" y1="15" x2="13" y2="15" stroke="#ea580c" stroke-width="1.2" />
-        <path d="M17 11.5c-1 0-2 .6-2.5 1.5l-1.8 2.5h4.8l2.8-3.2c-.9-.5-2.1-.8-3.3-.8z" />
-        <path d="M20 11.8l-2.6 4.8 3.2 2.8h4.2l2.4-4c.4-.6.2-1.4-.4-1.8l-4-2c-.8-.4-1.8-.1-2.8.2z" />
-        <path d="M9 20h8l4-7h5l2.5 7" fill="none" stroke="white" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" />
-        <circle cx="9" cy="26" r="4.2" fill="none" stroke="white" stroke-width="2.8" />
-        <circle cx="9" cy="26" r="1.5" fill="white" />
-        <circle cx="27" cy="26" r="4.2" fill="none" stroke="white" stroke-width="2.8" />
-        <circle cx="27" cy="26" r="1.5" fill="white" />
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
+        <path d="M19 15C19.55 15 20 15.45 20 16C20 16.55 19.55 17 19 17S18 16.55 18 16C18 15.45 18.45 15 19 15M19 13C17.34 13 16 14.34 16 16S17.34 19 19 19 22 17.66 22 16 20.66 13 19 13M10 6H5V8H10V6M17 5H14V7H17V9.65L13.5 14H10V9H6C3.79 9 2 10.79 2 13V16H4C4 17.66 5.34 19 7 19S10 17.66 10 16H14.5L19 10.35V7C19 5.9 18.11 5 17 5M7 17C6.45 17 6 16.55 6 16H8C8 16.55 7.55 17 7 17Z" />
       </svg>
     `;
   } else {

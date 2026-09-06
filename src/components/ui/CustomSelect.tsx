@@ -24,6 +24,7 @@ interface CustomSelectProps {
   addNewLabel?: string;
   searchable?: boolean;
   searchPlaceholder?: string;
+  align?: "left" | "center";
 }
 
 export function CustomSelect({
@@ -38,6 +39,7 @@ export function CustomSelect({
   addNewLabel,
   searchable,
   searchPlaceholder = "搜索...",
+  align,
 }: CustomSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -146,6 +148,11 @@ export function CustomSelect({
 
   // Always use custom styled select dropdown even on mobile to maintain visual aesthetics
 
+  const isCenter =
+    align === "center" ||
+    triggerClassName?.includes("text-center") ||
+    triggerClassName?.includes("justify-center");
+
   return (
     <div className={cn("relative", className)}>
       <button
@@ -153,39 +160,48 @@ export function CustomSelect({
         type="button"
         onClick={() => handleOpenChange(!isOpen)}
         className={cn(
-          "flex w-full h-full items-center justify-between bg-white dark:bg-white/5 border border-border dark:border-white/10 px-2.5 text-left text-xs transition-all outline-none ring-offset-background",
+          "flex w-full h-full items-center bg-white dark:bg-white/5 border border-border dark:border-white/10 px-2.5 text-xs transition-all outline-none ring-offset-background",
+          isCenter ? "justify-center text-center" : "justify-between text-left",
           !triggerClassName?.includes("rounded-") && "rounded-lg",
           isOpen ? "ring-2 ring-primary/20 border-primary/20 bg-background" : "hover:bg-muted/5 dark:hover:bg-white/10",
           triggerClassName
         )}
       >
-        {searchable ? (
-          <input
-            ref={inputRef}
-            type="text"
-            value={isOpen ? searchQuery : selectedLabel}
-            onChange={(e) => {
-              if (!isOpen) {
-                handleOpenChange(true);
-              }
-              setSearchQuery(e.target.value);
-            }}
-            onFocus={() => handleOpenChange(true)}
-            onClick={(e) => e.stopPropagation()}
-            placeholder={searchPlaceholder}
-            className={cn(
-              "w-full bg-transparent outline-none text-xs font-normal",
-              !value && !searchQuery && "text-muted-foreground"
-            )}
-            readOnly={!isOpen}
+        <div className={cn(
+          "flex items-center gap-1.5 min-w-0",
+          isCenter ? "justify-center w-full" : "flex-1 justify-between"
+        )}>
+          {searchable ? (
+            <input
+              ref={inputRef}
+              type="text"
+              value={isOpen ? searchQuery : selectedLabel}
+              onChange={(e) => {
+                if (!isOpen) {
+                  handleOpenChange(true);
+                }
+                setSearchQuery(e.target.value);
+              }}
+              onFocus={() => handleOpenChange(true)}
+              onClick={(e) => e.stopPropagation()}
+              placeholder={searchPlaceholder}
+              className={cn(
+                "w-full bg-transparent outline-none text-xs font-normal",
+                isCenter && "text-center",
+                !value && !searchQuery && "text-muted-foreground"
+              )}
+              readOnly={!isOpen}
+            />
+          ) : (
+            <span className={cn("truncate font-normal", !value && "text-muted-foreground", isCenter && "text-center")}>
+              {selectedLabel}
+            </span>
+          )}
+          <ChevronDown
+            size={12}
+            className={cn("text-muted-foreground transition-transform duration-200 shrink-0", isOpen && "rotate-180")}
           />
-        ) : (
-          <span className={cn("truncate font-normal", !value && "text-muted-foreground")}>{selectedLabel}</span>
-        )}
-        <ChevronDown
-          size={12}
-          className={cn("text-muted-foreground transition-transform duration-200 ml-1 shrink-0", isOpen && "rotate-180")}
-        />
+        </div>
       </button>
 
       {mounted && dropdownPosition.isReady && createPortal(
@@ -211,7 +227,7 @@ export function CustomSelect({
               {isSearchable && (
                 <div className="p-2 border-b border-border/40 sticky top-0 bg-white/95 dark:bg-[#0c1222]/95 backdrop-blur-md z-10">
                   <div className="relative flex items-center">
-                    <Search size={13} className="absolute left-2.5 text-muted-foreground pointer-events-none" />
+                    <Search size={13} className="absolute left-3 text-muted-foreground pointer-events-none" />
                     <input
                       ref={inputRef}
                       type="text"
@@ -219,7 +235,7 @@ export function CustomSelect({
                       onChange={(e) => setSearchQuery(e.target.value)}
                       placeholder={searchPlaceholder}
                       onClick={(e) => e.stopPropagation()}
-                      className="w-full h-8 pl-8 pr-7 bg-muted/50 dark:bg-white/5 border border-border/50 rounded-lg text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/40 transition-all font-normal"
+                      className="w-full h-8 pl-8.5 pr-7 bg-muted/50 dark:bg-white/5 border border-border/50 rounded-full text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/40 transition-all font-normal"
                     />
                     {searchQuery && (
                       <button

@@ -67,7 +67,23 @@ function OrderListSkeleton({ count = 3 }: { count?: number }) {
 
 type OrderAction = "self-delivery" | "complete-delivery" | "pickup-complete" | "sync" | "outbound" | "sync-brush";
 type PurchaseDraftPayload = PurchaseOrder & { sourceOrderId?: string };
-type ShopProfitInfo = { id: string | null; name: string; amount: number; count: number; deliveryFee: number; productCost: number; platformCommission: number; platformProfit?: Record<string, number>; platformCount?: Record<string, number> };
+type ShopProfitInfo = {
+  id: string | null;
+  name: string;
+  amount: number;
+  count: number;
+  receivedAmount?: number;
+  realReceivedAmount?: number;
+  brushReceivedAmount?: number;
+  brushPaidAmount?: number;
+  realOrderCount?: number;
+  brushOrderCount?: number;
+  deliveryFee: number;
+  productCost: number;
+  platformCommission: number;
+  platformProfit?: Record<string, number>;
+  platformCount?: Record<string, number>;
+};
 const UNMATCHED_SHOP_FILTER = "__unmatched__";
 
 function normalizeDisplayPlatform(platform?: string | null) {
@@ -666,9 +682,10 @@ export function AllOrdersView({
       {/* 筛选栏 */}
       <section className="rounded-3xl border border-black/8 bg-zinc-50/45 px-4 py-4 shadow-xs dark:border-white/10 dark:bg-white/4">
         <div className="flex flex-col gap-4">
-          <div className="grid gap-3 lg:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))_minmax(0,1fr)_minmax(0,1fr)]">
-            <div className="flex items-center gap-2 min-w-0">
-              <label className="flex h-11 flex-1 items-center gap-3 rounded-xl border border-black/8 bg-white px-4 focus-within:ring-2 focus-within:ring-primary/10 dark:border-white/10 dark:bg-white/3 min-w-0">
+          <div className="flex flex-col gap-2.5 lg:flex-row lg:items-center">
+            {/* 第一组：搜索框 + 全部店铺（移动端同行，桌面端自适应） */}
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <label className="flex h-11 flex-1 items-center gap-2.5 sm:gap-3 rounded-full border border-black/8 bg-white px-3.5 sm:px-4.5 focus-within:ring-2 focus-within:ring-primary/10 dark:border-white/10 dark:bg-white/3 min-w-0">
                 <Search size={16} className="text-muted-foreground shrink-0" />
                 <input
                   value={query}
@@ -682,43 +699,46 @@ export function AllOrdersView({
                   type="button"
                   onClick={resetFilters}
                   title="清空所有筛选条件"
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-black/8 bg-white/85 text-foreground hover:bg-white hover:border-black/12 active:scale-95 transition-all dark:border-white/10 dark:bg-white/3 dark:hover:bg-white/5 cursor-pointer"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-black/8 bg-white/85 text-foreground hover:bg-white hover:border-black/12 active:scale-95 transition-all dark:border-white/10 dark:bg-white/3 dark:hover:bg-white/5 cursor-pointer"
                 >
                   <X size={16} />
                 </button>
               ) : null}
-            </div>
-            <div className="grid grid-cols-2 gap-3 sm:contents">
               <CustomSelect
                 value={shop}
                 onChange={setShop}
                 options={shopOptions}
-                className="h-11"
-                triggerClassName="h-full rounded-xl border border-black/8 bg-white px-4 text-sm shadow-none dark:border-white/10 dark:bg-white/3"
+                align="center"
+                className="h-11 w-28 sm:w-32 lg:w-[136px] shrink-0"
+                triggerClassName="h-full rounded-full border border-black/8 bg-white px-3 text-sm shadow-none dark:border-white/10 dark:bg-white/3 whitespace-nowrap text-center justify-center"
               />
+            </div>
+
+            {/* 第二组：平台、状态、开始日期、结束日期（移动端2列对称，桌面端单行展开） */}
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:flex lg:items-center shrink-0">
               <CustomSelect
                 value={platform}
                 onChange={setPlatform}
                 options={platformOptions}
-                className="h-11"
-                triggerClassName="h-full rounded-xl border border-black/8 bg-white px-4 text-sm shadow-none dark:border-white/10 dark:bg-white/3"
+                align="center"
+                className="h-11 w-full lg:w-[124px]"
+                triggerClassName="h-full rounded-full border border-black/8 bg-white px-3.5 text-sm shadow-none dark:border-white/10 dark:bg-white/3 whitespace-nowrap text-center justify-center"
               />
-            </div>
-            <CustomSelect
-              value={status}
-              onChange={setStatus}
-              options={statusOptions}
-              className="h-11"
-              triggerClassName="h-full rounded-xl border border-black/8 bg-white px-4 text-sm shadow-none dark:border-white/10 dark:bg-white/3"
-            />
-            <div className="grid grid-cols-2 gap-3 sm:contents">
+              <CustomSelect
+                value={status}
+                onChange={setStatus}
+                options={statusOptions}
+                align="center"
+                className="h-11 w-full lg:w-[124px]"
+                triggerClassName="h-full rounded-full border border-black/8 bg-white px-3.5 text-sm shadow-none dark:border-white/10 dark:bg-white/3 whitespace-nowrap text-center justify-center"
+              />
               <DatePicker
                 value={startDate}
                 onChange={setStartDate}
                 placeholder="开始日期"
                 maxDate={endDate || todayDate}
-                className="h-11 w-full"
-                triggerClassName="h-full rounded-xl border border-black/8 bg-white px-4 text-sm shadow-none dark:border-white/10 dark:bg-white/3"
+                className="h-11 w-full lg:w-[134px]"
+                triggerClassName="h-full rounded-full border border-black/8 bg-white px-3.5 text-sm shadow-none dark:border-white/10 dark:bg-white/3 whitespace-nowrap text-center justify-center"
               />
               <DatePicker
                 value={endDate}
@@ -726,8 +746,8 @@ export function AllOrdersView({
                 placeholder="结束日期"
                 minDate={startDate || undefined}
                 maxDate={todayDate}
-                className="h-11 w-full"
-                triggerClassName="h-full rounded-xl border border-black/8 bg-white px-4 text-sm shadow-none dark:border-white/10 dark:bg-white/3"
+                className="h-11 w-full lg:w-[134px]"
+                triggerClassName="h-full rounded-full border border-black/8 bg-white px-3.5 text-sm shadow-none dark:border-white/10 dark:bg-white/3 whitespace-nowrap text-center justify-center"
               />
             </div>
           </div>
