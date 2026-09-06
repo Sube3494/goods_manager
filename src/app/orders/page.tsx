@@ -2521,26 +2521,26 @@ export default function OrdersPage() {
 
                   {/* 订单成分比例进度条 */}
                   {activeOverview.totalCount > 0 && (
-                    <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-black/6 dark:bg-white/10">
+                    <div className="flex h-2 w-full items-stretch overflow-hidden rounded-full bg-black/6 dark:bg-white/10 [transform:translateZ(0)] isolate">
                       {activeOverview.trueOrderCount > 0 && (
                         <div
                           style={{ width: `${(activeOverview.trueOrderCount / activeOverview.totalCount) * 100}%` }}
-                          className="bg-sky-500 transition-all duration-500"
+                          className="h-full shrink-0 self-stretch bg-sky-500 transition-[width] duration-500 ease-out"
                           title={`真单 ${activeOverview.trueOrderCount}单`}
                         />
                       )}
                       {activeOverview.brushCount > 0 && (
                         <div
                           style={{ width: `${(activeOverview.brushCount / activeOverview.totalCount) * 100}%` }}
-                          className="bg-rose-500 transition-all duration-500"
+                          className="h-full shrink-0 self-stretch bg-rose-500 transition-[width] duration-500 ease-out"
                           title={`刷单 ${activeOverview.brushCount}单`}
                         />
                       )}
                       {activeOverview.cancelledCount > 0 && (
                         <div
                           style={{ width: `${(activeOverview.cancelledCount / activeOverview.totalCount) * 100}%` }}
-                          className="bg-slate-400 dark:bg-slate-500 transition-all duration-500"
-                          title={`取消 ${activeOverview.cancelledCount}单`}
+                          className="h-full shrink-0 self-stretch bg-amber-400 transition-[width] duration-500 ease-out"
+                          title={`退款/已取消 ${activeOverview.cancelledCount}单`}
                         />
                       )}
                     </div>

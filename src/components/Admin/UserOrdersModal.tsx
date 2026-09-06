@@ -939,25 +939,25 @@ export function UserOrdersModal({
 
                         {/* 订单成分比例进度条 */}
                         {todayOverview.totalCount > 0 && (
-                          <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-black/6 dark:bg-white/10">
+                          <div className="flex h-2 w-full items-stretch overflow-hidden rounded-full bg-black/6 dark:bg-white/10 [transform:translateZ(0)] isolate">
                             {todayOverview.trueOrderCount > 0 && (
                               <div
                                 style={{ width: `${(todayOverview.trueOrderCount / todayOverview.totalCount) * 100}%` }}
-                                className="bg-sky-500 transition-all duration-500"
+                                className="h-full shrink-0 self-stretch bg-sky-500 transition-[width] duration-500 ease-out"
                                 title={`真单 ${todayOverview.trueOrderCount}单`}
                               />
                             )}
                             {todayOverview.brushCount > 0 && (
                               <div
                                 style={{ width: `${(todayOverview.brushCount / todayOverview.totalCount) * 100}%` }}
-                                className="bg-rose-500 transition-all duration-500"
+                                className="h-full shrink-0 self-stretch bg-rose-500 transition-[width] duration-500 ease-out"
                                 title={`刷单 ${todayOverview.brushCount}单`}
                               />
                             )}
                             {todayOverview.cancelledCount > 0 && (
                               <div
                                 style={{ width: `${(todayOverview.cancelledCount / todayOverview.totalCount) * 100}%` }}
-                                className="bg-slate-400 dark:bg-slate-500 transition-all duration-500"
+                                className="h-full shrink-0 self-stretch bg-slate-400 dark:bg-slate-500 transition-[width] duration-500 ease-out"
                                 title={`取消 ${todayOverview.cancelledCount}单`}
                               />
                             )}
