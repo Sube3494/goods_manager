@@ -830,7 +830,7 @@ export function OrderDistributionModal({ onClose, initialShopName, localShops, u
   const shopOptions = useMemo(() => {
     return availableShops.map((s) => ({
       value: s.name,
-      label: `${s.name}${s.isDefault ? "（默认）" : ""}${typeof s.orderCount === "number" ? ` (${s.orderCount}单)` : ""}`,
+      label: s.name,
     }));
   }, [availableShops]);
 
@@ -841,10 +841,30 @@ export function OrderDistributionModal({ onClose, initialShopName, localShops, u
     // 按订单数量降序排列
     platforms.sort((a, b) => (stats[b]?.count || 0) - (stats[a]?.count || 0));
     for (const plat of platforms) {
-      base.push({ value: plat, label: `${plat} (${stats[plat]?.count || 0})` });
+      base.push({ value: plat, label: plat });
     }
     return base;
   }, [summary.platformStats]);
+
+  const datePresetOptions = useMemo(() => {
+    const base = [
+      { value: "today", label: "今日" },
+      { value: "yesterday", label: "昨日" },
+      { value: "7d", label: "近7天" },
+      { value: "30d", label: "近30天" },
+      { value: "all", label: "全部日期" },
+    ];
+    if (datePreset === "custom") {
+      return [{ value: "custom", label: "自定义" }, ...base];
+    }
+    return base;
+  }, [datePreset]);
+
+  const orderTypeOptions = useMemo(() => [
+    { value: "all", label: "全部类型" },
+    { value: "real", label: "真单" },
+    { value: "brush", label: "刷单" },
+  ], []);
 
   if (!mounted) return null;
 
@@ -855,13 +875,13 @@ export function OrderDistributionModal({ onClose, initialShopName, localShops, u
         className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity"
         onClick={onClose}
       />
-      <div className="relative z-10 flex flex-col w-full h-full max-w-full max-h-full sm:max-w-[96vw] sm:max-h-[92vh] rounded-none sm:rounded-[28px] border-0 sm:border border-black/10 bg-background dark:border-white/10 dark:bg-zinc-950 overflow-hidden shadow-2xl">
+      <div className="relative z-10 flex flex-col w-full h-full max-w-full max-h-full sm:max-w-[96vw] sm:max-h-[92vh] rounded-none sm:rounded-[28px] border-0 sm:border border-black/8 bg-background dark:border-white/10 dark:bg-[#0c1220] overflow-hidden shadow-2xl">
         {/* 顶部控制栏 */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 sm:gap-3 border-b border-black/8 px-3 py-2.5 sm:px-6 sm:py-3 bg-white/80 backdrop-blur-md dark:border-white/10 dark:bg-zinc-900/80 shrink-0">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 sm:gap-3 border-b border-black/8 px-3 py-2.5 sm:px-6 sm:py-3 bg-white/76 backdrop-blur-xl dark:border-white/10 dark:bg-white/4 shrink-0">
           {/* 标题区（移动端整行带关闭，桌面端单行左侧） */}
           <div className="flex items-center justify-between sm:justify-start gap-2.5 shrink-0 w-full sm:w-auto">
             <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-              <div className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-xl bg-primary/10 text-primary shrink-0">
+              <div className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full bg-primary/10 text-primary shrink-0">
                 <MapPin size={16} className="sm:hidden" />
                 <MapPin size={18} className="hidden sm:block" />
               </div>
@@ -870,7 +890,7 @@ export function OrderDistributionModal({ onClose, initialShopName, localShops, u
                   <h2 className="text-sm sm:text-base lg:text-lg font-bold text-foreground whitespace-nowrap">
                     订单地点分布
                   </h2>
-                  <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[10px] sm:text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
+                  <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-0.5 text-[10px] sm:text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
                     单店分布
                   </span>
                 </div>
@@ -880,24 +900,15 @@ export function OrderDistributionModal({ onClose, initialShopName, localShops, u
               </div>
             </div>
 
-            {/* 移动端专属快捷操作（右上角直达） */}
-            <div className="flex items-center gap-1.5 sm:hidden shrink-0">
-              <button
-                type="button"
-                onClick={fetchData}
-                disabled={isLoading}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-black/8 bg-white text-muted-foreground hover:text-foreground active:scale-95 transition-all dark:border-white/10 dark:bg-white/5 disabled:opacity-50"
-                title="刷新数据"
-              >
-                <RefreshCw size={13} className={cn(isLoading && "animate-spin")} />
-              </button>
+            {/* 移动端专属快捷操作（右上角直达，无轮廓关闭按钮） */}
+            <div className="flex items-center sm:hidden shrink-0">
               <button
                 type="button"
                 onClick={onClose}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-black/8 bg-white text-muted-foreground hover:text-foreground active:scale-95 transition-all dark:border-white/10 dark:bg-white/5"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/10 active:scale-90 transition-all cursor-pointer"
                 title="关闭"
               >
-                <X size={15} />
+                <X size={16} />
               </button>
             </div>
           </div>
@@ -905,126 +916,58 @@ export function OrderDistributionModal({ onClose, initialShopName, localShops, u
           {/* 筛选控制器行（桌面端单行靠右，移动端流畅横向滑动） */}
           <div className="flex items-center justify-start sm:justify-end gap-2 overflow-x-auto sm:overflow-visible no-scrollbar pb-1 sm:pb-0 shrink-0 w-full sm:w-auto sm:ml-auto">
             {/* 店铺筛选 */}
-            <div className="w-32 sm:w-44 h-8 sm:h-9 shrink-0">
+            <div className="w-28 sm:w-36 h-8 sm:h-9 shrink-0">
               <CustomSelect
                 value={selectedShop}
                 onChange={(val) => setSelectedShop(val)}
                 options={shopOptions}
                 placeholder="选择店铺"
+                align="center"
                 className="h-full w-full"
-                triggerClassName="h-full rounded-xl border border-black/8 bg-white px-2.5 text-xs sm:text-sm shadow-none dark:border-white/10 dark:bg-white/3 dark:hover:bg-white/6"
+                triggerClassName="h-full rounded-full border border-black/8 bg-white/80 px-2.5 sm:px-3 text-xs sm:text-sm text-center shadow-none dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8"
               />
             </div>
 
             {/* 平台筛选 */}
-            <div className="w-24 sm:w-28 h-8 sm:h-9 shrink-0">
+            <div className="w-20 sm:w-24 h-8 sm:h-9 shrink-0">
               <CustomSelect
                 value={selectedPlatform}
                 onChange={(val) => setSelectedPlatform(val)}
                 options={platformOptions}
                 placeholder="全部平台"
+                align="center"
                 className="h-full w-full"
-                triggerClassName="h-full rounded-xl border border-black/8 bg-white px-2.5 text-xs sm:text-sm shadow-none dark:border-white/10 dark:bg-white/3 dark:hover:bg-white/6"
+                triggerClassName="h-full rounded-full border border-black/8 bg-white/80 px-2 text-xs sm:text-sm text-center shadow-none dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8"
               />
             </div>
 
             {/* 订单类型筛选：全部 / 真单 / 刷单 */}
-            <div className="inline-flex h-8 sm:h-9 items-center rounded-xl border border-black/8 bg-black/3 p-0.5 sm:p-1 dark:border-white/10 dark:bg-white/3 shrink-0">
-              <button
-                type="button"
-                onClick={() => setOrderType("all")}
-                className={cn(
-                  "h-full rounded-lg px-2 sm:px-2.5 text-xs font-medium transition-all",
-                  orderType === "all"
-                    ? "bg-white dark:bg-white/15 text-foreground shadow-xs font-semibold"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                全部
-              </button>
-              <button
-                type="button"
-                onClick={() => setOrderType("real")}
-                className={cn(
-                  "h-full rounded-lg px-2 sm:px-2.5 text-xs font-medium transition-all flex items-center gap-1 sm:gap-1.5",
-                  orderType === "real"
-                    ? "bg-emerald-500 text-white shadow-xs font-semibold"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                <span className={cn("w-1.5 h-1.5 rounded-full", orderType === "real" ? "bg-white" : "bg-emerald-500")} />
-                真单
-              </button>
-              <button
-                type="button"
-                onClick={() => setOrderType("brush")}
-                className={cn(
-                  "h-full rounded-lg px-2 sm:px-2.5 text-xs font-medium transition-all flex items-center gap-1 sm:gap-1.5",
-                  orderType === "brush"
-                    ? "bg-rose-500 text-white shadow-xs font-semibold"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                <span className={cn("w-1.5 h-1.5 rounded-full", orderType === "brush" ? "bg-white" : "bg-rose-500")} />
-                刷单
-              </button>
+            <div className="w-20 sm:w-24 h-8 sm:h-9 shrink-0">
+              <CustomSelect
+                value={orderType}
+                onChange={(val) => setOrderType(val as "all" | "real" | "brush")}
+                options={orderTypeOptions}
+                placeholder="全部类型"
+                align="center"
+                className="h-full w-full"
+                triggerClassName="h-full rounded-full border border-black/8 bg-white/80 px-2 text-xs sm:text-sm text-center shadow-none dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8"
+              />
             </div>
 
-            {/* 日期预设切换 */}
-            <div className="inline-flex h-8 sm:h-9 items-center rounded-xl border border-black/8 bg-black/3 p-0.5 sm:p-1 dark:border-white/10 dark:bg-white/3 shrink-0">
-              <button
-                type="button"
-                onClick={() => handleDatePresetChange("all")}
-                className={cn(
-                  "h-full rounded-lg px-2 sm:px-2.5 text-xs font-medium transition-all",
-                  datePreset === "all" ? "bg-white dark:bg-white/15 text-foreground shadow-xs font-semibold" : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                全部
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDatePresetChange("today")}
-                className={cn(
-                  "h-full rounded-lg px-2 sm:px-2.5 text-xs font-medium transition-all",
-                  datePreset === "today" ? "bg-white dark:bg-white/15 text-foreground shadow-xs font-semibold" : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                今日
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDatePresetChange("yesterday")}
-                className={cn(
-                  "h-full rounded-lg px-2 sm:px-2.5 text-xs font-medium transition-all",
-                  datePreset === "yesterday" ? "bg-white dark:bg-white/15 text-foreground shadow-xs font-semibold" : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                昨日
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDatePresetChange("7d")}
-                className={cn(
-                  "h-full rounded-lg px-2 sm:px-2.5 text-xs font-medium transition-all",
-                  datePreset === "7d" ? "bg-white dark:bg-white/15 text-foreground shadow-xs font-semibold" : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                近7天
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDatePresetChange("30d")}
-                className={cn(
-                  "h-full rounded-lg px-2 sm:px-2.5 text-xs font-medium transition-all",
-                  datePreset === "30d" ? "bg-white dark:bg-white/15 text-foreground shadow-xs font-semibold" : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                近30天
-              </button>
+            {/* 日期预设下拉选择器 */}
+            <div className="w-19 sm:w-22 h-8 sm:h-9 shrink-0">
+              <CustomSelect
+                value={datePreset}
+                onChange={(val) => handleDatePresetChange(val as any)}
+                options={datePresetOptions}
+                placeholder="日期"
+                align="center"
+                className="h-full w-full"
+                triggerClassName="h-full rounded-full border border-black/8 bg-white/80 px-2 text-xs sm:text-sm text-center shadow-none dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8"
+              />
             </div>
 
-            {/* 日期选择器 */}
+            {/* 日期选择器（充分拓宽，确保年月日完整显示不截断，文字居中） */}
             <div className="flex items-center gap-1.5 h-8 sm:h-9 shrink-0">
               <DatePicker
                 value={startDate}
@@ -1033,8 +976,8 @@ export function OrderDistributionModal({ onClose, initialShopName, localShops, u
                   setStartDate(val);
                   setDatePreset("custom");
                 }}
-                className="h-full w-24 sm:w-28"
-                triggerClassName="h-full rounded-xl border border-black/8 bg-white px-2 text-xs shadow-none dark:border-white/10 dark:bg-white/3 dark:hover:bg-white/6"
+                className="h-full w-29 sm:w-34"
+                triggerClassName="h-full rounded-full border border-black/8 bg-white/80 px-2.5 sm:px-3 text-xs justify-center text-center shadow-none dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8"
               />
               <span className="text-xs text-muted-foreground font-medium select-none">至</span>
               <DatePicker
@@ -1044,29 +987,20 @@ export function OrderDistributionModal({ onClose, initialShopName, localShops, u
                   setEndDate(val);
                   setDatePreset("custom");
                 }}
-                className="h-full w-24 sm:w-28"
-                triggerClassName="h-full rounded-xl border border-black/8 bg-white px-2 text-xs shadow-none dark:border-white/10 dark:bg-white/3 dark:hover:bg-white/6"
+                className="h-full w-29 sm:w-34"
+                triggerClassName="h-full rounded-full border border-black/8 bg-white/80 px-2.5 sm:px-3 text-xs justify-center text-center shadow-none dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8"
               />
             </div>
 
-            {/* 桌面端专属的刷新与关闭 */}
-            <div className="hidden sm:flex items-center gap-2 shrink-0">
-              <button
-                type="button"
-                onClick={fetchData}
-                disabled={isLoading}
-                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-black/8 bg-white text-muted-foreground hover:text-foreground active:scale-95 transition-all dark:border-white/10 dark:bg-white/3 dark:hover:bg-white/6 disabled:opacity-50 cursor-pointer"
-                title="刷新地图数据"
-              >
-                <RefreshCw size={15} className={cn(isLoading && "animate-spin")} />
-              </button>
+            {/* 桌面端专属的关闭（无轮廓） */}
+            <div className="hidden sm:flex items-center shrink-0 ml-1">
               <button
                 type="button"
                 onClick={onClose}
-                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-black/8 bg-white text-muted-foreground hover:text-foreground active:scale-95 transition-all dark:border-white/10 dark:bg-white/3 dark:hover:bg-white/6 cursor-pointer"
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/10 active:scale-90 transition-all cursor-pointer"
                 title="关闭弹窗"
               >
-                <X size={16} />
+                <X size={18} />
               </button>
             </div>
           </div>
@@ -1083,7 +1017,7 @@ export function OrderDistributionModal({ onClose, initialShopName, localShops, u
 
           {/* 加载状态浮层 */}
           {isLoading && (
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 rounded-full border border-black/10 bg-white/90 px-4 py-2 text-xs font-semibold text-foreground shadow-lg backdrop-blur-md dark:border-white/10 dark:bg-zinc-900/90">
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 rounded-full border border-black/8 bg-white/90 px-4 py-2 text-xs font-semibold text-foreground shadow-lg backdrop-blur-xl dark:border-white/10 dark:bg-[#0c1220]/90">
               <Loader2 size={14} className="animate-spin text-primary" />
               正在检索与绘制订单点位...
             </div>
@@ -1091,7 +1025,7 @@ export function OrderDistributionModal({ onClose, initialShopName, localShops, u
 
           {/* 错误提示 */}
           {error && (
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-2.5 text-xs font-medium text-rose-600 shadow-lg backdrop-blur-md dark:text-rose-400">
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 rounded-full border border-rose-500/20 bg-rose-500/10 px-4 py-2 text-xs font-medium text-rose-600 shadow-lg backdrop-blur-xl dark:text-rose-400">
               {error}
             </div>
           )}
@@ -1113,7 +1047,7 @@ export function OrderDistributionModal({ onClose, initialShopName, localShops, u
 
           {/* 无订单提示浮层（仅在已选门店但无订单时展示） */}
           {!isLoading && !error && availableShops.length > 0 && orders.length === 0 && (
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 rounded-xl border border-black/8 bg-white/90 px-4 py-2.5 text-xs font-medium text-muted-foreground shadow-md backdrop-blur-md dark:border-white/10 dark:bg-zinc-900/90">
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 rounded-full border border-black/8 bg-white/90 px-4 py-2.5 text-xs font-medium text-muted-foreground shadow-md backdrop-blur-xl dark:border-white/10 dark:bg-[#0c1220]/90">
               <MapPin size={14} className="text-muted-foreground" />
               {`当前门店【${currentShop?.name || selectedShop || "所选店铺"}】在所选筛选条件下暂无有效定位${orderType === "real" ? "真单" : orderType === "brush" ? "刷单" : "订单"}`}
             </div>
@@ -1124,7 +1058,7 @@ export function OrderDistributionModal({ onClose, initialShopName, localShops, u
             <button
               type="button"
               onClick={() => setIsMobileSummaryOpen(true)}
-              className="absolute top-3 left-3 z-20 sm:hidden flex items-center gap-1.5 rounded-full border border-black/10 bg-white/95 px-3 py-1.5 text-xs font-bold text-foreground shadow-lg backdrop-blur-md dark:border-white/10 dark:bg-zinc-900/95 active:scale-95 transition-all"
+              className="absolute top-3 left-3 z-20 sm:hidden flex items-center gap-1.5 rounded-full border border-black/8 bg-white/90 px-3 py-1.5 text-xs font-bold text-foreground shadow-lg backdrop-blur-xl dark:border-white/10 dark:bg-[#0c1220]/90 active:scale-95 transition-all"
             >
               <BarChart2 size={13} className="text-primary" />
               <span>订单分布 ({summary.totalOrders}单)</span>
@@ -1135,7 +1069,7 @@ export function OrderDistributionModal({ onClose, initialShopName, localShops, u
           {/* 统计面板（移动端支持可展开悬浮卡片，桌面端左上角常驻） */}
           <div
             className={cn(
-              "absolute z-20 flex-col gap-2.5 rounded-2xl border border-black/10 bg-white/95 p-3.5 shadow-xl backdrop-blur-md dark:border-white/10 dark:bg-zinc-900/95 pointer-events-auto transition-all",
+              "absolute z-20 flex-col gap-2.5 rounded-2xl border border-black/8 bg-white/90 p-3.5 shadow-xl backdrop-blur-xl dark:border-white/10 dark:bg-[#0c1220]/90 pointer-events-auto transition-all",
               "sm:top-4 sm:left-4 sm:flex sm:max-w-xs",
               isMobileSummaryOpen
                 ? "top-3 left-3 right-3 max-h-[75vh] overflow-y-auto flex"
@@ -1147,11 +1081,11 @@ export function OrderDistributionModal({ onClose, initialShopName, localShops, u
                 <Store size={14} className="text-primary shrink-0" />
                 <span className="truncate">{currentShop?.name || selectedShop || "请选择店铺"}</span>
               </div>
-              {/* 移动端收起按钮 */}
+              {/* 移动端收起按钮（无轮廓） */}
               <button
                 type="button"
                 onClick={() => setIsMobileSummaryOpen(false)}
-                className="sm:hidden rounded-lg p-1 text-muted-foreground hover:bg-black/5 dark:hover:bg-white/5"
+                className="sm:hidden rounded-full p-1 text-muted-foreground hover:bg-black/5 dark:hover:bg-white/10 active:scale-90 transition-all cursor-pointer"
                 title="收起统计"
               >
                 <X size={14} />
@@ -1206,7 +1140,7 @@ export function OrderDistributionModal({ onClose, initialShopName, localShops, u
                   return (
                     <span
                       key={plat}
-                      className="inline-flex items-center gap-1.5 rounded-md border border-black/6 bg-black/3 px-2 py-0.5 text-[10px] font-medium text-foreground dark:border-white/6 dark:bg-white/4"
+                      className="inline-flex items-center gap-1.5 rounded-full border border-black/6 bg-black/3 px-2.5 py-0.5 text-[10px] font-medium text-foreground dark:border-white/6 dark:bg-white/4"
                     >
                       <img src={theme.icon} alt="" className="w-3 h-3 object-contain shrink-0" />
                       <span>{plat}</span>
@@ -1218,7 +1152,7 @@ export function OrderDistributionModal({ onClose, initialShopName, localShops, u
             </div>
 
             {summary.isCapped && (
-              <div className="flex items-center gap-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 px-2 py-1 text-[10px] text-amber-600 dark:text-amber-400">
+              <div className="flex items-center gap-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 px-3 py-1 text-[10px] text-amber-600 dark:text-amber-400">
                 <Info size={12} className="shrink-0" />
                 <span>当前时段共 {summary.totalOrders} 笔订单，已聚合呈现最新 {summary.renderedCount || orders.length} 笔点位</span>
               </div>
@@ -1243,10 +1177,10 @@ export function OrderDistributionModal({ onClose, initialShopName, localShops, u
               type="button"
               onClick={() => setEnableCluster((v) => !v)}
               className={cn(
-                "flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-2xl border shadow-lg backdrop-blur-md transition-all active:scale-90 cursor-pointer",
+                "flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-full border shadow-lg backdrop-blur-xl transition-all active:scale-90 cursor-pointer",
                 enableCluster
                   ? "border-blue-500 bg-blue-600 text-white hover:bg-blue-700 shadow-blue-500/30"
-                  : "border-black/10 bg-white/95 text-foreground hover:bg-black/5 dark:border-white/10 dark:bg-zinc-900/95 dark:hover:bg-white/10"
+                  : "border-black/8 bg-white/90 text-foreground hover:bg-black/5 dark:border-white/10 dark:bg-[#0c1220]/90 dark:hover:bg-white/10"
               )}
               title={enableCluster ? "关闭聚合（切换为散点模式）" : "开启聚合（大量标记时不卡顿）"}
             >
@@ -1257,14 +1191,14 @@ export function OrderDistributionModal({ onClose, initialShopName, localShops, u
             <button
               type="button"
               onClick={handleResetFitView}
-              className="flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-2xl border border-black/10 bg-white/95 text-foreground shadow-lg backdrop-blur-md dark:border-white/10 dark:bg-zinc-900/95 active:scale-90 hover:bg-black/5 dark:hover:bg-white/10 transition-all cursor-pointer"
+              className="flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-full border border-black/8 bg-white/90 text-foreground shadow-lg backdrop-blur-xl dark:border-white/10 dark:bg-[#0c1220]/90 active:scale-90 hover:bg-black/5 dark:hover:bg-white/10 transition-all cursor-pointer"
               title="智能视野复位（聚焦订单集群）"
             >
               <Crosshair size={18} className="text-primary" />
             </button>
 
             {/* 放大 / 缩小 快捷控制器 */}
-            <div className="flex flex-col items-center rounded-2xl border border-black/10 bg-white/95 shadow-lg backdrop-blur-md dark:border-white/10 dark:bg-zinc-900/95 overflow-hidden">
+            <div className="flex flex-col items-center rounded-full border border-black/8 bg-white/90 shadow-lg backdrop-blur-xl dark:border-white/10 dark:bg-[#0c1220]/90 overflow-hidden">
               <button
                 type="button"
                 onClick={() => {
@@ -1294,12 +1228,12 @@ export function OrderDistributionModal({ onClose, initialShopName, localShops, u
 
           {/* 选中的订单卡片浮层（移动端居中贴底，桌面端贴右下角） */}
           {selectedOrder && (
-            <div className="absolute bottom-3 inset-x-3 sm:inset-x-auto sm:bottom-4 sm:right-4 z-30 w-auto sm:w-96 rounded-2xl border border-black/10 bg-white/95 p-3.5 sm:p-4 shadow-2xl backdrop-blur-md dark:border-white/10 dark:bg-zinc-900/95 animate-in fade-in slide-in-from-bottom-3 duration-200">
+            <div className="absolute bottom-3 inset-x-3 sm:inset-x-auto sm:bottom-4 sm:right-4 z-30 w-auto sm:w-96 rounded-2xl border border-black/8 bg-white/90 p-3.5 sm:p-4 shadow-2xl backdrop-blur-xl dark:border-white/10 dark:bg-[#0c1220]/90 animate-in fade-in slide-in-from-bottom-3 duration-200">
               <div className="flex items-start justify-between gap-2 border-b border-black/6 pb-2.5 dark:border-white/6">
                 <div>
                   <div className="flex items-center gap-1.5">
                     <span
-                      className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-bold text-white shadow-xs"
+                      className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold text-white shadow-xs"
                       style={{ background: getPlatformTheme(selectedOrder.platform).pinBg }}
                     >
                       <img src={getPlatformTheme(selectedOrder.platform).icon} alt="" className="w-3.5 h-3.5 object-contain" />
@@ -1311,7 +1245,7 @@ export function OrderDistributionModal({ onClose, initialShopName, localShops, u
                     {selectedOrder.isBrush !== undefined && (
                       <span
                         className={cn(
-                          "rounded-md px-1.5 py-0.5 text-[10px] font-bold",
+                          "rounded-full px-2 py-0.5 text-[10px] font-bold",
                           selectedOrder.isBrush
                             ? "bg-rose-500/15 text-rose-600 border border-rose-500/30 dark:text-rose-400"
                             : "bg-emerald-500/15 text-emerald-600 border border-emerald-500/30 dark:text-emerald-400"
@@ -1329,10 +1263,12 @@ export function OrderDistributionModal({ onClose, initialShopName, localShops, u
                     {formatLocalDateTime(selectedOrder.orderTime)}
                   </div>
                 </div>
+                {/* 选中的订单详情关闭按钮（无轮廓） */}
                 <button
                   type="button"
                   onClick={() => setSelectedOrder(null)}
-                  className="rounded-lg p-1 text-muted-foreground hover:bg-black/5 hover:text-foreground dark:hover:bg-white/5"
+                  className="rounded-full p-1 text-muted-foreground hover:bg-black/5 hover:text-foreground dark:hover:bg-white/10 active:scale-90 transition-all cursor-pointer"
+                  title="关闭详情"
                 >
                   <X size={14} />
                 </button>
@@ -1354,7 +1290,7 @@ export function OrderDistributionModal({ onClose, initialShopName, localShops, u
               </div>
 
               {/* 金额与状态 */}
-              <div className="mt-3 flex items-center justify-between rounded-xl border border-black/5 bg-black/2 px-3 py-2 text-xs dark:border-white/5 dark:bg-white/3">
+              <div className="mt-3 flex items-center justify-between rounded-full border border-black/5 bg-black/2 px-3 py-2 text-xs dark:border-white/5 dark:bg-white/3">
                 <div className="flex items-center gap-1">
                   <span className="text-muted-foreground">实付金额:</span>
                   <span className="font-bold text-foreground">¥{(selectedOrder.actualPaid / 100).toFixed(2)}</span>
