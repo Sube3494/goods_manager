@@ -26,7 +26,7 @@ import {
 } from "@/lib/shopCommission";
 import { processDueAutoCompleteJobs } from "@/lib/autoPickAutoComplete";
 import { parseAsShanghaiTime } from "@/lib/dateUtils";
-import { doesAutoPickOrderRequirePickConfirmation, isAutoPickOrderCancelledStatus, isAutoPickOrderDeletedStatus, isAutoPickOtherPickupOrder, isAutoPickPickCompleted, isAutoPickPickupOrder, resolveAutoPickBusinessStatus } from "@/lib/autoPickOrderStatus";
+import { doesAutoPickOrderRequirePickConfirmation, isAutoPickOrderCancelledStatus, isAutoPickOrderDeletedStatus, isAutoPickOtherPickupOrder, isAutoPickPickCompleted, isAutoPickPickupOrder, readMainSystemSelfDeliveryFlag, resolveAutoPickBusinessStatus } from "@/lib/autoPickOrderStatus";
 import { createRequestPerfTracker } from "@/lib/perf";
 import { getStorageStrategy } from "@/lib/storage";
 import { Prisma } from "../../../../prisma/generated-client";
@@ -857,24 +857,6 @@ function readCompletedAtFromRawPayload(rawPayload: unknown) {
   }
 
   return null;
-}
-
-function readMainSystemSelfDeliveryFlag(rawPayload: unknown) {
-  if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
-    return false;
-  }
-
-  const systemMeta = (rawPayload as Record<string, unknown>).systemMeta;
-  if (!systemMeta || typeof systemMeta !== "object" || Array.isArray(systemMeta)) {
-    return false;
-  }
-
-  const marker = (systemMeta as Record<string, unknown>).mainSystemSelfDelivery;
-  if (!marker || typeof marker !== "object" || Array.isArray(marker)) {
-    return false;
-  }
-
-  return Boolean((marker as Record<string, unknown>).triggered);
 }
 
 function readAutoOutboundMeta(rawPayload: unknown) {
@@ -2197,7 +2179,7 @@ export async function GET(request: NextRequest) {
         rawShopName: readShopNameFromRawPayload(order.rawPayload) || null,
         rawShopAddress: readShopAddressFromRawPayload(order.rawPayload) || order.shopAddress || null,
         deliveryTimeRange: order.deliveryTimeRange || readDeliveryTimeRangeFromRawPayload(order.rawPayload),
-        isMainSystemSelfDelivery: readMainSystemSelfDeliveryFlag(order.rawPayload),
+        isMainSystemSelfDelivery: readMainSystemSelfDeliveryFlag(order.rawPayload, order.delivery),
         isPickCompleted: doesAutoPickOrderRequirePickConfirmation(order.platform)
           ? isAutoPickPickCompleted(order.rawPayload)
           : true,

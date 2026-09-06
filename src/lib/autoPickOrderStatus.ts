@@ -434,6 +434,27 @@ export function isAutoPickOrderRiderAssigned(order?: {
 }
 
 export function isSelfDeliveryOrCancelledDelivery(delivery: unknown, rawPayloadOrFlag?: unknown): boolean {
+  if (delivery && typeof delivery === "object" && !Array.isArray(delivery)) {
+    const d = delivery as Record<string, unknown>;
+    const logisticName = String(d.logisticName || d.logistic_name || "").trim();
+    const riderName = String(d.riderName || d.delivery_name || "").trim();
+    const track = String(d.track || "").trim();
+
+    // 取消或退单
+    if (/取消|退单/.test(track)) return true;
+    if (d.cancel_time != null || d.cancelTime != null) return true;
+
+    // 显式标注自配送
+    if (/自配|自配送|商家自配|oneself/i.test(logisticName)) return true;
+    if (/自配|自配送|商家自配/i.test(riderName)) return true;
+
+    // 关键防御：如果订单已有明确的第三方物流运力（如货拉拉、顺丰、美团、达达等），客观上并非自配
+    const hasThirdPartyLogistic = Boolean(logisticName && !/自配|自配送|商家自配|oneself/i.test(logisticName));
+    if (hasThirdPartyLogistic) {
+      return false;
+    }
+  }
+
   if (rawPayloadOrFlag === true) return true;
   if (rawPayloadOrFlag && typeof rawPayloadOrFlag === "object" && !Array.isArray(rawPayloadOrFlag)) {
     const raw = rawPayloadOrFlag as Record<string, unknown>;
@@ -444,15 +465,7 @@ export function isSelfDeliveryOrCancelledDelivery(delivery: unknown, rawPayloadO
       return true;
     }
   }
-  if (!delivery || typeof delivery !== "object" || Array.isArray(delivery)) return false;
-  const d = delivery as Record<string, unknown>;
-  const logisticName = String(d.logisticName || d.logistic_name || "").trim();
-  const riderName = String(d.riderName || d.delivery_name || "").trim();
-  const track = String(d.track || "").trim();
-  if (/自配|自配送|商家自配|oneself/i.test(logisticName)) return true;
-  if (/自配|自配送|商家自配/i.test(riderName)) return true;
-  if (/取消|退单/.test(track)) return true;
-  if (d.cancel_time != null || d.cancelTime != null) return true;
+
   return false;
 }
 
@@ -463,7 +476,43 @@ export function readDeliveryFeeFromValue(delivery: unknown, rawPayloadOrFlag?: u
   if (!delivery || typeof delivery !== "object" || Array.isArray(delivery)) {
     return 0;
   }
-  const value = Number((delivery as Record<string, unknown>).sendFee ?? (delivery as Record<string, unknown>).send_fee ?? 0);
-  return Number.isFinite(value) ? Math.max(0, value) : 0;
+  const d = delivery as Record<string, unknown>;
+  const rawFee = d.sendFee ?? d.send_fee ?? d.delivery_fee ?? d.fee;
+  const num = Number(rawFee ?? 0);
+  if (!Number.isFinite(num) || num <= 0) {
+    return 0;
+  }
+  // 若带小数点（如 23.62 元）或小数，自动转换为分单位
+  if (String(rawFee).includes(".") || (num < 100 && !Number.isInteger(num))) {
+    return Math.round(num * 100);
+  }
+  return Math.round(num);
+}
+
+export function readMainSystemSelfDeliveryFlag(rawPayload: unknown, delivery?: unknown): boolean {
+  if (delivery && typeof delivery === "object" && !Array.isArray(delivery)) {
+    const d = delivery as Record<string, unknown>;
+    const logisticName = String(d.logisticName || d.logistic_name || "").trim();
+    const hasThirdPartyLogistic = Boolean(logisticName && !/自配|自配送|商家自配|oneself/i.test(logisticName));
+    if (hasThirdPartyLogistic) {
+      return false;
+    }
+  }
+
+  if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
+    return false;
+  }
+
+  const systemMeta = (rawPayload as Record<string, unknown>).systemMeta;
+  if (!systemMeta || typeof systemMeta !== "object" || Array.isArray(systemMeta)) {
+    return false;
+  }
+
+  const marker = (systemMeta as Record<string, unknown>).mainSystemSelfDelivery;
+  if (!marker || typeof marker !== "object" || Array.isArray(marker)) {
+    return false;
+  }
+
+  return Boolean((marker as Record<string, unknown>).triggered);
 }
 

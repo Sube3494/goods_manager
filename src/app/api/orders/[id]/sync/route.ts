@@ -19,7 +19,13 @@ import {
   syncBrushOrderFromCompletedAutoPickOrder,
 } from "@/lib/autoPickOrders";
 import { cancelAutoCompleteJob } from "@/lib/autoPickAutoComplete";
-import { isAutoPickOrderAbnormalStatus, isAutoPickOrderCancelledStatus, isAutoPickOrderCompletedStatus, isAutoPickOrderDeliveringStatus } from "@/lib/autoPickOrderStatus";
+import {
+  isAutoPickOrderAbnormalStatus,
+  isAutoPickOrderCancelledStatus,
+  isAutoPickOrderCompletedStatus,
+  isAutoPickOrderDeliveringStatus,
+  readMainSystemSelfDeliveryFlag,
+} from "@/lib/autoPickOrderStatus";
 
 export const dynamic = "force-dynamic";
 
@@ -108,7 +114,15 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
       Date.now() - new Date(selfDeliveryMeta.triggeredAt).getTime() < 15 * 60 * 1000
     );
 
-    if (
+    const refreshedDelivery = refreshedOrder.delivery && typeof refreshedOrder.delivery === "object" && !Array.isArray(refreshedOrder.delivery)
+      ? refreshedOrder.delivery as Record<string, unknown>
+      : null;
+    const refreshedLogisticName = String(refreshedDelivery?.logisticName || refreshedDelivery?.logistic_name || "").trim();
+    const hasThirdPartyLogistic = Boolean(refreshedLogisticName && !/自配|自配送|商家自配|oneself/i.test(refreshedLogisticName));
+
+    if (hasThirdPartyLogistic) {
+      await clearAutoPickOrderMainSystemSelfDelivery(order.userId, refreshedOrder.id, "sync-detected-third-party-logistic");
+    } else if (
       !isRecentlySelfDelivered
       && !isAutoPickOrderDeliveringStatus(refreshedOrder.status)
       && !isAutoPickOrderCompletedStatus(refreshedOrder.status)
@@ -156,8 +170,13 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
       || normalized?.customerType
       || null;
 
+    const isMainSystemSelfDelivery = hasThirdPartyLogistic
+      ? false
+      : readMainSystemSelfDeliveryFlag(refreshedOrder.rawPayload, refreshedOrder.delivery);
+
     const syncedOrder = {
       ...refreshedOrder,
+      isMainSystemSelfDelivery,
       expectedIncome: computedExpectedIncome,
       platformCommission: computedPlatformCommission,
       completedAt: normalized?.completedAt || null,

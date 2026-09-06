@@ -158,6 +158,8 @@ type AutoPickSystemMeta = {
     triggered: boolean;
     triggeredAt?: string;
     userId?: string;
+    clearedAt?: string;
+    clearedReason?: string;
   };
   autoOutbound?: {
     status?: "success" | "failed";
@@ -1969,8 +1971,21 @@ function parseDeliveryInfoFromDetail(detail: MaiyatianOrderDetailResponse["data"
   const logisticName = String(deliveryRecord?.logistic_name || deliveryRecord?.logisticName || "").trim();
   const track = String(deliveryRecord?.track || "").trim();
   const riderName = String(deliveryRecord?.delivery_name || deliveryRecord?.riderName || "").trim() || undefined;
-  const rawSendFee = deliveryRecord?.send_fee ?? deliveryRecord?.sendFee;
-  const sendFee = readDeliveryFeeFromValue(deliveryRecord);
+  const rawSendFee = deliveryRecord?.send_fee
+    ?? deliveryRecord?.sendFee
+    ?? deliveryRecord?.delivery_fee
+    ?? deliveryRecord?.deliveryFee
+    ?? deliveryRecord?.fee
+    ?? deliveryRecord?.actual_fee
+    ?? deliveryRecord?.pay_fee
+    ?? detailRecord?.delivery_fee
+    ?? detailRecord?.send_fee
+    ?? (detailRecord?.fee as Record<string, unknown> | undefined)?.delivery_fee
+    ?? (detailRecord?.fee as Record<string, unknown> | undefined)?.send_fee;
+  const sendFee = readDeliveryFeeFromValue({
+    ...(deliveryRecord || {}),
+    sendFee: rawSendFee,
+  });
   const jdLikePickupCandidates = [
     detail?.pickup_time,
     detail?.pickupTime,
@@ -3457,11 +3472,14 @@ export function normalizeAutoPickOrderPayload(payload: unknown): AutoPickInbound
       const normalizedLogisticName = String(deliveryRecord?.logisticName || deliveryRecord?.logistic_name || "").trim() || undefined;
       const normalizedTrack = String(deliveryRecord?.track || "").trim() || undefined;
       const normalizedRiderName = String(deliveryRecord?.riderName || deliveryRecord?.delivery_name || "").trim() || undefined;
-      const isSelfDeliveryOrCancelled = isSelfDeliveryOrCancelledDelivery(deliveryRecord);
-      const rawSendFee = deliveryRecord?.sendFee ?? deliveryRecord?.send_fee;
-      const normalizedSendFee = isSelfDeliveryOrCancelled
+      const rawSendFee = deliveryRecord?.sendFee
+        ?? deliveryRecord?.send_fee
+        ?? deliveryRecord?.delivery_fee
+        ?? deliveryRecord?.deliveryFee
+        ?? deliveryRecord?.fee;
+      const normalizedSendFee = isSelfDeliveryOrCancelledDelivery(deliveryRecord)
         ? 0
-        : (Number.isFinite(Number(rawSendFee)) ? Number(rawSendFee) : undefined);
+        : (rawSendFee != null ? readDeliveryFeeFromValue({ ...(deliveryRecord || {}), sendFee: rawSendFee }) : undefined);
 
       const normalizedDelivery = {
         logisticName: normalizedLogisticName,
@@ -3778,6 +3796,22 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
           },
         }
       : systemMetaWithoutResolvedShop;
+
+    const currentIncomingDelivery = normalized.delivery && typeof normalized.delivery === "object" && !Array.isArray(normalized.delivery)
+      ? normalized.delivery as Record<string, unknown>
+      : null;
+    const incomingLogisticName = String(currentIncomingDelivery?.logisticName || currentIncomingDelivery?.logistic_name || "").trim();
+    const hasThirdPartyLogistic = Boolean(incomingLogisticName && !/自配|自配送|商家自配|oneself/i.test(incomingLogisticName));
+
+    if (hasThirdPartyLogistic && nextSystemMeta.mainSystemSelfDelivery?.triggered) {
+      nextSystemMeta.mainSystemSelfDelivery = {
+        ...nextSystemMeta.mainSystemSelfDelivery,
+        triggered: false,
+        clearedAt: new Date().toISOString(),
+        clearedReason: "detected-third-party-logistic",
+      };
+    }
+
     const nextRawPayloadWithResolvedShop = {
       ...nextRawPayload,
       systemMeta: nextSystemMeta,
