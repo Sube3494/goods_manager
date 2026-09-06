@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
+import { hasAdminAccess } from "@/lib/permissions";
 import { isAutoPickOrderCancelledStatus, isAutoPickOrderDeletedStatus } from "@/lib/autoPickOrderStatus";
 import { resolveAutoPickMatchedShopName } from "@/lib/autoPickOrders";
 
@@ -50,6 +51,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const requestedUserId = String(request.nextUrl.searchParams.get("userId") || "").trim();
+    const canManageMembers = user.role === "SUPER_ADMIN"
+      || hasAdminAccess(user, "members:manage")
+      || hasAdminAccess(user, "members:status")
+      || hasAdminAccess(user, "whitelist:manage")
+      || hasAdminAccess(user, "roles:manage")
+      || String(user.roleProfile?.name || "").includes("管理");
+    const targetUserId = requestedUserId && canManageMembers ? requestedUserId : user.id;
+
     const startDateStr = request.nextUrl.searchParams.get("startDate");
     const endDateStr = request.nextUrl.searchParams.get("endDate");
     // 可选：按店铺过滤推广费数据（为空则汇总所有店铺）
@@ -65,7 +75,7 @@ export async function GET(request: NextRequest) {
     // 1. 获取时间范围内的推广费记录（可按店铺过滤）
     const promotionExpenses = await prisma.dailyPromotionExpense.findMany({
       where: {
-        userId: user.id,
+        userId: targetUserId,
         date: {
           gte: startDate,
           lte: endDate,
@@ -85,7 +95,7 @@ export async function GET(request: NextRequest) {
     // 2. 获取订单用于统计真实订单数
     const orders = await prisma.autoPickOrder.findMany({
       where: {
-        userId: user.id,
+        userId: targetUserId,
         orderTime: {
           gte: startDate,
           lte: endDate,

@@ -33,6 +33,7 @@ import { cn, getPlatformMeta } from "@/lib/utils";
 import { toCurrency, getPlatformBadgeMeta } from "@/app/orders/OrderCard";
 import { TodayOrdersView } from "@/app/orders/TodayOrdersView";
 import { AllOrdersView } from "@/app/orders/AllOrdersView";
+import { PromotionCalendarModal } from "@/app/orders/PromotionCalendarModal";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { StatsData } from "@/lib/types";
@@ -707,11 +708,35 @@ export function UserOrdersModal({
   const [activeTab, setActiveTab] = useState<"today-orders" | "all-orders" | "profit-trend">("today-orders");
   const [allOrdersMounted, setAllOrdersMounted] = useState(false);
 
+  const todayDate = useMemo(() => format(new Date(), "yyyy-MM-dd"), []);
+  const [promotionAmount, setPromotionAmount] = useState(0);
+  const [isPromotionModalOpen, setIsPromotionModalOpen] = useState(false);
+
+  const fetchPromotionExpense = useCallback(async () => {
+    if (!userId) return;
+    try {
+      const res = await fetch(`/api/promotion?date=${todayDate}&userId=${encodeURIComponent(userId)}`, { cache: "no-store" });
+      if (res.ok) {
+        const data = await res.json();
+        setPromotionAmount(Number(data.amount) || 0);
+      }
+    } catch (err) {
+      console.warn("Failed to fetch user promotion expense:", err);
+    }
+  }, [userId, todayDate]);
+
+  useEffect(() => {
+    if (isOpen && userId) {
+      void fetchPromotionExpense();
+    }
+  }, [isOpen, userId, fetchPromotionExpense]);
+
   const handleHeaderRefresh = useCallback(() => {
     setRefreshTrigger((prev) => prev + 1);
+    void fetchPromotionExpense();
     setIsSpinning(true);
     setTimeout(() => setIsSpinning(false), 700);
-  }, []);
+  }, [fetchPromotionExpense]);
 
   useEffect(() => {
     if (activeTab === "all-orders" && !allOrdersMounted) {
@@ -1632,14 +1657,22 @@ export function UserOrdersModal({
                             <p className="mt-2 text-xs text-muted-foreground">今日订单汇总</p>
                           </div>
 
-                          <div className="flex-1 min-w-0 rounded-[20px] border border-black/8 bg-white/76 px-4 py-3.5 shadow-xs dark:border-white/10 dark:bg-white/5 flex flex-col justify-between">
-                            <div>
+                          <div
+                            onClick={() => setIsPromotionModalOpen(true)}
+                            className="flex-1 min-w-0 rounded-[20px] border border-black/8 bg-white/76 px-4 py-3.5 shadow-xs dark:border-white/10 dark:bg-white/5 flex flex-col justify-between cursor-pointer group hover:border-amber-400/40 hover:bg-amber-50/60 dark:hover:border-amber-400/30 dark:hover:bg-amber-400/8 transition active:scale-[0.99]"
+                            title="点击查看历史推广费日历与趋势图"
+                          >
+                            <div className="flex items-center justify-between">
                               <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">推广费</div>
-                              <div className="mt-2 text-2xl sm:text-[30px] font-bold leading-none tracking-tight text-foreground">
-                                ¥0.00
-                              </div>
+                              <span className="flex items-center gap-0.5 text-[11px] font-medium text-amber-600 dark:text-amber-400 opacity-80 group-hover:opacity-100 transition-opacity">
+                                <span>历史日历</span>
+                                <ArrowUpRight size={13} className="shrink-0 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                              </span>
                             </div>
-                            <p className="mt-2 text-xs text-muted-foreground">今日推广费</p>
+                            <div className="mt-2 text-2xl sm:text-[30px] font-bold leading-none tracking-tight text-foreground group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">
+                              {toCurrency(promotionAmount)}
+                            </div>
+                            <p className="mt-2 text-xs text-muted-foreground">今日推广费录入</p>
                           </div>
                         </>
                       ) : (
@@ -1714,6 +1747,20 @@ export function UserOrdersModal({
             </div>
           </motion.div>
         </>
+      )}
+
+      {/* 查看成员的历史推广费日历与趋势弹窗 */}
+      {isPromotionModalOpen && (
+        <PromotionCalendarModal
+          initialDate={todayDate}
+          localShops={localShops}
+          userId={userId || undefined}
+          userName={userName || undefined}
+          onClose={() => {
+            setIsPromotionModalOpen(false);
+            void fetchPromotionExpense();
+          }}
+        />
       )}
     </AnimatePresence>,
     document.body

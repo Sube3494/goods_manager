@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
+import { hasAdminAccess } from "@/lib/permissions";
 
 function startOfDay(input: Date) {
   const date = new Date(input);
@@ -15,12 +16,21 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const requestedUserId = String(request.nextUrl.searchParams.get("userId") || "").trim();
+    const canManageMembers = user.role === "SUPER_ADMIN"
+      || hasAdminAccess(user, "members:manage")
+      || hasAdminAccess(user, "members:status")
+      || hasAdminAccess(user, "whitelist:manage")
+      || hasAdminAccess(user, "roles:manage")
+      || String(user.roleProfile?.name || "").includes("管理");
+    const targetUserId = requestedUserId && canManageMembers ? requestedUserId : user.id;
+
     const dateStr = request.nextUrl.searchParams.get("date") || new Date().toISOString().slice(0, 10);
     const targetDate = startOfDay(new Date(dateStr));
 
     const records = await prisma.dailyPromotionExpense.findMany({
       where: {
-        userId: user.id,
+        userId: targetUserId,
         date: targetDate,
       },
     });
@@ -68,7 +78,15 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { date, shopName, amountMeituan, amountJingdong, amountTaobao, amountOther } = body;
+    const { date, shopName, amountMeituan, amountJingdong, amountTaobao, amountOther, userId: requestedUserId } = body;
+
+    const canManageMembers = user.role === "SUPER_ADMIN"
+      || hasAdminAccess(user, "members:manage")
+      || hasAdminAccess(user, "members:status")
+      || hasAdminAccess(user, "whitelist:manage")
+      || hasAdminAccess(user, "roles:manage")
+      || String(user.roleProfile?.name || "").includes("管理");
+    const targetUserId = requestedUserId && canManageMembers ? String(requestedUserId).trim() : user.id;
 
     if (!date) {
       return NextResponse.json({ error: "Invalid date" }, { status: 400 });
@@ -86,7 +104,7 @@ export async function POST(request: NextRequest) {
     const record = await prisma.dailyPromotionExpense.upsert({
       where: {
         userId_date_shopName: {
-          userId: user.id,
+          userId: targetUserId,
           date: targetDate,
           shopName: finalShopName,
         },
@@ -98,7 +116,7 @@ export async function POST(request: NextRequest) {
         amountTaobao: taobao,
       },
       create: {
-        userId: user.id,
+        userId: targetUserId,
         date: targetDate,
         shopName: finalShopName,
         amount: total,

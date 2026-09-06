@@ -136,6 +136,8 @@ interface DayData {
 interface PromotionCalendarModalProps {
   initialDate: string;
   localShops?: Array<{ id: string; name: string; address: string }>;
+  userId?: string;
+  userName?: string;
   onClose: () => void;
 }
 
@@ -149,6 +151,8 @@ function formatDate(date: Date): string {
 export function PromotionCalendarModal({
   initialDate,
   localShops,
+  userId,
+  userName,
   onClose,
 }: PromotionCalendarModalProps) {
   const { showToast } = useToast();
@@ -295,8 +299,9 @@ export function PromotionCalendarModal({
     const startDateStr = formatDate(gridDays[0]);
     const endDateStr = formatDate(gridDays[gridDays.length - 1]);
     const shopParam = shopFilter ? `&shopName=${encodeURIComponent(shopFilter)}` : "";
+    const userParam = userId ? `&userId=${encodeURIComponent(userId)}` : "";
     try {
-      const res = await fetch(`/api/promotion/calendar?startDate=${startDateStr}&endDate=${endDateStr}${shopParam}`, { cache: "no-store" });
+      const res = await fetch(`/api/promotion/calendar?startDate=${startDateStr}&endDate=${endDateStr}${shopParam}${userParam}`, { cache: "no-store" });
       if (res.ok) {
         const body = await res.json();
         if (body.success && body.data) {
@@ -311,7 +316,7 @@ export function PromotionCalendarModal({
     } finally {
       setIsLoading(false);
     }
-  }, [gridDays, showToast]);
+  }, [gridDays, userId, showToast]);
 
   useEffect(() => {
     fetchCalendarData();
@@ -330,7 +335,8 @@ export function PromotionCalendarModal({
   const fetchDayDetail = useCallback(async (dateStr: string) => {
     setIsDetailLoading(true);
     try {
-      const res = await fetch(`/api/promotion?date=${dateStr}`, { cache: "no-store" });
+      const userParam = userId ? `&userId=${encodeURIComponent(userId)}` : "";
+      const res = await fetch(`/api/promotion?date=${dateStr}${userParam}`, { cache: "no-store" });
       if (res.ok) {
         const body = await res.json();
         const items = Array.isArray(body.items) ? body.items : [];
@@ -362,7 +368,7 @@ export function PromotionCalendarModal({
     } finally {
       setIsDetailLoading(false);
     }
-  }, [localShops]);
+  }, [localShops, userId]);
 
   // 当选择日期变化时，异步拉取该日期各店铺的明细
   useEffect(() => {
@@ -459,6 +465,7 @@ export function PromotionCalendarModal({
           amountJingdong: editVals.amountJingdong,
           amountTaobao: editVals.amountTaobao,
           amountOther: editVals.amountOther,
+          userId,
         }),
       });
 
@@ -530,7 +537,7 @@ export function PromotionCalendarModal({
               <div className="flex items-center gap-2">
                 <CalendarIcon size={18} className="text-muted-foreground shrink-0" />
                 <h2 className="text-base text-foreground sm:text-xl whitespace-nowrap">
-                  {currentYear} 年 {currentMonth} 月
+                  {userName ? `${userName} · ` : ""}{currentYear} 年 {currentMonth} 月
                 </h2>
               </div>
               {/* 模式选择 Tab */}
