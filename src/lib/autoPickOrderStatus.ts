@@ -374,7 +374,40 @@ export function isAutoPickOrderRiderAssigned(order?: {
     ? order.delivery as Record<string, unknown>
     : {};
 
-  // 1. 检查是否有真实的第三方骑手姓名（排除自配/自配送/商家自配）
+  // 1. 检查配送运单是否已取消或已退单（包含 cancel_time、取消状态码 99、或 track 含“取消/退单”）
+  const cancelTime = rawPayloadDelivery.cancel_time ?? rawPayloadDelivery.cancelTime ?? orderDelivery.cancelTime;
+  const isCancelledByTime = cancelTime && cancelTime !== "0" && cancelTime !== 0;
+
+  const deliveryStatusCandidates = [
+    orderDelivery.status,
+    orderDelivery.delivery_status,
+    orderDelivery.deliveryStatus,
+    rawPayloadDelivery.status,
+    rawPayloadDelivery.delivery_status,
+    rawPayloadDelivery.deliveryStatus,
+  ].map((s) => String(s || "").trim().toLowerCase());
+  const isCancelledByStatus = deliveryStatusCandidates.some((s) => s === "99" || s === "cancel" || s === "cancelled" || s === "canceled");
+
+  const trackCandidates = [
+    orderDelivery.track,
+    rawPayloadDelivery.track,
+  ].map((item) => String(item || "").trim()).filter(Boolean);
+
+  const isCancelledByTrack = trackCandidates.some((text) => /取消|退单|失效/.test(text));
+  const isPendingRiderByTrack = trackCandidates.some((text) => /待接单|未接单|待呼叫|呼叫中|未呼叫/.test(text));
+
+  // 核心：若配送已取消、已退单，或当前处于重新呼叫/等待接单阶段，则骑手并未在有效履约，绝不限制自配！
+  if (isCancelledByTime || isCancelledByStatus || isCancelledByTrack || isPendingRiderByTrack) {
+    return false;
+  }
+
+  // 2. 检查运单轨迹是否明确处于生效中的骑手接单/到店状态
+  const isRiderAssignedByTrack = trackCandidates.some((text) => /骑手已接单|配送已接单|骑手已到店|待取货/.test(text));
+  if (isRiderAssignedByTrack) {
+    return true;
+  }
+
+  // 3. 检查是否有真实的第三方骑手姓名（排除自配送）
   const riderNameCandidates = [
     orderDelivery.riderName,
     orderDelivery.rider_name,
@@ -387,48 +420,14 @@ export function isAutoPickOrderRiderAssigned(order?: {
   ].map((item) => String(item || "").trim()).filter(Boolean);
 
   const hasThirdPartyRiderName = riderNameCandidates.some((name) => !/自配|自配送|商家自配|oneself/i.test(name));
-  if (hasThirdPartyRiderName) {
+
+  // 4. 关键：当订单不在配送状态时，不能仅凭历史残留的配送员信息判定为接单！
+  // 只有当订单或运单明确属于“配送中/派送中”，且存在第三方配送员时，才视为骑手接单
+  const isOrderDelivering = isAutoPickOrderDeliveringStatus(order.status)
+    || trackCandidates.some((text) => /配送中|派送中/.test(text));
+
+  if (hasThirdPartyRiderName && isOrderDelivering) {
     return true;
-  }
-
-  // 2. 检查是否有骑手电话（排除自配送物流下的电话）
-  const logisticCandidates = [
-    orderDelivery.logisticName,
-    orderDelivery.logistic_name,
-    rawPayloadDelivery.logisticName,
-    rawPayloadDelivery.logistic_name,
-  ].map((item) => String(item || "").trim()).filter(Boolean);
-  const isSelfLogistic = logisticCandidates.some((name) => /自配|自配送|商家自配|oneself/i.test(name));
-  const hasSelfRiderName = riderNameCandidates.some((name) => /自配|自配送|商家自配|oneself/i.test(name));
-
-  const riderPhoneCandidates = [
-    orderDelivery.riderPhone,
-    orderDelivery.rider_phone,
-    orderDelivery.dispatcher_mobile,
-    orderDelivery.delivery_phone,
-    rawPayloadDelivery.riderPhone,
-    rawPayloadDelivery.rider_phone,
-    rawPayloadDelivery.dispatcher_mobile,
-    rawPayloadDelivery.delivery_phone,
-  ].map((item) => String(item || "").trim()).filter(Boolean);
-
-  if (!isSelfLogistic && !hasSelfRiderName && riderPhoneCandidates.length > 0) {
-    return true;
-  }
-
-  // 3. 检查配送运单轨迹：明确为“骑手已接单”、“配送已接单”、“骑手已到店”
-  const deliveryTextCandidates = [
-    orderDelivery.track,
-    rawPayloadDelivery.track,
-  ].map((item) => String(item || "").trim()).filter(Boolean);
-
-  for (const text of deliveryTextCandidates) {
-    if (/待接单|未接单|待呼叫|呼叫中|取消/i.test(text)) {
-      continue;
-    }
-    if (/骑手已接单|配送已接单|骑手已到店/i.test(text)) {
-      return true;
-    }
   }
 
   return false;
