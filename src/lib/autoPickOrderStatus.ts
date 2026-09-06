@@ -374,7 +374,7 @@ export function isAutoPickOrderRiderAssigned(order?: {
     ? order.delivery as Record<string, unknown>
     : {};
 
-  // 1. 检查是否有骑手姓名
+  // 1. 检查是否有真实的第三方骑手姓名（排除自配送/商家自配）
   const riderNameCandidates = [
     orderDelivery.riderName,
     orderDelivery.rider_name,
@@ -384,12 +384,23 @@ export function isAutoPickOrderRiderAssigned(order?: {
     rawPayloadDelivery.rider_name,
     rawPayloadDelivery.delivery_name,
     rawPayloadDelivery.dispatcher_name,
-  ];
-  if (riderNameCandidates.some((item) => String(item || "").trim().length > 0)) {
+  ].map((item) => String(item || "").trim()).filter(Boolean);
+
+  const hasThirdPartyRiderName = riderNameCandidates.some((name) => !/自配|自配送|商家自配/i.test(name));
+  if (hasThirdPartyRiderName) {
     return true;
   }
 
-  // 2. 检查是否有骑手电话
+  // 2. 检查是否有骑手电话（排除自配送物流下的自配电话）
+  const logisticCandidates = [
+    orderDelivery.logisticName,
+    orderDelivery.logistic_name,
+    rawPayloadDelivery.logisticName,
+    rawPayloadDelivery.logistic_name,
+  ].map((item) => String(item || "").trim()).filter(Boolean);
+  const isSelfLogistic = logisticCandidates.some((name) => /自配|自配送|商家自配/i.test(name));
+  const hasSelfRiderName = riderNameCandidates.some((name) => /自配|自配送|商家自配/i.test(name));
+
   const riderPhoneCandidates = [
     orderDelivery.riderPhone,
     orderDelivery.rider_phone,
@@ -399,25 +410,14 @@ export function isAutoPickOrderRiderAssigned(order?: {
     rawPayloadDelivery.rider_phone,
     rawPayloadDelivery.dispatcher_mobile,
     rawPayloadDelivery.delivery_phone,
-  ];
-  if (riderPhoneCandidates.some((item) => String(item || "").trim().length > 0)) {
+  ].map((item) => String(item || "").trim()).filter(Boolean);
+
+  if (!isSelfLogistic && !hasSelfRiderName && riderPhoneCandidates.length > 0) {
     return true;
   }
 
-  // 3. 检查是否有取货时间（已取货则必然早已接单）
-  const pickupTimeCandidates = [
-    orderDelivery.pickupTime,
-    orderDelivery.pickup_time,
-    rawPayloadDelivery.pickupTime,
-    rawPayloadDelivery.pickup_time,
-  ];
-  if (pickupTimeCandidates.some((item) => String(item || "").trim().length > 0)) {
-    return true;
-  }
-
-  // 4. 检查配送与状态轨迹文本
-  const textCandidates = [
-    order.status,
+  // 3. 检查配送运单状态与运单轨迹（注意：绝不检查订单本身的商家状态 order.status 或 rawPayload.status，因为商家接单/待配送允许自配）
+  const deliveryTextCandidates = [
     orderDelivery.track,
     orderDelivery.status,
     orderDelivery.delivery_status,
@@ -426,28 +426,28 @@ export function isAutoPickOrderRiderAssigned(order?: {
     rawPayloadDelivery.status,
     rawPayloadDelivery.delivery_status,
     rawPayloadDelivery.deliveryStatus,
-    rawPayload.status,
-    rawPayload.tips,
-    rawPayload.orderStatus,
-    rawPayload.order_status,
     rawPayload.deliveryStatus,
     rawPayload.delivery_status,
   ].map((item) => String(item || "").trim()).filter(Boolean);
 
-  const riderAssignedRegex = /配送已接单|骑手已接单|待取货|骑手已到店|已到店|已取货|配送中|派送中/;
-  const riderAssignedEnRegex = /^(pickup|delivering|assigned|accepted|accept)$/i;
+  const riderAssignedDeliveryRegex = /配送已接单|骑手已接单|待取货|骑手已到店|已到店|已取货|配送中|派送中/;
+  const riderAssignedDeliveryEnRegex = /^(delivering|assigned|accepted_by_rider|assigned_rider)$/i;
 
-  for (const text of textCandidates) {
-    if (riderAssignedEnRegex.test(text)) {
+  for (const text of deliveryTextCandidates) {
+    if (/待接单|未接单|待呼叫|呼叫中|取消/i.test(text)) {
+      continue;
+    }
+    if (riderAssignedDeliveryEnRegex.test(text)) {
       return true;
     }
-    if (riderAssignedRegex.test(text)) {
+    if (riderAssignedDeliveryRegex.test(text)) {
       return true;
     }
-    if (text.includes("已接单") && !/待接单|未接单/.test(text)) {
+    if ((text === "已接单" || text.includes("已接单")) && !/待接单|未接单/.test(text)) {
       return true;
     }
   }
 
   return false;
 }
+
