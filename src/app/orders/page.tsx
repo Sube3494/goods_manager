@@ -11,6 +11,8 @@ import {
   CheckCheck,
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
+  ChevronRight,
   Clock3,
   Eye,
   EyeOff,
@@ -27,7 +29,6 @@ import {
   X,
   Plus,
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/components/ui/Toast";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { DatePicker } from "@/components/ui/DatePicker";
@@ -1730,11 +1731,16 @@ export default function OrdersPage() {
     orderId: string;
     itemId: string;
     itemName: string;
+    sku?: string;
+    platformSkuId?: string;
+    thumb?: string;
+    quantity?: number;
     shopName: string;
     shopId: string;
     libraryId: string;
     currentMatchedProductId: string;
-      } | null>(null);
+    order?: AutoPickOrder;
+  } | null>(null);
 
   const [brushSyncPool, setBrushSyncPool] = useState<AutoPickOrder[]>([]);
   const [selectedBrushOrderIds, setSelectedBrushOrderIds] = useState<string[]>([]);
@@ -2198,11 +2204,16 @@ export default function OrdersPage() {
       orderId: order.id,
       itemId: String(item.id || "").trim(),
       itemName: item.productName || "未命名商品",
+      sku: item.productNo || "",
+      platformSkuId: item.platformSkuId || "",
+      thumb: item.thumb || "",
+      quantity: item.quantity || 1,
       shopName: resolvedShopName,
       shopId: resolvedShopId,
       libraryId: resolvedLibraryId,
       currentMatchedProductId: item.matchedProduct?.shopProductId || item.matchedProduct?.id || "",
-          });
+      order,
+    });
     setIsMatchPickerOpen(true);
   }, [integrationConfig.maiyatianShopMappings, localShops]);
 
@@ -3088,9 +3099,145 @@ export default function OrdersPage() {
         allowMultipleToggle={true}
         loadAllOnOpen
         showPlatformSelector={false}
-        showCategoryFilter
+        showCategoryFilter={false}
         showPrice={false}
-        title="修改商品匹配"
+        allowLibrarySwitch={false}
+        title={matchEditorTarget?.shopName ? `修改商品匹配 · ${matchEditorTarget.shopName}` : "修改商品匹配"}
+        headerBanner={
+          matchEditorTarget ? (
+            <div className="rounded-2xl border border-black/8 dark:border-white/10 bg-slate-500/5 dark:bg-white/[0.03] p-2.5 sm:p-3 space-y-2 text-left shrink-0 shadow-xs backdrop-blur-md">
+              {matchEditorTarget.order?.items && matchEditorTarget.order.items.length > 1 && (() => {
+                const items = matchEditorTarget.order.items;
+                const currentIndex = items.findIndex((it) => String(it.id || "") === matchEditorTarget.itemId);
+                const hasPrev = currentIndex > 0;
+                const hasNext = currentIndex >= 0 && currentIndex < items.length - 1;
+
+                return (
+                  <div className="flex items-center justify-between gap-1.5 p-1 rounded-full bg-zinc-100 dark:bg-white/10 border border-border/50 shrink-0 h-9 box-border">
+                    {/* Tab 区域：完全复刻系统内置的 rounded-full 胶囊药丸风格（与下方的列表/大图控件一致） */}
+                    <div
+                      className="flex items-center gap-1 overflow-x-auto no-scrollbar flex-nowrap flex-1 h-full items-center"
+                      onWheel={(e) => {
+                        if (e.deltaY !== 0) {
+                          e.currentTarget.scrollLeft += e.deltaY;
+                        }
+                      }}
+                    >
+                      {items.map((it, idx) => {
+                        const isCurrent = String(it.id || "") === matchEditorTarget.itemId;
+                        const isMatched = Boolean(it.matchedProduct);
+                        return (
+                          <button
+                            key={it.id || idx}
+                            type="button"
+                            onClick={() => openMatchEditor(matchEditorTarget.order!, it)}
+                            title={`商品 ${idx + 1}：${it.productName || "未命名商品"}`}
+                            className={cn(
+                              "p-1.5 rounded-full transition-colors duration-150 text-xs flex items-center gap-1.5 font-bold px-2.5 sm:px-3 shrink-0 whitespace-nowrap cursor-pointer",
+                              isCurrent
+                                ? "bg-white dark:bg-gray-800 text-foreground dark:text-white shadow-xs"
+                                : "text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5"
+                            )}
+                          >
+                            <span className={cn(
+                              "h-1.5 w-1.5 rounded-full shrink-0",
+                              isMatched ? "bg-emerald-500" : "bg-rose-500"
+                            )} />
+                            <span>#{idx + 1} 项</span>
+                            <span className={cn(
+                              "text-[10px] shrink-0 font-normal",
+                              isMatched
+                                ? (isCurrent ? "text-emerald-600 dark:text-emerald-400 font-medium" : "text-emerald-600/80 dark:text-emerald-400/80")
+                                : (isCurrent ? "text-rose-500 dark:text-rose-400 font-medium" : "text-rose-500/70 dark:text-rose-400/70")
+                            )}>
+                              {isMatched ? "已匹配" : "待匹配"}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* PC 端快捷翻页按钮：同样采用 rounded-full 风格 */}
+                    <div className="flex items-center gap-0.5 shrink-0 pl-1 pr-0.5 border-l border-border/40 text-muted-foreground h-full items-center">
+                      <button
+                        type="button"
+                        onClick={() => hasPrev && openMatchEditor(matchEditorTarget.order!, items[currentIndex - 1])}
+                        disabled={!hasPrev}
+                        className="p-1 rounded-full hover:bg-black/5 dark:hover:bg-white/10 hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                        title="切换到上一件商品"
+                      >
+                        <ChevronLeft size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => hasNext && openMatchEditor(matchEditorTarget.order!, items[currentIndex + 1])}
+                        disabled={!hasNext}
+                        className="p-1 rounded-full hover:bg-black/5 dark:hover:bg-white/10 hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                        title="切换到下一件商品"
+                      >
+                        <ChevronRight size={14} />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* 目标商品卡片：锁定恒定高度 h-16，杜绝任何纵向位移与闪烁 */}
+              <div className="flex items-center gap-3.5 sm:gap-4 h-16 shrink-0">
+                {/* 左侧商品缩略图 */}
+                <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-black/8 dark:border-white/12 bg-white dark:bg-white/5 flex items-center justify-center shadow-xs">
+                  {matchEditorTarget.thumb ? (
+                    <Image
+                      src={matchEditorTarget.thumb}
+                      alt={matchEditorTarget.itemName}
+                      width={64}
+                      height={64}
+                      className="h-full w-full object-cover"
+                      unoptimized
+                    />
+                  ) : (
+                    <Package2 className="text-muted-foreground/35" size={24} />
+                  )}
+                  <span className="absolute bottom-1 right-1 rounded-md bg-black/70 px-1.5 py-0.2 font-mono text-[10px] font-bold text-white/90 shadow-xs backdrop-blur-md">
+                    x{matchEditorTarget.quantity || 1}
+                  </span>
+                </div>
+
+                {/* 右侧商品详细信息：固定两行结构 */}
+                <div className="min-w-0 flex-1 flex flex-col justify-center gap-1.5 h-full">
+                  {/* 商品名称单行截断，超出省略号 */}
+                  <h3
+                    className="text-xs sm:text-[13.5px] font-semibold text-foreground leading-snug truncate text-left"
+                    title={matchEditorTarget.itemName}
+                  >
+                    {matchEditorTarget.itemName}
+                  </h3>
+
+                  {/* 编码信息：固定高度 h-5，无货号时保留占位防塌陷 */}
+                  <div className="h-5 flex items-center gap-2 text-xs text-muted-foreground overflow-hidden">
+                    {matchEditorTarget.sku ? (
+                      <span className="inline-flex items-center gap-1.5 rounded-lg bg-black/[0.04] dark:bg-white/[0.06] border border-black/6 dark:border-white/8 px-2 py-0.5 font-mono text-[11px] shrink-0">
+                        <span className="text-[10px] text-muted-foreground font-sans">货号</span>
+                        <span className="font-bold text-foreground">{matchEditorTarget.sku}</span>
+                      </span>
+                    ) : null}
+
+                    {matchEditorTarget.platformSkuId ? (
+                      <span className="inline-flex items-center gap-1.5 rounded-lg bg-black/[0.04] dark:bg-white/[0.06] border border-black/6 dark:border-white/8 px-2 py-0.5 font-mono text-[11px] text-muted-foreground shrink-0">
+                        <span className="text-[10px] font-sans">平台SKU</span>
+                        <span>{matchEditorTarget.platformSkuId}</span>
+                      </span>
+                    ) : null}
+
+                    {!matchEditorTarget.sku && !matchEditorTarget.platformSkuId ? (
+                      <span className="text-[11px] text-muted-foreground/45 font-mono">暂无编码/货号</span>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : null
+        }
         fetchPath="/api/shop-products"
         query={{
           all: "true",

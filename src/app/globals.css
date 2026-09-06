@@ -400,3 +400,30 @@ a,
     }
   }
 }
+
+/* 弹窗平滑无抖动入场动画（纯淡入，零物理位移零缩放） */
+@keyframes modalOverlayFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes modalContentFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-modal-overlay {
+  animation: modalOverlayFadeIn 120ms ease-out forwards;
+}
+
+.animate-modal-content {
+  animation: modalContentFadeIn 120ms ease-out forwards;
+}

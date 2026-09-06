@@ -50,9 +50,12 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
     }
   } catch (error) {
     console.error("Failed to create outbound from auto-pick order:", error);
+    const message = getOutboundOrderItemSchemaErrorMessage(error)
+      || (error instanceof Error ? error.message : "Failed to create outbound order");
+    const isUnmatched = message.includes("店铺商品匹配失败");
     return NextResponse.json({
-      error: getOutboundOrderItemSchemaErrorMessage(error)
-        || (error instanceof Error ? error.message : "Failed to create outbound order"),
-    }, { status: 500 });
+      error: message,
+      reason: isUnmatched ? "unmatched-item" : undefined,
+    }, { status: isUnmatched ? 409 : 500 });
   }
 }

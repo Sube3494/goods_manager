@@ -90,19 +90,33 @@ interface ProductSelectionModalProps {
   onClear?: () => void;
   clearLabel?: string;
   confirmLabel?: string;
+  headerBanner?: React.ReactNode;
+  initialSearchQuery?: string;
 }
 
 function ProductSkeleton({ imageOnly = false }: { imageOnly?: boolean }) {
   if (imageOnly) {
-    return <div className="aspect-square rounded-2xl border border-border/60 bg-white dark:bg-white/5 animate-pulse" />;
+    return (
+      <div className="flex flex-col overflow-hidden rounded-2xl border border-border/60 bg-white dark:bg-white/5 animate-pulse shadow-xs">
+        <div className="w-full aspect-square bg-muted/70" />
+        <div className="p-3 flex flex-col gap-2 flex-1 min-h-[72px]">
+          <div className="h-3.5 w-4/5 bg-muted/70 rounded" />
+          <div className="h-3 w-1/2 bg-muted/50 rounded" />
+          <div className="mt-auto flex items-center gap-1.5 pt-1">
+            <div className="h-4 w-12 bg-muted/40 rounded" />
+            <div className="h-4 w-10 bg-muted/40 rounded" />
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div className="flex items-center gap-5 p-4 rounded-2xl border border-border/60 bg-white dark:bg-white/5 animate-pulse">
-      <div className="h-12 w-12 rounded-lg bg-muted" />
-      <div className="flex-1 space-y-2">
-        <div className="h-4 w-1/2 bg-muted rounded" />
-        <div className="h-3 w-1/4 bg-muted rounded" />
+    <div className="flex w-full items-center gap-3 rounded-xl border border-border/60 p-3 bg-white dark:bg-white/5 animate-pulse min-h-[64px]">
+      <div className="h-11 w-11 shrink-0 rounded-lg bg-muted/70" />
+      <div className="flex-1 space-y-2 min-w-0">
+        <div className="h-3.5 w-2/3 bg-muted/70 rounded" />
+        <div className="h-3 w-1/3 bg-muted/50 rounded" />
       </div>
     </div>
   );
@@ -138,12 +152,20 @@ export function ProductSelectionModal({
   onClear,
   clearLabel = "解除匹配",
   confirmLabel,
+  headerBanner,
+  initialSearchQuery,
 }: ProductSelectionModalProps) {
   const [localSingleSelect, setLocalSingleSelect] = useState(Boolean(singleSelect));
   const queryRef = useRef(query);
   queryRef.current = query;
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(initialSearchQuery || "");
   const debouncedSearch = useDebounce(searchQuery, 500);
+
+  useEffect(() => {
+    if (initialSearchQuery !== undefined) {
+      setSearchQuery(initialSearchQuery);
+    }
+  }, [initialSearchQuery]);
 
   const [tempSelectedIds, setTempSelectedIds] = useState<string[]>([]);
   const [selectedProducts, setSelectedProducts] = useState<Product[]>([]);
@@ -226,7 +248,7 @@ export function ProductSelectionModal({
   const [mounted] = useState(typeof window !== "undefined");
   const [targetPlatform, setTargetPlatform] = useState("美团");
   const PLATFORMS = ["美团", "淘宝", "京东"];
-  const shouldShowCategoryFilter = !imageOnly && (!minimalView || showCategoryFilter);
+  const shouldShowCategoryFilter = !imageOnly && (showCategoryFilter !== undefined ? showCategoryFilter : !minimalView);
   const effectiveLibraryId = allowLibrarySwitch ? activeLibraryId : "all";
   const shouldShowLibraryTabs = allowLibrarySwitch && libraries.length > 1 && !lockLibraryId;
   const loadingDelayRef = useRef<NodeJS.Timeout | null>(null);
@@ -286,16 +308,18 @@ export function ProductSelectionModal({
     setLocalVisibleCount(50);
   }, [debouncedSearch, selectedCategoryName, showUnselectedOnly]);
 
+  // 当外部 selectedIds 变化（例如在弹窗内切换了正在匹配的订单项）时，同步更新内部选中的 tempSelectedIds 与 selectedProducts
   useEffect(() => {
-    if (!isOpen || disableAlreadySelected || selectedIds.length === 0 || products.length === 0) return;
-    setSelectedProducts((current) => {
-      const currentKeys = new Set(current.map((product) => getSelectionKey(product)));
-      const missingSelectedProducts = products.filter((product) => {
-        const key = getSelectionKey(product);
-        return selectedIds.includes(key) && !currentKeys.has(key);
-      });
-      return missingSelectedProducts.length > 0 ? [...current, ...missingSelectedProducts] : current;
-    });
+    if (!isOpen) return;
+    if (!disableAlreadySelected && Array.isArray(selectedIds)) {
+      setTempSelectedIds(selectedIds);
+      if (selectedIds.length === 0) {
+        setSelectedProducts([]);
+      } else if (products.length > 0) {
+        const matchingProducts = products.filter((p) => selectedIds.includes(getSelectionKey(p)));
+        setSelectedProducts(matchingProducts);
+      }
+    }
   }, [disableAlreadySelected, getSelectionKey, isOpen, products, selectedIds]);
 
   useEffect(() => {
@@ -317,10 +341,10 @@ export function ProductSelectionModal({
   // Lock body scroll when modal is open
   useEffect(() => {
     if (isOpen) {
-      const originalStyle = document.body.style.overflow;
+      const originalOverflow = document.body.style.overflow;
       document.body.style.overflow = "hidden";
       return () => {
-        document.body.style.overflow = originalStyle;
+        document.body.style.overflow = originalOverflow;
       };
     }
   }, [isOpen]);
@@ -593,27 +617,28 @@ export function ProductSelectionModal({
   return createPortal(
     <>
       <div
-        className="fixed inset-0 z-110000 bg-black/60 backdrop-blur-sm"
+        className="fixed inset-0 z-110000 bg-black/60 backdrop-blur-sm animate-modal-overlay"
         onClick={onClose}
       />
       <div
-        className="fixed left-1/2 top-1/2 z-110001 flex min-h-[520px] w-[calc(100%-24px)] sm:min-h-[560px] sm:w-full max-w-2xl -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-3xl border border-border/50 bg-white shadow-2xl backdrop-blur-xl dark:bg-gray-900/70 max-h-[min(84dvh,820px)]"
+        className="fixed left-1/2 top-1/2 z-110001 flex h-[min(88dvh,820px)] w-[calc(100%-24px)] sm:w-full max-w-3xl -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-3xl border border-border/60 bg-white/98 shadow-2xl backdrop-blur-xl dark:bg-gray-900/90 dark:border-white/10 animate-modal-content"
       >
-             <div className="flex items-center justify-between border-b border-border/50 p-5 sm:p-8 shrink-0">
-              <div className="flex items-center gap-4">
-                <h2 className="text-2xl font-bold text-foreground">{title}</h2>
+             <div className="flex items-center justify-between border-b border-border/50 px-5 py-4 sm:px-7 sm:py-4.5 shrink-0">
+              <div className="flex items-center gap-3">
+                <h2 className="text-lg sm:text-xl font-bold tracking-tight text-foreground">{title}</h2>
               </div>
               <div className="flex items-center gap-2">
                 <button 
                   onClick={onClose} 
                   className="rounded-full p-2 text-muted-foreground hover:bg-black/5 dark:hover:bg-white/10 hover:text-foreground transition-all active:scale-90"
                 >
-                  <X size={20} />
+                  <X size={18} />
                 </button>
               </div>
             </div>
 
-            <div className="flex-1 overflow-hidden flex flex-col p-5 sm:p-8 space-y-4">
+            <div className="flex-1 overflow-hidden flex flex-col p-4 sm:p-6 space-y-3.5">
+              {headerBanner}
               {shouldShowLibraryTabs && (
                 <div className="flex flex-wrap gap-2 border-b border-border/50 pb-3 shrink-0">
                   {libraries.map((lib) => (
@@ -634,16 +659,26 @@ export function ProductSelectionModal({
               )}
               <div className="flex items-center gap-3 shrink-0">
                  <div className="relative flex-1 group">
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" size={18} />
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" size={17} />
                   <input 
                     type="text"
                     placeholder="搜索商品名称或编号..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full h-11 pl-11 pr-10 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 focus:border-primary/20 transition-all dark:hover:bg-white/10 text-sm"
+                    className="w-full h-10.5 pl-10.5 pr-9 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 focus:border-primary/20 transition-all dark:hover:bg-white/10 text-sm"
                   />
+                  {searchQuery && !isLoading && !isSearching && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery("")}
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 p-0.5 rounded-full text-muted-foreground/60 hover:text-foreground hover:bg-black/5 dark:hover:bg-white/10 transition-all cursor-pointer"
+                      title="清空搜索"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
                   {(isLoading || isSearching) && products.length > 0 && (
-                    <Loader2 className="absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
+                    <Loader2 className="absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
                   )}
                  </div>
 
@@ -697,15 +732,15 @@ export function ProductSelectionModal({
               </div>
               
               {allowMultipleToggle && (
-                <div className="flex items-center justify-between gap-4 rounded-2xl border border-black/6 bg-black/2 px-4 py-3 dark:border-white/8 dark:bg-white/3 transition-all hover:bg-black/3 dark:hover:bg-white/5 shrink-0 mt-0.5 mb-1.5">
-                  <div className="flex flex-col gap-0.5 text-left">
-                    <span className="text-xs font-bold text-foreground transition-colors">组合商品匹配</span>
-                    <span className="text-[10px] font-medium text-muted-foreground leading-normal">开启后支持同时勾选多件商品进行合并绑定 (适用于套装礼盒等)</span>
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-black/6 bg-black/2 px-3.5 py-2 dark:border-white/8 dark:bg-white/3 transition-all hover:bg-black/3 dark:hover:bg-white/5 shrink-0">
+                  <div className="flex items-center gap-2 text-left">
+                    <span className="text-xs font-bold text-foreground">组合匹配</span>
+                    <span className="hidden sm:inline text-[11px] text-muted-foreground">勾选多件合并绑定（如礼盒套装）</span>
                   </div>
-                  <div className="flex items-center gap-3 shrink-0">
+                  <div className="flex items-center gap-2 shrink-0">
                     {!localSingleSelect && (
-                      <span className="hidden sm:inline-block text-[10px] text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full font-bold border border-emerald-500/15 animate-pulse">
-                        多选模式已启用
+                      <span className="text-[10px] text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full font-bold border border-emerald-500/15">
+                        多选已开启
                       </span>
                     )}
                     <label className="relative inline-flex cursor-pointer items-center select-none shrink-0">
@@ -733,7 +768,7 @@ export function ProductSelectionModal({
               <div className={cn("relative flex-1 overflow-y-auto no-scrollbar min-h-[220px]", isGridView ? "" : "space-y-2")}>
                  {(showInitialSkeleton && products.length === 0) ? (
                     <div className={cn(isGridView ? "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3.5" : "space-y-2")}>
-                        {[...Array(6)].map((_, i) => (
+                        {[...Array(8)].map((_, i) => (
                            <ProductSkeleton key={i} imageOnly={isGridView} />
                         ))}
                     </div>
@@ -752,26 +787,26 @@ export function ProductSelectionModal({
                           disabled={isAlreadySelected}
                           className={cn(
                              isGridView
-                               ? "group relative flex flex-col overflow-hidden rounded-2xl border transition-all cursor-pointer text-left bg-white dark:bg-white/5 shadow-xs"
+                               ? "group relative flex flex-col overflow-hidden rounded-2xl border transition-all cursor-pointer text-left bg-white dark:bg-white/[0.04] shadow-xs"
                                : "group relative flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-all cursor-pointer min-h-[64px]",
                              isSelected 
-                               ? "border-primary ring-2 ring-primary/20 bg-primary/5 dark:bg-primary/10 shadow-md" 
+                               ? "border-blue-500 ring-2 ring-blue-500/25 bg-blue-50/20 dark:bg-blue-500/[0.08] shadow-md" 
                                : isAlreadySelected
                                ? "border-emerald-500/20 bg-emerald-50/20 dark:bg-emerald-950/10 shadow-xs opacity-75 cursor-not-allowed"
-                               : "border-border/60 shadow-xs hover:border-primary/30 hover:bg-zinc-50/50 dark:hover:bg-white/10"
+                               : "border-border/60 shadow-xs hover:border-blue-500/40 hover:bg-zinc-50/50 dark:hover:bg-white/[0.07]"
                            )}
                         >
                           <div className={cn(
                             isGridView
-                              ? "absolute top-2.5 right-2.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border transition-all z-10 shadow-md"
+                              ? "absolute top-2.5 right-2.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border transition-all z-10"
                               : "order-last ml-auto flex h-6 w-6 shrink-0 items-center justify-center rounded-full border transition-all",
                             isSelected 
-                              ? "bg-primary border-primary text-primary-foreground shadow-sm shadow-primary/20"
+                              ? "bg-blue-600 border-blue-500 text-white shadow-md ring-2 ring-white/20 opacity-100 scale-100" 
                               : isAlreadySelected
-                              ? "bg-emerald-500 border-emerald-500 text-white"
-                              : "bg-black/20 dark:bg-white/20 backdrop-blur-xs border-white/60 text-transparent group-hover:border-foreground/60"
+                              ? "bg-emerald-500 border-emerald-500 text-white opacity-100 scale-100"
+                              : "opacity-0 group-hover:opacity-100 bg-black/40 backdrop-blur-xs border-white/60 text-transparent hover:border-white scale-90 group-hover:scale-100"
                           )}>
-                            {(isSelected || isAlreadySelected) && <Check size={14} strokeWidth={3.5} />}
+                            {(isSelected || isAlreadySelected) && <Check size={13} strokeWidth={3.5} />}
                           </div>
 
                           <div 
@@ -883,11 +918,28 @@ export function ProductSelectionModal({
                       );
                     })}
                     
-                     {filteredProducts.length === 0 && !showInitialSkeleton && !isLoading && !isSearching && !isNextPageLoading && (
-                        <div className="py-12 text-center text-muted-foreground">
-                            {emptyStateText}
+                      {filteredProducts.length === 0 && !showInitialSkeleton && !isLoading && !isSearching && !isNextPageLoading && (
+                        <div className="col-span-full w-full py-16 px-4 flex flex-col items-center justify-center text-center">
+                          <div className="w-13 h-13 rounded-2xl bg-muted/60 dark:bg-white/5 border border-border/70 flex items-center justify-center text-muted-foreground/50 mb-3 shadow-inner">
+                            <Package size={26} strokeWidth={1.5} />
+                          </div>
+                          <div className="text-sm font-semibold text-foreground/90 mb-1">
+                            {emptyStateText || "未找到相关候选商品"}
+                          </div>
+                          <p className="text-xs text-muted-foreground max-w-sm leading-relaxed">
+                            {searchQuery ? "当前搜索条件下未匹配到商品，您可以尝试缩短关键词或清空搜索。" : "当前库中暂无可用的商品数据。"}
+                          </p>
+                          {searchQuery && (
+                            <button
+                              type="button"
+                              onClick={() => setSearchQuery("")}
+                              className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-sky-600 dark:text-sky-400 hover:underline cursor-pointer"
+                            >
+                              <span>清空搜索词</span>
+                            </button>
+                          )}
                         </div>
-                     )}
+                      )}
                     
                      <div ref={observerTarget} className="flex h-14 items-center justify-center">
                       {(isNextPageLoading || (hasMoreLocal && !isLoading && !isSearching)) ? (
@@ -1035,23 +1087,28 @@ export function ProductSelectionModal({
 
                  {/* 主操作按钮：无需出库与确认 */}
                  <div className="flex items-center gap-2 w-full sm:w-auto">
-                   {onClear ? (
-                     <button
-                       type="button"
-                       onClick={onClear}
-                       className="flex-1 sm:flex-initial rounded-xl px-3 sm:px-4 py-2.5 text-xs sm:text-sm font-bold text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-all active:scale-95 whitespace-nowrap text-center"
-                     >
-                       {clearLabel || "无需出库 / 解除绑定"}
-                     </button>
-                   ) : null}
-                   <button 
-                     type="button"
-                     onClick={handleConfirm}
-                     disabled={tempSelectedIds.length === 0}
-                     className="flex-1 sm:flex-initial bg-foreground text-background dark:text-black px-4 sm:px-8 py-2.5 rounded-xl text-xs sm:text-sm font-black shadow-xl shadow-foreground/10 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap text-center"
-                   >
-                     {confirmLabel || "确认添加"}
-                   </button>
+                    {onClear ? (
+                      <button
+                        type="button"
+                        onClick={onClear}
+                        className="flex-1 sm:flex-initial rounded-xl px-3 sm:px-4 py-2.5 text-xs sm:text-sm font-medium text-rose-600 dark:text-rose-400 bg-rose-500/8 hover:bg-rose-500/15 border border-rose-500/20 transition-all active:scale-95 whitespace-nowrap text-center"
+                      >
+                        {clearLabel || "无需出库 / 解除绑定"}
+                      </button>
+                    ) : null}
+                    <button 
+                      type="button"
+                      onClick={handleConfirm}
+                      disabled={tempSelectedIds.length === 0}
+                      className={cn(
+                        "flex-1 sm:flex-initial px-5 sm:px-8 py-2.5 rounded-xl text-xs sm:text-sm font-bold shadow-md transition-all whitespace-nowrap text-center active:scale-[0.98]",
+                        tempSelectedIds.length > 0
+                          ? "bg-blue-600 hover:bg-blue-500 text-white shadow-blue-500/25 cursor-pointer"
+                          : "bg-zinc-200 dark:bg-white/10 text-zinc-400 dark:text-zinc-500 cursor-not-allowed shadow-none"
+                      )}
+                    >
+                      {confirmLabel || "确认添加"}
+                    </button>
                  </div>
                </div>
             </div>

@@ -494,6 +494,37 @@ export function AllOrdersView({
             return;
           }
         }
+
+        if (
+          (response.status === 409 && data.reason === "unmatched-item") ||
+          String(data.error || data.message || "").includes("店铺商品匹配失败")
+        ) {
+          const targetOrder = orders.find((o) => o.id === orderId);
+          const errorText = String(data.error || data.message || targetOrder?.autoOutboundError || "");
+          const itemMatchedByError = (targetOrder?.items || []).find((it) => {
+            if (it.productNo && errorText.includes(it.productNo)) return true;
+            if (it.platformSkuId && errorText.includes(it.platformSkuId)) return true;
+            if (it.productName && errorText.includes(it.productName)) return true;
+            return false;
+          });
+
+          const unmatchedItem = itemMatchedByError || targetOrder?.items?.find((it) => {
+            const rawPayload = it.rawPayload && typeof it.rawPayload === "object" && !Array.isArray(it.rawPayload)
+              ? it.rawPayload as Record<string, unknown>
+              : {};
+            const isIgnored = rawPayload.ignoreOutbound === true
+              || rawPayload.isManualIgnored === true
+              || (it.matchedProduct as any)?.ignoreOutbound === true;
+            if (isIgnored) return false;
+            return !it.matchedProduct;
+          }) || targetOrder?.items?.[0];
+
+          if (targetOrder && unmatchedItem && onOpenMatchEditor) {
+            onOpenMatchEditor(targetOrder, unmatchedItem);
+            return;
+          }
+        }
+
         throw new Error(getOrderActionErrorMessage(data.error || data.message || "操作失败"));
       }
 

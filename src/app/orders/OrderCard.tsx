@@ -2564,18 +2564,69 @@ export const OrderCard = memo(function OrderCard({
                     </span>
                   ) : null}
                   {autoOutboundFailed && !deleted && !cancelled ? (
-                    <div className="group/outbound relative">
+                    <span className="group/outbound relative inline-flex">
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
+                          // 清除当前焦点，避免悬浮层在弹窗打开时产生残留闪烁
+                          (e.currentTarget as HTMLElement)?.blur();
+
+                          const errorText = order.autoOutboundError || "";
+                          const isMatchFailed = !errorText
+                            || errorText.includes("匹配")
+                            || errorText.includes("商品")
+                            || errorText.includes("库")
+                            || errorText.includes("映射")
+                            || errorText.includes("关联")
+                            || errorText.includes("规格")
+                            || errorText.includes("未找到")
+                            || errorText.includes("unmatched");
+
+                          // 1. 优先从错误信息中匹配对应商品
+                          const itemMatchedByError = (order.items || []).find((it) => {
+                            if (it.productNo && errorText.includes(it.productNo)) return true;
+                            if (it.platformSkuId && errorText.includes(it.platformSkuId)) return true;
+                            if (it.productName && errorText.includes(it.productName)) return true;
+                            return false;
+                          });
+
+                          // 2. 找到第一个未匹配且未显式忽略的商品
+                          const firstUnmatchedItem = (order.items || []).find((it) => {
+                            const rawPayload = it.rawPayload && typeof it.rawPayload === "object" && !Array.isArray(it.rawPayload)
+                              ? it.rawPayload as Record<string, unknown>
+                              : {};
+                            const isIgnored = rawPayload.ignoreOutbound === true
+                              || rawPayload.isManualIgnored === true
+                              || (it.matchedProduct as any)?.ignoreOutbound === true;
+                            if (isIgnored) return false;
+                            return !it.matchedProduct;
+                          });
+
+                          // 3. 兜底获取目标商品
+                          const targetItem = itemMatchedByError || firstUnmatchedItem || (isMatchFailed ? (order.items || [])[0] : null);
+
+                          // 如果判定为匹配相关或者存在目标商品，直接 0ms 顺畅打开改匹配弹窗，绝不触发网络请求闪现“处理中...”
+                          if (targetItem && (isMatchFailed || firstUnmatchedItem)) {
+                            onOpenMatchEditor(order, targetItem);
+                            return;
+                          }
+
                           void onRunAction(order.id, "outbound");
                         }}
                         disabled={actingId === `${order.id}:outbound`}
-                        className="inline-flex h-7 items-center gap-0.5 rounded-full border border-rose-500/15 bg-rose-500/10 px-1.5 text-[11px] font-medium leading-none text-rose-700 transition-all hover:border-rose-500/30 hover:bg-rose-500/15 disabled:cursor-not-allowed disabled:opacity-60 dark:text-rose-400 sm:h-8 sm:gap-1.5 sm:px-2.5 sm:text-[13px]"
+                        className={cn(
+                          "group/outbound-btn inline-flex h-7 items-center gap-1 rounded-full border px-1.5 text-[10px] font-black leading-none cursor-pointer transition-all duration-150 active:opacity-80 sm:h-8 sm:gap-2 sm:px-3 sm:text-xs",
+                          "border-rose-500/25 bg-rose-500/10 text-rose-700 hover:border-rose-500/40 hover:bg-rose-500/15 dark:text-rose-400",
+                          "disabled:cursor-not-allowed disabled:opacity-60"
+                        )}
                       >
-                        <TriangleAlert size={10} className="sm:h-3 sm:w-3" />
-                        {actingId === `${order.id}:outbound` ? "处理中..." : "出库待处理"}
+                        {actingId === `${order.id}:outbound` ? (
+                          <Loader2 className="h-2.5 w-2.5 sm:h-3 sm:w-3 animate-spin text-rose-500 shrink-0" />
+                        ) : (
+                          <span className="h-1 w-1 rounded-full bg-rose-500 sm:h-2 sm:w-2 shrink-0" />
+                        )}
+                        <span>{actingId === `${order.id}:outbound` ? "处理中..." : "出库待处理"}</span>
                       </button>
                       
                       {/* Tooltip 浮层 */}
@@ -2583,16 +2634,22 @@ export const OrderCard = memo(function OrderCard({
                         <div className="relative rounded-xl border border-slate-200/90 bg-white/98 px-3.5 py-2.5 text-xs shadow-xl dark:border-white/12 dark:bg-[#171b22]/96">
                           {/* 小三角 */}
                           <div className="absolute top-full left-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1 rotate-45 border-r border-b border-slate-200/90 bg-white dark:border-white/12 dark:bg-[#171b22]" />
-                          <div className="font-semibold text-rose-600 dark:text-rose-400 mb-1 flex items-center gap-1.5">
-                            <TriangleAlert size={12} className="shrink-0" />
-                            <span>自动出库失败原因</span>
+                          <div className="font-semibold text-rose-600 dark:text-rose-400 mb-1 flex items-center justify-between">
+                            <div className="flex items-center gap-1.5">
+                              <TriangleAlert size={12} className="shrink-0" />
+                              <span>自动出库失败原因</span>
+                            </div>
+                            <span className="text-[10px] font-normal text-rose-500/80 bg-rose-500/10 px-1.5 py-0.5 rounded-full">可点击重试</span>
                           </div>
                           <div className="text-[11px] leading-relaxed text-zinc-600 dark:text-zinc-300 wrap-break-word font-normal text-left">
-                            {order.autoOutboundError || "未知异常，请检查库存或点击重试。"}
+                            {order.autoOutboundError || "未知异常，请检查库存或点击按钮重新尝试出库。"}
+                          </div>
+                          <div className="mt-2 pt-1.5 border-t border-slate-100 dark:border-white/10 flex items-center justify-between text-[10px] text-rose-600 dark:text-rose-400 font-medium">
+                            <span>点击按钮立即重新执行出库</span>
                           </div>
                         </div>
                       </div>
-                    </div>
+                    </span>
                   ) : null}
                   <StatusBadge order={order} />
                   {hasRefundAmount ? (
@@ -2856,25 +2913,25 @@ export const OrderCard = memo(function OrderCard({
                   </span>
                   <span className="inline-flex items-center gap-1.5 max-w-[280px] md:max-w-[420px] lg:max-w-[560px] min-w-0 leading-[18px]">
                     <button type="button" disabled={pickup} onClick={() => setRouteOpen(true)} title="查看配送地图" aria-label="查看配送地图" className="inline-flex shrink-0 items-center gap-1.5 rounded enabled:cursor-pointer enabled:hover:text-primary focus-visible:outline-2 focus-visible:outline-primary">
-                    <MapPin size={13} className="shrink-0 text-slate-400 dark:text-zinc-500" />
-                    <span className="truncate shrink-0">{pickup ? "-" : (order.distanceKm != null ? formatDistanceKm(order.distanceKm) : "距离待同步")}</span>
+                      <MapPin size={13} className="shrink-0 text-slate-400 dark:text-zinc-500" />
+                      <span className="truncate shrink-0">{pickup ? "-" : (order.distanceKm != null ? formatDistanceKm(order.distanceKm) : "距离待同步")}</span>
                     </button>
+                    {showCustomerTypeBadge ? (
+                      <span className={cn(
+                        "inline-flex h-[15px] shrink-0 items-center justify-center rounded-full border px-1 text-[9.5px] font-medium leading-none",
+                        resolvedCustomerType === "new"
+                          ? "border-orange-500/25 bg-orange-500/10 text-orange-600 dark:text-orange-400"
+                          : "border-slate-400/20 bg-slate-500/8 text-slate-500 dark:text-slate-300"
+                      )}>
+                        {customerTypeText}
+                      </span>
+                    ) : null}
                     {!pickup && order.userAddress ? (
                       <>
                         <span className="mx-1 text-slate-300 dark:text-zinc-700 font-normal shrink-0">·</span>
                         <span className="truncate text-foreground/80 font-normal leading-[18px]" title={order.userAddress}>
                           {order.userAddress}
                         </span>
-                        {showCustomerTypeBadge ? (
-                          <span className={cn(
-                            "inline-flex h-[18px] shrink-0 items-center justify-center rounded-full border px-1.5 text-[10px] font-semibold leading-none",
-                            resolvedCustomerType === "new"
-                              ? "border-rose-500/20 bg-rose-500/10 text-rose-600 dark:text-rose-300"
-                              : "border-slate-400/20 bg-slate-500/8 text-slate-500 dark:text-slate-300"
-                          )}>
-                            <span className="translate-y-px">{customerTypeText}</span>
-                          </span>
-                        ) : null}
                       </>
                     ) : null}
                   </span>
@@ -2898,10 +2955,22 @@ export const OrderCard = memo(function OrderCard({
                         <Clock3 size={12} className="shrink-0 text-slate-400 dark:text-zinc-500" />
                         <span>{formatLocalDateTime(order.orderTime)}</span>
                       </span>
-                      <button type="button" onClick={() => setRouteOpen(true)} title="查看配送地图" aria-label="查看配送地图" className="flex cursor-pointer items-center gap-1.5 rounded hover:text-primary focus-visible:outline-2 focus-visible:outline-primary">
-                        <MapPin size={12} className="shrink-0 text-slate-400 dark:text-zinc-500" />
-                        <span>{order.distanceKm != null ? formatDistanceKm(order.distanceKm) : "距离待同步"}</span>
-                      </button>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button type="button" onClick={() => setRouteOpen(true)} title="查看配送地图" aria-label="查看配送地图" className="flex cursor-pointer items-center gap-1.5 rounded hover:text-primary focus-visible:outline-2 focus-visible:outline-primary">
+                          <MapPin size={12} className="shrink-0 text-slate-400 dark:text-zinc-500" />
+                          <span>{order.distanceKm != null ? formatDistanceKm(order.distanceKm) : "距离待同步"}</span>
+                        </button>
+                        {showCustomerTypeBadge ? (
+                          <span className={cn(
+                            "inline-flex h-[15px] items-center justify-center rounded-full border px-1 text-[9.5px] font-medium leading-none",
+                            resolvedCustomerType === "new"
+                              ? "border-orange-500/25 bg-orange-500/10 text-orange-600 dark:text-orange-400"
+                              : "border-slate-400/20 bg-slate-500/8 text-slate-500 dark:text-slate-300"
+                          )}>
+                            {customerTypeText}
+                          </span>
+                        ) : null}
+                      </div>
                     </div>
                     
                     <div className="flex items-center justify-between border-t border-black/6 pt-2 dark:border-white/8">
@@ -2914,20 +2983,31 @@ export const OrderCard = memo(function OrderCard({
                       </span>
                     </div>
 
-                    <div className="flex items-start gap-1.5 text-foreground/90 border-t border-black/6 pt-2 dark:border-white/8">
-                      <Navigation size={12} className="mt-0.5 shrink-0 text-slate-400 dark:text-zinc-500" />
-                      <span className="line-clamp-2 break-all text-left w-full leading-normal">
-                        {order.userAddress || "地址待同步"}
-                      </span>
-                      {showCustomerTypeBadge ? (
-                        <span className={cn(
-                          "inline-flex h-[18px] shrink-0 items-center justify-center rounded-full border px-1.5 text-[10px] font-semibold leading-none",
-                          resolvedCustomerType === "new"
-                            ? "border-rose-500/20 bg-rose-500/10 text-rose-600 dark:text-rose-300"
-                            : "border-slate-400/20 bg-slate-500/8 text-slate-500 dark:text-slate-300"
-                        )}>
-                          <span className="translate-y-px">{customerTypeText}</span>
+                    <div className="flex items-center gap-1.5 text-foreground/90 border-t border-black/6 pt-2 dark:border-white/8">
+                      <Navigation size={12} className="shrink-0 text-slate-400 dark:text-zinc-500" />
+                      <div className="flex-1 min-w-0">
+                        <span className="line-clamp-2 break-all text-left leading-normal" title={order.userAddress}>
+                          {order.userAddress || "地址待同步"}
                         </span>
+                      </div>
+                      {showPlatformActions && !displayAsOfflineOrder && !deleted && !readOnly ? (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onRunAction(order.id, "self-delivery");
+                          }}
+                          disabled={cannotSelfDeliver}
+                          title={selfDeliveryTitle}
+                          className="ml-auto inline-flex h-6 shrink-0 items-center gap-1 rounded-full border border-sky-500/20 bg-sky-500/10 px-2 text-[11px] font-semibold text-sky-700 transition-all hover:bg-sky-500/15 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 dark:text-sky-300 sm:hidden"
+                        >
+                          {actingId === `${order.id}:self-delivery` ? (
+                            <Loader2 size={11} className="animate-spin" />
+                          ) : (
+                            <Truck size={11} />
+                          )}
+                          <span>自配</span>
+                        </button>
                       ) : null}
                     </div>
                   </div>
@@ -3069,7 +3149,7 @@ export const OrderCard = memo(function OrderCard({
               ? "grid-cols-1 sm:grid-cols-1 lg:min-w-0 lg:w-32 ml-auto"
             : showManualDeliveryMarker || displayAsOfflineOrder
               ? "grid-cols-3 sm:grid-cols-3 lg:min-w-0 lg:w-96 ml-auto"
-              : "grid-cols-2 sm:grid-cols-3"
+              : "grid-cols-3 sm:grid-cols-3"
           )}>
             <ActionButton
               label={expanded ? "收起详情" : "展开详情"}
@@ -3106,16 +3186,6 @@ export const OrderCard = memo(function OrderCard({
                   disabled={Boolean(actingId) || deleted}
                   mobileIconOnly
                 />
-                <div className="sm:hidden">
-                  <ActionButton
-                    label="自配"
-                    icon={actingId === `${order.id}:self-delivery` ? <Loader2 size={14} className="animate-spin" /> : <Truck size={14} />}
-                    onClick={() => onRunAction(order.id, "self-delivery")}
-                    disabled={cannotSelfDeliver}
-                    mobileIconOnly
-                    title={selfDeliveryTitle}
-                  />
-                </div>
                 <ActionButton
                   label={pickup ? "完成取货" : "完成配送"}
                   variant="primary"
@@ -3256,12 +3326,12 @@ export const OrderCard = memo(function OrderCard({
                     value={customerMaskedPhone}
                     labelAccessory={showCustomerTypeBadge ? (
                       <span className={cn(
-                        "inline-flex h-[18px] shrink-0 items-center justify-center rounded-full border px-1.5 text-[10px] font-semibold leading-none",
+                        "inline-flex h-[15px] items-center justify-center rounded-full border px-1 text-[9.5px] font-medium leading-none align-middle ml-1.5",
                         resolvedCustomerType === "new"
-                          ? "border-rose-500/20 bg-rose-500/10 text-rose-600 dark:text-rose-300"
+                          ? "border-orange-500/25 bg-orange-500/10 text-orange-600 dark:text-orange-400"
                           : "border-slate-400/20 bg-slate-500/8 text-slate-500 dark:text-slate-300"
                       )}>
-                        <span className="translate-y-px">{customerTypeText}</span>
+                        {customerTypeText}
                       </span>
                     ) : null}
                     valueClassName="break-all text-[13px] sm:text-sm"
