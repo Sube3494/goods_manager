@@ -3215,23 +3215,14 @@ export default function OrdersPage() {
 
                   {/* 编码信息：固定高度 h-5，无货号时保留占位防塌陷 */}
                   <div className="h-5 flex items-center gap-2 text-xs text-muted-foreground overflow-hidden">
-                    {matchEditorTarget.sku ? (
+                    {matchEditorTarget.sku && !/^\d{7,}$/.test(String(matchEditorTarget.sku).trim()) ? (
                       <span className="inline-flex items-center gap-1.5 rounded-lg bg-black/[0.04] dark:bg-white/[0.06] border border-black/6 dark:border-white/8 px-2 py-0.5 font-mono text-[11px] shrink-0">
                         <span className="text-[10px] text-muted-foreground font-sans">货号</span>
                         <span className="font-bold text-foreground">{matchEditorTarget.sku}</span>
                       </span>
-                    ) : null}
-
-                    {matchEditorTarget.platformSkuId ? (
-                      <span className="inline-flex items-center gap-1.5 rounded-lg bg-black/[0.04] dark:bg-white/[0.06] border border-black/6 dark:border-white/8 px-2 py-0.5 font-mono text-[11px] shrink-0">
-                        <span className="text-[10px] text-muted-foreground font-sans">平台SKU</span>
-                        <span className="font-bold text-foreground">{matchEditorTarget.platformSkuId}</span>
-                      </span>
-                    ) : null}
-
-                    {!matchEditorTarget.sku && !matchEditorTarget.platformSkuId ? (
+                    ) : (
                       <span className="text-[11px] text-muted-foreground/45 font-mono">暂无编码/货号</span>
-                    ) : null}
+                    )}
                   </div>
                 </div>
               </div>

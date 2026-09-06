@@ -1886,8 +1886,58 @@ export function ProductStripItem({
 }) {
   const [imgError, setImgError] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-  const platformSourceLabel = isJdOrder ? "JD SKU" : isMeituanOrder ? "美团 SKU ID" : isTaobaoOrder ? "淘宝 SKU ID" : isDoudianOrder ? "抖店 SKU ID" : "";
-  const platformSourceShortLabel = isJdOrder ? "JD" : isMeituanOrder ? "MT" : isTaobaoOrder ? "TB" : isDoudianOrder ? "DD" : "";
+
+  const matchMeta = (() => {
+    if ((matchedProduct as any)?.ignoreOutbound) {
+      return {
+        text: "无需出库",
+        className: "bg-slate-500/10 text-slate-700 dark:text-slate-400",
+      };
+    }
+    if (!matchedProduct) {
+      return {
+        text: display.optionalMatch ? "可选" : "未匹配",
+        className: "bg-rose-500/10 text-rose-700 dark:text-rose-400",
+      };
+    }
+    if (matchedProduct.isManual || (matchedProduct as any).matchMethod === "manual") {
+      return {
+        text: "手动",
+        className: "bg-violet-500/10 text-violet-700 dark:text-violet-400",
+      };
+    }
+    const method = (matchedProduct as any).matchMethod;
+    if (method === "id") {
+      return {
+        text: "ID匹配",
+        className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+      };
+    }
+    if (method === "sku") {
+      return {
+        text: "编码匹配",
+        className: "bg-sky-500/10 text-sky-700 dark:text-sky-400",
+      };
+    }
+
+    // 针对历史数据的纯前端兜底推断
+    const itemSku = String(display.sku || "").trim().toLowerCase();
+    const matchedSku = String(matchedProduct.sku || "").trim().toLowerCase();
+    const isPureId = (s: string) => /^\d{7,}$/.test(s);
+    if (itemSku && matchedSku && itemSku !== "-" && !isPureId(itemSku) && (itemSku === matchedSku || itemSku.includes(matchedSku) || matchedSku.includes(itemSku))) {
+      return {
+        text: "编码匹配",
+        className: "bg-sky-500/10 text-sky-700 dark:text-sky-400",
+      };
+    }
+    return {
+      text: "ID匹配",
+      className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+    };
+  })();
+
+  const isPlatformPureId = Boolean(display.sku && /^\d{7,}$/.test(String(display.sku).trim()));
+  const shouldShowItemSku = Boolean(display.sku && display.sku !== "-" && !isPlatformPureId);
 
   return (
     <>
@@ -1921,29 +1971,18 @@ export function ProductStripItem({
             {display.name}
           </div>
           <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-medium text-muted-foreground sm:mt-1 sm:gap-x-2.5">
-            <span className="shrink-0">{display.sku}</span>
+            {shouldShowItemSku ? (
+              <span className="shrink-0">{display.sku}</span>
+            ) : null}
             <span className="shrink-0">x{display.quantity}</span>
             {showMatchStatus ? (
               <span className={cn(
                 "inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[10px] font-medium leading-none whitespace-nowrap sm:text-[11px]",
-                (matchedProduct as any)?.ignoreOutbound
-                  ? "bg-slate-500/10 text-slate-700 dark:text-slate-400"
-                  : matchedProduct
-                  ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
-                  : "bg-rose-500/10 text-rose-700 dark:text-rose-400"
+                matchMeta.className
               )}>
-              {(matchedProduct as any)?.ignoreOutbound
-                ? "无需出库"
-                : matchedProduct ? (matchedProduct.isManual ? "手动" : "自动") : (display.optionalMatch ? "可选" : "未匹配")}
-            </span>
-          ) : null}
-          {platformSourceLabel && display.sourceId ? (
-            <span className="inline-flex shrink-0 items-center font-mono text-[10px] font-normal text-amber-700 dark:text-amber-300 bg-amber-500/10 dark:bg-amber-500/20 px-2 py-0.5 rounded-full border border-amber-500/20 leading-none whitespace-nowrap sm:text-[11px]">
-              <span className="hidden sm:inline">{platformSourceLabel}:&nbsp;</span>
-              <span className="sm:hidden">{platformSourceShortLabel}:&nbsp;</span>
-              {display.sourceId}
-            </span>
-          ) : null}
+                {matchMeta.text}
+              </span>
+            ) : null}
           {returnedQuantity > 0 ? (
             <span
               className="relative group inline-flex cursor-help items-center rounded-full border border-amber-500/15 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium leading-none text-amber-700 dark:text-amber-300 sm:text-[11px]"

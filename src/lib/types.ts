@@ -184,6 +184,7 @@ export interface AutoPickOrderItem {
     productId?: string | null;
     shopName?: string | null;
     isManual?: boolean;
+    matchMethod?: "id" | "sku" | "manual";
   } | null;
   createdAt?: string;
   updatedAt?: string;
@@ -198,6 +199,7 @@ export interface AutoPickMatchedProductRef {
   shopProductId?: string | null;
   shopName?: string | null;
   isManual?: boolean;
+  matchMethod?: "id" | "sku" | "manual";
 }
 
 export interface AutoPickOrder {

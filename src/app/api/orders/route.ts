@@ -2369,7 +2369,13 @@ export async function GET(request: NextRequest) {
             .filter((product): product is typeof mappedShopProducts[number] => Boolean(product)) : [];
           const hasStrictMatchForAllSegments = shouldTrySkuFallback && normalizedSkuCandidates.length > 0
             && normalizedSkuCandidates.every((candidate) => Boolean(resolveStrictSkuMatch(candidate)));
-          const matchedProduct = manualMatchedProduct || platformStrictMatch || (hasStrictMatchForAllSegments ? (fallbackStrictMatches[0] || null) : null);
+          const matchedProduct = manualMatchedProduct
+            ? { ...manualMatchedProduct, isManual: true, matchMethod: "manual" as const }
+            : platformStrictMatch
+            ? { ...platformStrictMatch, isManual: false, matchMethod: "id" as const }
+            : (hasStrictMatchForAllSegments && fallbackStrictMatches[0]
+              ? { ...fallbackStrictMatches[0], isManual: false, matchMethod: "sku" as const }
+              : null);
           if (matchedProduct) {
             const foundShopProduct = mappedShopProducts.find((p) =>
               (matchedProduct.shopProductId && p.id === matchedProduct.shopProductId)
