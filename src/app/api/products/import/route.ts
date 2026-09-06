@@ -89,7 +89,10 @@ export async function POST(request: Request) {
 
     existingSkuRecords.forEach(({ sku: s }) => {
       if (!s) return;
-      const match = s.trim().match(skuRegex);
+      const trimmed = s.trim();
+      // 排除纯长数字 ID（如美团/平台 ID），避免污染正常的自增编码前缀与最大值
+      if (/^\d{7,}$/.test(trimmed)) return;
+      const match = trimmed.match(skuRegex);
       if (match) {
         const prefix = match[1];
         const numStr = match[2];
@@ -134,20 +137,66 @@ export async function POST(request: Request) {
       return candidate;
     };
 
+    // 检查某个编码值是否实质上是平台ID/系统ID，而非商家的店内码
+    const isPlatformIdValue = (val: string, row: Record<string, any>, knownIds: string[]): boolean => {
+      if (!val) return false;
+      const clean = val.trim();
+      if (!clean) return false;
+
+      // 1. 若与已解析出的平台 ID 一致
+      if (knownIds.includes(clean)) return true;
+
+      // 2. 纯数字且长度 >= 7，属于典型的美团、京东或电商平台数字长 ID
+      if (/^\d{7,}$/.test(clean)) return true;
+
+      // 3. 符合常见平台 ID 格式（如 cuid、uuid、或以 MT/JD/WM 等开头的长 ID）
+      if (/^c[a-z0-9]{24}$/i.test(clean) || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(clean)) return true;
+      if (/^(mt|jd|wm)[-_]?\d{6,}$/i.test(clean)) return true;
+
+      // 4. 检查是否与当前表格行中任意带有 ID 特征列的值一致
+      for (const [k, v] of Object.entries(row)) {
+        if (!v) continue;
+        const normK = k.trim().toLowerCase();
+        if (normK.includes("id") || normK.includes("编码") || normK.includes("code")) {
+          if (String(v).trim() === clean && clean !== "") {
+            // 如果该列本身就是以 id 命名的（如 id, ID, 商品ID 等），则判定为 ID
+            if (normK === "id" || normK.endsWith("id") || normK.includes("商品id") || normK.includes("平台id")) {
+              return true;
+            }
+          }
+        }
+      }
+
+      return false;
+    };
+
     for (const item of products) {
         try {
             // Map keys for SKU and Quantity (Supporting both internal formats and exported headers)
             // "商品编码/编码" is intentionally not treated as local SKU: many Meituan exports use it for platform SKU IDs.
-            const sku = String(extractRowValue(item, ["sku", "SKU/店内码", "SKU", "店内码", "店内编码", "货号"]) || "");
+            const rawSku = String(extractRowValue(item, ["sku", "SKU/店内码", "SKU", "店内码", "店内编码", "货号"]) || "").trim();
             const jdSkuText = String(extractRowValue(item, ["JD SKU ID", "JD SKU", "JDSKU", "jdSkuId", "jdSkuIds", "京东编码", "京东SKU", "京东商品ID", "京东ID"]) || "");
             const meituanSkuText = String(extractRowValue(item, [
               "美团商品 ID", "美团商品ID", "美团商品Id", "美团商品id",
               "美团ID", "美团Id", "美团id", "美团编码", "美团sku", "美团SKU",
               "商品编码", "编码", "商品ID", "商品Id", "商品id", "平台商品ID", "平台商品id",
-              "meituanSkuId", "meituanSkuIds", "meituanId"
+              "meituanSkuId", "meituanSkuIds", "meituanId",
+              "id", "ID", "Id"
             ]) || "");
             const normalizedJdSkuIds = normalizeJdSkuIds(jdSkuText);
             const normalizedMeituanSkuIds = normalizeMeituanSkuIds(meituanSkuText);
+
+            // 严禁将平台 ID / 表格 ID 写入商品的商品编码 (SKU)
+            let sku = rawSku;
+            if (isPlatformIdValue(sku, item, [...normalizedMeituanSkuIds, ...normalizedJdSkuIds])) {
+              // 若该 ID 尚未收录进美团/平台映射，且符合平台ID特征，则保留其平台映射关系
+              if (!normalizedMeituanSkuIds.includes(sku) && !normalizedJdSkuIds.includes(sku)) {
+                normalizedMeituanSkuIds.push(sku);
+              }
+              // 清空 sku，后续走标准的系统自增编码生成规则 (generateNextSku)
+              sku = "";
+            }
+
             const primaryJdSkuId = getPrimaryJdSkuId(normalizedJdSkuIds);
             const costPrice = Number(extractRowValue(item, ["进货单价", "成本价", "成本价格", "costPrice", "Cost Price"]) || 0);
             // 1. 基础数据解析

@@ -121,14 +121,34 @@ export async function POST(
     for (let index = 0; index < rows.length; index += 1) {
       const row = rows[index] as Record<string, unknown>;
       const rowNumber = index + 1;
-      const sku = normalizeText(extractRowValue(row, ["SKU/店内码", "SKU", "sku", "店内码", "店内编码", "商品编码", "编码", "货号"]));
+      const rawSku = normalizeText(extractRowValue(row, ["SKU/店内码", "SKU", "sku", "店内码", "店内编码", "货号"]));
       const jdSkuText = normalizeText(extractRowValue(row, ["JD SKU ID", "JD SKU", "JDSKU", "jdSkuId", "jdSkuIds", "京东编码", "京东SKU", "京东商品ID", "京东ID"]));
-      const meituanSkuText = normalizeText(extractRowValue(row, [
+      let meituanSkuText = normalizeText(extractRowValue(row, [
         "美团商品 ID", "美团商品ID", "美团商品Id", "美团商品id", 
         "美团ID", "美团Id", "美团id", "美团编码", "美团sku", "美团SKU", 
-        "商品ID", "商品Id", "商品id", "平台商品ID", "平台商品id",
-        "meituanSkuId", "meituanSkuIds", "meituanId"
+        "商品编码", "编码", "商品ID", "商品Id", "商品id", "平台商品ID", "平台商品id",
+        "meituanSkuId", "meituanSkuIds", "meituanId",
+        "id", "ID", "Id"
       ]));
+
+      // 严禁将平台 ID / 表格 ID 写入商品编码 (SKU)
+      let sku = rawSku;
+      const isPlatformId = (val: string): boolean => {
+        if (!val) return false;
+        const clean = val.trim();
+        if (/^\d{7,}$/.test(clean)) return true;
+        if (/^c[a-z0-9]{24}$/i.test(clean) || /^[0-9a-f]{8}-[0-9a-f]{4}/i.test(clean)) return true;
+        if (/^(mt|jd|wm)[-_]?\d{6,}$/i.test(clean)) return true;
+        if (clean === jdSkuText || clean === meituanSkuText) return true;
+        return false;
+      };
+
+      if (isPlatformId(sku)) {
+        if (!meituanSkuText && !jdSkuText) {
+          meituanSkuText = sku;
+        }
+        sku = "";
+      }
       const name = normalizeText(extractRowValue(row, ["商品名称", "name", "名称"]));
       const categoryName = normalizeText(extractRowValue(row, ["分类", "categoryName", "类目"])) || "未分类";
       const supplierName = normalizeText(extractRowValue(row, ["供应商", "supplierName"]));
