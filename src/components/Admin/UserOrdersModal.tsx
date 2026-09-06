@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -52,6 +52,11 @@ const money = (val: number | undefined | null) => {
 };
 
 const int = (val: number | undefined | null) => Number(val || 0).toLocaleString("zh-CN");
+
+function simplifyShopName(name: string) {
+  if (!name) return "";
+  return name.replace(/（[^）]*）|\([^)]*\)/g, "").trim();
+}
 
 const CustomizedDot = (props: any) => {
   const { cx, cy, payload } = props;
@@ -305,10 +310,12 @@ function UserProfitTrendView({
   userId,
   userName,
   localShops,
+  refreshTrigger = 0,
 }: {
   userId: string;
   userName?: string | null;
   localShops: Array<{ id: string; name: string; address: string }>;
+  refreshTrigger?: number;
 }) {
   const today = useMemo(() => new Date(), []);
   const initialEnd = useMemo(() => format(today, "yyyy-MM-dd"), [today]);
@@ -318,8 +325,7 @@ function UserProfitTrendView({
   const [startDate, setStartDate] = useState(initialStart);
   const [endDate, setEndDate] = useState(initialEnd);
   const [selectedShopName, setSelectedShopName] = useState("");
-  const [profitPlatform, setProfitPlatform] = useState("all");
-  const [orderPlatform, setOrderPlatform] = useState("all");
+  const [selectedPlatform, setSelectedPlatform] = useState("all");
   const [orderScope, setOrderScope] = useState<"all" | "true">("all");
 
   const [statsData, setStatsData] = useState<StatsData | null>(null);
@@ -358,6 +364,21 @@ function UserProfitTrendView({
     void fetchStats();
   }, [fetchStats]);
 
+  useEffect(() => {
+    if (refreshTrigger > 0) {
+      void fetchStats();
+    }
+  }, [refreshTrigger, fetchStats]);
+
+  const timeRangeOptions = [
+    { value: "7d", label: "近 7 天" },
+    { value: "15d", label: "近 15 天" },
+    { value: "30d", label: "近 30 天" },
+    { value: "month", label: "本月" },
+    { value: "all", label: "全部时间" },
+    { value: "custom", label: "自定义区间" },
+  ];
+
   const handleRangePresetChange = (preset: string) => {
     setRangePreset(preset);
     if (preset === "7d") {
@@ -377,8 +398,8 @@ function UserProfitTrendView({
 
   const businessTrend = statsData?.businessTrend || [];
   const platformBusinessTrend = statsData?.platformBusinessTrend || {};
-  const profitTrend = profitPlatform === "all" ? businessTrend : (platformBusinessTrend[profitPlatform] || []);
-  const orderTrend = orderPlatform === "all" ? businessTrend : (platformBusinessTrend[orderPlatform] || []);
+  const profitTrend = selectedPlatform === "all" ? businessTrend : (platformBusinessTrend[selectedPlatform] || []);
+  const orderTrend = selectedPlatform === "all" ? businessTrend : (platformBusinessTrend[selectedPlatform] || []);
 
   const profitGradientOffset = useMemo(() => {
     if (!profitTrend || profitTrend.length === 0) return 0;
@@ -412,79 +433,56 @@ function UserProfitTrendView({
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      {/* 顶部控制栏与筛选器 */}
-      <div className="rounded-2xl border border-black/8 bg-white/70 p-3 sm:p-4 shadow-xs backdrop-blur-sm dark:border-white/10 dark:bg-white/4">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          {/* 时间预设快捷按钮 */}
-          <div className="inline-flex flex-wrap items-center rounded-xl border border-black/8 bg-black/3 p-1 dark:border-white/10 dark:bg-white/4">
-            {[
-              { key: "7d", label: "近7天" },
-              { key: "15d", label: "近15天" },
-              { key: "30d", label: "近30天" },
-              { key: "month", label: "本月" },
-              { key: "all", label: "全部" },
-            ].map((p) => (
-              <button
-                key={p.key}
-                type="button"
-                onClick={() => handleRangePresetChange(p.key)}
-                className={cn(
-                  "rounded-lg px-3 py-1.5 text-xs transition-all active:scale-95",
-                  rangePreset === p.key
-                    ? "bg-foreground text-background dark:bg-white dark:text-black font-semibold shadow-xs"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
+      {/* 顶部控制栏与筛选器：三个下拉列表一行（先店铺、后平台、后日子） */}
+      <div className="rounded-2xl border border-black/8 bg-white/70 p-2.5 sm:p-3 shadow-xs backdrop-blur-sm dark:border-white/10 dark:bg-white/4 space-y-2.5">
+        <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
+          {/* 下拉 1：店铺筛选 */}
+          <CustomSelect
+            value={selectedShopName}
+            onChange={setSelectedShopName}
+            options={shopSelectOptions}
+            className="h-8.5 sm:h-9 w-full"
+            triggerClassName="h-full rounded-xl text-xs sm:text-sm border border-black/8 bg-white px-2 sm:px-3 text-center justify-center dark:border-white/10 dark:bg-white/5 font-medium"
+          />
 
-          {/* 日期选择与店铺筛选 */}
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-1.5 text-xs">
-              <DatePicker
-                value={startDate}
-                onChange={(val) => {
-                  setRangePreset("custom");
-                  setStartDate(val);
-                }}
-                className="w-[125px]"
-                triggerClassName="h-8.5 rounded-xl text-xs border border-black/8 dark:border-white/10 bg-white dark:bg-white/5"
-              />
-              <span className="text-muted-foreground">至</span>
-              <DatePicker
-                value={endDate}
-                onChange={(val) => {
-                  setRangePreset("custom");
-                  setEndDate(val);
-                }}
-                className="w-[125px]"
-                triggerClassName="h-8.5 rounded-xl text-xs border border-black/8 dark:border-white/10 bg-white dark:bg-white/5"
-              />
-            </div>
+          {/* 下拉 2：平台筛选 */}
+          <CustomSelect
+            value={selectedPlatform}
+            onChange={setSelectedPlatform}
+            options={platformOptions}
+            className="h-8.5 sm:h-9 w-full"
+            triggerClassName="h-full rounded-xl text-xs sm:text-sm border border-black/8 bg-white px-2 sm:px-3 text-center justify-center dark:border-white/10 dark:bg-white/5 font-medium"
+          />
 
-            {shopSelectOptions.length > 1 && (
-              <CustomSelect
-                value={selectedShopName}
-                onChange={setSelectedShopName}
-                options={shopSelectOptions}
-                className="h-8.5 min-w-[130px]"
-                triggerClassName="h-full rounded-xl text-xs border border-black/8 bg-white dark:border-white/10 dark:bg-white/5"
-              />
-            )}
-
-            <button
-              onClick={() => void fetchStats()}
-              disabled={isLoading}
-              className="inline-flex h-8.5 items-center gap-1 rounded-xl border border-black/8 bg-white px-2.5 text-xs font-bold text-muted-foreground transition-all hover:bg-black/5 hover:text-foreground active:scale-95 dark:border-white/10 dark:bg-white/5 disabled:opacity-50"
-              title="刷新数据"
-            >
-              <RotateCcw size={12} className={cn(isLoading && "animate-spin text-primary")} />
-              <span>刷新</span>
-            </button>
-          </div>
+          {/* 下拉 3：时间范围（日子） */}
+          <CustomSelect
+            value={rangePreset}
+            onChange={handleRangePresetChange}
+            options={timeRangeOptions}
+            className="h-8.5 sm:h-9 w-full"
+            triggerClassName="h-full rounded-xl text-xs sm:text-sm border border-black/8 bg-white px-2 sm:px-3 text-center justify-center dark:border-white/10 dark:bg-white/5 font-medium"
+          />
         </div>
+
+        {/* 当选择自定义区间时，优雅展开日期选择 */}
+        {rangePreset === "custom" && (
+          <div className="flex items-center gap-1.5 sm:gap-2 pt-2 border-t border-black/5 dark:border-white/5 text-xs animate-in fade-in duration-200">
+            <span className="text-[11px] text-muted-foreground shrink-0">自定义区间:</span>
+            <DatePicker
+              value={startDate}
+              onChange={(val) => setStartDate(val)}
+              className="flex-1 min-w-0"
+              triggerClassName="h-8 rounded-xl text-xs border border-black/8 dark:border-white/10 bg-white dark:bg-white/5"
+            />
+            <span className="text-muted-foreground shrink-0 text-xs">至</span>
+            <DatePicker
+              value={endDate}
+              onChange={(val) => setEndDate(val)}
+              className="flex-1 min-w-0"
+              triggerClassName="h-8 rounded-xl text-xs border border-black/8 dark:border-white/10 bg-white dark:bg-white/5"
+            />
+          </div>
+        )}
       </div>
 
       {isLoading && !statsData ? (
@@ -566,8 +564,8 @@ function UserProfitTrendView({
               </div>
 
               <CustomSelect
-                value={profitPlatform}
-                onChange={setProfitPlatform}
+                value={selectedPlatform}
+                onChange={setSelectedPlatform}
                 options={platformOptions}
                 className="h-8 min-w-[110px]"
                 triggerClassName="h-full rounded-xl text-xs border border-black/8 bg-white px-2.5 dark:border-white/10 dark:bg-white/5"
@@ -644,8 +642,8 @@ function UserProfitTrendView({
                   triggerClassName="h-full rounded-xl text-xs border border-black/8 bg-white px-2.5 dark:border-white/10 dark:bg-white/5"
                 />
                 <CustomSelect
-                  value={orderPlatform}
-                  onChange={setOrderPlatform}
+                  value={selectedPlatform}
+                  onChange={setSelectedPlatform}
                   options={platformOptions}
                   className="h-8 min-w-[100px]"
                   triggerClassName="h-full rounded-xl text-xs border border-black/8 bg-white px-2.5 dark:border-white/10 dark:bg-white/5"
@@ -705,8 +703,15 @@ export function UserOrdersModal({
 }: UserOrdersModalProps) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [isSpinning, setIsSpinning] = useState(false);
   const [activeTab, setActiveTab] = useState<"today-orders" | "all-orders" | "profit-trend">("today-orders");
   const [allOrdersMounted, setAllOrdersMounted] = useState(false);
+
+  const handleHeaderRefresh = useCallback(() => {
+    setRefreshTrigger((prev) => prev + 1);
+    setIsSpinning(true);
+    setTimeout(() => setIsSpinning(false), 700);
+  }, []);
 
   useEffect(() => {
     if (activeTab === "all-orders" && !allOrdersMounted) {
@@ -729,6 +734,20 @@ export function UserOrdersModal({
     platformDelivery?: Record<string, number>;
     pureProfit: number;
     platformProfit?: Record<string, { amount: number; count: number }>;
+    shopProfit?: Record<string, {
+      name: string;
+      amount: number;
+      count: number;
+      receivedAmount?: number;
+      realReceivedAmount?: number;
+      brushReceivedAmount?: number;
+      brushPaidAmount?: number;
+      realOrderCount?: number;
+      brushOrderCount?: number;
+      deliveryFee: number;
+      productCost: number;
+      platformCommission: number;
+    }>;
   }>({
     receivedAmount: 0,
     platformCommission: 0,
@@ -783,6 +802,41 @@ export function UserOrdersModal({
 
   const activeSummary = activeTab === "all-orders" ? allSummary : todaySummary;
   const activeOverview = activeTab === "all-orders" ? allOverview : todayOverview;
+
+  const [isIncomeDetailsOpen, setIsIncomeDetailsOpen] = useState(false);
+  const incomeContainerRef = useRef<HTMLDivElement>(null);
+  const incomeModalRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isIncomeDetailsOpen) return;
+    const handleOutsideClick = (e: MouseEvent | TouchEvent) => {
+      const target = e.target as Node;
+      if (incomeContainerRef.current && incomeContainerRef.current.contains(target)) {
+        return;
+      }
+      if (incomeModalRef.current && incomeModalRef.current.contains(target)) {
+        return;
+      }
+      setIsIncomeDetailsOpen(false);
+    };
+    document.addEventListener("mousedown", handleOutsideClick);
+    document.addEventListener("touchstart", handleOutsideClick);
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+      document.removeEventListener("touchstart", handleOutsideClick);
+    };
+  }, [isIncomeDetailsOpen]);
+
+  const shopReceivedEntries = useMemo(() => {
+    return Object.entries(activeSummary.shopProfit || {})
+      .map(([key, info]) => ({ key, ...info }))
+      .filter((info) => (info.receivedAmount || 0) > 0 || (info.realReceivedAmount || 0) > 0 || (info.brushReceivedAmount || 0) > 0 || info.count > 0 || (info.realOrderCount || 0) > 0 || (info.brushOrderCount || 0) > 0 || info.amount !== 0)
+      .sort((a, b) => {
+        const aReceived = a.receivedAmount ?? a.amount ?? 0;
+        const bReceived = b.receivedAmount ?? b.amount ?? 0;
+        return bReceived - aReceived;
+      });
+  }, [activeSummary.shopProfit]);
 
   const [localShops, setLocalShops] = useState<Array<{ id: string; name: string; address: string }>>([]);
 
@@ -888,15 +942,13 @@ export function UserOrdersModal({
 
                 {/* 移动端右侧快捷操作（刷新 + 关闭） */}
                 <div className="flex items-center gap-1.5 sm:hidden shrink-0">
-                  {(activeTab === "today-orders" || activeTab === "all-orders") && (
-                    <button
-                      onClick={() => setRefreshTrigger((prev) => prev + 1)}
-                      className="h-8 w-8 rounded-xl border border-border/70 text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors flex items-center justify-center active:scale-95"
-                      title="刷新数据"
-                    >
-                      <RotateCcw size={14} />
-                    </button>
-                  )}
+                  <button
+                    onClick={handleHeaderRefresh}
+                    className="h-8 w-8 rounded-xl border border-border/70 text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors flex items-center justify-center active:scale-95"
+                    title="刷新数据"
+                  >
+                    <RotateCcw size={14} className={cn(isSpinning && "animate-spin text-primary")} />
+                  </button>
                   <button
                     onClick={onClose}
                     className="h-8 w-8 rounded-xl bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors flex items-center justify-center active:scale-95"
@@ -956,15 +1008,13 @@ export function UserOrdersModal({
 
                 {/* 桌面端独立操作按钮（刷新 + 全屏 + 关闭） */}
                 <div className="hidden sm:flex items-center gap-2 shrink-0">
-                  {(activeTab === "today-orders" || activeTab === "all-orders") && (
-                    <button
-                      onClick={() => setRefreshTrigger((prev) => prev + 1)}
-                      className="h-8 w-8 sm:h-9 sm:w-9 rounded-xl border border-border/70 text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors flex items-center justify-center active:scale-95"
-                      title="刷新数据"
-                    >
-                      <RotateCcw size={14} />
-                    </button>
-                  )}
+                  <button
+                    onClick={handleHeaderRefresh}
+                    className="h-8 w-8 sm:h-9 sm:w-9 rounded-xl border border-border/70 text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors flex items-center justify-center active:scale-95"
+                    title="刷新数据"
+                  >
+                    <RotateCcw size={14} className={cn(isSpinning && "animate-spin text-primary")} />
+                  </button>
 
                   <button
                     onClick={() => setIsFullscreen((prev) => !prev)}
@@ -993,6 +1043,7 @@ export function UserOrdersModal({
                     userId={userId}
                     userName={userName}
                     localShops={localShops}
+                    refreshTrigger={refreshTrigger}
                   />
                 ) : (
                   <div className="py-20 text-center text-sm text-muted-foreground">
@@ -1004,30 +1055,280 @@ export function UserOrdersModal({
                   {/* 今日/全部 指标看板：与订单页面顶部 1:1 完全对齐 */}
                   <div className="grid items-stretch gap-2.5 sm:gap-3 md:grid-cols-2 lg:grid-cols-4">
                     {/* 1. 总订单 / 商家实收 合并卡片 */}
-                    <div className="min-w-0 rounded-[20px] border border-black/8 bg-white/76 px-3.5 py-3 sm:px-4 sm:py-3.5 shadow-xs dark:border-white/10 dark:bg-white/5 md:col-span-2 lg:col-span-2">
-                      <div className="flex flex-col gap-2 sm:gap-2.5">
-                        <div className="flex items-baseline justify-between gap-2 sm:gap-3">
+                    <div className="min-w-0 rounded-[20px] border border-black/8 bg-white/76 px-4 py-3.5 shadow-xs dark:border-white/10 dark:bg-white/5 md:col-span-2 lg:col-span-2">
+                      <div className="flex flex-col gap-2.5">
+                        <div className="flex items-baseline justify-between gap-3">
                           <div className="shrink-0">
-                            <div className="text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground whitespace-nowrap">总订单</div>
-                            <div className="mt-1 sm:mt-2 text-xl sm:text-[30px] font-black leading-none tracking-tight text-foreground">{activeOverview.totalCount}</div>
+                            <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground whitespace-nowrap">总订单</div>
+                            <div className="mt-2 text-2xl sm:text-[30px] font-black leading-none tracking-tight text-foreground">{activeOverview.totalCount}</div>
                           </div>
-                          <div className="min-w-0 text-right">
-                            <div className="text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">商家实收</div>
-                            <div className="mt-1 sm:mt-2 text-xl sm:text-[30px] font-black leading-none tracking-tight text-emerald-600 dark:text-emerald-400">{toCurrency(activeSummary.receivedAmount || 0)}</div>
-                            <div className="mt-1 sm:mt-1.5 flex flex-wrap items-center justify-end gap-x-1.5 gap-y-0.5 text-[10px] sm:text-[11px] font-semibold">
-                              <span className="whitespace-nowrap text-sky-600 dark:text-sky-400">真实收入 {toCurrency(activeSummary.realReceivedAmount || 0)}</span>
-                              {(activeSummary.brushReceivedAmount || 0) > 0 || (activeSummary.brushPaidAmount || 0) > 0 ? (
-                                <>
-                                  <span className="text-muted-foreground">·</span>
-                                  <span className="whitespace-nowrap text-rose-500">刷单收入 {toCurrency(activeSummary.brushReceivedAmount || 0)} <span className="text-rose-500/80 dark:text-rose-400/80 font-normal">(实付 {toCurrency(activeSummary.brushPaidAmount || 0)})</span></span>
-                                </>
-                              ) : (
-                                <>
-                                  <span className="text-muted-foreground">·</span>
-                                  <span className="whitespace-nowrap text-rose-500/60 dark:text-rose-400/60 font-normal">无刷单</span>
-                                </>
-                              )}
+                          <div
+                            ref={incomeContainerRef}
+                            onClick={() => setIsIncomeDetailsOpen((prev) => !prev)}
+                            className="relative group/income min-w-0 text-right cursor-pointer select-none"
+                          >
+                            <div className="flex items-center justify-end gap-1.5 text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
+                              <span className="leading-none">商家实收</span>
+                              <span className="relative flex h-1.5 w-1.5 shrink-0 items-center justify-center -translate-y-[1px]">
+                                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60 duration-1000" />
+                                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.7)] transition-transform duration-200 group-hover/income:scale-125" />
+                              </span>
                             </div>
+                            <div className="mt-2 text-2xl sm:text-[30px] font-black leading-none tracking-tight text-emerald-600 dark:text-emerald-400 decoration-dotted underline-offset-4 group-hover/income:underline">
+                              {toCurrency(activeSummary.receivedAmount || 0)}
+                            </div>
+
+                            {/* 桌面端：收入明细气泡浮窗（仅 sm: 显示，支持悬停与点击） */}
+                            <div
+                              onClick={(e) => e.stopPropagation()}
+                              className={cn(
+                                "hidden sm:block absolute right-0 top-full z-50 mt-2 w-[360px] transition-all duration-200 ease-out",
+                                isIncomeDetailsOpen
+                                  ? "pointer-events-auto opacity-100 translate-y-0 scale-100"
+                                  : "pointer-events-none opacity-0 translate-y-1 scale-95 group-hover/income:pointer-events-auto group-hover/income:opacity-100 group-hover/income:translate-y-0 group-hover/income:scale-100"
+                              )}
+                            >
+                              <div className="flex flex-col gap-2.5 rounded-2xl border border-black/8 bg-white/94 p-3 text-left shadow-[0_16px_40px_rgba(0,0,0,0.18)] backdrop-blur-xl dark:border-white/12 dark:bg-[#0b111e]/95 dark:shadow-[0_20px_48px_rgba(0,0,0,0.7),0_0_0_1px_rgba(255,255,255,0.06)]">
+                                <div className="flex items-center justify-between border-b border-black/6 pb-2 text-xs text-muted-foreground dark:border-white/8">
+                                  <span className="flex items-center gap-1.5 font-medium text-foreground dark:text-white">
+                                    <Store size={14} className="text-emerald-500 shrink-0" />
+                                    <span>各店铺实收明细</span>
+                                  </span>
+                                  <span className="text-xs text-muted-foreground">
+                                    共 {shopReceivedEntries.length} 店
+                                  </span>
+                                </div>
+
+                                <div className="flex flex-col gap-1.5 max-h-[230px] overflow-y-auto pr-1">
+                                  {shopReceivedEntries.length > 0 ? (
+                                    shopReceivedEntries.map((shop, idx) => {
+                                      const displayShopName = shop.name === "未匹配店铺" ? shop.name : simplifyShopName(shop.name) || shop.name;
+                                      const shopReceived = shop.receivedAmount ?? shop.amount ?? 0;
+                                      const totalShopOrders = (shop.realOrderCount || 0) + (shop.brushOrderCount || 0) || shop.count;
+                                      const hasBrush = (shop.brushOrderCount || 0) > 0 || (shop.brushReceivedAmount || 0) > 0;
+
+                                      return (
+                                        <div
+                                          key={shop.key || idx}
+                                          className="flex items-center justify-between gap-3 rounded-xl bg-black/[0.025] border border-black/4 px-3 py-2 text-xs dark:bg-white/[0.035] dark:border-white/6 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors"
+                                        >
+                                          <div className="min-w-0 flex-1">
+                                            <div className="flex items-center gap-1.5">
+                                              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500/70" />
+                                              <span className="truncate text-sm font-semibold text-foreground dark:text-white" title={shop.name}>
+                                                {displayShopName}
+                                              </span>
+                                            </div>
+                                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5 pl-3">
+                                              <span>{totalShopOrders}单</span>
+                                              {hasBrush ? (
+                                                <>
+                                                  <span className="opacity-40">·</span>
+                                                  <span className="text-sky-600 dark:text-sky-400 font-medium">真{shop.realOrderCount || 0}</span>
+                                                  <span className="opacity-40">·</span>
+                                                  <span className="text-rose-500 dark:text-rose-400 font-medium">刷{shop.brushOrderCount || 0}</span>
+                                                </>
+                                              ) : null}
+                                            </div>
+                                          </div>
+
+                                          <div className="text-right shrink-0">
+                                            <div className="text-sm font-semibold text-foreground dark:text-white tabular-nums">
+                                              {toCurrency(shopReceived)}
+                                            </div>
+                                            {hasBrush ? (
+                                              <div className="flex items-center justify-end gap-1.5 text-[11px] mt-0.5 tabular-nums">
+                                                {(shop.brushReceivedAmount || 0) > 0 && (
+                                                  <span className="text-rose-500 dark:text-rose-400 font-medium">
+                                                    刷收 {toCurrency(shop.brushReceivedAmount || 0)}
+                                                  </span>
+                                                )}
+                                                {(shop.brushPaidAmount || 0) > 0 && (
+                                                  <span className="text-muted-foreground">
+                                                    实付 {toCurrency(shop.brushPaidAmount || 0)}
+                                                  </span>
+                                                )}
+                                              </div>
+                                            ) : null}
+                                          </div>
+                                        </div>
+                                      );
+                                    })
+                                  ) : (
+                                    <div className="py-4 text-center text-xs text-muted-foreground/60">
+                                      暂无分店铺实收数据
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div className="border-t border-black/6 pt-2.5 dark:border-white/8 flex flex-col gap-2">
+                                  <div className="flex items-baseline justify-between px-0.5">
+                                    <span className="text-xs font-semibold text-foreground dark:text-white">实收总计</span>
+                                    <span className="text-base font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                                      {toCurrency(activeSummary.receivedAmount || 0)}
+                                    </span>
+                                  </div>
+
+                                  <div className="grid grid-cols-2 gap-2 pt-0.5">
+                                    <div className="flex flex-col justify-between rounded-xl bg-sky-500/8 border border-sky-500/12 px-3 py-2 text-sky-700 dark:bg-sky-500/10 dark:text-sky-300">
+                                      <div className="flex items-center justify-between text-xs">
+                                        <span className="font-medium">真单实收</span>
+                                        <span className="font-bold tabular-nums">{toCurrency(activeSummary.realReceivedAmount || 0)}</span>
+                                      </div>
+                                      <div className="text-[11px] text-muted-foreground mt-0.5">
+                                        {activeOverview.trueOrderCount} 笔真单
+                                      </div>
+                                    </div>
+
+                                    <div className="flex flex-col justify-between rounded-xl bg-rose-500/8 border border-rose-500/12 px-3 py-2 text-rose-700 dark:bg-rose-500/10 dark:text-rose-300">
+                                      <div className="flex items-center justify-between text-xs">
+                                        <span className="font-medium">刷单实收</span>
+                                        <span className="font-bold tabular-nums">{toCurrency(activeSummary.brushReceivedAmount || 0)}</span>
+                                      </div>
+                                      <div className="flex items-center justify-between text-[11px] text-rose-600/80 dark:text-rose-300/80 mt-0.5 font-medium">
+                                        <span>实付支出</span>
+                                        <span className="tabular-nums">{toCurrency(activeSummary.brushPaidAmount || 0)}</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* 移动端：真正的全屏居中弹窗（Portal 挂载，带遮罩与右上角关闭按钮） */}
+                            {typeof document !== "undefined" && isIncomeDetailsOpen && createPortal(
+                              <div
+                                className="fixed inset-0 z-[100000] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 sm:hidden animate-in fade-in duration-200"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setIsIncomeDetailsOpen(false);
+                                }}
+                              >
+                                <div
+                                  ref={incomeModalRef}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="relative flex w-full max-w-[340px] max-h-[85vh] flex-col rounded-3xl border border-black/10 bg-white text-left shadow-2xl backdrop-blur-xl dark:border-white/15 dark:bg-[#0c1220] animate-in zoom-in-95 duration-200 overflow-hidden"
+                                >
+                                  <div className="flex items-center justify-between border-b border-black/6 px-4 py-3 dark:border-white/8">
+                                    <div className="flex items-center gap-2 font-semibold text-foreground dark:text-white">
+                                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400">
+                                        <Store size={15} />
+                                      </div>
+                                      <span className="text-sm font-bold">各店铺实收明细</span>
+                                      <span className="rounded-full bg-black/5 px-2 py-0.5 text-[11px] font-medium text-muted-foreground dark:bg-white/10 dark:text-white/70">
+                                        共 {shopReceivedEntries.length} 店
+                                      </span>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setIsIncomeDetailsOpen(false);
+                                      }}
+                                      className="flex h-7 w-7 items-center justify-center rounded-full bg-black/5 text-muted-foreground transition-all hover:bg-black/10 hover:text-foreground active:scale-95 dark:bg-white/10 dark:text-white/80 dark:hover:bg-white/20 dark:hover:text-white"
+                                      aria-label="关闭"
+                                    >
+                                      <X size={15} />
+                                    </button>
+                                  </div>
+
+                                  <div className="flex-1 flex flex-col gap-1.5 p-3.5 max-h-[42vh] overflow-y-auto">
+                                    {shopReceivedEntries.length > 0 ? (
+                                      shopReceivedEntries.map((shop, idx) => {
+                                        const displayShopName = shop.name === "未匹配店铺" ? shop.name : simplifyShopName(shop.name) || shop.name;
+                                        const shopReceived = shop.receivedAmount ?? shop.amount ?? 0;
+                                        const totalShopOrders = (shop.realOrderCount || 0) + (shop.brushOrderCount || 0) || shop.count;
+                                        const hasBrush = (shop.brushOrderCount || 0) > 0 || (shop.brushReceivedAmount || 0) > 0;
+
+                                        return (
+                                          <div
+                                            key={shop.key || idx}
+                                            className="flex items-center justify-between gap-3 rounded-2xl bg-black/[0.025] border border-black/4 px-3 py-2 text-xs dark:bg-white/[0.035] dark:border-white/6"
+                                          >
+                                            <div className="min-w-0 flex-1">
+                                              <div className="flex items-center gap-1.5">
+                                                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500/70" />
+                                                <span className="truncate text-sm font-semibold text-foreground dark:text-white" title={shop.name}>
+                                                  {displayShopName}
+                                                </span>
+                                              </div>
+                                              <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5 pl-3">
+                                                <span>{totalShopOrders}单</span>
+                                                {hasBrush ? (
+                                                  <>
+                                                    <span className="opacity-40">·</span>
+                                                    <span className="text-sky-600 dark:text-sky-400 font-medium">真{shop.realOrderCount || 0}</span>
+                                                    <span className="opacity-40">·</span>
+                                                    <span className="text-rose-500 dark:text-rose-400 font-medium">刷{shop.brushOrderCount || 0}</span>
+                                                  </>
+                                                ) : null}
+                                              </div>
+                                            </div>
+
+                                            <div className="text-right shrink-0">
+                                              <div className="text-sm font-semibold text-foreground dark:text-white tabular-nums">
+                                                {toCurrency(shopReceived)}
+                                              </div>
+                                              {hasBrush ? (
+                                                <div className="flex items-center justify-end gap-1.5 text-[11px] mt-0.5 tabular-nums">
+                                                  {(shop.brushReceivedAmount || 0) > 0 && (
+                                                    <span className="text-rose-500 dark:text-rose-400 font-medium">
+                                                      刷收 {toCurrency(shop.brushReceivedAmount || 0)}
+                                                    </span>
+                                                  )}
+                                                  {(shop.brushPaidAmount || 0) > 0 && (
+                                                    <span className="text-muted-foreground">
+                                                      实付 {toCurrency(shop.brushPaidAmount || 0)}
+                                                    </span>
+                                                  )}
+                                                </div>
+                                              ) : null}
+                                            </div>
+                                          </div>
+                                        );
+                                      })
+                                    ) : (
+                                      <div className="py-6 text-center text-xs text-muted-foreground/60">
+                                        暂无分店铺实收数据
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  <div className="border-t border-black/6 bg-black/[0.015] p-3.5 dark:border-white/8 dark:bg-white/[0.02] flex flex-col gap-2.5">
+                                    <div className="flex items-baseline justify-between px-0.5">
+                                      <span className="text-xs font-semibold text-foreground dark:text-white">实收总计</span>
+                                      <span className="text-base font-black text-emerald-600 dark:text-emerald-400 tabular-nums">
+                                        {toCurrency(activeSummary.receivedAmount || 0)}
+                                      </span>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-2 pt-0.5">
+                                      <div className="flex flex-col justify-between rounded-xl bg-sky-500/8 border border-sky-500/12 px-3 py-2 text-sky-700 dark:bg-sky-500/10 dark:text-sky-300">
+                                        <div className="flex items-center justify-between text-xs">
+                                          <span className="font-medium">真单实收</span>
+                                          <span className="font-bold tabular-nums">{toCurrency(activeSummary.realReceivedAmount || 0)}</span>
+                                        </div>
+                                        <div className="text-[11px] text-muted-foreground mt-0.5">
+                                          {activeOverview.trueOrderCount} 笔真单
+                                        </div>
+                                      </div>
+
+                                      <div className="flex flex-col justify-between rounded-xl bg-rose-500/8 border border-rose-500/12 px-3 py-2 text-rose-700 dark:bg-rose-500/10 dark:text-rose-300">
+                                        <div className="flex items-center justify-between text-xs">
+                                          <span className="font-medium">刷单实收</span>
+                                          <span className="font-bold tabular-nums">{toCurrency(activeSummary.brushReceivedAmount || 0)}</span>
+                                        </div>
+                                        <div className="flex items-center justify-between text-[11px] text-rose-600/80 dark:text-rose-300/80 mt-0.5 font-medium">
+                                          <span>实付支出</span>
+                                          <span className="tabular-nums">{toCurrency(activeSummary.brushPaidAmount || 0)}</span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>,
+                              document.body
+                            )}
                           </div>
                         </div>
 
@@ -1058,92 +1359,191 @@ export function UserOrdersModal({
                           </div>
                         )}
 
-                        {/* 三列看板网格：真单 / 刷单 / 取消 */}
-                        <div className="grid grid-cols-3 gap-1.5 sm:gap-5 mt-1.5 sm:mt-2 border-t border-black/4 pt-2.5 sm:pt-3 dark:border-white/5 text-[10px]">
+                        {/* 看板网格（移动端自适应为流式横条卡片，零截断无空白，0单项自动隐藏；桌面端保持三竖列大看板） */}
+                        <div className="flex flex-col sm:grid sm:grid-cols-3 gap-2 sm:gap-4 mt-1 border-t border-black/4 pt-3 dark:border-white/5 text-[10px]">
                           {/* 第一列：真单 */}
-                          <div className="flex flex-col gap-1 sm:gap-1.5 min-w-0 rounded-xl bg-black/1.5 p-1.5 sm:p-0 dark:bg-white/1.5 sm:bg-transparent sm:dark:bg-transparent">
-                            <div className="flex items-center justify-between rounded-lg bg-sky-500/8 px-1 sm:px-1.5 py-0.5 text-sky-700 dark:bg-sky-500/12 dark:text-sky-400 font-medium text-[8.5px] sm:text-[9px]">
-                              <span className="truncate">真单</span>
-                              <span className="shrink-0">{activeOverview.trueOrderCount}单</span>
+                          <div className={cn(
+                            "flex flex-col gap-2 min-w-0 rounded-2xl bg-sky-500/5 border border-sky-500/12 p-2.5 sm:p-3 dark:bg-sky-500/8 dark:border-sky-500/15",
+                            activeOverview.trueOrderCount === 0 && (activeOverview.brushCount > 0 || activeOverview.cancelledCount > 0) && "hidden sm:flex"
+                          )}>
+                            {/* 移动端横向流式布局（< sm） */}
+                            <div className="flex flex-col gap-1.5 sm:hidden">
+                              <div className="flex items-baseline justify-between border-b border-sky-500/15 pb-1 px-0.5 text-sky-600 dark:text-sky-300 font-bold text-xs">
+                                <span className="tracking-wide">真单</span>
+                                <span className="text-xs font-black text-foreground dark:text-white tabular-nums">{activeOverview.trueOrderCount}单</span>
+                              </div>
+                              <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                                {activeOverview.platformBreakdown?.truePlatformCounts && Object.keys(activeOverview.platformBreakdown.truePlatformCounts).length > 0 ? (
+                                  Object.entries(activeOverview.platformBreakdown.truePlatformCounts)
+                                    .sort((a, b) => b[1] - a[1])
+                                    .map(([platform, count]) => {
+                                      const meta = getPlatformBadgeMeta(platform);
+                                      return (
+                                        <div key={platform} className="inline-flex items-center gap-1 rounded-lg bg-black/[0.03] dark:bg-white/[0.05] border border-black/4 dark:border-white/6 px-2 py-0.5 text-[11px] text-foreground/90 dark:text-white/90">
+                                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                                          <img src={meta.iconSrc} alt={meta.iconAlt} className="h-3.5 w-3.5 object-contain shrink-0" onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                                          <span className="font-medium">{platform}</span>
+                                          <span className="font-bold text-foreground dark:text-white tabular-nums">{count}单</span>
+                                        </div>
+                                      );
+                                    })
+                                ) : (
+                                  <span className="text-muted-foreground/40 text-[11px] py-0.5">-</span>
+                                )}
+                              </div>
                             </div>
-                            <div className="flex flex-col gap-0.5 sm:gap-1 px-0.5">
-                              {activeOverview.platformBreakdown?.truePlatformCounts && Object.keys(activeOverview.platformBreakdown.truePlatformCounts).length > 0 ? (
-                                Object.entries(activeOverview.platformBreakdown.truePlatformCounts)
-                                  .sort((a, b) => b[1] - a[1])
-                                  .map(([platform, count]) => {
-                                  const meta = getPlatformBadgeMeta(platform);
-                                  return (
-                                    <div key={platform} className="flex items-center justify-between text-foreground/80 dark:text-white/80 text-[8.5px] sm:text-[9px] gap-1">
-                                      <span className="flex items-center gap-0.5 min-w-0 truncate">
-                                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                                        <img src={meta.iconSrc} alt={meta.iconAlt} className="h-2.5 w-2.5 sm:h-3 sm:w-3 object-contain shrink-0" onError={(e) => { e.currentTarget.style.display = "none"; }} />
-                                        <span className="truncate">{platform}</span>
-                                      </span>
-                                      <span className="shrink-0">{count}单</span>
-                                    </div>
-                                  );
-                                })
-                              ) : (
-                                <div className="text-muted-foreground/30 text-center py-0.5 text-[8.5px] sm:text-[9px]">-</div>
-                              )}
+
+                            {/* 桌面端垂直布局（sm: 及以上） */}
+                            <div className="hidden sm:flex sm:flex-col sm:gap-2">
+                              <div className="flex items-baseline justify-between border-b border-sky-500/15 pb-1.5 px-0.5 text-sky-600 dark:text-sky-300 font-bold text-[11px]">
+                                <span className="truncate tracking-wide">真单</span>
+                                <span className="text-[13px] font-black text-foreground dark:text-white shrink-0">{activeOverview.trueOrderCount}单</span>
+                              </div>
+                              <div className="flex flex-col gap-1.5 px-0.5 mt-0.5">
+                                {activeOverview.platformBreakdown?.truePlatformCounts && Object.keys(activeOverview.platformBreakdown.truePlatformCounts).length > 0 ? (
+                                  Object.entries(activeOverview.platformBreakdown.truePlatformCounts)
+                                    .sort((a, b) => b[1] - a[1])
+                                    .map(([platform, count]) => {
+                                    const meta = getPlatformBadgeMeta(platform);
+                                    return (
+                                      <div key={platform} className="flex items-center justify-between text-foreground/90 dark:text-white/90 text-[10px]">
+                                        <span className="flex items-center gap-1 min-w-0">
+                                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                                          <img src={meta.iconSrc} alt={meta.iconAlt} className="h-3.5 w-3.5 object-contain shrink-0" onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                                          <span className="truncate font-medium">{platform}</span>
+                                        </span>
+                                        <span className="shrink-0 font-semibold">{count}单</span>
+                                      </div>
+                                    );
+                                  })
+                                ) : (
+                                  <div className="text-muted-foreground/40 text-center py-1 text-[9px]">-</div>
+                                )}
+                              </div>
                             </div>
                           </div>
 
                           {/* 第二列：刷单 */}
-                          <div className="flex flex-col gap-1 sm:gap-1.5 min-w-0 rounded-xl bg-black/1.5 p-1.5 sm:p-0 dark:bg-white/1.5 sm:bg-transparent sm:dark:bg-transparent">
-                            <div className="flex items-center justify-between rounded-lg bg-rose-500/8 px-1 sm:px-1.5 py-0.5 text-rose-700 dark:bg-rose-500/12 dark:text-rose-400 font-medium text-[8.5px] sm:text-[9px]">
-                              <span className="truncate">刷单</span>
-                              <span className="shrink-0">{activeOverview.brushCount}单</span>
+                          <div className={cn(
+                            "flex flex-col gap-2 min-w-0 rounded-2xl bg-rose-500/5 border border-rose-500/12 p-2.5 sm:p-3 dark:bg-rose-500/8 dark:border-rose-500/15",
+                            activeOverview.brushCount === 0 && "hidden sm:flex"
+                          )}>
+                            {/* 移动端横向流式布局（< sm） */}
+                            <div className="flex flex-col gap-1.5 sm:hidden">
+                              <div className="flex items-baseline justify-between border-b border-rose-500/15 pb-1 px-0.5 text-rose-600 dark:text-rose-300 font-bold text-xs">
+                                <span className="tracking-wide">刷单</span>
+                                <span className="text-xs font-black text-foreground dark:text-white tabular-nums">{activeOverview.brushCount}单</span>
+                              </div>
+                              <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                                {activeOverview.platformBreakdown?.brushPlatformCounts && Object.keys(activeOverview.platformBreakdown.brushPlatformCounts).length > 0 ? (
+                                  Object.entries(activeOverview.platformBreakdown.brushPlatformCounts)
+                                    .sort((a, b) => b[1] - a[1])
+                                    .map(([platform, count]) => {
+                                      const meta = getPlatformBadgeMeta(platform);
+                                      return (
+                                        <div key={platform} className="inline-flex items-center gap-1 rounded-lg bg-black/[0.03] dark:bg-white/[0.05] border border-black/4 dark:border-white/6 px-2 py-0.5 text-[11px] text-foreground/90 dark:text-white/90">
+                                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                                          <img src={meta.iconSrc} alt={meta.iconAlt} className="h-3.5 w-3.5 object-contain shrink-0" onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                                          <span className="font-medium">{platform}</span>
+                                          <span className="font-bold text-foreground dark:text-white tabular-nums">{count}单</span>
+                                        </div>
+                                      );
+                                    })
+                                ) : (
+                                  <span className="text-muted-foreground/40 text-[11px] py-0.5">-</span>
+                                )}
+                              </div>
                             </div>
-                            <div className="flex flex-col gap-0.5 sm:gap-1 px-0.5">
-                              {activeOverview.platformBreakdown?.brushPlatformCounts && Object.keys(activeOverview.platformBreakdown.brushPlatformCounts).length > 0 ? (
-                                Object.entries(activeOverview.platformBreakdown.brushPlatformCounts)
-                                  .sort((a, b) => b[1] - a[1])
-                                  .map(([platform, count]) => {
-                                  const meta = getPlatformBadgeMeta(platform);
-                                  return (
-                                    <div key={platform} className="flex items-center justify-between text-foreground/80 dark:text-white/80 text-[8.5px] sm:text-[9px] gap-1">
-                                      <span className="flex items-center gap-0.5 min-w-0 truncate">
-                                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                                        <img src={meta.iconSrc} alt={meta.iconAlt} className="h-2.5 w-2.5 sm:h-3 sm:w-3 object-contain shrink-0" onError={(e) => { e.currentTarget.style.display = "none"; }} />
-                                        <span className="truncate">{platform}</span>
-                                      </span>
-                                      <span className="shrink-0">{count}单</span>
-                                    </div>
-                                  );
-                                })
-                              ) : (
-                                <div className="text-muted-foreground/30 text-center py-0.5 text-[8.5px] sm:text-[9px]">-</div>
-                              )}
+
+                            {/* 桌面端垂直布局（sm: 及以上） */}
+                            <div className="hidden sm:flex sm:flex-col sm:gap-2">
+                              <div className="flex items-baseline justify-between border-b border-rose-500/15 pb-1.5 px-0.5 text-rose-600 dark:text-rose-300 font-bold text-[11px]">
+                                <span className="truncate tracking-wide">刷单</span>
+                                <span className="text-[13px] font-black text-foreground dark:text-white shrink-0">{activeOverview.brushCount}单</span>
+                              </div>
+                              <div className="flex flex-col gap-1.5 px-0.5 mt-0.5">
+                                {activeOverview.platformBreakdown?.brushPlatformCounts && Object.keys(activeOverview.platformBreakdown.brushPlatformCounts).length > 0 ? (
+                                  Object.entries(activeOverview.platformBreakdown.brushPlatformCounts)
+                                    .sort((a, b) => b[1] - a[1])
+                                    .map(([platform, count]) => {
+                                    const meta = getPlatformBadgeMeta(platform);
+                                    return (
+                                      <div key={platform} className="flex items-center justify-between text-foreground/90 dark:text-white/90 text-[10px]">
+                                        <span className="flex items-center gap-1 min-w-0">
+                                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                                          <img src={meta.iconSrc} alt={meta.iconAlt} className="h-3.5 w-3.5 object-contain shrink-0" onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                                          <span className="truncate font-medium">{platform}</span>
+                                        </span>
+                                        <span className="shrink-0 font-semibold">{count}单</span>
+                                      </div>
+                                    );
+                                  })
+                                ) : (
+                                  <div className="text-muted-foreground/40 text-center py-1 text-[9px]">-</div>
+                                )}
+                              </div>
                             </div>
                           </div>
 
                           {/* 第三列：取消 */}
-                          <div className="flex flex-col gap-1 sm:gap-1.5 min-w-0 rounded-xl bg-black/1.5 p-1.5 sm:p-0 dark:bg-white/1.5 sm:bg-transparent sm:dark:bg-transparent">
-                            <div className="flex items-center justify-between rounded-lg bg-slate-500/8 px-1 sm:px-1.5 py-0.5 text-slate-600 dark:bg-slate-500/12 dark:text-slate-400 font-medium text-[8.5px] sm:text-[9px]">
-                              <span className="truncate">取消</span>
-                              <span className="shrink-0">{activeOverview.cancelledCount}单</span>
+                          <div className={cn(
+                            "flex flex-col gap-2 min-w-0 rounded-2xl bg-amber-500/5 border border-amber-500/12 p-2.5 sm:p-3 dark:bg-amber-500/8 dark:border-amber-500/15",
+                            activeOverview.cancelledCount === 0 && "hidden sm:flex"
+                          )}>
+                            {/* 移动端横向流式布局（< sm） */}
+                            <div className="flex flex-col gap-1.5 sm:hidden">
+                              <div className="flex items-baseline justify-between border-b border-amber-500/15 pb-1 px-0.5 text-amber-600 dark:text-amber-300 font-bold text-xs">
+                                <span className="tracking-wide">取消</span>
+                                <span className="text-xs font-black text-foreground dark:text-white tabular-nums">{activeOverview.cancelledCount}单</span>
+                              </div>
+                              <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                                {activeOverview.platformBreakdown?.cancelledPlatformCounts && Object.keys(activeOverview.platformBreakdown.cancelledPlatformCounts).length > 0 ? (
+                                  Object.entries(activeOverview.platformBreakdown.cancelledPlatformCounts)
+                                    .sort((a, b) => b[1] - a[1])
+                                    .map(([platform, count]) => {
+                                      const meta = getPlatformBadgeMeta(platform);
+                                      return (
+                                        <div key={platform} className="inline-flex items-center gap-1 rounded-lg bg-black/[0.03] dark:bg-white/[0.05] border border-black/4 dark:border-white/6 px-2 py-0.5 text-[11px] text-foreground/90 dark:text-white/90">
+                                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                                          <img src={meta.iconSrc} alt={meta.iconAlt} className="h-3.5 w-3.5 object-contain shrink-0" onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                                          <span className="font-medium">{platform}</span>
+                                          <span className="font-bold text-foreground dark:text-white tabular-nums">{count}单</span>
+                                        </div>
+                                      );
+                                    })
+                                ) : (
+                                  <span className="text-muted-foreground/40 text-[11px] py-0.5">-</span>
+                                )}
+                              </div>
                             </div>
-                            <div className="flex flex-col gap-0.5 sm:gap-1 px-0.5">
-                              {activeOverview.platformBreakdown?.cancelledPlatformCounts && Object.keys(activeOverview.platformBreakdown.cancelledPlatformCounts).length > 0 ? (
-                                Object.entries(activeOverview.platformBreakdown.cancelledPlatformCounts)
-                                  .sort((a, b) => b[1] - a[1])
-                                  .map(([platform, count]) => {
-                                  const meta = getPlatformBadgeMeta(platform);
-                                  return (
-                                    <div key={platform} className="flex items-center justify-between text-foreground/80 dark:text-white/80 text-[8.5px] sm:text-[9px] gap-1">
-                                      <span className="flex items-center gap-0.5 min-w-0 truncate">
-                                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                                        <img src={meta.iconSrc} alt={meta.iconAlt} className="h-2.5 w-2.5 sm:h-3 sm:w-3 object-contain shrink-0" onError={(e) => { e.currentTarget.style.display = "none"; }} />
-                                        <span className="truncate">{platform}</span>
-                                      </span>
-                                      <span className="shrink-0">{count}单</span>
-                                    </div>
-                                  );
-                                })
-                              ) : (
-                                <div className="text-muted-foreground/30 text-center py-0.5 text-[8.5px] sm:text-[9px]">-</div>
-                              )}
+
+                            {/* 桌面端垂直布局（sm: 及以上） */}
+                            <div className="hidden sm:flex sm:flex-col sm:gap-2">
+                              <div className="flex items-baseline justify-between border-b border-amber-500/15 pb-1.5 px-0.5 text-amber-600 dark:text-amber-300 font-bold text-[11px]">
+                                <span className="truncate tracking-wide">取消</span>
+                                <span className="text-[13px] font-black text-foreground dark:text-white shrink-0">{activeOverview.cancelledCount}单</span>
+                              </div>
+                              <div className="flex flex-col gap-1.5 px-0.5 mt-0.5">
+                                {activeOverview.platformBreakdown?.cancelledPlatformCounts && Object.keys(activeOverview.platformBreakdown.cancelledPlatformCounts).length > 0 ? (
+                                  Object.entries(activeOverview.platformBreakdown.cancelledPlatformCounts)
+                                    .sort((a, b) => b[1] - a[1])
+                                    .map(([platform, count]) => {
+                                    const meta = getPlatformBadgeMeta(platform);
+                                    return (
+                                      <div key={platform} className="flex items-center justify-between text-foreground/90 dark:text-white/90 text-[10px]">
+                                        <span className="flex items-center gap-1 min-w-0">
+                                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                                          <img src={meta.iconSrc} alt={meta.iconAlt} className="h-3.5 w-3.5 object-contain shrink-0" onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                                          <span className="truncate font-medium">{platform}</span>
+                                        </span>
+                                        <span className="shrink-0 font-semibold">{count}单</span>
+                                      </div>
+                                    );
+                                  })
+                                ) : (
+                                  <div className="text-muted-foreground/40 text-center py-1 text-[9px]">-</div>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -1151,10 +1551,10 @@ export function UserOrdersModal({
                     </div>
 
                     {/* 2. 平台纯利润分布卡片 */}
-                    <div className="group min-w-0 h-full rounded-[20px] border border-black/8 bg-white/76 px-3.5 py-3 sm:px-4 sm:py-3.5 text-left shadow-xs transition hover:border-emerald-400/40 hover:bg-emerald-50/60 focus:outline-none focus:ring-2 focus:ring-emerald-400/40 dark:border-white/10 dark:bg-white/5 dark:hover:border-emerald-300/35 dark:hover:bg-emerald-400/8 flex flex-col gap-2 sm:gap-2.5">
+                    <div className="group min-w-0 h-full rounded-[20px] border border-black/8 bg-white/76 px-4 py-3.5 text-left shadow-xs transition hover:border-emerald-400/40 hover:bg-emerald-50/60 dark:border-white/10 dark:bg-white/5 dark:hover:border-emerald-300/35 dark:hover:bg-emerald-400/8 flex flex-col gap-2.5">
                       <div className="flex flex-col w-full">
                         <div className="flex items-center justify-between sm:block">
-                          <div className="flex items-center justify-between text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
+                          <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
                             <span className="flex items-center gap-1.5">
                               <span>纯利润</span>
                               <Store className="h-3.5 w-3.5 opacity-0 transition group-hover:opacity-100" />
@@ -1172,7 +1572,7 @@ export function UserOrdersModal({
                             </button>
                           </div>
                           <div className={cn(
-                            "sm:hidden text-xl font-black leading-none tracking-tight",
+                            "sm:hidden text-[22px] font-bold leading-none tracking-tight",
                             activeSummary.pureProfit < 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"
                           )}>
                             {toCurrency(activeSummary.pureProfit || 0)}
@@ -1184,26 +1584,26 @@ export function UserOrdersModal({
                         )}>
                           {toCurrency(activeSummary.pureProfit || 0)}
                         </div>
-                        <div className="mt-1 text-[11px] sm:text-xs text-muted-foreground">
+                        <div className="mt-1.5 text-xs text-muted-foreground">
                           {activeTab === "all-orders" ? "当前筛选各平台纯利润汇总" : "今日各平台纯利润汇总"}
                         </div>
                       </div>
                       {activeSummary.platformProfit && Object.entries(activeSummary.platformProfit).some(([, info]) => info.amount !== 0) ? (
-                        <div className="flex flex-col gap-1.5 sm:gap-2 border-t border-black/4 pt-2.5 sm:pt-3 dark:border-white/5">
+                        <div className="grid grid-cols-2 gap-2 border-t border-black/4 pt-3 dark:border-white/5">
                           {Object.entries(activeSummary.platformProfit)
                             .sort((a, b) => b[1].amount - a[1].amount)
                             .map(([platform, info]) => {
                             if (info.amount === 0) return null;
                             const meta = getPlatformBadgeMeta(platform);
                             return (
-                              <div key={platform} className="flex items-center justify-between rounded-xl bg-black/1.5 px-2.5 py-1.5 sm:px-3 dark:bg-white/1.5 text-[10px] sm:text-[11px] text-foreground/80 dark:text-white/80">
-                                <span className="flex items-center gap-1.5 min-w-0">
+                              <div key={platform} className="flex items-center justify-between min-w-0 rounded-xl bg-black/1.5 px-2.5 py-1.5 dark:bg-white/1.5 text-[11px] text-foreground/80 dark:text-white/80">
+                                <span className="flex items-center gap-1.5 min-w-0 shrink">
                                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                                  <img src={meta.iconSrc} alt={meta.iconAlt} className="h-3 w-3 sm:h-3.5 sm:w-3.5 object-contain shrink-0" onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                                  <img src={meta.iconSrc} alt={meta.iconAlt} className="h-3.5 w-3.5 object-contain shrink-0" onError={(e) => { e.currentTarget.style.display = "none"; }} />
                                   <span className="truncate font-medium">{platform}</span>
                                 </span>
                                 <span className={cn(
-                                  "font-bold shrink-0",
+                                  "font-bold shrink-0 tabular-nums ml-1",
                                   info.amount < 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"
                                 )}>
                                   {toCurrency(info.amount)}
@@ -1215,30 +1615,55 @@ export function UserOrdersModal({
                       ) : null}
                     </div>
 
-                    {/* 3. 最右侧：总配送费与推广费 */}
-                    <div className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:flex lg:flex-col">
-                      <div className="min-w-0 rounded-[20px] border border-black/8 bg-white/76 px-3.5 py-3 sm:px-4 sm:py-3.5 shadow-xs dark:border-white/10 dark:bg-white/5 flex flex-col justify-between">
-                        <div>
-                          <div className="text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">总配送费</div>
-                          <div className="mt-1 sm:mt-2 text-lg sm:text-[26px] font-bold leading-none tracking-tight text-foreground">
+                    {/* 3. 总配送费 */}
+                    <div className="min-w-0 h-full rounded-[20px] border border-black/8 bg-white/76 px-4 py-3.5 shadow-xs dark:border-white/10 dark:bg-white/5 flex flex-col gap-2.5">
+                      <div className="flex flex-col w-full">
+                        <div className="flex items-center justify-between sm:block">
+                          <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">总配送费</div>
+                          <div className="sm:hidden text-[22px] font-bold leading-none tracking-tight text-foreground">
                             {toCurrency(activeSummary.totalDeliveryFee || 0)}
                           </div>
                         </div>
-                        <div className="mt-1 text-[10px] sm:text-xs text-muted-foreground">
+                        <div className="hidden sm:block mt-2 text-[26px] font-bold leading-none tracking-tight text-foreground">
+                          {toCurrency(activeSummary.totalDeliveryFee || 0)}
+                        </div>
+                        <div className="mt-1.5 text-xs text-muted-foreground">
                           {activeTab === "all-orders" ? "全部订单配送费汇总" : "今日订单汇总"}
                         </div>
                       </div>
+                      {activeSummary.platformDelivery && Object.keys(activeSummary.platformDelivery).length > 0 ? (
+                        <div className="grid grid-cols-2 gap-2 border-t border-black/4 pt-3 dark:border-white/5">
+                          {Object.entries(activeSummary.platformDelivery)
+                            .sort(([, a], [, b]) => b - a)
+                            .map(([platform, fee]) => {
+                              const meta = getPlatformBadgeMeta(platform);
+                              return (
+                                <div key={platform} className="flex items-center justify-between min-w-0 rounded-xl bg-black/1.5 px-2.5 py-1.5 dark:bg-white/1.5 text-[11px] text-foreground/80 dark:text-white/80">
+                                  <span className="flex items-center gap-1.5 min-w-0 shrink">
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img src={meta.iconSrc} alt={meta.iconAlt} className="h-3.5 w-3.5 object-contain shrink-0" onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                                    <span className="truncate font-medium">{platform}</span>
+                                  </span>
+                                  <span className="font-bold shrink-0 tabular-nums ml-1 text-foreground/90 dark:text-white/90">
+                                    {toCurrency(fee)}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                        </div>
+                      ) : null}
+                    </div>
 
-                      <div className="min-w-0 rounded-[20px] border border-black/8 bg-white/76 px-3.5 py-3 sm:px-4 sm:py-3.5 shadow-xs dark:border-white/10 dark:bg-white/5 flex flex-col justify-between">
-                        <div>
-                          <div className="text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">推广费</div>
-                          <div className="mt-1 sm:mt-2 text-lg sm:text-[26px] font-bold leading-none tracking-tight text-foreground">
-                            ¥0.00
-                          </div>
+                    {/* 4. 推广费 */}
+                    <div className="min-w-0 h-full rounded-[20px] border border-black/8 bg-white/76 px-4 py-3.5 shadow-xs dark:border-white/10 dark:bg-white/5 flex flex-col justify-between">
+                      <div>
+                        <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">推广费</div>
+                        <div className="mt-2 text-xl sm:text-[26px] font-bold leading-none tracking-tight text-foreground">
+                          ¥0.00
                         </div>
-                        <div className="mt-1 text-[10px] sm:text-xs text-muted-foreground">
-                          {activeTab === "all-orders" ? "推广费录入" : "今日推广费录入"}
-                        </div>
+                      </div>
+                      <div className="mt-1.5 text-xs text-muted-foreground">
+                        {activeTab === "all-orders" ? "全部订单推广费" : "今日推广费"}
                       </div>
                     </div>
                   </div>

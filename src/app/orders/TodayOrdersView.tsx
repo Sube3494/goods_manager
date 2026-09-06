@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowUp, Package2, Search, X, ChevronUp, ChevronDown } from "lucide-react";
+import { ArrowUp, Package2, Search, X, ChevronUp, ChevronDown, Loader2 } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -116,7 +116,66 @@ interface TodayOrdersViewProps {
   onShopChange?: (shop: string) => void;
 }
 
-const TODAY_TAB_PAGE_SIZE = 100;
+const TODAY_TAB_PAGE_SIZE = 40;
+
+type TodayCacheEntry = {
+  orders: AutoPickOrder[];
+  summary: {
+    receivedAmount: number;
+    platformCommission: number;
+    validOrderCount: number;
+    itemCount: number;
+    totalDeliveryFee: number;
+    platformReceived?: Record<string, { amount: number; count: number }>;
+    platformDelivery?: Record<string, number>;
+    pureProfit: number;
+    platformProfit?: Record<string, { amount: number; count: number }>;
+    shopProfit?: Record<string, ShopProfitInfo>;
+  };
+  overview: {
+    totalCount: number;
+    trueOrderCount: number;
+    brushCount: number;
+    cancelledCount: number;
+    platformBreakdown?: {
+      truePlatformCounts: Record<string, number>;
+      brushPlatformCounts: Record<string, number>;
+      cancelledPlatformCounts: Record<string, number>;
+    };
+  };
+  platforms: string[];
+  statuses: string[];
+  matchedShopOptions: Array<{ value: string; label: string }>;
+  timestamp: number;
+};
+
+const todayOrdersMemoryCache = new Map<string, TodayCacheEntry>();
+const CACHE_STALE_TIME = 5 * 60 * 1000; // 5分钟瞬时缓存有效期
+
+const defaultTodaySummary = {
+  receivedAmount: 0,
+  platformCommission: 0,
+  validOrderCount: 0,
+  itemCount: 0,
+  totalDeliveryFee: 0,
+  platformReceived: {},
+  platformDelivery: {},
+  pureProfit: 0,
+  platformProfit: {},
+  shopProfit: {},
+};
+
+const defaultTodayOverview = {
+  totalCount: 0,
+  trueOrderCount: 0,
+  brushCount: 0,
+  cancelledCount: 0,
+  platformBreakdown: {
+    truePlatformCounts: {},
+    brushPlatformCounts: {},
+    cancelledPlatformCounts: {},
+  },
+};
 
 export function TodayOrdersView({
   refreshTrigger,
@@ -131,56 +190,23 @@ export function TodayOrdersView({
   onShopChange,
 }: TodayOrdersViewProps) {
   const { showToast } = useToast();
-  const [orders, setOrders] = useState<AutoPickOrder[]>([]);
-  const [summary, setSummary] = useState<{
-    receivedAmount: number;
-    platformCommission: number;
-    validOrderCount: number;
-    itemCount: number;
-    totalDeliveryFee: number;
-    platformReceived?: Record<string, { amount: number; count: number }>;
-    platformDelivery?: Record<string, number>;
-    pureProfit: number;
-    platformProfit?: Record<string, { amount: number; count: number }>;
-    shopProfit?: Record<string, ShopProfitInfo>;
-  }>({
-    receivedAmount: 0,
-    platformCommission: 0,
-    validOrderCount: 0,
-    itemCount: 0,
-    totalDeliveryFee: 0,
-    platformReceived: {},
-    platformDelivery: {},
-    pureProfit: 0,
-    platformProfit: {},
-    shopProfit: {},
-  });
-  const [overview, setOverview] = useState<{
-    totalCount: number;
-    trueOrderCount: number;
-    brushCount: number;
-    cancelledCount: number;
-    platformBreakdown?: {
-      truePlatformCounts: Record<string, number>;
-      brushPlatformCounts: Record<string, number>;
-      cancelledPlatformCounts: Record<string, number>;
-    };
-  }>({
-    totalCount: 0,
-    trueOrderCount: 0,
-    brushCount: 0,
-    cancelledCount: 0,
-    platformBreakdown: {
-      truePlatformCounts: {},
-      brushPlatformCounts: {},
-      cancelledPlatformCounts: {},
-    },
-  });
-  const [platforms, setPlatforms] = useState<string[]>([]);
-  const [statuses, setStatuses] = useState<string[]>([]);
-  const [matchedShopOptions, setMatchedShopOptions] = useState<Array<{ value: string; label: string }>>([]);
+  const todayDate = useMemo(() => formatLocalDate(new Date()), []);
+  const cacheKey = `${userId || "self"}_${todayDate}`;
+  const initialCache = todayOrdersMemoryCache.get(cacheKey);
+  const hasValidCache = Boolean(initialCache && Date.now() - initialCache.timestamp < CACHE_STALE_TIME);
+
+  const [orders, setOrders] = useState<AutoPickOrder[]>(() => (hasValidCache && initialCache ? initialCache.orders : []));
+  const [summary, setSummary] = useState(() => (hasValidCache && initialCache ? initialCache.summary : defaultTodaySummary));
+  const [overview, setOverview] = useState(() => (hasValidCache && initialCache ? initialCache.overview : defaultTodayOverview));
+  const [platforms, setPlatforms] = useState<string[]>(() => (hasValidCache && initialCache ? initialCache.platforms : []));
+  const [statuses, setStatuses] = useState<string[]>(() => (hasValidCache && initialCache ? initialCache.statuses : []));
+  const [matchedShopOptions, setMatchedShopOptions] = useState<Array<{ value: string; label: string }>>(() => (hasValidCache && initialCache ? initialCache.matchedShopOptions : []));
   const [showScrollTop, setShowScrollTop] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(() => !hasValidCache);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const loadMoreTriggerRef = useRef<HTMLDivElement | null>(null);
   
   // 筛选状态
   const [query, setQuery] = useState("");
@@ -212,21 +238,23 @@ export function TodayOrdersView({
     setShop(shopFilterSignal.value);
   }, [shopFilterSignal?.nonce, shopFilterSignal?.value]);
 
-  const todayDate = useMemo(() => formatLocalDate(new Date()), []);
-
   // 1. 获取订单列表
-  const fetchOrders = useCallback(async (options?: { silent?: boolean; force?: boolean }) => {
+  const fetchOrders = useCallback(async (options?: { silent?: boolean; force?: boolean; append?: boolean; targetPage?: number }) => {
     if (isFetchingRef.current && !options?.force) return;
     isFetchingRef.current = true;
     
     const silent = Boolean(options?.silent);
-    if (!silent) {
+    const append = Boolean(options?.append);
+    const targetPage = options?.targetPage || 1;
+    if (append) {
+      setIsLoadingMore(true);
+    } else if (!silent) {
       setIsLoading(true);
     }
 
     try {
       const params = new URLSearchParams({
-        page: "1",
+        page: String(targetPage),
         pageSize: String(TODAY_TAB_PAGE_SIZE),
         startDate: todayDate,
         endDate: todayDate,
@@ -237,7 +265,11 @@ export function TodayOrdersView({
       if (status !== "all") params.set("status", status);
       if (shop !== "all") params.set("shop", shop);
       if (userId) params.set("userId", userId);
-      params.set("_metrics", "1");
+      if (append) {
+        params.set("_lite", "1");
+      } else {
+        params.set("_metrics", "1");
+      }
 
       const response = await fetch(`/api/orders?${params.toString()}`, { cache: "no-store" });
       const data = await response.json().catch(() => ({}));
@@ -247,29 +279,61 @@ export function TodayOrdersView({
       }
 
       const nextItems = Array.isArray(data.items) ? data.items : [];
-      setOrders(nextItems);
+      setOrders((current) => {
+        if (!append) return nextItems;
+        const seen = new Set(current.map((item) => item.id));
+        const merged = [...current];
+        for (const item of nextItems) {
+          if (!seen.has(item.id)) {
+            merged.push(item);
+          }
+        }
+        return merged;
+      });
 
-      if (Array.isArray(data.filters?.platforms)) {
-        setPlatforms(Array.from(new Set(data.filters.platforms.map(normalizeDisplayPlatform))));
-      }
-      if (Array.isArray(data.filters?.statuses)) setStatuses(data.filters.statuses);
-      if (Array.isArray(data.filters?.shops)) {
-        setMatchedShopOptions(
-          data.filters.shops
+      setCurrentPage(targetPage);
+      const totalCount = typeof data.total === "number" ? data.total : (data.meta?.total || nextItems.length);
+      setHasMore(targetPage * TODAY_TAB_PAGE_SIZE < totalCount);
+
+      const nextPlatforms: string[] = Array.isArray(data.filters?.platforms)
+        ? Array.from(new Set(data.filters.platforms.map((p: unknown) => normalizeDisplayPlatform(String(p || "")))))
+        : [];
+      if (nextPlatforms.length > 0) setPlatforms(nextPlatforms);
+
+      const nextStatuses = Array.isArray(data.filters?.statuses) ? data.filters.statuses : [];
+      if (nextStatuses.length > 0) setStatuses(nextStatuses);
+
+      const nextShops = Array.isArray(data.filters?.shops)
+        ? data.filters.shops
             .map((item: { value?: unknown; label?: unknown }) => ({
               value: String(item.value || "").trim(),
               label: String(item.label || item.value || "").trim(),
             }))
             .filter((item: { value: string; label: string }) => item.value && item.label)
-        );
-      }
+        : [];
+      if (nextShops.length > 0) setMatchedShopOptions(nextShops);
+
       if (data.summary) setSummary(data.summary);
       if (data.overview) setOverview(data.overview);
-      if (onDataLoadRef.current) {
+
+      // 在默认无特定过滤且第一页时更新瞬时内存缓存
+      if (!append && !query.trim() && platform === "all" && status === "all" && shop === "all") {
+        todayOrdersMemoryCache.set(cacheKey, {
+          orders: nextItems,
+          summary: data.summary || defaultTodaySummary,
+          overview: data.overview || defaultTodayOverview,
+          platforms: nextPlatforms,
+          statuses: nextStatuses,
+          matchedShopOptions: nextShops,
+          timestamp: Date.now(),
+        });
+      }
+
+      if (onDataLoadRef.current && !append) {
         onDataLoadRef.current({
-          summary: data.summary || { receivedAmount: 0, platformCommission: 0, validOrderCount: 0, itemCount: 0, totalDeliveryFee: 0, pureProfit: 0 },
-          overview: data.overview || { totalCount: 0, trueOrderCount: 0, brushCount: 0, cancelledCount: 0 },
-          total: typeof data.total === "number" ? data.total : nextItems.length,
+          summary: data.summary || defaultTodaySummary,
+          overview: data.overview || defaultTodayOverview,
+          total: totalCount,
           eligibleBrushSyncOrders: [],
           isLoading: false,
         });
@@ -281,20 +345,67 @@ export function TodayOrdersView({
     } finally {
       isFetchingRef.current = false;
       setIsLoading(false);
+      setIsLoadingMore(false);
     }
-  }, [platform, query, shop, status, todayDate, showToast, userId]);
+  }, [platform, query, shop, status, todayDate, showToast, userId, cacheKey]);
 
   const handleRefreshOrder = useCallback(() => {
     void fetchOrders({ silent: true, force: true });
   }, [fetchOrders]);
 
+  const handleLoadMore = useCallback(() => {
+    if (isFetchingRef.current || isLoadingMore || !hasMore) return;
+    void fetchOrders({ append: true, targetPage: currentPage + 1 });
+  }, [currentPage, fetchOrders, hasMore, isLoadingMore]);
+
+  // 触底无限加载监听
+  useEffect(() => {
+    const triggerEl = loadMoreTriggerRef.current;
+    if (!triggerEl || !hasMore || isLoadingMore) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const [entry] = entries;
+        if (entry && entry.isIntersecting) {
+          handleLoadMore();
+        }
+      },
+      { rootMargin: "300px" }
+    );
+
+    observer.observe(triggerEl);
+    return () => observer.disconnect();
+  }, [handleLoadMore, hasMore, isLoadingMore]);
+
+  // 组件挂载时先将缓存指标直出给父组件，实现 0ms 骨架屏秒开
+  useEffect(() => {
+    if (hasValidCache && initialCache && onDataLoadRef.current) {
+      onDataLoadRef.current({
+        summary: initialCache.summary,
+        overview: initialCache.overview,
+        total: initialCache.orders.length,
+        eligibleBrushSyncOrders: [],
+        isLoading: false,
+      });
+    }
+  }, []); // 仅在挂载时直出一次
+
+  const isInitialMountRef = useRef(true);
+
   // 外部刷新信号监听
   useEffect(() => {
-    void fetchOrders();
+    if (refreshTrigger > 0) {
+      void fetchOrders({ force: true });
+    }
   }, [refreshTrigger, fetchOrders]);
 
-  // 选项联动加载
+  // 筛选项变动或首次加载（初次有缓存时 silent 静默对齐）
   useEffect(() => {
+    if (isInitialMountRef.current) {
+      isInitialMountRef.current = false;
+      void fetchOrders({ silent: hasValidCache });
+      return;
+    }
     void fetchOrders();
   }, [platform, query, shop, status, fetchOrders]);
 
@@ -862,6 +973,29 @@ export function TodayOrdersView({
                     </div>
                   )}
                 </section>
+              )}
+
+              {/* 触底加载更多触发区域与状态指示 */}
+              {hasMore && (
+                <div
+                  ref={loadMoreTriggerRef}
+                  className="flex items-center justify-center py-6 text-xs text-muted-foreground"
+                >
+                  {isLoadingMore ? (
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                      <span>正在加载更多今日订单...</span>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleLoadMore}
+                      className="rounded-full border border-black/8 bg-white/76 px-4 py-2 text-xs font-medium text-muted-foreground transition hover:bg-black/5 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10"
+                    >
+                      向下滚动或点击加载更多
+                    </button>
+                  )}
+                </div>
               )}
             </motion.div>
           )}

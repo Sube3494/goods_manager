@@ -2056,15 +2056,22 @@ export async function GET(request: NextRequest) {
             cancelledPlatformCounts,
           },
         };
-    await backfillJdSkuIdForManualMatchedShopProducts(prisma, targetUserId);
-    await backfillMeituanSkuIdForManualMatchedShopProducts(prisma, targetUserId);
-    await Promise.all(
-      responseOrders
-        .filter((order) => isMeituanPlatform(order.platform) || isJDPlatform(order.platform) || isTaobaoPlatform(order.platform))
-        .map((order) => backfillPlatformIdsForSyncedAutoPickOrder(targetUserId, order.id).catch((error) => {
-          console.warn("[orders/route] 忽略当前页平台 SKU 自动回填失败:", error);
-        }))
-    );
+    // 异步后台静默回填平台 SKU，不阻塞用户查询主干道响应
+    void (async () => {
+      try {
+        await backfillJdSkuIdForManualMatchedShopProducts(prisma, targetUserId);
+        await backfillMeituanSkuIdForManualMatchedShopProducts(prisma, targetUserId);
+        await Promise.all(
+          responseOrders
+            .filter((order) => isMeituanPlatform(order.platform) || isJDPlatform(order.platform) || isTaobaoPlatform(order.platform))
+            .map((order) => backfillPlatformIdsForSyncedAutoPickOrder(targetUserId, order.id).catch((error) => {
+              console.warn("[orders/route] 忽略当前页平台 SKU 自动回填失败:", error);
+            }))
+        );
+      } catch (err) {
+        console.warn("[orders/route] 后台回填任务异常:", err);
+      }
+    })();
 
     const productNames = Array.from(new Set(
       responseOrders.flatMap((order) => order.items.map((item) => String(item.productName || "").trim()).filter(Boolean))
