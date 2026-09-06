@@ -24,6 +24,7 @@ import {
   isAutoPickOrderCancelledStatus,
   isAutoPickOrderCompletedStatus,
   isAutoPickOrderDeliveringStatus,
+  readDeliveryFeeFromValue,
   readMainSystemSelfDeliveryFlag,
 } from "@/lib/autoPickOrderStatus";
 
@@ -174,24 +175,33 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
       ? false
       : readMainSystemSelfDeliveryFlag(refreshedOrder.rawPayload, refreshedOrder.delivery);
 
-    const syncedOrder = {
-      ...refreshedOrder,
-      isMainSystemSelfDelivery,
-      expectedIncome: computedExpectedIncome,
-      platformCommission: computedPlatformCommission,
-      completedAt: normalized?.completedAt || null,
-      customerName: readCustomerNameFromRawPayload(refreshedOrder.rawPayload),
-      customerPhone: readCustomerPhoneFromRawPayload(refreshedOrder.rawPayload),
-      customerMaskedPhone: readCustomerMaskedPhoneFromRawPayload(refreshedOrder.rawPayload),
-      customerPhoneExtension: readCustomerPhoneExtensionFromRawPayload(refreshedOrder.rawPayload),
-      customerType,
-      delivery: refreshedOrder.delivery && typeof refreshedOrder.delivery === "object"
+      const computedSendFee = readDeliveryFeeFromValue(refreshedOrder.delivery, refreshedOrder.rawPayload);
+      const deliveryRecord = refreshedOrder.delivery && typeof refreshedOrder.delivery === "object"
+        ? (refreshedOrder.delivery as Record<string, unknown>)
+        : null;
+      const syncedDelivery = deliveryRecord
         ? {
-            ...(refreshedOrder.delivery as Record<string, unknown>),
+            ...deliveryRecord,
+            sendFee: isMainSystemSelfDelivery
+              ? 0
+              : (computedSendFee > 0 ? computedSendFee : deliveryRecord.sendFee),
             riderPhone: readRiderPhoneFromDelivery(refreshedOrder.delivery) || readRiderPhoneFromRawPayload(refreshedOrder.rawPayload) || undefined,
           }
-        : refreshedOrder.delivery,
-    };
+        : refreshedOrder.delivery;
+
+      const syncedOrder = {
+        ...refreshedOrder,
+        isMainSystemSelfDelivery,
+        expectedIncome: computedExpectedIncome,
+        platformCommission: computedPlatformCommission,
+        completedAt: normalized?.completedAt || null,
+        customerName: readCustomerNameFromRawPayload(refreshedOrder.rawPayload),
+        customerPhone: readCustomerPhoneFromRawPayload(refreshedOrder.rawPayload),
+        customerMaskedPhone: readCustomerMaskedPhoneFromRawPayload(refreshedOrder.rawPayload),
+        customerPhoneExtension: readCustomerPhoneExtensionFromRawPayload(refreshedOrder.rawPayload),
+        customerType,
+        delivery: syncedDelivery,
+      };
 
     return NextResponse.json({
       ok: true,

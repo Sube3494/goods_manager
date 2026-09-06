@@ -469,24 +469,103 @@ export function isSelfDeliveryOrCancelledDelivery(delivery: unknown, rawPayloadO
   return false;
 }
 
+export function parseDeliveryFeeToCents(rawValue: unknown): number {
+  if (rawValue == null || rawValue === "") return 0;
+  const num = Number(rawValue);
+  if (!Number.isFinite(num) || num <= 0) return 0;
+
+  // 若带小数点（如 5.50、6.5 元）或为浮点数，转为分
+  if (String(rawValue).includes(".") || !Number.isInteger(num)) {
+    return Math.round(num * 100);
+  }
+  // 麦芽田跑腿同城配送费多为 2~50 元整数区间，若小于 50 的正整数判定为元，转为分
+  if (num > 0 && num < 50) {
+    return Math.round(num * 100);
+  }
+  return Math.round(num);
+}
+
 export function readDeliveryFeeFromValue(delivery: unknown, rawPayloadOrFlag?: unknown) {
   if (isSelfDeliveryOrCancelledDelivery(delivery, rawPayloadOrFlag)) {
     return 0;
   }
-  if (!delivery || typeof delivery !== "object" || Array.isArray(delivery)) {
-    return 0;
+
+  const deliveryObj = (delivery && typeof delivery === "object" && !Array.isArray(delivery))
+    ? delivery as Record<string, unknown>
+    : null;
+
+  const rawObj = (rawPayloadOrFlag && typeof rawPayloadOrFlag === "object" && !Array.isArray(rawPayloadOrFlag))
+    ? rawPayloadOrFlag as Record<string, unknown>
+    : null;
+
+  const rawDelivery = (rawObj?.delivery && typeof rawObj.delivery === "object" && !Array.isArray(rawObj.delivery))
+    ? rawObj.delivery as Record<string, unknown>
+    : null;
+
+  const rawFeeObj = (rawObj?.fee && typeof rawObj.fee === "object" && !Array.isArray(rawObj.fee))
+    ? rawObj.fee as Record<string, unknown>
+    : null;
+
+  // 1. 优先提取基础配送费（支持麦芽田各类即时跑腿运力字段及不同挂载层级）
+  const candidates = [
+    deliveryObj?.sendFee,
+    deliveryObj?.send_fee,
+    deliveryObj?.delivery_fee,
+    deliveryObj?.deliveryFee,
+    deliveryObj?.carrier_fee,
+    deliveryObj?.carrierFee,
+    deliveryObj?.actual_fee,
+    deliveryObj?.actualFee,
+    deliveryObj?.pay_fee,
+    deliveryObj?.payFee,
+    deliveryObj?.total_fee,
+    deliveryObj?.fee,
+    deliveryObj?.money,
+    deliveryObj?.price,
+    rawDelivery?.sendFee,
+    rawDelivery?.send_fee,
+    rawDelivery?.delivery_fee,
+    rawDelivery?.deliveryFee,
+    rawDelivery?.carrier_fee,
+    rawDelivery?.carrierFee,
+    rawDelivery?.actual_fee,
+    rawDelivery?.actualFee,
+    rawDelivery?.pay_fee,
+    rawDelivery?.payFee,
+    rawDelivery?.total_fee,
+    rawDelivery?.fee,
+    rawDelivery?.money,
+    rawDelivery?.price,
+    rawObj?.delivery_fee,
+    rawObj?.deliveryFee,
+    rawObj?.send_fee,
+    rawObj?.sendFee,
+    rawObj?.shipping_fee,
+    rawObj?.shippingFee,
+    rawFeeObj?.delivery_fee,
+    rawFeeObj?.deliveryFee,
+    rawFeeObj?.send_fee,
+    rawFeeObj?.sendFee,
+    rawFeeObj?.shipping_fee,
+  ];
+
+  let baseFee = 0;
+  for (const candidate of candidates) {
+    const parsed = parseDeliveryFeeToCents(candidate);
+    if (parsed > 0) {
+      baseFee = parsed;
+      break;
+    }
   }
-  const d = delivery as Record<string, unknown>;
-  const rawFee = d.sendFee ?? d.send_fee ?? d.delivery_fee ?? d.fee;
-  const num = Number(rawFee ?? 0);
-  if (!Number.isFinite(num) || num <= 0) {
-    return 0;
-  }
-  // 若带小数点（如 23.62 元）或小数，自动转换为分单位
-  if (String(rawFee).includes(".") || (num < 100 && !Number.isInteger(num))) {
-    return Math.round(num * 100);
-  }
-  return Math.round(num);
+
+  // 2. 累加骑手小费/加价（tip）与动态溢价（premium_fee）
+  const tip = parseDeliveryFeeToCents(deliveryObj?.tip ?? rawDelivery?.tip ?? rawObj?.tip);
+  const premiumFee = parseDeliveryFeeToCents(
+    deliveryObj?.premium_fee ?? deliveryObj?.premiumFee ?? rawDelivery?.premium_fee ?? rawDelivery?.premiumFee
+  );
+
+  const totalFee = baseFee + tip + premiumFee;
+  return totalFee > 0 ? totalFee : 0;
 }
 
 export function readMainSystemSelfDeliveryFlag(rawPayload: unknown, delivery?: unknown): boolean {

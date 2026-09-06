@@ -38,6 +38,7 @@ import {
   isAutoPickOrderRiderAssigned,
   isAutoPickOrderTerminalStatus,
   isSelfDeliveryOrCancelledDelivery,
+  readDeliveryFeeFromValue,
 } from "@/lib/autoPickOrderStatus";
 import { formatLocalDate, formatLocalDateTime } from "@/lib/dateUtils";
 
@@ -200,15 +201,11 @@ export function getExpectedIncome(
   return paid - commission;
 }
 
-export function getDeliveryFee(delivery: unknown, order?: { isMainSystemSelfDelivery?: boolean } | null) {
-  if (isSelfDeliveryOrCancelledDelivery(delivery, order?.isMainSystemSelfDelivery)) {
+export function getDeliveryFee(delivery: unknown, order?: { isMainSystemSelfDelivery?: boolean; rawPayload?: unknown } | null) {
+  if (isSelfDeliveryOrCancelledDelivery(delivery, order?.rawPayload ?? order?.isMainSystemSelfDelivery)) {
     return 0;
   }
-  if (!delivery || typeof delivery !== "object" || Array.isArray(delivery)) {
-    return 0;
-  }
-  const value = Number((delivery as Record<string, unknown>).sendFee || 0);
-  return Number.isFinite(value) ? Math.max(0, value) : 0;
+  return readDeliveryFeeFromValue(delivery, order?.rawPayload ?? order?.isMainSystemSelfDelivery);
 }
 
 export function summarizeOrders(orders: AutoPickOrder[]) {
@@ -1325,9 +1322,9 @@ export function StatusBadge({ order }: { order: Pick<AutoPickOrder, "isPickup" |
     <span className="group/status relative inline-flex">
       <span
         title={cancelReason || undefined}
-        className={cn("inline-flex h-7 items-center gap-1 rounded-full border px-1.5 text-[10px] font-black sm:h-8 sm:gap-2 sm:px-3 sm:text-xs", tone.badge)}
+        className={cn("inline-flex h-7 items-center gap-1.5 rounded-full border px-2 text-[11px] font-medium leading-none sm:h-8 sm:gap-1.5 sm:px-2.5 sm:text-[13px]", tone.badge)}
       >
-        <span className={cn("h-1 w-1 rounded-full sm:h-2 sm:w-2", tone.dot)} />
+        <span className={cn("h-1.5 w-1.5 rounded-full shrink-0", tone.dot)} />
         {display}
       </span>
       {cancelReason ? (
@@ -1928,7 +1925,7 @@ export function ProductStripItem({
             <span className="shrink-0">x{display.quantity}</span>
             {showMatchStatus ? (
               <span className={cn(
-                "inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none whitespace-nowrap",
+                "inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[10px] font-medium leading-none whitespace-nowrap sm:text-[11px]",
                 (matchedProduct as any)?.ignoreOutbound
                   ? "bg-slate-500/10 text-slate-700 dark:text-slate-400"
                   : matchedProduct
@@ -1941,7 +1938,7 @@ export function ProductStripItem({
             </span>
           ) : null}
           {platformSourceLabel && display.sourceId ? (
-            <span className="inline-flex shrink-0 items-center font-mono text-[10px] font-normal text-amber-700 dark:text-amber-300 bg-amber-500/10 dark:bg-amber-500/20 px-1.5 py-0.5 rounded border border-amber-500/20 leading-none whitespace-nowrap">
+            <span className="inline-flex shrink-0 items-center font-mono text-[10px] font-normal text-amber-700 dark:text-amber-300 bg-amber-500/10 dark:bg-amber-500/20 px-2 py-0.5 rounded-full border border-amber-500/20 leading-none whitespace-nowrap sm:text-[11px]">
               <span className="hidden sm:inline">{platformSourceLabel}:&nbsp;</span>
               <span className="sm:hidden">{platformSourceShortLabel}:&nbsp;</span>
               {display.sourceId}
@@ -1949,7 +1946,7 @@ export function ProductStripItem({
           ) : null}
           {returnedQuantity > 0 ? (
             <span
-              className="relative group inline-flex cursor-help items-center rounded-full border border-amber-500/15 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-bold leading-none text-amber-700 dark:text-amber-300"
+              className="relative group inline-flex cursor-help items-center rounded-full border border-amber-500/15 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium leading-none text-amber-700 dark:text-amber-300 sm:text-[11px]"
             >
               已退{returnedQuantity > 1 ? ` x${returnedQuantity}` : ""}
               {returnedDetails && returnedDetails.length > 0 && (
@@ -1973,12 +1970,12 @@ export function ProductStripItem({
                       {(Number(detail.refundAmount) > 0 || Number(detail.extraExpense) > 0) && (
                         <div className="flex flex-wrap gap-1 mt-0.5">
                           {Number(detail.refundAmount) > 0 && (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-rose-500/10 text-[9px] font-semibold text-rose-600 dark:text-rose-400 whitespace-nowrap">
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-rose-500/10 text-[9px] font-semibold text-rose-600 dark:text-rose-400 whitespace-nowrap">
                               退款 ¥{(Number(detail.refundAmount) / 100).toFixed(2)}
                             </span>
                           )}
                           {Number(detail.extraExpense) > 0 && (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-amber-500/10 text-[9px] font-semibold text-amber-600 dark:text-amber-400 whitespace-nowrap">
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-amber-500/10 text-[9px] font-semibold text-amber-600 dark:text-amber-400 whitespace-nowrap">
                               支出 ¥{(Number(detail.extraExpense) / 100).toFixed(2)}
                             </span>
                           )}
@@ -1999,7 +1996,7 @@ export function ProductStripItem({
           <button
             type="button"
             onClick={onEditMatch}
-            className="inline-flex h-8 shrink-0 items-center justify-center rounded-xl border border-black/8 bg-white/85 px-2.5 text-[11px] font-bold text-foreground transition-all hover:border-black/12 hover:bg-zinc-100 dark:border-white/10 dark:bg-white/6 dark:text-white dark:hover:border-white/20 dark:hover:bg-white/14"
+            className="inline-flex h-7 sm:h-8 shrink-0 items-center justify-center rounded-full border border-black/8 bg-white/85 px-2 text-[11px] font-medium text-foreground transition-all hover:border-black/12 hover:bg-zinc-100 dark:border-white/10 dark:bg-white/6 dark:text-white dark:hover:border-white/20 dark:hover:bg-white/14 sm:px-2.5 sm:text-[13px] cursor-pointer"
           >
             改匹配
           </button>
@@ -2064,11 +2061,11 @@ export function ActionButton({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-2xl px-3 text-xs font-medium transition-all disabled:cursor-not-allowed disabled:opacity-50 sm:h-10 sm:gap-2 sm:px-4",
-        mobileIconOnly && "aspect-square px-0 sm:aspect-auto sm:px-4",
+        "inline-flex h-7 sm:h-8 items-center justify-center gap-1.5 rounded-full px-2.5 sm:px-3.5 text-[11px] sm:text-[13px] font-medium transition-all disabled:cursor-not-allowed disabled:opacity-50 whitespace-nowrap cursor-pointer",
+        mobileIconOnly && "aspect-square px-0 sm:aspect-auto sm:px-3.5",
         variant === "primary"
-          ? "bg-foreground text-background hover:opacity-90 dark:bg-white dark:text-black"
-          : "border border-black/8 bg-white/85 text-foreground hover:bg-white dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8"
+          ? "bg-foreground text-background hover:opacity-90 dark:bg-white dark:text-black shadow-xs"
+          : "border border-black/8 bg-white/85 text-foreground hover:bg-white dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8 shadow-xs"
       )}
     >
       {icon}
@@ -2301,10 +2298,16 @@ export const OrderCard = memo(function OrderCard({
   const terminal = isTerminalStatus(order.status);
   const abnormal = isAbnormalStatus(order.status);
   const deliveryFee = getDeliveryFee(order.delivery, order);
-  const isSelfDeliveryOrCancelled = isSelfDeliveryOrCancelledDelivery(order.delivery, order.isMainSystemSelfDelivery);
+  const isSelfDeliveryOrCancelled = isSelfDeliveryOrCancelledDelivery(order.delivery, order.rawPayload ?? order.isMainSystemSelfDelivery);
   const effectiveSendFee = isSelfDeliveryOrCancelled
     ? 0
-    : (order.delivery?.sendFee != null ? Number(order.delivery.sendFee) : null);
+    : (() => {
+        const fee = readDeliveryFeeFromValue(order.delivery, order.rawPayload);
+        if (fee > 0) return fee;
+        const fallbackFee = Number((order.delivery as Record<string, unknown> | undefined)?.sendFee);
+        if (Number.isFinite(fallbackFee) && fallbackFee > 0) return fallbackFee;
+        return null;
+      })();
   const hasDeliveryAddress = Boolean(String(order.userAddress || "").trim());
   const isPureOffline = isPureManualOfflineOrder(order);
   const [routeOpen, setRouteOpen] = useState(false);
@@ -2524,7 +2527,7 @@ export const OrderCard = memo(function OrderCard({
             <div className="flex flex-col gap-2.5 sm:gap-3">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                 <div className="flex min-w-0 flex-wrap items-center gap-1 sm:gap-2">
-                  <span className="inline-flex h-7 items-center gap-0.5 rounded-full border border-black/8 bg-black/3 pl-1 pr-1.5 text-foreground dark:border-white/10 dark:bg-white/4 sm:h-8 sm:gap-1.5 sm:pl-2 sm:pr-2.5">
+                  <span className="inline-flex h-7 items-center gap-1 rounded-full border border-black/8 bg-black/3 px-1.5 text-foreground dark:border-white/10 dark:bg-white/4 sm:h-8 sm:gap-1.5 sm:px-2.5">
                     <span className="inline-flex h-4 w-4 items-center justify-center sm:h-5 sm:w-5">
                       <Image
                         src={platformMeta.iconSrc}
@@ -2535,7 +2538,7 @@ export const OrderCard = memo(function OrderCard({
                         unoptimized
                       />
                     </span>
-                    <span className="pr-0.5 text-[12px] font-semibold leading-none tracking-tight sm:text-[15px]">#{order.dailyPlatformSequence || 0}</span>
+                    <span className="pr-0.5 text-[12px] font-bold leading-none tracking-tight sm:text-[13px]">#{order.dailyPlatformSequence || 0}</span>
                   </span>
                   <button
                     type="button"
@@ -2544,22 +2547,22 @@ export const OrderCard = memo(function OrderCard({
                       setIsShopEditorOpen(true);
                     }}
                     title="点击修改订单归属门店"
-                    className="inline-flex h-7 min-w-0 max-w-[calc(100vw-10rem)] items-center rounded-full border border-black/8 bg-black/3 px-1.5 text-[11px] font-medium leading-none text-muted-foreground transition-colors hover:border-sky-500/30 hover:bg-sky-500/10 hover:text-sky-600 dark:border-white/10 dark:bg-white/4 dark:hover:border-sky-400/30 dark:hover:bg-sky-500/15 dark:hover:text-sky-300 sm:h-8 sm:max-w-55 sm:px-2.5 sm:text-[13px]"
+                    className="inline-flex h-7 min-w-0 max-w-[calc(100vw-10rem)] items-center rounded-full border border-black/8 bg-black/3 px-2 text-[11px] font-medium leading-none text-muted-foreground transition-colors hover:border-sky-500/30 hover:bg-sky-500/10 hover:text-sky-600 dark:border-white/10 dark:bg-white/4 dark:hover:border-sky-400/30 dark:hover:bg-sky-500/15 dark:hover:text-sky-300 sm:h-8 sm:max-w-55 sm:px-2.5 sm:text-[13px]"
                   >
                     <span className="truncate">{sourceLabel || "+ 绑定门店"}</span>
                   </button>
                   {orderTypeLabel ? (
-                    <span className="inline-flex h-7 items-center rounded-full border border-violet-500/15 bg-violet-500/10 px-1.5 text-[11px] font-medium leading-none text-violet-700 dark:text-violet-400 sm:h-8 sm:px-2.5 sm:text-[13px]">
+                    <span className="inline-flex h-7 items-center rounded-full border border-violet-500/15 bg-violet-500/10 px-2 text-[11px] font-medium leading-none text-violet-700 dark:text-violet-400 sm:h-8 sm:px-2.5 sm:text-[13px]">
                       {orderTypeLabel}
                     </span>
                   ) : null}
                   {pickup && !displayAsOfflineOrder ? (
-                    <span className="inline-flex h-7 items-center rounded-full border border-sky-500/15 bg-sky-500/10 px-1.5 text-[11px] font-medium leading-none text-sky-700 dark:text-sky-400 sm:h-8 sm:px-2.5 sm:text-[13px]">
+                    <span className="inline-flex h-7 items-center rounded-full border border-sky-500/15 bg-sky-500/10 px-2 text-[11px] font-medium leading-none text-sky-700 dark:text-sky-400 sm:h-8 sm:px-2.5 sm:text-[13px]">
                       到店自取
                     </span>
                   ) : null}
                   {showBrushMarker ? (
-                    <span className="inline-flex h-7 items-center rounded-full border border-rose-500/15 bg-rose-500/10 px-1.5 text-[11px] font-medium leading-none text-rose-700 dark:text-rose-400 sm:h-8 sm:px-2.5 sm:text-[13px]">
+                    <span className="inline-flex h-7 items-center rounded-full border border-rose-500/15 bg-rose-500/10 px-2 text-[11px] font-medium leading-none text-rose-700 dark:text-rose-400 sm:h-8 sm:px-2.5 sm:text-[13px]">
                       刷单
                     </span>
                   ) : null}
@@ -2616,7 +2619,7 @@ export const OrderCard = memo(function OrderCard({
                         }}
                         disabled={actingId === `${order.id}:outbound`}
                         className={cn(
-                          "group/outbound-btn inline-flex h-7 items-center gap-1 rounded-full border px-1.5 text-[10px] font-black leading-none cursor-pointer transition-all duration-150 active:opacity-80 sm:h-8 sm:gap-2 sm:px-3 sm:text-xs",
+                          "group/outbound-btn inline-flex h-7 items-center gap-1 rounded-full border px-2 text-[11px] font-medium leading-none cursor-pointer transition-all duration-150 active:opacity-80 sm:h-8 sm:gap-1.5 sm:px-2.5 sm:text-[13px]",
                           "border-rose-500/25 bg-rose-500/10 text-rose-700 hover:border-rose-500/40 hover:bg-rose-500/15 dark:text-rose-400",
                           "disabled:cursor-not-allowed disabled:opacity-60"
                         )}
@@ -2624,7 +2627,7 @@ export const OrderCard = memo(function OrderCard({
                         {actingId === `${order.id}:outbound` ? (
                           <Loader2 className="h-2.5 w-2.5 sm:h-3 sm:w-3 animate-spin text-rose-500 shrink-0" />
                         ) : (
-                          <span className="h-1 w-1 rounded-full bg-rose-500 sm:h-2 sm:w-2 shrink-0" />
+                          <span className="h-1.5 w-1.5 rounded-full bg-rose-500 shrink-0" />
                         )}
                         <span>{actingId === `${order.id}:outbound` ? "处理中..." : "出库待处理"}</span>
                       </button>
@@ -2655,7 +2658,7 @@ export const OrderCard = memo(function OrderCard({
                   {hasRefundAmount ? (
                     <span
                       title="出库退款金额"
-                      className="inline-flex h-7 min-w-0 items-center gap-0.5 rounded-full border border-rose-500/15 bg-rose-500/10 px-1.5 text-[11px] font-medium leading-none text-rose-700 dark:text-rose-400 sm:h-8 sm:gap-1.5 sm:px-2.5 sm:text-[13px]"
+                      className="inline-flex h-7 min-w-0 items-center gap-1 rounded-full border border-rose-500/15 bg-rose-500/10 px-2 text-[11px] font-medium leading-none text-rose-700 dark:text-rose-400 sm:h-8 sm:gap-1.5 sm:px-2.5 sm:text-[13px]"
                     >
                       <span className="shrink-0">已退款</span>
                       <span className="truncate font-semibold">{toCurrency(refundAmount)}</span>
@@ -2674,7 +2677,7 @@ export const OrderCard = memo(function OrderCard({
                           onClick={handleProfitTooltipTriggerClick}
                           aria-expanded={isProfitTooltipVisible}
                           className={cn(
-                            "inline-flex h-7 min-w-0 items-center gap-0.5 rounded-full border px-1.5 text-[11px] font-medium leading-none transition-all hover:-translate-y-px active:translate-y-0 sm:h-8 sm:gap-1.5 sm:px-2.5 sm:text-[13px]",
+                            "inline-flex h-7 min-w-0 items-center gap-1 rounded-full border px-2 text-[11px] font-medium leading-none transition-all hover:-translate-y-px active:translate-y-0 sm:h-8 sm:gap-1.5 sm:px-2.5 sm:text-[13px]",
                             pureProfit >= 0
                               ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 hover:border-emerald-500/35 hover:bg-emerald-500/14 dark:text-emerald-300"
                               : "border-rose-500/20 bg-rose-500/10 text-rose-700 hover:border-rose-500/35 hover:bg-rose-500/14 dark:text-rose-300"
@@ -2687,7 +2690,7 @@ export const OrderCard = memo(function OrderCard({
                         <button
                           type="button"
                           onClick={() => onOpenCostBackfill(order)}
-                          className="inline-flex h-7 min-w-0 items-center gap-0.5 rounded-full border border-orange-500/20 bg-orange-500/10 px-1.5 text-[11px] font-medium leading-none text-orange-700 transition-all hover:border-orange-500/35 hover:bg-orange-500/14 dark:text-orange-300 sm:h-8 sm:gap-1.5 sm:px-2.5 sm:text-[13px]"
+                          className="inline-flex h-7 min-w-0 items-center gap-1 rounded-full border border-orange-500/20 bg-orange-500/10 px-2 text-[11px] font-medium leading-none text-orange-700 transition-all hover:border-orange-500/35 hover:bg-orange-500/14 dark:text-orange-300 sm:h-8 sm:gap-1.5 sm:px-2.5 sm:text-[13px]"
                         >
                           <span className="shrink-0">成本</span>
                           <span className="truncate">{productCostStatusText}</span>
@@ -2828,7 +2831,7 @@ export const OrderCard = memo(function OrderCard({
                     </div>
                   ) : null}
                   {isProfitUpdating ? (
-                    <span className="inline-flex h-7 min-w-0 items-center gap-1 rounded-full border border-sky-500/20 bg-sky-500/10 px-1.5 text-[11px] font-medium leading-none text-sky-700 dark:text-sky-300 sm:h-8 sm:gap-1.5 sm:px-2.5 sm:text-[13px]">
+                    <span className="inline-flex h-7 min-w-0 items-center gap-1 rounded-full border border-sky-500/20 bg-sky-500/10 px-2 text-[11px] font-medium leading-none text-sky-700 dark:text-sky-300 sm:h-8 sm:gap-1.5 sm:px-2.5 sm:text-[13px]">
                       <Loader2 size={11} className="animate-spin sm:h-3 sm:w-3" />
                       <span className="truncate">更新利润中...</span>
                     </span>
@@ -2869,36 +2872,37 @@ export const OrderCard = memo(function OrderCard({
                   </div>
                 </div>
 
+                {/* PC 端：与左侧门店胶囊严格保持等高 (sm:h-8) 统一视觉规范 */}
                 <div className="hidden sm:flex sm:flex-wrap sm:justify-end sm:gap-2">
-                  <div className="flex min-w-0 items-center justify-between gap-2 rounded-2xl border border-black/8 bg-black/2 px-3 py-2 dark:border-white/10 dark:bg-white/3 sm:inline-flex sm:h-9 sm:justify-start sm:rounded-full sm:py-0">
-                    <span className="shrink-0 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">实付</span>
-                    <span className="truncate text-sm font-semibold text-foreground">{actualPaidDisplay}</span>
+                  <div className="flex min-w-0 items-center justify-between gap-1.5 rounded-2xl border border-black/8 bg-black/2 px-3 py-2 dark:border-white/10 dark:bg-white/3 sm:inline-flex sm:h-8 sm:justify-start sm:rounded-full sm:px-2.5 sm:py-0">
+                    <span className="shrink-0 text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground sm:text-[11px]">实付</span>
+                    <span className="truncate text-xs font-semibold text-foreground sm:text-[13px]">{actualPaidDisplay}</span>
                   </div>
                   {canEditExpectedIncome ? (
                     <button
                       type="button"
                       onClick={() => setIsAmountEditorOpen(true)}
                       disabled={isSavingAmount}
-                      className="flex min-w-0 items-center justify-between gap-2 rounded-2xl border border-black/8 bg-black/2 px-3 py-2 text-left transition-all hover:border-black/12 hover:bg-black/3 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-white/3 dark:hover:bg-white/4 sm:inline-flex sm:h-9 sm:justify-start sm:rounded-full sm:py-0"
+                      className="flex min-w-0 items-center justify-between gap-1.5 rounded-2xl border border-black/8 bg-black/2 px-3 py-2 text-left transition-all hover:border-black/12 hover:bg-black/3 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-white/3 dark:hover:bg-white/4 sm:inline-flex sm:h-8 sm:justify-start sm:rounded-full sm:px-2.5 sm:py-0"
                     >
-                      <span className="shrink-0 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">到手</span>
-                      <span className="truncate text-sm font-semibold text-foreground">{expectedIncomeDisplay}</span>
-                      {isSavingAmount ? <Loader2 size={12} className="shrink-0 animate-spin text-muted-foreground" /> : null}
+                      <span className="shrink-0 text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground sm:text-[11px]">到手</span>
+                      <span className="truncate text-xs font-semibold text-foreground sm:text-[13px]">{expectedIncomeDisplay}</span>
+                      {isSavingAmount ? <Loader2 size={11} className="shrink-0 animate-spin text-muted-foreground" /> : null}
                     </button>
                   ) : (
-                    <div className="flex min-w-0 items-center justify-between gap-2 rounded-2xl border border-black/8 bg-black/2 px-3 py-2 dark:border-white/10 dark:bg-white/3 sm:inline-flex sm:h-9 sm:justify-start sm:rounded-full sm:py-0">
-                      <span className="shrink-0 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">到手</span>
-                      <span className="truncate text-sm font-semibold text-foreground">{expectedIncomeDisplay}</span>
+                    <div className="flex min-w-0 items-center justify-between gap-1.5 rounded-2xl border border-black/8 bg-black/2 px-3 py-2 dark:border-white/10 dark:bg-white/3 sm:inline-flex sm:h-8 sm:justify-start sm:rounded-full sm:px-2.5 sm:py-0">
+                      <span className="shrink-0 text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground sm:text-[11px]">到手</span>
+                      <span className="truncate text-xs font-semibold text-foreground sm:text-[13px]">{expectedIncomeDisplay}</span>
                     </div>
                   )}
-                  <div className="col-span-2 flex min-w-0 items-center justify-between gap-2 rounded-2xl border border-black/8 bg-black/2 px-3 py-2 dark:border-white/10 dark:bg-white/3 sm:col-span-1 sm:inline-flex sm:h-9 sm:justify-start sm:rounded-full sm:py-0">
-                    <span className="shrink-0 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">{commissionDisplay.label}</span>
-                    <span className="truncate text-sm font-semibold text-foreground">{commissionDisplay.value}</span>
+                  <div className="col-span-2 flex min-w-0 items-center justify-between gap-1.5 rounded-2xl border border-black/8 bg-black/2 px-3 py-2 dark:border-white/10 dark:bg-white/3 sm:col-span-1 sm:inline-flex sm:h-8 sm:justify-start sm:rounded-full sm:px-2.5 sm:py-0">
+                    <span className="shrink-0 text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground sm:text-[11px]">{commissionDisplay.label}</span>
+                    <span className="truncate text-xs font-semibold text-foreground sm:text-[13px]">{commissionDisplay.value}</span>
                   </div>
                   {effectiveSendFee != null ? (
-                    <div className="flex min-w-0 items-center justify-between gap-2 rounded-2xl border border-black/8 bg-black/2 px-3 py-2 dark:border-white/10 dark:bg-white/3 sm:inline-flex sm:h-9 sm:justify-start sm:rounded-full sm:py-0">
-                      <span className="shrink-0 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">配送费</span>
-                      <span className="truncate text-sm font-semibold text-foreground">{toCurrency(effectiveSendFee)}</span>
+                    <div className="flex min-w-0 items-center justify-between gap-1.5 rounded-2xl border border-black/8 bg-black/2 px-3 py-2 dark:border-white/10 dark:bg-white/3 sm:inline-flex sm:h-8 sm:justify-start sm:rounded-full sm:px-2.5 sm:py-0">
+                      <span className="shrink-0 text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground sm:text-[11px]">配送费</span>
+                      <span className="truncate text-xs font-semibold text-foreground sm:text-[13px]">{toCurrency(effectiveSendFee)}</span>
                     </div>
                   ) : null}
                 </div>
@@ -3094,20 +3098,20 @@ export const OrderCard = memo(function OrderCard({
               </span>
             ) : null}
             {!pickup && !terminal && !abnormal && Boolean(order.isMainSystemSelfDelivery) && order.autoCompleteAt ? (
-              <span className="inline-flex min-w-0 items-center gap-1.5 rounded-full border border-amber-500/15 bg-amber-500/10 px-2.5 py-1 text-[11px] font-medium text-amber-700 dark:text-amber-400 sm:gap-2 sm:px-3 sm:py-1.5 sm:text-xs">
+              <span className="inline-flex h-7 sm:h-8 min-w-0 items-center gap-1.5 rounded-full border border-amber-500/15 bg-amber-500/10 px-2 text-[11px] font-medium leading-none text-amber-700 dark:text-amber-400 sm:gap-1.5 sm:px-2.5 sm:text-[13px]">
                 <TimerReset size={12} />
                 <span className="truncate sm:hidden">{`自动完成 ${compactAutoCompleteAt}`}</span>
                 <span className="hidden sm:inline">{`预计自动完成 ${formatLocalDateTime(order.autoCompleteAt)}`}</span>
               </span>
             ) : null}
             {autoCompleteFailed && Boolean(order.isMainSystemSelfDelivery) ? (
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-rose-500/15 bg-rose-500/10 px-2.5 py-1 text-[11px] font-medium text-rose-700 dark:text-rose-400 sm:gap-2 sm:px-3 sm:py-1.5 sm:text-xs">
+              <span className="inline-flex h-7 sm:h-8 items-center gap-1.5 rounded-full border border-rose-500/15 bg-rose-500/10 px-2 text-[11px] font-medium leading-none text-rose-700 dark:text-rose-400 sm:gap-1.5 sm:px-2.5 sm:text-[13px]">
                 <X size={12} />
                 自动完成失败
               </span>
             ) : null}
             {deadlineDisplay !== "-" ? (
-              <span className="ml-auto inline-flex min-w-0 items-center justify-end gap-1.5 rounded-full border border-black/8 bg-white/85 px-2.5 py-1 text-[11px] font-medium text-muted-foreground dark:border-white/10 dark:bg-white/4 sm:ml-0 sm:justify-start sm:gap-2 sm:px-3 sm:py-1.5 sm:text-xs">
+              <span className="ml-auto inline-flex h-7 sm:h-8 min-w-0 items-center justify-end gap-1.5 rounded-full border border-black/8 bg-white/85 px-2 text-[11px] font-medium leading-none text-muted-foreground dark:border-white/10 dark:bg-white/4 sm:ml-0 sm:justify-start sm:gap-1.5 sm:px-2.5 sm:text-[13px]">
                 <Clock3 size={12} />
                 <span className="min-w-0 text-right sm:hidden">
                   <span className="block truncate">
@@ -3133,7 +3137,7 @@ export const OrderCard = memo(function OrderCard({
                 onClick={() => onRunAction(order.id, "self-delivery")}
                 disabled={cannotSelfDeliver}
                 title={selfDeliveryTitle}
-                className="hidden h-7 items-center gap-1.5 rounded-full border border-sky-500/20 bg-sky-500/10 px-2.5 text-[11px] font-semibold text-sky-700 transition-all hover:bg-sky-500/15 disabled:cursor-not-allowed disabled:opacity-45 dark:text-sky-300 sm:inline-flex sm:h-8 sm:px-3 sm:text-xs"
+                className="hidden h-7 sm:h-8 items-center gap-1.5 rounded-full border border-sky-500/20 bg-sky-500/10 px-2 text-[11px] font-medium leading-none text-sky-700 transition-all hover:bg-sky-500/15 disabled:cursor-not-allowed disabled:opacity-45 dark:text-sky-300 sm:inline-flex sm:px-2.5 sm:text-[13px]"
               >
                 {actingId === `${order.id}:self-delivery` ? <Loader2 size={12} className="animate-spin" /> : <Truck size={12} />}
                 自配
@@ -3141,16 +3145,7 @@ export const OrderCard = memo(function OrderCard({
             ) : null}
           </div>
 
-          <div className={cn(
-            "grid gap-2 lg:min-w-110",
-            readOnly
-              ? "grid-cols-1 lg:min-w-0 lg:w-36 ml-auto"
-            : deleted
-              ? "grid-cols-1 sm:grid-cols-1 lg:min-w-0 lg:w-32 ml-auto"
-            : showManualDeliveryMarker || displayAsOfflineOrder
-              ? "grid-cols-3 sm:grid-cols-3 lg:min-w-0 lg:w-96 ml-auto"
-              : "grid-cols-3 sm:grid-cols-3"
-          )}>
+          <div className="flex flex-wrap items-center justify-end gap-1.5 sm:gap-2 shrink-0 ml-auto">
             <ActionButton
               label={expanded ? "收起详情" : "展开详情"}
               icon={expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
@@ -3406,7 +3401,11 @@ export const OrderCard = memo(function OrderCard({
                         : removeYear(getDeadlineDisplay(order))
                     }
                   />
-                  <DetailStat label="配送费" value={effectiveSendFee != null ? toCurrency(effectiveSendFee) : "-"} className="col-span-2" />
+                  <DetailStat
+                    label="配送费"
+                    value={effectiveSendFee != null ? toCurrency(effectiveSendFee) : (isSelfDeliveryOrCancelled ? "¥0.00" : (riderName !== "-" ? "待同步" : "-"))}
+                    className="col-span-2"
+                  />
                 </div>
                 <div className="mt-2 sm:mt-2.5">
                   <DetailBlock label="轨迹" value={order.delivery?.track || "暂无轨迹"} />

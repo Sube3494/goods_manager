@@ -1985,17 +1985,26 @@ function parseDeliveryInfoFromDetail(detail: MaiyatianOrderDetailResponse["data"
     ?? deliveryRecord?.sendFee
     ?? deliveryRecord?.delivery_fee
     ?? deliveryRecord?.deliveryFee
-    ?? deliveryRecord?.fee
+    ?? deliveryRecord?.carrier_fee
+    ?? deliveryRecord?.carrierFee
     ?? deliveryRecord?.actual_fee
     ?? deliveryRecord?.pay_fee
+    ?? deliveryRecord?.fee
+    ?? deliveryRecord?.money
+    ?? deliveryRecord?.price
     ?? detailRecord?.delivery_fee
+    ?? detailRecord?.deliveryFee
     ?? detailRecord?.send_fee
+    ?? detailRecord?.sendFee
+    ?? detailRecord?.shipping_fee
     ?? (detailRecord?.fee as Record<string, unknown> | undefined)?.delivery_fee
     ?? (detailRecord?.fee as Record<string, unknown> | undefined)?.send_fee;
-  const sendFee = readDeliveryFeeFromValue({
+  const parsedSendFee = readDeliveryFeeFromValue({
     ...(deliveryRecord || {}),
     sendFee: rawSendFee,
-  });
+  }, detail);
+  const isSelfOrCancelled = isSelfDeliveryOrCancelledDelivery(deliveryRecord, detail);
+  const sendFee = isSelfOrCancelled ? 0 : (parsedSendFee > 0 ? parsedSendFee : undefined);
   const jdLikePickupCandidates = [
     detail?.pickup_time,
     detail?.pickupTime,
@@ -2044,7 +2053,7 @@ function parseDeliveryInfoFromDetail(detail: MaiyatianOrderDetailResponse["data"
         ? parseUnixTimestampToOrderTime(rawFinishedTime)
         : undefined);
 
-  if (!logisticName && sendFee <= 0 && !pickupTime && !track && !riderName && !riderPhone && !completedTime) {
+  if (!logisticName && (sendFee == null || sendFee <= 0) && !pickupTime && !track && !riderName && !riderPhone && !completedTime) {
     return undefined;
   }
 
@@ -2061,16 +2070,24 @@ function parseDeliveryInfoFromDetail(detail: MaiyatianOrderDetailResponse["data"
 
 function parseAmountsFromDetail(detail: MaiyatianOrderDetailResponse["data"], platform = "") {
   const fee = detail?.fee;
-  if (!fee) {
+  const feeRecord = (fee && typeof fee === "object" ? fee : {}) as Record<string, string | number | undefined>;
+  const detailObj = detail as Record<string, unknown> | undefined;
+
+  const userFee = (feeRecord.user_fee ?? detailObj?.total_price ?? detailObj?.totalPrice) as string | number | undefined;
+  const shopFee = (feeRecord.shop_fee ?? detailObj?.balance_price ?? detailObj?.balancePrice) as string | number | undefined;
+  const commission = feeRecord.commission;
+  const totalPrice = (feeRecord.total_fee ?? detailObj?.total_price ?? detailObj?.totalPrice) as string | number | undefined;
+
+  if (userFee == null && shopFee == null && totalPrice == null && commission == null) {
     return undefined;
   }
-  const feeRecord = fee as Record<string, string | number | undefined>;
 
   return parseAmountsFromRawValues(platform, {
-    commission: feeRecord.commission,
-    userFee: feeRecord.user_fee,
-    shopFee: feeRecord.shop_fee,
-    totalPrice: feeRecord.total_fee,
+    commission,
+    userFee,
+    shopFee,
+    totalPrice,
+    balancePrice: (detailObj?.balance_price ?? detailObj?.balancePrice) as string | number | undefined,
   });
 }
 
@@ -3486,10 +3503,25 @@ export function normalizeAutoPickOrderPayload(payload: unknown): AutoPickInbound
         ?? deliveryRecord?.send_fee
         ?? deliveryRecord?.delivery_fee
         ?? deliveryRecord?.deliveryFee
-        ?? deliveryRecord?.fee;
-      const normalizedSendFee = isSelfDeliveryOrCancelledDelivery(deliveryRecord)
+        ?? deliveryRecord?.carrier_fee
+        ?? deliveryRecord?.carrierFee
+        ?? deliveryRecord?.actual_fee
+        ?? deliveryRecord?.pay_fee
+        ?? deliveryRecord?.fee
+        ?? deliveryRecord?.money
+        ?? deliveryRecord?.price
+        ?? input.delivery_fee
+        ?? input.deliveryFee
+        ?? input.send_fee
+        ?? input.sendFee;
+      const parsedSendFee = readDeliveryFeeFromValue(
+        { ...(deliveryRecord || {}), sendFee: rawSendFee },
+        input
+      );
+      const isSelfOrCancelled = isSelfDeliveryOrCancelledDelivery(deliveryRecord, input);
+      const normalizedSendFee = isSelfOrCancelled
         ? 0
-        : (rawSendFee != null ? readDeliveryFeeFromValue({ ...(deliveryRecord || {}), sendFee: rawSendFee }) : undefined);
+        : (parsedSendFee > 0 ? parsedSendFee : undefined);
 
       const normalizedDelivery = {
         logisticName: normalizedLogisticName,
