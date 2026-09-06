@@ -2665,26 +2665,9 @@ export const OrderCard = memo(function OrderCard({
                           (e.currentTarget as HTMLElement)?.blur();
 
                           const errorText = order.autoOutboundError || "";
-                          const isMatchFailed = !errorText
-                            || errorText.includes("匹配")
-                            || errorText.includes("商品")
-                            || errorText.includes("库")
-                            || errorText.includes("映射")
-                            || errorText.includes("关联")
-                            || errorText.includes("规格")
-                            || errorText.includes("未找到")
-                            || errorText.includes("unmatched");
 
-                          // 1. 优先从错误信息中匹配对应商品
-                          const itemMatchedByError = (order.items || []).find((it) => {
-                            if (it.productNo && errorText.includes(it.productNo)) return true;
-                            if (it.platformSkuId && errorText.includes(it.platformSkuId)) return true;
-                            if (it.productName && errorText.includes(it.productName)) return true;
-                            return false;
-                          });
-
-                          // 2. 找到第一个未匹配且未显式忽略的商品
-                          const firstUnmatchedItem = (order.items || []).find((it) => {
+                          // 查找所有未匹配且未显式忽略的商品
+                          const unmatchedItems = (order.items || []).filter((it) => {
                             const rawPayload = it.rawPayload && typeof it.rawPayload === "object" && !Array.isArray(it.rawPayload)
                               ? it.rawPayload as Record<string, unknown>
                               : {};
@@ -2695,15 +2678,21 @@ export const OrderCard = memo(function OrderCard({
                             return !it.matchedProduct;
                           });
 
-                          // 3. 兜底获取目标商品
-                          const targetItem = itemMatchedByError || firstUnmatchedItem || (isMatchFailed ? (order.items || [])[0] : null);
+                          // 只有在【确实存在未匹配商品】时，才拦截并拉起改匹配弹窗
+                          if (unmatchedItems.length > 0) {
+                            // 优先匹配报错信息中提及的具体商品，否则取第一个未匹配商品
+                            const targetItem = unmatchedItems.find((it) => {
+                              if (it.productNo && errorText.includes(it.productNo)) return true;
+                              if (it.platformSkuId && errorText.includes(it.platformSkuId)) return true;
+                              if (it.productName && errorText.includes(it.productName)) return true;
+                              return false;
+                            }) || unmatchedItems[0];
 
-                          // 如果判定为匹配相关或者存在目标商品，直接 0ms 顺畅打开改匹配弹窗，绝不触发网络请求闪现“处理中...”
-                          if (targetItem && (isMatchFailed || firstUnmatchedItem)) {
                             onOpenMatchEditor(order, targetItem);
                             return;
                           }
 
+                          // 已经全部配对好，直接执行出库操作，进入出库环节
                           void onRunAction(order.id, "outbound");
                         }}
                         disabled={actingId === `${order.id}:outbound`}

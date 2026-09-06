@@ -55,7 +55,8 @@ import {
   readShopNameFromRawPayload,
   readShopAddressFromRawPayload,
 } from "@/lib/shopCommission";
-import { AutoPickIntegrationConfig, AutoPickMaiyatianShop, AutoPickMaiyatianShopMapping, AutoPickOrder, AutoPickOrderItem, AutoPickSelfDeliveryTimingConfig, PurchaseOrder, PurchaseOrderItem } from "@/lib/types";
+import { AutoPickIntegrationConfig, AutoPickMaiyatianShop, AutoPickMaiyatianShopMapping, AutoPickOrder, AutoPickOrderItem, AutoPickSelfDeliveryTimingConfig, PurchaseOrder, PurchaseOrderItem, PurchaseStatus } from "@/lib/types";
+import { isShopNameMatch } from "@/lib/shopIdentity";
 import { cn } from "@/lib/utils";
 import { formatLocalDate, formatLocalDateTime } from "@/lib/dateUtils";
 import { ORDER_SHORTAGE_PURCHASE_NOTE_KEYWORD } from "@/lib/purchaseOrderTypes";
@@ -2240,9 +2241,101 @@ export default function OrdersPage() {
         throw new Error(data?.error || (isClear ? "解除商品匹配失败" : "更新商品匹配失败"));
       }
 
-      showToast(isClear ? "已标记为无需出库，解除商品绑定" : "商品匹配已更新", "success");
+      const targetOrder = matchEditorTarget.order;
+      const currentItemId = matchEditorTarget.itemId;
+
+      // 检查当前订单是否还有其他未匹配且未显式忽略的商品
+      const otherUnmatchedItems = (targetOrder?.items || []).filter((it) => {
+        if (it.id === currentItemId) return false;
+        const rawPayload = it.rawPayload && typeof it.rawPayload === "object" && !Array.isArray(it.rawPayload)
+          ? it.rawPayload as Record<string, unknown>
+          : {};
+        const isIgnored = rawPayload.ignoreOutbound === true
+          || rawPayload.isManualIgnored === true
+          || (it.matchedProduct as any)?.ignoreOutbound === true;
+        if (isIgnored) return false;
+        return !it.matchedProduct;
+      });
+
+      // 如果还有其他商品未配对，提示并自动打开下一个商品的配对弹窗
+      if (otherUnmatchedItems.length > 0) {
+        showToast("当前商品已配对，请继续配对下一件商品", "info");
+        const nextOrder: AutoPickOrder = {
+          ...targetOrder!,
+          items: (targetOrder?.items || []).map((it) =>
+            it.id === currentItemId ? { ...it, matchedProduct: data.matchedProduct || { id: productId, name: "" } } : it
+          ),
+        };
+        openMatchEditor(nextOrder, otherUnmatchedItems[0]);
+        triggerParentRefresh();
+        return;
+      }
+
+      // 所有商品都已匹配就绪，关闭匹配弹窗
       setIsMatchPickerOpen(false);
       setMatchEditorTarget(null);
+
+      // 如果该订单尚未生成出库单且不是已删除/取消状态，自动触发进入下一个环节：出库！
+      const shouldAutoOutbound = targetOrder && !targetOrder.hasOutbound && targetOrder.status !== "已删除" && targetOrder.status !== "已取消";
+      if (shouldAutoOutbound && !isClear) {
+        try {
+          const outboundRes = await fetch(`/api/orders/${matchEditorTarget.orderId}/outbound`, {
+            method: "POST",
+          });
+          const outboundData = await outboundRes.json().catch(() => ({}));
+
+          if (outboundRes.ok) {
+            showToast("商品匹配已更新，并已成功完成出库！", "success");
+          } else if (outboundRes.status === 409 && outboundData.reason === "insufficient-stock" && Array.isArray(outboundData.insufficientItems)) {
+            const today = new Date();
+            const draftShopId = outboundData.insufficientItems[0]?.mappedShopId || "";
+            const draftShopName = outboundData.insufficientItems[0]?.mappedShopName || "";
+            const matchedShop = draftShopId
+              ? localShops.find((shop) => shop.id === draftShopId)
+              : draftShopName
+                ? localShops.find((shop) => isShopNameMatch(shop.name, draftShopName))
+                : undefined;
+            const draft = {
+              id: `PO-${today.toISOString().slice(0, 10).replace(/-/g, "")}-${Math.floor(Math.random() * 1000).toString().padStart(3, "0")}`,
+              status: "Confirmed" as PurchaseStatus,
+              type: "Purchase",
+              date: today.toLocaleString("sv-SE").slice(0, 16).replace("T", " "),
+              items: outboundData.insufficientItems.map((item: any) => ({
+                productId: item.productId || null,
+                shopProductId: item.shopProductId || null,
+                product: {
+                  id: item.shopProductId || item.productId,
+                  name: item.name || "未命名商品",
+                  sku: "",
+                  image: item.image || null,
+                  costPrice: 0,
+                },
+                image: item.image || null,
+                supplierId: null,
+                quantity: item.missingQuantity,
+                costPrice: 0,
+              })),
+              shippingFees: 0,
+              extraFees: 0,
+              totalAmount: 0,
+              discountAmount: 0,
+              shippingAddress: matchedShop?.address || "",
+              shopName: draftShopName,
+              sourceOrderId: matchEditorTarget.orderId,
+            };
+            setPurchaseDraft(draft);
+            showToast("商品匹配已更新，但库存不足，已为您生成采购草稿单", "warning");
+          } else {
+            const errMsg = outboundData.error || "";
+            showToast(errMsg ? `商品匹配已更新，出库提示：${errMsg}` : "商品匹配已更新", "success");
+          }
+        } catch (e) {
+          showToast("商品匹配已更新", "success");
+        }
+      } else {
+        showToast(isClear ? "已标记为无需出库，解除商品绑定" : "商品匹配已更新", "success");
+      }
+
       triggerParentRefresh();
     } catch (error) {
       console.error("Failed to save manual product match:", error);
@@ -2250,7 +2343,7 @@ export default function OrdersPage() {
     } finally {
       setIsSavingMatch(false);
     }
-  }, [matchEditorTarget, showToast, triggerParentRefresh]);
+  }, [matchEditorTarget, openMatchEditor, localShops, showToast, triggerParentRefresh]);
 
   // 刷单同步确认
   const syncBrushOrders = async (targetIds?: string[], commission?: number) => {
