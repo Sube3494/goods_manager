@@ -2856,7 +2856,7 @@ export const OrderCard = memo(function OrderCard({
                               ? "border-rose-500/20 bg-rose-500/10 text-rose-600 dark:text-rose-300"
                               : "border-slate-400/20 bg-slate-500/8 text-slate-500 dark:text-slate-300"
                           )}>
-                            {customerTypeText}
+                            <span className="translate-y-px">{customerTypeText}</span>
                           </span>
                         ) : null}
                       </>
@@ -2910,7 +2910,7 @@ export const OrderCard = memo(function OrderCard({
                             ? "border-rose-500/20 bg-rose-500/10 text-rose-600 dark:text-rose-300"
                             : "border-slate-400/20 bg-slate-500/8 text-slate-500 dark:text-slate-300"
                         )}>
-                          {customerTypeText}
+                          <span className="translate-y-px">{customerTypeText}</span>
                         </span>
                       ) : null}
                     </div>
@@ -3245,7 +3245,7 @@ export const OrderCard = memo(function OrderCard({
                           ? "border-rose-500/20 bg-rose-500/10 text-rose-600 dark:text-rose-300"
                           : "border-slate-400/20 bg-slate-500/8 text-slate-500 dark:text-slate-300"
                       )}>
-                        {customerTypeText}
+                        <span className="translate-y-px">{customerTypeText}</span>
                       </span>
                     ) : null}
                     valueClassName="break-all text-[13px] sm:text-sm"
