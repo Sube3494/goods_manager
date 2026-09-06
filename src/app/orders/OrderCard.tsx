@@ -37,8 +37,8 @@ import {
   isAutoPickOrderDeliveringStatus,
   isAutoPickOrderRiderAssigned,
   isAutoPickOrderTerminalStatus,
+  isSelfDeliveryOrCancelledDelivery,
 } from "@/lib/autoPickOrderStatus";
-import { isSelfDeliveryOrCancelledDelivery } from "@/lib/autoPickOrders";
 import { formatLocalDate, formatLocalDateTime } from "@/lib/dateUtils";
 
 const OrderRouteModal = dynamic(() => import("@/components/Orders/OrderRouteModal").then((module) => module.OrderRouteModal), { ssr: false });

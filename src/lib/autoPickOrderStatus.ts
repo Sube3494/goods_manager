@@ -433,3 +433,37 @@ export function isAutoPickOrderRiderAssigned(order?: {
   return false;
 }
 
+export function isSelfDeliveryOrCancelledDelivery(delivery: unknown, rawPayloadOrFlag?: unknown): boolean {
+  if (rawPayloadOrFlag === true) return true;
+  if (rawPayloadOrFlag && typeof rawPayloadOrFlag === "object" && !Array.isArray(rawPayloadOrFlag)) {
+    const raw = rawPayloadOrFlag as Record<string, unknown>;
+    const systemMeta = raw.systemMeta && typeof raw.systemMeta === "object" && !Array.isArray(raw.systemMeta)
+      ? raw.systemMeta as Record<string, unknown>
+      : null;
+    if (systemMeta?.isSelfDelivery === true || systemMeta?.isMainSystemSelfDelivery === true || raw.isMainSystemSelfDelivery === true) {
+      return true;
+    }
+  }
+  if (!delivery || typeof delivery !== "object" || Array.isArray(delivery)) return false;
+  const d = delivery as Record<string, unknown>;
+  const logisticName = String(d.logisticName || d.logistic_name || "").trim();
+  const riderName = String(d.riderName || d.delivery_name || "").trim();
+  const track = String(d.track || "").trim();
+  if (/自配|自配送|商家自配|oneself/i.test(logisticName)) return true;
+  if (/自配|自配送|商家自配/i.test(riderName)) return true;
+  if (/取消|退单/.test(track)) return true;
+  if (d.cancel_time != null || d.cancelTime != null) return true;
+  return false;
+}
+
+export function readDeliveryFeeFromValue(delivery: unknown, rawPayloadOrFlag?: unknown) {
+  if (isSelfDeliveryOrCancelledDelivery(delivery, rawPayloadOrFlag)) {
+    return 0;
+  }
+  if (!delivery || typeof delivery !== "object" || Array.isArray(delivery)) {
+    return 0;
+  }
+  const value = Number((delivery as Record<string, unknown>).sendFee ?? (delivery as Record<string, unknown>).send_fee ?? 0);
+  return Number.isFinite(value) ? Math.max(0, value) : 0;
+}
+
