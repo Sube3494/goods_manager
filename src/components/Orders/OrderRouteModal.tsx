@@ -265,7 +265,6 @@ function extractCity(address?: string, shopName?: string): string | undefined {
 }
 
 export function OrderRouteModal({ order, onClose }: { order: AutoPickOrder; onClose: () => void }) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
   const [attempt, setAttempt] = useState(0);
@@ -341,10 +340,18 @@ export function OrderRouteModal({ order, onClose }: { order: AutoPickOrder; onCl
     : (effectiveShopCoord && customerCoord ? `${formatMeters(calculateDistanceMeters(effectiveShopCoord, customerCoord))}` : "");
 
   useEffect(() => {
-    const previousFocus = document.activeElement as HTMLElement | null;
-    dialogRef.current?.showModal();
-    return () => previousFocus?.focus();
-  }, []);
+    const previousFocus = typeof document !== "undefined" ? (document.activeElement as HTMLElement | null) : null;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      previousFocus?.focus();
+    };
+  }, [onClose]);
 
   // 自动从本地店铺库加载匹配店铺的地址与经纬度作为兜底
   useEffect(() => {
@@ -701,15 +708,22 @@ export function OrderRouteModal({ order, onClose }: { order: AutoPickOrder; onCl
   }, [trail, riderAssigned, effectiveShopAddress, displayShopName, derivedCity, order.longitude, order.latitude, order.userAddress, attempt, customerCoord, phaseInfo.phase, primaryDistanceValue, shopToCustomerDistance, effectiveShopCoord, isDark]);
 
   return createPortal(
-    <dialog
-      ref={dialogRef}
-      aria-labelledby="order-route-title"
-      onCancel={onClose}
-      onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}
-      className="fixed inset-0 m-auto h-[88dvh] max-h-[860px] w-[95vw] max-w-5xl overflow-hidden rounded-2xl border border-border/80 bg-background p-0 text-foreground shadow-2xl backdrop:bg-black/60"
-    >
-      {/* 沉浸式全屏高德地图容器 */}
-      <div ref={containerRef} className="absolute inset-0 h-full w-full bg-muted/40" />
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4">
+      {/* 遮罩层 */}
+      <div
+        className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity animate-in fade-in duration-200"
+        onClick={onClose}
+        aria-hidden="true"
+      />
+      {/* 弹窗主体 */}
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="order-route-title"
+        className="relative z-10 h-[88dvh] max-h-[860px] w-[95vw] max-w-5xl overflow-hidden rounded-2xl border border-border/80 bg-background p-0 text-foreground shadow-2xl animate-in zoom-in-95 duration-200"
+      >
+        {/* 沉浸式全屏高德地图容器 */}
+        <div ref={containerRef} className="absolute inset-0 h-full w-full bg-muted/40" />
 
       {/* 右上角悬浮操作胶囊栏 */}
       <div className="absolute right-3.5 top-3.5 z-20 flex items-center gap-2">
@@ -828,7 +842,8 @@ export function OrderRouteModal({ order, onClose }: { order: AutoPickOrder; onCl
           )}
         </div>
       </div>
-    </dialog>,
+    </div>
+    </div>,
     document.body,
   );
 }

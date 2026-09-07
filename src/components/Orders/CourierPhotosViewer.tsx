@@ -51,7 +51,12 @@ export function CourierPhotoLightbox({
   useEffect(() => {
     setMounted(true);
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        onClose();
+        return;
+      }
       if (e.key === "ArrowLeft" && photos.length > 1) {
         setCurrentIndex((prev) => (prev > 0 ? prev - 1 : photos.length - 1));
       }
@@ -72,7 +77,7 @@ export function CourierPhotoLightbox({
       role="dialog"
       aria-modal="true"
       aria-label="查看照片预览"
-      className="fixed inset-0 z-[1000] flex flex-col items-center justify-center bg-black/90 backdrop-blur-md select-none transition-all animate-in fade-in duration-200"
+      className="fixed inset-0 z-[999999] flex flex-col items-center justify-center bg-black/90 backdrop-blur-md select-none transition-all animate-in fade-in duration-200"
       onClick={onClose}
     >
       {/* 顶部控制栏 */}
