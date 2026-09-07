@@ -27,7 +27,7 @@ import { useToast } from "@/components/ui/Toast";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { ProductSelectionModal } from "@/components/Purchases/ProductSelectionModal";
 import { createPortal } from "react-dom";
-import { AutoPickOrder, AutoPickOrderItem, AutoPickIntegrationConfig } from "@/lib/types";
+import { AutoPickOrder, AutoPickOrderItem, AutoPickIntegrationConfig, MaiyatianCookieAccount } from "@/lib/types";
 type OrderAction = "self-delivery" | "complete-delivery" | "pickup-complete" | "sync" | "outbound" | "sync-brush";
 import {
   getBaseAutoPickStatusDisplay,
@@ -77,10 +77,30 @@ export function normalizeOptionalSelfDeliveryTiming(input: unknown) {
 
 export function readIntegrationConfigResponse(data: unknown): AutoPickIntegrationConfig {
   const payload = data && typeof data === "object" ? data as Record<string, unknown> : {};
+  const legacyCookie = String(payload.maiyatianCookie || "");
+  const maiyatianCookies: MaiyatianCookieAccount[] = Array.isArray(payload.maiyatianCookies)
+    ? payload.maiyatianCookies.map((item, index) => {
+        const record = item && typeof item === "object" ? item as Record<string, unknown> : {};
+        return {
+          id: String(record.id || `account-${index + 1}`),
+          name: String(record.name || `账号${String.fromCharCode(65 + (index % 26))}`),
+          cookie: String(record.cookie || ""),
+          enabled: record.enabled !== false,
+          lastTestedAt: record.lastTestedAt ? String(record.lastTestedAt) : undefined,
+          lastTestStatus: record.lastTestStatus === "success" || record.lastTestStatus === "error" ? record.lastTestStatus : undefined,
+          lastTestMessage: record.lastTestMessage ? String(record.lastTestMessage) : undefined,
+          shopCount: typeof record.shopCount === "number" ? record.shopCount : undefined,
+        };
+      })
+    : legacyCookie
+      ? [{ id: "account-default", name: "账号A", cookie: legacyCookie, enabled: true }]
+      : [];
+
   return {
     pluginBaseUrl: String(payload.pluginBaseUrl || ""),
     inboundApiKey: String(payload.inboundApiKey || ""),
-    maiyatianCookie: String(payload.maiyatianCookie || ""),
+    maiyatianCookie: legacyCookie,
+    maiyatianCookies,
     maiyatianShopMappings: Array.isArray(payload.maiyatianShopMappings) ? payload.maiyatianShopMappings.map((item) => {
       const record = item && typeof item === "object" && !Array.isArray(item) ? item as Record<string, unknown> : {};
       return {
@@ -94,6 +114,8 @@ export function readIntegrationConfigResponse(data: unknown): AutoPickIntegratio
         libraryName: record.libraryName ? String(record.libraryName) : undefined,
         brushCommission: typeof record.brushCommission === "number" ? record.brushCommission : null,
         selfDeliveryTiming: normalizeOptionalSelfDeliveryTiming(record.selfDeliveryTiming),
+        accountId: record.accountId ? String(record.accountId) : undefined,
+        accountName: record.accountName ? String(record.accountName) : undefined,
       };
     }) : [],
     selfDeliveryTiming: normalizeSelfDeliveryTiming(payload.selfDeliveryTiming),
@@ -101,11 +123,12 @@ export function readIntegrationConfigResponse(data: unknown): AutoPickIntegratio
   };
 }
 
-export function serializeIntegrationConfig(config: Pick<AutoPickIntegrationConfig, "pluginBaseUrl" | "inboundApiKey" | "maiyatianCookie" | "maiyatianShopMappings" | "selfDeliveryTiming" | "defaultBrushCommission">) {
+export function serializeIntegrationConfig(config: Pick<AutoPickIntegrationConfig, "pluginBaseUrl" | "inboundApiKey" | "maiyatianCookie" | "maiyatianCookies" | "maiyatianShopMappings" | "selfDeliveryTiming" | "defaultBrushCommission">) {
   return JSON.stringify({
     pluginBaseUrl: String(config.pluginBaseUrl || ""),
     inboundApiKey: String(config.inboundApiKey || ""),
     maiyatianCookie: String(config.maiyatianCookie || ""),
+    maiyatianCookies: Array.isArray(config.maiyatianCookies) ? config.maiyatianCookies : [],
     maiyatianShopMappings: Array.isArray(config.maiyatianShopMappings) ? config.maiyatianShopMappings.map((item) => ({
       ...item,
       selfDeliveryTiming: normalizeOptionalSelfDeliveryTiming(item.selfDeliveryTiming),

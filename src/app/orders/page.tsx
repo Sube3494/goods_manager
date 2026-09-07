@@ -29,6 +29,8 @@ import {
   X,
   Plus,
   Paintbrush,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { CustomSelect } from "@/components/ui/CustomSelect";
@@ -56,7 +58,7 @@ import {
   readShopNameFromRawPayload,
   readShopAddressFromRawPayload,
 } from "@/lib/shopCommission";
-import { AutoPickIntegrationConfig, AutoPickMaiyatianShop, AutoPickMaiyatianShopMapping, AutoPickOrder, AutoPickOrderItem, AutoPickSelfDeliveryTimingConfig, PurchaseOrder, PurchaseOrderItem, PurchaseStatus } from "@/lib/types";
+import { AutoPickIntegrationConfig, AutoPickMaiyatianShop, AutoPickMaiyatianShopMapping, AutoPickOrder, AutoPickOrderItem, AutoPickSelfDeliveryTimingConfig, MaiyatianCookieAccount, PurchaseOrder, PurchaseOrderItem, PurchaseStatus } from "@/lib/types";
 import { isShopNameMatch } from "@/lib/shopIdentity";
 import { cn } from "@/lib/utils";
 import { formatLocalDate, formatLocalDateTime } from "@/lib/dateUtils";
@@ -384,8 +386,109 @@ function IntegrationModal({
   onSaveConfig: (value: AutoPickIntegrationConfig) => Promise<void>;
   libraries: any[];
 }) {
-  const hasCookie = Boolean(integrationConfig.maiyatianCookie.trim());
-  const [isEditingCookie, setIsEditingCookie] = useState(!hasCookie);
+  const { showToast } = useToast();
+  const [testingAccountId, setTestingAccountId] = useState<string | null>(null);
+  const [editingAccountIds, setEditingAccountIds] = useState<Record<string, boolean>>({});
+
+  const accounts: MaiyatianCookieAccount[] = useMemo(() => {
+    if (integrationConfig.maiyatianCookies && integrationConfig.maiyatianCookies.length > 0) {
+      return integrationConfig.maiyatianCookies;
+    }
+    if (integrationConfig.maiyatianCookie.trim()) {
+      return [{
+        id: "account-default",
+        name: "账号A",
+        cookie: integrationConfig.maiyatianCookie.trim(),
+        enabled: true,
+      }];
+    }
+    return [];
+  }, [integrationConfig.maiyatianCookies, integrationConfig.maiyatianCookie]);
+
+  const updateAccounts = (newAccounts: MaiyatianCookieAccount[]) => {
+    const primaryCookie = newAccounts.find((a) => a.enabled && a.cookie.trim())?.cookie || "";
+    onChange({
+      ...integrationConfig,
+      maiyatianCookies: newAccounts,
+      maiyatianCookie: primaryCookie,
+    });
+  };
+
+  const toggleAccountEditor = (accountId: string, currentHasCookie: boolean) => {
+    setEditingAccountIds((prev) => {
+      const currentExpanded = prev[accountId] !== undefined ? prev[accountId] : !currentHasCookie;
+      return {
+        ...prev,
+        [accountId]: !currentExpanded,
+      };
+    });
+  };
+
+  const handleAddAccount = () => {
+    const nextLetter = String.fromCharCode(65 + (accounts.length % 26));
+    const newId = `account-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const newAccount: MaiyatianCookieAccount = {
+      id: newId,
+      name: `账号${nextLetter}${accounts.length >= 26 ? Math.floor(accounts.length / 26) : ""}`,
+      cookie: "",
+      enabled: true,
+    };
+    setEditingAccountIds((prev) => ({ ...prev, [newId]: true }));
+    updateAccounts([...accounts, newAccount]);
+  };
+
+  const handleUpdateAccount = (index: number, patch: Partial<MaiyatianCookieAccount>) => {
+    const next = [...accounts];
+    next[index] = { ...next[index], ...patch };
+    updateAccounts(next);
+  };
+
+  const handleRemoveAccount = (index: number) => {
+    const next = accounts.filter((_, i) => i !== index);
+    updateAccounts(next);
+  };
+
+  const handleTestSingleAccount = async (account: MaiyatianCookieAccount) => {
+    if (!account.cookie.trim()) return;
+    setTestingAccountId(account.id);
+    try {
+      const response = await fetch("/api/orders/integration/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          target: "cookie",
+          accountId: account.id,
+          accountName: account.name,
+          cookie: account.cookie.trim(),
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data?.error || "测试失败");
+      }
+      const accResult = Array.isArray(data.maiyatian?.accounts) ? data.maiyatian.accounts[0] : null;
+      const ok = accResult ? accResult.ok : Boolean(data.maiyatian?.ok);
+      const shopCount = accResult ? accResult.shopCount : data.maiyatian?.shopCount;
+      const message = accResult ? accResult.message : data.maiyatian?.message;
+
+      const idx = accounts.findIndex((a) => a.id === account.id);
+      if (idx !== -1) {
+        handleUpdateAccount(idx, {
+          lastTestedAt: new Date().toLocaleTimeString(),
+          lastTestStatus: ok ? "success" : "error",
+          lastTestMessage: message,
+          shopCount: typeof shopCount === "number" ? shopCount : undefined,
+        });
+      }
+
+      showToast(message || (ok ? "Cookie 测试通过" : "Cookie 不可用"), ok ? "success" : "error");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Cookie 测试失败", "error");
+    } finally {
+      setTestingAccountId(null);
+    }
+  };
+
   const [showInboundApiKey, setShowInboundApiKey] = useState(false);
   const [copiedCallback, setCopiedCallback] = useState(false);
   const [timingDraft, setTimingDraft] = useState<Record<TimingFieldKey, string>>({
@@ -408,7 +511,6 @@ function IntegrationModal({
     return window.location.origin;
   }, []);
   const callbackOrderUrl = callbackBaseUrl ? `${callbackBaseUrl}/api/v1/api-key/listened-orders` : "/api/v1/api-key/listened-orders";
-  const showCookieEditor = !integrationConfig.maiyatianCookie.trim() || isEditingCookie;
   const timing = integrationConfig.selfDeliveryTiming;
   const timingTotalLabel = `${formatTimingNumber(Number(timingDraft.pickupMinutes || 0))} + 距离 × ${formatTimingNumber(Number(timingDraft.minutesPerKm || 0))} + ${formatTimingNumber(Number(timingDraft.riderUpstairsMinutes || 0))}`;
   const visibleCommissionMappings = useMemo(() => {
@@ -558,52 +660,208 @@ function IntegrationModal({
             </div>
 
             <div className="rounded-[20px] border border-black/8 bg-black/2 p-4 dark:border-white/10 dark:bg-white/3 sm:p-5">
-              <div className="flex flex-col gap-3 border-b border-black/8 pb-3 dark:border-white/10 lg:flex-row lg:items-center lg:justify-between">
+              {/* 麦芽田多账号 Cookie 头部 */}
+              <div className="flex flex-col gap-3 border-b border-black/8 pb-3 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0 flex-1">
-                  <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground font-bold">麦芽田 Cookie</div>
-                  <p className="mt-1 text-xs text-muted-foreground">用于读取麦芽田发货门店。</p>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground font-bold">麦芽田 Cookie 账号管理</span>
+                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
+                      {accounts.length} 个账号
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">支持配置多个麦芽田主账号，并发拉取各账号下的发货门店并处理订单。</p>
                 </div>
-                <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-                  <span className={cn(
-                    "inline-flex h-9 items-center rounded-full border px-3 text-xs font-bold",
-                    hasCookie
-                      ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-500"
-                      : "border-amber-500/20 bg-amber-500/10 text-amber-500"
-                  )}>
-                    {hasCookie ? "Cookie 已保存" : "未填 Cookie"}
-                  </span>
+                <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:justify-end">
                   <button
                     type="button"
-                    onClick={() => setIsEditingCookie((current) => !current)}
-                    className={cn(pillButtonClass, "px-3.5 text-center leading-4 bg-white/88 dark:bg-white/5")}
+                    onClick={handleAddAccount}
+                    className={cn(pillButtonClass, "h-9 w-full sm:w-auto px-3.5 text-center leading-4 bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground border-transparent shadow-sm")}
                   >
-                    {showCookieEditor ? "收起 Cookie" : hasCookie ? "编辑 Cookie" : "填写 Cookie"}
+                    <Plus size={13} />
+                    添加账号
                   </button>
-                  {hasCookie ? (
+                  {accounts.length > 0 ? (
                     <button
                       type="button"
-                      onClick={() => onChange({ ...integrationConfig, maiyatianCookie: "" })}
-                      className={cn(pillButtonClass, "px-3.5 text-center leading-4 bg-white/88 dark:bg-white/5")}
+                      disabled={isTestingCookie}
+                      onClick={() => onTestCookie()}
+                      className={cn(pillButtonClass, "h-9 w-full sm:w-auto px-3.5 text-center leading-4 bg-white/88 dark:bg-white/5")}
                     >
-                      删除 Cookie
+                      {isTestingCookie ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+                      测试全部
                     </button>
                   ) : null}
                 </div>
               </div>
 
-              {showCookieEditor ? (
-                <textarea
-                  value={integrationConfig.maiyatianCookie}
-                  onChange={(event) => onChange({ ...integrationConfig, maiyatianCookie: event.target.value })}
-                  placeholder="粘贴麦芽田 cookie，用于读取发货门店"
-                  className="mt-3 min-h-20 w-full rounded-xl border border-black/8 bg-white/80 px-3.5 py-2.5 text-sm font-medium outline-none transition-all focus:border-primary/30 focus:ring-2 focus:ring-primary/10 dark:border-white/10 dark:bg-[#111827]"
-                />
-              ) : null}
+              {/* 账号卡片列表 */}
+              <div className="mt-3.5 space-y-3">
+                {accounts.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-black/10 bg-white/40 py-8 text-center dark:border-white/10 dark:bg-white/2">
+                    <div className="text-xs text-muted-foreground">暂未配置麦芽田账号</div>
+                    <button
+                      type="button"
+                      onClick={handleAddAccount}
+                      className={cn(pillButtonClass, "mt-3 px-4")}
+                    >
+                      <Plus size={13} />
+                      立即添加第一个账号
+                    </button>
+                  </div>
+                ) : (
+                  accounts.map((acc, index) => {
+                    const hasAccCookie = Boolean(acc.cookie.trim());
+                    const isEnabled = acc.enabled !== false;
+                    const isExpanded = editingAccountIds[acc.id] !== undefined ? editingAccountIds[acc.id] : !hasAccCookie;
 
-              <div className="mt-3 flex flex-col gap-3 min-w-0 sm:flex-row sm:items-center sm:justify-between">
+                    return (
+                      <div
+                        key={acc.id}
+                        className={cn(
+                          "overflow-hidden rounded-2xl border transition-all duration-200",
+                          isEnabled
+                            ? "border-black/8 bg-white/85 shadow-[0_1px_3px_rgba(0,0,0,0.03)] dark:border-white/10 dark:bg-[#111827]"
+                            : "border-dashed border-black/8 bg-black/[0.02] opacity-60 dark:border-white/6 dark:bg-white/[0.02]"
+                        )}
+                      >
+                        {/* 顶部主信息栏 */}
+                        <div className="flex items-center justify-between gap-3 p-3.5 sm:p-4">
+                          {/* 左侧：头像 + 名称 + 状态 */}
+                          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                            <div className={cn(
+                              "flex h-8 w-8 shrink-0 items-center justify-center rounded-xl font-bold text-xs select-none",
+                              isEnabled
+                                ? "bg-primary/12 text-primary dark:bg-primary/20"
+                                : "bg-black/5 text-muted-foreground dark:bg-white/5"
+                            )}>
+                              {String.fromCharCode(65 + (index % 26))}
+                            </div>
+
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center min-w-0">
+                                <input
+                                  type="text"
+                                  value={acc.name}
+                                  onChange={(e) => handleUpdateAccount(index, { name: e.target.value })}
+                                  placeholder={`账号${String.fromCharCode(65 + (index % 26))}`}
+                                  className="w-full max-w-[170px] truncate bg-transparent px-1 py-0.5 text-sm font-bold text-foreground outline-none transition-colors hover:bg-black/5 focus:bg-black/5 focus:ring-1 focus:ring-primary/25 dark:hover:bg-white/5 dark:focus:bg-white/5 rounded-md -ml-1"
+                                  title="点击可修改账号备注"
+                                />
+                              </div>
+
+                              {/* 状态徽标与点 */}
+                              <div className="mt-0.5 flex items-center gap-1.5">
+                                {acc.lastTestStatus === "success" ? (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+                                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                                    正常 {acc.shopCount !== undefined ? `(${acc.shopCount}个门店)` : ""}
+                                  </span>
+                                ) : acc.lastTestStatus === "error" ? (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-rose-500" title={acc.lastTestMessage}>
+                                    <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
+                                    {acc.lastTestMessage || "已失效"}
+                                  </span>
+                                ) : hasAccCookie ? (
+                                  <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground font-medium">
+                                    <span className="h-1.5 w-1.5 rounded-full bg-sky-400" />
+                                    Cookie 就绪
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 text-[10px] text-amber-500 font-semibold">
+                                    <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+                                    待填写 Cookie
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* 右侧：开关与删除 */}
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {/* 启用/停用按钮 */}
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateAccount(index, { enabled: !isEnabled })}
+                              className={cn(
+                                "inline-flex h-7 items-center rounded-full px-2.5 text-[10px] font-semibold transition-all",
+                                isEnabled
+                                  ? "bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/18 dark:bg-emerald-500/15 dark:text-emerald-400"
+                                  : "bg-black/5 text-muted-foreground hover:bg-black/8 dark:bg-white/5"
+                              )}
+                            >
+                              {isEnabled ? "已启用" : "已停用"}
+                            </button>
+
+                            {/* 删除按钮 */}
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveAccount(index)}
+                              className="flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground/45 transition-colors hover:bg-rose-500/10 hover:text-rose-500"
+                              title="删除该账号"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* 底部操作分栏：编辑与测试等宽排布 */}
+                        <div className="grid grid-cols-2 gap-2 border-t border-black/5 bg-black/[0.015] px-3.5 py-2 dark:border-white/5 dark:bg-white/[0.015]">
+                          <button
+                            type="button"
+                            onClick={() => toggleAccountEditor(acc.id, hasAccCookie)}
+                            className={cn(
+                              pillButtonClass,
+                              "h-7 min-h-7 w-full text-[11px] font-medium",
+                              isExpanded
+                                ? "bg-primary/10 text-primary border-primary/20 dark:bg-primary/20"
+                                : hasAccCookie
+                                ? "text-foreground"
+                                : "text-amber-600 dark:text-amber-400 font-semibold"
+                            )}
+                          >
+                            <Pencil size={11} />
+                            {isExpanded ? "收起 Cookie" : hasAccCookie ? "编辑 Cookie" : "填写 Cookie"}
+                          </button>
+
+                          <button
+                            type="button"
+                            disabled={!hasAccCookie || testingAccountId === acc.id}
+                            onClick={() => handleTestSingleAccount(acc)}
+                            className={cn(
+                              pillButtonClass,
+                              "h-7 min-h-7 w-full text-[11px] font-medium",
+                              (!hasAccCookie || testingAccountId === acc.id) && "opacity-40 cursor-not-allowed"
+                            )}
+                            title="单独测试该账号 Cookie 连通性"
+                          >
+                            {testingAccountId === acc.id ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />}
+                            测试连通
+                          </button>
+                        </div>
+
+                        {/* 展开的 Cookie 输入框 */}
+                        {isExpanded && (
+                          <div className="border-t border-black/5 bg-black/[0.02] p-3 dark:border-white/5 dark:bg-white/[0.02] animate-in fade-in duration-150">
+                            <textarea
+                              value={acc.cookie}
+                              onChange={(event) => handleUpdateAccount(index, { cookie: event.target.value })}
+                              placeholder={`请在此粘贴【${acc.name}】的麦芽田 Cookie`}
+                              rows={3}
+                              className="w-full rounded-xl border border-black/8 bg-white/95 px-3 py-2 text-xs font-mono outline-none transition-all focus:border-primary/40 focus:ring-2 focus:ring-primary/10 dark:border-white/10 dark:bg-black/50"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* 麦芽田门店绑定区域 */}
+              <div className="mt-4 flex flex-col gap-3 min-w-0 sm:flex-row sm:items-center sm:justify-between border-t border-black/6 pt-4 dark:border-white/6">
                 <div className="min-w-0 flex-1">
                   <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground font-bold">麦芽田门店绑定</div>
-                  <p className="mt-1 text-xs text-muted-foreground">读取发货门店后，在这里手动映射到系统门店。</p>
+                  <p className="mt-1 text-xs text-muted-foreground">点击右侧按钮拉取已启用账号名下的发货门店，然后手动映射到系统门店。</p>
                 </div>
                 <button
                   type="button"
@@ -635,7 +893,14 @@ function IntegrationModal({
                     <div key={shop.id} className="group rounded-2xl border border-black/8 bg-white/80 p-3 transition-all hover:bg-white dark:hover:bg-white/8 dark:border-white/10 dark:bg-white/4 min-w-0">
                       {/* 第一列：麦芽田门店信息 + 状态 */}
                       <div className="min-w-0 flex flex-col gap-1 text-left">
-                        <div className="text-sm font-bold text-foreground truncate" title={shop.name}>{shop.name}</div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold text-foreground truncate" title={shop.name}>{shop.name}</span>
+                          {shop.accountName ? (
+                            <span className="inline-flex shrink-0 items-center rounded-md bg-blue-500/10 px-1.5 py-0.5 text-[9px] font-semibold text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                              {shop.accountName}
+                            </span>
+                          ) : null}
+                        </div>
                         <div className="text-xs text-muted-foreground truncate leading-normal" title={shop.address || undefined}>
                           {shop.address}
                         </div>
@@ -688,6 +953,8 @@ function IntegrationModal({
                                         libraryName: defaultLib ? defaultLib.name : undefined,
                                         brushCommission: previousMapping?.brushCommission ?? undefined,
                                         selfDeliveryTiming: previousMapping?.selfDeliveryTiming || undefined,
+                                        accountId: shop.accountId || previousMapping?.accountId || undefined,
+                                        accountName: shop.accountName || previousMapping?.accountName || undefined,
                                       });
                                     }
                                     onChange({
@@ -2153,8 +2420,10 @@ export default function OrdersPage() {
 
   const fetchMaiyatianShops = useCallback(async () => {
     const cookie = integrationConfig.maiyatianCookie.trim();
-    if (!cookie) {
-      showToast("请先填写麦芽田 Cookie", "error");
+    const accounts = integrationConfig.maiyatianCookies || [];
+    const enabledAccounts = accounts.filter((a) => a.enabled !== false && a.cookie.trim());
+    if (enabledAccounts.length === 0 && !cookie) {
+      showToast("请先填写并启用至少一个麦芽田 Cookie", "error");
       return;
     }
 
@@ -2163,7 +2432,10 @@ export default function OrdersPage() {
       const response = await fetch("/api/orders/integration/maiyatian-shops", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ maiyatianCookie: cookie }),
+        body: JSON.stringify({
+          maiyatianCookie: cookie,
+          maiyatianCookies: enabledAccounts.length > 0 ? enabledAccounts : undefined,
+        }),
       });
       const data = await response.json().catch(() => ({}));
 
@@ -2192,13 +2464,17 @@ export default function OrdersPage() {
     } finally {
       setIsFetchingMaiyatianShops(false);
     }
-  }, [integrationConfig.maiyatianCookie, showToast]);
+  }, [integrationConfig.maiyatianCookie, integrationConfig.maiyatianCookies, showToast]);
 
   useEffect(() => {
-    if (!integrationConfig.maiyatianCookie.trim()) {
+    const hasAnyCookie = Boolean(
+      integrationConfig.maiyatianCookie.trim() ||
+      (integrationConfig.maiyatianCookies || []).some((a) => a.enabled !== false && a.cookie.trim())
+    );
+    if (!hasAnyCookie) {
       setMaiyatianShops([]);
     }
-  }, [integrationConfig.maiyatianCookie]);
+  }, [integrationConfig.maiyatianCookie, integrationConfig.maiyatianCookies]);
 
   const saveIntegrationConfig = useCallback(async (
     nextConfig?: AutoPickIntegrationConfig,
@@ -2223,18 +2499,19 @@ export default function OrdersPage() {
       setIntegrationConfig(savedConfig);
       setHasUnresolvedShops(Boolean(data?.hasUnresolvedShops));
       setSavedIntegrationDigest(serializeIntegrationConfig({
-        pluginBaseUrl: savedConfig.pluginBaseUrl,
-        inboundApiKey: savedConfig.inboundApiKey,
-        maiyatianCookie: savedConfig.maiyatianCookie,
-        maiyatianShopMappings: savedConfig.maiyatianShopMappings,
-        selfDeliveryTiming: savedConfig.selfDeliveryTiming,
-        defaultBrushCommission: savedConfig.defaultBrushCommission
+        pluginBaseUrl: payload.pluginBaseUrl,
+        inboundApiKey: payload.inboundApiKey,
+        maiyatianCookie: payload.maiyatianCookie,
+        maiyatianCookies: payload.maiyatianCookies,
+        maiyatianShopMappings: payload.maiyatianShopMappings,
+        selfDeliveryTiming: payload.selfDeliveryTiming,
+        defaultBrushCommission: payload.defaultBrushCommission,
       }));
       setSavedMappingsDigest(serializeMaiyatianMappings({
         maiyatianShopMappings: savedConfig.maiyatianShopMappings,
       }));
       if (!options?.silent) {
-        showToast("自动推单对接配置已保存", "success");
+        showToast("对接配置已保存", "success");
       }
       if (shouldRefreshOrders) {
         triggerParentRefresh();
@@ -2265,7 +2542,32 @@ export default function OrdersPage() {
         throw new Error(data?.error || `${target === "plugin" ? "脚本" : "Cookie"} 测试失败`);
       }
 
-      showToast(data.ok ? `${target === "plugin" ? "脚本" : "Cookie"} 测试通过` : `${target === "plugin" ? "脚本" : "Cookie"} 测试未通过`, data.ok ? "success" : "error");
+      if (target === "cookie" && Array.isArray(data.maiyatian?.accounts)) {
+        setIntegrationConfig((prev) => {
+          const currentAccs = prev.maiyatianCookies && prev.maiyatianCookies.length > 0
+            ? prev.maiyatianCookies
+            : (prev.maiyatianCookie ? [{ id: "account-default", name: "账号A", cookie: prev.maiyatianCookie, enabled: true }] : []);
+          const updated = currentAccs.map((acc) => {
+            const res = data.maiyatian.accounts.find((item: { id: string }) => item.id === acc.id);
+            if (res) {
+              return {
+                ...acc,
+                lastTestedAt: new Date().toLocaleTimeString(),
+                lastTestStatus: res.ok ? ("success" as const) : ("error" as const),
+                lastTestMessage: res.message,
+                shopCount: res.shopCount,
+              };
+            }
+            return acc;
+          });
+          return {
+            ...prev,
+            maiyatianCookies: updated,
+          };
+        });
+      }
+
+      showToast(data.maiyatian?.message || (data.ok ? `${target === "plugin" ? "脚本" : "Cookie"} 测试通过` : `${target === "plugin" ? "脚本" : "Cookie"} 测试未通过`), data.ok ? "success" : "error");
     } catch (error) {
       console.error("Failed to test order integration config:", error);
       showToast(error instanceof Error ? error.message : `${target === "plugin" ? "脚本" : "Cookie"} 测试失败`, "error");

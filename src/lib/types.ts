@@ -321,10 +321,22 @@ export interface AutoPickApiKey {
   updatedAt?: string;
 }
 
+export interface MaiyatianCookieAccount {
+  id: string;
+  name: string;
+  cookie: string;
+  enabled: boolean;
+  lastTestedAt?: string;
+  lastTestStatus?: "success" | "error";
+  lastTestMessage?: string;
+  shopCount?: number;
+}
+
 export interface AutoPickIntegrationConfig {
   pluginBaseUrl: string;
   inboundApiKey: string;
   maiyatianCookie: string;
+  maiyatianCookies?: MaiyatianCookieAccount[];
   maiyatianShopMappings: AutoPickMaiyatianShopMapping[];
   selfDeliveryTiming: AutoPickSelfDeliveryTimingConfig;
   defaultBrushCommission: number;
@@ -344,6 +356,8 @@ export interface AutoPickMaiyatianShop {
   phone?: string | null;
   cityCode?: string | null;
   cityName?: string | null;
+  accountId?: string | null;
+  accountName?: string | null;
 }
 
 export interface AutoPickMaiyatianShopMapping {
@@ -357,6 +371,8 @@ export interface AutoPickMaiyatianShopMapping {
   libraryName?: string | null;
   brushCommission?: number | null;
   selfDeliveryTiming?: AutoPickSelfDeliveryTimingConfig | null;
+  accountId?: string | null;
+  accountName?: string | null;
 }
 
 export type TTLockRegion = "cn" | "global";

@@ -71,10 +71,13 @@ export async function GET() {
         if (userRecord) {
             const rawPermissions = userRecord.permissions && typeof userRecord.permissions === "object" ? userRecord.permissions as Record<string, unknown> : {};
             const autoPickConfig = normalizeAutoPickIntegrationConfig(rawPermissions.autoPickIntegration);
-            const hasMaiyatianCookie = Boolean(String(autoPickConfig.maiyatianCookie || "").trim());
+            const activeCookies = (autoPickConfig.maiyatianCookies || []).filter((c) => c.enabled && c.cookie.trim());
+            const hasMaiyatianCookie = activeCookies.length > 0 || Boolean(String(autoPickConfig.maiyatianCookie || "").trim());
+            const maiyatianCookieCount = activeCookies.length > 0 ? activeCookies.length : (hasMaiyatianCookie ? 1 : 0);
             userWithConfig = {
                 ...userRecord,
                 hasMaiyatianCookie,
+                maiyatianCookieCount,
             };
         }
 

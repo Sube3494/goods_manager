@@ -21,7 +21,7 @@ export {
 };
 import { Prisma } from "../../prisma/generated-client";
 import { createHash, randomBytes, randomUUID } from "crypto";
-import { AutoPickIntegrationConfig, AutoPickMaiyatianShop, AutoPickMaiyatianShopMapping, AutoPickSelfDeliveryTimingConfig } from "@/lib/types";
+import { AutoPickIntegrationConfig, AutoPickMaiyatianShop, AutoPickMaiyatianShopMapping, AutoPickSelfDeliveryTimingConfig, MaiyatianCookieAccount } from "@/lib/types";
 import { InventoryService } from "@/services/inventoryService";
 import { emitAutoPickOrderEvent } from "@/lib/autoPickOrderEvents";
 import { FinanceMath } from "@/lib/math";
@@ -1125,6 +1125,50 @@ function normalizeMaiyatianCookie(value: string) {
   return value.trim();
 }
 
+export function normalizeMaiyatianCookieAccount(input: unknown, index = 0): MaiyatianCookieAccount | null {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return null;
+  const item = input as Record<string, unknown>;
+  const cookie = normalizeMaiyatianCookie(String(item.cookie || ""));
+  const name = String(item.name || "").trim() || `账号${String.fromCharCode(65 + (index % 26))}${index >= 26 ? Math.floor(index / 26) : ""}`;
+  const id = String(item.id || "").trim() || `account-${index + 1}`;
+  const enabled = item.enabled !== false;
+  return {
+    id,
+    name,
+    cookie,
+    enabled,
+    lastTestedAt: item.lastTestedAt ? String(item.lastTestedAt) : undefined,
+    lastTestStatus: item.lastTestStatus === "success" || item.lastTestStatus === "error" ? item.lastTestStatus : undefined,
+    lastTestMessage: item.lastTestMessage ? String(item.lastTestMessage) : undefined,
+    shopCount: typeof item.shopCount === "number" ? item.shopCount : undefined,
+  };
+}
+
+export function normalizeMaiyatianCookieAccounts(input: unknown, legacySingleCookie = ""): MaiyatianCookieAccount[] {
+  const accounts: MaiyatianCookieAccount[] = [];
+  if (Array.isArray(input)) {
+    input.forEach((item, index) => {
+      const normalized = normalizeMaiyatianCookieAccount(item, index);
+      if (normalized) {
+        accounts.push(normalized);
+      }
+    });
+  }
+
+  // 向前兼容：若没有传入有效账号数组，但有老的单 cookie 字段，则自动初始化为“账号A”
+  const normalizedLegacy = normalizeMaiyatianCookie(legacySingleCookie);
+  if (accounts.length === 0 && normalizedLegacy) {
+    accounts.push({
+      id: "account-default",
+      name: "账号A",
+      cookie: normalizedLegacy,
+      enabled: true,
+    });
+  }
+
+  return accounts;
+}
+
 
 
 function findMappedShopNameFromAutoPickConfig(
@@ -1199,6 +1243,9 @@ function normalizeMaiyatianShopMapping(input: unknown): AutoPickMaiyatianShopMap
     return null;
   }
 
+  const accountId = record.accountId ? String(record.accountId).trim() : undefined;
+  const accountName = record.accountName ? String(record.accountName).trim() : undefined;
+
   return {
     maiyatianShopId,
     maiyatianShopName,
@@ -1212,6 +1259,8 @@ function normalizeMaiyatianShopMapping(input: unknown): AutoPickMaiyatianShopMap
     selfDeliveryTiming: record.selfDeliveryTiming && typeof record.selfDeliveryTiming === "object" && !Array.isArray(record.selfDeliveryTiming)
       ? normalizeAutoPickSelfDeliveryTimingConfig(record.selfDeliveryTiming)
       : undefined,
+    accountId: accountId || undefined,
+    accountName: accountName || undefined,
   };
 }
 
@@ -1280,10 +1329,15 @@ export function normalizeAutoPickIntegrationConfig(input: unknown): AutoPickInte
         .filter((item): item is AutoPickMaiyatianShopMapping => Boolean(item))
     : [];
 
+  const legacyCookie = normalizeMaiyatianCookie(String(payload.maiyatianCookie || ""));
+  const maiyatianCookies = normalizeMaiyatianCookieAccounts(payload.maiyatianCookies, legacyCookie);
+  const activePrimaryCookie = maiyatianCookies.find((acc) => acc.enabled && acc.cookie)?.cookie || legacyCookie;
+
   return {
     pluginBaseUrl: normalizePluginBaseUrl(String(payload.pluginBaseUrl || "")),
     inboundApiKey: normalizeInboundApiKey(String(payload.inboundApiKey || "")),
-    maiyatianCookie: normalizeMaiyatianCookie(String(payload.maiyatianCookie || "")),
+    maiyatianCookie: activePrimaryCookie,
+    maiyatianCookies,
     maiyatianShopMappings: dedupeMaiyatianShopMappings(maiyatianShopMappings),
     selfDeliveryTiming: normalizeAutoPickSelfDeliveryTimingConfig(payload.selfDeliveryTiming),
     defaultBrushCommission: typeof payload.defaultBrushCommission === "number"
@@ -2658,12 +2712,31 @@ async function fetchSimplifiedMaiyatianOrderDetailByCookie(cookie: string, order
   return order;
 }
 
-async function getMaiyatianCookieForUser(userId: string) {
+export async function getMaiyatianCookiesForUser(userId: string): Promise<MaiyatianCookieAccount[]> {
   const config = await getAutoPickIntegrationConfigByUserId(userId);
-  if (!config.maiyatianCookie) {
+  if (config.maiyatianCookies && config.maiyatianCookies.length > 0) {
+    const enabled = config.maiyatianCookies.filter((a) => a.enabled !== false && a.cookie.trim());
+    if (enabled.length > 0) {
+      return enabled;
+    }
+  }
+  if (config.maiyatianCookie && config.maiyatianCookie.trim()) {
+    return [{
+      id: "account-default",
+      name: "账号A",
+      cookie: config.maiyatianCookie.trim(),
+      enabled: true,
+    }];
+  }
+  return [];
+}
+
+async function getMaiyatianCookieForUser(userId: string) {
+  const accounts = await getMaiyatianCookiesForUser(userId);
+  if (accounts.length === 0) {
     throw new Error("Maiyatian cookie is not configured");
   }
-  return config.maiyatianCookie;
+  return accounts[0].cookie;
 }
 
 async function submitMaiyatianFormByCookie(
@@ -2733,6 +2806,55 @@ export async function fetchMaiyatianShippingShopsByCookie(cookie: string) {
   }
 
   return Array.from(deduped.values()).sort((left, right) => {
+    const cityCompare = String(left.cityCode || "").localeCompare(String(right.cityCode || ""));
+    if (cityCompare !== 0) return cityCompare;
+    return left.name.localeCompare(right.name, "zh-CN");
+  });
+}
+
+export async function fetchMaiyatianShippingShopsByMultipleCookies(
+  accounts: Array<{ id: string; name: string; cookie: string; enabled?: boolean }>
+): Promise<AutoPickMaiyatianShop[]> {
+  const enabledAccounts = accounts.filter((a) => a.enabled !== false && normalizeMaiyatianCookie(a.cookie));
+  if (enabledAccounts.length === 0) {
+    throw new Error("请先填写并启用至少一个麦芽田 Cookie");
+  }
+
+  const results = await Promise.allSettled(
+    enabledAccounts.map(async (acc) => {
+      const shops = await fetchMaiyatianShippingShopsByCookie(acc.cookie);
+      return shops.map((s) => ({
+        ...s,
+        accountId: acc.id,
+        accountName: acc.name,
+      }));
+    })
+  );
+
+  const merged = new Map<string, AutoPickMaiyatianShop>();
+  let hasAnySuccess = false;
+  let lastError: unknown = null;
+
+  for (let i = 0; i < results.length; i++) {
+    const res = results[i];
+    if (res.status === "fulfilled") {
+      hasAnySuccess = true;
+      for (const shop of res.value) {
+        if (!merged.has(shop.id)) {
+          merged.set(shop.id, shop);
+        }
+      }
+    } else {
+      lastError = res.reason;
+      console.warn(`[Maiyatian] Failed to fetch shops for account ${enabledAccounts[i].name}:`, res.reason);
+    }
+  }
+
+  if (!hasAnySuccess) {
+    throw lastError || new Error("未能从配置的麦芽田账号中读取到门店");
+  }
+
+  return Array.from(merged.values()).sort((left, right) => {
     const cityCompare = String(left.cityCode || "").localeCompare(String(right.cityCode || ""));
     if (cityCompare !== 0) return cityCompare;
     return left.name.localeCompare(right.name, "zh-CN");
@@ -8110,12 +8232,8 @@ export async function backfillMeituanSkuIdForManualMatchedShopProducts(
 
 
 export async function fetchMaiyatianDeliveryTrail(userId: string, deliveryId: string) {
-  const cookie = await getMaiyatianCookieForUser(userId);
-  const response = await fetchMaiyatianJson<{ errno?: number; data?: Record<string, unknown> }>(
-    `/delivery/trail/?${new URLSearchParams({ f: "json", id: deliveryId })}`, cookie,
-    { signal: AbortSignal.timeout(15000) },
-  );
-  if ((response.errno !== undefined && response.errno !== 0 && response.errno !== 1) || !response.data) {
+  const accounts = await getMaiyatianCookiesForUser(userId);
+  if (accounts.length === 0) {
     throw new Error("配送轨迹暂不可用，请检查麦芽田登录状态或稍后刷新。");
   }
   const coord = (value: unknown) => {
@@ -8126,15 +8244,31 @@ export async function fetchMaiyatianDeliveryTrail(userId: string, deliveryId: st
     return Number.isFinite(lng) && Number.isFinite(lat) && Math.abs(lng) <= 180 && Math.abs(lat) <= 90 && (lng !== 0 || lat !== 0)
       ? { lng, lat } : null;
   };
-  const data = response.data;
-  return {
-    dispatcher: coord(data.dispatcher), sender: coord(data.sender), receiver: coord(data.receiver),
-    distance: data.distance != null && data.distance !== "" ? String(data.distance) : "",
-    orderStatus: String(data.order_status || data.orderStatus || data.delivery_status || data.status || ""),
-    statusName: typeof data.status_name === "string" ? data.status_name : (typeof data.statusName === "string" ? data.statusName : ""),
-    isTakeGoods: data.is_take_goods === 1 || data.is_take_goods === "1" || data.is_take_goods === true,
-    fetchedAt: new Date().toISOString(),
-  };
+
+  let lastError: unknown = null;
+  for (const account of accounts) {
+    try {
+      const response = await fetchMaiyatianJson<{ errno?: number; data?: Record<string, unknown> }>(
+        `/delivery/trail/?${new URLSearchParams({ f: "json", id: deliveryId })}`, account.cookie,
+        { signal: AbortSignal.timeout(15000) },
+      );
+      if ((response.errno === undefined || response.errno === 0 || response.errno === 1) && response.data) {
+        const data = response.data;
+        return {
+          dispatcher: coord(data.dispatcher), sender: coord(data.sender), receiver: coord(data.receiver),
+          distance: data.distance != null && data.distance !== "" ? String(data.distance) : "",
+          orderStatus: String(data.order_status || data.orderStatus || data.delivery_status || data.status || ""),
+          statusName: typeof data.status_name === "string" ? data.status_name : (typeof data.statusName === "string" ? data.statusName : ""),
+          isTakeGoods: data.is_take_goods === 1 || data.is_take_goods === "1" || data.is_take_goods === true,
+          fetchedAt: new Date().toISOString(),
+        };
+      }
+    } catch (err) {
+      lastError = err;
+    }
+  }
+
+  throw lastError || new Error("配送轨迹暂不可用，请检查麦芽田登录状态或稍后刷新。");
 }
 
 export type MaiyatianCourierPhotosResult = {
@@ -8170,57 +8304,90 @@ export async function fetchMaiyatianCourierPhotos(
     };
   }
 
-  const cookie = await getMaiyatianCookieForUser(userId);
-  const formData = new URLSearchParams();
-  formData.set("delivery_id", normalizedDeliveryId);
-  formData.set("tag", normalizedTag);
-
-  const response = await fetchMaiyatianJson<{
-    errno?: number;
-    message?: string;
-    data?: {
-      courier_delivery_photos?: string[];
-      courier_pickup_photos?: string[];
-      [key: string]: unknown;
-    } | boolean;
-    courier_delivery_photos?: string[];
-    courier_pickup_photos?: string[];
-  }>(
-    "/delivery/courierPhoto/?f=json",
-    cookie,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-      },
-      body: formData.toString(),
-      signal: AbortSignal.timeout(15000),
-    },
-  );
-
-  if (response.errno === 0 && !response.data) {
+  const accounts = await getMaiyatianCookiesForUser(userId);
+  if (accounts.length === 0) {
     return {
       supported: false,
       deliveryPhotos: [],
       pickupPhotos: [],
-      message: response.message || "当前配送不支持查询取送照片",
+      message: "请先配置麦芽田 Cookie",
     };
   }
 
-  const rawDeliveryPhotos = (response.data && typeof response.data === "object" && Array.isArray(response.data.courier_delivery_photos))
-    ? response.data.courier_delivery_photos
-    : (Array.isArray(response.courier_delivery_photos) ? response.courier_delivery_photos : []);
+  const formData = new URLSearchParams();
+  formData.set("delivery_id", normalizedDeliveryId);
+  formData.set("tag", normalizedTag);
 
-  const rawPickupPhotos = (response.data && typeof response.data === "object" && Array.isArray(response.data.courier_pickup_photos))
-    ? response.data.courier_pickup_photos
-    : (Array.isArray(response.courier_pickup_photos) ? response.courier_pickup_photos : []);
-
-  const cleanPhotos = (arr: unknown[]) =>
-    arr.map((item) => String(item || "").trim()).filter((url) => /^https?:\/\//i.test(url));
-
-  return {
-    supported: true,
-    deliveryPhotos: cleanPhotos(rawDeliveryPhotos),
-    pickupPhotos: cleanPhotos(rawPickupPhotos),
+  let lastResult: MaiyatianCourierPhotosResult = {
+    supported: false,
+    deliveryPhotos: [],
+    pickupPhotos: [],
+    message: "暂无骑手照片凭证",
   };
+
+  for (const account of accounts) {
+    try {
+      const response = await fetchMaiyatianJson<{
+        errno?: number;
+        message?: string;
+        data?: {
+          courier_delivery_photos?: string[];
+          courier_pickup_photos?: string[];
+          [key: string]: unknown;
+        } | boolean;
+        courier_delivery_photos?: string[];
+        courier_pickup_photos?: string[];
+      }>(
+        "/delivery/courierPhoto/?f=json",
+        account.cookie,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+          },
+          body: formData.toString(),
+          signal: AbortSignal.timeout(15000),
+        },
+      );
+
+      if (response.errno === 0 && !response.data) {
+        lastResult = {
+          supported: false,
+          deliveryPhotos: [],
+          pickupPhotos: [],
+          message: response.message || "当前配送不支持查询取送照片",
+        };
+        continue;
+      }
+
+      const dataObj = response.data && typeof response.data === "object" ? response.data : null;
+      const rawDeliveryPhotos = dataObj?.courier_delivery_photos || response.courier_delivery_photos || [];
+      const rawPickupPhotos = dataObj?.courier_pickup_photos || response.courier_pickup_photos || [];
+
+      const cleanPhotos = (arr: unknown[]) =>
+        Array.isArray(arr) ? arr.map((item) => String(item || "").trim()).filter((url) => /^https?:\/\//i.test(url)) : [];
+
+      const deliveryPhotos = cleanPhotos(rawDeliveryPhotos);
+      const pickupPhotos = cleanPhotos(rawPickupPhotos);
+
+      if (deliveryPhotos.length > 0 || pickupPhotos.length > 0) {
+        return {
+          supported: true,
+          deliveryPhotos,
+          pickupPhotos,
+        };
+      }
+
+      lastResult = {
+        supported: true,
+        deliveryPhotos: [],
+        pickupPhotos: [],
+        message: response.message || "暂无骑手取送照片",
+      };
+    } catch {
+      // 当前账号请求异常，继续尝试下一个账号
+    }
+  }
+
+  return lastResult;
 }

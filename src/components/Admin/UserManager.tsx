@@ -50,6 +50,7 @@ interface WhitelistEntry {
     roleProfile?: RoleProfile;
     isInternal?: boolean;
     hasMaiyatianCookie?: boolean;
+    maiyatianCookieCount?: number;
     accessibleLibraries?: Array<{ id: string; name: string }>;
   };
 }
@@ -820,7 +821,7 @@ export function UserManager() {
                               ) : null}
                               {entry.user?.hasMaiyatianCookie ? (
                                 <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
-                                  麦芽田已接入
+                                  麦芽田已接入{entry.user?.maiyatianCookieCount && entry.user.maiyatianCookieCount > 1 ? ` (${entry.user.maiyatianCookieCount}号)` : ""}
                                 </span>
                               ) : null}
                             </div>
@@ -959,7 +960,7 @@ export function UserManager() {
                             ) : null}
                             {entry.user?.hasMaiyatianCookie ? (
                               <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
-                                麦芽田已接入
+                                麦芽田已接入{entry.user?.maiyatianCookieCount && entry.user.maiyatianCookieCount > 1 ? ` (${entry.user.maiyatianCookieCount}号)` : ""}
                               </span>
                             ) : null}
                           </div>

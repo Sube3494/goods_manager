@@ -2,7 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthorizedUser } from "@/lib/auth";
 import { getAddressDetail, isAddressDisabled } from "@/lib/addressBook";
 import prisma from "@/lib/prisma";
-import { fetchMaiyatianShippingShopsByCookie, getAutoPickIntegrationConfigByUserId } from "@/lib/autoPickOrders";
+import {
+  fetchMaiyatianShippingShopsByCookie,
+  fetchMaiyatianShippingShopsByMultipleCookies,
+  getAutoPickIntegrationConfigByUserId,
+  normalizeMaiyatianCookieAccounts,
+} from "@/lib/autoPickOrders";
+import { AutoPickMaiyatianShop } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -24,13 +30,17 @@ export async function GET(_request: NextRequest) {
 
   try {
     const saved = await getAutoPickIntegrationConfigByUserId(session.id);
-    const cookie = String(saved.maiyatianCookie || "").trim();
+    const accounts = saved.maiyatianCookies && saved.maiyatianCookies.length > 0
+      ? saved.maiyatianCookies
+      : saved.maiyatianCookie
+        ? [{ id: "account-default", name: "账号A", cookie: saved.maiyatianCookie, enabled: true }]
+        : [];
 
-    let shops: Array<{ id: string; name: string; address?: string | null; cityName?: string | null }> = [];
+    let shops: AutoPickMaiyatianShop[] = [];
 
-    if (cookie) {
+    if (accounts.length > 0) {
       try {
-        shops = await fetchMaiyatianShippingShopsByCookie(cookie);
+        shops = await fetchMaiyatianShippingShopsByMultipleCookies(accounts);
       } catch (err) {
         console.warn("实时读取麦芽田门店失败，尝试使用保存的映射:", err);
       }
@@ -42,6 +52,9 @@ export async function GET(_request: NextRequest) {
         .map((m) => ({
           id: String(m.maiyatianShopId || "").trim(),
           name: String(m.maiyatianShopName || "").trim(),
+          address: m.maiyatianShopAddress || "",
+          accountId: m.accountId,
+          accountName: m.accountName,
         }))
         .filter((item) => item.name);
     }
@@ -67,14 +80,19 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json().catch(() => ({}));
     const saved = await getAutoPickIntegrationConfigByUserId(session.id);
-    const cookie = String(body?.maiyatianCookie ?? saved.maiyatianCookie ?? "").trim();
+    
+    const accounts = normalizeMaiyatianCookieAccounts(
+      body?.maiyatianCookies ?? saved.maiyatianCookies,
+      String(body?.maiyatianCookie ?? saved.maiyatianCookie ?? "")
+    );
 
-    if (!cookie) {
-      return NextResponse.json({ error: "请先填写麦芽田 Cookie" }, { status: 400 });
+    const enabledAccounts = accounts.filter((a) => a.enabled !== false && a.cookie.trim());
+    if (enabledAccounts.length === 0) {
+      return NextResponse.json({ error: "请先填写并启用至少一个麦芽田 Cookie" }, { status: 400 });
     }
 
     const [shops, user, dbShops] = await Promise.all([
-      fetchMaiyatianShippingShopsByCookie(cookie),
+      fetchMaiyatianShippingShopsByMultipleCookies(enabledAccounts),
       prisma.user.findUnique({
         where: { id: session.id },
         select: { shippingAddresses: true },
