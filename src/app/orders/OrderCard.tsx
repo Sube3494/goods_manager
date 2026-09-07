@@ -3543,15 +3543,21 @@ export const OrderCard = memo(function OrderCard({
                   />
                   <DetailStat label="货品成本" value={order.productCostStatus === "ready" ? toCurrency(order.productCost) : (productCostStatusText || "-")} />
                   <DetailStat label="纯利润" value={pureProfitDisplay} />
+                  <DetailStat label={commissionDisplay.label} value={commissionDisplay.value} />
                   {hasRefundAmount ? (
-                    <DetailStat label="退款金额" value={toCurrency(refundAmount)} />
+                    <DetailStat
+                      label="退款金额"
+                      value={toCurrency(refundAmount)}
+                      className={!hasReturnExtraExpense ? "col-span-2 sm:col-span-1" : ""}
+                    />
                   ) : null}
                   {hasReturnExtraExpense ? (
-                    <DetailStat label="退货支出" value={toCurrency(returnExtraExpense)} />
+                    <DetailStat
+                      label="退货支出"
+                      value={toCurrency(returnExtraExpense)}
+                      className={!hasRefundAmount ? "col-span-2 sm:col-span-1" : ""}
+                    />
                   ) : null}
-                  <div className={hasRefundAmount || hasReturnExtraExpense ? "" : "col-span-2"}>
-                    <DetailStat label={commissionDisplay.label} value={commissionDisplay.value} />
-                  </div>
                 </div>
               </section>
               <section className="rounded-[20px] border border-black/6 bg-white/80 p-3.5 dark:border-white/8 dark:bg-white/4 sm:rounded-3xl sm:p-4">
