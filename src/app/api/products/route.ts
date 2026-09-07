@@ -319,7 +319,7 @@ export async function POST(request: Request) {
                 doudianSkuId: String(doudianSkuId || "").trim() || null,
                 productName: name,
                 pinyin: ProductService.generatePinyinSearchText(name),
-                productImage: storage.stripUrl(image),
+                productImage: null,
                 categoryId: categoryId || null,
                 categoryName: category?.name || null,
                 supplierId: supplierId || null,
@@ -442,6 +442,22 @@ export async function PUT(request: Request) {
           shelfLifeDays: shelfLifeDays !== undefined ? (Number.isFinite(shelfLifeDays) ? shelfLifeDays : null) : undefined,
         },
       });
+
+      if (image !== undefined) {
+        // 同步更新继承该主库商品的所有店铺商品，确保主库换图时店铺即刻同步最新图，且不会残留旧图死链
+        await tx.shopProduct.updateMany({
+          where: {
+            productId: id,
+            OR: [
+              { productImage: null },
+              ...(existing.image ? [{ productImage: existing.image }] : []),
+            ],
+          },
+          data: {
+            productImage: null,
+          },
+        });
+      }
 
       await replaceProductJdSkuMappings(tx, id, user.id, normalizedJdSkuIds);
       await replaceProductMeituanSkuMappings(tx, id, user.id, normalizedMeituanSkuIds);

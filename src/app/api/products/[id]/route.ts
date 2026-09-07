@@ -182,6 +182,21 @@ export async function PUT(
         }
       });
 
+      if (image !== undefined) {
+        await tx.shopProduct.updateMany({
+          where: {
+            productId: id,
+            OR: [
+              { productImage: null },
+              ...(existingProduct?.image ? [{ productImage: existingProduct.image }] : []),
+            ],
+          },
+          data: {
+            productImage: null,
+          },
+        });
+      }
+
       await replaceProductJdSkuMappings(tx, id, session.id, normalizedJdSkuIds);
       await replaceProductMeituanSkuMappings(tx, id, session.id, normalizedMeituanSkuIds);
 

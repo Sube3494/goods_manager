@@ -52,6 +52,10 @@ export async function PATCH(
         where: { image: oldItem.url },
         data: { image: normalizedUrl }
       });
+      await prisma.shopProduct.updateMany({
+        where: { productImage: oldItem.url },
+        data: { productImage: null }
+      });
     }
 
     // 如果 URL 发生了变化，清理旧物理文件
@@ -120,6 +124,10 @@ export async function DELETE(
       return NextResponse.json({ error: "Item not found" }, { status: 404 });
     }
 
+    if (!item) {
+      return NextResponse.json({ error: "Item not found" }, { status: 404 });
+    }
+
     // 计算该 URL 的引用数（有多少 GalleryItem 指向同一物理文件）
     const refCount = await prisma.galleryItem.count({
       where: { url: item.url }
@@ -129,6 +137,12 @@ export async function DELETE(
     await prisma.product.updateMany({
       where: { image: item.url },
       data: { image: null }
+    });
+
+    // 同样清除关联店铺商品对该已删除图片的引用，使其自动继承主库最新图或置空，绝不留死链
+    await prisma.shopProduct.updateMany({
+      where: { productImage: item.url },
+      data: { productImage: null }
     });
 
     await prisma.galleryItem.delete({

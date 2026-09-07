@@ -2194,7 +2194,7 @@ export const OrderCard = memo(function OrderCard({
   onToggleExpanded: (id: string) => void;
   onRunAction: (orderId: string, action: OrderAction) => void;
   onOpenCostBackfill: (order: AutoPickOrder) => void;
-  onOpenMatchEditor: (order: AutoPickOrder, item: AutoPickOrderItem) => void;
+  onOpenMatchEditor: (order: AutoPickOrder, item: AutoPickOrderItem, options?: { autoOutbound?: boolean }) => void;
   onRefresh?: () => void;
 }) {
   const [isProfitTooltipOpen, setIsProfitTooltipOpen] = useState(false);
@@ -2716,7 +2716,7 @@ export const OrderCard = memo(function OrderCard({
                               return false;
                             }) || unmatchedItems[0];
 
-                            onOpenMatchEditor(order, targetItem);
+                            onOpenMatchEditor(order, targetItem, { autoOutbound: true });
                             return;
                           }
 

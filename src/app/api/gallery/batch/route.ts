@@ -34,22 +34,27 @@ export async function DELETE(request: Request) {
       select: { url: true, thumbnailUrl: true, id: true }
     });
 
-    // 清除涉及这些 URL 的商品封面引用
     const urls = items.map((item: { url: string }) => item.url);
-    if (urls.length > 0) {
-      await prisma.product.updateMany({
-        where: { image: { in: urls } },
-        data: { image: null }
-      });
-    }
 
     // 先删数据库记录
     const deleteResult = await prisma.galleryItem.deleteMany({
       where: { id: { in: ids } }
     });
 
-    // 对每个唯一 URL 检查是否还有其他 GalleryItem 引用，没有才物理删除
+    // 清除关联商品主图与店铺商品封面引用，避免物理删除后产生死链
     const uniqueUrls = [...new Set(urls)];
+    if (uniqueUrls.length > 0) {
+      await prisma.product.updateMany({
+        where: { image: { in: uniqueUrls } },
+        data: { image: null }
+      });
+      await prisma.shopProduct.updateMany({
+        where: { productImage: { in: uniqueUrls } },
+        data: { productImage: null }
+      });
+    }
+
+    // 对每个唯一 URL 检查是否还有其他 GalleryItem 引用，没有才物理删除
     const uniqueThumbnailUrls = [...new Set(items.map(item => item.thumbnailUrl).filter(Boolean))] as string[];
     if (uniqueUrls.length > 0) {
       const storage = await getStorageStrategy();

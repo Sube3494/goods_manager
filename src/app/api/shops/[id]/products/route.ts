@@ -270,7 +270,11 @@ export async function GET(
         .filter((item): item is NonNullable<typeof item> => Boolean(item));
 
       const storage = await getStorageStrategy();
+      const staleShopProductIdsToHeal: string[] = [];
       const resolved = orderedItems.map((item) => {
+        if (item.productId && item.productImage && item.product?.image) {
+          staleShopProductIdsToHeal.push(item.id);
+        }
         const aggregatedJdSkuIds = Array.from(new Set([
           ...normalizeJdSkuIds(item.jdSkuId),
           ...(item.product?.jdSkuMappings?.map((mapping: any) => mapping.jdSkuId) || []),
@@ -284,11 +288,9 @@ export async function GET(
           jdSkuIds: aggregatedJdSkuIds,
           taobaoSkuId: item.taobaoSkuId || null,
           name: item.productName || item.product?.name || "未命名商品",
-          image: item.productImage
-            ? storage.resolveUrl(item.productImage)
-            : item.product?.image
+          image: (item.productId && item.product?.image)
             ? storage.resolveUrl(item.product.image)
-            : null,
+            : (item.productImage ? storage.resolveUrl(item.productImage) : (item.product?.image ? storage.resolveUrl(item.product.image) : null)),
           categoryId: item.categoryId || item.product?.categoryId || null,
           categoryName: item.categoryName || item.product?.category?.name || "未分类",
           supplierId: item.supplierId || item.product?.supplierId || null,
@@ -307,6 +309,13 @@ export async function GET(
           updatedAt: item.updatedAt,
         };
       });
+
+      if (staleShopProductIdsToHeal.length > 0) {
+        prisma.shopProduct.updateMany({
+          where: { id: { in: staleShopProductIdsToHeal } },
+          data: { productImage: null },
+        }).catch((err) => console.error("静默自愈店铺商品图片失败:", err));
+      }
 
       return NextResponse.json({
         items: resolved,
@@ -365,7 +374,11 @@ export async function GET(
     ]);
 
     const storage = await getStorageStrategy();
+    const staleShopProductIdsToHeal: string[] = [];
     const resolved = items.map((item) => {
+      if (item.productId && item.productImage && item.product?.image) {
+        staleShopProductIdsToHeal.push(item.id);
+      }
       const aggregatedJdSkuIds = Array.from(new Set([
         ...normalizeJdSkuIds(item.jdSkuId),
         ...(item.product?.jdSkuMappings?.map((mapping: any) => mapping.jdSkuId) || []),
@@ -387,11 +400,9 @@ export async function GET(
         meituanSkuIds: aggregatedMeituanSkuIds,
         taobaoSkuId: item.taobaoSkuId || null,
         name: item.productName || item.product?.name || "未命名商品",
-        image: item.productImage
-          ? storage.resolveUrl(item.productImage)
-          : item.product?.image
+        image: (item.productId && item.product?.image)
           ? storage.resolveUrl(item.product.image)
-          : null,
+          : (item.productImage ? storage.resolveUrl(item.productImage) : (item.product?.image ? storage.resolveUrl(item.product.image) : null)),
         categoryId: item.categoryId || item.product?.categoryId || null,
         categoryName: item.categoryName || item.product?.category?.name || "未分类",
         supplierId: item.supplierId || item.product?.supplierId || null,
@@ -410,6 +421,13 @@ export async function GET(
         updatedAt: item.updatedAt,
       };
     });
+
+    if (staleShopProductIdsToHeal.length > 0) {
+      prisma.shopProduct.updateMany({
+        where: { id: { in: staleShopProductIdsToHeal } },
+        data: { productImage: null },
+      }).catch((err) => console.error("静默自愈店铺商品图片失败:", err));
+    }
 
     return NextResponse.json({
       items: resolved,
@@ -877,7 +895,7 @@ export async function POST(
         doudianSkuId: null,
         productName: product.name,
         pinyin: generatePinyinSearchText(product.name),
-        productImage: product.image || null,
+        productImage: null,
         categoryId: categoryMap.get(product.category?.name || "") || null,
         categoryName: product.category?.name || null,
         supplierId: product.supplier?.name ? (supplierMap.get(product.supplier.name) || null) : null,

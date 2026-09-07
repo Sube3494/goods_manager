@@ -98,7 +98,7 @@ function normalizeDisplayPlatform(platform?: string | null) {
 interface AllOrdersViewProps {
   refreshTrigger: number;
   onOpenCostBackfill: (order: AutoPickOrder) => void;
-  onOpenMatchEditor: (order: AutoPickOrder, item: AutoPickOrderItem) => void;
+  onOpenMatchEditor: (order: AutoPickOrder, item: AutoPickOrderItem, options?: { autoOutbound?: boolean }) => void;
   onOpenPurchaseDraft?: (draft: PurchaseDraftPayload) => void;
   profitUpdatingOrderIds?: string[];
   onDataLoad: (data: {
@@ -539,7 +539,7 @@ export function AllOrdersView({
           }) || targetOrder?.items?.[0];
 
           if (targetOrder && unmatchedItem && onOpenMatchEditor) {
-            onOpenMatchEditor(targetOrder, unmatchedItem);
+            onOpenMatchEditor(targetOrder, unmatchedItem, { autoOutbound: true });
             return;
           }
         }

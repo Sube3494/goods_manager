@@ -7051,11 +7051,11 @@ export async function createOutboundFromAutoPickOrder(
             productId: item.productId,
             shopProductId: item.shopProductId,
             name: String(shopProduct?.productName || "未命名商品").trim() || "未命名商品",
-            image: shopProduct?.productImage
-              ? storage.resolveUrl(shopProduct.productImage)
-              : shopProduct?.product?.image
-                ? storage.resolveUrl(shopProduct.product.image)
-                : null,
+            image: shopProduct?.product?.image
+              ? storage.resolveUrl(shopProduct.product.image)
+              : (shopProduct?.productImage
+                ? storage.resolveUrl(shopProduct.productImage)
+                : (shopProduct?.product?.image ? storage.resolveUrl(shopProduct.product.image) : null)),
             quantity: item.quantity,
             availableQuantity: currentBatchStock,
             missingQuantity: item.quantity - currentBatchStock,

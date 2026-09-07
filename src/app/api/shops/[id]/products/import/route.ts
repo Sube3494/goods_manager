@@ -289,7 +289,7 @@ export async function POST(
           jdSkuId: jdSkuText || null,
           productName: name || finalSourceProduct.name,
           pinyin: generatePinyinSearchText(name || finalSourceProduct.name),
-          productImage: normalizedImage || finalSourceProduct.image,
+          productImage: normalizedImage && normalizedImage !== finalSourceProduct.image ? normalizedImage : null,
           categoryId: category?.id || null,
           categoryName: category?.name || "未分类",
           supplierId: supplier?.id || null,

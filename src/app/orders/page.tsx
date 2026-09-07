@@ -1852,6 +1852,7 @@ export default function OrdersPage() {
     libraryId: string;
     currentMatchedProductId: string;
     order?: AutoPickOrder;
+    autoOutbound?: boolean;
   } | null>(null);
 
   const [brushSyncPool, setBrushSyncPool] = useState<AutoPickOrder[]>([]);
@@ -2304,7 +2305,7 @@ export default function OrdersPage() {
   }, [fetchMaiyatianShops, integrationConfig.maiyatianCookie, isIntegrationOpen, maiyatianShops.length]);
 
   // 商品匹配逻辑
-  const openMatchEditor = useCallback((order: AutoPickOrder, item: AutoPickOrderItem) => {
+  const openMatchEditor = useCallback((order: AutoPickOrder, item: AutoPickOrderItem, options?: { autoOutbound?: boolean }) => {
     const resolvedShopName = order.matchedShopName || "";
     const resolvedShop = localShops.find((s) => s.name === resolvedShopName);
     const resolvedShopId = resolvedShop?.id || "";
@@ -2325,6 +2326,7 @@ export default function OrdersPage() {
       libraryId: resolvedLibraryId,
       currentMatchedProductId: item.matchedProduct?.shopProductId || item.matchedProduct?.id || "",
       order,
+      autoOutbound: Boolean(options?.autoOutbound),
     });
     setIsMatchPickerOpen(true);
   }, [integrationConfig.maiyatianShopMappings, localShops]);
@@ -2354,6 +2356,7 @@ export default function OrdersPage() {
 
       const targetOrder = matchEditorTarget.order;
       const currentItemId = matchEditorTarget.itemId;
+      const willAutoOutbound = Boolean(matchEditorTarget.autoOutbound);
 
       // 检查当前订单是否还有其他未匹配且未显式忽略的商品
       const otherUnmatchedItems = (targetOrder?.items || []).filter((it) => {
@@ -2377,7 +2380,7 @@ export default function OrdersPage() {
             it.id === currentItemId ? { ...it, matchedProduct: data.matchedProduct || { id: productId, name: "" } } : it
           ),
         };
-        openMatchEditor(nextOrder, otherUnmatchedItems[0]);
+        openMatchEditor(nextOrder, otherUnmatchedItems[0], { autoOutbound: willAutoOutbound });
         triggerParentRefresh();
         return;
       }
@@ -2386,8 +2389,8 @@ export default function OrdersPage() {
       setIsMatchPickerOpen(false);
       setMatchEditorTarget(null);
 
-      // 如果该订单尚未生成出库单且不是已删除/取消状态，自动触发进入下一个环节：出库！
-      const shouldAutoOutbound = targetOrder && !targetOrder.hasOutbound && targetOrder.status !== "已删除" && targetOrder.status !== "已取消";
+      // 仅在出库拦截联动（willAutoOutbound=true）且订单尚未出库时，才自动触发进入下一个环节：出库与采购草稿检查
+      const shouldAutoOutbound = willAutoOutbound && targetOrder && !targetOrder.hasOutbound && targetOrder.status !== "已删除" && targetOrder.status !== "已取消";
       if (shouldAutoOutbound && !isClear) {
         try {
           const outboundRes = await fetch(`/api/orders/${matchEditorTarget.orderId}/outbound`, {
@@ -3688,7 +3691,7 @@ export default function OrdersPage() {
                           <button
                             key={it.id || idx}
                             type="button"
-                            onClick={() => openMatchEditor(matchEditorTarget.order!, it)}
+                            onClick={() => openMatchEditor(matchEditorTarget.order!, it, { autoOutbound: matchEditorTarget.autoOutbound })}
                             title={`商品 ${idx + 1}：${it.productName || "未命名商品"}`}
                             className={cn(
                               "p-1.5 rounded-full transition-colors duration-150 text-xs flex items-center gap-1.5 font-bold px-2.5 sm:px-3 shrink-0 whitespace-nowrap cursor-pointer",
@@ -3719,7 +3722,7 @@ export default function OrdersPage() {
                     <div className="flex items-center gap-0.5 shrink-0 pl-1 pr-0.5 border-l border-border/40 text-muted-foreground h-full items-center">
                       <button
                         type="button"
-                        onClick={() => hasPrev && openMatchEditor(matchEditorTarget.order!, items[currentIndex - 1])}
+                        onClick={() => hasPrev && openMatchEditor(matchEditorTarget.order!, items[currentIndex - 1], { autoOutbound: matchEditorTarget.autoOutbound })}
                         disabled={!hasPrev}
                         className="p-1 rounded-full hover:bg-black/5 dark:hover:bg-white/10 hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed transition-colors cursor-pointer"
                         title="切换到上一件商品"
@@ -3728,7 +3731,7 @@ export default function OrdersPage() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => hasNext && openMatchEditor(matchEditorTarget.order!, items[currentIndex + 1])}
+                        onClick={() => hasNext && openMatchEditor(matchEditorTarget.order!, items[currentIndex + 1], { autoOutbound: matchEditorTarget.autoOutbound })}
                         disabled={!hasNext}
                         className="p-1 rounded-full hover:bg-black/5 dark:hover:bg-white/10 hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed transition-colors cursor-pointer"
                         title="切换到下一件商品"
