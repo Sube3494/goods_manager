@@ -573,14 +573,14 @@ function UserProfitTrendView({
               />
             </div>
 
-            <div className="h-[250px] sm:h-[280px] w-full [&_.recharts-wrapper]:outline-none [&_.recharts-surface]:outline-none [&_.recharts-tooltip-wrapper]:!z-[9999] [&_.recharts-tooltip-wrapper]:!pointer-events-none">
+            <div className="h-[250px] sm:h-[280px] w-full [&_.recharts-wrapper]:outline-none [&_.recharts-surface]:outline-none [&_.recharts-tooltip-wrapper]:!z-[9999] [&_.recharts-tooltip-wrapper]:!pointer-events-none [&_*:focus]:outline-none [&_*:focus-visible]:outline-none [&_svg]:outline-none">
               {profitTrend.length === 0 ? (
                 <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
                   所选区间暂无利润数据
                 </div>
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={profitTrend} margin={{ top: 12, right: 10, left: 0, bottom: 0 }}>
+                  <AreaChart accessibilityLayer={false} data={profitTrend} margin={{ top: 12, right: 10, left: 0, bottom: 0 }} style={{ outline: "none" }}>
                     <defs>
                       <linearGradient id="userModalProfitStroke" x1="0" y1="0" x2="0" y2="1">
                         <stop offset={profitGradientOffset} stopColor="#22c55e" stopOpacity={1} />
@@ -652,14 +652,14 @@ function UserProfitTrendView({
               </div>
             </div>
 
-            <div className="h-[220px] sm:h-[250px] w-full [&_.recharts-wrapper]:outline-none [&_.recharts-surface]:outline-none [&_.recharts-tooltip-wrapper]:!z-[9999] [&_.recharts-tooltip-wrapper]:!pointer-events-none">
+            <div className="h-[220px] sm:h-[250px] w-full [&_.recharts-wrapper]:outline-none [&_.recharts-surface]:outline-none [&_.recharts-tooltip-wrapper]:!z-[9999] [&_.recharts-tooltip-wrapper]:!pointer-events-none [&_*:focus]:outline-none [&_*:focus-visible]:outline-none [&_svg]:outline-none">
               {orderTrend.length === 0 ? (
                 <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
                   所选区间暂无订单波动数据
                 </div>
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={orderTrend} margin={{ top: 12, right: 10, left: 0, bottom: 0 }}>
+                  <AreaChart accessibilityLayer={false} data={orderTrend} margin={{ top: 12, right: 10, left: 0, bottom: 0 }} style={{ outline: "none" }}>
                     <defs>
                       <linearGradient id="userModalOrderFill" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="0%" stopColor="#0ea5e9" stopOpacity={0.3} />

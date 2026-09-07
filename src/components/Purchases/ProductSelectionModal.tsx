@@ -620,11 +620,11 @@ export function ProductSelectionModal({
         onClick={onClose}
       />
       <div
-        className="fixed left-1/2 top-1/2 z-110001 flex h-[min(90dvh,860px)] w-[calc(100%-24px)] sm:w-full max-w-4xl -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-3xl border border-border/60 bg-white/98 shadow-2xl backdrop-blur-xl dark:bg-gray-900/90 dark:border-white/10 animate-modal-content"
+        className="fixed left-1/2 top-1/2 z-110001 flex h-[min(94dvh,860px)] sm:h-[min(90dvh,860px)] w-[calc(100%-16px)] sm:w-full max-w-4xl -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-3xl border border-border/60 bg-white/98 shadow-2xl backdrop-blur-xl dark:bg-gray-900/90 dark:border-white/10 animate-modal-content"
       >
-             <div className="flex items-center justify-between border-b border-border/50 px-5 py-4 sm:px-7 sm:py-4.5 shrink-0">
+             <div className="flex items-center justify-between border-b border-border/50 px-4 py-3.5 sm:px-7 sm:py-4.5 shrink-0">
               <div className="flex items-center gap-3">
-                <h2 className="text-lg sm:text-xl font-bold tracking-tight text-foreground">{title}</h2>
+                <h2 className="text-base sm:text-xl font-bold tracking-tight text-foreground">{title}</h2>
               </div>
               <div className="flex items-center gap-2">
                 <button 
@@ -636,7 +636,7 @@ export function ProductSelectionModal({
               </div>
             </div>
 
-            <div className="flex-1 overflow-hidden flex flex-col p-4 sm:p-6 space-y-3.5">
+            <div className="flex-1 overflow-hidden flex flex-col p-3 sm:p-6 space-y-2.5 sm:space-y-3.5">
               {headerBanner}
               {shouldShowLibraryTabs && (
                 <div className="flex flex-wrap gap-2 border-b border-border/50 pb-3 shrink-0">
@@ -764,7 +764,7 @@ export function ProductSelectionModal({
                 </div>
               )}
 
-              <div className={cn("relative flex-1 overflow-y-auto no-scrollbar min-h-[220px]", isGridView ? "" : "space-y-2")}>
+              <div className={cn("relative flex-1 overflow-y-auto no-scrollbar min-h-0 sm:min-h-[180px]", isGridView ? "" : "space-y-2")}>
                  {(showInitialSkeleton && products.length === 0) ? (
                     <div className={cn(isGridView ? "grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2.5 sm:gap-3" : "space-y-2")}>
                         {[...Array(12)].map((_, i) => (
@@ -953,60 +953,9 @@ export function ProductSelectionModal({
                     </div>
                   )}
                 </div>
-
-                {showQuantityControls && selectedProducts.length > 0 && (
-                  <div className="mt-2.5 border-t border-border/50 bg-amber-500/10 rounded-xl p-2.5 shrink-0">
-                    <div className="text-xs font-bold text-amber-800 dark:text-amber-300 mb-1.5 flex items-center gap-1.5">
-                      <span>已选商品配比数量:</span>
-                      <span className="text-[11px] font-normal text-muted-foreground">（可手动调整每个商品在当前订单中的匹配数量）</span>
-                    </div>
-                    <div className="flex flex-wrap gap-2.5 max-h-28 overflow-y-auto pr-1">
-                      {selectedProducts.map((product) => {
-                        const key = getSelectionKey(product);
-                        const currentQty = productQuantities[key] || 1;
-                        return (
-                          <div key={key} className="flex items-center gap-2 bg-white dark:bg-gray-800 border border-border/70 rounded-xl px-2.5 py-1.5 shadow-xs">
-                            {product.image && (
-                              <img src={product.image} alt="" className="w-6 h-6 rounded-md object-cover" />
-                            )}
-                            <span className="text-xs font-medium text-foreground max-w-[120px] truncate" title={product.name}>
-                              {product.name}
-                            </span>
-                            <div className="flex items-center gap-1 bg-muted/60 rounded-lg p-0.5 border border-border/40">
-                              <button
-                                type="button"
-                                onClick={() => setProductQuantities(prev => ({ ...prev, [key]: Math.max(1, (prev[key] || 1) - 1) }))}
-                                className="w-5 h-5 flex items-center justify-center rounded text-xs font-bold hover:bg-white dark:hover:bg-white/10 active:scale-90"
-                              >
-                                -
-                              </button>
-                              <input
-                                type="number"
-                                min={1}
-                                value={currentQty}
-                                onChange={(e) => {
-                                  const val = Math.max(1, parseInt(e.target.value) || 1);
-                                  setProductQuantities(prev => ({ ...prev, [key]: val }));
-                                }}
-                                className="w-8 text-center text-xs font-bold bg-transparent outline-none border-none p-0"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => setProductQuantities(prev => ({ ...prev, [key]: (prev[key] || 1) + 1 }))}
-                                className="w-5 h-5 flex items-center justify-center rounded text-xs font-bold hover:bg-white dark:hover:bg-white/10 active:scale-90"
-                              >
-                                +
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
             </div>
 
-            <div className="border-t border-border/50 bg-zinc-50/80 p-3 sm:p-6 shrink-0 dark:bg-white/5 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:pb-6">
+            <div className="border-t border-border/50 bg-zinc-50/80 p-3 sm:p-5 shrink-0 dark:bg-white/5 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:pb-5">
                {showPlatformSelector ? (
                  <div className="flex flex-col gap-1.5 mb-3 sm:mb-4 w-full">
                    <div className="text-xs font-bold text-muted-foreground uppercase tracking-wider pl-1">添加到平台</div>
@@ -1029,6 +978,65 @@ export function ProductSelectionModal({
                    </div>
                  </div>
                ) : null}
+
+               {/* 数量与配比控制区 (位于底栏顶部，保证在移动端小屏/iOS安全区下始终完整可见) */}
+               {showQuantityControls && selectedProducts.length > 0 && (
+                 <div className="mb-2.5 rounded-2xl border border-amber-500/25 bg-amber-500/10 p-2 sm:p-2.5 shrink-0">
+                   <div className="text-[11px] sm:text-xs font-bold text-amber-800 dark:text-amber-300 mb-1.5 flex items-center justify-between">
+                     <span className="flex items-center gap-1">
+                       <span>已选商品配比数量</span>
+                       <span className="font-normal text-muted-foreground text-[10px] sm:text-[11px]">（调整每个商品匹配数量）</span>
+                     </span>
+                     {selectedProducts.length > 1 && (
+                       <span className="text-[10px] text-amber-700 dark:text-amber-400 font-semibold">
+                         共 {selectedProducts.length} 种
+                       </span>
+                     )}
+                   </div>
+                   <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 max-h-24 sm:max-h-28 overflow-y-auto pr-0.5">
+                     {selectedProducts.map((product) => {
+                       const key = getSelectionKey(product);
+                       const currentQty = productQuantities[key] || 1;
+                       return (
+                         <div key={key} className="flex items-center gap-1.5 sm:gap-2 bg-white dark:bg-gray-800 border border-border/70 rounded-xl px-2 py-1 sm:px-2.5 sm:py-1.5 shadow-xs">
+                           {product.image && (
+                             <img src={product.image} alt="" className="w-5 h-5 sm:w-6 sm:h-6 rounded-md object-cover shrink-0" />
+                           )}
+                           <span className="text-[11px] sm:text-xs font-medium text-foreground max-w-[90px] sm:max-w-[140px] truncate" title={product.name}>
+                             {product.name}
+                           </span>
+                           <div className="flex items-center gap-0.5 sm:gap-1 bg-muted/60 rounded-lg p-0.5 border border-border/40 shrink-0">
+                             <button
+                               type="button"
+                               onClick={() => setProductQuantities(prev => ({ ...prev, [key]: Math.max(1, (prev[key] || 1) - 1) }))}
+                               className="w-5 h-5 flex items-center justify-center rounded text-xs font-bold hover:bg-white dark:hover:bg-white/10 active:scale-90"
+                             >
+                               -
+                             </button>
+                             <input
+                               type="number"
+                               min={1}
+                               value={currentQty}
+                               onChange={(e) => {
+                                 const val = Math.max(1, parseInt(e.target.value) || 1);
+                                 setProductQuantities(prev => ({ ...prev, [key]: val }));
+                               }}
+                               className="w-7 text-center text-xs font-bold bg-transparent outline-none border-none p-0"
+                             />
+                             <button
+                               type="button"
+                               onClick={() => setProductQuantities(prev => ({ ...prev, [key]: (prev[key] || 1) + 1 }))}
+                               className="w-5 h-5 flex items-center justify-center rounded text-xs font-bold hover:bg-white dark:hover:bg-white/10 active:scale-90"
+                             >
+                               +
+                             </button>
+                           </div>
+                         </div>
+                       );
+                     })}
+                   </div>
+                 </div>
+               )}
 
                {/* 移动端顶部信息栏 (桌面端隐藏) */}
                <div className="flex sm:hidden items-center justify-between gap-2 pb-2.5 mb-2.5 border-b border-border/40 text-xs">

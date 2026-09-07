@@ -33,6 +33,20 @@ export function PurchaseFilters({
     ...shops.map((shop) => ({ value: shop, label: shop })),
   ];
 
+  const renderResetButton = (className?: string) =>
+    hasActiveFilters ? (
+      <button
+        onClick={onReset}
+        className={cn(
+          "h-10 sm:h-11 px-3 sm:px-4 flex items-center justify-center gap-1.5 rounded-full border border-primary/20 bg-primary/5 text-primary text-xs font-bold hover:bg-primary/10 transition-all active:scale-95 shadow-sm shrink-0 whitespace-nowrap",
+          className
+        )}
+      >
+        <RotateCcw size={14} />
+        <span>重置</span>
+      </button>
+    ) : null;
+
   return (
     <div className="flex flex-col md:flex-row md:items-center gap-3 mb-6 md:mb-8 text-foreground">
       <div className="flex items-center gap-2 w-full">
@@ -54,6 +68,7 @@ export function PurchaseFilters({
             </button>
           )}
         </div>
+        {renderResetButton("sm:hidden")}
       </div>
 
       <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:flex-row sm:items-center sm:gap-3 sm:h-11 sm:w-auto">
@@ -89,16 +104,7 @@ export function PurchaseFilters({
           />
         </div>
 
-        {hasActiveFilters && (
-          <button
-            onClick={onReset}
-            className="h-10 sm:h-11 px-3 sm:px-4 flex items-center justify-center gap-2 rounded-full border border-primary/20 bg-primary/5 text-primary text-xs font-bold hover:bg-primary/10 transition-all active:scale-95 shadow-sm shrink-0 whitespace-nowrap"
-          >
-            <RotateCcw size={14} />
-            <span className="hidden sm:inline">重置</span>
-            <span className="sm:hidden text-[10px]">重置</span>
-          </button>
-        )}
+        {renderResetButton("hidden sm:flex")}
       </div>
     </div>
   );
