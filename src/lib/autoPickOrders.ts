@@ -8136,3 +8136,91 @@ export async function fetchMaiyatianDeliveryTrail(userId: string, deliveryId: st
     fetchedAt: new Date().toISOString(),
   };
 }
+
+export type MaiyatianCourierPhotosResult = {
+  supported: boolean;
+  deliveryPhotos: string[];
+  pickupPhotos: string[];
+  message?: string;
+};
+
+export async function fetchMaiyatianCourierPhotos(
+  userId: string,
+  deliveryId: string,
+  tag: string,
+): Promise<MaiyatianCourierPhotosResult> {
+  const normalizedDeliveryId = String(deliveryId || "").trim();
+  const normalizedTag = String(tag || "").trim().toLowerCase();
+
+  if (!normalizedDeliveryId) {
+    return {
+      supported: false,
+      deliveryPhotos: [],
+      pickupPhotos: [],
+      message: "未找到有效的配送单号",
+    };
+  }
+
+  if (!normalizedTag || /自配|oneself/i.test(normalizedTag)) {
+    return {
+      supported: false,
+      deliveryPhotos: [],
+      pickupPhotos: [],
+      message: "商家自配暂无骑手取送照片",
+    };
+  }
+
+  const cookie = await getMaiyatianCookieForUser(userId);
+  const formData = new URLSearchParams();
+  formData.set("delivery_id", normalizedDeliveryId);
+  formData.set("tag", normalizedTag);
+
+  const response = await fetchMaiyatianJson<{
+    errno?: number;
+    message?: string;
+    data?: {
+      courier_delivery_photos?: string[];
+      courier_pickup_photos?: string[];
+      [key: string]: unknown;
+    } | boolean;
+    courier_delivery_photos?: string[];
+    courier_pickup_photos?: string[];
+  }>(
+    "/delivery/courierPhoto/?f=json",
+    cookie,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+      },
+      body: formData.toString(),
+      signal: AbortSignal.timeout(15000),
+    },
+  );
+
+  if (response.errno === 0 && !response.data) {
+    return {
+      supported: false,
+      deliveryPhotos: [],
+      pickupPhotos: [],
+      message: response.message || "当前配送不支持查询取送照片",
+    };
+  }
+
+  const rawDeliveryPhotos = (response.data && typeof response.data === "object" && Array.isArray(response.data.courier_delivery_photos))
+    ? response.data.courier_delivery_photos
+    : (Array.isArray(response.courier_delivery_photos) ? response.courier_delivery_photos : []);
+
+  const rawPickupPhotos = (response.data && typeof response.data === "object" && Array.isArray(response.data.courier_pickup_photos))
+    ? response.data.courier_pickup_photos
+    : (Array.isArray(response.courier_pickup_photos) ? response.courier_pickup_photos : []);
+
+  const cleanPhotos = (arr: unknown[]) =>
+    arr.map((item) => String(item || "").trim()).filter((url) => /^https?:\/\//i.test(url));
+
+  return {
+    supported: true,
+    deliveryPhotos: cleanPhotos(rawDeliveryPhotos),
+    pickupPhotos: cleanPhotos(rawPickupPhotos),
+  };
+}

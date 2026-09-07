@@ -7,6 +7,7 @@ import { ChevronDown, ChevronUp, Phone, RefreshCw, Store, User, X } from "lucide
 import { loadBareAmap } from "@/components/DistanceCalc/BareAmapTest";
 import type { AutoPickOrder } from "@/lib/types";
 import { isAutoPickOrderRiderAssigned } from "@/lib/autoPickOrderStatus";
+import { CourierPhotosViewer } from "@/components/Orders/CourierPhotosViewer";
 
 type Point = { lng: number; lat: number };
 type Trail = {
@@ -816,6 +817,13 @@ export function OrderRouteModal({ order, onClose }: { order: AutoPickOrder; onCl
               )}
               {error && <div className="text-[11px] text-red-500">{error}</div>}
               {mapError && <div className="text-[11px] text-red-500">{mapError}</div>}
+              <div className="pt-2 border-t border-border/40">
+                <CourierPhotosViewer
+                  orderId={order.id}
+                  isSelfDelivery={false}
+                  autoLoad={true}
+                />
+              </div>
             </div>
           )}
         </div>

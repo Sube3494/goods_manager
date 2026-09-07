@@ -43,6 +43,7 @@ import {
 import { formatLocalDate, formatLocalDateTime } from "@/lib/dateUtils";
 
 const OrderRouteModal = dynamic(() => import("@/components/Orders/OrderRouteModal").then((module) => module.OrderRouteModal), { ssr: false });
+import { CourierPhotosViewer } from "@/components/Orders/CourierPhotosViewer";
 
 export function createDefaultSelfDeliveryTiming() {
   return {
@@ -3587,6 +3588,15 @@ export const OrderCard = memo(function OrderCard({
                 <div className="mt-2 sm:mt-2.5">
                   <DetailBlock label="轨迹" value={order.delivery?.track || "暂无轨迹"} />
                 </div>
+                {!pickup ? (
+                  <div className="mt-2.5 pt-2.5 border-t border-black/6 dark:border-white/6">
+                    <CourierPhotosViewer
+                      orderId={order.id}
+                      isSelfDelivery={isSelfDeliveryOrCancelled}
+                      autoLoad={Boolean(order.delivery?.track || order.delivery?.completedTime || order.delivery?.pickupTime)}
+                    />
+                  </div>
+                ) : null}
               </section>
 
             </div>
