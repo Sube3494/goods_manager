@@ -1,4 +1,4 @@
-import { LayoutDashboard, Package, Settings, PlusCircle, Layers, Truck, ShoppingCart, Camera, Users, CreditCard, ArrowUpRight, ShieldAlert, LucideIcon, Store, PanelsTopLeft, Navigation2, Clock, WalletCards, KeyRound, Link2 } from "lucide-react";
+import { LayoutDashboard, Package, Settings, PlusCircle, Layers, Truck, ShoppingCart, Camera, Users, CreditCard, ArrowUpRight, ShieldAlert, LucideIcon, Store, PanelsTopLeft, Navigation2, Clock, WalletCards, KeyRound } from "lucide-react";
 import { AdminCapability, Permission, hasAdminAccess } from "./permissions";
 
 export interface NavItem {
@@ -40,7 +40,7 @@ export const navItems: NavItem[] = [
   { name: "经营成本", href: "/operating-costs", icon: WalletCards, adminOnly: true, permission: "operating-costs:manage", description: "管理房租人工与水电物业等经营成本", section: "workspace" },
   { name: "门锁管理", href: "/door-locks", icon: KeyRound, adminOnly: true, permission: "settings:manage", description: "配置 TTLock 并管理门锁远程控制", section: "workspace" },
   { name: "实物相册", href: "/gallery", icon: Camera, permission: ["gallery:upload", "gallery:download", "gallery:share", "gallery:copy"], description: "商品实拍与公共素材", section: "workspace" },
-  { name: "成员管理", href: "/admin/members", icon: Users, adminCapability: ["members:manage", "members:status", "whitelist:manage"], description: "成员、白名单与邀请控制", section: "management" },
+  { name: "成员管理", href: "/admin/members", icon: Users, permission: "members:read", description: "成员、白名单与邀请控制", section: "management" },
   { name: "角色管理", href: "/admin/roles", icon: ShieldAlert, adminCapability: "roles:manage", description: "角色模板与权限矩阵", section: "management" },
   { name: "系统设置", href: "/settings", icon: Settings, adminOnly: true, permission: ["settings:manage", "backup:manage", "data:transfer", "system:manage"], description: "系统参数、存储与备份", section: "management" },
 ];

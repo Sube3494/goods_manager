@@ -1,35 +1,23 @@
 "use client";
 
-import { useState, useEffect, useCallback, forwardRef, useImperativeHandle, useRef } from "react";
+import { useState, useEffect, useCallback, forwardRef, useImperativeHandle } from "react";
 import {
+  ArrowRight,
   BadgeCheck,
   Check,
-  ClipboardCheck,
   Edit2,
   Eye,
-  Image as ImageIcon,
   LayoutGrid,
-  Layers,
-  ListChecks,
   Loader2,
-  Package,
   Plus,
-  Search,
-  Settings,
   Shield,
-  ShoppingBag,
-  Sparkles,
-  Store,
   Trash2,
-  Truck,
-  Warehouse,
-  WalletCards,
   X,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
-import { PERMISSION_TREE } from "@/lib/permissions";
+import { PAGE_PERMISSION_TREE, PagePermissionGroup, PagePermissionNode } from "@/lib/permissions";
 import { useToast } from "@/components/ui/Toast";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 
@@ -46,35 +34,70 @@ interface RoleProfile {
   _count?: { users: number };
 }
 
-const GROUP_ICONS = {
-  products: Package,
-  categories: LayoutGrid,
-  suppliers: Truck,
-  purchases: ShoppingBag,
-  setup_purchases: Store,
-  inbound: Warehouse,
-  outbound: Package,
-  brush_center: Layers,
-  gallery: ImageIcon,
-  gallery_audit: ClipboardCheck,
-  logistics: Truck,
-  settlement: WalletCards,
-  system: Settings,
-} as const;
+type PermissionStats = {
+  enabledPages: number;
+  totalPages: number;
+  enabledActions: number;
+  totalActions: number;
+};
 
-function getGroupIcon(groupKey: string) {
-  return GROUP_ICONS[groupKey as keyof typeof GROUP_ICONS] || Shield;
+const firstGroup = PAGE_PERMISSION_TREE[0];
+const firstPage = firstGroup.pages[0];
+
+function getPageKeys(page: PagePermissionNode) {
+  return [page.accessKey, ...page.actions.map((action) => action.key)];
 }
 
-function summarizeRolePermissions(permissions: Record<string, boolean> | undefined) {
-  return PERMISSION_TREE.map((group) => {
-    const selected = group.children.filter((child) => permissions?.[child.key]).length;
-    return {
-      ...group,
-      selected,
-      total: group.children.length,
-    };
-  }).filter((group) => group.selected > 0);
+function getPermissionStats(permissions: Record<string, boolean> | undefined): PermissionStats {
+  return PAGE_PERMISSION_TREE.reduce<PermissionStats>(
+    (stats, group) => {
+      group.pages.forEach((page) => {
+        stats.totalPages += 1;
+        stats.totalActions += page.actions.length;
+        if (permissions?.[page.accessKey]) stats.enabledPages += 1;
+        stats.enabledActions += page.actions.filter((action) => permissions?.[action.key]).length;
+      });
+      return stats;
+    },
+    { enabledPages: 0, totalPages: 0, enabledActions: 0, totalActions: 0 }
+  );
+}
+
+function getGroupStats(group: PagePermissionGroup, permissions: Record<string, boolean> | undefined): PermissionStats {
+  return group.pages.reduce<PermissionStats>(
+    (stats, page) => {
+      stats.totalPages += 1;
+      stats.totalActions += page.actions.length;
+      if (permissions?.[page.accessKey]) stats.enabledPages += 1;
+      stats.enabledActions += page.actions.filter((action) => permissions?.[action.key]).length;
+      return stats;
+    },
+    { enabledPages: 0, totalPages: 0, enabledActions: 0, totalActions: 0 }
+  );
+}
+
+function findPage(groupKey: string, pageKey: string) {
+  const group = PAGE_PERMISSION_TREE.find((item) => item.key === groupKey) || firstGroup;
+  const page = group.pages.find((item) => item.key === pageKey) || group.pages[0] || firstPage;
+  return { group, page };
+}
+
+function SwitchMark({ checked }: { checked: boolean }) {
+  return (
+    <span
+      className={cn(
+        "relative inline-flex h-6 w-10 shrink-0 rounded-full border transition-all",
+        checked ? "border-foreground bg-foreground dark:border-white dark:bg-white" : "border-border bg-muted"
+      )}
+    >
+      <span
+        className={cn(
+          "absolute left-0.5 top-0.5 h-4.5 w-4.5 rounded-full transition-all",
+          checked ? "translate-x-4 bg-background dark:bg-black" : "bg-muted-foreground/60"
+        )}
+      />
+    </span>
+  );
 }
 
 export const RoleManager = forwardRef<RoleManagerHandle>((props, ref) => {
@@ -84,20 +107,21 @@ export const RoleManager = forwardRef<RoleManagerHandle>((props, ref) => {
   const [isMounted, setIsMounted] = useState(false);
   const [roleToDelete, setRoleToDelete] = useState<string | null>(null);
   const [editingRole, setEditingRole] = useState<Partial<RoleProfile> | null>(null);
-  const [activeTab, setActiveTab] = useState<string>(PERMISSION_TREE[0].key);
-  const [permissionQuery, setPermissionQuery] = useState("");
-  const groupListRef = useRef<HTMLDivElement | null>(null);
-  const detailPaneRef = useRef<HTMLDivElement | null>(null);
-  const mobilePaneRef = useRef<HTMLDivElement | null>(null);
+  const [activeGroupKey, setActiveGroupKey] = useState(firstGroup.key);
+  const [activePageKey, setActivePageKey] = useState(firstPage.key);
   const { showToast } = useToast();
 
-  useImperativeHandle(ref, () => ({
-    openCreateModal: () => {
-      setEditingRole({ name: "", description: "", permissions: {} });
-      setActiveTab(PERMISSION_TREE[0].key);
-      setPermissionQuery("");
-    },
-  }));
+  const resetEditorPosition = () => {
+    setActiveGroupKey(firstGroup.key);
+    setActivePageKey(firstPage.key);
+  };
+
+  const openCreateModal = () => {
+    setEditingRole({ name: "", description: "", permissions: {} });
+    resetEditorPosition();
+  };
+
+  useImperativeHandle(ref, () => ({ openCreateModal }));
 
   useEffect(() => {
     setIsMounted(true);
@@ -121,22 +145,10 @@ export const RoleManager = forwardRef<RoleManagerHandle>((props, ref) => {
   }, [fetchRoles]);
 
   useEffect(() => {
-    if (!detailPaneRef.current) return;
-    if (detailPaneRef.current.scrollHeight <= detailPaneRef.current.clientHeight) return;
-    detailPaneRef.current.scrollTo({ top: 0, behavior: "smooth" });
-  }, [activeTab]);
-
-  useEffect(() => {
-    if (!mobilePaneRef.current) return;
-    mobilePaneRef.current.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
-  }, [activeTab, editingRole?.id]);
-
-  useEffect(() => {
     if (!editingRole) return;
 
     const originalOverflow = document.body.style.overflow;
     const originalOverscrollBehavior = document.body.style.overscrollBehavior;
-
     document.body.style.overflow = "hidden";
     document.body.style.overscrollBehavior = "none";
 
@@ -177,26 +189,50 @@ export const RoleManager = forwardRef<RoleManagerHandle>((props, ref) => {
     }
   };
 
-  const togglePermission = (key: string) => {
-    if (!editingRole) return;
-    const permissions = { ...(editingRole.permissions || {}) };
-    permissions[key] = !permissions[key];
-    setEditingRole({ ...editingRole, permissions });
-  };
-
-  const toggleGroup = (keys: string[], nextValue: boolean) => {
-    if (!editingRole) return;
-    const permissions = { ...(editingRole.permissions || {}) };
-    keys.forEach((key) => {
-      permissions[key] = nextValue;
-    });
-    setEditingRole({ ...editingRole, permissions });
-  };
-
   const openRole = (role: RoleProfile) => {
     setEditingRole(role);
-    setActiveTab(PERMISSION_TREE[0].key);
-    setPermissionQuery("");
+    resetEditorPosition();
+  };
+
+  const updatePermissions = (updater: (permissions: Record<string, boolean>) => Record<string, boolean>) => {
+    if (!editingRole || editingRole.isSystem) return;
+    setEditingRole({
+      ...editingRole,
+      permissions: updater({ ...(editingRole.permissions || {}) }),
+    });
+  };
+
+  const togglePageAccess = (page: PagePermissionNode) => {
+    updatePermissions((permissions) => {
+      const nextValue = !permissions[page.accessKey];
+      permissions[page.accessKey] = nextValue;
+      if (!nextValue) {
+        page.actions.forEach((action) => {
+          permissions[action.key] = false;
+        });
+      }
+      return permissions;
+    });
+  };
+
+  const toggleAction = (page: PagePermissionNode, actionKey: string) => {
+    updatePermissions((permissions) => {
+      const nextValue = !permissions[actionKey];
+      permissions[actionKey] = nextValue;
+      if (nextValue) {
+        permissions[page.accessKey] = true;
+      }
+      return permissions;
+    });
+  };
+
+  const setPageAll = (page: PagePermissionNode, nextValue: boolean) => {
+    updatePermissions((permissions) => {
+      getPageKeys(page).forEach((key) => {
+        permissions[key] = nextValue;
+      });
+      return permissions;
+    });
   };
 
   const confirmDelete = async () => {
@@ -219,16 +255,12 @@ export const RoleManager = forwardRef<RoleManagerHandle>((props, ref) => {
 
   if (!isMounted) return null;
 
-  const selectedPermissions = Object.values(editingRole?.permissions || {}).filter(Boolean).length;
-  const enabledGroups = summarizeRolePermissions(editingRole?.permissions);
-  const currentGroup = PERMISSION_TREE.find((group) => group.key === activeTab) || PERMISSION_TREE[0];
-  const currentKeys = currentGroup.children.map((child) => child.key);
-  const currentSelected = currentKeys.filter((key) => !!editingRole?.permissions?.[key]).length;
-  const visiblePermissions = currentGroup.children.filter((child) => {
-    const query = permissionQuery.trim().toLowerCase();
-    if (!query) return true;
-    return child.label.toLowerCase().includes(query) || child.key.toLowerCase().includes(query);
-  });
+  const { group: activeGroup, page: activePage } = findPage(activeGroupKey, activePageKey);
+  const activeStats = getPermissionStats(editingRole?.permissions);
+  const activePageEnabled = !!editingRole?.permissions?.[activePage.accessKey];
+  const activePageActionCount = activePage.actions.filter((action) => editingRole?.permissions?.[action.key]).length;
+  const activePageTotal = getPageKeys(activePage).length;
+  const activePageSelected = Number(activePageEnabled) + activePageActionCount;
 
   return (
     <div className="space-y-6 min-h-[400px] relative">
@@ -237,91 +269,64 @@ export const RoleManager = forwardRef<RoleManagerHandle>((props, ref) => {
           <Loader2 className="animate-spin text-emerald-500 opacity-20" size={40} />
         </div>
       ) : (
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 2xl:grid-cols-3">
           {roles.map((role) => {
-            const groups = summarizeRolePermissions(role.permissions);
+            const stats = getPermissionStats(role.permissions);
             return (
               <div
                 key={role.id}
-                className="group rounded-[28px] border border-black/5 dark:border-white/10 bg-white/70 dark:bg-white/5 p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-xl hover:shadow-black/5 dark:hover:shadow-black/20"
+                className="group rounded-[18px] border border-black/6 bg-white/72 p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/5 dark:border-white/10 dark:bg-white/5 dark:hover:shadow-black/20"
               >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex items-start gap-4 min-w-0">
-                    <div className="h-12 w-12 rounded-2xl bg-linear-to-br from-primary/15 to-primary/5 ring-1 ring-primary/10 flex items-center justify-center text-primary shrink-0">
-                      <Shield size={20} />
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/8 text-primary ring-1 ring-primary/10">
+                      <Shield size={18} />
                     </div>
                     <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="text-lg font-black tracking-tight text-foreground">{role.name}</h3>
-                        <span
-                          className={cn(
-                            "inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-black tracking-[0.12em] uppercase",
-                            role.isSystem ? "bg-amber-500/10 text-amber-600" : "bg-sky-500/10 text-sky-600"
-                          )}
-                        >
+                      <div className="flex min-w-0 items-center gap-2">
+                        <h3 className="truncate text-base font-black tracking-tight text-foreground">{role.name}</h3>
+                        <span className={cn("inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[10px] font-black", role.isSystem ? "bg-amber-500/10 text-amber-600" : "bg-sky-500/10 text-sky-600")}>
                           {role.isSystem ? "系统角色" : "自定义"}
                         </span>
                       </div>
-                      <p className="mt-1 text-sm text-muted-foreground line-clamp-2">
+                      <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">
                         {role.description || "暂无描述，建议补充这个角色适合谁使用。"}
                       </p>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex shrink-0 items-center gap-1.5">
                     <button
                       onClick={() => openRole(role)}
-                      className="h-10 w-10 rounded-2xl border border-border bg-background/70 hover:bg-muted transition-colors flex items-center justify-center text-muted-foreground hover:text-foreground"
+                      className="flex h-8 w-8 items-center justify-center rounded-xl border border-border bg-background/70 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                       title={role.isSystem ? "查看内置角色权限" : "编辑角色权限"}
                     >
-                      {role.isSystem ? <Eye size={18} /> : <Edit2 size={18} />}
+                      {role.isSystem ? <Eye size={15} /> : <Edit2 size={15} />}
                     </button>
                     {!role.isSystem && (
                       <button
                         onClick={() => setRoleToDelete(role.id)}
-                        className="h-10 w-10 rounded-2xl border border-border bg-background/70 hover:bg-red-500/10 transition-colors flex items-center justify-center text-muted-foreground hover:text-red-500"
+                        className="flex h-8 w-8 items-center justify-center rounded-xl border border-border bg-background/70 text-muted-foreground transition-colors hover:bg-red-500/10 hover:text-red-500"
                         title="删除角色"
                       >
-                        <Trash2 size={18} />
+                        <Trash2 size={15} />
                       </button>
                     )}
                   </div>
                 </div>
 
-                <div className="mt-5 grid grid-cols-2 gap-3">
-                  <div className="rounded-2xl bg-black/3 dark:bg-white/5 px-4 py-3">
-                    <div className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">成员覆盖</div>
-                    <div className="mt-1 flex items-end gap-2">
-                      <span className="text-2xl font-black text-foreground">{role._count?.users || 0}</span>
-                      <span className="pb-1 text-xs text-muted-foreground">位成员</span>
-                    </div>
+                <div className="mt-4 grid grid-cols-3 gap-2">
+                  <div className="rounded-xl bg-black/3 px-3 py-2 dark:bg-white/5">
+                    <div className="text-[10px] font-black text-muted-foreground/60">成员</div>
+                    <div className="mt-0.5 text-lg font-black text-foreground">{role._count?.users || 0}</div>
                   </div>
-                  <div className="rounded-2xl bg-primary/5 px-4 py-3 ring-1 ring-primary/10">
-                    <div className="text-[10px] font-black uppercase tracking-[0.18em] text-primary/60">权限规模</div>
-                    <div className="mt-1 flex items-end gap-2">
-                      <span className="text-2xl font-black text-foreground">{Object.values(role.permissions || {}).filter(Boolean).length}</span>
-                      <span className="pb-1 text-xs text-muted-foreground">项已启用</span>
-                    </div>
+                  <div className="rounded-xl bg-primary/5 px-3 py-2 ring-1 ring-primary/10">
+                    <div className="text-[10px] font-black text-primary/60">页面</div>
+                    <div className="mt-0.5 text-lg font-black text-foreground">{stats.enabledPages}</div>
                   </div>
-                </div>
-
-                <div className="mt-4 space-y-3">
-                  <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">
-                    <Sparkles size={12} />
-                    角色画像
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {groups.slice(0, 4).map((group) => {
-                      const GroupIcon = getGroupIcon(group.key);
-                      return (
-                        <div key={group.key} className="inline-flex items-center gap-2 rounded-full bg-muted/60 dark:bg-white/8 px-3 py-2 text-xs font-bold text-foreground/80">
-                          <GroupIcon size={12} />
-                          {group.label}
-                          <span className="text-muted-foreground">{group.selected}/{group.total}</span>
-                        </div>
-                      );
-                    })}
-                    {groups.length === 0 && <div className="text-xs text-muted-foreground">这个角色还没有启用任何权限。</div>}
+                  <div className="rounded-xl bg-black/3 px-3 py-2 dark:bg-white/5">
+                    <div className="text-[10px] font-black text-muted-foreground/60">操作</div>
+                    <div className="mt-0.5 text-lg font-black text-foreground">{stats.enabledActions}</div>
                   </div>
                 </div>
               </div>
@@ -329,19 +334,15 @@ export const RoleManager = forwardRef<RoleManagerHandle>((props, ref) => {
           })}
 
           <button
-            onClick={() => {
-              setEditingRole({ name: "", description: "", permissions: {} });
-              setActiveTab(PERMISSION_TREE[0].key);
-              setPermissionQuery("");
-            }}
-            className="h-full min-h-[280px] rounded-[28px] border-2 border-dashed border-black/6 dark:border-white/8 flex flex-col items-center justify-center gap-4 hover:border-primary/30 hover:bg-primary/5 transition-all group"
+            onClick={openCreateModal}
+            className="group hidden min-h-[136px] items-center justify-center gap-4 rounded-[18px] border-2 border-dashed border-black/8 p-4 text-left transition-all hover:border-primary/30 hover:bg-primary/5 dark:border-white/10 md:flex"
           >
-            <div className="h-14 w-14 rounded-full bg-muted dark:bg-white/5 flex items-center justify-center group-hover:bg-primary group-hover:text-primary-foreground transition-all">
-              <Plus size={24} />
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-muted transition-all group-hover:bg-primary group-hover:text-primary-foreground dark:bg-white/5">
+              <Plus size={22} />
             </div>
-            <div className="space-y-1 text-center">
+            <div className="min-w-0 space-y-1">
               <div className="font-black text-base text-foreground">创建新角色</div>
-              <div className="text-xs text-muted-foreground max-w-[220px]">从空白模板开始，按职责勾选权限并立即投入使用。</div>
+              <div className="text-xs text-muted-foreground">按页面配置访问，再细分页面内操作。</div>
             </div>
           </button>
         </div>
@@ -353,421 +354,298 @@ export const RoleManager = forwardRef<RoleManagerHandle>((props, ref) => {
             <div className="fixed inset-0 z-99999 flex items-end sm:items-center justify-center p-3 sm:p-4 overscroll-none">
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setEditingRole(null)} className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
               <motion.div
-                initial={{ opacity: 0, y: 40 }}
+                initial={{ opacity: 0, y: 32 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 40 }}
-                className="relative w-full max-w-7xl h-[92dvh] sm:h-[90dvh] max-h-[92dvh] sm:max-h-[90dvh] min-h-0 bg-background border border-border rounded-[28px] sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col"
+                exit={{ opacity: 0, y: 32 }}
+                className="relative flex h-[92dvh] max-h-[92dvh] min-h-0 w-full max-w-7xl flex-col overflow-hidden rounded-[24px] border border-border bg-background shadow-2xl sm:h-[90dvh] sm:max-h-[90dvh] sm:rounded-3xl"
               >
-                <div className="px-5 sm:px-6 py-4 shrink-0 bg-background/95 backdrop-blur border-b border-border/60">
+                <div className="shrink-0 border-b border-border/60 bg-background px-5 py-4 sm:px-6">
                   <div className="flex items-start justify-between gap-4">
-                    <div className="flex min-w-0 items-start gap-3">
-                      <div className="h-10 w-10 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
-                        <Shield size={18} />
-                      </div>
-                      <div className="min-w-0 pt-0.5">
-                        <h2 className="text-xl sm:text-lg md:text-xl font-black tracking-tighter text-foreground leading-none">
-                          {editingRole.id ? (editingRole.isSystem ? "查看系统内置角色" : "配置访问权限") : "创建新角色"}
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <Shield size={18} className="text-primary" />
+                        <h2 className="text-xl font-black tracking-tight text-foreground">
+                          {editingRole.id ? (editingRole.isSystem ? "查看系统角色" : "编辑角色权限") : "创建新角色"}
                         </h2>
-                        <p className="mt-2 max-w-[20rem] text-sm sm:text-xs text-muted-foreground leading-6 sm:leading-5">
-                          把角色信息、权限组和具体能力放在同一个工作区里，一次看清。
-                        </p>
                       </div>
+                      <p className="mt-2 hidden text-sm text-muted-foreground sm:block">先决定角色能进入哪些页面，再配置页面里的具体操作。</p>
                     </div>
-                    <button
-                      onClick={() => setEditingRole(null)}
-                      className="h-11 w-11 sm:h-9 sm:w-9 rounded-full hover:bg-muted flex items-center justify-center transition-all opacity-70 hover:opacity-100 shrink-0"
-                    >
+                    <button onClick={() => setEditingRole(null)} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition hover:bg-muted">
                       <X size={18} />
                     </button>
                   </div>
                 </div>
 
-                <div
-                  ref={mobilePaneRef}
-                  className="sm:hidden flex-1 min-h-0 overflow-y-auto overscroll-contain custom-scrollbar touch-pan-y"
-                  style={{ WebkitOverflowScrolling: "touch" }}
-                >
-                  <div className="p-4 pb-24 space-y-4">
-                    <div className="space-y-3 rounded-3xl border border-border/60 bg-background/70 p-4">
-                      <div className="space-y-1.5">
-                        <label className="text-sm font-black text-foreground ml-1 flex items-center gap-1">
-                          角色名称 <span className="text-red-500">*</span>
-                        </label>
-                        <div className="flex items-center gap-3 bg-background border border-border rounded-2xl px-4 py-3">
-                          <input
-                            type="text"
-                            value={editingRole.name || ""}
-                            onChange={(e) => setEditingRole({ ...editingRole, name: e.target.value })}
-                            placeholder="输入角色名称..."
-                            disabled={editingRole.isSystem}
-                            className="flex-1 bg-transparent outline-none font-black text-sm text-foreground placeholder:text-foreground/40 disabled:opacity-50"
-                          />
-                        </div>
+                <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto lg:grid-cols-[280px_320px_minmax(0,1fr)] lg:overflow-hidden">
+                  <aside className="hidden min-h-0 border-r border-border/60 bg-black/[0.015] p-4 dark:bg-white/[0.02] lg:flex lg:flex-col">
+                    <div className="space-y-3 shrink-0">
+                      <div>
+                        <label className="ml-1 text-sm font-black text-foreground">角色名称</label>
+                        <input
+                          value={editingRole.name || ""}
+                          onChange={(e) => setEditingRole({ ...editingRole, name: e.target.value })}
+                          disabled={editingRole.isSystem}
+                          className="mt-2 h-11 w-full rounded-2xl border border-border bg-background px-4 text-sm font-black outline-none disabled:opacity-50"
+                          placeholder="输入角色名称"
+                        />
                       </div>
-
-                      <div className="space-y-1.5">
-                        <label className="text-sm font-black text-foreground ml-1">职能定位描述</label>
-                        <div className="flex items-center gap-3 bg-background border border-border rounded-2xl px-4 py-3">
-                          <input
-                            type="text"
-                            value={editingRole.description || ""}
-                            onChange={(e) => setEditingRole({ ...editingRole, description: e.target.value })}
-                            placeholder="输入职能定位描述..."
-                            disabled={editingRole.isSystem}
-                            className="flex-1 bg-transparent outline-none font-bold text-sm text-foreground/80 placeholder:text-foreground/40 disabled:opacity-50"
-                          />
-                        </div>
+                      <div>
+                        <label className="ml-1 text-sm font-black text-foreground">职能定位</label>
+                        <input
+                          value={editingRole.description || ""}
+                          onChange={(e) => setEditingRole({ ...editingRole, description: e.target.value })}
+                          disabled={editingRole.isSystem}
+                          className="mt-2 h-11 w-full rounded-2xl border border-border bg-background px-4 text-sm font-bold outline-none disabled:opacity-50"
+                          placeholder="适合谁使用"
+                        />
                       </div>
                     </div>
 
-                    <div className="space-y-3 rounded-3xl border border-border/60 bg-background/70 p-4">
-                      <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground/60">
-                        <ListChecks size={12} />
-                        权限分组
+                    <div className="mt-5 grid grid-cols-2 gap-2">
+                      <div className="rounded-2xl border border-border bg-background px-3 py-2.5">
+                        <div className="text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground/60">页面</div>
+                        <div className="mt-1 text-xl font-black">{activeStats.enabledPages}/{activeStats.totalPages}</div>
                       </div>
-                      <div className="-mx-1 overflow-x-auto px-1">
-                        <div className="flex gap-2 min-w-max">
-                          {PERMISSION_TREE.map((group) => {
-                            const selectedCount = group.children.filter((child) => !!editingRole.permissions?.[child.key]).length;
-                            const isActive = activeTab === group.key;
-                            const GroupIcon = getGroupIcon(group.key);
-                            return (
-                              <button
-                                key={group.key}
-                                onClick={() => setActiveTab(group.key)}
-                                className={cn(
-                                  "min-w-[140px] rounded-2xl border px-3 py-3 text-left transition-all touch-pan-y",
-                                  isActive ? "border-primary/30 bg-primary/8 shadow-sm" : "border-border bg-background hover:bg-muted/50"
-                                )}
-                              >
-                                <div className="flex items-center gap-3">
-                                  <div className={cn("h-9 w-9 rounded-xl flex items-center justify-center shrink-0", isActive ? "bg-primary text-primary-foreground" : "bg-muted text-foreground/70")}>
-                                    <GroupIcon size={16} />
-                                  </div>
-                                  <div className="min-w-0">
-                                    <div className="text-sm font-black text-foreground truncate">{group.label}</div>
-                                    <div className="text-[11px] text-muted-foreground">{selectedCount} / {group.children.length}</div>
+                      <div className="rounded-2xl border border-border bg-background px-3 py-2.5">
+                        <div className="text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground/60">操作</div>
+                        <div className="mt-1 text-xl font-black">{activeStats.enabledActions}/{activeStats.totalActions}</div>
+                      </div>
+                    </div>
+
+                    <div className="mt-5 space-y-2 overflow-y-auto custom-scrollbar">
+                      {PAGE_PERMISSION_TREE.map((group) => {
+                        const stats = getGroupStats(group, editingRole.permissions);
+                        const isActive = group.key === activeGroup.key;
+                        return (
+                          <button
+                            key={group.key}
+                            onClick={() => {
+                              setActiveGroupKey(group.key);
+                              setActivePageKey(group.pages[0]?.key || firstPage.key);
+                            }}
+                            className={cn("w-full rounded-2xl border px-4 py-3 text-left transition", isActive ? "border-primary/30 bg-primary/8" : "border-border bg-background hover:bg-muted/50")}
+                          >
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="truncate text-sm font-black text-foreground">{group.label}</div>
+                                <div className="mt-1 text-[11px] text-muted-foreground">{stats.enabledPages}/{stats.totalPages} 页面</div>
+                              </div>
+                              <ArrowRight size={15} className={cn("shrink-0 transition", isActive ? "text-primary" : "text-muted-foreground")} />
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </aside>
+
+                  <section className="min-h-0 border-r border-border/60 p-4 lg:overflow-y-auto lg:custom-scrollbar">
+                    <div className="mb-3 space-y-2 lg:hidden">
+                      <input
+                        value={editingRole.name || ""}
+                        onChange={(e) => setEditingRole({ ...editingRole, name: e.target.value })}
+                        disabled={editingRole.isSystem}
+                        className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm font-black outline-none disabled:opacity-50"
+                        placeholder="角色名称"
+                      />
+                      <input
+                        value={editingRole.description || ""}
+                        onChange={(e) => setEditingRole({ ...editingRole, description: e.target.value })}
+                        disabled={editingRole.isSystem}
+                        className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm font-bold outline-none disabled:opacity-50"
+                        placeholder="职能定位"
+                      />
+                      <div className="flex gap-2 overflow-x-auto pb-1 custom-scrollbar">
+                        {PAGE_PERMISSION_TREE.map((group) => (
+                          <button
+                            key={group.key}
+                            onClick={() => {
+                              setActiveGroupKey(group.key);
+                              setActivePageKey(group.pages[0]?.key || firstPage.key);
+                            }}
+                            className={cn("h-9 shrink-0 rounded-xl border px-3 text-xs font-black", group.key === activeGroup.key ? "border-primary/30 bg-primary/8 text-primary" : "border-border bg-background text-muted-foreground")}
+                          >
+                            {group.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="mb-2 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground/60">
+                      <LayoutGrid size={12} />
+                      {activeGroup.label}
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 lg:grid-cols-1">
+                      {activeGroup.pages.map((page) => {
+                        const enabled = !!editingRole.permissions?.[page.accessKey];
+                        const actionCount = page.actions.filter((action) => editingRole.permissions?.[action.key]).length;
+                        const isActive = page.key === activePage.key;
+                        return (
+                          <div key={page.key} className={cn(isActive && "col-span-2 lg:col-span-1")}>
+                            <button
+                              onClick={() => setActivePageKey(page.key)}
+                              className={cn("w-full rounded-xl border px-3 py-2.5 text-left transition lg:rounded-2xl lg:px-4 lg:py-3", isActive ? "border-primary/30 bg-primary/8 shadow-sm" : "border-border bg-background hover:bg-muted/40")}
+                            >
+                              <div className="flex items-center justify-between gap-3">
+                                <div className="min-w-0">
+                                  <div className="truncate text-sm font-black text-foreground">{page.label}</div>
+                                  <div className="mt-0.5 text-[11px] text-muted-foreground lg:mt-1">
+                                    {enabled ? "可访问" : "未开放"} · {actionCount}/{page.actions.length} 操作
                                   </div>
                                 </div>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
+                                <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", enabled ? "bg-emerald-500" : "bg-muted-foreground/25")} />
+                              </div>
+                            </button>
+
+                            {isActive && (
+                              <div className="mt-2 space-y-2 rounded-2xl border border-border bg-background p-3 lg:hidden">
+                                <div className="flex items-center justify-between gap-3">
+                                  <div className="min-w-0">
+                                    <div className="truncate text-base font-black text-foreground">{page.label}</div>
+                                    <div className="mt-0.5 text-xs text-muted-foreground">{page.description}</div>
+                                  </div>
+                                  {!editingRole.isSystem && (
+                                    <button
+                                      onClick={() => setPageAll(page, (Number(enabled) + actionCount) !== getPageKeys(page).length)}
+                                      className="h-8 shrink-0 rounded-xl border border-border px-3 text-xs font-black"
+                                    >
+                                      {(Number(enabled) + actionCount) === getPageKeys(page).length ? "全关" : "全开"}
+                                    </button>
+                                  )}
+                                </div>
+
+                                <button
+                                  type="button"
+                                  disabled={editingRole.isSystem}
+                                  onClick={() => togglePageAccess(page)}
+                                  className={cn("flex w-full items-center justify-between gap-3 rounded-xl border p-3 text-left", enabled ? "border-primary/25 bg-primary/6" : "border-border", editingRole.isSystem && "cursor-not-allowed opacity-75")}
+                                >
+                                  <div className="min-w-0">
+                                    <div className="text-sm font-black text-foreground">允许访问此页面</div>
+                                    <div className="mt-0.5 break-all font-mono text-[11px] text-muted-foreground">{page.accessKey}</div>
+                                  </div>
+                                  <SwitchMark checked={enabled} />
+                                </button>
+
+                                {page.actions.length > 0 ? (
+                                  page.actions.map((action) => {
+                                    const checked = !!editingRole.permissions?.[action.key];
+                                    return (
+                                      <button
+                                        key={action.key}
+                                        type="button"
+                                        disabled={editingRole.isSystem || !enabled}
+                                        onClick={() => toggleAction(page, action.key)}
+                                        className={cn("flex w-full items-center justify-between gap-3 rounded-xl border p-3 text-left", checked ? "border-primary/25 bg-primary/6" : "border-border", (!enabled || editingRole.isSystem) && "cursor-not-allowed opacity-55")}
+                                      >
+                                        <div className="min-w-0">
+                                          <div className="text-sm font-black text-foreground">{action.label}</div>
+                                          <div className="mt-0.5 break-all font-mono text-[11px] text-muted-foreground">{action.key}</div>
+                                        </div>
+                                        <SwitchMark checked={checked} />
+                                      </button>
+                                    );
+                                  })
+                                ) : (
+                                  <div className="rounded-xl border border-dashed border-border p-3 text-center text-xs text-muted-foreground">
+                                    这个页面目前只有访问权限。
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
+                  </section>
 
-                    <div className="space-y-3 rounded-3xl border border-border/60 bg-background/70 p-4">
-                      <div className="space-y-1">
-                        <h3 className="text-xl font-black tracking-tight text-foreground">{currentGroup.label}</h3>
-                        <p className="text-sm text-muted-foreground">在当前分组里精细配置这个角色能访问和操作的功能。</p>
-                      </div>
-
-                      <div className="space-y-3">
-                        <div className="relative">
-                          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                          <input
-                            type="text"
-                            value={permissionQuery}
-                            onChange={(e) => setPermissionQuery(e.target.value)}
-                            placeholder="搜索当前分组权限..."
-                            className="w-full h-11 rounded-2xl border border-border bg-background pl-10 pr-4 text-sm outline-none"
-                          />
+                  <section className="hidden min-h-0 p-4 pb-24 lg:block lg:overflow-y-auto lg:custom-scrollbar sm:p-6">
+                    <div className="rounded-2xl border border-border bg-white/70 p-4 dark:bg-white/5 sm:rounded-[22px] sm:p-5">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="truncate text-lg font-black tracking-tight text-foreground sm:text-2xl">{activePage.label}</div>
+                          <p className="mt-2 hidden text-sm leading-6 text-muted-foreground sm:block">{activePage.description}</p>
                         </div>
                         {!editingRole.isSystem && (
                           <button
-                            onClick={() => toggleGroup(currentKeys, currentSelected !== currentKeys.length)}
-                            className="w-full h-11 px-4 rounded-2xl border border-border bg-background hover:bg-muted text-sm font-black"
+                            onClick={() => setPageAll(activePage, activePageSelected !== activePageTotal)}
+                            className="h-9 shrink-0 rounded-xl border border-border bg-background px-3 text-xs font-black transition hover:bg-muted sm:h-10 sm:rounded-2xl sm:px-4 sm:text-sm"
                           >
-                            当前分组全选/撤销
+                            {activePageSelected === activePageTotal ? "全部关闭" : "全部开启"}
                           </button>
                         )}
                       </div>
 
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="rounded-2xl border border-border bg-background px-4 py-3">
-                          <div className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground/60">启用权限</div>
-                          <div className="mt-1 text-xl font-black text-foreground">{selectedPermissions}</div>
-                        </div>
-                        <div className="rounded-2xl border border-border bg-background px-4 py-3">
-                          <div className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground/60">覆盖模块</div>
-                          <div className="mt-1 text-xl font-black text-foreground">{enabledGroups.length}</div>
-                        </div>
+                      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted sm:mt-5 sm:h-2">
+                        <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${(activePageSelected / activePageTotal) * 100}%` }} />
                       </div>
+                    </div>
 
-                      <div className="grid grid-cols-1 gap-3">
-                        {visiblePermissions.map((child) => {
-                          const isChecked = !!editingRole.permissions?.[child.key];
+                    <div className="mt-3 space-y-2 sm:mt-4 sm:space-y-3">
+                      <button
+                        type="button"
+                        disabled={editingRole.isSystem}
+                        onClick={() => togglePageAccess(activePage)}
+                        className={cn("flex w-full items-center justify-between gap-4 rounded-2xl border p-4 text-left transition sm:rounded-[22px] sm:p-5", activePageEnabled ? "border-primary/25 bg-primary/6" : "border-border bg-background hover:bg-muted/40", editingRole.isSystem && "cursor-not-allowed opacity-75")}
+                      >
+                        <div className="min-w-0">
+                          <div className="text-sm font-black text-foreground sm:text-base">允许访问此页面</div>
+                          <div className="mt-1 break-all font-mono text-xs text-muted-foreground">{activePage.accessKey}</div>
+                        </div>
+                        <SwitchMark checked={activePageEnabled} />
+                      </button>
+
+                      {activePage.actions.length > 0 ? (
+                        activePage.actions.map((action) => {
+                          const checked = !!editingRole.permissions?.[action.key];
                           return (
                             <button
-                              key={child.key}
+                              key={action.key}
                               type="button"
-                              role="switch"
-                              aria-checked={isChecked}
-                              disabled={editingRole.isSystem}
-                              onPointerDown={(e) => e.preventDefault()}
-                              onClick={() => !editingRole.isSystem && togglePermission(child.key)}
+                              disabled={editingRole.isSystem || !activePageEnabled}
+                              onClick={() => toggleAction(activePage, action.key)}
                               className={cn(
-                                "flex items-center justify-between gap-4 rounded-2xl border px-4 py-3.5 text-left transition-all cursor-pointer shadow-sm",
-                                isChecked ? "border-primary/25 bg-primary/6" : "border-border bg-background hover:bg-muted/40",
-                                editingRole.isSystem && "cursor-not-allowed opacity-70"
+                                "flex w-full items-center justify-between gap-4 rounded-2xl border p-4 text-left transition sm:rounded-[22px] sm:p-5",
+                                checked ? "border-primary/25 bg-primary/6" : "border-border bg-background hover:bg-muted/40",
+                                (!activePageEnabled || editingRole.isSystem) && "cursor-not-allowed opacity-55"
                               )}
                             >
-                              <div className="min-w-0 space-y-1">
-                                <div className="text-base font-black text-foreground leading-none">{child.label}</div>
-                                <div className={cn("text-xs font-bold", isChecked ? "text-primary/80" : "text-muted-foreground")}>
-                                  {isChecked ? "已启用" : "未启用"}
-                                </div>
+                              <div className="min-w-0">
+                                <div className="text-sm font-black text-foreground">{action.label}</div>
+                                <div className="mt-1 break-all font-mono text-xs text-muted-foreground">{action.key}</div>
                               </div>
-                              <div className="flex items-center gap-2 shrink-0">
-                                {isChecked && <Check size={14} className="text-primary" />}
-                                <div className={cn("relative w-10 h-6 rounded-full border transition-all", isChecked ? "bg-foreground dark:bg-white border-foreground dark:border-white" : "bg-muted border-border", editingRole.isSystem && "opacity-50")}>
-                                  <div className={cn("absolute top-0.5 left-0.5 h-4.5 w-4.5 rounded-full transition-all", isChecked ? "translate-x-4 bg-background dark:bg-black" : "bg-muted-foreground/60")} />
-                                </div>
+                              <div className="flex shrink-0 items-center gap-2">
+                                {checked && <Check size={14} className="text-primary" />}
+                                <SwitchMark checked={checked} />
                               </div>
                             </button>
                           );
-                        })}
-
-                        {visiblePermissions.length === 0 && (
-                          <div className="rounded-3xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-                            当前分组里没有匹配 “{permissionQuery}” 的权限项。
-                          </div>
-                        )}
-                      </div>
+                        })
+                      ) : (
+                        <div className="rounded-2xl border border-dashed border-border p-5 text-center text-sm text-muted-foreground sm:rounded-[22px] sm:p-8">
+                          这个页面目前只有访问权限，没有额外细分操作。
+                        </div>
+                      )}
                     </div>
-                  </div>
+                  </section>
                 </div>
 
-                <div className="hidden sm:block flex-1 min-h-0 overflow-hidden">
-                  <div className="grid grid-cols-1 xl:grid-cols-[280px_minmax(0,1fr)] h-full min-h-0">
-                    <div className="border-b xl:border-b-0 xl:border-r border-border/60 bg-black/1.5 dark:bg-white/2 h-full min-h-0 flex flex-col">
-                      <div className="p-4 md:p-5 space-y-4 shrink-0 border-b border-border/40">
-                        <div className="space-y-3">
-                        <div className="space-y-1.5">
-                          <label className="text-sm font-black text-foreground ml-1 flex items-center gap-1">
-                            角色名称 <span className="text-red-500">*</span>
-                          </label>
-                          <div className="flex items-center gap-3 bg-background border border-border rounded-2xl px-5 py-3">
-                            <input
-                              type="text"
-                              value={editingRole.name || ""}
-                              onChange={(e) => setEditingRole({ ...editingRole, name: e.target.value })}
-                              placeholder="输入角色名称..."
-                              disabled={editingRole.isSystem}
-                              className="flex-1 bg-transparent outline-none font-black text-sm text-foreground placeholder:text-foreground/40 disabled:opacity-50"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="space-y-1.5">
-                          <label className="text-sm font-black text-foreground ml-1">职能定位描述</label>
-                          <div className="flex items-center gap-3 bg-background border border-border rounded-2xl px-5 py-3">
-                            <input
-                              type="text"
-                              value={editingRole.description || ""}
-                              onChange={(e) => setEditingRole({ ...editingRole, description: e.target.value })}
-                              placeholder="输入职能定位描述..."
-                              disabled={editingRole.isSystem}
-                              className="flex-1 bg-transparent outline-none font-bold text-sm text-foreground/80 placeholder:text-foreground/40 disabled:opacity-50"
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="space-y-3">
-                        <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground/60">
-                          <ListChecks size={12} />
-                          权限分组
-                        </div>
-                      </div>
-                      </div>
-
-                      <div ref={groupListRef} className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar px-4 md:px-5 pb-4 xl:pb-16 pt-3">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-2 min-w-0">
-                          {PERMISSION_TREE.map((group) => {
-                            const selectedCount = group.children.filter((child) => !!editingRole.permissions?.[child.key]).length;
-                            const isActive = activeTab === group.key;
-                            const GroupIcon = getGroupIcon(group.key);
-                            return (
-                            <button
-                              key={group.key}
-                              onClick={() => setActiveTab(group.key)}
-                              className={cn(
-                                "w-full rounded-2xl border px-4 py-3 text-left transition-all touch-pan-y",
-                                isActive ? "border-primary/30 bg-primary/8 shadow-sm" : "border-border bg-background hover:bg-muted/50"
-                              )}
-                            >
-                                <div className="flex items-center justify-between gap-3">
-                                  <div className="flex items-center gap-3 min-w-0">
-                                    <div className={cn("h-9 w-9 rounded-xl flex items-center justify-center shrink-0", isActive ? "bg-primary text-primary-foreground" : "bg-muted text-foreground/70")}>
-                                      <GroupIcon size={16} />
-                                    </div>
-                                    <div className="min-w-0">
-                                      <div className="text-sm font-black text-foreground truncate">{group.label}</div>
-                                      <div className="text-[11px] text-muted-foreground">{selectedCount} / {group.children.length} 已启用</div>
-                                    </div>
-                                  </div>
-                                  <div className="text-xs font-black text-muted-foreground">{selectedCount}</div>
-                                </div>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div ref={detailPaneRef} className="h-full min-h-0 overflow-y-auto custom-scrollbar">
-                      <div className="xl:sticky xl:top-0 z-10 p-4 md:p-8 pb-4 bg-background/96 backdrop-blur border-b border-border/40 space-y-5">
-                        <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
-                          <div className="space-y-1">
-                            <h3 className="text-2xl md:text-3xl font-black tracking-tighter text-foreground">{currentGroup.label}</h3>
-                            <p className="text-sm text-muted-foreground">在当前分组里精细配置这个角色能访问和操作的功能。</p>
-                          </div>
-                          <div className="flex flex-col sm:flex-row gap-3">
-                            <div className="relative min-w-[240px]">
-                              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                              <input
-                                type="text"
-                                value={permissionQuery}
-                                onChange={(e) => setPermissionQuery(e.target.value)}
-                                placeholder="搜索当前分组权限..."
-                                className="w-full h-11 rounded-2xl border border-border bg-background pl-10 pr-4 text-sm outline-none"
-                              />
-                            </div>
-                            {!editingRole.isSystem && (
-                              <button
-                                onClick={() => toggleGroup(currentKeys, currentSelected !== currentKeys.length)}
-                                className="h-11 px-4 rounded-2xl border border-border bg-background hover:bg-muted text-sm font-black"
-                              >
-                                当前分组全选/撤销
-                              </button>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="rounded-3xl border border-border bg-white/50 dark:bg-white/5 p-5">
-                          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                            <div>
-                              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">分组概览</div>
-                              <div className="mt-2 text-sm text-muted-foreground">
-                                当前已启用 <span className="font-black text-foreground">{currentSelected}</span> / {currentGroup.children.length} 项能力
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-3">
-                              <div className="h-2 w-40 rounded-full bg-muted overflow-hidden">
-                                <div className="h-full bg-primary rounded-full" style={{ width: `${(currentSelected / currentGroup.children.length) * 100}%` }} />
-                              </div>
-                              <div className={cn("text-xs font-black", currentSelected === currentGroup.children.length ? "text-primary" : "text-muted-foreground")}>
-                                {currentSelected === currentGroup.children.length ? "已全开" : "未全开"}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,180px)_minmax(0,180px)_minmax(0,1fr)] gap-3">
-                          <div className="rounded-2xl border border-border bg-background px-4 py-3">
-                            <div className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground/60">启用权限</div>
-                            <div className="mt-1 text-2xl font-black text-foreground">{selectedPermissions}</div>
-                          </div>
-                          <div className="rounded-2xl border border-border bg-background px-4 py-3">
-                            <div className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground/60">覆盖模块</div>
-                            <div className="mt-1 text-2xl font-black text-foreground">{enabledGroups.length}</div>
-                          </div>
-                          <div className="rounded-2xl border border-border bg-background p-4 space-y-3">
-                            <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground/60">
-                              <BadgeCheck size={12} />
-                              已覆盖模块
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                              {enabledGroups.length > 0 ? (
-                                enabledGroups.map((group) => (
-                                  <div key={group.key} className="inline-flex items-center gap-2 rounded-full bg-muted px-3 py-2 text-xs font-bold text-foreground/80">
-                                    {group.label}
-                                    <span className="text-muted-foreground">{group.selected}/{group.total}</span>
-                                  </div>
-                                ))
-                              ) : (
-                                <div className="text-xs text-muted-foreground">还没有选中任何权限。</div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="p-4 md:p-8 pt-5 pb-16">
-                        <AnimatePresence mode="wait">
-                          <motion.div
-                            key={activeTab + permissionQuery}
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -10 }}
-                            className="space-y-5"
-                          >
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-4">
-                              {visiblePermissions.map((child) => {
-                                const isChecked = !!editingRole.permissions?.[child.key];
-                                return (
-                                  <label
-                                    key={child.key}
-                                    className={cn(
-                                      "flex flex-col gap-3 rounded-2xl md:rounded-3xl border p-4 md:p-5 transition-all cursor-pointer shadow-sm min-h-[92px] md:min-h-[116px]",
-                                      isChecked ? "border-primary/25 bg-primary/6" : "border-border bg-background hover:bg-muted/40"
-                                    )}
-                                  >
-                                    <div className="min-w-0">
-                                      <div className="text-sm font-black text-foreground">{child.label}</div>
-                                    </div>
-                                    <div className="flex items-center justify-between gap-3">
-                                      <div className="min-w-0 text-[11px] md:text-xs text-muted-foreground font-mono break-all">{child.key}</div>
-                                      <div className="flex items-center gap-2 md:gap-3 shrink-0">
-                                        {isChecked && <Check size={14} className="text-primary" />}
-                                        <input
-                                          type="checkbox"
-                                          checked={isChecked}
-                                          disabled={editingRole.isSystem}
-                                          onChange={() => togglePermission(child.key)}
-                                          className="sr-only"
-                                        />
-                                        <div className={cn("relative w-9 h-5.5 md:w-10 md:h-6 rounded-full border transition-all", isChecked ? "bg-foreground dark:bg-white border-foreground dark:border-white" : "bg-muted border-border", editingRole.isSystem && "opacity-50")}>
-                                          <div className={cn("absolute top-0.5 left-0.5 h-4 w-4 md:h-4.5 md:w-4.5 rounded-full transition-all", isChecked ? "translate-x-3.5 md:translate-x-4.5 bg-background dark:bg-black" : "bg-muted-foreground/60")} />
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </label>
-                                );
-                              })}
-                            </div>
-
-                            {visiblePermissions.length === 0 && (
-                              <div className="rounded-3xl border border-dashed border-border p-10 text-center text-sm text-muted-foreground">
-                                当前分组里没有匹配 “{permissionQuery}” 的权限项。
-                              </div>
-                            )}
-                          </motion.div>
-                        </AnimatePresence>
-                      </div>
-                    </div>
+                <div className="flex shrink-0 items-center justify-between gap-4 border-t border-border bg-background px-5 py-4 sm:px-6">
+                  <div className="hidden items-center gap-3 rounded-2xl border border-border bg-white/40 px-4 py-2 dark:bg-white/5 sm:flex">
+                    <BadgeCheck size={14} className="text-primary" />
+                    <span className="text-xs font-bold text-muted-foreground">{activeStats.enabledPages} 个页面，{activeStats.enabledActions} 项操作已启用</span>
                   </div>
-                </div>
-
-                <div className="px-6 md:px-8 py-4 flex flex-row items-center justify-between gap-4 shrink-0 bg-background border-t border-border">
-                  <div className="hidden lg:flex items-center gap-3 rounded-2xl border border-border bg-white/40 dark:bg-white/5 px-4 py-2">
-                    <span className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.16em]">当前配置</span>
-                    <span className="text-lg font-black text-foreground">{selectedPermissions}</span>
-                    <span className="text-xs font-bold text-muted-foreground">项权限已启用</span>
-                  </div>
-                  <div className="flex items-center gap-3 w-full sm:w-auto ml-auto">
-                    <button onClick={() => setEditingRole(null)} className="flex-1 sm:flex-none px-4 md:px-6 h-10 rounded-xl md:rounded-2xl font-black hover:bg-black/5 dark:hover:bg-white/5 transition-all text-sm opacity-70">
+                  <div className="ml-auto flex w-full items-center gap-3 sm:w-auto">
+                    <button onClick={() => setEditingRole(null)} className="h-10 flex-1 rounded-xl px-5 text-sm font-black opacity-70 transition hover:bg-muted sm:flex-none">
                       {editingRole.isSystem ? "关闭" : "放弃"}
                     </button>
                     {!editingRole.isSystem && (
                       <button
                         onClick={handleSave}
                         disabled={isSaving}
-                        className="flex-1 sm:flex-none px-6 md:px-10 h-10 rounded-xl md:rounded-2xl bg-foreground text-background font-black shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 whitespace-nowrap disabled:opacity-50"
+                        className="flex h-10 flex-1 items-center justify-center gap-2 rounded-xl bg-foreground px-8 text-sm font-black text-background shadow-xl transition hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 sm:flex-none"
                       >
                         {isSaving ? <Loader2 className="animate-spin" size={18} /> : <Check size={18} strokeWidth={3} />}
-                        <span className="text-sm md:text-base">保存角色</span>
+                        保存角色
                       </button>
                     )}
                   </div>

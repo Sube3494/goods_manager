@@ -117,6 +117,7 @@ export async function proxy(request: NextRequest) {
             path === "/api/admin/users" ||
             path.startsWith("/api/admin/users/");
           const hasMembersAccess =
+            hasAdminAccess(sessionUser, "members:read") ||
             hasAdminAccess(sessionUser, "members:manage") ||
             hasAdminAccess(sessionUser, "members:status") ||
             hasAdminAccess(sessionUser, "whitelist:manage");
