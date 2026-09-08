@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Shield, Settings2, Loader2, User as UserIcon, Mail, Plus, Trash2, AlertCircle, NotebookPen, Search, Check, UserCheck, Ban, MonitorSmartphone, Smartphone, FolderLock, ShoppingBag } from "lucide-react";
+import { Shield, Settings2, Loader2, User as UserIcon, Mail, Plus, Trash2, AlertCircle, NotebookPen, Search, Check, UserCheck, Ban, MonitorSmartphone, Smartphone, FolderLock, ShoppingBag, X, Crown, ShieldAlert } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { Switch } from "@/components/ui/Switch";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
@@ -53,6 +53,11 @@ interface WhitelistEntry {
     maiyatianCookieCount?: number;
     accessibleLibraries?: Array<{ id: string; name: string }>;
   };
+}
+
+interface ProductLibraryOption {
+  id: string;
+  name: string;
 }
 
 function formatLastActiveAt(value?: string | null) {
@@ -125,23 +130,92 @@ function DevicePresence({
   );
 }
 
+function RoleBadge({
+  isSuperAdmin,
+  roleName,
+}: {
+  isSuperAdmin: boolean;
+  roleName?: string | null;
+}) {
+  if (isSuperAdmin) {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black bg-orange-500/12 text-orange-600 dark:text-orange-400 border border-orange-500/30 shadow-xs whitespace-nowrap">
+        <Crown size={12} className="text-orange-500 dark:text-orange-400 shrink-0" />
+        超级管理员
+      </span>
+    );
+  }
+
+  if (roleName) {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/20 shadow-xs whitespace-nowrap">
+        <Shield size={11} className="text-sky-600 dark:text-sky-400 shrink-0" />
+        {roleName}
+      </span>
+    );
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-zinc-100 text-zinc-500 dark:bg-white/5 dark:text-zinc-400 border border-dashed border-zinc-300 dark:border-zinc-700 whitespace-nowrap">
+      <ShieldAlert size={10} className="shrink-0 text-amber-500/80" />
+      未分配角色
+    </span>
+  );
+}
+
+function MemberAvatar({
+  isRegistered,
+  size = "md",
+}: {
+  isRegistered: boolean;
+  size?: "md" | "lg";
+}) {
+  const isLg = size === "lg";
+
+  return (
+    <div
+      className={`rounded-full flex items-center justify-center shrink-0 transition-all ${
+        isLg ? "h-10 w-10" : "h-9 w-9"
+      } ${
+        isRegistered
+          ? "bg-primary/10 text-primary shadow-2xs"
+          : "bg-muted/40 border border-dashed border-muted-foreground/30 text-muted-foreground"
+      }`}
+    >
+      {isRegistered ? (
+        <UserIcon size={isLg ? 18 : 16} />
+      ) : (
+        <Mail size={isLg ? 16 : 14} />
+      )}
+    </div>
+  );
+}
+
 function SelectionCircleButton({
   checked,
   onClick,
+  disabled = false,
+  title,
   className = "",
 }: {
   checked: boolean;
-  onClick: () => void;
+  onClick?: () => void;
+  disabled?: boolean;
+  title?: string;
   className?: string;
 }) {
   return (
     <button
       type="button"
-      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      onClick={disabled ? undefined : onClick}
       className={`relative h-5 w-5 rounded-full border-2 transition-all duration-300 flex items-center justify-center ${
-        checked
-          ? "bg-foreground border-foreground text-background dark:text-black scale-110 shadow-lg shadow-black/10"
-          : "bg-white dark:bg-white/5 border-gray-300 dark:border-white/20 hover:border-gray-400 dark:hover:border-foreground/50 shadow-sm"
+        disabled
+          ? "cursor-not-allowed bg-zinc-100 dark:bg-zinc-800/80 border-zinc-300 dark:border-zinc-700 opacity-60 shadow-none"
+          : checked
+          ? "bg-foreground border-foreground text-background dark:text-black scale-110 shadow-lg shadow-black/10 cursor-pointer"
+          : "bg-white dark:bg-white/5 border-gray-300 dark:border-white/20 hover:border-gray-400 dark:hover:border-foreground/50 shadow-sm cursor-pointer"
       } ${className}`}
     >
       {checked ? <Check size={12} strokeWidth={4} /> : null}
@@ -172,36 +246,50 @@ function RemarkModal({
   }, []);
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-3 sm:p-4 animate-in fade-in duration-300">
-      <div className="mb-10 w-full max-w-lg overflow-hidden rounded-[28px] sm:mb-0 sm:rounded-3xl border border-border bg-background shadow-2xl flex flex-col animate-in zoom-in-95 duration-300 relative">
-        <div className="px-5 sm:px-8 py-5 sm:py-6 border-b border-border bg-background/95 backdrop-blur">
-          <h3 className="text-lg sm:text-xl font-black text-foreground">成员备注</h3>
-          <p className="text-xs sm:text-sm text-muted-foreground mt-1 break-all">{email}</p>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-3 sm:p-4 animate-in fade-in duration-200">
+      <div className="relative mb-10 w-full max-w-lg overflow-hidden rounded-[26px] sm:mb-0 sm:rounded-[32px] border border-border/80 dark:border-white/10 bg-white dark:bg-zinc-900 shadow-2xl flex flex-col animate-in zoom-in-95 duration-200">
+        <div className="relative px-6 py-5 border-b border-border/60 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 shadow-2xs shrink-0">
+              <NotebookPen size={18} />
+            </div>
+            <div className="min-w-0">
+              <h3 className="text-lg sm:text-xl font-black text-foreground tracking-tight">成员备注</h3>
+              <p className="text-xs text-muted-foreground mt-0.5 truncate">{email}</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="h-8 w-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-all hover:scale-105 active:scale-95 shrink-0"
+          >
+            <X size={17} />
+          </button>
         </div>
 
-        <div className="p-4 sm:p-6">
+        <div className="relative p-6">
           <textarea
             value={remark}
             onChange={(e) => setRemark(e.target.value)}
             placeholder="写点方便识别的备注，比如客户昵称、团队名或来源渠道"
             rows={4}
             maxLength={60}
-            className="w-full rounded-2xl border border-border bg-white dark:bg-white/5 px-4 py-3 text-sm outline-none transition-all focus:ring-2 focus:ring-primary/20 resize-none"
+            className="w-full rounded-2xl border border-border/80 bg-zinc-50 dark:bg-white/[0.03] px-4 py-3 text-sm outline-none transition-all focus:border-primary/40 focus:ring-2 focus:ring-primary/20 resize-none shadow-2xs"
           />
-          <div className="mt-2 text-right text-[11px] text-muted-foreground">{remark.length}/60</div>
+          <div className="mt-2 text-right text-[11px] text-muted-foreground font-mono">{remark.length}/60</div>
         </div>
 
-        <div className="p-4 sm:p-6 border-t border-border flex justify-end gap-3 bg-muted/5">
+        <div className="relative px-6 py-4 border-t border-border/60 flex justify-end gap-3">
           <button
             onClick={onClose}
-            className="px-5 py-2.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-all text-sm font-bold"
+            className="px-6 py-2.5 rounded-full bg-zinc-100 dark:bg-white/5 hover:bg-zinc-200/80 dark:hover:bg-white/10 text-foreground transition-all text-sm font-bold active:scale-95"
           >
             取消
           </button>
           <button
             disabled={isSaving}
             onClick={() => onSave(remark)}
-            className="px-6 sm:px-8 py-2.5 rounded-xl bg-primary text-primary-foreground font-black shadow-lg hover:scale-105 active:scale-95 transition-all disabled:opacity-50"
+            className="px-7 sm:px-8 py-2.5 rounded-full bg-primary text-primary-foreground font-black shadow-lg shadow-primary/25 hover:shadow-primary/35 hover:-translate-y-0.5 active:translate-y-0 transition-all disabled:opacity-50 text-sm"
           >
             {isSaving ? <Loader2 className="animate-spin" size={18} /> : "保存备注"}
           </button>
@@ -235,50 +323,84 @@ function RoleAssignmentModal({
     }, []);
 
     return createPortal(
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-3 sm:p-4 animate-in fade-in duration-300">
-            <div className="mb-10 w-full max-w-lg overflow-hidden rounded-[28px] sm:mb-0 sm:rounded-3xl border border-border bg-background shadow-2xl flex flex-col animate-in zoom-in-95 duration-300 relative max-h-[calc(100dvh-5rem)] sm:max-h-safe-modal">
-                <div className="px-5 sm:px-8 py-5 sm:py-6 border-b border-border bg-background/95 backdrop-blur">
-                    <h3 className="text-lg sm:text-xl font-black text-foreground">设置成员角色</h3>
-                    <p className="text-xs sm:text-sm text-muted-foreground mt-1">请选择一个角色以更新该成员的访问权限集</p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-3 sm:p-4 animate-in fade-in duration-200">
+            <div className="relative mb-10 w-full max-w-lg overflow-hidden rounded-[26px] sm:mb-0 sm:rounded-[32px] border border-border/80 dark:border-white/10 bg-white dark:bg-zinc-900 shadow-2xl flex flex-col animate-in zoom-in-95 duration-200 max-h-[calc(100dvh-5rem)] sm:max-h-safe-modal">
+                <div className="relative px-6 py-5 border-b border-border/60 flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary shadow-2xs shrink-0">
+                            <Shield size={18} />
+                        </div>
+                        <div>
+                            <h3 className="text-lg sm:text-xl font-black text-foreground tracking-tight">设置成员角色</h3>
+                            <p className="text-xs text-muted-foreground mt-0.5">请选择一个角色以更新该成员的访问权限集</p>
+                        </div>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="h-8 w-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-all hover:scale-105 active:scale-95 shrink-0"
+                    >
+                        <X size={17} />
+                    </button>
                 </div>
 
-                <div className="p-4 sm:p-6 space-y-3 overflow-y-auto custom-scrollbar">
-                    {roles.length > 0 ? roles.map(role => (
-                        <button
-                            key={role.id}
-                            type="button"
-                            onClick={() => setSelectedId(role.id)}
-                            className={`w-full p-4 rounded-2xl border transition-all text-left flex items-start justify-between gap-3 ${
-                                selectedId === role.id 
-                                ? "bg-primary/5 border-primary ring-1 ring-primary/20" 
-                                : "bg-background border-border hover:border-primary/40"
-                            }`}
-                        >
-                            <div className="min-w-0">
-                                <div className="font-black text-sm text-foreground flex items-center gap-2 flex-wrap">
-                                    {role.name}
-                                    {role.isSystem && <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded-full font-bold">系统</span>}
+                <div className="relative p-6 space-y-3 overflow-y-auto custom-scrollbar">
+                    {roles.length > 0 ? roles.map(role => {
+                        const isSelected = selectedId === role.id;
+                        return (
+                            <button
+                                key={role.id}
+                                type="button"
+                                onClick={() => setSelectedId(role.id)}
+                                className={`w-full p-4 rounded-2xl border transition-all text-left flex items-start justify-between gap-3 group ${
+                                    isSelected 
+                                    ? "bg-primary/5 dark:bg-primary/10 border-primary ring-2 ring-primary/20 shadow-xs" 
+                                    : "bg-zinc-50 dark:bg-white/[0.03] border-border/80 hover:bg-zinc-100/90 dark:hover:bg-white/[0.06] hover:border-primary/40"
+                                }`}
+                            >
+                                <div className="min-w-0 flex-1">
+                                    <div className="font-black text-sm text-foreground flex items-center gap-2 flex-wrap">
+                                        {role.name}
+                                        {role.isSystem && (
+                                            <span className="text-[10px] bg-zinc-200/80 text-zinc-700 dark:bg-white/10 dark:text-white/80 px-2 py-0.5 rounded-full font-bold">
+                                                系统
+                                            </span>
+                                        )}
+                                    </div>
+                                    <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">{role.description || "无具体权限描述"}</p>
                                 </div>
-                                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{role.description || "无描述"}</p>
-                            </div>
-                            <div className={`mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${selectedId === role.id ? "bg-primary border-primary" : "border-muted-foreground/30"}`}>
-                                {selectedId === role.id && <div className="w-2 h-2 rounded-full bg-white" />}
-                            </div>
-                        </button>
-                    )) : (
-                        <div className="rounded-2xl border border-dashed border-border px-4 py-10 text-center">
+                                <div className={`mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all duration-200 ${
+                                    isSelected 
+                                    ? "bg-primary border-primary text-primary-foreground shadow-xs shadow-primary/40 scale-105" 
+                                    : "border-zinc-300 dark:border-white/20 bg-white dark:bg-zinc-800 group-hover:border-primary/50"
+                                }`}>
+                                    {isSelected ? <Check size={11} strokeWidth={4} /> : null}
+                                </div>
+                            </button>
+                        );
+                    }) : (
+                        <div className="rounded-2xl border border-dashed border-border/80 px-4 py-10 text-center bg-muted/10">
                             <p className="text-sm font-bold text-muted-foreground">当前没有可分配的角色</p>
                             <p className="text-xs text-muted-foreground/70 mt-1">请先到角色管理中创建或启用角色模板。</p>
                         </div>
                     )}
                 </div>
 
-                <div className="p-4 sm:p-6 border-t border-border flex justify-end gap-3 bg-muted/5">
-                    <button onClick={onClose} className="px-5 py-2.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-all text-sm font-bold">取消</button>
+                <div className="relative px-6 py-4 border-t border-border/60 flex justify-end gap-3">
+                    <button 
+                        onClick={onClose} 
+                        className="px-6 py-2.5 rounded-full bg-zinc-100 dark:bg-white/5 hover:bg-zinc-200/80 dark:hover:bg-white/10 text-foreground transition-all text-sm font-bold active:scale-95"
+                    >
+                        取消
+                    </button>
                     <button 
                         disabled={isSaving || !selectedId}
                         onClick={() => onSave(selectedId)}
-                        className="px-6 sm:px-8 py-2.5 rounded-xl bg-primary text-primary-foreground font-black shadow-lg hover:scale-105 active:scale-95 transition-all disabled:opacity-50"
+                        className={`px-7 sm:px-8 py-2.5 rounded-full font-black text-sm transition-all ${
+                            selectedId && !isSaving
+                                ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25 hover:shadow-primary/35 hover:-translate-y-0.5 active:translate-y-0"
+                                : "bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-600 cursor-not-allowed shadow-none"
+                        }`}
                     >
                         {isSaving ? <Loader2 className="animate-spin" size={18} /> : "确认角色设置"}
                     </button>
@@ -330,7 +452,7 @@ export function UserManager() {
   // 新增：商品库授权状态
   const [authLibraryUserId, setAuthLibraryUserId] = useState<string | null>(null);
   const [selectedLibraryIds, setSelectedLibraryIds] = useState<string[]>([]);
-  const [allLibraries, setAllLibraries] = useState<any[]>([]);
+  const [allLibraries, setAllLibraries] = useState<ProductLibraryOption[]>([]);
 
   useEffect(() => {
     if (authLibraryUserId) {
@@ -367,7 +489,13 @@ export function UserManager() {
     () => selectedEntries.filter((entry) => Boolean(entry.user)),
     [selectedEntries]
   );
-  const allFilteredSelected = filteredEntries.length > 0 && filteredEntries.every((entry) => selectedEmails.includes(entry.email));
+  const selectableFilteredEntries = useMemo(
+    () => filteredEntries.filter((entry) => entry.user?.role !== "SUPER_ADMIN"),
+    [filteredEntries]
+  );
+  const allFilteredSelected =
+    selectableFilteredEntries.length > 0 &&
+    selectableFilteredEntries.every((entry) => selectedEmails.includes(entry.email));
   const shouldHideActionBar = Boolean(editingUserId || isBatchRoleOpen || editingRemarkEntry || deleteEmail || viewOrdersUser);
 
   const fetchData = useCallback(async () => {
@@ -587,12 +715,12 @@ export function UserManager() {
   };
 
   const toggleSelectAllFiltered = () => {
-    const filteredEmails = filteredEntries.map((entry) => entry.email);
+    const selectableEmails = selectableFilteredEntries.map((entry) => entry.email);
     setSelectedEmails((current) => {
       if (allFilteredSelected) {
-        return current.filter((email) => !filteredEmails.includes(email));
+        return current.filter((email) => !selectableEmails.includes(email));
       }
-      return Array.from(new Set([...current, ...filteredEmails]));
+      return Array.from(new Set([...current, ...selectableEmails]));
     });
   };
 
@@ -686,12 +814,15 @@ export function UserManager() {
   return (
     <div className="space-y-6">
       {canManageWhitelist && (
-        <div className="glass-panel p-5 md:p-6 rounded-3xl border border-border">
-          <h3 className="text-sm font-bold flex items-center gap-2 mb-4">
-            <Mail className="text-primary" size={18} />
+        <div className="relative overflow-hidden rounded-[22px] sm:rounded-[28px] border border-border/60 bg-linear-to-br from-white/95 via-white/85 to-background p-5 sm:p-6 shadow-sm backdrop-blur-md dark:border-white/10 dark:from-white/[0.06] dark:via-white/[0.03] dark:to-transparent">
+          <div className="pointer-events-none absolute -right-12 -top-12 hidden h-48 w-48 rounded-full bg-primary/5 blur-2xl sm:block" />
+          <h3 className="relative text-sm font-black flex items-center gap-2 mb-4 text-foreground tracking-wide">
+            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <Mail size={13} />
+            </div>
             邀请新成员
           </h3>
-          <form onSubmit={handleAdd} className="space-y-3">
+          <form onSubmit={handleAdd} className="relative space-y-3">
             <div className="flex gap-2 flex-1">
               <div className="flex-1 relative">
                 <input
@@ -700,7 +831,7 @@ export function UserManager() {
                   value={newEmail}
                   onChange={(e) => setNewEmail(e.target.value)}
                   required
-                  className="w-full h-10 px-4 rounded-xl bg-white dark:bg-white/5 border border-border outline-none focus:ring-2 focus:ring-primary/20 transition-all text-sm"
+                  className="w-full h-10 px-4 rounded-full bg-white dark:bg-white/5 border border-border/80 outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/20 transition-all text-sm shadow-2xs"
                 />
               </div>
 
@@ -710,7 +841,7 @@ export function UserManager() {
                   onChange={setTargetRoleId}
                   options={roles.map(r => ({ value: r.id, label: r.name }))}
                   placeholder="角色..."
-                  triggerClassName="w-full h-10 rounded-xl bg-white dark:bg-white/5 border border-border px-3 text-sm"
+                  triggerClassName="w-full h-10 rounded-full bg-white dark:bg-white/5 border border-border/80 px-4 text-sm shadow-2xs"
                 />
               </div>
             </div>
@@ -723,7 +854,7 @@ export function UserManager() {
                   value={newRemark}
                   onChange={(e) => setNewRemark(e.target.value)}
                   maxLength={60}
-                  className="w-full h-10 px-4 rounded-xl bg-white dark:bg-white/5 border border-border outline-none focus:ring-2 focus:ring-primary/20 transition-all text-sm"
+                  className="w-full h-10 px-4 rounded-full bg-white dark:bg-white/5 border border-border/80 outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/20 transition-all text-sm shadow-2xs"
                 />
               </div>
 
@@ -731,7 +862,7 @@ export function UserManager() {
                 <button
                   type="submit"
                   disabled={isInviting}
-                  className="w-full h-10 px-8 rounded-xl bg-primary text-primary-foreground font-bold text-sm shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="w-full sm:w-auto h-10 px-8 rounded-full bg-primary text-primary-foreground font-black text-sm shadow-lg shadow-primary/25 hover:shadow-primary/35 hover:-translate-y-0.5 active:translate-y-0 transition-all disabled:opacity-50 flex items-center justify-center gap-2 whitespace-nowrap"
                 >
                   {isInviting ? <Loader2 className="animate-spin" size={14} /> : <Plus size={16} />}
                   发送邀请
@@ -739,7 +870,7 @@ export function UserManager() {
               </div>
             </div>
           </form>
-          <p className="mt-4 text-xs text-muted-foreground flex items-center gap-1.5 px-1">
+          <p className="relative mt-4 text-xs text-muted-foreground flex items-center gap-1.5 px-1">
             <AlertCircle size={14} />
             只有受邀并分配角色的邮箱可完成注册。您可以在“角色管理”页签中自定义更多的角色模板。
           </p>
@@ -747,8 +878,8 @@ export function UserManager() {
       )}
 
       {!canManageWhitelist && (
-        <div className="rounded-2xl border border-dashed border-border bg-white/40 dark:bg-white/5 p-4">
-          <p className="text-sm font-semibold text-foreground">邀请与白名单能力已收起</p>
+        <div className="rounded-[20px] sm:rounded-[22px] border border-border/60 bg-linear-to-br from-white/80 to-muted/20 dark:from-white/[0.03] dark:to-transparent p-4 backdrop-blur-xs">
+          <p className="text-sm font-bold text-foreground">邀请与白名单能力已收起</p>
           <p className="mt-1 text-xs text-muted-foreground">当前账号可以查看成员信息，但不能新增邀请或撤销准入。</p>
         </div>
       )}
@@ -760,30 +891,30 @@ export function UserManager() {
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="搜索邮箱或备注"
-          className="h-11 w-full rounded-2xl border border-border bg-white dark:bg-white/5 pl-11 pr-4 text-sm outline-none transition-all focus:border-primary/30 focus:ring-2 focus:ring-primary/20"
+          className="h-11 w-full rounded-full border border-border/70 bg-white dark:bg-white/5 pl-11 pr-4 text-sm outline-none transition-all shadow-2xs focus:border-primary/40 focus:ring-2 focus:ring-primary/20 backdrop-blur-xs"
         />
       </div>
 
       {/* Members Table - Desktop */}
-      <div className="rounded-3xl border border-border bg-white dark:bg-gray-900/40 overflow-hidden shadow-sm flex-1">
+      <div className="rounded-[22px] sm:rounded-[28px] border border-border/60 bg-linear-to-br from-white/95 via-white/85 to-background dark:border-white/10 dark:from-white/[0.06] dark:via-white/[0.03] dark:to-transparent overflow-hidden shadow-sm backdrop-blur-md flex-1">
         <div className="hidden md:block overflow-x-auto w-full">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-muted/30 border-b border-border">
-                <th className="px-4 py-3 text-center">
+              <tr className="bg-muted/40 dark:bg-white/[0.03] border-b border-border/60">
+                <th className="px-4 py-3.5 text-center">
                   <div className="flex justify-center">
                     <SelectionCircleButton checked={allFilteredSelected} onClick={toggleSelectAllFiltered} />
                   </div>
                 </th>
-                <th className="px-5 py-3 text-xs font-bold text-foreground">成员信息</th>
-                <th className="px-5 py-3 text-xs font-bold text-foreground text-center">最后活动</th>
-                <th className="px-5 py-3 text-xs font-bold text-foreground text-center">在线设备</th>
-                <th className="px-5 py-3 text-xs font-bold text-foreground text-center">系统角色</th>
-                <th className="px-5 py-3 text-xs font-bold text-foreground text-center">状态</th>
-                <th className="px-5 py-3 text-xs font-bold text-foreground text-center">操作</th>
+                <th className="px-5 py-3.5 text-xs font-black text-foreground">成员信息</th>
+                <th className="px-5 py-3.5 text-xs font-black text-foreground text-center">最后活动</th>
+                <th className="px-5 py-3.5 text-xs font-black text-foreground text-center">在线设备</th>
+                <th className="px-5 py-3.5 text-xs font-black text-foreground text-center">系统角色</th>
+                <th className="px-5 py-3.5 text-xs font-black text-foreground text-center">状态</th>
+                <th className="px-5 py-3.5 text-xs font-black text-foreground text-center">操作</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border">
+            <tbody className="divide-y divide-border/60">
               {isLoading ? (
                 <tr>
                   <td colSpan={7} className="py-20 text-center text-muted-foreground">
@@ -796,35 +927,40 @@ export function UserManager() {
               ) : (
                 filteredEntries.map((entry) => {
                   const isRegistered = !!entry.user;
-                  const roleName = isRegistered ? entry.user?.roleProfile?.name : entry.roleProfile?.name;
+                  const isSuperAdmin = entry.user?.role === "SUPER_ADMIN";
+                  const roleName = isSuperAdmin ? "超级管理员" : (isRegistered ? entry.user?.roleProfile?.name : entry.roleProfile?.name);
                   
                   return (
                     <tr key={entry.id} className="hover:bg-muted/20 transition-colors group">
                       <td className="px-4 py-3 text-center">
                         <div className="flex justify-center">
-                          <SelectionCircleButton checked={selectedEmails.includes(entry.email)} onClick={() => toggleSelectEmail(entry.email)} />
+                          {isSuperAdmin ? (
+                            <SelectionCircleButton
+                              checked={false}
+                              disabled
+                              title="不可勾选"
+                            />
+                          ) : (
+                            <SelectionCircleButton checked={selectedEmails.includes(entry.email)} onClick={() => toggleSelectEmail(entry.email)} />
+                          )}
                         </div>
                       </td>
                       <td className="px-5 py-3">
                         <div className="flex items-center gap-3">
-                          <div className={`h-9 w-9 rounded-xl flex items-center justify-center shrink-0 ${isRegistered ? 'bg-primary/10 text-primary' : 'bg-muted/30 border border-dashed border-muted-foreground/30 text-muted-foreground'}`}>
-                             {isRegistered ? <UserIcon size={16} /> : <Mail size={14} />}
-                          </div>
+                          <MemberAvatar
+                            isRegistered={isRegistered}
+                            size="md"
+                          />
                           <div className="flex flex-col min-w-0">
                             <span className="text-sm font-bold truncate">{isRegistered ? entry.user?.name : "待邀请成员"}</span>
                             <span className="text-[10px] text-muted-foreground font-mono truncate">{entry.email}</span>
-                            <div className="flex items-center gap-1.5 flex-wrap mt-1">
-                              {entry.remark ? (
-                                <span className="inline-flex max-w-fit items-center rounded-md bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300">
+                            {entry.remark && entry.remark !== "系统超级管理员" ? (
+                              <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                                <span className="inline-flex max-w-fit items-center rounded-full bg-amber-500/10 px-2.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300 border border-amber-500/20">
                                   {entry.remark}
                                 </span>
-                              ) : null}
-                              {entry.user?.hasMaiyatianCookie ? (
-                                <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
-                                  麦芽田已接入{entry.user?.maiyatianCookieCount && entry.user.maiyatianCookieCount > 1 ? ` (${entry.user.maiyatianCookieCount}号)` : ""}
-                                </span>
-                              ) : null}
-                            </div>
+                              </div>
+                            ) : null}
                           </div>
                         </div>
                       </td>
@@ -837,10 +973,7 @@ export function UserManager() {
                         <DevicePresence devices={entry.user?.deviceSessions} compact />
                       </td>
                       <td className="px-5 py-3 text-center">
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-primary/5 text-primary border border-primary/10 whitespace-nowrap">
-                            <Shield size={10} />
-                            {roleName || "未分配"}
-                          </span>
+                        <RoleBadge isSuperAdmin={isSuperAdmin} roleName={roleName} />
                       </td>
                       <td className="px-5 py-3 text-center">
                          {isRegistered ? (
@@ -848,17 +981,17 @@ export function UserManager() {
                                  <Switch
                                      checked={entry.user?.status === 'ACTIVE'}
                                      onChange={() => handleStatusToggle(entry.email, entry.user?.status || 'ACTIVE')}
-                                     disabled={!canManageMemberStatus}
+                                     disabled={!canManageMemberStatus || isSuperAdmin}
                                  />
                              </div>
                          ) : (
-                             <span className="text-[10px] font-bold text-amber-600 bg-amber-500/10 px-2 py-1 rounded-lg">等待加入</span>
+                             <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-full border border-amber-500/20 whitespace-nowrap">等待加入</span>
                          )}
                       </td>
-                       <td className="px-6 py-5 text-center">
-                         <div className="flex justify-center gap-2">
-                            <div className="flex items-center gap-1">
-                               {isRegistered && canManageMembers && entry.user?.hasMaiyatianCookie ? (
+                       <td className="px-6 py-4 text-center">
+                         <div className="flex justify-center">
+                            <div className="flex items-center gap-1 bg-muted/20 dark:bg-white/[0.02] p-1 rounded-full border border-border/40">
+                               {isRegistered && canManageMembers ? (
                                   <button
                                     onClick={() => {
                                       setViewOrdersUser({
@@ -868,52 +1001,65 @@ export function UserManager() {
                                         roleName: entry.user?.roleProfile?.name || entry.roleProfile?.name,
                                       });
                                     }}
-                                    className="p-2.5 rounded-xl text-muted-foreground hover:bg-sky-500/10 hover:text-sky-600 transition-all"
-                                    title="查看麦芽田订单数据"
+                                    className={`relative h-8 w-8 rounded-full flex items-center justify-center transition-all hover:scale-110 active:scale-95 cursor-pointer ${
+                                      Boolean(entry.user?.hasMaiyatianCookie)
+                                        ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/25 shadow-2xs shadow-emerald-500/10"
+                                        : "text-muted-foreground/45 hover:text-muted-foreground hover:bg-muted/40"
+                                    }`}
+                                    title={
+                                      Boolean(entry.user?.hasMaiyatianCookie)
+                                        ? `查看麦芽田订单数据（已接入${entry.user?.maiyatianCookieCount && entry.user.maiyatianCookieCount > 1 ? ` ${entry.user.maiyatianCookieCount}号` : ""}）`
+                                        : "查看麦芽田订单数据（未接入）"
+                                    }
                                   >
-                                    <ShoppingBag size={18} />
+                                    <ShoppingBag size={15} />
+                                    {entry.user?.hasMaiyatianCookie && entry.user?.maiyatianCookieCount && entry.user.maiyatianCookieCount > 1 ? (
+                                      <span className="absolute -top-1 -right-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-emerald-600 px-0.5 text-[8px] font-black text-white ring-2 ring-background leading-none">
+                                        {entry.user.maiyatianCookieCount}
+                                      </span>
+                                    ) : null}
                                   </button>
                                 ) : null}
-                               {isRegistered && canManageMembers ? (
+                               {isRegistered && canManageMembers && !isSuperAdmin ? (
                                   <button
                                     onClick={() => {
                                       setEditingUserId(entry.user!.id);
                                       setCurrentRoleId(entry.user!.roleProfileId);
                                     }}
-                                    className="p-2.5 rounded-xl text-muted-foreground hover:bg-primary/5 hover:text-primary transition-all"
+                                    className="h-8 w-8 rounded-full flex items-center justify-center text-muted-foreground hover:bg-primary/15 hover:text-primary transition-all hover:scale-110 active:scale-95"
                                     title="角色分配"
                                   >
-                                    <Settings2 size={18} />
+                                    <Settings2 size={15} />
                                   </button>
                                 ) : null}
-                                {isRegistered && canManageMembers ? (
+                                {isRegistered && canManageMembers && !isSuperAdmin ? (
                                   <button
                                     onClick={() => {
                                       setAuthLibraryUserId(entry.user!.id);
                                       setSelectedLibraryIds(entry.user!.accessibleLibraries?.map(l => l.id) || []);
                                     }}
-                                    className="p-2.5 rounded-xl text-muted-foreground hover:bg-indigo-500/10 hover:text-indigo-600 transition-all"
+                                    className="h-8 w-8 rounded-full flex items-center justify-center text-muted-foreground hover:bg-indigo-500/15 hover:text-indigo-600 transition-all hover:scale-110 active:scale-95"
                                     title="商品库授权"
                                   >
-                                    <FolderLock size={18} />
+                                    <FolderLock size={15} />
                                   </button>
                                 ) : null}
                                {canManageWhitelist && (
                                  <button
                                    onClick={() => setEditingRemarkEntry(entry)}
-                                   className="p-2.5 rounded-xl text-muted-foreground hover:bg-amber-500/10 hover:text-amber-600 transition-all"
+                                   className="h-8 w-8 rounded-full flex items-center justify-center text-muted-foreground hover:bg-amber-500/15 hover:text-amber-600 transition-all hover:scale-110 active:scale-95"
                                    title="编辑备注"
                                  >
-                                   <NotebookPen size={18} />
+                                   <NotebookPen size={15} />
                                  </button>
                                )}
-                               {canManageWhitelist && (
+                               {canManageWhitelist && !isSuperAdmin && (
                                  <button
                                     onClick={() => setDeleteEmail(entry.email)}
-                                    className="p-2.5 rounded-xl text-muted-foreground hover:bg-red-500/10 hover:text-red-500 transition-all"
+                                    className="h-8 w-8 rounded-full flex items-center justify-center text-muted-foreground hover:bg-red-500/15 hover:text-red-500 transition-all hover:scale-110 active:scale-95"
                                     title={isRegistered ? "移除成员" : "撤销邀请"}
                                  >
-                                    <Trash2 size={18} />
+                                    <Trash2 size={15} />
                                  </button>
                                )}
                             </div>
@@ -939,60 +1085,62 @@ export function UserManager() {
           ) : (
             filteredEntries.map((entry) => {
               const isRegistered = !!entry.user;
-              const roleName = isRegistered ? entry.user?.roleProfile?.name : entry.roleProfile?.name;
+              const isSuperAdmin = entry.user?.role === "SUPER_ADMIN";
+              const roleName = isSuperAdmin ? "超级管理员" : (isRegistered ? entry.user?.roleProfile?.name : entry.roleProfile?.name);
               
               return (
                 <div key={entry.id} className="p-4 transition-colors hover:bg-muted/10">
-                  <div className="rounded-3xl border border-border/70 bg-background/70 p-4 shadow-[0_12px_32px_rgba(15,23,42,0.06)] backdrop-blur-sm">
+                  <div className="rounded-[22px] border border-border/60 bg-linear-to-br from-white/95 via-white/85 to-background dark:border-white/10 dark:from-white/[0.06] dark:via-white/[0.03] dark:to-transparent p-4 shadow-sm backdrop-blur-md">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex min-w-0 flex-1 items-center gap-3">
-                        <div className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 ${isRegistered ? 'bg-primary/10 text-primary' : 'bg-muted/30 border border-dashed border-muted-foreground/30 text-muted-foreground'}`}>
-                          {isRegistered ? <UserIcon size={18} /> : <Mail size={16} />}
-                        </div>
+                        <MemberAvatar
+                          isRegistered={isRegistered}
+                          size="lg"
+                        />
                         <div className="min-w-0 flex-1">
                           <span className="block text-sm font-bold truncate">{isRegistered ? entry.user?.name : "待邀请成员"}</span>
                           <span className="mt-0.5 block text-[10px] text-muted-foreground font-mono break-all leading-relaxed">{entry.email}</span>
-                          <div className="mt-1 flex items-center gap-1.5 flex-wrap">
-                            {entry.remark ? (
-                              <span className="inline-flex max-w-full items-center rounded-md bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300 break-all">
+                          {entry.remark && entry.remark !== "系统超级管理员" ? (
+                            <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                              <span className="inline-flex max-w-full items-center rounded-full bg-amber-500/10 px-2.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300 border border-amber-500/20 break-all">
                                 {entry.remark}
                               </span>
-                            ) : null}
-                            {entry.user?.hasMaiyatianCookie ? (
-                              <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
-                                麦芽田已接入{entry.user?.maiyatianCookieCount && entry.user.maiyatianCookieCount > 1 ? ` (${entry.user.maiyatianCookieCount}号)` : ""}
-                              </span>
-                            ) : null}
-                          </div>
+                            </div>
+                          ) : null}
                         </div>
                       </div>
-                      <SelectionCircleButton checked={selectedEmails.includes(entry.email)} onClick={() => toggleSelectEmail(entry.email)} />
+                      {isSuperAdmin ? (
+                        <SelectionCircleButton
+                          checked={false}
+                          disabled
+                          title="不可勾选"
+                        />
+                      ) : (
+                        <SelectionCircleButton checked={selectedEmails.includes(entry.email)} onClick={() => toggleSelectEmail(entry.email)} />
+                      )}
                     </div>
 
                     <div className="mt-4 flex items-center justify-between gap-3">
-                      <span className="inline-flex min-w-0 items-center gap-1 rounded-lg border border-primary/10 bg-primary/5 px-2.5 py-1 text-[10px] font-bold text-primary">
-                        <Shield size={10} className="shrink-0" />
-                        <span className="truncate">{roleName || "未分配"}</span>
-                      </span>
+                      <RoleBadge isSuperAdmin={isSuperAdmin} roleName={roleName} />
                       {isRegistered ? (
                         <Switch
                           checked={entry.user?.status === 'ACTIVE'}
                           onChange={() => handleStatusToggle(entry.email, entry.user?.status || 'ACTIVE')}
-                          disabled={!canManageMemberStatus}
+                          disabled={!canManageMemberStatus || isSuperAdmin}
                         />
                       ) : (
-                        <span className="shrink-0 rounded-lg bg-amber-500/10 px-2 py-1 text-[10px] font-bold text-amber-600">等待加入</span>
+                        <span className="shrink-0 rounded-full border border-amber-500/20 bg-amber-500/10 px-2.5 py-1 text-[10px] font-bold text-amber-600 dark:text-amber-400">等待加入</span>
                       )}
                     </div>
 
-                    <div className="mt-3 rounded-2xl bg-muted/25 px-3 py-2">
+                    <div className="mt-3 rounded-2xl bg-muted/30 dark:bg-white/[0.02] px-3.5 py-2.5 border border-border/30">
                       <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">最后活动</div>
-                      <div className="mt-1 text-xs text-foreground">
+                      <div className="mt-1 text-xs font-semibold text-foreground">
                         {isRegistered ? formatLastActiveAt(entry.user?.lastActiveAt) : "暂无记录"}
                       </div>
                     </div>
 
-                    <div className="mt-3 rounded-2xl bg-muted/25 px-3 py-2">
+                    <div className="mt-3 rounded-2xl bg-muted/30 dark:bg-white/[0.02] px-3.5 py-2.5 border border-border/30">
                       <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">在线设备</div>
                       <div className="mt-2 flex flex-wrap gap-1.5">
                         <DevicePresence devices={entry.user?.deviceSessions} />
@@ -1003,7 +1151,7 @@ export function UserManager() {
                       {canManageWhitelist && (
                         <button
                           onClick={() => setEditingRemarkEntry(entry)}
-                          className={`h-9 rounded-xl bg-amber-500/5 text-amber-700 dark:text-amber-300 text-xs font-bold transition-all hover:bg-amber-500/10 flex items-center justify-center gap-2 ${
+                          className={`h-9 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-300 text-xs font-bold transition-all hover:bg-amber-500/20 active:scale-95 flex items-center justify-center gap-2 border border-amber-500/20 ${
                             isRegistered ? "" : "col-span-2"
                           }`}
                         >
@@ -1011,19 +1159,19 @@ export function UserManager() {
                           备注
                         </button>
                       )}
-                      {isRegistered && canManageMembers && (
+                      {isRegistered && canManageMembers && !isSuperAdmin && (
                         <button
                           onClick={() => {
                             setEditingUserId(entry.user!.id);
                             setCurrentRoleId(entry.user!.roleProfileId);
                           }}
-                          className="h-9 rounded-xl bg-primary/5 text-primary text-xs font-bold transition-all hover:bg-primary/10 flex items-center justify-center gap-2"
+                          className="h-9 rounded-full bg-primary/10 text-primary text-xs font-bold transition-all hover:bg-primary/20 active:scale-95 flex items-center justify-center gap-2 border border-primary/20"
                         >
                           <Settings2 size={14} />
                           角色分配
                         </button>
                       )}
-                      {isRegistered && canManageMembers && entry.user?.hasMaiyatianCookie && (
+                      {isRegistered && canManageMembers && (
                         <button
                           onClick={() => {
                             setViewOrdersUser({
@@ -1033,28 +1181,35 @@ export function UserManager() {
                               roleName: entry.user?.roleProfile?.name || entry.roleProfile?.name,
                             });
                           }}
-                          className="col-span-2 h-9 rounded-xl bg-sky-500/5 text-sky-700 dark:text-sky-300 text-xs font-bold transition-all hover:bg-sky-500/10 flex items-center justify-center gap-2"
+                          className={`col-span-2 h-9 rounded-full text-xs font-bold transition-all hover:scale-[1.01] active:scale-95 flex items-center justify-center gap-2 border ${
+                            Boolean(entry.user?.hasMaiyatianCookie)
+                              ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/25 hover:bg-emerald-500/20"
+                              : "bg-muted/20 text-muted-foreground/60 border-border/40 hover:bg-muted/40 hover:text-muted-foreground"
+                          }`}
                         >
-                          <ShoppingBag size={14} />
-                          查看麦芽田订单数据
+                          <ShoppingBag size={14} className={Boolean(entry.user?.hasMaiyatianCookie) ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground/50"} />
+                          <span>查看麦芽田订单数据</span>
+                          <span className={`text-[10px] font-semibold ${Boolean(entry.user?.hasMaiyatianCookie) ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground/50"}`}>
+                            ({Boolean(entry.user?.hasMaiyatianCookie) ? `已接入${entry.user?.maiyatianCookieCount && entry.user.maiyatianCookieCount > 1 ? ` ${entry.user.maiyatianCookieCount}号` : ""}` : "未接入"})
+                          </span>
                         </button>
                       )}
-                      {isRegistered && canManageMembers && (
+                      {isRegistered && canManageMembers && !isSuperAdmin && (
                         <button
                           onClick={() => {
                             setAuthLibraryUserId(entry.user!.id);
                             setSelectedLibraryIds(entry.user!.accessibleLibraries?.map(l => l.id) || []);
                           }}
-                          className="col-span-2 h-9 rounded-xl bg-indigo-500/5 text-indigo-700 dark:text-indigo-300 text-xs font-bold transition-all hover:bg-indigo-500/10 flex items-center justify-center gap-2"
+                          className="col-span-2 h-9 rounded-full bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 text-xs font-bold transition-all hover:bg-indigo-500/20 active:scale-95 flex items-center justify-center gap-2 border border-indigo-500/20"
                         >
                           <FolderLock size={14} />
                           商品库授权
                         </button>
                       )}
-                      {canManageWhitelist && (
+                      {canManageWhitelist && !isSuperAdmin && (
                         <button
                           onClick={() => setDeleteEmail(entry.email)}
-                          className="col-span-2 h-9 rounded-xl bg-red-500/5 text-red-500 text-xs font-bold transition-all hover:bg-red-500/10 flex items-center justify-center gap-2"
+                          className="col-span-2 h-9 rounded-full bg-red-500/10 text-red-500 text-xs font-bold transition-all hover:bg-red-500/20 active:scale-95 flex items-center justify-center gap-2 border border-red-500/20"
                         >
                           <Trash2 size={14} />
                           {isRegistered ? "移除成员" : "撤销邀请"}
@@ -1168,10 +1323,10 @@ export function UserManager() {
                           setSelectedLibraryIds(prev => [...prev, lib.id]);
                         }
                       }}
-                      className={`flex items-center justify-between p-3 rounded-xl border text-sm transition-all cursor-pointer select-none ${
+                      className={`flex items-center justify-between p-3.5 rounded-2xl border text-sm transition-all cursor-pointer select-none ${
                         isChecked
-                          ? "border-primary/20 bg-primary/5 text-foreground"
-                          : "border-border hover:bg-muted/10 text-muted-foreground"
+                          ? "border-primary/40 bg-primary/8 text-foreground shadow-2xs"
+                          : "border-border/60 hover:bg-muted/20 text-muted-foreground hover:border-border"
                       }`}
                     >
                       <div className="flex items-center gap-3">
@@ -1244,11 +1399,12 @@ export function UserManager() {
          })}
        />
 
-       {/* 成员订单数据弹窗 */}
-       <UserOrdersModal
-         isOpen={Boolean(viewOrdersUser)}
-         onClose={() => setViewOrdersUser(null)}
-         userId={viewOrdersUser?.id || null}
+        {/* 成员订单数据弹窗 */}
+        <UserOrdersModal
+          key={viewOrdersUser?.id || "closed"}
+          isOpen={Boolean(viewOrdersUser)}
+          onClose={() => setViewOrdersUser(null)}
+          userId={viewOrdersUser?.id || null}
          userName={viewOrdersUser?.name}
          userEmail={viewOrdersUser?.email}
          roleName={viewOrdersUser?.roleName}

@@ -1781,6 +1781,39 @@ function parseCoordinate(rawValue: string | number | undefined) {
   return Number.isFinite(value) ? value : 0;
 }
 
+function readNestedRecord(root: Record<string, unknown>, keys: string[]) {
+  for (const key of keys) {
+    const value = root[key];
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      return value as Record<string, unknown>;
+    }
+  }
+  return null;
+}
+
+export function readMaiyatianUserCoordinate(rawOrder: Record<string, unknown>, axis: "longitude" | "latitude") {
+  const userInfo = readNestedRecord(rawOrder, ["user_info", "userInfo"]);
+  const receiver = readNestedRecord(rawOrder, ["receiver", "receiver_info", "receiverInfo", "recipient", "recipientInfo"]);
+  const addressInfo = readNestedRecord(rawOrder, ["address_info", "addressInfo", "map_address_info", "mapAddressInfo"]);
+  const location = readNestedRecord(rawOrder, ["location", "loc", "coordinate", "coordinates"]);
+  const lngKeys = ["longitude", "lng", "lon", "map_lng", "mapLng", "address_lng", "addressLng", "user_lng", "userLng", "receiver_lng", "receiverLng"];
+  const latKeys = ["latitude", "lat", "map_lat", "mapLat", "address_lat", "addressLat", "user_lat", "userLat", "receiver_lat", "receiverLat"];
+  const keys = axis === "longitude" ? lngKeys : latKeys;
+  const candidates = [
+    ...(userInfo ? keys.map((key) => userInfo[key]) : []),
+    ...(receiver ? keys.map((key) => receiver[key]) : []),
+    ...(addressInfo ? keys.map((key) => addressInfo[key]) : []),
+    ...(location ? keys.map((key) => location[key]) : []),
+    ...keys.map((key) => rawOrder[key]),
+  ];
+
+  for (const candidate of candidates) {
+    const parsed = parseCoordinate(candidate as string | number | undefined);
+    if (parsed !== 0) return parsed;
+  }
+  return 0;
+}
+
 function applyJDPlatformCommissionFallback(platform: string, actualPaid: number, platformCommission: number) {
   const normalizedPlatform = String(platform || "").trim();
   if (normalizedPlatform !== "京东" || platformCommission !== 0 || !Number.isFinite(actualPaid) || actualPaid <= 0) {
@@ -1946,8 +1979,8 @@ function buildListenedOrderFromRawOrder(rawOrder: MaiyatianRawOrder): AutoPickIn
     rawShopAddress: readPreferredMaiyatianShopAddress(rawOrder as Record<string, unknown>),
     isSubscribe: readMaiyatianIsSubscribe(rawOrder as Record<string, unknown>),
     completedAt: readMaiyatianCompletedAt(rawOrder as Record<string, unknown>),
-    longitude: parseCoordinate(rawOrder.longitude),
-    latitude: parseCoordinate(rawOrder.latitude),
+    longitude: readMaiyatianUserCoordinate(rawOrder as Record<string, unknown>, "longitude"),
+    latitude: readMaiyatianUserCoordinate(rawOrder as Record<string, unknown>, "latitude"),
     status: resolveMaiyatianOrderStatus(rawOrder as Record<string, unknown>),
     deliveryDeadline: parseMaiyatianDeliveryDeadline(platform, rawOrder.delivery_time, rawOrder.delivery_end),
     deliveryTimeRange: parseDeliveryTimeRange(rawOrder.delivery_time_format),
@@ -1994,8 +2027,8 @@ function buildListenedOrderFromQueryOrder(rawOrder: MaiyatianQueryOrder): AutoPi
     rawShopAddress: readPreferredMaiyatianShopAddress(rawOrder),
     isSubscribe: readMaiyatianIsSubscribe(rawOrder),
     completedAt: readMaiyatianCompletedAt(rawOrder),
-    longitude: parseCoordinate(rawOrder.longitude as string | number | undefined),
-    latitude: parseCoordinate(rawOrder.latitude as string | number | undefined),
+    longitude: readMaiyatianUserCoordinate(rawOrder, "longitude"),
+    latitude: readMaiyatianUserCoordinate(rawOrder, "latitude"),
     status: resolveMaiyatianOrderStatus(rawOrder),
     deliveryDeadline: parseMaiyatianDeliveryDeadline(platform, rawOrder.delivery_time, rawOrder.delivery_end),
     deliveryTimeRange: parseDeliveryTimeRange(rawOrder.delivery_time_format as string | undefined),
@@ -2515,8 +2548,8 @@ async function enrichMaiyatianOrderByCookie(cookie: string, order: AutoPickInbou
     order.orderTime = detailOrderTime;
   }
 
-  const detailLongitude = parseCoordinate(detailData.longitude);
-  const detailLatitude = parseCoordinate(detailData.latitude);
+  const detailLongitude = readMaiyatianUserCoordinate(detailDataObj || {}, "longitude");
+  const detailLatitude = readMaiyatianUserCoordinate(detailDataObj || {}, "latitude");
   if (detailLongitude !== 0) {
     order.longitude = detailLongitude;
   }
@@ -3567,8 +3600,8 @@ export function normalizeAutoPickOrderPayload(payload: unknown): AutoPickInbound
     ).trim() || undefined,
     isSubscribe: input.isSubscribe === true || input.isSubscribe === 1 || input.isSubscribe === "1" || input.is_subscribe === true || input.is_subscribe === 1 || input.is_subscribe === "1",
     completedAt: String(input.completedAt || input.finishedTime || input.finished_time || "").trim() || undefined,
-    longitude: Number.isFinite(Number(input.longitude)) ? Number(input.longitude) : undefined,
-    latitude: Number.isFinite(Number(input.latitude)) ? Number(input.latitude) : undefined,
+    longitude: readMaiyatianUserCoordinate(input, "longitude") || undefined,
+    latitude: readMaiyatianUserCoordinate(input, "latitude") || undefined,
     status: String(input.status || "").trim() || undefined,
     deliveryDeadline: resolveAutoPickDeliveryDeadline(input),
     deliveryTimeRange: resolveAutoPickDeliveryTimeRange(input),

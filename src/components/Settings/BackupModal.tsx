@@ -83,25 +83,25 @@ export function BackupModal({ isOpen, onClose, type, file, requirePassword = tru
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="my-auto w-full max-w-md overflow-hidden rounded-3xl border border-border bg-card p-6 shadow-2xl max-sm:min-h-0 sm:max-h-[calc(100vh-5rem)] sm:overflow-y-auto"
+              className="my-auto w-full max-w-md overflow-hidden rounded-[28px] sm:rounded-[32px] border border-border/70 bg-white dark:bg-zinc-900 p-6 sm:p-7 shadow-2xl shadow-black/10 dark:shadow-black/40 max-sm:min-h-0 sm:max-h-[calc(100vh-5rem)] sm:overflow-y-auto"
             >
               {/* Header */}
               <div className="mb-6 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className={cn(
-                    "p-2.5 rounded-2xl ring-1",
+                    "h-11 w-11 rounded-full flex items-center justify-center ring-1",
                     type === "export" ? "bg-primary/10 text-primary ring-primary/20" : "bg-emerald-500/10 text-emerald-500 ring-emerald-500/20"
                   )}>
                     {type === "export" ? <Download size={20} /> : <Upload size={20} />}
                   </div>
                   <div>
-                    <h3 className="text-lg font-bold">{type === "export" ? "数据加密备份" : "系统数据恢复"}</h3>
+                    <h3 className="text-base sm:text-lg font-bold text-zinc-900 dark:text-zinc-100">{type === "export" ? "数据加密备份" : "系统数据恢复"}</h3>
                     <p className="text-xs text-muted-foreground">{type === "export" ? "打包并加密所有业务数据" : "解密并全量覆盖现有数据"}</p>
                   </div>
                 </div>
                 <button
                   onClick={onClose}
-                  className="p-2 rounded-xl border border-border hover:bg-muted transition-colors"
+                  className="h-9 w-9 rounded-full border border-border/60 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors"
                   disabled={state === "processing"}
                 >
                   <X size={16} />
@@ -112,8 +112,8 @@ export function BackupModal({ isOpen, onClose, type, file, requirePassword = tru
               <div className="space-y-6">
                 {state === "password" && (
                   <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
-                    <div className="p-4 rounded-2xl bg-muted/30 border border-border/50">
-                      <div className="flex items-center gap-2 mb-3 text-sm font-medium text-foreground">
+                    <div className="p-4 sm:p-5 rounded-2xl bg-zinc-50 dark:bg-zinc-800/40 border border-border/60">
+                      <div className="flex items-center gap-2 mb-3 text-sm font-semibold text-foreground">
                         <KeyRound size={16} className="text-primary" />
                         {type === "export" ? (requirePassword ? "设置备份加密密码" : "设置备份密码，可留空") : requirePassword ? "输入备份解密密码" : "确认执行备份恢复"}
                       </div>
@@ -125,11 +125,11 @@ export function BackupModal({ isOpen, onClose, type, file, requirePassword = tru
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
                             placeholder={type === "export" ? (requirePassword ? "设置 6 位以上安全密码" : "留空则使用系统内置密钥，可自定义密码") : "输入备份时的加密密码"}
-                            className="w-full h-12 bg-background border border-border rounded-xl px-4 focus:ring-2 focus:ring-primary/20 outline-none transition-all font-mono"
+                            className="w-full h-11 bg-white dark:bg-zinc-900 border border-border rounded-full px-5 focus:ring-2 focus:ring-primary/20 outline-none transition-all font-mono text-sm shadow-sm"
                             onKeyDown={(e) => e.key === "Enter" && handleConfirm()}
                           />
                           <div className="mt-2 flex items-center justify-between">
-                              <p className="text-[10px] text-muted-foreground italic">
+                              <p className="text-[11px] text-muted-foreground">
                                   {type === "export"
                                     ? requirePassword
                                       ? "要求：至少 6 位，支持字母、数字及符号"
@@ -139,7 +139,7 @@ export function BackupModal({ isOpen, onClose, type, file, requirePassword = tru
                           </div>
                         </>
                       ) : (
-                        <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 text-sm leading-relaxed text-muted-foreground">
+                        <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 text-sm leading-relaxed text-muted-foreground">
                           密码可留空。系统会优先尝试你输入的备份密码；如果这是服务器自动备份文件，也会自动使用内置备份密钥完成解密恢复。
                         </div>
                       )}
@@ -162,8 +162,8 @@ export function BackupModal({ isOpen, onClose, type, file, requirePassword = tru
                     <button
                       onClick={handleConfirm}
                       className={cn(
-                        "w-full h-12 rounded-2xl font-bold transition-all active:scale-[0.98]",
-                        type === "export" ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20" : "bg-emerald-500 text-white shadow-lg shadow-emerald-500/20"
+                        "w-full h-12 rounded-full font-bold text-sm transition-all active:scale-[0.98] shadow-md",
+                        type === "export" ? "bg-primary text-primary-foreground shadow-primary/20 hover:opacity-95" : "bg-emerald-600 text-white shadow-emerald-600/20 hover:bg-emerald-500"
                       )}
                     >
                       {type === "export" ? "开始加密导出" : "校验并开始恢复"}
@@ -202,7 +202,7 @@ export function BackupModal({ isOpen, onClose, type, file, requirePassword = tru
                     </p>
                     <button
                       onClick={onClose}
-                      className="h-11 px-8 rounded-xl bg-secondary hover:bg-muted font-bold transition-all"
+                      className="h-11 px-8 rounded-full bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 font-bold text-sm transition-all hover:opacity-90 active:scale-[0.98]"
                     >
                       关闭窗口
                     </button>
@@ -218,7 +218,7 @@ export function BackupModal({ isOpen, onClose, type, file, requirePassword = tru
                     <p className="text-sm text-red-400 mb-8">{error}</p>
                     <button
                       onClick={() => setState("password")}
-                      className="h-11 px-8 rounded-xl bg-secondary hover:bg-muted font-bold transition-all"
+                      className="h-11 px-8 rounded-full bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 font-bold text-sm transition-all hover:opacity-90 active:scale-[0.98]"
                     >
                       返回重试
                     </button>

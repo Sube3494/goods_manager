@@ -32,6 +32,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { SettlementDetailModal } from "@/components/Settlement/SettlementDetailModal";
 import { Settlement, AddressItem } from "@/lib/types";
 import { isAddressDisabled } from "@/lib/addressBook";
+import { cn } from "@/lib/utils";
 
 const formatCurrency = (value: number) =>
   `¥${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -229,42 +230,42 @@ export default function SettlementHistoryPage() {
         </div>
       </div>
 
-      {/* Filter Toolbar - Consolidated Row */}
-      <div className="flex flex-col md:flex-row items-center gap-2.5 mb-6 md:mb-8">
-        {/* Search Bar */}
-        <div className="w-full md:flex-1 h-10 sm:h-11 px-4 sm:px-5 rounded-full bg-white/70 dark:bg-white/5 border border-border dark:border-white/10 backdrop-blur-md flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 group">
-          <Search size={18} className="text-muted-foreground group-focus-within:text-primary transition-colors shrink-0" />
-          <input
-            type="text"
-            placeholder="搜索 ID、备注..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="bg-transparent border-none outline-none w-full text-foreground placeholder:text-muted-foreground text-sm h-full"
-          />
-        </div>
-
-        {/* Filters Group */}
-        <div className="flex items-center gap-2 h-10 sm:h-11 w-full md:w-auto">
-          <div className="flex items-center gap-1.5 h-full flex-1 md:flex-none">
-            <DatePicker
-              value={startDate}
-              onChange={setStartDate}
-              placeholder="起始日期"
-              maxDate={today}
-              className="h-full flex-1 md:w-32 lg:w-36"
-              triggerClassName="rounded-full shadow-sm bg-white/70 dark:bg-white/5 border-border dark:border-white/10 backdrop-blur-md dark:hover:bg-white/10 transition-all"
-            />
-            <DatePicker
-              value={endDate}
-              onChange={setEndDate}
-              placeholder="截止日期"
-              maxDate={today}
-              className="h-full flex-1 md:w-32 lg:w-36"
-              triggerClassName="rounded-full shadow-sm bg-white/70 dark:bg-white/5 border-border dark:border-white/10 backdrop-blur-md dark:hover:bg-white/10 transition-all"
+      {/* Filter Toolbar - 移动端两行满宽整齐自适应，桌面端单行并排 */}
+      <div className="flex flex-col md:flex-row items-center gap-2.5 mb-6 md:mb-8 text-foreground">
+        {/* 搜索框区域 */}
+        <div className="flex items-center gap-2 w-full md:flex-1 min-w-0 md:min-w-[200px]">
+          <div className="w-full h-10 sm:h-11 px-3.5 sm:px-4 rounded-full bg-white/70 dark:bg-white/5 border border-border/60 dark:border-white/10 flex items-center gap-2 sm:gap-2.5 focus-within:ring-2 focus-within:ring-sky-500/20 transition-all dark:hover:bg-white/10 flex-1 min-w-0 shadow-2xs">
+            <Search size={16} className="text-muted-foreground shrink-0" />
+            <input
+              type="text"
+              placeholder="搜索账单ID、店铺或备注..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="bg-transparent border-none outline-none w-full text-foreground placeholder:text-muted-foreground text-xs sm:text-sm h-full"
             />
           </div>
-          
-          <div className="h-full min-w-[120px] sm:min-w-[140px] md:min-w-[160px]">
+
+          {/* 移动端重置按钮 */}
+          {(searchQuery || filterShop || startDate || endDate) && (
+            <button
+              onClick={() => {
+                setSearchQuery("");
+                setFilterShop("");
+                setStartDate("");
+                setEndDate("");
+              }}
+              className="md:hidden h-10 sm:h-11 px-3.5 flex items-center gap-1.5 rounded-full border border-sky-500/20 bg-sky-500/10 text-sky-600 dark:text-sky-400 text-xs font-bold hover:bg-sky-500/20 transition-all active:scale-95 shadow-2xs shrink-0 whitespace-nowrap cursor-pointer"
+            >
+              <RotateCcw size={13} />
+              <span>重置</span>
+            </button>
+          )}
+        </div>
+
+        {/* 筛选组：移动端 100% 满宽对称填满，大屏紧凑平铺 */}
+        <div className="flex items-center gap-2 w-full md:w-auto shrink-0">
+          {/* 1. 店铺筛选：移动端占约 36% 宽，大屏固定尺寸 */}
+          <div className="h-10 sm:h-11 w-[36%] min-w-[96px] sm:w-auto sm:min-w-[130px] shrink-0">
             <CustomSelect
               options={[
                 { value: "", label: "全部店铺" },
@@ -275,12 +276,39 @@ export default function SettlementHistoryPage() {
               ]}
               value={filterShop}
               onChange={setFilterShop}
-              placeholder="筛选店铺"
-              className="h-full"
-              triggerClassName="h-full rounded-full border shadow-sm px-4 sm:px-5 text-sm font-medium bg-white/70 dark:bg-white/5 border-border dark:border-white/10 backdrop-blur-md dark:hover:bg-white/10 transition-all"
+              placeholder="全部店铺"
+              className="h-full w-full"
+              triggerClassName={cn(
+                "h-full rounded-full border text-[11px] sm:text-xs font-bold transition-colors px-2.5 sm:px-3.5 gap-1 justify-center text-foreground whitespace-nowrap shadow-none",
+                filterShop 
+                  ? "bg-sky-500/10 border-sky-500/25 text-sky-700 dark:bg-sky-500/20 dark:border-sky-500/30 dark:text-sky-300" 
+                  : "bg-white/80 dark:bg-white/5 border-border/60 dark:border-white/10 hover:bg-white dark:hover:bg-white/10"
+              )}
             />
           </div>
 
+          {/* 2. 日期区间：移动端平分剩余 64% 空间，大屏紧凑并排 */}
+          <div className="flex items-center gap-1 sm:gap-1.5 h-10 sm:h-11 flex-1 min-w-0">
+            <DatePicker
+              value={startDate}
+              onChange={setStartDate}
+              placeholder="起始日期"
+              maxDate={today}
+              className="h-full flex-1 min-w-0 sm:w-28 md:w-32 sm:flex-initial"
+              triggerClassName="h-full w-full rounded-full border shadow-2xs text-[11px] sm:text-xs font-bold bg-white/70 dark:bg-white/5 border-border/60 dark:border-white/10 hover:bg-white dark:hover:bg-white/10 px-2 sm:px-3 transition-all justify-center"
+            />
+            <span className="text-muted-foreground/50 text-xs shrink-0">-</span>
+            <DatePicker
+              value={endDate}
+              onChange={setEndDate}
+              placeholder="截止日期"
+              maxDate={today}
+              className="h-full flex-1 min-w-0 sm:w-28 md:w-32 sm:flex-initial"
+              triggerClassName="h-full w-full rounded-full border shadow-2xs text-[11px] sm:text-xs font-bold bg-white/70 dark:bg-white/5 border-border/60 dark:border-white/10 hover:bg-white dark:hover:bg-white/10 px-2 sm:px-3 transition-all justify-center"
+            />
+          </div>
+
+          {/* 大屏重置按钮 */}
           {(searchQuery || filterShop || startDate || endDate) && (
             <button
               onClick={() => {
@@ -289,10 +317,11 @@ export default function SettlementHistoryPage() {
                 setStartDate("");
                 setEndDate("");
               }}
-              className="h-10 w-10 sm:h-11 sm:w-11 flex items-center justify-center rounded-full bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white transition-all shrink-0 shadow-sm"
-              title="重置筛选"
+              className="hidden md:flex h-10 sm:h-11 px-3.5 items-center gap-1.5 rounded-full border border-sky-500/20 bg-sky-500/10 text-sky-600 dark:text-sky-400 text-xs font-bold hover:bg-sky-500/20 transition-all active:scale-95 shadow-2xs shrink-0 whitespace-nowrap cursor-pointer"
+              title="重置所有筛选"
             >
-              <RotateCcw size={16} />
+              <RotateCcw size={13} />
+              <span>重置</span>
             </button>
           )}
         </div>

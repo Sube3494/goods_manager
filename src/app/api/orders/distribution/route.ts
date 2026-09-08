@@ -14,7 +14,7 @@ import {
   normalizeExternalId,
   normalizeShopNameKey,
 } from "@/lib/shopIdentity";
-import { normalizeAutoPickIntegrationConfig } from "@/lib/autoPickOrders";
+import { normalizeAutoPickIntegrationConfig, readMaiyatianUserCoordinate } from "@/lib/autoPickOrders";
 
 export const dynamic = "force-dynamic";
 
@@ -413,26 +413,33 @@ export async function GET(request: NextRequest) {
         longitude: s.longitude,
         latitude: s.latitude,
       })),
-      orders: renderableOrders.map((o) => ({
-        id: o.id,
-        orderNo: o.orderNo,
-        seq: o.dailyPlatformSequence,
-        platform: normalizeDisplayPlatform(o.platform),
-        orderTime: o.orderTime,
-        userAddress: o.userAddress,
-        lng: o.longitude,
-        lat: o.latitude,
-        actualPaid: o.actualPaid,
-        status: o.status,
-        distanceKm: o.distanceKm,
-        isBrush: o.isBrush,
-        items: o.items.map((it) => ({
-          name: it.productName,
-          quantity: it.quantity,
-          thumb: it.thumb || null,
-          productNo: it.productNo || null,
-        })),
-      })),
+      orders: renderableOrders.map((o) => {
+        const rawPayload = o.rawPayload && typeof o.rawPayload === "object" && !Array.isArray(o.rawPayload)
+          ? o.rawPayload as Record<string, unknown>
+          : {};
+        const preciseLng = readMaiyatianUserCoordinate(rawPayload, "longitude");
+        const preciseLat = readMaiyatianUserCoordinate(rawPayload, "latitude");
+        return {
+          id: o.id,
+          orderNo: o.orderNo,
+          seq: o.dailyPlatformSequence,
+          platform: normalizeDisplayPlatform(o.platform),
+          orderTime: o.orderTime,
+          userAddress: o.userAddress,
+          lng: preciseLng || o.longitude,
+          lat: preciseLat || o.latitude,
+          actualPaid: o.actualPaid,
+          status: o.status,
+          distanceKm: o.distanceKm,
+          isBrush: o.isBrush,
+          items: o.items.map((it) => ({
+            name: it.productName,
+            quantity: it.quantity,
+            thumb: it.thumb || null,
+            productNo: it.productNo || null,
+          })),
+        };
+      }),
       summary: {
         totalOrders: orders.length,
         renderedCount: renderableOrders.length,

@@ -23,6 +23,10 @@ type Trail = {
 
 type DeliveryPhase = "unassigned" | "assigned" | "arrived_shop" | "delivering" | "delivered";
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
 function calculateDistanceMeters(p1: Point, p2: Point): number {
   const rad = Math.PI / 180;
   const dLat = (p2.lat - p1.lat) * rad;
@@ -56,13 +60,15 @@ function getDeliveryPhase(order: AutoPickOrder, trail: Trail | null, riderAssign
 } {
   const trailStatusName = String(trail?.statusName || "").trim();
   const trailOrderStatus = String(trail?.orderStatus || "").trim().toLowerCase();
-  const deliveryTrack = String(order.delivery?.track || (order.delivery as any)?.status || "").trim();
+  const deliveryRecord = isRecord(order.delivery) ? order.delivery : {};
+  const deliveryTrack = String(order.delivery?.track || deliveryRecord.status || "").trim();
   const orderStatus = String(order.status || "").trim();
 
   // 1. 已完成 / 已送达
   if (
     /已完成|已送达|配送完成|done|finished|completed/i.test(`${trailStatusName} ${trailOrderStatus} ${deliveryTrack} ${orderStatus}`)
     || Boolean(order.delivery?.completedTime)
+    || Boolean(order.completedAt)
   ) {
     return {
       phase: "delivered",
@@ -282,15 +288,20 @@ export function OrderRouteModal({ order, onClose }: { order: AutoPickOrder; onCl
   const [fallbackShopAddress, setFallbackShopAddress] = useState("");
   const [shopCity, setShopCity] = useState("");
 
-  const riderAssigned = Boolean(trail?.dispatcher || trail?.isTakeGoods
-    || /^(pickup|delivering)$/i.test(trail?.orderStatus || "")
+  const orderAlreadyDelivered = getDeliveryPhase(order, null, false).phase === "delivered";
+  const effectiveTrail = orderAlreadyDelivered ? null : trail;
+  const effectiveLoading = orderAlreadyDelivered ? false : loading;
+  const effectiveError = orderAlreadyDelivered ? "" : error;
+
+  const riderAssigned = !orderAlreadyDelivered && Boolean(effectiveTrail?.dispatcher || effectiveTrail?.isTakeGoods
+    || /^(pickup|delivering)$/i.test(effectiveTrail?.orderStatus || "")
     || isAutoPickOrderRiderAssigned(order));
   const shopAddress = order.shopAddress?.trim() || order.rawShopAddress?.trim() || "";
   const displayShopName = order.matchedShopName?.trim() || order.rawShopName?.trim() || "门店";
   const effectiveShopAddress = shopAddress || fallbackShopAddress || "";
   const derivedCity = shopCity || extractCity(order.userAddress, displayShopName) || undefined;
 
-  const customerCoord: Point | null = (trail?.receiver ?? null) || (
+  const customerCoord: Point | null = (effectiveTrail?.receiver ?? null) || (
     typeof order.longitude === "number" && typeof order.latitude === "number"
     && Number.isFinite(order.longitude) && Number.isFinite(order.latitude)
     && Math.abs(order.longitude) <= 180 && Math.abs(order.latitude) <= 90
@@ -298,14 +309,14 @@ export function OrderRouteModal({ order, onClose }: { order: AutoPickOrder; onCl
       ? { lng: order.longitude, lat: order.latitude }
       : null
   );
-  const shopCoord: Point | null = trail?.sender ?? null;
+  const shopCoord: Point | null = effectiveTrail?.sender ?? null;
   const effectiveShopCoord: Point | null = shopCoord || resolvedShopCoord;
-  const riderCoord: Point | null = trail?.dispatcher ?? null;
+  const riderCoord: Point | null = effectiveTrail?.dispatcher ?? null;
 
-  const phaseInfo = getDeliveryPhase(order, trail, riderAssigned);
+  const phaseInfo = getDeliveryPhase(order, effectiveTrail, riderAssigned);
 
   let primaryDistanceValue = "";
-  const platformDistance = formatDistanceText(trail?.distance);
+  const platformDistance = formatDistanceText(effectiveTrail?.distance);
 
   if (phaseInfo.phase === "delivered") {
     primaryDistanceValue = "已送达";
@@ -402,6 +413,14 @@ export function OrderRouteModal({ order, onClose }: { order: AutoPickOrder; onCl
     let timer: ReturnType<typeof setTimeout>;
     const controller = new AbortController();
     async function refresh() {
+      if (orderAlreadyDelivered) {
+        if (!disposed) {
+          setTrail(null);
+          setError("");
+          setLoading(false);
+        }
+        return;
+      }
       if (!order.deliveryId) { setLoading(false); return; }
       setLoading(true);
       try {
@@ -417,7 +436,7 @@ export function OrderRouteModal({ order, onClose }: { order: AutoPickOrder; onCl
     }
     void refresh();
     return () => { disposed = true; controller.abort(); clearTimeout(timer); };
-  }, [order.id, order.deliveryId, attempt]);
+  }, [order.id, order.deliveryId, orderAlreadyDelivered, attempt]);
 
   useEffect(() => {
     let disposed = false;
@@ -468,8 +487,8 @@ export function OrderRouteModal({ order, onClose }: { order: AutoPickOrder; onCl
         if (disposed) return;
 
         // 1. 获取门店真实经纬度（优先取 trail.sender，再取已解析坐标，最后使用高德地理编码带城市候选精准解析）
-        let finalShopLng = trail?.sender ? Number(trail.sender.lng) : (effectiveShopCoord ? Number(effectiveShopCoord.lng) : NaN);
-        let finalShopLat = trail?.sender ? Number(trail.sender.lat) : (effectiveShopCoord ? Number(effectiveShopCoord.lat) : NaN);
+        let finalShopLng = effectiveTrail?.sender ? Number(effectiveTrail.sender.lng) : (effectiveShopCoord ? Number(effectiveShopCoord.lng) : NaN);
+        let finalShopLat = effectiveTrail?.sender ? Number(effectiveTrail.sender.lat) : (effectiveShopCoord ? Number(effectiveShopCoord.lat) : NaN);
 
         if ((!Number.isFinite(finalShopLng) || !Number.isFinite(finalShopLat)) && (effectiveShopAddress || displayShopName)) {
           try {
@@ -504,8 +523,8 @@ export function OrderRouteModal({ order, onClose }: { order: AutoPickOrder; onCl
         }
 
         // 2. 获取顾客真实经纬度（优先取 trail.receiver / order.longitude / order.latitude，缺失时使用地理编码精准解析）
-        let finalCustomerLng = trail?.receiver ? Number(trail.receiver.lng) : (customerCoord ? Number(customerCoord.lng) : NaN);
-        let finalCustomerLat = trail?.receiver ? Number(trail.receiver.lat) : (customerCoord ? Number(customerCoord.lat) : NaN);
+        let finalCustomerLng = effectiveTrail?.receiver ? Number(effectiveTrail.receiver.lng) : (customerCoord ? Number(customerCoord.lng) : NaN);
+        let finalCustomerLat = effectiveTrail?.receiver ? Number(effectiveTrail.receiver.lat) : (customerCoord ? Number(customerCoord.lat) : NaN);
 
         if ((!Number.isFinite(finalCustomerLng) || !Number.isFinite(finalCustomerLat)) && order.userAddress) {
           try {
@@ -533,8 +552,8 @@ export function OrderRouteModal({ order, onClose }: { order: AutoPickOrder; onCl
         const hasCustomer = Number.isFinite(finalCustomerLng) && Number.isFinite(finalCustomerLat);
 
         // 判定骑手与门店是否处于近距离（如 80 米）避让范围
-        const riderLng = trail?.dispatcher ? Number(trail.dispatcher.lng) : NaN;
-        const riderLat = trail?.dispatcher ? Number(trail.dispatcher.lat) : NaN;
+        const riderLng = effectiveTrail?.dispatcher ? Number(effectiveTrail.dispatcher.lng) : NaN;
+        const riderLat = effectiveTrail?.dispatcher ? Number(effectiveTrail.dispatcher.lat) : NaN;
         const hasRider = Number.isFinite(riderLng) && Number.isFinite(riderLat);
         const isCloseProximity = hasRider && hasShop
           && calculateDistanceMeters({ lng: riderLng, lat: riderLat }, { lng: finalShopLng, lat: finalShopLat }) < 80;
@@ -705,7 +724,7 @@ export function OrderRouteModal({ order, onClose }: { order: AutoPickOrder; onCl
         // 忽略地图销毁异常
       }
     };
-  }, [trail, riderAssigned, effectiveShopAddress, displayShopName, derivedCity, order.longitude, order.latitude, order.userAddress, attempt, customerCoord, phaseInfo.phase, primaryDistanceValue, shopToCustomerDistance, effectiveShopCoord, isDark]);
+  }, [effectiveTrail, riderAssigned, effectiveShopAddress, displayShopName, derivedCity, order.longitude, order.latitude, order.userAddress, attempt, customerCoord, phaseInfo.phase, primaryDistanceValue, shopToCustomerDistance, effectiveShopCoord, isDark]);
 
   return createPortal(
     <div className="fixed inset-0 z-[120000] flex items-center justify-center p-3 sm:p-4">
@@ -739,13 +758,13 @@ export function OrderRouteModal({ order, onClose }: { order: AutoPickOrder; onCl
         {/* 刷新按钮 */}
         <button
           type="button"
-          disabled={loading}
+          disabled={effectiveLoading || orderAlreadyDelivered}
           onClick={() => setAttempt((v) => v + 1)}
-          title="刷新骑手实时位置"
+          title={orderAlreadyDelivered ? "订单已送达，无需刷新骑手位置" : "刷新骑手实时位置"}
           className="flex h-8 items-center gap-1.5 rounded-full border border-border/70 bg-background/90 px-3 text-xs font-medium text-foreground shadow-md backdrop-blur-md transition-colors hover:bg-muted disabled:opacity-50 dark:bg-zinc-900/90"
         >
-          <RefreshCw size={13} className={loading ? "animate-spin text-primary" : ""} />
-          <span className="hidden sm:inline">{loading ? "查询中…" : "刷新"}</span>
+          <RefreshCw size={13} className={effectiveLoading ? "animate-spin text-primary" : ""} />
+          <span className="hidden sm:inline">{effectiveLoading ? "查询中…" : "刷新"}</span>
         </button>
 
         {/* 关闭按钮 */}
@@ -820,16 +839,16 @@ export function OrderRouteModal({ order, onClose }: { order: AutoPickOrder; onCl
                 </div>
               )}
 
-              {riderAssigned && trail?.fetchedAt && (
+              {riderAssigned && effectiveTrail?.fetchedAt && (
                 <div className="text-[10px] text-muted-foreground/80 flex items-center justify-between pt-1 border-t border-border/30">
-                  <span>最近更新：{new Date(trail.fetchedAt).toLocaleTimeString()}</span>
+                  <span>最近更新：{new Date(effectiveTrail.fetchedAt).toLocaleTimeString()}</span>
                   <span>30秒自动刷新</span>
                 </div>
               )}
-              {riderAssigned && !trail?.dispatcher && !loading && (
+              {riderAssigned && !effectiveTrail?.dispatcher && !effectiveLoading && (
                 <div className="text-[11px] text-amber-500 font-medium">平台暂未返回骑手实时坐标</div>
               )}
-              {error && <div className="text-[11px] text-red-500">{error}</div>}
+              {effectiveError && <div className="text-[11px] text-red-500">{effectiveError}</div>}
               {mapError && <div className="text-[11px] text-red-500">{mapError}</div>}
               <div className="pt-2 border-t border-border/40">
                 <CourierPhotosViewer

@@ -130,7 +130,7 @@ const CourierSelect: React.FC<{
                 width: coords.width,
                 zIndex: 999999
               }}
-              className="rounded-2xl border border-border/40 dark:border-white/10 bg-white dark:bg-zinc-900 shadow-[0_20px_50px_rgba(0,0,0,0.3)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.6)] p-1.5 overflow-hidden ring-1 ring-black/5 max-w-[calc(100vw-2rem)]"
+              className="rounded-2xl border border-border/50 dark:border-white/10 bg-popover/95 dark:bg-card/95 backdrop-blur-xl shadow-xl dark:shadow-2xl p-1.5 overflow-hidden max-w-[calc(100vw-2rem)]"
             >
               <div className="max-h-60 overflow-y-auto px-1 space-y-1">
                 {COURIER_OPTIONS.map((opt) => {
@@ -146,7 +146,7 @@ const CourierSelect: React.FC<{
                       className={`relative w-full rounded-xl px-4 py-2 text-left text-sm transition-all duration-200 group flex items-center justify-between ${
                         isSelected 
                           ? "bg-primary/10 text-primary font-bold" 
-                          : "text-foreground/70 hover:bg-zinc-500/10 hover:text-foreground"
+                          : "text-foreground/70 hover:bg-muted hover:text-foreground"
                       }`}
                     >
                       <span className="relative z-10">{opt}</span>
@@ -314,21 +314,23 @@ const TrackingNumberModal: React.FC<TrackingNumberModalProps> = ({
   return createPortal(
     <AnimatePresence mode="wait">
       {isOpen && (
-        <>
+        <div className="fixed inset-0 z-9999 flex items-center justify-center p-3 sm:p-4 overflow-hidden">
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 z-9998 bg-black/40 backdrop-blur-md"
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm"
           />
           <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+            initial={{ opacity: 0, scale: 0.96, y: 16 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 10 }}
-            className={`fixed left-1/2 top-1/2 z-9999 w-[calc(100%-32px)] sm:w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 -translate-y-1/2 rounded-4xl sm:rounded-[2.5rem] bg-white/95 dark:bg-gray-900/60 backdrop-blur-3xl border border-border/40 dark:border-white/10 shadow-2xl flex flex-col ${mode === 'payment' ? 'min-h-[300px] sm:min-h-[360px]' : 'min-h-[400px] sm:min-h-[500px]'} max-h-safe-modal overflow-hidden`}
+            exit={{ opacity: 0, scale: 0.96, y: 16 }}
+            transition={{ type: "spring", stiffness: 350, damping: 28 }}
+            className={`relative z-10 w-full max-w-2xl rounded-[28px] sm:rounded-[32px] bg-white dark:bg-gray-900/75 backdrop-blur-2xl border border-border/60 dark:border-white/10 shadow-2xl flex flex-col ${mode === 'payment' ? 'min-h-[300px] sm:min-h-[360px]' : 'min-h-[400px] sm:min-h-[500px]'} max-h-[min(90vh,760px)] overflow-hidden`}
           >
-            <div className="relative p-6 sm:p-10 border-b border-border/40 shrink-0 flex items-center gap-4 sm:gap-6">
+            <div className="pointer-events-none absolute -right-12 -top-12 h-48 w-48 rounded-full bg-blue-500/10 blur-3xl" />
+            <div className="relative z-10 p-6 sm:p-10 border-b border-border/40 shrink-0 flex items-center gap-4 sm:gap-6">
               <div className="h-12 w-12 rounded-xl bg-orange-500/10 flex items-center justify-center text-orange-500 shrink-0">
                 <Truck size={24} />
               </div>
@@ -639,19 +641,19 @@ const TrackingNumberModal: React.FC<TrackingNumberModalProps> = ({
                 )}
               </div>
 
-              <div className="p-4 sm:p-10 border-t border-border/40 shrink-0 bg-muted/10">
+              <div className="p-4 sm:p-8 border-t border-black/6 dark:border-white/10 shrink-0 bg-black/2 dark:bg-white/2">
                 <div className="flex items-center justify-between gap-2 sm:gap-4">
                   <button
                     type="button"
                     onClick={onClose}
-                    className="h-10 sm:h-12 px-4 sm:px-6 text-[13px] sm:text-sm font-bold text-muted-foreground hover:text-destructive hover:bg-destructive/5 rounded-2xl transition-all active:scale-95 shrink-0"
+                    className="h-10 sm:h-11 px-5 sm:px-6 text-xs sm:text-sm font-bold text-muted-foreground hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-all active:scale-95 shrink-0"
                   >
                     取消
                   </button>
 
                   <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                     {readOnly ? (
-                      <div className="flex items-center gap-2 h-10 sm:h-12 px-4 sm:px-8 rounded-2xl bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 font-bold text-[13px] sm:text-sm">
+                      <div className="flex items-center gap-2 h-10 sm:h-11 px-5 sm:px-6 rounded-full bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 font-bold text-xs sm:text-sm">
                         <CheckCircle2 size={16} className="shrink-0" />
                         <span className="truncate">数据锁定</span>
                       </div>
@@ -661,7 +663,7 @@ const TrackingNumberModal: React.FC<TrackingNumberModalProps> = ({
                           <button
                             type="button"
                             onClick={(e) => handleSubmit(e, false)}
-                            className="h-10 sm:h-12 px-4 sm:px-6 rounded-2xl text-[13px] sm:text-sm font-bold border border-orange-500/20 bg-orange-500/5 text-orange-500/80 hover:bg-orange-500/10 hover:border-orange-500/40 transition-all active:scale-95 shadow-sm shrink-0"
+                            className="h-10 sm:h-11 px-5 sm:px-6 rounded-full text-xs sm:text-sm font-bold border border-orange-500/30 bg-orange-500/8 text-orange-600 dark:text-orange-400 hover:bg-orange-500/15 transition-all active:scale-95 shadow-xs shrink-0"
                           >
                             暂存
                           </button>
@@ -672,7 +674,7 @@ const TrackingNumberModal: React.FC<TrackingNumberModalProps> = ({
                             e.preventDefault();
                             handleSubmit(e as unknown as React.FormEvent, true);
                           }}
-                          className="h-10 sm:h-12 px-4 sm:px-8 rounded-2xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-[13px] sm:text-sm font-black shadow-xl shadow-gray-900/10 dark:shadow-white/10 hover:brightness-110 active:scale-95 transition-all flex items-center gap-1.5 sm:gap-2 min-w-0"
+                          className="h-10 sm:h-11 px-6 sm:px-8 rounded-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-xs sm:text-sm font-black shadow-lg shadow-gray-900/15 dark:shadow-white/10 hover:opacity-90 active:scale-95 transition-all flex items-center gap-1.5 sm:gap-2 min-w-0"
                         >
                           <CheckCircle2 size={16} className="shrink-0 hidden xs:block" />
                           <span className="truncate">
@@ -695,7 +697,7 @@ const TrackingNumberModal: React.FC<TrackingNumberModalProps> = ({
               </div>
             </form>
           </motion.div>
-        </>
+        </div>
       )}
     </AnimatePresence>,
     document.body

@@ -219,16 +219,16 @@ export function ConfirmModal({
                 "relative z-10 min-w-0",
                 authPrimary
                   ? "grid grid-cols-2 gap-4 px-8 pb-8 pt-0"
-                  : "px-5 sm:px-8 pb-5 sm:pb-8 pt-1 sm:pt-0 flex flex-col gap-2.5 sm:grid sm:grid-cols-2 sm:gap-4"
+                  : "px-5 sm:px-8 pb-5 sm:pb-8 pt-1 sm:pt-0 flex flex-col gap-2.5 sm:grid sm:grid-cols-2 sm:gap-3.5"
               )}
             >
               <button
                 onClick={onClose}
                 className={cn(
-                  "min-w-0 px-4 text-[15px] font-bold transition-all active:scale-[0.97]",
+                  "min-w-0 px-5 text-[14px] sm:text-[15px] font-bold transition-all active:scale-[0.97] cursor-pointer",
                   authPrimary
-                    ? "h-14 rounded-3xl border border-white/8 bg-transparent text-[#c5ccd7] hover:border-white/14 hover:bg-white/4 hover:text-white"
-                    : "order-1 sm:order-none h-11 sm:h-14 rounded-2xl sm:text-[15px] text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5 border border-black/5 dark:border-white/10 sm:border-transparent hover:border-black/5 dark:hover:border-white/5"
+                    ? "h-12 sm:h-13 rounded-full border border-white/10 bg-transparent text-[#c5ccd7] hover:border-white/20 hover:bg-white/5 hover:text-white"
+                    : "order-1 sm:order-none h-11 sm:h-12 rounded-full text-muted-foreground hover:text-foreground hover:bg-zinc-100 dark:hover:bg-zinc-800 border border-border/70 shadow-2xs"
                 )}
               >
                 {cancelLabel}
@@ -241,10 +241,10 @@ export function ConfirmModal({
                   onClose();
                 }}
                 className={cn(
-                  "min-w-0 px-4 text-[15px] font-black transition-all active:scale-[0.97] flex items-center justify-center gap-1.5 sm:gap-2 text-center leading-tight",
+                  "min-w-0 px-5 text-[14px] sm:text-[15px] font-black transition-all active:scale-[0.97] flex items-center justify-center gap-1.5 sm:gap-2 text-center leading-tight cursor-pointer",
                   authPrimary
-                    ? "h-14 rounded-3xl bg-white text-[#17181c] shadow-[0_12px_30px_rgba(255,255,255,0.12)] hover:bg-white/92"
-                    : cn("h-13 sm:h-14 rounded-[20px] sm:rounded-2xl sm:text-[15px]", currentStyle.confirm),
+                    ? "h-12 sm:h-13 rounded-full bg-white text-[#17181c] shadow-[0_12px_30px_rgba(255,255,255,0.15)] hover:bg-white/95"
+                    : cn("h-11 sm:h-12 rounded-full shadow-md", currentStyle.confirm),
                   confirmDisabled && "opacity-40 cursor-not-allowed active:scale-100"
                 )}
               >

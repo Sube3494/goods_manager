@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { LogOut, LogIn } from "lucide-react";
+import { LogOut, LogIn, Crown, Shield } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
@@ -279,26 +279,24 @@ export function Sidebar({ onClose, isOpen, isCollapsed, onToggleCollapse }: Side
                         <motion.div 
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
-                            className="flex-1 flex flex-col overflow-hidden"
+                            className="flex-1 flex flex-col overflow-hidden gap-0.5"
                         >
-                            <p className="text-sm font-medium text-foreground truncate group-hover:text-primary transition-colors">
+                            <p className="text-xs font-semibold text-foreground truncate group-hover:text-primary transition-colors">
                                 {user.name || user.email}
                             </p>
-                            <p className="text-[10px] text-muted-foreground/60 truncate">
-                                {user.role === 'SUPER_ADMIN' ? '超级管理员' : (user.roleProfile?.name || '普通成员')}
-                            </p>
-                            {(canManageSystem || isSuperAdmin) && (
-                              <div className="mt-1 flex items-center gap-1">
-                                <span className={cn(
-                                  "inline-flex h-5 items-center rounded-full px-2 text-[9px] font-black tracking-[0.14em] uppercase",
-                                  isSuperAdmin
-                                    ? "bg-red-500/10 text-red-500"
-                                    : "bg-primary/10 text-primary"
-                                )}>
-                                  {isSuperAdmin ? "Root" : "System"}
+                            <div className="flex items-center gap-1">
+                              {isSuperAdmin ? (
+                                <span className="inline-flex items-center gap-1 rounded-full border border-orange-500/30 bg-orange-500/12 px-2 py-0.5 text-[10px] font-black text-orange-600 dark:text-orange-400 shadow-2xs">
+                                  <Crown size={10} className="shrink-0 text-orange-500 dark:text-orange-400" />
+                                  超级管理员
                                 </span>
-                              </div>
-                            )}
+                              ) : (
+                                <span className="inline-flex items-center gap-1 rounded-full border border-sky-500/20 bg-sky-500/10 px-2 py-0.5 text-[10px] font-bold text-sky-600 dark:text-sky-400 shadow-2xs">
+                                  <Shield size={9} className="shrink-0 text-sky-500 dark:text-sky-400" />
+                                  {user.roleProfile?.name || "普通成员"}
+                                </span>
+                              )}
+                            </div>
                         </motion.div>
                         )}
                     </Link>

@@ -152,14 +152,15 @@ function PurchaseMetricCard({
   accentClassName: string;
 }) {
   return (
-    <div className="rounded-[18px] border border-black/8 bg-white/76 px-3 py-2.5 shadow-xs dark:border-white/10 dark:bg-white/5 sm:px-3.5 sm:py-3">
-      <div className="flex items-start justify-between gap-2 sm:gap-3">
+    <div className="relative overflow-hidden rounded-[22px] sm:rounded-[28px] border border-border/60 bg-linear-to-br from-white/95 via-white/85 to-background p-4 sm:p-5 shadow-sm backdrop-blur-md dark:border-white/10 dark:from-white/[0.06] dark:via-white/[0.03] dark:to-transparent">
+      <div className="pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full bg-primary/5 blur-xl" />
+      <div className="relative flex items-start justify-between gap-2 sm:gap-3">
         <div className="min-w-0">
-          <div className="text-[9px] uppercase tracking-[0.12em] text-muted-foreground sm:text-[10px] sm:tracking-[0.14em]">{label}</div>
-          <div className="mt-1 text-[18px] font-bold leading-none tracking-tight text-foreground sm:mt-1.5 sm:text-[24px]">{value}</div>
-          <p className="mt-1 line-clamp-2 text-[10px] leading-4 text-muted-foreground sm:mt-1.5 sm:text-[11px]">{hint}</p>
+          <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground sm:text-[11px] sm:tracking-[0.14em]">{label}</div>
+          <div className="mt-1 text-[20px] font-black leading-none tracking-tight text-foreground sm:mt-1.5 sm:text-[26px]">{value}</div>
+          <p className="mt-1.5 line-clamp-2 text-[10px] font-medium leading-4 text-muted-foreground sm:text-[11px]">{hint}</p>
         </div>
-        <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border sm:h-9 sm:w-9", accentClassName)}>
+        <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border sm:h-10 sm:w-10 shadow-xs", accentClassName)}>
           {icon}
         </div>
       </div>
@@ -1600,7 +1601,7 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
 
       {/* Table/List View */}
       {/* Desktop Table View */}
-      <div className="hidden md:block rounded-2xl border border-border bg-white dark:bg-white/5 backdrop-blur-md overflow-hidden shadow-sm">
+      <div className="hidden md:block rounded-[22px] sm:rounded-[28px] border border-border/60 bg-linear-to-br from-white/95 via-white/85 to-background dark:border-white/10 dark:from-white/[0.06] dark:via-white/[0.03] dark:to-transparent overflow-hidden shadow-sm backdrop-blur-md">
         <div className="overflow-auto max-h-[calc(100dvh-220px-env(safe-area-inset-bottom,0px))]">
           {isLoading && purchases.length === 0 ? (
             <PurchasesTableSkeleton />
@@ -1617,8 +1618,8 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
               <col className="w-[90px]" />
             </colgroup>
             <thead>
-              <tr className="border-b border-border bg-muted/30">
-                <th className="w-[44px] px-1 py-3 text-center align-middle lg:w-[52px] lg:px-0">
+              <tr className="border-b border-border/60 bg-muted/40 dark:bg-white/[0.03]">
+                <th className="w-[44px] px-1 py-3.5 text-center align-middle lg:w-[52px] lg:px-0">
                   <div className="flex justify-center">
                     <button
                       type="button"
@@ -1641,18 +1642,18 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
                     </button>
                   </div>
                 </th>
-                <th className="w-[52px] px-1 py-3 text-xs text-foreground text-center whitespace-nowrap align-middle lg:w-[64px] lg:px-0">
+                <th className="w-[52px] px-1 py-3.5 text-xs font-black text-foreground text-center whitespace-nowrap align-middle lg:w-[64px] lg:px-0">
                   <div className="flex justify-center">序号</div>
                 </th>
-                <th className="px-4 py-4 text-center text-xs uppercase tracking-wider text-muted-foreground whitespace-nowrap">归属店铺</th>
-                <th className="px-5 py-4 text-center text-xs uppercase tracking-wider text-muted-foreground whitespace-nowrap">商品与数量</th>
-                <th className="px-4 py-4 text-center text-xs uppercase tracking-wider text-muted-foreground whitespace-nowrap">交易金额</th>
-                <th className="px-4 py-4 text-center text-xs uppercase tracking-wider text-muted-foreground whitespace-nowrap">状态</th>
-                <th className="px-4 py-4 text-center text-xs uppercase tracking-wider text-muted-foreground whitespace-nowrap">下单时间</th>
-                <th className="px-4 py-4 text-center text-xs uppercase tracking-wider text-muted-foreground whitespace-nowrap">操作</th>
+                <th className="px-4 py-3.5 text-center text-xs font-black text-foreground whitespace-nowrap">归属店铺</th>
+                <th className="px-5 py-3.5 text-center text-xs font-black text-foreground whitespace-nowrap">商品与数量</th>
+                <th className="px-4 py-3.5 text-center text-xs font-black text-foreground whitespace-nowrap">交易金额</th>
+                <th className="px-4 py-3.5 text-center text-xs font-black text-foreground whitespace-nowrap">状态</th>
+                <th className="px-4 py-3.5 text-center text-xs font-black text-foreground whitespace-nowrap">下单时间</th>
+                <th className="px-4 py-3.5 text-center text-xs font-black text-foreground whitespace-nowrap">操作</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border">
+            <tbody className="divide-y divide-border/60">
               <AnimatePresence>
                 {paginatedPurchases.map((po, index) => (
                    <motion.tr 
@@ -1664,7 +1665,7 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
                     }}
                     exit={{ opacity: 0 }}
                     transition={{ duration: 0.2 }}
-                    className="hover:bg-muted/20 transition-colors group"
+                    className="hover:bg-muted/20 dark:hover:bg-white/[0.02] transition-colors group"
                   >
                     <td className="w-[44px] px-1 py-3 text-center align-middle lg:w-[52px] lg:px-0">
                       <div className="flex justify-center">
@@ -1693,11 +1694,15 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
                     </td>
                     <td className="px-4 py-4 text-center">
                       {po.shopName ? (
-                          <span className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-primary/10 bg-primary/5 px-2.5 py-1 text-[10px] text-primary">
-                              <Store size={10} />
+                          <span className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-sky-500/20 bg-sky-500/10 px-2.5 py-1 text-[10px] font-bold text-sky-700 dark:border-sky-500/30 dark:bg-sky-500/15 dark:text-sky-300 shadow-2xs">
+                              <Store size={11} className="text-sky-600 dark:text-sky-400 shrink-0" />
                               <span className="truncate">{po.shopName}</span>
                           </span>
-                      ) : <span className="text-[10px] text-muted-foreground/30 italic">未归属</span>}
+                      ) : (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-dashed border-border/70 dark:border-white/10 bg-muted/30 dark:bg-white/5 px-2.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                              未归属
+                          </span>
+                      )}
                     </td>
                     <td className="px-3 py-4 text-center text-sm">
                       {(() => {
@@ -1707,20 +1712,20 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
                             {summary.items.length > 0 ? summary.items.map((item) => (
                               <div
                                 key={item.key}
-                                className="flex min-w-0 max-w-[105px] items-center gap-1.5 rounded-full border border-border/50 bg-secondary/30 p-0.5 pr-2 shadow-sm transition-all hover:border-primary/30 dark:bg-white/5"
+                                className="flex min-w-0 max-w-[125px] items-center gap-1.5 rounded-full border border-black/8 dark:border-white/10 bg-white/80 dark:bg-white/[0.06] p-0.5 pr-2.5 shadow-2xs transition-all hover:border-primary/40 hover:bg-white dark:hover:bg-white/10"
                                 title={item.name}
                               >
-                                <div className="flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white dark:bg-black">
+                                <div className="flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white dark:bg-white/15 border border-black/5 dark:border-white/10">
                                   {item.image ? (
                                     <img src={item.image} className="h-full w-full object-cover" alt="" loading="lazy" />
                                   ) : (
                                     <Package size={12} className="text-muted-foreground/50" />
                                   )}
                                 </div>
-                                <span className="truncate text-[10px] font-medium leading-none text-foreground/80">
+                                <span className="truncate text-[10px] font-bold leading-none text-foreground/90">
                                   {item.name}
                                 </span>
-                                <span className="shrink-0 text-[10px] font-bold leading-none text-primary">
+                                <span className="shrink-0 text-[10px] font-black leading-none text-primary">
                                   x{item.quantity}
                                 </span>
                               </div>
@@ -1728,7 +1733,7 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
                               <span className="text-xs text-muted-foreground">暂无商品</span>
                             )}
                             {summary.hasMore && (
-                              <div className="flex h-7 items-center justify-center rounded-full border border-border/50 bg-muted/50 px-3 text-[10px] font-bold text-muted-foreground">
+                              <div className="flex h-7 items-center justify-center rounded-full border border-border/60 bg-muted/60 dark:bg-white/[0.06] px-3 text-[10px] font-black text-muted-foreground">
                                 +{po.items.length - summary.items.length}
                               </div>
                             )}
@@ -1740,8 +1745,8 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
                       })()}
                     </td>
                     <td className="px-4 py-4 text-center whitespace-nowrap">
-                      <div className="flex items-center justify-center font-bold text-foreground">
-                        <span className="mr-0.5 opacity-60">￥</span>
+                      <div className="flex items-center justify-center font-black text-foreground text-sm">
+                        <span className="mr-0.5 text-xs text-muted-foreground font-normal">￥</span>
                         {po.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </div>
                     </td>
@@ -1756,26 +1761,28 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
                       </div>
                     </td>
                     <td className="px-2 py-4 text-center whitespace-nowrap">
-                      <div className="flex items-center justify-center gap-2">
-                        {/* Unified Detail/Manage Button */}
-                        <button 
-                            onClick={(e) => { e.stopPropagation(); handleEdit(po); }}
-                            className="h-8 w-8 flex items-center justify-center rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-500 hover:text-white transition-all shadow-sm group/btn"
-                            title="详细管理"
-                        >
-                          <Eye size={15} className="group-hover/btn:scale-110 transition-transform" />
-                        </button>
+                      <div className="flex justify-center">
+                        <div className="flex items-center gap-1 bg-muted/30 dark:bg-white/[0.03] p-1 rounded-full border border-border/60 dark:border-white/10 shadow-2xs">
+                          {/* Unified Detail/Manage Button */}
+                          <button 
+                              onClick={(e) => { e.stopPropagation(); handleEdit(po); }}
+                              className="h-7 w-7 flex items-center justify-center rounded-full text-blue-600 dark:text-blue-400 hover:bg-blue-500/15 transition-all active:scale-90"
+                              title="详细管理"
+                          >
+                            <Eye size={14} className="hover:scale-110 transition-transform" />
+                          </button>
 
-                        {/* Delete Action */}
-                        {canEdit && (
-                           <button 
-                               onClick={(e) => { e.stopPropagation(); handleDelete(po.id); }}
-                               className="h-8 w-8 flex items-center justify-center rounded-xl bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-500 hover:text-white transition-all shadow-sm group/btn"
-                               title="删除"
-                           >
-                             <Trash2 size={15} className="group-hover/btn:scale-110 transition-transform" />
-                           </button>
-                        )}
+                          {/* Delete Action */}
+                          {canEdit && (
+                             <button 
+                                 onClick={(e) => { e.stopPropagation(); handleDelete(po.id); }}
+                                 className="h-7 w-7 flex items-center justify-center rounded-full text-red-600 dark:text-red-400 hover:bg-red-500/15 transition-all active:scale-90"
+                                 title="删除"
+                             >
+                               <Trash2 size={14} className="hover:scale-110 transition-transform" />
+                             </button>
+                          )}
+                        </div>
                       </div>
                     </td>
                   </motion.tr>
@@ -1813,9 +1820,10 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
-                className="rounded-[22px] border border-border/70 bg-white p-3 shadow-sm dark:border-white/10 dark:bg-[#161b2b]"
+                className="group relative overflow-hidden rounded-[24px] border border-border/60 bg-linear-to-br from-white/95 via-white/85 to-background p-3.5 shadow-sm backdrop-blur-md dark:border-white/10 dark:from-white/[0.06] dark:via-white/[0.03] dark:to-transparent"
               >
-                <div className="mb-3 flex items-start justify-between gap-2">
+                <div className="pointer-events-none absolute -right-6 -top-6 h-20 w-20 rounded-full bg-primary/5 blur-xl transition-all group-hover:bg-primary/10" />
+                <div className="relative mb-3 flex items-start justify-between gap-2">
                   <div className="flex min-w-0 flex-1 items-center gap-2.5">
                     <button
                       type="button"
@@ -1834,11 +1842,11 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
                     </button>
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-muted px-1.5 text-[10px] font-bold text-foreground dark:bg-white/8 dark:text-white">
+                        <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-muted/60 px-1.5 text-[10px] font-bold text-foreground dark:bg-white/10 dark:text-white">
                           {(currentPage - 1) * pageSize + index + 1}
                         </span>
-                        <div className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-primary/8 px-2.5 py-1 text-[11px] text-primary dark:bg-white/6 dark:text-white">
-                          <Store size={12} />
+                        <div className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-sky-500/20 bg-sky-500/10 px-2.5 py-1 text-[11px] font-bold text-sky-700 dark:border-sky-500/30 dark:bg-sky-500/15 dark:text-sky-300 shadow-2xs">
+                          <Store size={12} className="text-sky-600 dark:text-sky-400 shrink-0" />
                           <span className="max-w-[180px] truncate">{po.shopName || "未指定店铺"}</span>
                         </div>
                         <div className="inline-flex items-center gap-1.5 text-[10px] font-mono text-foreground/60">
@@ -1851,9 +1859,9 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
                   <PurchaseStatusBadge status={po.status} />
                 </div>
 
-                <div className="space-y-2.5">
-                    <div className="rounded-[18px] border border-border/40 bg-muted/25 p-2.5 dark:border-white/6 dark:bg-white/[0.04]">
-                      <div className="mb-2 text-[10px] uppercase tracking-[0.16em] text-muted-foreground/80">商品与数量</div>
+                <div className="relative space-y-2.5">
+                    <div className="rounded-[18px] border border-border/50 bg-muted/20 p-2.5 dark:border-white/8 dark:bg-white/[0.03]">
+                      <div className="mb-2 text-[10px] uppercase tracking-[0.16em] text-muted-foreground/80 font-bold">商品与数量</div>
                       {(() => {
                         const summary = formatPurchaseItemsSummary(po);
                         return (
@@ -1862,10 +1870,10 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
                               {summary.items.length > 0 ? summary.items.map((item) => (
                                 <div
                                   key={item.key}
-                                  className="flex min-w-0 items-center gap-1.5 rounded-full border border-border/50 bg-white/70 p-0.5 pr-2 shadow-sm dark:border-white/8 dark:bg-white/[0.06]"
+                                  className="flex min-w-0 items-center gap-1.5 rounded-full border border-border/50 bg-white/80 p-0.5 pr-2 shadow-2xs dark:border-white/10 dark:bg-white/[0.06]"
                                   title={item.name}
                                 >
-                                  <div className="flex h-5 w-5 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white dark:bg-black">
+                                  <div className="flex h-5 w-5 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted/50 dark:bg-white/10">
                                     {item.image ? (
                                       <img src={item.image} className="h-full w-full object-cover" alt="" loading="lazy" />
                                     ) : (
@@ -1883,7 +1891,7 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
                                 <div className="col-span-2 text-xs text-muted-foreground">暂无商品</div>
                               )}
                             </div>
-                            <div className="flex items-center justify-between rounded-xl bg-white/70 px-2.5 py-2 text-[10px] text-muted-foreground dark:bg-white/[0.06]">
+                            <div className="flex items-center justify-between rounded-xl bg-white/80 px-2.5 py-1.5 text-[10px] text-muted-foreground shadow-2xs dark:bg-white/[0.05]">
                               <span>
                                 共 <span className="font-bold text-foreground">{po.items.length}</span> 项
                                 {summary.hasMore ? <> · 另有 <span className="font-bold text-foreground">{po.items.length - summary.items.length}</span> 项</> : ""}
@@ -1896,29 +1904,31 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
                     </div>
 
                     <div className="flex items-center gap-2 border-t border-border/30 pt-2 dark:border-white/6">
-                      <div className="flex h-12 min-w-0 flex-1 flex-col justify-center rounded-2xl border border-border/40 bg-muted/25 px-3 dark:border-white/6 dark:bg-white/[0.04]">
-                        <div className="text-[9px] uppercase tracking-[0.14em] text-muted-foreground/75">交易金额</div>
-                        <div className="mt-0.5 text-[18px] font-bold leading-none tracking-tight text-foreground">
+                      <div className="flex h-10 min-w-0 flex-1 items-center justify-between rounded-full border border-border/50 bg-muted/20 px-3.5 dark:border-white/8 dark:bg-white/[0.03]">
+                        <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground/75">交易金额</span>
+                        <div className="text-[15px] font-black leading-none tracking-tight text-foreground">
                           {formatCurrency(po.totalAmount)}
                         </div>
                       </div>
-                      <button 
-                          onClick={() => handleEdit(po)}
-                          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-blue-500/10 text-blue-600 shadow-sm transition-all active:scale-95 hover:bg-blue-500 hover:text-white dark:bg-blue-500/12 dark:text-blue-300"
-                          title="详细管理"
-                      >
-                          <Eye size={18} />
-                      </button>
+                      <div className="flex items-center gap-1 rounded-full border border-border/60 bg-muted/30 p-1 shadow-2xs backdrop-blur-md dark:border-white/10 dark:bg-white/[0.03]">
+                        <button 
+                            onClick={() => handleEdit(po)}
+                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-500/10 text-blue-600 shadow-2xs transition-all active:scale-95 hover:bg-blue-500 hover:text-white dark:bg-blue-500/15 dark:text-blue-300"
+                            title="详细管理"
+                        >
+                            <Eye size={15} />
+                        </button>
 
-                      {canEdit && (
-                          <button 
-                              onClick={() => handleDelete(po.id)}
-                              className="flex h-12 w-11 shrink-0 items-center justify-center rounded-2xl bg-red-500/10 text-red-600 shadow-sm transition-all active:scale-95 hover:bg-red-500 hover:text-white dark:bg-red-500/12 dark:text-red-300"
-                              title="删除"
-                          >
-                              <Trash2 size={18} />
-                          </button>
-                      )}
+                        {canEdit && (
+                            <button 
+                                onClick={() => handleDelete(po.id)}
+                                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-red-500/10 text-red-600 shadow-2xs transition-all active:scale-95 hover:bg-red-500 hover:text-white dark:bg-red-500/15 dark:text-red-300"
+                                title="删除"
+                            >
+                                <Trash2 size={15} />
+                            </button>
+                        )}
+                      </div>
                     </div>
                 </div>
               </motion.div>
@@ -2048,7 +2058,7 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
       {/* 实时导出进度通知 Modal */}
       {mounted && exportProgress.isOpen && createPortal(
         <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-sm rounded-3xl bg-card border border-border/80 p-6 shadow-2xl space-y-5 animate-in zoom-in-95 duration-200">
+          <div className="w-full max-w-sm rounded-[28px] border border-black/8 dark:border-white/10 bg-white/95 dark:bg-slate-950/95 p-6 shadow-2xl backdrop-blur-xl space-y-5 animate-in zoom-in-95 duration-200">
             <div className="flex items-center gap-3.5">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
                 {exportProgress.percentage >= 100 ? (
@@ -2058,7 +2068,7 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
                 )}
               </div>
               <div className="min-w-0 flex-1">
-                <h3 className="font-bold text-base text-foreground leading-tight truncate">
+                <h3 className="font-black text-base text-foreground leading-tight truncate">
                   {exportProgress.title}
                 </h3>
                 <p className="text-xs text-muted-foreground mt-0.5">
@@ -2069,17 +2079,17 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
 
             {/* 实时百分比与进度条 */}
             <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs font-semibold">
+              <div className="flex items-center justify-between text-xs font-bold">
                 <span className="text-muted-foreground truncate max-w-[210px]">
                   {exportProgress.currentStepText}
                 </span>
-                <span className="text-amber-600 dark:text-amber-400 font-mono text-sm font-bold">
+                <span className="text-amber-600 dark:text-amber-400 font-mono text-sm font-black">
                   {Math.min(100, Math.round(exportProgress.percentage))}%
                 </span>
               </div>
-              <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted">
+              <div className="h-2 w-full overflow-hidden rounded-full bg-black/6 dark:bg-white/10">
                 <div
-                  className="h-full bg-gradient-to-r from-amber-500 via-amber-400 to-emerald-500 transition-all duration-300 ease-out"
+                  className="h-full bg-gradient-to-r from-amber-500 via-amber-400 to-emerald-500 transition-all duration-300 ease-out rounded-full"
                   style={{ width: `${Math.min(100, Math.max(3, exportProgress.percentage))}%` }}
                 />
               </div>
@@ -2158,29 +2168,29 @@ function ExportSettingsModal({ isOpen, onClose, onConfirm, selectedColumns, onCh
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       
       {/* Modal Content */}
-      <div className="relative w-full max-w-lg overflow-hidden rounded-3xl bg-white dark:bg-gray-900 shadow-2xl border border-border/50 flex flex-col max-h-[90vh] sm:max-h-[85vh] animate-in zoom-in-95 duration-200">
+      <div className="relative w-full max-w-lg overflow-hidden rounded-[28px] sm:rounded-[32px] border border-black/8 dark:border-white/10 bg-white/95 dark:bg-slate-950/95 shadow-2xl backdrop-blur-xl flex flex-col max-h-[90vh] sm:max-h-[85vh] animate-in zoom-in-95 duration-200">
         {/* Header */}
-        <div className="border-b border-border p-4 sm:p-6 flex items-center justify-between shrink-0">
+        <div className="border-b border-black/6 dark:border-white/10 p-4 sm:p-6 flex items-center justify-between shrink-0">
           <div>
-            <h3 className="text-base sm:text-lg font-bold text-foreground">自定义导出设置</h3>
+            <h3 className="text-base sm:text-lg font-black text-foreground">自定义导出设置</h3>
             <p className="text-[11px] sm:text-xs text-muted-foreground mt-0.5 sm:mt-1">请选择导出格式以及采购文档中包含的信息</p>
           </div>
-          <button onClick={onClose} className="rounded-full p-2 text-muted-foreground hover:bg-muted active:scale-90 transition-all touch-manipulation">
+          <button onClick={onClose} className="rounded-full p-2 text-muted-foreground hover:bg-black/5 dark:hover:bg-white/10 active:scale-90 transition-all touch-manipulation">
             <X size={18} />
           </button>
         </div>
 
         {/* Format Selector */}
-        <div className="px-4 sm:px-6 pt-3.5 pb-3 border-b border-border/50 bg-muted/20 shrink-0">
+        <div className="px-4 sm:px-6 pt-3.5 pb-3 border-b border-black/6 dark:border-white/10 bg-black/2 dark:bg-white/2 shrink-0">
           <p className="text-[11px] sm:text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">选择导出文件格式</p>
           <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
             <button
               type="button"
               onClick={() => setExportFormat("excel")}
-              className={`flex items-center justify-center gap-2 sm:gap-2.5 p-2.5 sm:p-3 rounded-2xl border font-bold text-xs sm:text-sm active:scale-[0.98] transition-all touch-manipulation ${
+              className={`flex items-center justify-center gap-2 sm:gap-2.5 p-2.5 sm:p-3 rounded-full border font-bold text-xs sm:text-sm active:scale-[0.98] transition-all touch-manipulation ${
                 exportFormat === "excel"
-                  ? "border-emerald-500 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 shadow-sm ring-1 ring-emerald-500/30"
-                  : "border-border hover:bg-muted text-muted-foreground"
+                  ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 shadow-xs ring-1 ring-emerald-500/30"
+                  : "border-black/8 dark:border-white/10 hover:bg-black/4 dark:hover:bg-white/4 text-muted-foreground"
               }`}
             >
               <FileSpreadsheet size={16} className="sm:w-[18px] sm:h-[18px]" />
@@ -2189,10 +2199,10 @@ function ExportSettingsModal({ isOpen, onClose, onConfirm, selectedColumns, onCh
             <button
               type="button"
               onClick={() => setExportFormat("pdf")}
-              className={`flex items-center justify-center gap-2 sm:gap-2.5 p-2.5 sm:p-3 rounded-2xl border font-bold text-xs sm:text-sm active:scale-[0.98] transition-all touch-manipulation ${
+              className={`flex items-center justify-center gap-2 sm:gap-2.5 p-2.5 sm:p-3 rounded-full border font-bold text-xs sm:text-sm active:scale-[0.98] transition-all touch-manipulation ${
                 exportFormat === "pdf"
-                  ? "border-red-500 bg-red-500/10 text-red-600 dark:text-red-400 shadow-sm ring-1 ring-red-500/30"
-                  : "border-border hover:bg-muted text-muted-foreground"
+                  ? "border-red-500/40 bg-red-500/10 text-red-600 dark:text-red-400 shadow-xs ring-1 ring-red-500/30"
+                  : "border-black/8 dark:border-white/10 hover:bg-black/4 dark:hover:bg-white/4 text-muted-foreground"
               }`}
             >
               <FileText size={16} className="sm:w-[18px] sm:h-[18px]" />
@@ -2204,9 +2214,9 @@ function ExportSettingsModal({ isOpen, onClose, onConfirm, selectedColumns, onCh
         {/* List of attributes */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-3.5">
           <div className="flex gap-2 justify-end mb-1">
-            <button type="button" onClick={handleSelectAll} className="text-xs font-medium text-primary hover:underline p-1 touch-manipulation">全选</button>
+            <button type="button" onClick={handleSelectAll} className="text-xs font-bold text-primary hover:underline p-1 touch-manipulation">全选</button>
             <span className="text-muted-foreground/30 text-xs self-center">|</span>
-            <button type="button" onClick={handleSelectNone} className="text-xs font-medium text-muted-foreground hover:underline p-1 touch-manipulation">清空</button>
+            <button type="button" onClick={handleSelectNone} className="text-xs font-bold text-muted-foreground hover:underline p-1 touch-manipulation">清空</button>
           </div>
           <div className="space-y-2">
             {allColumns.map(col => {
@@ -2217,16 +2227,16 @@ function ExportSettingsModal({ isOpen, onClose, onConfirm, selectedColumns, onCh
                   onClick={() => handleToggle(col.key)}
                   className={`flex items-start gap-3 p-3 sm:p-3.5 rounded-2xl border cursor-pointer active:scale-[0.99] transition-all touch-manipulation ${
                     isChecked 
-                      ? "border-primary bg-primary/5 dark:bg-primary/10" 
-                      : "border-border hover:bg-muted/40"
+                      ? "border-primary/30 bg-primary/5 dark:bg-primary/10 dark:border-primary/30" 
+                      : "border-black/6 dark:border-white/8 hover:bg-black/2 dark:hover:bg-white/4"
                   }`}
                 >
-                  <div className={`mt-0.5 relative flex h-4 w-4 shrink-0 items-center justify-center rounded-md border-2 transition-all ${
+                  <div className={`mt-0.5 relative flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full border-2 transition-all ${
                     isChecked 
                       ? "border-primary bg-primary text-primary-foreground" 
                       : "border-gray-300 dark:border-white/20"
                   }`}>
-                    {isChecked && <Check size={10} strokeWidth={4} />}
+                    {isChecked && <Check size={11} strokeWidth={4} />}
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className={`text-xs sm:text-sm font-bold leading-tight ${isChecked ? "text-primary" : "text-foreground/90"}`}>{col.label}</p>
@@ -2239,18 +2249,18 @@ function ExportSettingsModal({ isOpen, onClose, onConfirm, selectedColumns, onCh
         </div>
 
         {/* Footer */}
-        <div className="border-t border-border p-4 sm:p-6 flex items-center justify-end gap-2.5 sm:gap-3 shrink-0 pb-safe">
+        <div className="border-t border-black/6 dark:border-white/10 p-4 sm:p-6 flex items-center justify-end gap-2.5 sm:gap-3 shrink-0 pb-safe">
           <button
             type="button"
             onClick={onClose}
-            className="h-11 sm:h-10 px-4 sm:px-5 rounded-full text-xs sm:text-sm font-medium text-muted-foreground hover:bg-muted active:scale-95 transition-all touch-manipulation"
+            className="h-11 sm:h-10 px-5 sm:px-6 rounded-full text-xs sm:text-sm font-bold text-muted-foreground hover:bg-black/5 dark:hover:bg-white/8 active:scale-95 transition-all touch-manipulation"
           >
             取消
           </button>
           <button
             type="button"
             onClick={() => onConfirm(selectedColumns, exportFormat)}
-            className="h-11 sm:h-10 px-5 sm:px-6 rounded-full text-xs sm:text-sm font-medium bg-primary text-primary-foreground shadow-lg shadow-primary/20 hover:opacity-90 active:scale-95 transition-all touch-manipulation"
+            className="h-11 sm:h-10 px-6 sm:px-7 rounded-full text-xs sm:text-sm font-bold bg-primary text-primary-foreground shadow-lg shadow-primary/25 hover:opacity-90 active:scale-95 transition-all touch-manipulation"
           >
             确认导出 ({exportFormat === "excel" ? "Excel" : "PDF"})
           </button>

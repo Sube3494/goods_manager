@@ -450,50 +450,50 @@ function SettingsContent() {
 
   return (
     <div className="w-full min-w-0 space-y-6 overflow-x-hidden">
-      <div className="relative overflow-hidden rounded-[24px] md:rounded-[28px] border border-border/60 bg-white/70 dark:bg-white/5 shadow-sm backdrop-blur-xl">
+      <div className="relative overflow-hidden rounded-[28px] sm:rounded-[32px] border border-border/70 bg-linear-to-br from-white/95 via-white/90 to-background dark:from-white/[0.06] dark:via-white/[0.03] dark:to-transparent p-5 sm:p-7 shadow-sm backdrop-blur-md">
         <div className="absolute inset-0 pointer-events-none">
-          <div className={cn("absolute right-8 top-8 h-28 w-28 rounded-full opacity-60 blur-3xl", activeTabMeta.accent)} />
+          <div className={cn("absolute right-8 top-8 h-36 w-36 rounded-full opacity-50 blur-3xl", activeTabMeta.accent)} />
         </div>
-        <div className="relative p-4 md:p-7 space-y-5 md:space-y-6">
+        <div className="relative space-y-5 md:space-y-6">
           <div className="flex flex-col gap-4 md:gap-5 lg:flex-row lg:items-start lg:justify-between">
-            <div className="space-y-3 max-w-2xl">
-              <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/80 px-3 py-1 text-[11px] font-black tracking-[0.18em] text-muted-foreground uppercase backdrop-blur">
-                <ShieldCheck size={12} className="text-primary" />
+            <div className="space-y-2.5 max-w-2xl">
+              <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-white/80 dark:bg-white/5 px-3.5 py-1 text-[11px] font-black tracking-[0.18em] text-muted-foreground uppercase shadow-2xs backdrop-blur-xs">
+                <ShieldCheck size={13} className="text-primary" />
                 配置中心
               </div>
               <div>
-                <h1 className="text-xl sm:text-2xl md:text-4xl font-black tracking-tight text-foreground">
+                <h1 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight text-foreground">
                   {canManageSettings ? "系统管理中心" : "系统工作台"}
                 </h1>
-                <p className="mt-2 text-sm md:text-base text-muted-foreground leading-relaxed">
+                <p className="mt-2 text-xs sm:text-sm text-muted-foreground leading-relaxed">
                   {canManageSettings
-                    ? "把全局逻辑、文件存储、备份恢复和系统状态放到一个更清楚的工作区里。"
-                    : "只展示你被授权管理的系统能力，避免把危险操作和日常工作混在一起。"}
+                    ? "统一管理全局逻辑、文件存储、备份恢复与系统运行状态，提供稳定可靠的运行底座。"
+                    : "仅展示当前账号被授权的系统能力，避免将危险配置与日常运营工作相混淆。"}
                 </p>
               </div>
             </div>
-            <div className="inline-flex items-center gap-2 rounded-2xl border border-border/60 bg-background/80 px-3 py-2 text-[11px] md:text-xs font-bold shadow-sm backdrop-blur self-start">
+            <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-white/80 dark:bg-white/5 px-3.5 py-1.5 text-[11px] md:text-xs font-bold shadow-2xs backdrop-blur-xs self-start">
               {saveStatus === "saving" && (
                 <>
                   <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
-                  <span className="text-primary">设置正在同步</span>
+                  <span className="text-primary font-bold">设置正在同步</span>
                 </>
               )}
               {saveStatus === "saved" && (
                 <>
                   <ShieldCheck size={14} className="text-emerald-500" />
-                  <span className="text-muted-foreground">最近一次改动已同步</span>
+                  <span className="text-muted-foreground font-semibold">改动已同步</span>
                 </>
               )}
-              {saveStatus === "error" && <span className="text-red-500">最近一次同步失败</span>}
+              {saveStatus === "error" && <span className="text-rose-500 font-bold">同步异常</span>}
             </div>
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {overviewCards.map((card) => (
-              <div key={card.label} className="rounded-2xl border border-border/60 bg-background/70 px-4 py-4 backdrop-blur">
+              <div key={card.label} className="rounded-2xl border border-border/60 bg-white/70 dark:bg-white/[0.03] px-4 py-3.5 shadow-2xs transition-all hover:border-primary/25">
                 <div className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/70">{card.label}</div>
-                <div className={cn("mt-2 text-lg font-black", card.tone)}>{card.value}</div>
+                <div className={cn("mt-1.5 text-lg font-black", card.tone)}>{card.value}</div>
                 <div className="mt-1 text-xs text-muted-foreground leading-relaxed">{card.hint}</div>
               </div>
             ))}
@@ -501,36 +501,36 @@ function SettingsContent() {
         </div>
       </div>
 
-      <div className="space-y-5">
-        <section className="rounded-[24px] md:rounded-[28px] border border-border/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl dark:bg-white/5 md:p-5">
+      <div className="space-y-6">
+        <section className="rounded-[28px] sm:rounded-[32px] border border-border/70 bg-linear-to-br from-white/95 via-white/90 to-background dark:from-white/[0.06] dark:via-white/[0.03] dark:to-transparent p-4 sm:p-6 shadow-sm backdrop-blur-md">
           <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <div className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">
+                <div className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/70">
                   设置分区
                 </div>
-                <div className="mt-1 text-sm text-muted-foreground">
-                  把系统能力按用途拆开，先选分区，再在下面集中处理当前内容。
+                <div className="mt-0.5 text-xs sm:text-sm text-muted-foreground">
+                  按用途划分模块，集中处理特定维度的全局配置。
                 </div>
               </div>
               {canManageRoles && (
                 <div className="flex flex-wrap gap-2">
                   <Link
                     href="/admin/roles"
-                    className="group inline-flex items-center gap-2 rounded-2xl border border-border/60 bg-background/70 px-4 py-2.5 text-sm font-black text-foreground transition-all hover:border-primary/25 hover:bg-primary/[0.04]"
+                    className="group inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-white/80 dark:bg-white/5 px-3.5 py-1.5 text-xs font-bold text-foreground transition-all hover:border-primary/40 hover:bg-primary/5 hover:scale-105 active:scale-95 shadow-2xs"
                   >
-                    <span className="rounded-xl bg-primary/10 p-1.5 text-primary ring-1 ring-primary/20">
-                      <ShieldAlert size={14} />
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-primary">
+                      <ShieldAlert size={12} />
                     </span>
                     角色管理
                   </Link>
                   {canManageMembers && (
                     <Link
                       href="/admin/members"
-                      className="group inline-flex items-center gap-2 rounded-2xl border border-border/60 bg-background/70 px-4 py-2.5 text-sm font-black text-foreground transition-all hover:border-sky-500/25 hover:bg-sky-500/[0.04]"
+                      className="group inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-white/80 dark:bg-white/5 px-3.5 py-1.5 text-xs font-bold text-foreground transition-all hover:border-sky-500/40 hover:bg-sky-500/5 hover:scale-105 active:scale-95 shadow-2xs"
                     >
-                      <span className="rounded-xl bg-sky-500/10 p-1.5 text-sky-500 ring-1 ring-sky-500/20">
-                        <Users size={14} />
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-sky-500/10 text-sky-500">
+                        <Users size={12} />
                       </span>
                       成员管理
                     </Link>
@@ -539,7 +539,7 @@ function SettingsContent() {
               )}
             </div>
 
-            <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-4">
+            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
               {tabs.map((tab) => {
                 const isActive = activeTab === tab.id;
                 return (
@@ -547,28 +547,28 @@ function SettingsContent() {
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
                     className={cn(
-                      "group relative w-full overflow-hidden rounded-2xl border px-4 py-3 text-left transition-all",
+                      "group relative w-full overflow-hidden rounded-2xl border p-3.5 text-left transition-all cursor-pointer",
                       isActive
-                        ? "border-primary/20 bg-primary/[0.07] shadow-sm"
-                        : "border-border/40 bg-background/45 hover:border-border/70 hover:bg-black/[0.025] dark:hover:bg-white/[0.03]"
+                        ? "border-primary/40 bg-primary/[0.08] shadow-xs ring-2 ring-primary/20"
+                        : "border-border/50 bg-white/60 hover:border-border/80 hover:bg-white dark:bg-white/[0.02] dark:hover:bg-white/[0.04]"
                     )}
                   >
                     <div className="flex items-center gap-3">
-                      <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border", isActive ? "border-primary/15 bg-primary text-primary-foreground" : "border-border/60 bg-background text-foreground/70")}>
+                      <div className={cn(
+                        "flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-all",
+                        isActive
+                          ? "bg-primary text-primary-foreground shadow-sm scale-105"
+                          : "border border-border/60 bg-muted/40 text-foreground/70 group-hover:bg-muted group-hover:text-foreground"
+                      )}>
                         <tab.icon size={16} />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <div className={cn("text-sm font-black", isActive ? "text-foreground" : "text-foreground/85")}>{tab.label}</div>
-                        <div className="mt-1 text-xs leading-relaxed text-muted-foreground line-clamp-2">{tab.desc}</div>
+                        <div className={cn("text-sm font-black tracking-wide", isActive ? "text-foreground" : "text-foreground/80")}>
+                          {tab.label}
+                        </div>
+                        <div className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground line-clamp-1">{tab.desc}</div>
                       </div>
                     </div>
-                    {isActive && (
-                      <motion.div
-                        layoutId="activeSettingTab"
-                        className="absolute inset-0 rounded-2xl ring-1 ring-primary/15"
-                        transition={{ type: "spring", bounce: 0.18, duration: 0.55 }}
-                      />
-                    )}
                   </button>
                 );
               })}
@@ -576,7 +576,7 @@ function SettingsContent() {
           </div>
         </section>
 
-        <div className="min-w-0 overflow-hidden rounded-[24px] md:rounded-[28px] border border-border/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl dark:bg-white/5 md:p-6">
+        <div className="min-w-0 overflow-hidden rounded-[28px] sm:rounded-[32px] border border-border/70 bg-linear-to-br from-white/95 via-white/90 to-background dark:from-white/[0.06] dark:via-white/[0.03] dark:to-transparent p-5 sm:p-7 shadow-sm backdrop-blur-md">
           <div className="grid min-w-0 w-full grid-cols-1 gap-6 overflow-hidden">
         {activeTab === "general" && (
           <GeneralTab

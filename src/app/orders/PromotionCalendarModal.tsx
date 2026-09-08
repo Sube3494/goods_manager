@@ -521,32 +521,34 @@ export function PromotionCalendarModal({
       {/* 蒙层 */}
       <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm" onClick={onClose} />
       
-      {/* 弹窗主体（与系统设计高度统一的经典卡片风格） */}
-      <div className="relative flex h-auto max-h-[95dvh] md:h-[90dvh] md:max-h-[680px] w-full max-w-5xl flex-col overflow-y-auto overscroll-contain md:overflow-hidden rounded-[24px] border border-black/8 bg-white dark:border-white/10 dark:bg-[#0b111e]/98 shadow-[0_24px_64px_rgba(15,23,42,0.20)] md:flex-row">
+      {/* 弹窗主体（高阶微质感与现代全胶囊体系） */}
+      <div className="relative flex h-auto max-h-[95dvh] md:h-[90dvh] md:max-h-[700px] w-full max-w-5xl flex-col overflow-y-auto overscroll-contain md:overflow-hidden rounded-[28px] sm:rounded-[32px] border border-border/70 bg-white dark:bg-zinc-900 shadow-2xl shadow-black/10 dark:shadow-black/50 md:flex-row">
         
         {/* 左侧日历主栏 */}
-        <div className={`flex flex-col shrink-0 md:shrink p-3.5 sm:p-6 ${
+        <div className={`flex flex-col shrink-0 md:shrink p-4 sm:p-6 ${
           activeTab === "calendar" ? "md:flex-1 min-h-[480px] md:min-h-0" : "flex-1 min-h-[320px] md:min-h-0"
         } ${
-          activeTab === "calendar" ? "md:border-r md:border-black/6 md:dark:border-white/8" : ""
+          activeTab === "calendar" ? "md:border-r md:border-border/60" : ""
         }`}>
           
           {/* 日历头部 */}
-          <div className="flex flex-col gap-3 pb-4 sm:flex-row sm:items-center sm:justify-between border-b border-black/4 dark:border-white/8">
+          <div className="flex flex-col gap-3 pb-4 sm:flex-row sm:items-center sm:justify-between border-b border-border/50">
             <div className="flex items-center justify-between sm:justify-start gap-3">
-              <div className="flex items-center gap-2">
-                <CalendarIcon size={18} className="text-muted-foreground shrink-0" />
-                <h2 className="text-base text-foreground sm:text-xl whitespace-nowrap">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary ring-1 ring-primary/20">
+                  <CalendarIcon size={16} />
+                </div>
+                <h2 className="text-base sm:text-lg font-black tracking-tight text-foreground whitespace-nowrap">
                   {userName ? `${userName} · ` : ""}{currentYear} 年 {currentMonth} 月
                 </h2>
               </div>
               {/* 模式选择 Tab */}
-              <div className="inline-flex rounded-lg bg-slate-100 p-0.5 dark:bg-white/5 shadow-2xs shrink-0">
+              <div className="inline-flex rounded-full border border-border/70 bg-muted/40 p-1 shadow-2xs shrink-0">
                 <button
                   onClick={() => setActiveTab("calendar")}
-                  className={`rounded-md px-2.5 py-1 text-xs font-normal transition-all cursor-pointer whitespace-nowrap ${
+                  className={`rounded-full px-3 py-1 text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                     activeTab === "calendar"
-                      ? "bg-white text-foreground shadow-2xs dark:bg-slate-800"
+                      ? "bg-primary text-primary-foreground shadow-xs"
                       : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
@@ -554,9 +556,9 @@ export function PromotionCalendarModal({
                 </button>
                 <button
                   onClick={() => setActiveTab("chart")}
-                  className={`rounded-md px-2.5 py-1 text-xs font-normal transition-all cursor-pointer whitespace-nowrap ${
+                  className={`rounded-full px-3 py-1 text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                     activeTab === "chart"
-                      ? "bg-white text-foreground shadow-2xs dark:bg-slate-800"
+                      ? "bg-primary text-primary-foreground shadow-xs"
                       : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
@@ -568,25 +570,27 @@ export function PromotionCalendarModal({
             <div className="flex items-center justify-end gap-1.5 w-full sm:w-auto">
               <button
                 onClick={handleBackToToday}
-                className="rounded-lg border border-black/8 bg-white px-2.5 py-1.5 text-xs text-foreground hover:bg-slate-50 dark:border-white/10 dark:bg-white/4 dark:hover:bg-white/8 transition-all cursor-pointer active:scale-95 whitespace-nowrap"
+                className="rounded-full border border-border/70 bg-white px-3 py-1.5 text-xs font-bold text-foreground hover:bg-zinc-100 dark:border-white/10 dark:bg-zinc-800 dark:hover:bg-zinc-700 transition-all cursor-pointer active:scale-95 whitespace-nowrap shadow-2xs"
               >
                 今天
               </button>
               <button
                 onClick={handlePrevMonth}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-black/8 bg-white text-muted-foreground hover:text-foreground dark:border-white/10 dark:bg-white/4 cursor-pointer active:scale-90"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border/70 bg-white text-muted-foreground hover:text-foreground hover:bg-zinc-100 dark:border-white/10 dark:bg-zinc-800 dark:hover:bg-zinc-700 cursor-pointer active:scale-90 shadow-2xs transition-all"
+                title="上个月"
               >
                 <ChevronLeft size={16} />
               </button>
               <button
                 onClick={handleNextMonth}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-black/8 bg-white text-muted-foreground hover:text-foreground dark:border-white/10 dark:bg-white/4 cursor-pointer active:scale-90"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border/70 bg-white text-muted-foreground hover:text-foreground hover:bg-zinc-100 dark:border-white/10 dark:bg-zinc-800 dark:hover:bg-zinc-700 cursor-pointer active:scale-90 shadow-2xs transition-all"
+                title="下个月"
               >
                 <ChevronRight size={16} />
               </button>
               <button
                 onClick={onClose}
-                className={`${activeTab === "chart" ? "" : "md:hidden"} inline-flex h-8 w-8 items-center justify-center rounded-lg border border-black/8 bg-white text-muted-foreground hover:text-foreground dark:border-white/10 dark:bg-white/4 cursor-pointer`}
+                className={`${activeTab === "chart" ? "" : "md:hidden"} inline-flex h-8 w-8 items-center justify-center rounded-full border border-border/70 bg-white text-muted-foreground hover:text-foreground hover:bg-zinc-100 dark:border-white/10 dark:bg-zinc-800 dark:hover:bg-zinc-700 cursor-pointer shadow-2xs transition-all`}
               >
                 <X size={16} />
               </button>
@@ -734,13 +738,13 @@ export function PromotionCalendarModal({
                       ...localShops.map((shop) => ({ value: shop.name, label: shop.name })),
                     ]}
                     className="h-8 w-32 shrink-0"
-                    triggerClassName="h-full rounded-xl border border-black/8 bg-white px-2.5 text-xs shadow-none dark:border-white/10 dark:bg-white/4"
+                    triggerClassName="h-full rounded-full border border-border/70 bg-white px-3 text-xs font-bold shadow-2xs dark:border-white/10 dark:bg-zinc-800"
                    />
                 )}
               </div>
 
               {/* 折线图图表 */}
-              <div className="h-[260px] md:h-[380px] bg-slate-50/30 dark:bg-white/1 rounded-2xl border border-slate-100/50 dark:border-white/8 p-3 sm:p-4 flex flex-col justify-between">
+              <div className="h-[260px] md:h-[380px] bg-zinc-50/70 dark:bg-white/[0.02] rounded-2xl border border-border/60 p-3 sm:p-4 flex flex-col justify-between">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart
                     data={chartData}
@@ -814,21 +818,21 @@ export function PromotionCalendarModal({
 
               {/* 汇总指标卡片 */}
               <div className="grid grid-cols-3 gap-1.5 sm:gap-3">
-                <div className="rounded-xl border border-slate-100 bg-white p-2 sm:p-3 shadow-2xs dark:border-white/8 dark:bg-white/2 overflow-hidden">
-                  <span className="text-[8.5px] sm:text-[10px] text-muted-foreground block uppercase truncate">累计推广费</span>
-                  <span className="text-xs sm:text-sm text-foreground mt-0.5 block tabular-nums truncate">
+                <div className="rounded-2xl border border-border/60 bg-white p-2.5 sm:p-3 shadow-2xs dark:border-white/8 dark:bg-white/[0.02] overflow-hidden">
+                  <span className="text-[9px] sm:text-[10px] font-bold text-muted-foreground block uppercase truncate tracking-wider">累计推广费</span>
+                  <span className="text-xs sm:text-sm font-black text-foreground mt-0.5 block tabular-nums truncate">
                     {summaryInfo.totalPromo > 0 ? "-" : ""}¥{summaryInfo.totalPromo.toFixed(2)}
                   </span>
                 </div>
-                <div className="rounded-xl border border-slate-100 bg-white p-2 sm:p-3 shadow-2xs dark:border-white/8 dark:bg-white/2 overflow-hidden">
-                  <span className="text-[8.5px] sm:text-[10px] text-muted-foreground block uppercase truncate">真实订单量</span>
-                  <span className="text-xs sm:text-sm text-foreground mt-0.5 block tabular-nums truncate">
+                <div className="rounded-2xl border border-border/60 bg-white p-2.5 sm:p-3 shadow-2xs dark:border-white/8 dark:bg-white/[0.02] overflow-hidden">
+                  <span className="text-[9px] sm:text-[10px] font-bold text-muted-foreground block uppercase truncate tracking-wider">真实订单量</span>
+                  <span className="text-xs sm:text-sm font-black text-foreground mt-0.5 block tabular-nums truncate">
                     {summaryInfo.totalOrders} 单
                   </span>
                 </div>
-                <div className="rounded-xl border border-slate-100 bg-white p-2 sm:p-3 shadow-2xs dark:border-white/8 dark:bg-white/2 overflow-hidden">
-                  <span className="text-[8.5px] sm:text-[10px] text-muted-foreground block uppercase truncate">单均推广成本</span>
-                  <span className="text-xs sm:text-sm text-foreground mt-0.5 block tabular-nums truncate">
+                <div className="rounded-2xl border border-border/60 bg-white p-2.5 sm:p-3 shadow-2xs dark:border-white/8 dark:bg-white/[0.02] overflow-hidden">
+                  <span className="text-[9px] sm:text-[10px] font-bold text-muted-foreground block uppercase truncate tracking-wider">单均推广成本</span>
+                  <span className="text-xs sm:text-sm font-black text-foreground mt-0.5 block tabular-nums truncate">
                     ¥{summaryInfo.avgCostPerOrder.toFixed(2)}
                   </span>
                 </div>
@@ -838,24 +842,26 @@ export function PromotionCalendarModal({
         </div>
 
         {/* 右侧编辑侧边栏 */}
+        {/* 右侧编辑侧边栏 */}
         {activeTab === "calendar" && (
-          <div className="flex w-full flex-col p-5 md:w-[320px] md:p-6 justify-between border-t md:border-t-0 border-black/6 dark:border-white/8">
+          <div className="flex w-full flex-col p-5 md:w-[320px] md:p-6 justify-between border-t md:border-t-0 border-border/60 bg-zinc-50/40 dark:bg-white/[0.01]">
           
           <div className="space-y-5">
             {/* 选中日期标题与关闭按钮 */}
             <div className="flex items-start justify-between gap-3">
               <div>
-                <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">日期统计</span>
-                <h3 className="text-base text-foreground mt-0.5 flex items-center gap-2">
+                <span className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">日期明细统计</span>
+                <h3 className="text-base font-black text-foreground mt-0.5 flex items-center gap-2">
                   <span>{selectedDateStr}</span>
                   {selectedDateStr === formatDate(today) && (
-                    <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-[9px] text-primary">今天</span>
+                    <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-[10px] font-bold text-primary ring-1 ring-primary/20">今天</span>
                   )}
                 </h3>
               </div>
               <button
                 onClick={onClose}
-                className="hidden md:inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-black/8 bg-white text-muted-foreground transition-all hover:text-foreground dark:border-white/8 dark:bg-white/5 cursor-pointer shadow-2xs"
+                className="hidden md:inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border/70 bg-white text-muted-foreground transition-all hover:text-foreground hover:bg-zinc-100 dark:border-white/10 dark:bg-zinc-800 dark:hover:bg-zinc-700 cursor-pointer shadow-2xs"
+                title="关闭"
               >
                 <X size={16} />
               </button>
@@ -863,14 +869,14 @@ export function PromotionCalendarModal({
 
             {/* 每日订单统计卡片 */}
             {selectedDayInfo && (
-              <div className="rounded-2xl border border-black/6 bg-white/80 p-4 shadow-2xs dark:border-white/6 dark:bg-white/2 space-y-3">
+              <div className="rounded-2xl border border-border/60 bg-white dark:bg-zinc-800/50 p-4 shadow-2xs space-y-3">
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <span>订单统计</span>
-                  <span className="text-foreground">{selectedDayInfo.total} 单</span>
+                  <span className="font-bold">订单构成</span>
+                  <span className="font-mono font-bold text-foreground">{selectedDayInfo.total} 单</span>
                 </div>
                 
-                {/* 简明无渐变的纯色进度条 */}
-                <div className="relative h-3.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800 flex shadow-inner">
+                {/* 胶囊纯色进度条 */}
+                <div className="relative h-3 w-full overflow-hidden rounded-full bg-muted flex shadow-inner">
                   {selectedDayInfo.total > 0 ? (
                     <>
                       <div className="bg-emerald-500" style={{ width: `${selectedDayInfo.realPercent}%` }} />
@@ -878,19 +884,19 @@ export function PromotionCalendarModal({
                       <div className="bg-slate-400 dark:bg-slate-600" style={{ width: `${selectedDayInfo.cancelledPercent}%` }} />
                     </>
                   ) : (
-                    <div className="h-full w-full bg-slate-200 dark:bg-slate-800" />
+                    <div className="h-full w-full bg-muted/60" />
                   )}
                 </div>
 
-                <div className="grid grid-cols-3 gap-2 text-center text-xs text-muted-foreground">
-                  <div className="rounded-xl bg-black/3 py-2 dark:bg-white/4 shadow-2xs">
-                    <span className="text-emerald-600 dark:text-emerald-400">真实 {selectedDayInfo.real}</span>
+                <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                  <div className="rounded-full bg-emerald-500/10 py-1.5 border border-emerald-500/20">
+                    <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">真实 {selectedDayInfo.real}</span>
                   </div>
-                  <div className="rounded-xl bg-black/3 py-2 dark:bg-white/4 shadow-2xs">
-                    <span className="text-rose-600 dark:text-rose-400">刷单 {selectedDayInfo.brush}</span>
+                  <div className="rounded-full bg-rose-500/10 py-1.5 border border-rose-500/20">
+                    <span className="text-[11px] font-bold text-rose-600 dark:text-rose-400">刷单 {selectedDayInfo.brush}</span>
                   </div>
-                  <div className="rounded-xl bg-black/3 py-2 dark:bg-white/4 shadow-2xs">
-                    <span className="text-slate-600 dark:text-slate-400">取消 {selectedDayInfo.cancelled}</span>
+                  <div className="rounded-full bg-zinc-500/10 py-1.5 border border-zinc-500/20">
+                    <span className="text-[11px] font-bold text-zinc-600 dark:text-zinc-400">取消 {selectedDayInfo.cancelled}</span>
                   </div>
                 </div>
               </div>
@@ -898,8 +904,8 @@ export function PromotionCalendarModal({
 
             {/* 选择店铺录入（当识别到有多个店铺时渲染选择框） */}
             {localShops && localShops.length > 1 && (
-              <div className="space-y-2">
-                <span className="text-xs uppercase tracking-wider text-muted-foreground block">选择店铺录入</span>
+              <div className="space-y-1.5">
+                <span className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground block">选择店铺录入</span>
                 <CustomSelect
                   value={selectedShopName}
                   onChange={setSelectedShopName}
@@ -908,38 +914,38 @@ export function PromotionCalendarModal({
                     label: shop.name,
                   }))}
                   className="h-10"
-                  triggerClassName="h-full rounded-xl border border-black/8 bg-white px-3 text-xs shadow-none dark:border-white/10 dark:bg-white/4"
+                  triggerClassName="h-full rounded-full border border-border/70 bg-white px-4 text-xs font-bold shadow-2xs dark:border-white/10 dark:bg-zinc-800"
                 />
               </div>
             )}
 
-            {/* 各平台金额输入（经典清爽文本标签布局） */}
-            <div className="space-y-3">
+            {/* 各平台金额输入 */}
+            <div className="space-y-2.5">
               <div className="flex items-center justify-between">
-                <span className="text-xs uppercase tracking-wider text-muted-foreground">渠道推广费</span>
+                <span className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">渠道推广费用录入</span>
                 {isDetailLoading && (
-                  <Loader2 size={11} className="animate-spin text-primary" />
+                  <Loader2 size={12} className="animate-spin text-primary" />
                 )}
               </div>
               {PROMOTION_PLATFORM_ROWS.map((row) => (
                 <label
                   key={row.key}
-                  className="flex items-center gap-3 rounded-xl border border-black/8 bg-white px-3 focus-within:ring-2 focus-within:ring-primary/12 focus-within:border-primary/30 transition-all dark:border-white/10 dark:bg-white/4 cursor-text shadow-2xs hover:border-black/15 dark:hover:border-white/15"
+                  className="flex items-center gap-3 rounded-full border border-border/70 bg-white px-3.5 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary/50 transition-all dark:border-white/10 dark:bg-zinc-800/80 cursor-text shadow-2xs hover:border-border"
                 >
                   {/* 平台 Logo */}
-                  <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-slate-50 dark:bg-white/5 p-0.5">
+                  <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted/60 p-0.5">
                     <img
                       src={row.logo}
                       alt={row.label}
-                      className="h-full w-full object-contain"
+                      className="h-4 w-4 object-contain"
                       onError={(e) => {
                         e.currentTarget.style.display = "none";
                       }}
                     />
                   </div>
                   
-                  <span className="w-10 shrink-0 text-sm text-foreground">{row.label}</span>
-                  <span className="text-sm text-muted-foreground">¥</span>
+                  <span className="w-10 shrink-0 text-xs font-bold text-foreground">{row.label}</span>
+                  <span className="text-xs text-muted-foreground font-mono">¥</span>
                   <input
                     type="text"
                     inputMode="decimal"
@@ -949,7 +955,7 @@ export function PromotionCalendarModal({
                     onChange={(e) => handleFieldChange(row.key, e.target.value)}
                     disabled={isSaving}
                     onKeyDown={(e) => { if (e.key === "Enter") handleSave(); }}
-                    className="h-11 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/30 tabular-nums"
+                    className="h-10 flex-1 bg-transparent text-xs font-mono font-bold text-foreground outline-none placeholder:text-muted-foreground/30 tabular-nums"
                   />
                 </label>
               ))}
@@ -957,10 +963,10 @@ export function PromotionCalendarModal({
           </div>
 
           {/* 表单底部合计与保存按钮 */}
-          <div className="pt-4 border-t border-black/6 dark:border-white/8 mt-4 flex items-center justify-between gap-3">
+          <div className="pt-4 border-t border-border/50 mt-4 flex items-center justify-between gap-3">
             <div className="text-xs text-muted-foreground">
-              当日合计 
-              <div className="text-base text-foreground mt-0.5 tabular-nums">
+              <span className="text-[10px] font-bold uppercase tracking-wider block">当日合计</span>
+              <div className="text-base font-black text-foreground mt-0.5 tabular-nums">
                 {editTotalAmount > 0 ? "-" : ""}¥{editTotalAmount.toFixed(2)}
               </div>
             </div>
@@ -968,9 +974,9 @@ export function PromotionCalendarModal({
               <button
                 onClick={handleSave}
                 disabled={isSaving}
-                className="h-10 px-5 rounded-xl bg-linear-to-r bg-foreground text-xs text-background transition-all hover:opacity-90 disabled:opacity-50 dark:bg-white dark:text-black flex items-center gap-2 cursor-pointer active:scale-95"
+                className="h-10 px-6 rounded-full bg-primary text-primary-foreground font-bold text-xs shadow-md shadow-primary/20 hover:opacity-95 disabled:opacity-50 flex items-center gap-1.5 cursor-pointer active:scale-95 transition-all"
               >
-                {isSaving ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} strokeWidth={2} />}
+                {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} strokeWidth={2.5} />}
                 保存数据
               </button>
             </div>

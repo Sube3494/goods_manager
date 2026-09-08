@@ -154,48 +154,77 @@ export function OverviewAiPanel() {
 
   return createPortal(
     <>
-      <div className="fixed inset-0 z-[10000] bg-black/35 backdrop-blur-[2px]" onClick={() => setCollapsed(true)} aria-hidden="true" />
-      <section className="fixed inset-x-2 bottom-3 top-3 z-[10001] mx-auto flex max-w-6xl flex-col overflow-hidden rounded-[24px] border border-black/10 bg-white/95 p-3 shadow-2xl backdrop-blur-xl dark:border-white/10 dark:bg-[#11151f]/95 sm:inset-x-8 sm:bottom-auto sm:top-16 sm:h-[min(700px,calc(100vh-6rem))] sm:rounded-[28px] sm:p-5">
-        <header className="shrink-0">
+      <div className="fixed inset-0 z-[10000] bg-black/60 backdrop-blur-md" onClick={() => setCollapsed(true)} aria-hidden="true" />
+      <section className="fixed inset-x-2 bottom-3 top-3 z-[10001] mx-auto flex max-w-6xl flex-col overflow-hidden rounded-[28px] sm:rounded-[32px] border border-border/70 bg-white dark:bg-zinc-900 p-4 shadow-2xl shadow-black/10 dark:shadow-black/50 backdrop-blur-xl sm:inset-x-8 sm:bottom-auto sm:top-16 sm:h-[min(720px,calc(100vh-6rem))] sm:p-6">
+        <header className="shrink-0 border-b border-border/50 pb-3.5">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <h2 className="flex items-center gap-2 text-base font-black leading-tight sm:text-lg">
-                <Bot size={19} className="shrink-0 text-sky-500" />
+              <h2 className="flex items-center gap-2.5 text-base font-black leading-tight sm:text-lg text-foreground">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-sky-500/10 text-sky-500 ring-1 ring-sky-500/20">
+                  <Bot size={18} />
+                </div>
                 <span>经营数据 AI 助手</span>
               </h2>
-              <p className="mt-1 text-xs text-muted-foreground">基于账号下全部经营数据回答</p>
+              <p className="mt-1 text-xs text-muted-foreground font-medium">基于账号下全部经营指标与趋势实时分析</p>
             </div>
-            <button onClick={() => setCollapsed(true)} className="rounded-lg p-1 text-muted-foreground hover:bg-black/5 dark:hover:bg-white/10" aria-label="收起经营助手">
-              <ChevronUp size={18} />
+            <button
+              onClick={() => setCollapsed(true)}
+              className="h-8 w-8 rounded-full border border-border/70 bg-white text-muted-foreground hover:text-foreground hover:bg-zinc-100 dark:border-white/10 dark:bg-zinc-800 dark:hover:bg-zinc-700 flex items-center justify-center transition-all shadow-2xs cursor-pointer"
+              aria-label="收起经营助手"
+            >
+              <X size={15} />
             </button>
           </div>
           <div className="mt-3 flex justify-end">
-            <CustomSelect value={model} onChange={changeModel} options={modelOptions} className="h-10 w-full sm:w-56" triggerClassName="h-full rounded-xl border bg-white px-3 text-sm outline-none dark:bg-white/5" />
+            <CustomSelect value={model} onChange={changeModel} options={modelOptions} className="h-9 w-full sm:w-56" triggerClassName="h-full rounded-full border border-border/70 bg-white px-3.5 text-xs font-bold shadow-2xs dark:border-white/10 dark:bg-zinc-800" />
           </div>
         </header>
 
         {!configured ? (
-          <div className="mt-4 flex shrink-0 gap-2">
-            <input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="输入 DeepSeek API Key" className="h-10 min-w-0 flex-1 rounded-xl border bg-white px-3 text-sm outline-none focus:outline-none focus:ring-0 dark:bg-white/5" />
-            <button onClick={saveKey} disabled={!apiKey.trim()} className="flex h-10 w-12 shrink-0 items-center justify-center rounded-xl bg-sky-600 text-sm font-bold text-white disabled:opacity-50">
-              <KeyRound size={15} />
+          <div className="mt-5 flex shrink-0 gap-2">
+            <input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="输入 DeepSeek API Key" className="h-11 min-w-0 flex-1 rounded-full border border-border/70 bg-zinc-50 dark:bg-zinc-800/80 px-4 text-xs font-mono outline-none shadow-2xs focus:ring-2 focus:ring-sky-500/20" />
+            <button onClick={saveKey} disabled={!apiKey.trim()} className="flex h-11 px-5 shrink-0 items-center justify-center rounded-full bg-sky-600 text-xs font-bold text-white shadow-md shadow-sky-600/20 hover:bg-sky-500 disabled:opacity-50 active:scale-95 cursor-pointer">
+              <KeyRound size={15} className="mr-1.5" />
+              验证并绑定
             </button>
           </div>
         ) : (
           <div className="mt-3 flex min-h-0 flex-1 flex-col gap-3 sm:mt-4 sm:flex-row sm:gap-4">
             {mobileChatSelector}
-            <aside className="hidden shrink-0 gap-2 dark:border-white/10 sm:flex sm:w-52 sm:flex-col sm:border-r sm:pr-4">
-              {chatList}
+            <aside className="hidden shrink-0 gap-1.5 dark:border-white/10 sm:flex sm:w-52 sm:flex-col sm:border-r border-border/60 sm:pr-4">
+              <button
+                onClick={newChat}
+                className="shrink-0 rounded-full border border-dashed border-sky-500/50 bg-sky-500/5 px-4 py-2 text-left text-xs font-bold text-sky-600 transition hover:bg-sky-500/10 active:scale-95 sm:mb-2 sm:w-full cursor-pointer"
+              >
+                ＋ 新建聊天
+              </button>
+              {history.map((chat) => (
+                <div
+                  key={chat.id}
+                  className={`flex shrink-0 items-center rounded-full sm:w-full transition-all ${
+                    chat.id === chatId
+                      ? "bg-sky-500/12 text-sky-600 dark:text-sky-400 font-bold border border-sky-500/20"
+                      : "text-muted-foreground hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                  }`}
+                >
+                  <button onClick={() => openChat(chat)} className="min-w-0 flex-1 truncate px-3.5 py-1.5 text-left text-xs">
+                    {chat.title}
+                  </button>
+                  <button onClick={() => deleteChat(chat.id)} className="px-2.5 text-xs text-muted-foreground hover:text-rose-500 cursor-pointer" aria-label="删除聊天">
+                    <X size={13} />
+                  </button>
+                </div>
+              ))}
             </aside>
             <main className="flex min-h-0 flex-1 flex-col">
-              <Conversation className="min-h-0 flex-1 rounded-2xl border bg-black/[0.02] outline-none dark:border-white/10 dark:bg-white/[0.02]">
+              <Conversation className="min-h-0 flex-1 rounded-2xl border border-border/60 bg-zinc-50/60 dark:bg-white/[0.01] outline-none">
                 <ConversationContent>{messageList}</ConversationContent>
               </Conversation>
               <div className="mt-3 flex shrink-0 gap-2">
-                <input value={question} onChange={(e) => setQuestion(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") ask(); }} placeholder="输入你的问题，Enter 发送" className="h-11 min-w-0 flex-1 rounded-2xl border bg-white px-4 text-sm outline-none ring-0 focus:outline-none focus:ring-0 dark:bg-white/5" />
-                <button onClick={ask} disabled={loading || !question.trim()} className="flex h-11 w-12 shrink-0 items-center justify-center rounded-2xl bg-sky-600 text-sm font-bold text-white disabled:opacity-50 sm:w-auto sm:px-4">
-                  {loading ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
-                  <span className="hidden sm:ml-2 sm:inline">{loading ? "分析中…" : "提问"}</span>
+                <input value={question} onChange={(e) => setQuestion(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") ask(); }} placeholder="输入你的问题，Enter 发送" className="h-11 min-w-0 flex-1 rounded-full border border-border/70 bg-zinc-50 dark:bg-zinc-800/80 px-4 text-xs outline-none shadow-2xs focus:ring-2 focus:ring-sky-500/20" />
+                <button onClick={ask} disabled={loading || !question.trim()} className="flex h-11 shrink-0 items-center justify-center rounded-full bg-sky-600 px-5 text-xs font-bold text-white shadow-md shadow-sky-600/20 hover:bg-sky-500 disabled:opacity-50 active:scale-95 cursor-pointer">
+                  {loading ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
+                  <span className="ml-1.5">{loading ? "分析中…" : "发送"}</span>
                 </button>
               </div>
             </main>
@@ -204,27 +233,27 @@ export function OverviewAiPanel() {
 
         {configured && (
           <div className="mt-3 shrink-0">
-            <button onClick={() => setShowSettings((value) => !value)} className="flex items-center gap-2 text-xs text-muted-foreground transition hover:text-sky-500">
+            <button onClick={() => setShowSettings((value) => !value)} className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground transition hover:text-sky-500 cursor-pointer">
               <Settings size={14} />
               {showSettings ? "返回对话" : "AI 设置"}
             </button>
           </div>
         )}
         {configured && showSettings && (
-          <div className="absolute inset-3 top-[118px] z-20 flex flex-col rounded-2xl border border-black/10 bg-white p-5 shadow-xl dark:border-white/10 dark:bg-[#171c28] sm:inset-y-4 sm:left-[236px] sm:right-4 sm:top-20 sm:p-6">
-            <button onClick={() => setShowSettings(false)} className="mb-5 flex w-fit items-center gap-1.5 text-sm text-muted-foreground hover:text-sky-500">
+          <div className="absolute inset-3 top-[118px] z-20 flex flex-col rounded-2xl border border-border/70 bg-white p-5 shadow-xl dark:border-white/10 dark:bg-zinc-900 sm:inset-y-4 sm:left-[236px] sm:right-4 sm:top-20 sm:p-6">
+            <button onClick={() => setShowSettings(false)} className="mb-5 flex w-fit items-center gap-1.5 text-xs font-bold text-muted-foreground hover:text-sky-500 cursor-pointer">
               <ArrowLeft size={16} />
               返回对话
             </button>
             <div>
-              <h3 className="text-lg font-bold">AI 设置</h3>
-              <p className="mt-1 text-xs text-muted-foreground">修改经营数据助手使用的 DeepSeek API Key</p>
+              <h3 className="text-base font-black text-foreground">AI 设置</h3>
+              <p className="mt-0.5 text-xs text-muted-foreground">配置与修改经营数据助手使用的 DeepSeek API Key</p>
             </div>
-            <div className="mt-6 max-w-2xl space-y-3">
-              <label className="text-xs text-muted-foreground">DeepSeek API Key</label>
-              <input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="输入新的 DeepSeek API Key" className="h-11 w-full rounded-xl border bg-white px-3 text-sm outline-none focus:outline-none focus:ring-0 dark:bg-white/5" />
-              <div className="pt-3">
-                <button onClick={saveKey} disabled={!apiKey.trim()} className="rounded-xl bg-sky-600 px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50">保存配置</button>
+            <div className="mt-5 max-w-2xl space-y-3">
+              <label className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">DeepSeek API Key</label>
+              <input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="输入新的 DeepSeek API Key" className="h-11 w-full rounded-full border border-border/70 bg-zinc-50 dark:bg-zinc-800/80 px-4 text-xs font-mono outline-none shadow-2xs focus:ring-2 focus:ring-sky-500/20" />
+              <div className="pt-2">
+                <button onClick={saveKey} disabled={!apiKey.trim()} className="rounded-full bg-sky-600 px-6 py-2.5 text-xs font-bold text-white shadow-md shadow-sky-600/20 hover:bg-sky-500 disabled:opacity-50 active:scale-95 cursor-pointer">保存配置</button>
               </div>
             </div>
           </div>

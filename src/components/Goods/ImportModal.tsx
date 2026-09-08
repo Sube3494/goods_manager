@@ -222,12 +222,12 @@ export function ImportModal({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             className={cn(
-              "fixed left-1/2 top-1/2 z-60000 w-[calc(100%-32px)] sm:w-full -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-3xl bg-white dark:bg-gray-900/70 backdrop-blur-xl p-0 shadow-2xl border border-border/50 flex flex-col max-h-safe-modal transition-all duration-300 ease-out",
+              "fixed left-1/2 top-1/2 z-60000 w-[calc(100%-32px)] sm:w-full -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-3xl bg-card/95 backdrop-blur-2xl p-0 shadow-2xl border border-border/70 flex flex-col max-h-safe-modal transition-all duration-300 ease-out",
               dynamicMaxWidth
             )}
           >
             {/* Header */}
-            <div className="flex flex-col border-b border-border/50 p-6 md:p-8 shrink-0">
+            <div className="flex flex-col border-b border-border/60 p-6 md:p-8 shrink-0">
               <div className="flex items-center justify-between">
                 <h2 className="text-xl md:text-2xl font-bold text-foreground">{title}</h2>
                 <button 

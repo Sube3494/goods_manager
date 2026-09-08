@@ -58,19 +58,25 @@ export default function DistanceCalcPage() {
 
   return (
     <div className="flex min-h-[calc(100dvh-3.5rem-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px))] flex-1 flex-col animate-in fade-in duration-700">
-      <div className="flex flex-col sm:flex-row items-baseline justify-between gap-1.5 shrink-0 px-4 sm:px-6 lg:px-8 pt-2 pb-1.5">
+      <div className="flex flex-col sm:flex-row items-baseline justify-between gap-1.5 shrink-0 px-4 sm:px-6 lg:px-8 pt-3 pb-2">
         <div className="min-w-0 flex-1">
-          <h1 className="text-[1.75rem] sm:text-[2.1rem] leading-none font-black tracking-tight text-foreground truncate">
-            智能调货中心
-          </h1>
-          <p className="text-muted-foreground mt-1 max-w-3xl text-xs sm:text-sm">
-            基于高德地图 LBS 能力，实时测算目标点与各仓库、门店之间的路线方案、骑行距离及预估运费。
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-[1.75rem] sm:text-[2.1rem] leading-none font-black tracking-tight text-foreground truncate">
+              智能调货中心
+            </h1>
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/25 bg-primary/10 px-2.5 py-0.5 text-[11px] font-bold text-primary shadow-xs">
+              <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+              LBS 智能调度
+            </span>
+          </div>
+          <p className="text-muted-foreground mt-1.5 max-w-3xl text-xs sm:text-sm">
+            基于高德地图实时 LBS 测距能力，精准规划目标收货地与各仓库、门店的配送路径与预估运费。
           </p>
         </div>
       </div>
 
       <div className={cn(
-        "flex min-h-0 flex-1 flex-col rounded-none border-y border-border/60 bg-white/5 shadow-sm overflow-hidden backdrop-blur-xl relative lg:rounded-[32px] lg:border lg:mx-4 lg:mb-4",
+        "flex min-h-0 flex-1 flex-col rounded-none border-y border-border/60 bg-card/60 shadow-sm overflow-hidden backdrop-blur-xl relative lg:rounded-[32px] lg:border lg:border-border/60 lg:mx-4 lg:mb-4",
       )}>
         <StoreDispatchMap initialStores={[]} />
       </div>

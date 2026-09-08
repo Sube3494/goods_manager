@@ -27,8 +27,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
   });
 
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
-
-  const [canAnimate, setCanAnimate] = useState(false);
+  const [isCollapsing, setIsCollapsing] = useState(false);
 
   const isLoginPage = pathname === "/login";
   const isSharePage =
@@ -44,15 +43,6 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
   const visibleItems = getVisibleNavItems(user as SessionUser | null);
   const isGuest = user?.roleProfile?.name === "基础访客";
   const showSidebar = !isFullScreenPage && !!user && visibleItems.length > 0 && !isGuest;
-
-  // Track initialization to prevent initial mount transition
-  useEffect(() => {
-    if (!isLoading) {
-      // Small timeout to ensure the DOM has settled with initial padding before enabling transitions
-      const timer = setTimeout(() => setCanAnimate(true), 100);
-      return () => clearTimeout(timer);
-    }
-  }, [isLoading]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -91,9 +81,13 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
   }, []);
 
   const toggleCollapse = () => {
+    setIsCollapsing(true);
     const newValue = !isCollapsed;
     setIsCollapsed(newValue);
     localStorage.setItem("sidebar-collapsed", String(newValue));
+    setTimeout(() => {
+      setIsCollapsing(false);
+    }, 240);
   };
 
     return (
@@ -116,7 +110,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
         
         <div className={cn(
             "flex-1 flex flex-col min-h-dynamic-screen relative z-10 w-full",
-            canAnimate && "lg:transition-[padding] lg:duration-200 lg:ease-in-out",
+            isCollapsing && "lg:transition-[padding] lg:duration-200 lg:ease-in-out",
             showSidebar ? (isCollapsed ? "lg:pl-28" : "lg:pl-72") : "pl-0"
         )}>
             {!isFullScreenPage && (

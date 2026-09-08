@@ -77,9 +77,9 @@ function NumberField({
 }) {
   return (
     <label className="space-y-1.5 block">
-      <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground/80">{label}</div>
+      <div className="text-[11px] font-black uppercase tracking-[0.14em] text-muted-foreground/80">{label}</div>
       <div className="relative flex items-center">
-        <span className="absolute left-3.5 text-sm font-semibold text-muted-foreground/60 select-none">¥</span>
+        <span className="absolute left-4 text-sm font-semibold text-muted-foreground/60 select-none">¥</span>
         <input
           value={value}
           onChange={(event) => {
@@ -89,7 +89,7 @@ function NumberField({
           }}
           inputMode="decimal"
           placeholder={placeholder || "0.00"}
-          className="h-11 w-full rounded-xl border border-black/8 bg-white pl-8 pr-4 text-sm font-bold text-foreground outline-none transition focus:border-primary/50 focus:ring-4 focus:ring-primary/5 dark:border-white/10 dark:bg-white/5 dark:focus:border-primary/40"
+          className="h-11 w-full rounded-full border border-border/60 bg-white/70 pl-8 pr-4 text-sm font-bold text-foreground outline-none transition-all placeholder:text-muted-foreground/40 focus:border-primary/50 focus:ring-4 focus:ring-primary/10 focus:bg-white dark:border-white/10 dark:bg-white/[0.05] dark:focus:border-primary/40 dark:focus:bg-white/[0.08]"
         />
       </div>
     </label>
@@ -108,18 +108,21 @@ function MetricCard({
   icon: ReactNode;
 }) {
   return (
-    <div className="rounded-[20px] border border-black/8 bg-white/76 px-3.5 py-3 shadow-xs dark:border-white/10 dark:bg-white/5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md sm:px-4 sm:py-3.5 flex flex-col justify-between h-full">
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground truncate">{label}</span>
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-black/6 bg-black/[0.02] text-foreground dark:border-white/8 dark:bg-white/4 sm:h-9 sm:w-9">
+    <div className="relative overflow-hidden rounded-[24px] border border-border/60 bg-linear-to-br from-white/95 via-white/85 to-background p-4 sm:p-5 shadow-xs transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md hover:border-primary/30 dark:border-white/10 dark:from-white/[0.06] dark:via-white/[0.03] dark:to-transparent backdrop-blur-md flex flex-col justify-between h-full group">
+      {/* 顶部微光光晕 */}
+      <div className="pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full bg-primary/10 blur-2xl transition-opacity group-hover:opacity-100 dark:bg-primary/15" />
+      
+      <div className="flex items-center justify-between gap-2 relative z-10">
+        <span className="text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground truncate">{label}</span>
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-border/50 bg-muted/40 text-primary shadow-2xs transition-all group-hover:scale-105 group-hover:bg-primary/10 dark:border-white/10 dark:bg-white/5 sm:h-10 sm:w-10">
           {icon}
         </div>
       </div>
-      <div className="mt-3.5 flex-1 flex flex-col justify-end">
-        <div className="text-[20px] font-black leading-none tracking-tight text-foreground sm:text-[28px] break-all truncate" title={value}>
+      <div className="mt-4 flex-1 flex flex-col justify-end relative z-10">
+        <div className="text-[22px] font-black leading-none tracking-tight text-foreground sm:text-[28px] break-all truncate" title={value}>
           {value}
         </div>
-        <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground sm:text-xs" title={hint}>
+        <p className="mt-2 text-[11px] font-medium leading-relaxed text-muted-foreground sm:text-xs line-clamp-1" title={hint}>
           {hint}
         </p>
       </div>
@@ -139,16 +142,16 @@ function ChartTooltip({
   if (!active || !payload?.length) return null;
 
   return (
-    <div className="min-w-[160px] rounded-[18px] border border-black/8 bg-white/92 px-3.5 py-3 shadow-[0_18px_50px_rgba(15,23,42,0.12)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/92">
-      <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">{label}</div>
-      <div className="mt-2 space-y-2">
+    <div className="min-w-[170px] rounded-[20px] border border-border/60 bg-white/95 px-4 py-3.5 shadow-2xl backdrop-blur-2xl dark:border-white/10 dark:bg-gray-900/90">
+      <div className="text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground">{label}</div>
+      <div className="mt-2.5 space-y-2">
         {payload.map((item) => (
           <div key={String(item.name || "")} className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
-              <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: item.color || "#0ea5e9" }} />
+            <div className="flex items-center gap-2 text-xs font-medium text-foreground/80">
+              <span className="h-2 w-2 rounded-full ring-2 ring-white/20" style={{ backgroundColor: item.color || "#0ea5e9" }} />
               <span>{item.name}</span>
             </div>
-            <span className="text-sm font-black tabular-nums text-slate-900 dark:text-white">
+            <span className="text-sm font-black tabular-nums text-foreground">
               {toCurrency(Number(item.value || 0))}
             </span>
           </div>
@@ -402,14 +405,19 @@ export default function OperatingCostsPage() {
   return (
     <div className="space-y-6 px-2 pb-10 sm:space-y-8 sm:px-1">
       {/* 头部标题块 */}
-      <section className="overflow-hidden rounded-[24px] border border-black/8 bg-[linear-gradient(135deg,rgba(255,255,255,0.92),rgba(244,244,245,0.78)_48%,rgba(239,246,255,0.78)_100%)] px-4 py-4 shadow-xs dark:border-white/10 dark:bg-[linear-gradient(135deg,rgba(255,255,255,0.06),rgba(255,255,255,0.03)_48%,rgba(14,165,233,0.05)_100%)] sm:px-5">
-        <div className="flex items-end justify-between gap-3">
+      <section className="relative overflow-hidden rounded-[28px] border border-border/60 bg-linear-to-br from-white/95 via-white/85 to-background p-5 sm:p-6 shadow-xs backdrop-blur-md dark:border-white/10 dark:from-white/[0.06] dark:via-white/[0.03] dark:to-transparent">
+        <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-primary/10 blur-3xl dark:bg-primary/20" />
+        <div className="relative z-10 flex items-center justify-between gap-4">
           <div className="min-w-0 flex-1">
-            <h1 className="text-[30px] font-black leading-none tracking-tight text-foreground sm:text-3xl">经营成本</h1>
-            <p className="mt-1.5 text-sm text-muted-foreground">管理房租、人工、水费、电费、公摊、物业等非订单固定与浮动成本</p>
-          </div>
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-black/8 bg-white/75 text-foreground dark:border-white/10 dark:bg-white/5">
-            <WalletCards size={18} />
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-border/60 bg-primary/10 text-primary shadow-2xs dark:border-white/10 dark:bg-primary/15">
+                <WalletCards size={20} />
+              </div>
+              <div>
+                <h1 className="text-2xl font-black leading-none tracking-tight text-foreground sm:text-3xl">经营成本</h1>
+                <p className="mt-1.5 text-xs text-muted-foreground sm:text-sm">管理房租、人工、水费、电费、公摊、物业等非订单固定与浮动成本</p>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -423,52 +431,59 @@ export default function OperatingCostsPage() {
       </div>
 
       {/* 第二层：录入配置单独一行 */}
-      <section className="rounded-[24px] border border-black/8 bg-white/78 p-4 shadow-xs dark:border-white/10 dark:bg-white/5 sm:p-5">
-        <div className="mb-4 flex items-center justify-between gap-4">
+      <section className="relative overflow-hidden rounded-[28px] border border-border/60 bg-linear-to-br from-white/95 via-white/85 to-background p-5 shadow-xs backdrop-blur-md dark:border-white/10 dark:from-white/[0.06] dark:via-white/[0.03] dark:to-transparent sm:p-6 space-y-6">
+        <div className="flex items-center justify-between gap-4">
           <div>
             <h2 className="text-xl font-black tracking-tight text-foreground">成本录入与设置</h2>
-            <p className="mt-1 text-sm text-muted-foreground">切换店铺与模式后，直接填写当前表单。</p>
+            <p className="mt-1 text-xs sm:text-sm text-muted-foreground">切换店铺与录入模式，实时折算每日运营成本。</p>
           </div>
-          {isLoading ? <Loader2 size={16} className="animate-spin text-muted-foreground" /> : null}
+          {isLoading ? (
+            <div className="flex items-center gap-2 px-3 py-1 rounded-full border border-border/60 bg-muted/30 text-xs font-bold text-muted-foreground dark:border-white/10">
+              <Loader2 size={14} className="animate-spin text-primary" />
+              <span>加载中...</span>
+            </div>
+          ) : null}
         </div>
 
         <div className="w-full">
-          <div className="rounded-[24px] border border-black/6 bg-white/70 p-5 md:p-6 shadow-xs backdrop-blur-xl dark:border-white/8 dark:bg-white/5 space-y-6">
+          <div className="rounded-[24px] border border-border/60 bg-white/70 p-5 md:p-6 shadow-xs backdrop-blur-xl dark:border-white/8 dark:bg-white/[0.03] space-y-6">
             {/* 一行里面的切换行 */}
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between pb-4 border-b border-black/5 dark:border-white/5 mb-5 shrink-0">
-              {/* 左侧：店铺切换 */}
-              <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
-                <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground mr-2 shrink-0">选择店铺:</span>
-                {shops.map((shop) => {
-                  const isActive = shop.label === activeShop;
-                  return (
-                    <button
-                      key={shop.id}
-                      type="button"
-                      onClick={() => setActiveShop(shop.label)}
-                      className={cn(
-                        "h-9 px-4 rounded-xl text-xs font-black transition-all shrink-0 border flex items-center gap-2",
-                        isActive
-                          ? "bg-primary text-primary-foreground border-primary/10 shadow-sm"
-                          : "bg-white/40 text-muted-foreground border-black/8 hover:text-foreground dark:bg-white/5 dark:border-white/8"
-                      )}
-                    >
-                      <span className={cn("h-1.5 w-1.5 rounded-full transition-colors duration-200", isActive ? "bg-current" : "bg-muted-foreground/45")} />
-                      {shop.label}
-                    </button>
-                  );
-                })}
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between pb-4 border-b border-border/60 dark:border-white/10">
+              {/* 左侧：店铺切换胶囊组 */}
+              <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
+                <span className="text-[11px] font-black uppercase tracking-[0.14em] text-muted-foreground mr-1 shrink-0">选择店铺:</span>
+                <div className="inline-flex items-center gap-1.5 p-1 rounded-full border border-border/60 bg-muted/30 dark:border-white/10 dark:bg-white/[0.03] shadow-inner">
+                  {shops.map((shop) => {
+                    const isActive = shop.label === activeShop;
+                    return (
+                      <button
+                        key={shop.id}
+                        type="button"
+                        onClick={() => setActiveShop(shop.label)}
+                        className={cn(
+                          "h-8 px-4 rounded-full text-xs font-bold transition-all shrink-0 flex items-center gap-1.5",
+                          isActive
+                            ? "bg-primary text-primary-foreground shadow-sm shadow-primary/30"
+                            : "text-muted-foreground hover:text-foreground hover:bg-muted/50 dark:hover:bg-white/5"
+                        )}
+                      >
+                        <span className={cn("h-1.5 w-1.5 rounded-full transition-colors", isActive ? "bg-white" : "bg-muted-foreground/45")} />
+                        {shop.label}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
-              {/* 右侧：模式切换 */}
-              <div className="flex p-1 bg-black/[0.03] dark:bg-white/5 rounded-xl self-start sm:self-auto shrink-0">
+              {/* 右侧：模式切换胶囊 */}
+              <div className="inline-flex p-1 bg-muted/40 dark:bg-white/5 border border-border/50 dark:border-white/10 rounded-full self-start lg:self-auto shrink-0 shadow-inner">
                 <button
                   type="button"
                   onClick={() => setActiveFormTab("bill")}
                   className={cn(
-                    "h-8 px-4 rounded-lg text-xs font-black transition-all",
+                    "h-8 px-4 rounded-full text-xs font-black transition-all",
                     activeFormTab === "bill"
-                      ? "bg-white text-foreground shadow-sm dark:bg-white/10"
+                      ? "bg-white text-foreground shadow-sm dark:bg-white/15 dark:text-white"
                       : "text-muted-foreground hover:text-foreground"
                   )}
                 >
@@ -478,9 +493,9 @@ export default function OperatingCostsPage() {
                   type="button"
                   onClick={() => setActiveFormTab("profile")}
                   className={cn(
-                    "h-8 px-4 rounded-lg text-xs font-black transition-all",
+                    "h-8 px-4 rounded-full text-xs font-black transition-all",
                     activeFormTab === "profile"
-                      ? "bg-white text-foreground shadow-sm dark:bg-white/10"
+                      ? "bg-white text-foreground shadow-sm dark:bg-white/15 dark:text-white"
                       : "text-muted-foreground hover:text-foreground"
                   )}
                 >
@@ -495,13 +510,13 @@ export default function OperatingCostsPage() {
                 <div className="space-y-5">
                   <div>
                     <h3 className="text-lg font-black text-foreground">月账单录入</h3>
-                    <p className="mt-1 text-sm text-muted-foreground">选择月份并填写当月的水电物业费用</p>
+                    <p className="mt-1 text-xs sm:text-sm text-muted-foreground">选择月份并填写当月的水电物业费用</p>
                   </div>
 
                   <div className="grid gap-5 lg:grid-cols-4">
                     {/* 账单月份 */}
                     <div className="lg:col-span-1 space-y-1.5">
-                      <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground/80">账单月份</div>
+                      <div className="text-[11px] font-black uppercase tracking-[0.14em] text-muted-foreground/80">账单月份</div>
                       <DatePicker
                         value={monthKey}
                         onChange={setMonthKey}
@@ -509,7 +524,7 @@ export default function OperatingCostsPage() {
                         placeholder="选择月份"
                         showClear={false}
                         className="h-11 w-full"
-                        triggerClassName="rounded-xl border border-black/8 bg-white px-4 text-sm text-foreground transition focus:border-primary/40 focus:ring-4 focus:ring-primary/5 dark:border-white/10 dark:bg-white/5"
+                        triggerClassName="rounded-full border border-border/60 bg-white/70 px-4 text-sm font-bold text-foreground transition-all focus:border-primary/50 focus:ring-4 focus:ring-primary/10 dark:border-white/10 dark:bg-white/[0.05] dark:focus:border-primary/40"
                       />
                     </div>
 
@@ -523,31 +538,31 @@ export default function OperatingCostsPage() {
                   </div>
                 </div>
 
-                <div className="mt-6 flex flex-col gap-4 rounded-2xl bg-black/[0.015] dark:bg-white/[0.01] border border-black/5 dark:border-white/5 p-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex flex-wrap gap-8">
+                <div className="mt-6 flex flex-col gap-4 rounded-[24px] border border-border/60 bg-muted/30 p-5 dark:border-white/10 dark:bg-white/[0.03] backdrop-blur-md sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex flex-wrap items-center gap-6 sm:gap-8">
                     <div className="space-y-1">
-                      <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground/70">当月合计</div>
+                      <div className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground/80">当月合计</div>
                       <div className="text-3xl font-black tabular-nums leading-none text-foreground tracking-tight">
                         {toCurrency(waterAmount + electricAmount + sharedElectricAmount + propertyFeeAmount)}
                       </div>
                     </div>
-                    <div className="h-10 w-px bg-black/8 dark:bg-white/8 hidden sm:block" />
+                    <div className="h-10 w-px bg-border/60 dark:bg-white/10 hidden sm:block" />
                     <div className="space-y-1">
-                      <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground/70">日摊成本</div>
+                      <div className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground/80">日摊成本</div>
                       <div className="flex items-baseline gap-1.5">
-                        <span className="text-xl font-black tabular-nums leading-none text-foreground">{toCurrency(dailyUtilityCost)}</span>
-                        <span className="text-xs text-muted-foreground font-semibold">/ 天</span>
+                        <span className="text-2xl font-black tabular-nums leading-none text-primary">{toCurrency(dailyUtilityCost)}</span>
+                        <span className="text-xs text-muted-foreground font-bold">/ 天</span>
                       </div>
-                      <div className="text-[10px] text-muted-foreground/70">按 {monthKey} 自然日均摊</div>
+                      <div className="text-[10px] font-medium text-muted-foreground">按 {monthKey} 自然日均摊</div>
                     </div>
                   </div>
                   <button
                     onClick={handleSaveBill}
                     disabled={isSavingBill}
-                    className="group relative flex h-12 items-center justify-center gap-2 rounded-xl bg-primary px-6 text-sm font-black text-primary-foreground shadow-sm transition hover:scale-[1.01] hover:opacity-95 active:scale-[0.99] disabled:pointer-events-none disabled:opacity-50 shrink-0"
+                    className="group relative flex h-11 sm:h-12 items-center justify-center gap-2 rounded-full bg-primary px-7 text-sm font-black text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:shadow-primary/40 hover:-translate-y-0.5 active:scale-95 disabled:pointer-events-none disabled:opacity-50 shrink-0"
                   >
                     {isSavingBill ? (
-                      <Loader2 className="animate-spin" size={16} />
+                      <Loader2 className="animate-spin" size={18} />
                     ) : (
                       <span>保存月账单</span>
                     )}
@@ -559,7 +574,7 @@ export default function OperatingCostsPage() {
                 <div className="space-y-5">
                   <div>
                     <h3 className="text-lg font-black text-foreground">固定成本设置</h3>
-                    <p className="mt-1 text-sm text-muted-foreground">维护房租和人工，系统自动折算每日固定成本。</p>
+                    <p className="mt-1 text-xs sm:text-sm text-muted-foreground">维护房租和人工，系统自动折算每日固定成本。</p>
                   </div>
 
                   <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
@@ -568,32 +583,32 @@ export default function OperatingCostsPage() {
                   </div>
                 </div>
 
-                <div className="mt-6 flex flex-col gap-4 rounded-2xl bg-black/[0.015] dark:bg-white/[0.01] border border-black/5 dark:border-white/5 p-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex flex-wrap gap-8">
+                <div className="mt-6 flex flex-col gap-4 rounded-[24px] border border-border/60 bg-muted/30 p-5 dark:border-white/10 dark:bg-white/[0.03] backdrop-blur-md sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex flex-wrap items-center gap-6 sm:gap-8">
                     <div className="space-y-1">
-                      <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground/70">固定日成本</div>
+                      <div className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground/80">固定日成本</div>
                       <div className="text-3xl font-black tabular-nums leading-none text-foreground tracking-tight">
                         {toCurrency(dailyFixedCost)}
                       </div>
                     </div>
-                    <div className="h-10 w-px bg-black/8 dark:bg-white/8 hidden sm:block" />
+                    <div className="h-10 w-px bg-border/60 dark:bg-white/10 hidden sm:block" />
                     <div className="space-y-1">
-                      <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground/70">计算折算</div>
+                      <div className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground/80">计算折算</div>
                       <div className="flex items-baseline gap-1.5">
-                        <span className="text-sm font-semibold text-muted-foreground">
+                        <span className="text-sm font-bold text-muted-foreground">
                           ({toCurrency(monthlyRent)} + {toCurrency(monthlyLabor)}) / 30 天
                         </span>
                       </div>
-                      <div className="text-[10px] text-muted-foreground/70">配置店铺：{activeShop || "未选择店铺"}</div>
+                      <div className="text-[10px] font-medium text-muted-foreground">配置店铺：{activeShop || "未选择店铺"}</div>
                     </div>
                   </div>
                   <button
                     onClick={handleSaveProfile}
                     disabled={isSavingProfile}
-                    className="group relative flex h-12 items-center justify-center gap-2 rounded-xl bg-primary px-6 text-sm font-black text-primary-foreground shadow-sm transition hover:scale-[1.01] hover:opacity-95 active:scale-[0.99] disabled:pointer-events-none disabled:opacity-50 shrink-0"
+                    className="group relative flex h-11 sm:h-12 items-center justify-center gap-2 rounded-full bg-primary px-7 text-sm font-black text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:shadow-primary/40 hover:-translate-y-0.5 active:scale-95 disabled:pointer-events-none disabled:opacity-50 shrink-0"
                   >
                     {isSavingProfile ? (
-                      <Loader2 className="animate-spin" size={16} />
+                      <Loader2 className="animate-spin" size={18} />
                     ) : (
                       <span>保存固定成本</span>
                     )}
@@ -602,20 +617,21 @@ export default function OperatingCostsPage() {
               </div>
             )}
           </div>
-        </div></section>
+        </div>
+      </section>
 
       {/* 第三层：趋势图表单独一行 */}
-      <section className="rounded-[24px] border border-black/8 bg-white/78 p-4 shadow-xs dark:border-white/10 dark:bg-white/5 sm:p-5">
+      <section className="relative overflow-hidden rounded-[28px] border border-border/60 bg-linear-to-br from-white/95 via-white/85 to-background p-5 shadow-xs backdrop-blur-md dark:border-white/10 dark:from-white/[0.06] dark:via-white/[0.03] dark:to-transparent sm:p-6">
         <div>
-          <h2 className="text-base font-black tracking-tight text-foreground">月账单走势</h2>
-          <p className="mt-1 text-sm text-muted-foreground">分析最近几个月的非订单成本变化趋势</p>
+          <h2 className="text-lg font-black tracking-tight text-foreground">月账单走势</h2>
+          <p className="mt-1 text-xs sm:text-sm text-muted-foreground">分析最近几个月的非订单成本变化趋势与费用构成对比</p>
         </div>
 
         <div className="mt-5 grid gap-4 xl:grid-cols-2">
-          <div className="rounded-[20px] border border-black/6 bg-white/55 p-3.5 dark:border-white/8 dark:bg-white/3">
+          <div className="rounded-[22px] border border-border/50 bg-muted/20 p-4.5 dark:border-white/8 dark:bg-white/[0.02]">
             <div className="mb-3">
               <h3 className="text-sm font-black text-foreground">总账单合计</h3>
-              <p className="mt-1 text-xs text-muted-foreground">看每个月整体费用波动</p>
+              <p className="mt-1 text-xs text-muted-foreground">看每个月整体费用波动趋势</p>
             </div>
             <div className="h-[220px] [&_.recharts-wrapper]:outline-none [&_.recharts-surface]:outline-none [&_*:focus]:outline-none">
               {chartData.length > 0 ? (
@@ -624,25 +640,25 @@ export default function OperatingCostsPage() {
                     <defs>
                       <linearGradient id="operatingCostFill" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="0%" stopColor="#0ea5e9" stopOpacity={0.26} />
-                        <stop offset="100%" stopColor="#0ea5e9" stopOpacity={0.03} />
+                        <stop offset="100%" stopColor="#0ea5e9" stopOpacity={0.02} />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="rgba(148,163,184,0.18)" />
-                    <XAxis dataKey="monthKey" tickLine={false} axisLine={false} fontSize={12} />
-                    <YAxis tickLine={false} axisLine={false} fontSize={12} width={56} />
+                    <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="rgba(148,163,184,0.15)" />
+                    <XAxis dataKey="monthKey" tickLine={false} axisLine={false} fontSize={12} stroke="currentColor" className="text-muted-foreground" />
+                    <YAxis tickLine={false} axisLine={false} fontSize={12} width={56} stroke="currentColor" className="text-muted-foreground" />
                     <Tooltip content={<ChartTooltip />} />
                     <Area type="monotone" dataKey="total" name="月账单合计" stroke="#0ea5e9" fill="url(#operatingCostFill)" strokeWidth={2.5} />
                   </AreaChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="flex h-full items-center justify-center rounded-[16px] border border-dashed border-black/10 px-6 text-sm text-muted-foreground dark:border-white/10">
+                <div className="flex h-full items-center justify-center rounded-[18px] border border-dashed border-border/60 px-6 text-sm font-medium text-muted-foreground dark:border-white/10">
                   录入月份账单后，这里会显示趋势
                 </div>
               )}
             </div>
           </div>
 
-          <div className="rounded-[20px] border border-black/6 bg-white/55 p-3.5 dark:border-white/8 dark:bg-white/3">
+          <div className="rounded-[22px] border border-border/50 bg-muted/20 p-4.5 dark:border-white/8 dark:bg-white/[0.02]">
             <div className="mb-3">
               <h3 className="text-sm font-black text-foreground">费用明细对比</h3>
               <p className="mt-1 text-xs text-muted-foreground">对比水费、电费、公摊和物业费变化</p>
@@ -651,9 +667,9 @@ export default function OperatingCostsPage() {
               {chartData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={chartData} margin={{ top: 16, right: 10, left: 0, bottom: 0 }}>
-                    <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="rgba(148,163,184,0.18)" />
-                    <XAxis dataKey="monthKey" tickLine={false} axisLine={false} fontSize={12} />
-                    <YAxis tickLine={false} axisLine={false} fontSize={12} width={56} />
+                    <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="rgba(148,163,184,0.15)" />
+                    <XAxis dataKey="monthKey" tickLine={false} axisLine={false} fontSize={12} stroke="currentColor" className="text-muted-foreground" />
+                    <YAxis tickLine={false} axisLine={false} fontSize={12} width={56} stroke="currentColor" className="text-muted-foreground" />
                     <Tooltip content={<ChartTooltip />} />
                     <Area type="monotone" dataKey="waterAmount" name="水费" stroke="#38bdf8" fill="none" strokeWidth={2.5} dot={{ r: 3.5 }} />
                     <Area type="monotone" dataKey="electricAmount" name="电费" stroke="#f59e0b" fill="none" strokeWidth={2.5} dot={{ r: 3.5 }} />
@@ -662,7 +678,7 @@ export default function OperatingCostsPage() {
                   </AreaChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="flex h-full items-center justify-center rounded-[16px] border border-dashed border-black/10 px-6 text-sm text-muted-foreground dark:border-white/10">
+                <div className="flex h-full items-center justify-center rounded-[18px] border border-dashed border-border/60 px-6 text-sm font-medium text-muted-foreground dark:border-white/10">
                   录入月份账单后，这里会显示趋势
                 </div>
               )}
@@ -672,18 +688,18 @@ export default function OperatingCostsPage() {
       </section>
 
       {/* 第四层：历史账单明细数据表格 (满宽) */}
-      <section className="rounded-[24px] border border-black/8 bg-white/78 p-4 shadow-xs dark:border-white/10 dark:bg-white/5 sm:p-5">
-        <div className="flex items-center justify-between gap-3 mb-4">
+      <section className="relative overflow-hidden rounded-[28px] border border-border/60 bg-linear-to-br from-white/95 via-white/85 to-background p-5 shadow-xs backdrop-blur-md dark:border-white/10 dark:from-white/[0.06] dark:via-white/[0.03] dark:to-transparent sm:p-6">
+        <div className="flex items-center justify-between gap-3 mb-5">
           <div>
-            <h2 className="text-base font-black tracking-tight text-foreground">历史明细表格</h2>
-            <p className="mt-1 text-sm text-muted-foreground">各月份历史成本账单细节对比，点击编辑可在弹窗中直接修改</p>
+            <h2 className="text-lg font-black tracking-tight text-foreground">历史明细表格</h2>
+            <p className="mt-1 text-xs sm:text-sm text-muted-foreground">各月份历史成本账单细节对比，点击编辑可在弹窗中直接修改</p>
           </div>
         </div>
 
-        <div className="overflow-x-auto rounded-[20px] border border-black/6 dark:border-white/8 bg-white/50 dark:bg-white/2">
+        <div className="overflow-x-auto rounded-[20px] border border-border/60 dark:border-white/10 bg-white/50 dark:bg-white/[0.02]">
           <table className="w-full min-w-[900px] border-collapse text-sm">
             <thead>
-              <tr className="border-b border-black/6 dark:border-white/8 text-[11px] font-bold uppercase tracking-[0.12em] text-muted-foreground bg-black/1 dark:bg-white/1">
+              <tr className="border-b border-border/60 dark:border-white/10 text-[11px] font-black uppercase tracking-[0.14em] text-muted-foreground bg-muted/40 dark:bg-white/5">
                 <th className="px-5 py-3.5 text-center">账单月份</th>
                 <th className="px-5 py-3.5 text-center">水费</th>
                 <th className="px-5 py-3.5 text-center">电费</th>
@@ -694,7 +710,7 @@ export default function OperatingCostsPage() {
                 <th className="px-5 py-3.5 text-center">操作</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-black/6 dark:divide-white/6">
+            <tbody className="divide-y divide-border/40 dark:divide-white/5">
               {recentBills.length > 0 ? (
                 [...recentBills]
                   .sort((a, b) => b.monthKey.localeCompare(a.monthKey))
@@ -706,34 +722,40 @@ export default function OperatingCostsPage() {
                       <tr
                         key={bill.monthKey}
                         className={cn(
-                          "transition-colors hover:bg-black/1 dark:hover:bg-white/1",
-                          isSelected && "bg-primary/4 dark:bg-primary/6 font-semibold text-primary"
+                          "transition-colors hover:bg-primary/[0.03] dark:hover:bg-white/[0.03]",
+                          isSelected && "bg-primary/5 dark:bg-primary/10 font-semibold"
                         )}
                       >
-                        <td className="px-5 py-3.5 text-center font-bold text-foreground">{bill.monthKey}</td>
+                        <td className="px-5 py-3.5 text-center font-bold text-foreground">
+                          <span className={cn("px-2.5 py-1 rounded-full text-xs", isSelected ? "bg-primary/15 text-primary dark:text-primary font-black" : "text-foreground")}>
+                            {bill.monthKey}
+                          </span>
+                        </td>
                         <td className="px-5 py-3.5 text-center tabular-nums text-foreground">{toCurrency(bill.waterAmount)}</td>
                         <td className="px-5 py-3.5 text-center tabular-nums text-foreground">{toCurrency(bill.electricAmount)}</td>
                         <td className="px-5 py-3.5 text-center tabular-nums text-foreground">{toCurrency(bill.sharedElectricAmount)}</td>
                         <td className="px-5 py-3.5 text-center tabular-nums text-foreground">{toCurrency(bill.propertyFeeAmount)}</td>
-                        <td className="px-5 py-3.5 text-center tabular-nums font-bold text-foreground">{toCurrency(billTotal)}</td>
+                        <td className="px-5 py-3.5 text-center tabular-nums font-black text-foreground">{toCurrency(billTotal)}</td>
                         <td className="px-5 py-3.5 text-center tabular-nums text-muted-foreground">{toCurrency(dailyCost)}</td>
                         <td className="px-5 py-3.5 text-center">
-                          <button
-                            type="button"
-                            onClick={() => handleOpenEditModal(bill)}
-                            aria-label={`编辑 ${bill.monthKey} 月账单`}
-                            title={`编辑 ${bill.monthKey} 月账单`}
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-black/8 bg-white/85 text-foreground transition-all hover:bg-zinc-100 dark:border-white/10 dark:bg-white/6 dark:text-white dark:hover:bg-white/12 cursor-pointer"
-                          >
-                            <Pencil size={14} />
-                          </button>
+                          <div className="flex justify-center">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditModal(bill)}
+                              aria-label={`编辑 ${bill.monthKey} 月账单`}
+                              title={`编辑 ${bill.monthKey} 月账单`}
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border/60 bg-white dark:border-white/10 dark:bg-white/5 text-muted-foreground hover:text-primary hover:border-primary/40 transition-all shadow-2xs cursor-pointer active:scale-90"
+                            >
+                              <Pencil size={13} />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
                   })
               ) : (
                 <tr>
-                  <td colSpan={8} className="px-5 py-10 text-center text-muted-foreground">
+                  <td colSpan={8} className="px-5 py-12 text-center text-muted-foreground">
                     还没有录入过月份账单数据
                   </td>
                 </tr>
@@ -744,31 +766,30 @@ export default function OperatingCostsPage() {
       </section>
 
       {editingBill && billDraft ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 transition-[padding] duration-200 lg:left-[calc(var(--sidebar-width,0px)/2)]">
-          <button
-            type="button"
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 transition-[padding] duration-200">
+          <div
             aria-label="关闭编辑账单弹窗"
             onClick={handleCloseEditModal}
-            className="absolute inset-0 bg-black/55 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
           />
-          <div className="relative z-10 w-full max-w-2xl overflow-hidden rounded-[28px] border border-black/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.96))] shadow-[0_24px_80px_rgba(15,23,42,0.28)] dark:border-white/10 dark:bg-[linear-gradient(180deg,rgba(18,21,28,0.98),rgba(11,15,23,0.96))]">
-            <div className="flex items-start justify-between gap-4 border-b border-black/6 px-5 py-4 dark:border-white/8 sm:px-6 sm:py-5">
+          <div className="relative z-10 w-full max-w-2xl overflow-hidden rounded-[32px] border border-border/60 bg-white dark:bg-gray-900/75 dark:border-white/10 shadow-2xl backdrop-blur-2xl animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-start justify-between gap-4 border-b border-border/60 px-6 py-5 dark:border-white/10 bg-white/50 dark:bg-white/[0.03]">
               <div>
-                <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">历史账单编辑</div>
+                <div className="text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground">历史账单编辑</div>
                 <h2 className="mt-1 text-xl font-black tracking-tight text-foreground sm:text-2xl">{billDraft.monthKey} 月账单</h2>
-                <p className="mt-1 text-sm text-muted-foreground">{activeShop} 的历史月账单将直接在这里更新，不影响上方录入表单。</p>
+                <p className="mt-1 text-xs sm:text-sm text-muted-foreground">{activeShop} 的历史月账单将直接在这里更新，不影响上方录入表单。</p>
               </div>
               <button
                 type="button"
                 onClick={handleCloseEditModal}
                 disabled={isEditModalSaving}
-                className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-black/8 bg-white/80 text-muted-foreground transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-white/6 dark:hover:bg-white/12"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-border/60 bg-white/80 text-muted-foreground transition-all hover:bg-muted dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10 hover:text-foreground active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <X size={18} />
               </button>
             </div>
 
-            <div className="space-y-5 px-5 py-5 sm:px-6 sm:py-6">
+            <div className="space-y-5 px-6 py-6">
               <div className="grid gap-4 sm:grid-cols-2">
                 <NumberField
                   label="当月水费"
@@ -796,24 +817,24 @@ export default function OperatingCostsPage() {
                 />
               </div>
 
-              <div className="rounded-[22px] border border-black/8 bg-black/[0.03] px-4 py-4 dark:border-white/10 dark:bg-white/[0.04]">
+              <div className="rounded-[22px] border border-border/60 bg-muted/30 px-5 py-4 dark:border-white/10 dark:bg-white/[0.03]">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                   <div>
-                    <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">当月账单合计</div>
+                    <div className="text-[11px] font-black uppercase tracking-[0.14em] text-muted-foreground">当月账单合计</div>
                     <div className="mt-1.5 text-2xl font-black tabular-nums text-foreground">{toCurrency(editingBillTotal)}</div>
                   </div>
-                  <div className="text-sm text-muted-foreground">
+                  <div className="text-xs sm:text-sm text-muted-foreground">
                     按 {billDraft.monthKey} 自然日均摊为 <span className="font-bold tabular-nums text-foreground">{toCurrency(editingBillDailyCost)}</span> / 天
                   </div>
                 </div>
               </div>
 
-              <div className="flex flex-col-reverse gap-2.5 sm:flex-row sm:justify-end">
+              <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end border-t border-border/60 dark:border-white/10 pt-5">
                 <button
                   type="button"
                   onClick={handleCloseEditModal}
                   disabled={isEditModalSaving}
-                  className="inline-flex h-11 items-center justify-center rounded-xl border border-black/8 bg-white px-4 text-sm font-medium text-foreground transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-white/6 dark:hover:bg-white/10"
+                  className="inline-flex h-11 items-center justify-center rounded-full border border-border/60 bg-white px-6 text-sm font-bold text-foreground transition-all hover:bg-muted dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   取消
                 </button>
@@ -821,7 +842,7 @@ export default function OperatingCostsPage() {
                   type="button"
                   onClick={handleSaveEditedBill}
                   disabled={isEditModalSaving}
-                  className="inline-flex h-11 items-center justify-center rounded-xl bg-foreground px-4 text-sm font-medium text-background transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex h-11 items-center justify-center rounded-full bg-primary px-7 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:shadow-primary/40 hover:-translate-y-0.5 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {isEditModalSaving ? "保存中..." : "保存修改"}
                 </button>

@@ -27,7 +27,6 @@ export async function GET() {
     });
 
     const users = await prisma.user.findMany({
-        where: { role: { not: "SUPER_ADMIN" } },
         select: {
             id: true,
             email: true,
@@ -36,7 +35,9 @@ export async function GET() {
             status: true,
             lastActiveAt: true,
             permissions: true,
+            roleProfileId: true,
             roleProfile: true,
+            isInternal: true,
             accessibleLibraries: {
               select: {
                 id: true,
@@ -62,11 +63,7 @@ export async function GET() {
         }
     });
 
-    // Join data in-memory
-    const combined = whitelist.map(entry => {
-        const entryEmail = entry.email.toLowerCase();
-        const invitation = invitations.find(i => i.email.toLowerCase() === entryEmail);
-        const userRecord = users.find(u => u.email.toLowerCase() === entryEmail);
+    const buildUserWithConfig = (userRecord: typeof users[number] | undefined) => {
         let userWithConfig = null;
         if (userRecord) {
             const rawPermissions = userRecord.permissions && typeof userRecord.permissions === "object" ? userRecord.permissions as Record<string, unknown> : {};
@@ -80,16 +77,40 @@ export async function GET() {
                 maiyatianCookieCount,
             };
         }
+        return userWithConfig;
+    };
+
+    const whitelistEmails = new Set(whitelist.map((entry) => entry.email.toLowerCase()));
+
+    // Join data in-memory
+    const combined = whitelist.map(entry => {
+        const entryEmail = entry.email.toLowerCase();
+        const invitation = invitations.find(i => i.email.toLowerCase() === entryEmail);
+        const userRecord = users.find(u => u.email.toLowerCase() === entryEmail);
 
         return {
             ...entry,
             invitationToken: invitation?.token || null,
             invitationExpiresAt: invitation?.expiresAt || null,
-            user: userWithConfig
+            user: buildUserWithConfig(userRecord)
         };
     });
 
-    return NextResponse.json(combined);
+    const userOnlyEntries = users
+      .filter((user) => !whitelistEmails.has(user.email.toLowerCase()))
+      .map((user) => ({
+        id: `user:${user.id}`,
+        email: user.email,
+        remark: null,
+        roleProfileId: user.roleProfileId,
+        roleProfile: user.roleProfile,
+        invitationToken: null,
+        invitationExpiresAt: null,
+        user: buildUserWithConfig(user),
+        createdAt: user.lastActiveAt ?? new Date(0),
+      }));
+
+    return NextResponse.json([...userOnlyEntries, ...combined]);
   } catch (error) {
     console.error("Failed to fetch whitelist:", error);
     return NextResponse.json({ error: "Failed to fetch whitelist" }, { status: 500 });
@@ -283,7 +304,10 @@ export async function DELETE(request: Request) {
 
         // 3. Always try to delete matching user account to ensure complete removal
         await tx.user.deleteMany({
-            where: { email: { in: targetEmails } }
+            where: {
+              email: { in: targetEmails },
+              role: { not: "SUPER_ADMIN" },
+            }
         });
     });
 

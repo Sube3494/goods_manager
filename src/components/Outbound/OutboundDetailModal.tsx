@@ -1,5 +1,9 @@
 import { useState } from "react";
-import { X, Copy, Check, Store, Clock, FileText, MapPin, Tag, ShoppingBag, AlertCircle } from "lucide-react";
+import { 
+  X, Copy, Check, Store, Clock, FileText, MapPin, Tag, 
+  ShoppingBag, AlertCircle, User, Phone, CreditCard, Hash, 
+  ExternalLink, Calendar
+} from "lucide-react";
 import { OutboundOrder, OutboundOrderItem } from "@/lib/types";
 import { parseOutboundNote, copyToClipboard, getPlatformMeta, cn } from "@/lib/utils";
 import { getOutboundReturnedQuantityMap, parseOutboundReturnMeta } from "@/lib/outboundReturnMeta";
@@ -12,6 +16,36 @@ interface OutboundDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   order: OutboundOrder | null;
+}
+
+// 智能解析用户备注中的结构化标签（例如 [收件人:xxx] [电话:xxx] [货款:xxx]）
+function parseStructuredNote(noteText: string | null) {
+  if (!noteText) return { structuredTags: [], freeText: "" };
+  
+  const tagRegex = /\[(收件人|电话|联系电话|货款|支付状态|付款|姓名|买家|客户):([^\]]+)\]/g;
+  const structuredTags: Array<{ label: string; value: string; type: string }> = [];
+  let remaining = noteText;
+  let match: RegExpExecArray | null;
+
+  while ((match = tagRegex.exec(noteText)) !== null) {
+    const rawLabel = match[1];
+    const rawValue = match[2].trim();
+    let type = "default";
+    if (rawLabel.includes("收件") || rawLabel.includes("姓名") || rawLabel.includes("买家") || rawLabel.includes("客户")) {
+      type = "user";
+    } else if (rawLabel.includes("电话")) {
+      type = "phone";
+    } else if (rawLabel.includes("货款") || rawLabel.includes("支付") || rawLabel.includes("付款")) {
+      type = "payment";
+    }
+    structuredTags.push({ label: rawLabel, value: rawValue, type });
+  }
+
+  remaining = remaining.replace(tagRegex, "").trim();
+  // 清理多余的前导/后置分隔符
+  remaining = remaining.replace(/^\|\s*/, '').replace(/\|\s*$/, '').trim();
+
+  return { structuredTags, freeText: remaining };
 }
 
 export function OutboundDetailModal({ isOpen, onClose, order }: OutboundDetailModalProps) {
@@ -50,206 +84,254 @@ export function OutboundDetailModal({ isOpen, onClose, order }: OutboundDetailMo
     } else {
       showToast("复制失败，请手动选择复制", "error");
     }
-  };  const totalQuantity = order.items.reduce((acc, item) => acc + item.quantity, 0);
+  };
+
+  const totalQuantity = order.items.reduce((acc, item) => acc + item.quantity, 0);
+  const totalSkuCount = order.items.length;
+
+  const typeConfig: Record<string, { label: string; color: string; dot: string }> = {
+    Sale: { 
+      label: '销售出库', 
+      color: 'bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/20',
+      dot: 'bg-sky-500'
+    },
+    Sample: { 
+      label: '领用出库', 
+      color: 'bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/20',
+      dot: 'bg-purple-500'
+    },
+    Return: { 
+      label: '退货出库', 
+      color: 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20',
+      dot: 'bg-amber-500'
+    },
+    Loss: { 
+      label: '损耗出库', 
+      color: 'bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/20',
+      dot: 'bg-rose-500'
+    }
+  };
+  const activeType = typeConfig[order.type as keyof typeof typeConfig] || { 
+    label: '其他出库', 
+    color: 'bg-muted/40 text-muted-foreground border-border/60',
+    dot: 'bg-muted-foreground'
+  };
+
+  const displayOrderNo = parsed.serialNum 
+    ? `#${parsed.serialNum}` 
+    : `#${order.id.slice(-6).toUpperCase()}`;
+
+  const resolvedShop = parsed.shopName || order.shopName || "未分配门店";
+  const { structuredTags, freeText } = parseStructuredNote(parsed.userNote);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 lg:pl-(--sidebar-width) transition-[padding] duration-200">
-      {/* Background overlay with high end glass blur */}
+      {/* 背景遮罩 */}
       <div 
-        className="absolute inset-0 bg-slate-900/40 dark:bg-[#020617]/75 backdrop-blur-md dark:backdrop-blur-2xl transition-all duration-300"
+        className="absolute inset-0 bg-black/60 backdrop-blur-md transition-all duration-300"
         onClick={onClose}
       />
 
-      {/* Modal Content - Styled with refined glass panel */}
-      <div className="relative w-full max-w-3xl max-h-[92vh] sm:max-h-[90vh] flex flex-col bg-white/95 dark:bg-[#0a0f1d]/95 backdrop-blur-3xl border border-black/[0.08] dark:border-white/5 rounded-[24px] sm:rounded-[28px] shadow-2xl dark:shadow-[0_32px_64px_-16px_rgba(0,0,0,0.9)] overflow-hidden animate-in fade-in zoom-in-95 duration-300">
+      {/* 弹窗主体容器 */}
+      <div className="relative w-full max-w-2xl max-h-[92vh] sm:max-h-[88vh] flex flex-col bg-white dark:bg-gray-900/80 backdrop-blur-2xl border border-border/60 dark:border-white/10 rounded-[28px] sm:rounded-[32px] shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         
-        {/* Modal Header */}
-        <div className="flex items-center justify-between px-5 sm:px-8 py-4 sm:py-5 border-b border-black/[0.05] dark:border-white/5 bg-transparent">
-          <div className="flex items-center gap-3">
-            <h2 className="text-base sm:text-lg font-black bg-gradient-to-r from-slate-900 via-slate-800 to-slate-600 dark:from-white dark:via-slate-100 dark:to-slate-400 bg-clip-text text-transparent">出库单详情</h2>
+        {/* 头部导航与摘要 */}
+        <div className="flex items-center justify-between px-5 sm:px-7 py-4 sm:py-5 border-b border-border/60 dark:border-white/10 bg-white/50 dark:bg-white/[0.02]">
+          <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 min-w-0">
+            <h2 className="text-base sm:text-lg font-black tracking-tight text-foreground whitespace-nowrap">
+              出库单详情
+            </h2>
+
+            {/* 平台与流水号胶囊 */}
+            {platformMeta ? (
+              <span className={cn("inline-flex h-6.5 items-center gap-1.5 px-2.5 rounded-full text-[11px] font-black border shadow-2xs whitespace-nowrap", platformMeta.className)}>
+                <Image
+                  src={platformMeta.iconSrc}
+                  alt={platformMeta.name}
+                  width={13}
+                  height={13}
+                  className="h-3.5 w-3.5 object-cover rounded-xs shrink-0"
+                  unoptimized
+                />
+                <span>{platformMeta.name} {displayOrderNo}</span>
+              </span>
+            ) : (
+              <span className="inline-flex h-6.5 items-center px-2.5 rounded-full border border-border/60 bg-muted/40 dark:border-white/10 dark:bg-white/5 text-[11px] font-mono font-black text-foreground whitespace-nowrap">
+                {displayOrderNo}
+              </span>
+            )}
+
+            {/* 出库类型徽章 */}
+            <span className={cn("inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold border shadow-2xs", activeType.color)}>
+              <span className={cn("h-1.5 w-1.5 rounded-full shrink-0", activeType.dot)} />
+              {activeType.label}
+            </span>
+
+            {/* 对冲/退回状态 */}
             {(isReturned || isPartialReturned) && (
-              <span className="flex items-center gap-1 text-[10px] font-black tracking-wide text-rose-600 dark:text-rose-400 bg-rose-500/10 px-2.5 py-0.5 rounded-full border border-rose-500/20 shadow-[0_0_12px_rgba(244,63,94,0.1)] animate-pulse">
-                <AlertCircle size={10} />
-                {isReturned ? "已对冲" : "部分退回"}
+              <span className="flex items-center gap-1 text-[10px] font-black text-rose-600 dark:text-rose-400 bg-rose-500/10 px-2.5 py-0.5 rounded-full border border-rose-500/20 shadow-2xs">
+                <AlertCircle size={11} />
+                {isReturned ? "已对冲退货" : "部分退回"}
               </span>
             )}
           </div>
+
           <button 
             onClick={onClose}
-            className="p-1.5 rounded-full text-slate-500 dark:text-slate-400 hover:bg-black/5 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white transition-all duration-300 hover:rotate-90 active:scale-90"
+            className="p-1.5 sm:p-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/10 transition-all duration-200 shrink-0 ml-2 cursor-pointer active:scale-90"
+            title="关闭"
           >
             <X size={18} />
           </button>
         </div>
 
-        {/* Modal Body (Scrollable) */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5 sm:space-y-6 custom-scrollbar">
+        {/* 弹窗内容区域 */}
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-5 custom-scrollbar">
           
-          {/* Main Info Dashboard - Unified One-Box Panel */}
-          <div className="space-y-4 p-5 rounded-2xl bg-slate-50/60 dark:bg-white/[0.02] border border-black/[0.04] dark:border-white/10 shadow-[inner_0_1px_1px_rgba(255,255,255,0.05)] animate-in fade-in slide-in-from-top-2 duration-300">
-            <h3 className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-[0.15em] mb-1 flex items-center gap-1.5">
-              <FileText size={12} className="text-blue-500 dark:text-blue-400" />
-              订单基本信息
-            </h3>
-            
-            <div className="grid grid-cols-2 gap-3">
-              {/* 流水号与平台渠道集成卡片 (完美复刻订单列表的平台+流水号集成Badge形式) */}
-              <div className="col-span-2 bg-white dark:bg-white/[0.04] border border-black/[0.05] dark:border-white/5 hover:border-black/[0.1] dark:hover:border-white/10 p-3.5 rounded-xl transition-all duration-300 shadow-sm dark:shadow-none flex items-center justify-between group">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5">
-                    <FileText size={12} className="text-blue-500 dark:text-blue-400 group-hover:scale-110 transition-transform" />
-                    <span>流水号与平台</span>
-                  </div>
-                  <div className="flex items-center gap-2 mt-1">
-                    {platformMeta ? (
-                      <span className={cn("inline-flex h-7 items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black border shadow-xs whitespace-nowrap", platformMeta.className)}>
-                        <span className="inline-flex h-3.5 w-3.5 items-center justify-center shrink-0">
-                          <Image
-                            src={platformMeta.iconSrc}
-                            alt={platformMeta.name}
-                            width={14}
-                            height={14}
-                            className="h-3.5 w-3.5 object-cover"
-                            unoptimized
-                          />
-                        </span>
-                        <span>
-                          {parsed.serialNum 
-                            ? `${platformMeta.name} #${parsed.serialNum}` 
-                            : `${platformMeta.name} #${order.id.slice(-6).toUpperCase()}`}
-                        </span>
-                      </span>
-                    ) : (
-                      <span className="inline-flex h-7 items-center rounded-full border border-black/8 bg-black/3 dark:border-white/10 dark:bg-white/4 px-2.5 text-[10px] font-mono font-black text-foreground/80 whitespace-nowrap">
-                        {parsed.serialNum ? `#${parsed.serialNum}` : `#${order.id.slice(-6).toUpperCase()}`}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-              </div>
-
-              {/* 出库类型 (col-span-1 平行) */}
-              {(() => {
-                const typeConfig = {
-                  Sale: { label: '销售出库', color: 'from-blue-500/10 to-cyan-500/5 text-blue-600 dark:text-cyan-400 border-blue-200 dark:border-cyan-500/30' },
-                  Sample: { label: '领用出库', color: 'from-purple-500/10 to-pink-500/5 text-purple-600 dark:text-pink-400 border-purple-200 dark:border-pink-500/30' },
-                  Return: { label: '退货出库', color: 'from-amber-500/10 to-orange-500/5 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-500/30' },
-                  Loss: { label: '损耗出库', color: 'from-rose-500/10 to-red-500/5 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-500/30' }
-                };
-                const activeType = typeConfig[order.type as keyof typeof typeConfig] || { label: '其他出库', color: 'from-slate-500/10 to-slate-500/5 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-500/30' };
-                return (
-                  <div className="col-span-1 bg-white dark:bg-white/[0.04] border border-black/[0.05] dark:border-white/5 hover:border-black/[0.1] dark:hover:border-white/10 p-3 rounded-xl transition-all duration-300 group shadow-sm dark:shadow-none">
-                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">
-                      <Tag size={12} className="text-pink-500 dark:text-pink-400 group-hover:scale-110 transition-transform" />
-                      <span>出库类型</span>
-                    </div>
-                    <div className="mt-1">
-                      <span className={cn("inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold border bg-gradient-to-br shadow-xs", activeType.color)}>
-                        {activeType.label}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })()}
-
-              {/* 出库门店 (col-span-1 平行) */}
-              <div className="col-span-1 bg-white dark:bg-white/[0.04] border border-black/[0.05] dark:border-white/5 hover:border-black/[0.1] dark:hover:border-white/10 p-3 rounded-xl transition-all duration-300 group shadow-sm dark:shadow-none">
-                <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">
-                  <Store size={12} className="text-indigo-500 dark:text-indigo-400 group-hover:scale-110 transition-transform" />
+          {/* 订单基础属性面板 (轻量化仪表盘结构，杜绝框套框) */}
+          <div className="p-4 sm:p-5 rounded-2xl bg-white/60 dark:bg-white/[0.03] border border-border/60 dark:border-white/10 shadow-2xs space-y-3.5">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3.5 text-xs">
+              
+              {/* 出库门店 */}
+              <div className="space-y-1">
+                <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground">
+                  <Store size={12} className="text-sky-500 shrink-0" />
                   <span>出库门店</span>
                 </div>
-                <div className="font-bold text-xs text-slate-900 dark:text-white truncate mt-0.5" title={parsed.shopName || order.shopName || "未知门店"}>
-                  {parsed.shopName || order.shopName || "未知门店"}
+                <div className="font-bold text-foreground text-xs sm:text-sm truncate" title={resolvedShop}>
+                  {resolvedShop}
                 </div>
               </div>
 
-              {/* 出库时间 (col-span-2) */}
-              <div className="col-span-2 bg-white dark:bg-white/[0.04] border border-black/[0.05] dark:border-white/5 hover:border-black/[0.1] dark:hover:border-white/10 p-3 rounded-xl transition-all duration-300 group shadow-sm dark:shadow-none">
-                <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">
-                  <Clock size={12} className="text-emerald-500 dark:text-emerald-400 group-hover:scale-110 transition-transform" />
+              {/* 出库时间 */}
+              <div className="space-y-1">
+                <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground">
+                  <Clock size={12} className="text-emerald-500 shrink-0" />
                   <span>出库时间</span>
                 </div>
-                <div className="font-mono text-xs text-slate-700 dark:text-slate-300 font-semibold mt-0.5">
+                <div className="font-mono text-foreground font-semibold text-xs">
                   {format(new Date(order.date), 'yyyy-MM-dd HH:mm:ss', { locale: zhCN })}
                 </div>
               </div>
 
-              {/* 平台订单号 (col-span-2 独立一行全宽平铺，右置复制) */}
-              <div className="col-span-2 bg-white dark:bg-white/[0.04] border border-black/[0.05] dark:border-white/5 hover:border-black/[0.1] dark:hover:border-white/10 p-3 rounded-xl transition-all duration-300 group flex items-center justify-between gap-4 shadow-sm dark:shadow-none">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">
-                    <FileText size={12} className="text-cyan-500 dark:text-cyan-400 group-hover:scale-110 transition-transform" />
-                    <span>平台订单号</span>
-                  </div>
-                  <div className="font-mono text-xs text-slate-900 dark:text-white truncate font-bold mt-0.5 select-all" title={parsed.platformId || "-"}>
-                    {parsed.platformId || "-"}
-                  </div>
+              {/* 平台订单号 */}
+              <div className="space-y-1 col-span-2 sm:col-span-1">
+                <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground">
+                  <Hash size={12} className="text-purple-500 shrink-0" />
+                  <span>平台订单号</span>
                 </div>
-                {parsed.platformId && (
-                  <button
-                    onClick={() => handleCopy(parsed.platformId!, "platformId")}
-                    className="p-2 rounded-lg bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/10 hover:text-slate-900 dark:hover:text-white transition-all shrink-0 self-end mb-0.5"
-                    title="复制平台订单号"
-                  >
-                    {copiedField === "platformId" ? <Check size={12} className="text-emerald-500 dark:text-emerald-400 animate-bounce" /> : <Copy size={12} />}
-                  </button>
-                )}
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="font-mono text-xs text-foreground font-bold truncate select-all">
+                    {parsed.platformId || "-"}
+                  </span>
+                  {parsed.platformId && (
+                    <button
+                      onClick={() => handleCopy(parsed.platformId!, "platformId")}
+                      className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/10 transition-colors shrink-0 cursor-pointer"
+                      title="复制平台订单号"
+                    >
+                      {copiedField === "platformId" ? (
+                        <Check size={12} className="text-emerald-500" />
+                      ) : (
+                        <Copy size={12} />
+                      )}
+                    </button>
+                  )}
+                </div>
               </div>
 
-              {/* 配送地址 (去除累赘嵌套黑框，右置一键复制，与上面的平台订单号完美对称) */}
-              <div className="col-span-2 bg-white dark:bg-white/[0.04] border border-black/[0.05] dark:border-white/5 hover:border-black/[0.1] dark:hover:border-white/10 p-3 rounded-xl transition-all duration-300 group flex items-center justify-between gap-4 shadow-sm dark:shadow-none">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">
-                    <MapPin size={12} className="text-rose-500 dark:text-rose-400 group-hover:scale-110 transition-transform" />
-                    <span>配送地址</span>
-                  </div>
-                  <div className="font-bold text-xs text-slate-900 dark:text-white leading-relaxed break-all mt-0.5">
-                    {parsed.address || "-"}
+            </div>
+
+            {/* 配送地址单独横条 */}
+            {parsed.address && (
+              <div className="pt-3 border-t border-border/50 dark:border-white/5 flex items-start justify-between gap-3">
+                <div className="flex items-start gap-2 min-w-0 flex-1">
+                  <MapPin size={14} className="text-rose-500 shrink-0 mt-0.5" />
+                  <div className="min-w-0">
+                    <span className="text-[10px] font-bold text-muted-foreground block mb-0.5">配送地址</span>
+                    <p className="text-xs font-bold text-foreground leading-relaxed select-all break-all">
+                      {parsed.address}
+                    </p>
                   </div>
                 </div>
-                {parsed.address && (
-                  <button
-                    onClick={() => handleCopy(parsed.address!, "address")}
-                    className="p-2 rounded-lg bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/10 hover:text-slate-900 dark:hover:text-white transition-all shrink-0 self-end mb-0.5"
-                    title="复制配送地址"
-                  >
-                    {copiedField === "address" ? <Check size={12} className="text-emerald-500 dark:text-emerald-400 animate-bounce" /> : <Copy size={12} />}
-                  </button>
-                )}
+                <button
+                  onClick={() => handleCopy(parsed.address!, "address")}
+                  className="p-1.5 rounded-full border border-border/60 bg-white/70 dark:bg-white/5 dark:border-white/10 text-muted-foreground hover:text-foreground hover:border-sky-500/40 transition-all shrink-0 cursor-pointer shadow-2xs active:scale-95"
+                  title="复制配送地址"
+                >
+                  {copiedField === "address" ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
+                </button>
               </div>
-            </div>
+            )}
           </div>
 
-          {/* User Custom Note */}
-          {parsed.userNote && (
-            <div className="space-y-4">
-              <div className="p-4 rounded-2xl border border-blue-500/20 bg-blue-500/5 backdrop-blur-md shadow-[0_0_15px_rgba(59,130,246,0.03)] flex gap-3">
-                <div className="p-2 h-fit rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-500 shrink-0">
-                  <FileText size={14} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h4 className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1">用户备注</h4>
-                  <p className="text-xs font-bold text-slate-800 dark:text-slate-200 leading-relaxed break-words">
-                    {parsed.userNote}
-                  </p>
-                </div>
+          {/* 结构化用户备注 / 履约信息便签 */}
+          {(structuredTags.length > 0 || freeText) && (
+            <div className="p-4 rounded-2xl border border-sky-500/20 bg-sky-500/[0.04] dark:bg-sky-500/[0.06] backdrop-blur-md shadow-2xs space-y-2.5">
+              <div className="flex items-center gap-1.5 text-[10px] font-black text-sky-600 dark:text-sky-400 uppercase tracking-wider">
+                <FileText size={12} className="text-sky-500" />
+                <span>订单备注与履约信息</span>
               </div>
+
+              {/* 结构化微卡片/胶囊 */}
+              {structuredTags.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2">
+                  {structuredTags.map((tag, idx) => (
+                    <div 
+                      key={idx}
+                      className={cn(
+                        "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border shadow-2xs",
+                        tag.type === "payment"
+                          ? tag.value.includes("未") 
+                            ? "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20"
+                            : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20"
+                          : tag.type === "phone"
+                            ? "bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/20"
+                            : "bg-white/80 dark:bg-white/5 text-foreground border-border/60 dark:border-white/10"
+                      )}
+                    >
+                      {tag.type === "user" && <User size={12} className="opacity-70" />}
+                      {tag.type === "phone" && <Phone size={12} className="opacity-70" />}
+                      {tag.type === "payment" && <CreditCard size={12} className="opacity-70" />}
+                      <span className="text-muted-foreground text-[11px] font-medium">{tag.label}:</span>
+                      <span className="font-mono">{tag.value}</span>
+                      {tag.type === "phone" && (
+                        <button
+                          onClick={() => handleCopy(tag.value, `phone-${idx}`)}
+                          className="p-0.5 text-muted-foreground hover:text-foreground cursor-pointer"
+                          title="复制电话"
+                        >
+                          {copiedField === `phone-${idx}` ? <Check size={10} className="text-emerald-500" /> : <Copy size={10} />}
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* 自由文本说明 */}
+              {freeText && (
+                <p className="text-xs font-bold text-foreground leading-relaxed break-words bg-white/40 dark:bg-white/[0.03] p-2.5 rounded-xl border border-sky-500/10">
+                  {freeText}
+                </p>
+              )}
             </div>
           )}
 
-          {/* Product Items Section */}
+          {/* 出库商品清单 */}
           <div className="space-y-3">
-            <h3 className="text-xs font-black text-slate-800 dark:text-white flex items-center gap-2 tracking-widest uppercase">
-              <ShoppingBag size={14} className="text-blue-500 dark:text-blue-400" />
-              出库商品明细
-              <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 px-2 py-0.5 rounded-full bg-slate-100 dark:bg-white/5 border border-black/[0.05] dark:border-white/5">
-                {order.items.length} 种 · 共 {totalQuantity} 件
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-black text-foreground flex items-center gap-2 tracking-wider uppercase">
+                <ShoppingBag size={14} className="text-sky-500" />
+                出库商品明细
+              </h3>
+              <span className="text-[10px] font-bold text-muted-foreground px-3 py-1 rounded-full bg-white/70 dark:bg-white/5 border border-border/60 dark:border-white/10 shadow-2xs">
+                {totalSkuCount} 种 · 共 {totalQuantity} 件
               </span>
-            </h3>
+            </div>
             
-            {/* Products Card List */}
-            <div className="space-y-2.5">
+            {/* 商品清单列表 */}
+            <div className="space-y-2">
               {order.items.map((item: OutboundOrderItem) => {
                 const itemId = String(item.id || "");
                 const name = item.shopProduct?.name || item.product?.name || '未知商品';
@@ -264,33 +346,35 @@ export function OutboundDetailModal({ isOpen, onClose, order }: OutboundDetailMo
                   <div 
                     key={item.id} 
                     className={cn(
-                      "flex items-center justify-between gap-3 p-3.5 sm:p-4 rounded-2xl border transition-all duration-300 hover:-translate-y-0.5 group shadow-xs dark:shadow-none",
+                      "flex items-center justify-between gap-3 p-3 sm:p-3.5 rounded-2xl border transition-all duration-200 group shadow-2xs",
                       isItemReturned
-                        ? "bg-rose-50/70 border-rose-200 dark:bg-rose-500/[0.05] dark:border-rose-500/20 hover:border-rose-300 dark:hover:border-rose-500/30"
-                        : "bg-slate-50 border-black/[0.05] dark:bg-white/[0.03] dark:border-white/10 hover:border-black/[0.1] dark:hover:border-white/20 hover:bg-slate-100 dark:hover:bg-white/[0.06]"
+                        ? "bg-rose-50/50 border-rose-200 dark:bg-rose-500/[0.05] dark:border-rose-500/20"
+                        : "bg-white/60 dark:bg-white/[0.02] border-border/60 dark:border-white/10 hover:border-sky-500/30 hover:bg-white/90 dark:hover:bg-white/[0.05]"
                     )}
                   >
-                    {/* Left: Product Info */}
-                    <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
-                      <div className="relative w-12 h-12 shrink-0 rounded-xl overflow-hidden bg-slate-200 dark:bg-slate-900 flex items-center justify-center border border-black/[0.08] dark:border-white/15 shadow-sm group-hover:scale-105 transition-transform duration-300">
+                    {/* 左侧：商品图 + 描述 */}
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <div className="relative w-11 h-11 sm:w-12 sm:h-12 shrink-0 rounded-xl overflow-hidden bg-muted/50 border border-border/60 dark:border-white/10 shadow-2xs group-hover:scale-105 transition-transform">
                         {img ? (
                           <Image src={img} className="object-cover" alt="" fill sizes="48px" />
                         ) : (
-                          <ShoppingBag size={18} className="text-slate-400 dark:text-slate-500" />
+                          <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                            <ShoppingBag size={18} />
+                          </div>
                         )}
                       </div>
+
                       <div className="min-w-0 space-y-1">
-                        {/* 商品名称折行限制 line-clamp-2，以完美消化长商品名并减少空白区域 */}
-                        <p className="font-bold text-xs sm:text-sm text-slate-900 dark:text-white leading-snug line-clamp-2 max-w-[280px] sm:max-w-[420px]" title={name}>
+                        <p className="font-bold text-xs sm:text-sm text-foreground leading-snug truncate" title={name}>
                           {name}
                         </p>
                         <div className="flex flex-wrap items-center gap-1.5">
                           {item.shopProduct?.shopName && (
-                            <span className="inline-flex px-1.5 py-0.2 rounded text-[9px] font-black bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                            <span className="inline-flex items-center border border-sky-500/20 bg-sky-500/10 px-2 py-0.5 rounded-full text-[9px] font-bold text-sky-700 dark:border-sky-500/30 dark:bg-sky-500/15 dark:text-sky-300">
                               {item.shopProduct.shopName}
                             </span>
                           )}
-                          <span className="font-mono text-[9px] text-slate-500 dark:text-slate-400 bg-slate-200/50 dark:bg-white/5 px-2 py-0.5 rounded border border-black/[0.04] dark:border-white/5">
+                          <span className="font-mono text-[9px] text-muted-foreground bg-muted/40 dark:bg-white/5 px-2 py-0.5 rounded-full border border-border/50 dark:border-white/5">
                             SKU: {sku}
                           </span>
                           {isItemReturned ? (
@@ -298,7 +382,7 @@ export function OutboundDetailModal({ isOpen, onClose, order }: OutboundDetailMo
                               {returnedDetails.map((detail, detailIndex) => (
                                 <span
                                   key={`${itemId}-return-${detailIndex}`}
-                                  className="inline-flex max-w-full items-center rounded text-[9px] font-black bg-rose-500/8 px-1.5 py-0.2 text-rose-600 dark:text-rose-300 border border-rose-500/15"
+                                  className="inline-flex items-center rounded-full text-[9px] font-bold bg-rose-500/10 px-2 py-0.5 text-rose-600 dark:text-rose-300 border border-rose-500/20"
                                   title={`${format(new Date(detail.createdAt), 'yyyy-MM-dd HH:mm', { locale: zhCN })} · ${detail.reason} · x${detail.quantity}`}
                                 >
                                   {detail.reason}{detail.quantity > 1 ? ` x${detail.quantity}` : ""}
@@ -310,19 +394,19 @@ export function OutboundDetailModal({ isOpen, onClose, order }: OutboundDetailMo
                       </div>
                     </div>
 
-                    {/* Right: Quantity Badge */}
+                    {/* 右侧：出库数量高亮徽章 */}
                     <div className="shrink-0 flex items-center gap-2 pl-2">
-                      {isItemReturned ? (
-                        <div className="hidden sm:flex flex-col items-end text-[10px] font-semibold leading-4">
-                          <span className="text-rose-600 dark:text-rose-400">退回 x{returnedQuantity}</span>
-                          <span className="text-slate-500 dark:text-slate-400">原始 x{item.quantity}</span>
+                      {isItemReturned && (
+                        <div className="hidden sm:flex flex-col items-end text-[10px] font-semibold leading-3.5">
+                          <span className="text-rose-600 dark:text-rose-400 font-mono">退 x{returnedQuantity}</span>
+                          <span className="text-muted-foreground font-mono">原 x{item.quantity}</span>
                         </div>
-                      ) : null}
+                      )}
                       <div className={cn(
-                        "font-mono text-xs sm:text-sm font-black px-3 py-1.2 rounded-full shadow-sm",
+                        "font-mono text-xs sm:text-sm font-black px-3 py-1 rounded-full shadow-2xs border",
                         isItemReturned
-                          ? "text-rose-700 bg-rose-100 border border-rose-200 dark:text-rose-300 dark:bg-rose-500/10 dark:border-rose-500/20"
-                          : "text-emerald-700 bg-emerald-50 border border-emerald-200 dark:text-emerald-400 dark:bg-emerald-500/10 dark:border-emerald-500/20 dark:shadow-[0_0_15px_rgba(16,185,129,0.05)]"
+                          ? "text-rose-600 bg-rose-500/10 border-rose-500/20 dark:text-rose-400"
+                          : "text-emerald-600 bg-emerald-500/10 border-emerald-500/20 dark:text-emerald-400"
                       )}>
                         {isItemReturned ? `剩 x${remainingQuantity}` : `x${item.quantity}`}
                       </div>
@@ -335,11 +419,21 @@ export function OutboundDetailModal({ isOpen, onClose, order }: OutboundDetailMo
 
         </div>
 
-        {/* Modal Footer */}
-        <div className="px-5 sm:px-8 py-4 sm:py-5 border-t border-black/[0.05] dark:border-white/5 bg-transparent flex justify-end">
+        {/* 底部操作栏 */}
+        <div className="px-5 sm:px-7 py-3.5 sm:py-4 border-t border-border/60 dark:border-white/10 bg-white/50 dark:bg-white/[0.02] flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => handleCopy(order.id, "orderId")}
+              className="h-9 px-3.5 rounded-full border border-border/60 bg-white/80 dark:bg-white/5 dark:border-white/10 text-muted-foreground hover:text-foreground hover:border-sky-500/30 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs active:scale-95"
+            >
+              {copiedField === "orderId" ? <Check size={13} className="text-emerald-500" /> : <Copy size={13} />}
+              <span>复制单据ID</span>
+            </button>
+          </div>
+
           <button 
             onClick={onClose}
-            className="px-6 py-2.5 bg-slate-900 text-white hover:bg-slate-800 dark:bg-gradient-to-b dark:from-slate-100 dark:to-slate-200 dark:hover:from-white dark:hover:to-slate-100 dark:text-slate-900 font-black text-xs rounded-full transition-all duration-300 hover:scale-[1.03] active:scale-[0.97] shadow-lg dark:shadow-[0_4px_20px_rgba(255,255,255,0.08)] cursor-pointer"
+            className="h-9 sm:h-10 px-6 sm:px-7 rounded-full text-xs sm:text-sm font-bold transition-all bg-primary text-primary-foreground shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 cursor-pointer"
           >
             关闭详情
           </button>

@@ -505,7 +505,7 @@ export function DataOverview({
             <button
               onClick={onRefresh}
               disabled={isLoading}
-              className="group relative flex h-10 shrink-0 items-center gap-2 rounded-xl border border-black/8 bg-white/75 px-3 transition-all hover:border-primary/30 hover:bg-white sm:gap-2.5 sm:px-3.5 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8 disabled:cursor-not-allowed disabled:opacity-50"
+              className="group relative flex h-10 shrink-0 items-center gap-2 rounded-full border border-black/8 bg-white/75 px-4 transition-all hover:border-primary/30 hover:bg-white sm:gap-2.5 sm:px-4 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer active:scale-95 shadow-2xs"
             >
               <div className={`flex h-5 w-5 items-center justify-center rounded-full ${isLoading ? "bg-primary/20" : "bg-black/5 transition-colors group-hover:bg-primary/15 dark:bg-white/10"}`}>
                 <RefreshCw
@@ -537,7 +537,7 @@ export function DataOverview({
               onChange={onSelectedShopNameChange}
               options={[{ value: "", label: "全部店铺" }, ...shopOptions.map((shop) => ({ value: shop.name, label: shop.name }))]}
               className="h-10"
-              triggerClassName="h-full rounded-xl border border-black/8 bg-white px-3.5 text-sm shadow-none dark:border-white/10 dark:bg-white/3"
+              triggerClassName="h-full rounded-full border border-black/8 bg-white px-4 text-xs font-bold shadow-none dark:border-white/10 dark:bg-white/3"
             />
           </div>
           <div className="col-span-1 space-y-1.5">
@@ -554,7 +554,7 @@ export function DataOverview({
                 { value: "custom", label: "自定义" },
               ]}
               className="h-10"
-              triggerClassName="h-full rounded-xl border border-black/8 bg-white px-3.5 text-sm shadow-none dark:border-white/10 dark:bg-white/3"
+              triggerClassName="h-full rounded-full border border-black/8 bg-white px-4 text-xs font-bold shadow-none dark:border-white/10 dark:bg-white/3"
             />
           </div>
           <div className="col-span-1 space-y-1.5">
@@ -565,7 +565,7 @@ export function DataOverview({
               maxDate={endDate || todayDate}
               showClear={false}
               className="h-10 w-full"
-              triggerClassName="h-full rounded-xl border border-black/8 bg-white px-3.5 text-sm shadow-none dark:border-white/10 dark:bg-white/3"
+              triggerClassName="h-full rounded-full border border-black/8 bg-white px-4 text-xs font-bold shadow-none dark:border-white/10 dark:bg-white/3"
             />
           </div>
           <div className="col-span-1 space-y-1.5">
@@ -580,7 +580,7 @@ export function DataOverview({
               maxDate={todayDate}
               showClear={false}
               className="h-10 w-full"
-              triggerClassName="h-full rounded-xl border border-black/8 bg-white px-3.5 text-sm shadow-none dark:border-white/10 dark:bg-white/3"
+              triggerClassName="h-full rounded-full border border-black/8 bg-white px-4 text-xs font-bold shadow-none dark:border-white/10 dark:bg-white/3"
             />
           </div>
         </div>
@@ -670,7 +670,7 @@ export function DataOverview({
           <button
             type="button"
             onClick={() => setIsCustomerDetailOpen(true)}
-            className="h-9 shrink-0 rounded-xl border border-black/8 bg-white/80 px-3 text-xs font-bold text-foreground transition-all hover:border-primary/30 hover:text-primary dark:border-white/10 dark:bg-white/5"
+            className="h-9 shrink-0 rounded-full border border-black/8 bg-white/80 px-4 text-xs font-bold text-foreground transition-all hover:border-primary/30 hover:text-primary dark:border-white/10 dark:bg-white/5 active:scale-95 cursor-pointer shadow-2xs"
           >
             每日明细
           </button>
@@ -843,12 +843,12 @@ export function DataOverview({
                 onChange={setProfitPlatform}
                 options={platformOptions}
                 className="h-9 min-w-29"
-                triggerClassName="h-full rounded-xl border border-black/8 bg-white px-3 text-sm shadow-none dark:border-white/10 dark:bg-white/3"
+                triggerClassName="h-full rounded-full border border-black/8 bg-white px-3.5 text-xs font-bold shadow-none dark:border-white/10 dark:bg-white/3"
               />
               <button
                 type="button"
                 onClick={() => setIsChartsFullWidth((prev) => !prev)}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-black/8 bg-white text-muted-foreground hover:text-foreground hover:bg-black/3 dark:border-white/10 dark:bg-white/3 dark:hover:bg-white/10 transition-all active:scale-95 cursor-pointer"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-black/8 bg-white text-muted-foreground hover:text-foreground hover:bg-black/3 dark:border-white/10 dark:bg-white/3 dark:hover:bg-white/10 transition-all active:scale-95 cursor-pointer shadow-2xs"
                 title={isChartsFullWidth ? "收起为单行并排" : "独占整行全宽展示"}
               >
                 {isChartsFullWidth ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
@@ -905,19 +905,19 @@ export function DataOverview({
                   { value: "true", label: "去除刷单" },
                 ]}
                 className="h-9 min-w-0 sm:min-w-29"
-                triggerClassName="h-full rounded-xl border border-black/8 bg-white px-3 text-sm shadow-none dark:border-white/10 dark:bg-white/3"
+                triggerClassName="h-full rounded-full border border-black/8 bg-white px-3.5 text-xs font-bold shadow-none dark:border-white/10 dark:bg-white/3"
               />
               <CustomSelect
                 value={orderPlatform}
                 onChange={setOrderPlatform}
                 options={platformOptions}
                 className="h-9 min-w-0 sm:min-w-29"
-                triggerClassName="h-full rounded-xl border border-black/8 bg-white px-3 text-sm shadow-none dark:border-white/10 dark:bg-white/3"
+                triggerClassName="h-full rounded-full border border-black/8 bg-white px-3.5 text-xs font-bold shadow-none dark:border-white/10 dark:bg-white/3"
               />
               <button
                 type="button"
                 onClick={() => setIsChartsFullWidth((prev) => !prev)}
-                className="hidden sm:inline-flex h-9 w-9 items-center justify-center rounded-xl border border-black/8 bg-white text-muted-foreground hover:text-foreground hover:bg-black/3 dark:border-white/10 dark:bg-white/3 dark:hover:bg-white/10 transition-all active:scale-95 cursor-pointer shrink-0"
+                className="hidden sm:inline-flex h-9 w-9 items-center justify-center rounded-full border border-black/8 bg-white text-muted-foreground hover:text-foreground hover:bg-black/3 dark:border-white/10 dark:bg-white/3 dark:hover:bg-white/10 transition-all active:scale-95 cursor-pointer shrink-0 shadow-2xs"
                 title={isChartsFullWidth ? "收起为单行并排" : "独占整行全宽展示"}
               >
                 {isChartsFullWidth ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
@@ -956,8 +956,8 @@ export function DataOverview({
       )}
       {isCustomerDetailOpen ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 px-3 py-4 backdrop-blur-sm sm:items-center">
-          <div className="w-full max-w-3xl overflow-hidden rounded-[26px] border border-black/8 bg-white shadow-2xl dark:border-white/10 dark:bg-slate-950">
-            <div className="flex items-start justify-between gap-3 border-b border-black/6 px-4 py-4 dark:border-white/10 sm:px-5">
+          <div className="w-full max-w-3xl overflow-hidden rounded-[28px] border border-black/8 bg-white/95 shadow-2xl backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/95 sm:rounded-[32px]">
+            <div className="flex items-start justify-between gap-3 border-b border-black/6 px-5 py-4 dark:border-white/10 sm:px-6">
               <div className="min-w-0">
                 <h3 className="text-base font-black text-foreground">客户每日明细</h3>
                 <p className="mt-1 text-xs text-muted-foreground">{contextLabel}</p>
@@ -965,7 +965,7 @@ export function DataOverview({
               <button
                 type="button"
                 onClick={() => setIsCustomerDetailOpen(false)}
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-all hover:bg-black/5 hover:text-foreground dark:hover:bg-white/10"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-black/6 bg-black/4 text-muted-foreground transition-all hover:bg-black/8 hover:text-foreground dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10"
                 aria-label="关闭"
               >
                 <X size={18} />

@@ -24,106 +24,106 @@ export function SystemTab({ systemInfo }: SystemTabProps) {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
         {overview.map((item) => (
-          <div key={item.label} className="rounded-2xl border border-border/60 bg-white/75 px-4 py-4 shadow-sm dark:bg-white/5">
-            <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">
-              <item.icon size={11} />
+          <div key={item.label} className="rounded-2xl border border-border/60 bg-white/80 dark:bg-white/[0.03] p-4 shadow-2xs transition-all hover:border-primary/20">
+            <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/70">
+              <item.icon size={12} className="text-primary" />
               {item.label}
             </div>
-            <div className={cn("mt-3 truncate text-xl font-black tracking-tight", item.tone)}>{item.value}</div>
+            <div className={cn("mt-2.5 truncate text-xl font-black tracking-tight", item.tone)}>{item.value}</div>
           </div>
         ))}
       </div>
 
-      <section className="overflow-hidden rounded-[26px] border border-border/60 bg-white/75 shadow-sm dark:bg-white/5">
-        <div className="border-b border-border/50 bg-white/50 px-4 py-4 md:px-5 dark:bg-white/[0.03]">
-          <div className="flex items-start gap-3">
-            <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-500/10 text-slate-500 ring-1 ring-slate-500/25">
+      <section className="overflow-hidden rounded-[28px] border border-border/70 bg-white/80 dark:bg-white/[0.02] shadow-sm backdrop-blur-xs">
+        <div className="border-b border-border/50 bg-muted/20 dark:bg-white/[0.02] px-5 py-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-500/10 text-slate-600 dark:text-slate-400 ring-1 ring-slate-500/25">
               <Code2 size={17} />
             </div>
             <div>
               <h3 className="text-base font-black text-foreground">系统诊断</h3>
-              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">把版本、运行环境和备份状态放到同一层，先判断系统是否健康。</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">当前运行状态评估、基础服务健康检查及安全建议。</p>
             </div>
           </div>
         </div>
-        <div className="space-y-4 p-4 md:p-5">
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div className="space-y-4 p-5">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {overview.map((item) => (
-              <div key={item.label} className="rounded-2xl border border-border/50 bg-white/72 px-4 py-4 shadow-sm dark:bg-white/[0.04]">
-                <div className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground/60">{item.label}</div>
-                <div className={cn("mt-2 text-sm font-black", item.tone)}>{item.value}</div>
+              <div key={item.label} className="rounded-2xl border border-border/60 bg-zinc-50/80 dark:bg-white/[0.02] p-4 shadow-2xs">
+                <div className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground/70">{item.label}</div>
+                <div className={cn("mt-1.5 text-sm font-black", item.tone)}>{item.value}</div>
               </div>
             ))}
           </div>
-          <div className="rounded-3xl border border-amber-500/15 bg-white/72 px-5 py-4 shadow-sm dark:bg-white/[0.04]">
+          <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 px-4 py-3.5 shadow-2xs">
             <div className="flex items-start gap-3">
               <AlertTriangle size={16} className="mt-0.5 shrink-0 text-amber-500" />
               <div>
-                <div className="text-sm font-black text-amber-500/90">系统诊断提示</div>
-                <div className="mt-1 text-xs leading-relaxed text-muted-foreground">PickNote 正在生产环境下运行。请定期执行数据备份，并确认当前版本与运行环境保持在预期状态。</div>
+                <div className="text-sm font-black text-amber-600 dark:text-amber-400">系统诊断建议</div>
+                <div className="mt-0.5 text-xs leading-relaxed text-muted-foreground">系统正在稳定运行中。建议定期在“数据与安全”页签下执行本地或云端归档备份，保障生产数据完整性。</div>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-[26px] border border-border/60 bg-white/75 shadow-sm dark:bg-white/5">
-        <div className="border-b border-border/50 bg-white/50 px-4 py-4 md:px-5 dark:bg-white/[0.03]">
-          <div className="flex items-start gap-3">
-            <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-500/10 text-blue-500 ring-1 ring-blue-500/25">
+      <section className="overflow-hidden rounded-[28px] border border-border/70 bg-white/80 dark:bg-white/[0.02] shadow-sm backdrop-blur-xs">
+        <div className="border-b border-border/50 bg-muted/20 dark:bg-white/[0.02] px-5 py-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-sky-500/10 text-sky-600 ring-1 ring-sky-500/25">
               <BookOpen size={17} />
             </div>
             <div>
               <h3 className="text-base font-black text-foreground">技术栈与模块</h3>
-              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">把底层技术和业务模块拆成两组，阅读时不会再混成一片。</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">底层架构驱动技术与主要业务管理边界一览。</p>
             </div>
           </div>
         </div>
-        <div className="grid grid-cols-1 gap-4 p-4 md:p-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-          <div className="rounded-3xl border border-border/50 bg-white/72 p-5 shadow-sm dark:bg-white/[0.04]">
-            <div className="text-sm font-black text-foreground">技术栈</div>
-            <div className="mt-1 text-xs text-muted-foreground">系统构建依赖的主要框架、运行库和数据层。</div>
-            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 p-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+          <div className="rounded-2xl sm:rounded-[22px] border border-border/60 bg-zinc-50/80 dark:bg-white/[0.02] p-4 sm:p-5 shadow-2xs">
+            <div className="text-sm font-black text-foreground">技术底座</div>
+            <div className="mt-0.5 text-xs text-muted-foreground">现代高性能全栈工程框架与数据持久化生态。</div>
+            <div className="mt-4 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
               {[
-                { name: "Next.js 15", desc: "React 全栈框架", color: "text-foreground", bg: "bg-muted/20" },
-                { name: "React 19", desc: "UI 组件库", color: "text-cyan-500", bg: "bg-cyan-500/5" },
-                { name: "TypeScript", desc: "类型安全", color: "text-blue-500", bg: "bg-blue-500/5" },
-                { name: "Prisma ORM", desc: "数据库访问层", color: "text-emerald-500", bg: "bg-emerald-500/5" },
-                { name: "Tailwind CSS", desc: "原子化样式", color: "text-sky-500", bg: "bg-sky-500/5" },
-                { name: "Framer Motion", desc: "动画引擎", color: "text-purple-500", bg: "bg-purple-500/5" },
-                { name: "Lucide Icons", desc: "图标库", color: "text-pink-500", bg: "bg-pink-500/5" },
-                { name: "MinIO", desc: "对象存储 (可选)", color: "text-amber-500", bg: "bg-amber-500/5" },
+                { name: "Next.js 15", desc: "React 全栈应用框架", color: "text-foreground", bg: "bg-muted/30" },
+                { name: "React 19", desc: "前端界面构建与 Hook", color: "text-cyan-600 dark:text-cyan-400", bg: "bg-cyan-500/10" },
+                { name: "TypeScript", desc: "端到端类型静态检查", color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-500/10" },
+                { name: "Prisma ORM", desc: "声明式数据库管理", color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-500/10" },
+                { name: "Tailwind CSS", desc: "原子化现代响应式样式", color: "text-sky-600 dark:text-sky-400", bg: "bg-sky-500/10" },
+                { name: "Framer Motion", desc: "丝滑交互微动效引擎", color: "text-purple-600 dark:text-purple-400", bg: "bg-purple-500/10" },
+                { name: "Lucide Icons", desc: "统一矢量线性图标集", color: "text-pink-600 dark:text-pink-400", bg: "bg-pink-500/10" },
+                { name: "MinIO", desc: "S3 协议对象存储 (可选)", color: "text-amber-600 dark:text-amber-400", bg: "bg-amber-500/10" },
               ].map((tech) => (
-                <div key={tech.name} className={cn("rounded-2xl border border-border/40 bg-white/68 px-4 py-3 shadow-sm dark:bg-white/[0.04]", tech.bg)}>
-                  <div className={cn("text-sm font-black", tech.color)}>{tech.name}</div>
-                  <div className="mt-1 text-xs text-muted-foreground">{tech.desc}</div>
+                <div key={tech.name} className="rounded-xl border border-border/50 bg-white/70 dark:bg-white/[0.02] p-3 shadow-2xs">
+                  <div className={cn("text-xs font-black", tech.color)}>{tech.name}</div>
+                  <div className="mt-0.5 text-[11px] text-muted-foreground">{tech.desc}</div>
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="rounded-3xl border border-border/50 bg-white/72 p-5 shadow-sm dark:bg-white/[0.04]">
+          <div className="rounded-2xl sm:rounded-[22px] border border-border/60 bg-zinc-50/80 dark:bg-white/[0.02] p-4 sm:p-5 shadow-2xs">
             <div className="text-sm font-black text-foreground">功能模块</div>
-            <div className="mt-1 text-xs text-muted-foreground">当前系统覆盖的业务能力与主要管理边界。</div>
-            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="mt-0.5 text-xs text-muted-foreground">当前系统覆盖的核心业务能力与控制边界。</div>
+            <div className="mt-4 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
               {[
-                { name: "商品管理", desc: "SKU / 批次 / 入库", icon: Database },
-                { name: "分类管理", desc: "多级分类体系", icon: GitBranch },
-                { name: "供应商管理", desc: "供应链信息维护", icon: Server },
-                { name: "采购管理", desc: "采购单与结算", icon: Code2 },
-                { name: "出入库管理", desc: "库存流水追踪", icon: Zap },
-                { name: "实物相册", desc: "商品图片管理", icon: Globe },
-                { name: "刷单管理", desc: "计划与订单", icon: BookOpen },
-                { name: "系统设置", desc: "全局配置中心", icon: Shield },
+                { name: "商品管理", desc: "SKU / 批次 / 库存流水", icon: Database },
+                { name: "分类管理", desc: "多级分类与属性树", icon: GitBranch },
+                { name: "供应商管理", desc: "供应链伙伴信息维护", icon: Server },
+                { name: "采购管理", desc: "采购单进货与账单结算", icon: Code2 },
+                { name: "出入库管理", desc: "进出库单审核与追溯", icon: Zap },
+                { name: "实物相册", desc: "商品高清图库与缩略图", icon: Globe },
+                { name: "刷单管理", desc: "计划与多店铺订单映射", icon: BookOpen },
+                { name: "权限与安全", desc: "RBAC 角色与白名单控制", icon: Shield },
               ].map((mod) => (
-                <div key={mod.name} className="rounded-2xl border border-border/40 bg-white/68 px-4 py-3 shadow-sm dark:bg-white/[0.04]">
+                <div key={mod.name} className="rounded-xl border border-border/50 bg-white/70 dark:bg-white/[0.02] p-3 shadow-2xs">
                   <div className="flex items-center gap-2">
-                    <mod.icon size={13} className="text-muted-foreground/70" />
-                    <div className="text-sm font-black text-foreground">{mod.name}</div>
+                    <mod.icon size={13} className="text-primary/70 shrink-0" />
+                    <div className="text-xs font-black text-foreground">{mod.name}</div>
                   </div>
-                  <div className="mt-1 text-xs text-muted-foreground">{mod.desc}</div>
+                  <div className="mt-0.5 text-[11px] text-muted-foreground pl-5">{mod.desc}</div>
                 </div>
               ))}
             </div>
@@ -131,43 +131,31 @@ export function SystemTab({ systemInfo }: SystemTabProps) {
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-[26px] border border-border/60 bg-white/75 shadow-sm dark:bg-white/5">
-        <div className="border-b border-border/50 bg-white/50 px-4 py-4 md:px-5 dark:bg-white/[0.03]">
-          <div className="flex items-start gap-3">
-            <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-2xl bg-rose-500/10 text-rose-500 ring-1 ring-rose-500/25">
+      <section className="overflow-hidden rounded-[28px] border border-border/70 bg-white/80 dark:bg-white/[0.02] shadow-sm backdrop-blur-xs">
+        <div className="border-b border-border/50 bg-muted/20 dark:bg-white/[0.02] px-5 py-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-rose-500/10 text-rose-500 ring-1 ring-rose-500/25">
               <Heart size={17} />
             </div>
             <div>
-              <h3 className="text-base font-black text-foreground">许可与声明</h3>
-              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">把版权说明和支持信息放到最后，作为补充信息而不是主内容。</p>
+              <h3 className="text-base font-black text-foreground">版权与技术支持</h3>
+              <p className="mt-0.5 text-xs text-muted-foreground">系统版权归属、运行声明及相关支持信息。</p>
             </div>
           </div>
         </div>
-        <div className="space-y-4 p-4 md:p-5">
-          <div className="rounded-3xl border border-border/50 bg-white/72 p-5 shadow-sm dark:bg-white/[0.04]">
+        <div className="space-y-4 p-5">
+          <div className="rounded-2xl sm:rounded-[22px] border border-border/60 bg-zinc-50/80 dark:bg-white/[0.02] p-4 sm:p-5 shadow-2xs">
             <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                <Shield size={20} />
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <Shield size={18} />
               </div>
               <div>
-                <div className="text-sm font-black text-foreground">PickNote 库存管理系统</div>
-                <div className="text-[11px] text-muted-foreground">Copyright © {new Date().getFullYear()} PickNote. All rights reserved.</div>
+                <div className="text-sm font-black text-foreground">Goods Manager 供应链管理系统</div>
+                <div className="text-[11px] text-muted-foreground">Copyright © {new Date().getFullYear()} All rights reserved.</div>
               </div>
             </div>
-            <div className="mt-4 border-t border-border/40 pt-4 text-xs leading-relaxed text-muted-foreground">
-              <p>本系统为 PickNote 内部业务管理工具，涵盖商品管理、采购结算、库存追踪、实物相册及刷单管理等核心业务场景。</p>
-              <p className="mt-2">未经授权不得转载、修改或用于商业用途。系统数据仅供授权人员访问，请妥善保管账号凭证。</p>
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-3 rounded-3xl border border-border/50 bg-white/72 px-5 py-4 shadow-sm sm:flex-row sm:items-center sm:justify-between dark:bg-white/[0.04]">
-            <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground">
-              <BookOpen size={13} />
-              文档与帮助
-            </div>
-            <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground">
-              <ExternalLink size={13} />
-              技术支持请联系管理员
+            <div className="mt-3.5 border-t border-border/50 pt-3.5 text-xs leading-relaxed text-muted-foreground">
+              <p>专为精细化库存、供应链与多平台销售订单协同而设计，涵盖完整的商品主库、店铺进货、麦芽田订单对接与门锁物联网联动。</p>
             </div>
           </div>
         </div>

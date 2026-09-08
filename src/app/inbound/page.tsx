@@ -255,120 +255,139 @@ function InboundContent() {
   }, [searchQuery, startDate, endDate, selectedShop, selectedInboundType, platformFilter, pageSize]);
 
   return (
-    <div className="space-y-8 animate-in fade-in zoom-in-95 duration-500 pb-20">
-      {/* Header section with unified style */}
-      <div className="flex flex-row items-center justify-between gap-4 mb-6 md:mb-8 transition-all">
-        <div className="flex-1 min-w-0">
-          <h1 className="text-2xl sm:text-4xl font-bold tracking-tight text-foreground truncate">入库管理</h1>
-          <p className="hidden md:block text-muted-foreground mt-2 text-sm sm:text-lg">查看入库历史、凭证明细，并进行批量或手动入库登记。</p>
+    <div className="space-y-6 pb-20 animate-in fade-in duration-300">
+      {/* 头部标题块 */}
+      <div className="flex flex-row items-center justify-between gap-4 transition-all">
+        <div>
+          <h1 className="text-2xl sm:text-4xl font-bold tracking-tight text-foreground">入库管理</h1>
+          <p className="hidden md:block text-muted-foreground mt-1.5 text-sm sm:text-base">查看入库历史、凭证明细，并进行批量或手动入库登记</p>
         </div>
-        
       </div>
 
-
-      {/* Search Box & Reset */}
-      <div className="flex flex-col md:flex-row md:items-center gap-3 mb-6 md:mb-8 text-foreground">
-        <div className="flex items-center gap-2 w-full">
-          <div className="h-10 sm:h-11 px-4 sm:px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-2 sm:gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 flex-1 min-w-0">
-              <Search size={18} className="text-muted-foreground shrink-0" />
-              <input
-                type="text"
-                placeholder="搜索入库单号或商品名称..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="bg-transparent border-none outline-none w-full text-foreground placeholder:text-muted-foreground text-sm h-full"
-              />
+      {/* Filter & Search Bar: 移动端/中屏自适应分层横滑，超大屏单行填满 */}
+      <div className="w-full flex flex-col xl:flex-row xl:items-center gap-2.5 sm:gap-3 text-foreground">
+        {/* 搜索框区域 */}
+        <div className="flex items-center gap-2 w-full xl:flex-1 min-w-0 xl:min-w-[260px]">
+          <div className="h-10 sm:h-11 px-4 rounded-full bg-white/70 dark:bg-white/5 border border-border/60 dark:border-white/10 flex items-center gap-2.5 focus-within:ring-2 focus-within:ring-sky-500/20 transition-all dark:hover:bg-white/10 flex-1 min-w-0 shadow-2xs">
+            <Search size={16} className="text-muted-foreground shrink-0" />
+            <input
+              type="text"
+              placeholder="搜索入库单号或商品名称..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="bg-transparent border-none outline-none w-full text-foreground placeholder:text-muted-foreground text-xs sm:text-sm h-full"
+            />
           </div>
 
+          {/* 移动端/小屏重置按钮 */}
           {hasActiveFilters && (
-              <button
-                  onClick={resetFilters}
-                  className="h-10 sm:h-11 px-3 sm:px-4 flex items-center justify-center gap-2 rounded-full border border-primary/20 bg-primary/5 text-primary text-xs font-bold hover:bg-primary/10 transition-all active:scale-95 shadow-sm shrink-0 whitespace-nowrap"
-              >
-                  <RotateCcw size={14} />
-                  <span className="hidden sm:inline">重置</span>
-                  <span className="sm:hidden text-[10px]">重置</span>
-              </button>
+            <button
+              onClick={resetFilters}
+              className="xl:hidden h-10 sm:h-11 px-3.5 flex items-center gap-1.5 rounded-full border border-sky-500/20 bg-sky-500/10 text-sky-600 dark:text-sky-400 text-xs font-bold hover:bg-sky-500/20 transition-all active:scale-95 shadow-2xs shrink-0 whitespace-nowrap cursor-pointer"
+            >
+              <RotateCcw size={13} />
+              <span>重置</span>
+            </button>
           )}
         </div>
 
-        <div className="grid w-full grid-cols-3 gap-2 sm:flex sm:flex-row sm:items-center sm:gap-3 sm:h-11 sm:w-auto">
-            {/* Date Range Pickers */}
-            <div className="col-span-3 flex h-10 items-center gap-1.5 sm:h-full sm:shrink-0 sm:flex-1 md:flex-none">
-                <DatePicker 
-                    value={startDate} 
-                    onChange={setStartDate} 
-                    maxDate={endDate}
-                    placeholder="起始日期" 
-                    className="h-full w-full md:w-32 lg:w-36"
-                    triggerClassName="rounded-full shadow-sm"
-                    isCompact
-                />
-                <span className="text-muted-foreground text-[10px] sm:text-xs shrink-0 font-medium whitespace-nowrap">至</span>
-                <DatePicker 
-                    value={endDate} 
-                    onChange={setEndDate} 
-                    minDate={startDate}
-                    placeholder="截至日期" 
-                    className="h-full w-full md:w-32 lg:w-36"
-                    triggerClassName="rounded-full shadow-sm"
-                    isCompact
-                />
-            </div>
+        {/* 筛选器胶囊组：移动端/中屏横向丝滑滑动，超大屏无缝平铺 */}
+        <div className="flex items-center gap-2 sm:gap-2.5 overflow-x-auto no-scrollbar py-1 shrink-0 w-full xl:w-auto -mx-1 px-1 xl:mx-0 xl:px-0 pe-4 xl:pe-0">
+          {/* 1. 门店筛选 */}
+          <div className="h-10 sm:h-11 shrink-0">
+            <CustomSelect
+              value={selectedShop}
+              onChange={setSelectedShop}
+              options={[
+                { value: "全部", label: "全部门店" },
+                ...allShopNames.map(name => ({ value: name, label: name }))
+              ]}
+              placeholder="全部门店"
+              className="h-full"
+              triggerClassName={cn(
+                "h-full rounded-full border shadow-2xs text-xs font-bold transition-all px-3.5 gap-1.5 justify-center text-foreground whitespace-nowrap",
+                selectedShop !== "全部" 
+                  ? "bg-sky-500/10 border-sky-500/20 text-sky-700 dark:bg-sky-500/20 dark:border-sky-500/30 dark:text-sky-300" 
+                  : "bg-white/70 dark:bg-white/5 border-border/60 dark:border-white/10 hover:bg-white dark:hover:bg-white/10"
+              )}
+            />
+          </div>
 
-            <div className="h-10 min-w-0 sm:h-full sm:w-28 sm:shrink-0">
-                <CustomSelect
-                    value={platformFilter}
-                    onChange={setPlatformFilter}
-                    options={[
-                      { value: "全部平台", label: "全部平台" },
-                      ...allPlatforms.map(name => ({ value: name, label: name }))
-                    ]}
-                    placeholder="全部平台"
-                    className="h-full"
-                    triggerClassName={cn(
-                        "h-full rounded-full border shadow-sm transition-all text-[10px] sm:text-sm",
-                        platformFilter !== "全部平台" ? "bg-primary/10 border-primary/20 text-primary dark:bg-primary/20 dark:border-primary/30 dark:text-primary font-medium" : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5 font-normal"
-                    )}
-                />
-            </div>
+          {/* 2. 平台筛选 */}
+          <div className="h-10 sm:h-11 shrink-0">
+            <CustomSelect
+              value={platformFilter}
+              onChange={setPlatformFilter}
+              options={[
+                { value: "全部平台", label: "全部平台" },
+                ...allPlatforms.map(name => ({ value: name, label: name }))
+              ]}
+              placeholder="全部平台"
+              className="h-full"
+              triggerClassName={cn(
+                "h-full rounded-full border shadow-2xs text-xs font-bold transition-all px-3.5 gap-1.5 justify-center text-foreground whitespace-nowrap",
+                platformFilter !== "全部平台" 
+                  ? "bg-sky-500/10 border-sky-500/20 text-sky-700 dark:bg-sky-500/20 dark:border-sky-500/30 dark:text-sky-300" 
+                  : "bg-white/70 dark:bg-white/5 border-border/60 dark:border-white/10 hover:bg-white dark:hover:bg-white/10"
+              )}
+            />
+          </div>
 
-            <div className="h-10 min-w-0 sm:h-full sm:w-28 sm:shrink-0">
-                <CustomSelect
-                    value={selectedInboundType}
-                    onChange={setSelectedInboundType}
-                    options={INBOUND_TYPE_OPTIONS.map((item) => ({ value: item.value, label: item.label }))}
-                    placeholder="入库类型"
-                    className="h-full"
-                    triggerClassName={cn(
-                        "h-full rounded-full border shadow-sm transition-all text-[10px] sm:text-sm",
-                        selectedInboundType !== INBOUND_TYPE_ALL ? "bg-primary/10 border-primary/20 text-primary dark:bg-primary/20 dark:border-primary/30 dark:text-primary font-medium" : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5 font-normal"
-                    )}
-                />
-            </div>
+          {/* 3. 类型筛选 */}
+          <div className="h-10 sm:h-11 shrink-0">
+            <CustomSelect
+              value={selectedInboundType}
+              onChange={setSelectedInboundType}
+              options={INBOUND_TYPE_OPTIONS.map((item) => ({ value: item.value, label: item.label }))}
+              placeholder="全部类型"
+              className="h-full"
+              triggerClassName={cn(
+                "h-full rounded-full border shadow-2xs text-xs font-bold transition-all px-3.5 gap-1.5 justify-center text-foreground whitespace-nowrap",
+                selectedInboundType !== INBOUND_TYPE_ALL 
+                  ? "bg-sky-500/10 border-sky-500/20 text-sky-700 dark:bg-sky-500/20 dark:border-sky-500/30 dark:text-sky-300" 
+                  : "bg-white/70 dark:bg-white/5 border-border/60 dark:border-white/10 hover:bg-white dark:hover:bg-white/10"
+              )}
+            />
+          </div>
 
-            <div className="h-10 min-w-0 sm:h-full sm:w-28 sm:shrink-0">
-                <CustomSelect
-                    value={selectedShop}
-                    onChange={setSelectedShop}
-                    options={[
-                      { value: "全部", label: "全部店铺" },
-                      ...allShopNames.map(name => ({ value: name, label: name }))
-                    ]}
-                    placeholder="全部店铺"
-                    className="h-full"
-                    triggerClassName={cn(
-                        "h-full rounded-full border shadow-sm transition-all text-[10px] sm:text-sm",
-                        selectedShop !== "全部" ? "bg-primary/10 border-primary/20 text-primary dark:bg-primary/20 dark:border-primary/30 dark:text-primary font-medium" : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5 font-normal"
-                    )}
-                />
-            </div>
+          {/* 4. Date Range Pickers: 日期 */}
+          <div className="flex items-center gap-1.5 sm:gap-2 h-10 sm:h-11 shrink-0">
+            <DatePicker 
+              value={startDate} 
+              onChange={setStartDate} 
+              maxDate={endDate}
+              placeholder="起始日期" 
+              className="h-full w-24 sm:w-28"
+              triggerClassName="rounded-full shadow-2xs border-border/60 bg-white/70 dark:bg-white/5 px-2.5"
+              isCompact
+            />
+            <span className="text-muted-foreground text-[10px] sm:text-xs shrink-0 font-medium whitespace-nowrap">至</span>
+            <DatePicker 
+              value={endDate} 
+              onChange={setEndDate} 
+              minDate={startDate}
+              placeholder="截至日期" 
+              className="h-full w-24 sm:w-28"
+              triggerClassName="rounded-full shadow-2xs border-border/60 bg-white/70 dark:bg-white/5 px-2.5"
+              isCompact
+            />
+          </div>
 
+          {/* 5. 桌面端重置按钮 */}
+          {hasActiveFilters && (
+            <button
+              onClick={resetFilters}
+              className="hidden lg:flex h-10 sm:h-11 px-3.5 items-center gap-1.5 rounded-full border border-sky-500/20 bg-sky-500/10 text-sky-600 dark:text-sky-400 text-xs font-bold hover:bg-sky-500/20 transition-all active:scale-95 shadow-2xs shrink-0 whitespace-nowrap cursor-pointer"
+            >
+              <RotateCcw size={13} />
+              <span>重置</span>
+            </button>
+          )}
         </div>
       </div>
 
       {/* Desktop Table View */}
-      <div className="hidden md:block rounded-2xl border border-border bg-white dark:bg-white/5 backdrop-blur-md shadow-sm overflow-hidden">
+      <div className="hidden md:block relative overflow-hidden rounded-[28px] border border-border/60 bg-linear-to-br from-white/95 via-white/85 to-background dark:border-white/10 dark:from-white/[0.06] dark:via-white/[0.03] dark:to-transparent backdrop-blur-md shadow-xs">
         <div className="overflow-auto max-h-[calc(100dvh-280px-env(safe-area-inset-bottom,0px))]">
           <AnimatePresence mode="wait">
             {isLoading ? (
@@ -388,19 +407,19 @@ function InboundContent() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.25 }}
-                className="w-full text-left border-collapse min-w-[800px] table-auto"
+                className="w-full text-left border-collapse min-w-[800px] table-auto text-sm"
               >
                 <thead>
-                  <tr className="border-b border-border bg-muted/30">
-                    <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">入库单信息</th>
-                    <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">包含商品</th>
-                    <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">入库金额</th>
-                    <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">状态</th>
-                    <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">入库时间</th>
-                    <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">操作</th>
+                  <tr className="border-b border-border/60 dark:border-white/10 bg-muted/40 dark:bg-white/5 text-[11px] font-black uppercase tracking-[0.14em] text-muted-foreground">
+                    <th className="px-6 py-4 text-center">入库单信息</th>
+                    <th className="px-6 py-4 text-center">包含商品</th>
+                    <th className="px-6 py-4 text-center">入库金额</th>
+                    <th className="px-6 py-4 text-center">状态</th>
+                    <th className="px-6 py-4 text-center">入库时间</th>
+                    <th className="px-6 py-4 text-center">操作</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border">
+                <tbody className="divide-y divide-border/40 dark:divide-white/5">
                     {paginatedInbounds.map((po) => {
                       const serialMatch = po.note?.match(/\[流水号:(.*?)\]/);
                       const cleanId = getCleanShortId(po.id);
@@ -410,43 +429,43 @@ function InboundContent() {
                       return (
                        <tr 
                         key={po.id}
-                        className="hover:bg-muted/20 transition-colors group"
+                        className="hover:bg-primary/[0.03] dark:hover:bg-white/[0.03] transition-colors group"
                       >
                         <td className="px-6 py-4 whitespace-nowrap text-center">
                           <div className="flex flex-col items-center justify-center gap-1.5">
                             <div className="flex items-center gap-1.5">
-                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border shadow-2xs ${
                                 isAutoInboundOrderLike(po)
-                                  ? 'bg-orange-500/10 text-orange-600 border-orange-500/20'
+                                  ? 'bg-orange-500/10 text-orange-600 border-orange-500/20 dark:text-orange-400'
                                   : po.type === "Return" || po.type === "InternalReturn"
-                                  ? 'bg-violet-500/10 text-violet-600 border-violet-500/20'
-                                  : 'bg-blue-500/10 text-blue-600 border-blue-500/20'
+                                  ? 'bg-violet-500/10 text-violet-600 border-violet-500/20 dark:text-violet-400'
+                                  : 'bg-blue-500/10 text-blue-600 border-blue-500/20 dark:text-blue-400'
                               }`}>
                                 {getInboundTypeLabel(po)}
                               </span>
                               {po.shopName && (
-                                <span className="flex items-center justify-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-primary/10 text-primary border border-primary/20 w-fit">
-                                  <Store size={10} />
-                                  {po.shopName}
+                                <span className="inline-flex items-center gap-1 rounded-full border border-sky-500/20 bg-sky-500/10 px-2.5 py-0.5 text-[10px] font-bold text-sky-700 dark:border-sky-500/30 dark:bg-sky-500/15 dark:text-sky-300 shadow-2xs">
+                                  <Store size={10} className="text-sky-600 dark:text-sky-400 shrink-0" />
+                                  <span>{po.shopName}</span>
                                 </span>
                               )}
                             </div>
-                            <span className="text-[10px] font-mono text-muted-foreground/50 font-medium">{serialText}</span>
+                            <span className="text-[10px] font-mono text-muted-foreground/60 font-medium">{serialText}</span>
                           </div>
                         </td>
                         <td className="px-6 py-4 text-center">
-                          <div className="flex flex-wrap justify-center gap-2 max-w-[320px] mx-auto">
+                          <div className="flex flex-wrap justify-center gap-1.5 max-w-[320px] mx-auto">
                             {po.items.slice(0, 3).map((item, idx) => (
                               <div 
                                 key={idx} 
-                                className="flex items-center gap-2 p-0.5 pr-2.5 rounded-full bg-secondary/30 dark:bg-white/5 border border-border/50 max-w-[180px] shadow-sm hover:border-primary/30 transition-all cursor-default"
+                                className="flex items-center gap-1.5 p-0.5 pr-2.5 rounded-full bg-white/80 dark:bg-white/5 border border-border/60 dark:border-white/10 max-w-[180px] shadow-2xs hover:border-primary/40 transition-all cursor-default"
                                 title={item.shopProduct?.name || item.product?.name || item.shopProduct?.productName || ""}
                               >
-                                <div className="w-6 h-6 shrink-0 rounded-full overflow-hidden bg-white dark:bg-black flex items-center justify-center">
+                                <div className="w-5 h-5 shrink-0 rounded-full overflow-hidden bg-muted flex items-center justify-center">
                                   {(item.shopProduct?.image || item.product?.image) ? (
                                     <img src={item.shopProduct?.image || item.product?.image || ""} className="w-full h-full object-cover" alt="" loading="lazy" />
                                   ) : (
-                                    <Package size={12} className="text-muted-foreground/50" />
+                                    <Package size={10} className="text-muted-foreground/50" />
                                   )}
                                 </div>
                                 <span className="text-[10px] font-medium truncate text-foreground/80 leading-none">
@@ -458,39 +477,39 @@ function InboundContent() {
                               </div>
                             ))}
                             {po.items.length > 3 && (
-                              <div className="flex items-center justify-center h-7 px-3 rounded-full bg-muted/50 border border-border/50 text-[10px] font-bold text-muted-foreground">
+                              <div className="flex items-center justify-center h-6 px-2.5 rounded-full bg-muted/60 dark:bg-white/5 border border-border/50 dark:border-white/10 text-[10px] font-bold text-muted-foreground">
                                 +{po.items.length - 3}
                               </div>
                             )}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-center">
-                          <div className="flex items-center justify-center font-bold text-sm text-foreground">
-                            <span className="mr-0.5 opacity-60">￥</span>
+                          <div className="flex items-center justify-center font-black text-sm text-foreground tabular-nums">
+                            <span className="mr-0.5 text-xs opacity-60">¥</span>
                             {displayAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-center">
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border bg-emerald-500/10 text-emerald-500 border-emerald-500/20">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold border bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 shadow-2xs">
                             已入库
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-sm text-muted-foreground whitespace-nowrap text-center">
-                          <div className="flex items-center justify-center gap-2">
-                              <Calendar size={14} />
-                              <span className="font-mono">
-                                  {formatLocalDateTime(po.date)}
-                              </span>
+                        <td className="px-6 py-4 text-xs text-muted-foreground whitespace-nowrap text-center">
+                          <div className="flex items-center justify-center gap-1.5 font-mono">
+                            <Calendar size={13} className="text-muted-foreground/60" />
+                            <span>{formatLocalDateTime(po.date)}</span>
                           </div>
                         </td>
                         <td className="px-6 py-4 text-center whitespace-nowrap">
+                          <div className="flex justify-center">
                             <button 
-                                onClick={() => handleView(po)}
-                                className="p-2 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-all"
-                                title="查看详情"
+                              onClick={() => handleView(po)}
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border/60 bg-white dark:border-white/10 dark:bg-white/5 text-muted-foreground hover:text-primary hover:border-primary/40 transition-all shadow-2xs cursor-pointer active:scale-90"
+                              title="查看详情"
                             >
-                                <Eye size={16} />
+                              <Eye size={14} />
                             </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -516,8 +535,8 @@ function InboundContent() {
       </div>
 
       {/* Mobile Card View */}
-      <div className="md:hidden rounded-2xl border border-border bg-white dark:bg-white/5 overflow-hidden shadow-sm">
-        <div className="p-4 space-y-4">
+      <div className="md:hidden relative overflow-hidden rounded-[28px] border border-border/60 bg-linear-to-br from-white/95 via-white/85 to-background dark:border-white/10 dark:from-white/[0.06] dark:via-white/[0.03] dark:to-transparent backdrop-blur-md shadow-xs">
+        <div className="p-3.5 sm:p-4 space-y-3">
           <AnimatePresence mode="wait">
             {isLoading ? (
               <motion.div
@@ -536,7 +555,7 @@ function InboundContent() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.25 }}
-                className="space-y-4"
+                className="space-y-3"
               >
                 {paginatedInbounds.map((po) => {
                   const serialMatch = po.note?.match(/\[流水号:(.*?)\]/);
@@ -548,42 +567,42 @@ function InboundContent() {
                   <div
                     key={po.id}
                     onClick={() => handleView(po)}
-                    className="rounded-2xl border border-border/50 bg-white/50 dark:bg-white/5 p-4 shadow-sm active:scale-[0.98] transition-all cursor-pointer"
+                    className="rounded-[22px] border border-border/60 bg-white/70 dark:bg-white/[0.03] p-4 shadow-2xs active:scale-[0.98] transition-all cursor-pointer hover:border-primary/40"
                   >
                     <div className="flex items-center justify-between mb-3">
                        <div className="flex flex-wrap items-center gap-1.5 min-w-0 flex-1">
-                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${
-                             po.id.startsWith('PO-AUTO') ? 'bg-orange-500/10 text-orange-600 border-orange-500/20' : 'bg-blue-500/10 text-blue-600 border-blue-500/20'
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border shadow-2xs ${
+                             po.id.startsWith('PO-AUTO') ? 'bg-orange-500/10 text-orange-600 border-orange-500/20 dark:text-orange-400' : 'bg-blue-500/10 text-blue-600 border-blue-500/20 dark:text-blue-400'
                           }`}>
                             {po.id.startsWith('PO-AUTO') ? '系统补库' : '采购入库'}
                           </span>
                           {po.shopName && (
-                            <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold bg-primary/10 text-primary border border-primary/20">
-                              <Store size={8} />
-                              {po.shopName}
+                            <span className="inline-flex items-center gap-1 rounded-full border border-sky-500/20 bg-sky-500/10 px-2 py-0.5 text-[10px] font-bold text-sky-700 dark:border-sky-500/30 dark:bg-sky-500/15 dark:text-sky-300 shadow-2xs">
+                              <Store size={9} className="text-sky-600 dark:text-sky-400 shrink-0" />
+                              <span>{po.shopName}</span>
                             </span>
                           )}
-                          <span className="inline-flex items-center rounded-full border border-black/8 bg-black/3 dark:border-white/10 dark:bg-white/4 px-2 py-0.5 text-[10px] font-mono font-black text-foreground/80 whitespace-nowrap">
+                          <span className="inline-flex items-center rounded-full border border-border/60 bg-muted/40 dark:border-white/10 dark:bg-white/5 px-2 py-0.5 text-[10px] font-mono font-bold text-foreground/80 whitespace-nowrap">
                             {shortIdText}
                           </span>
                        </div>
-                       <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 uppercase shrink-0">
+                       <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 uppercase shrink-0 shadow-2xs">
                           已入库
                        </span>
                     </div>
                     
-                    <div className="flex flex-wrap gap-2 mb-3 mt-1">
+                    <div className="flex flex-wrap gap-1.5 mb-3 mt-1">
                       {po.items.slice(0, 4).map((item, idx) => (
                         <div 
                           key={idx} 
-                          className="flex items-center gap-2 p-0.5 pr-2.5 rounded-full bg-secondary/30 dark:bg-white/5 border border-border/50 max-w-[160px] shadow-sm"
+                          className="flex items-center gap-1.5 p-0.5 pr-2 rounded-full bg-white/80 dark:bg-white/5 border border-border/60 dark:border-white/10 max-w-[160px] shadow-2xs"
                           title={item.shopProduct?.name || item.product?.name || item.shopProduct?.productName || ""}
                         >
-                          <div className="w-5 h-5 shrink-0 rounded-full overflow-hidden bg-white dark:bg-black flex items-center justify-center">
+                          <div className="w-4.5 h-4.5 shrink-0 rounded-full overflow-hidden bg-muted flex items-center justify-center">
                             {(item.shopProduct?.image || item.product?.image) ? (
                               <img src={item.shopProduct?.image || item.product?.image || ""} className="w-full h-full object-cover" alt="" loading="lazy" />
                             ) : (
-                              <Package size={10} className="text-muted-foreground/50" />
+                              <Package size={9} className="text-muted-foreground/50" />
                             )}
                           </div>
                           <span className="text-[10px] font-medium truncate text-foreground/80 leading-none">
@@ -595,20 +614,20 @@ function InboundContent() {
                         </div>
                       ))}
                       {po.items.length > 4 && (
-                        <div className="flex items-center justify-center h-6 px-2.5 rounded-full bg-muted/50 border border-border/50 text-[10px] font-bold text-muted-foreground">
+                        <div className="flex items-center justify-center h-5.5 px-2 rounded-full bg-muted/60 dark:bg-white/5 border border-border/50 dark:border-white/10 text-[9px] font-bold text-muted-foreground">
                           +{po.items.length - 4}
                         </div>
                       )}
                     </div>
 
-                    <div className="flex items-center justify-between mt-4 border-t border-border/10 pt-3">
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                          <Calendar size={12} />
+                    <div className="flex items-center justify-between mt-3.5 border-t border-border/50 dark:border-white/5 pt-2.5">
+                      <div className="flex items-center gap-1.5 text-muted-foreground">
+                          <Calendar size={11} className="text-muted-foreground/60" />
                           <span className="text-[10px] font-mono">{formatLocalDateTime(po.date)}</span>
                       </div>
-                       <div className="font-bold text-foreground text-sm flex items-center gap-1">
-                           <span className="text-[10px] text-muted-foreground font-normal">金额:</span>
-                           <span className="text-[10px] text-muted-foreground">￥</span>
+                       <div className="font-black text-foreground text-sm flex items-center gap-0.5 tabular-nums">
+                           <span className="text-[10px] text-muted-foreground font-normal mr-1">金额</span>
+                           <span className="text-xs opacity-60">¥</span>
                            {displayAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                        </div>
                      </div>

@@ -10,11 +10,13 @@ import { createPortal } from "react-dom";
 import { FinanceMath } from "@/lib/math";
 
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
+import { CustomSelect } from "@/components/ui/CustomSelect";
 import { useToast } from "@/components/ui/Toast";
 import { useUser } from "@/hooks/useUser";
 import { hasPermission, SessionUser } from "@/lib/permissions";
 import { User } from "@/lib/types";
 import { isAddressDisabled } from "@/lib/addressBook";
+import { cn } from "@/lib/utils";
 
 interface PlatformData {
   id: string;
@@ -393,90 +395,44 @@ export default function SettlementPage() {
 
   return (
     <div className="w-full space-y-6 pb-20 px-2 sm:px-4 max-w-7xl mx-auto">
-      {/* Unified Dashboard Header */}
-      <div className="relative space-y-5">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="bg-primary/10 p-2 rounded-xl text-primary shrink-0">
-              <Receipt size={24} />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <div className="flex items-center gap-2">
-                <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground leading-none">
-                  单店对账台
-                </h1>
-                {editId && (
-                  <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20 text-[10px] font-black uppercase tracking-wider animate-pulse">
-                    <Edit2 size={10} />
-                    正在编辑历史记录
-                  </div>
-                )}
-              </div>
-              <p className="hidden sm:block text-sm text-slate-500 dark:text-slate-400 font-medium">
-                {editId ? "正在修改已保存的结算单。更新后将同步至历史记录。" : "专注为每家店铺生成单独的结算发票。填写完毕即刻保存入账。"}
-              </p>
-            </div>
+      {/* Unified Dashboard Header：单行并排两端对齐，历史记录按钮靠右不独占一行 */}
+      <div className="flex items-center justify-between gap-3 sm:gap-4">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="hidden sm:flex bg-primary/10 p-2 rounded-xl text-primary shrink-0">
+            <Receipt size={22} />
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <h1 className="text-xl sm:text-3xl font-black tracking-tight text-foreground truncate leading-none">
+              单店对账台
+            </h1>
             {editId && (
-              <button 
-                onClick={handleCancelEdit}
-                className="flex h-10 items-center justify-center gap-2 rounded-full border border-rose-500/30 bg-rose-500/5 text-rose-600 dark:text-rose-400 px-4 text-sm font-bold transition-all hover:bg-rose-500/10 active:scale-95"
-              >
-                <ChevronLeft size={16} strokeWidth={3} />
-                返回历史
-              </button>
-            )}
-            {!editId && (
-              <button 
-                onClick={handleHistoryClick}
-                className="flex h-10 items-center justify-center gap-2 rounded-full border border-border/50 bg-white dark:bg-white/5 text-foreground px-5 text-sm font-bold transition-all hover:bg-muted/50 dark:hover:bg-white/10 shadow-sm active:scale-95"
-              >
-                <History size={16} />
-                历史记录
-              </button>
+              <div className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20 text-[10px] font-bold uppercase tracking-wider animate-pulse shrink-0">
+                <Edit2 size={10} />
+                <span>编辑中</span>
+              </div>
             )}
           </div>
         </div>
-        <p className="sm:hidden text-xs text-slate-500 dark:text-slate-400 font-medium pl-1">
-          专注为每家店铺生成单独的结算发票。填写完毕即刻保存入账。
-        </p>
 
-        {/* Shop Segmented Control */}
-        <div className="p-1 rounded-[20px] bg-white dark:bg-white/5 border border-border/40 inline-flex flex-wrap gap-1 shadow-inner backdrop-blur-md relative overflow-hidden">
-          {editId && (
-            <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm" />
+        {/* 顶部操作按钮：并排置于右侧 */}
+        <div className="flex items-center gap-2 shrink-0">
+          {editId ? (
+            <button 
+              onClick={handleCancelEdit}
+              className="flex h-8.5 sm:h-10 items-center justify-center gap-1.5 rounded-full border border-rose-500/30 bg-rose-500/5 text-rose-600 dark:text-rose-400 px-3 sm:px-4 text-xs sm:text-sm font-bold transition-all hover:bg-rose-500/10 active:scale-95 cursor-pointer"
+            >
+              <ChevronLeft size={14} strokeWidth={2.5} />
+              <span>返回历史</span>
+            </button>
+          ) : (
+            <button 
+              onClick={handleHistoryClick}
+              className="flex h-8.5 sm:h-10 items-center justify-center gap-1.5 rounded-full border border-border/60 bg-white/80 dark:bg-white/5 text-foreground px-3.5 sm:px-5 text-xs sm:text-sm font-bold transition-all hover:bg-white dark:hover:bg-white/10 shadow-2xs active:scale-95 cursor-pointer"
+            >
+              <History size={14} className="text-muted-foreground" />
+              <span>对账历史记录</span>
+            </button>
           )}
-          {editId && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-               <div className="bg-black/80 text-white text-[10px] px-3 py-1 rounded-full font-bold">编辑模式下锁定切换</div>
-            </div>
-          )}
-          {shops.map((shop) => {
-            const isActive = shop.label === activeShop;
-            const hasData = groups.find(g => g.shopName === shop.label)?.hasData;
-            return (
-              <button
-                key={shop.id}
-                onClick={() => !editId && setActiveShop(shop.label)}
-                disabled={!!editId && !isActive}
-                className={`relative flex items-center gap-2 rounded-[14px] px-5 py-2 text-sm font-bold transition-all duration-300 ${
-                  isActive
-                    ? "bg-white dark:bg-white/10 text-primary shadow-sm ring-1 ring-black/5 dark:ring-white/10"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted/30 dark:hover:bg-white/5 disabled:opacity-40"
-                }`}
-              >
-                <Store size={14} className={isActive ? "text-primary" : "text-muted-foreground/60"} />
-                {shop.label}
-                {hasData && !isActive && (
-                  <div className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-orange-500 rounded-full shadow-[0_0_8px_rgba(249,115,22,0.5)]" />
-                )}
-                {isActive && (
-                  <motion.div layoutId="active-shop-pill" className="absolute inset-0 rounded-[14px] border border-primary/20 pointer-events-none" />
-                )}
-              </button>
-            );
-          })}
         </div>
       </div>
 
@@ -510,40 +466,81 @@ export default function SettlementPage() {
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
           {/* 左侧：主工作台 */}
           <main className="space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-[24px] border border-border/50 bg-white/90 dark:bg-white/5 p-4 shadow-sm transition-colors hover:border-border/80">
-              <div className="flex items-center gap-4">
-                <div className="bg-white dark:bg-white/5 p-2.5 rounded-2xl shadow-sm">
-                  <FileText size={20} className="text-primary" />
+            <div className="rounded-[24px] border border-border/50 bg-white/90 dark:bg-white/5 p-4 sm:p-5 shadow-sm transition-colors hover:border-border/80 space-y-3.5 md:grid md:grid-cols-[minmax(0,1fr)_auto] md:items-center md:gap-4 md:space-y-0">
+              {/* 卡片上半层：左侧基准参数与费率，右上角店铺选择下拉列表 */}
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 sm:gap-3.5 min-w-0">
+                  <div className="bg-white dark:bg-white/10 p-2 sm:p-2.5 rounded-2xl shadow-2xs border border-border/40 dark:border-white/10 shrink-0">
+                    <FileText size={18} className="text-foreground" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-muted-foreground">对账单基准参数</div>
+                    <div className="font-bold tracking-tight text-foreground text-xs sm:text-sm mt-0.5 truncate">
+                      <span>综合抽成费率 </span>
+                      <span className="font-mono font-black">{(activeGroup.serviceFeeRate * 100).toFixed(1)}%</span>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <div className="text-[11px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">当前结算单基准</div>
-                  <div className="font-bold tracking-tight text-foreground mt-0.5">{activeGroup.shopName} · 综合抽成费率 {(activeGroup.serviceFeeRate * 100).toFixed(1)}%</div>
+
+                {/* 右上角：店铺切换下拉列表 */}
+                <div className="w-[125px] sm:w-[155px] shrink-0">
+                  {editId ? (
+                    <div 
+                      className="h-8.5 sm:h-9 px-3 rounded-full border border-border/40 bg-muted/40 text-muted-foreground text-xs font-bold flex items-center justify-between gap-1.5 cursor-not-allowed select-none shadow-2xs"
+                      title="编辑历史账单模式下已锁定当前店铺"
+                    >
+                      <span className="truncate">{activeShop}</span>
+                      <span className="text-[10px] text-amber-600 dark:text-amber-400 font-normal shrink-0">(锁定)</span>
+                    </div>
+                  ) : (
+                    <CustomSelect
+                      options={shops.map((shop) => {
+                        const hasData = groups.find(g => g.shopName === shop.label)?.hasData;
+                        return {
+                          value: shop.label,
+                          label: hasData ? `${shop.label} (已填)` : shop.label,
+                        };
+                      })}
+                      value={activeShop}
+                      onChange={(val) => setActiveShop(val)}
+                      placeholder="选择店铺"
+                      align="right"
+                      matchTriggerWidth
+                      className="h-8.5 sm:h-9 w-full"
+                      triggerClassName="h-full rounded-full border border-border/60 dark:border-white/10 bg-white dark:bg-white/5 px-3 text-xs font-bold shadow-2xs hover:bg-slate-50 dark:hover:bg-white/10 transition-all text-foreground justify-between whitespace-nowrap"
+                    />
+                  )}
                 </div>
               </div>
-              <div className="flex items-center gap-3 w-full sm:w-auto relative" ref={monthPickerContainerRef}>
-                <button 
-                  onClick={() => {
-                    setPickerYear(parseInt(businessMonth.split('-')[0]));
-                    setIsMonthPickerOpen(!isMonthPickerOpen);
-                  }}
-                  className={`flex items-center justify-between gap-2 h-10 w-full sm:w-[150px] rounded-2xl bg-white dark:bg-white/5 border border-border dark:border-white/10 px-4 text-sm transition-all outline-none ${
-                    isMonthPickerOpen ? "ring-2 ring-primary/20 border-primary/20 shadow-lg" : "hover:bg-muted/50 dark:hover:bg-white/10"
-                  }`}
-                >
-                  <div className="flex items-center justify-center gap-2 min-w-0 flex-1">
-                    <CalendarDays size={14} className={businessMonth ? "text-primary" : "text-muted-foreground"} />
-                    <span className="truncate text-foreground font-medium">
-                      {businessMonth ? format(new Date(businessMonth + "-01"), "yyyy-MM") : "选择月份"}
-                    </span>
-                  </div>
-                </button>
+
+              {/* 卡片下半层：月份选择器 + 刷新重置按钮 */}
+              <div className="flex items-center justify-between gap-2.5 pt-3 border-t border-border/40 dark:border-white/5 md:justify-end md:border-t-0 md:pt-0">
+                <div className="relative flex-1 sm:flex-initial" ref={monthPickerContainerRef}>
+                  <button 
+                    onClick={() => {
+                      setPickerYear(parseInt(businessMonth.split('-')[0]));
+                      setIsMonthPickerOpen(!isMonthPickerOpen);
+                    }}
+                    className={`flex items-center justify-between gap-2 h-9 w-full sm:w-[160px] rounded-full bg-white dark:bg-white/5 border border-border/60 dark:border-white/10 px-3.5 text-xs sm:text-sm transition-all outline-none shadow-2xs ${
+                      isMonthPickerOpen ? "ring-2 ring-primary/20 border-primary/20" : "hover:bg-slate-50 dark:hover:bg-white/10"
+                    }`}
+                  >
+                    <div className="flex items-center justify-center gap-2 min-w-0 flex-1">
+                      <CalendarDays size={13} className={businessMonth ? "text-primary" : "text-muted-foreground"} />
+                      <span className="truncate text-foreground font-mono font-bold text-xs">
+                        {businessMonth ? format(new Date(businessMonth + "-01"), "yyyy年MM月") : "选择月份"}
+                      </span>
+                    </div>
+                  </button>
+                </div>
+
                 <button 
                   onClick={() => setIsConfirmResetOpen(true)} 
                   disabled={!!editId}
                   title={editId ? "编辑模式无法重置" : "重置本店数据"} 
-                  className="h-10 w-10 flex items-center justify-center rounded-xl border border-border/10 bg-white dark:bg-white/5 shadow-sm text-muted-foreground hover:dark:bg-white/10 transition-colors shrink-0 disabled:opacity-30 disabled:cursor-not-allowed"
+                  className="h-9 w-9 flex items-center justify-center rounded-full border border-border/60 dark:border-white/10 bg-white dark:bg-white/5 shadow-2xs text-muted-foreground hover:text-foreground hover:bg-slate-50 dark:hover:bg-white/10 transition-all shrink-0 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
                 >
-                  <RefreshCw size={16} />
+                  <RefreshCw size={14} />
                 </button>
 
                 <ConfirmModal 

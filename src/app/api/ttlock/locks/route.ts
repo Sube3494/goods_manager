@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthorizedUser } from "@/lib/auth";
-import { listTTLocksByUserId } from "@/lib/ttlock";
+import { getPublicTTLockIntegrationConfigByUserId, listTTLocksByUserId } from "@/lib/ttlock";
 import { createHash } from "crypto";
 
 export const dynamic = "force-dynamic";
@@ -32,9 +32,15 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(result);
   } catch (error) {
-    console.error("Failed to load TTLock locks:", error);
+    const message = error instanceof Error ? error.message : "Failed to load TTLock locks";
+    const isAuthExpired = /授权已失效|refresh[_ ]token|invalid refresh/i.test(message);
+    if (!isAuthExpired) {
+      console.error("Failed to load TTLock locks:", error);
+    }
+    const config = await getPublicTTLockIntegrationConfigByUserId(session.id).catch(() => null);
     return NextResponse.json({
-      error: error instanceof Error ? error.message : "Failed to load TTLock locks",
-    }, { status: 500 });
+      error: message,
+      config,
+    }, { status: isAuthExpired ? 409 : 500 });
   }
 }

@@ -117,7 +117,7 @@ function toTTLockUserMessage(input: unknown) {
     return "TTLock App 密码有误，请检查后重新登录";
   }
 
-  if (normalized.includes("refresh token")) {
+  if (normalized.includes("refresh token") || normalized.includes("refresh_token")) {
     return "TTLock 授权已失效，请重新登录并重新获取门锁";
   }
 
@@ -470,10 +470,23 @@ export async function refreshTTLockAccessTokenByUserId(userId: string) {
   return await saveTTLockIntegrationConfigByUserId(userId, next);
 }
 
+function isTTLockTokenExpiredMessage(message: string) {
+  const normalized = message.toLowerCase();
+  return normalized.includes("授权已失效")
+    || normalized.includes("refresh token")
+    || normalized.includes("refresh_token")
+    || normalized.includes("invalid refresh");
+}
+
 async function markTTLockTokenError(userId: string, message: string) {
   const config = await getTTLockIntegrationConfigByUserId(userId);
+  const shouldClearToken = isTTLockTokenExpiredMessage(message);
   return await saveTTLockIntegrationConfigByUserId(userId, {
     ...config,
+    accessToken: shouldClearToken ? "" : config.accessToken,
+    refreshToken: shouldClearToken ? "" : config.refreshToken,
+    accessTokenExpiresAt: shouldClearToken ? null : config.accessTokenExpiresAt,
+    refreshTokenExpiresAt: shouldClearToken ? null : config.refreshTokenExpiresAt,
     lastTokenError: toTTLockUserMessage(message).slice(0, 500),
   });
 }

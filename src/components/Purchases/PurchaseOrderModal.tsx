@@ -102,19 +102,32 @@ const PurchaseItemRow = memo(({
     return (
         <div 
             className={cn(
-                "group relative flex flex-col sm:grid items-center gap-4 p-4 rounded-2xl border shadow-sm transition-all",
+                "group relative flex flex-col sm:grid items-center gap-3 sm:gap-4 px-3 sm:px-5 py-3 sm:py-3.5 transition-colors hover:bg-muted/20 dark:hover:bg-white/[0.02]",
                 isBatchMode
                     ? isChecked
-                        ? 'bg-destructive/5 border-destructive/30 dark:bg-destructive/10 dark:border-destructive/20 cursor-pointer'
-                        : 'bg-white dark:bg-white/10 border-border dark:border-white/5 cursor-pointer'
-                    : 'bg-white dark:bg-white/10 border-border dark:border-white/5',
-                readOnly ? 'sm:grid-cols-[1fr_100px_120px_120px]' : 'sm:grid-cols-[1fr_80px_120px_120px_40px]'
+                        ? 'bg-destructive/5 dark:bg-destructive/10 cursor-pointer'
+                        : 'cursor-pointer'
+                    : '',
+                readOnly ? 'sm:grid-cols-[1fr_100px_120px_120px]' : 'sm:grid-cols-[1fr_90px_120px_120px_48px]'
             )}
             onClick={isBatchMode ? () => onToggle(itemKey) : undefined}
         >
             {/* Product Info Column */}
-            <div className="flex w-full items-center gap-3">
-                <div className="h-10 w-10 shrink-0 rounded-lg overflow-hidden bg-background border border-border/50">
+            <div className="flex w-full items-center gap-3 min-w-0">
+                {/* Batch selection indicator on desktop */}
+                {isBatchMode && (
+                    <div className="hidden sm:flex shrink-0 items-center justify-center">
+                        <div className={cn(
+                            "h-5 w-5 rounded-full border-2 transition-all duration-200 flex items-center justify-center shrink-0",
+                            isChecked
+                                ? 'bg-destructive border-destructive text-white shadow-xs'
+                                : 'bg-white dark:bg-white/5 border-border/80 dark:border-white/20 group-hover:border-destructive/60'
+                        )}>
+                            {isChecked && <Check size={11} strokeWidth={3.5} />}
+                        </div>
+                    </div>
+                )}
+                <div className="h-11 w-11 shrink-0 rounded-xl overflow-hidden bg-muted/40 dark:bg-white/5 border border-border/60 dark:border-white/10 shadow-2xs">
                     {productData.imageUrl ? (
                         /* eslint-disable-next-line @next/next/no-img-element */
                         <img 
@@ -124,35 +137,35 @@ const PurchaseItemRow = memo(({
                         />
                     ) : (
                         <div className="h-full w-full flex items-center justify-center text-muted-foreground/40">
-                            <Package size={14} />
+                            <Package size={16} />
                         </div>
                     )}
                 </div>
                 <div className="flex-1 space-y-1 min-w-0">
                     <div className="flex flex-col gap-0.5 min-w-0">
                         <div className="flex items-start justify-between gap-2">
-                            <span className="text-xs sm:text-sm font-medium text-foreground line-clamp-2">
+                            <span className="text-xs sm:text-sm font-bold text-foreground line-clamp-2">
                                 {productData.productName}
                             </span>
                             {!readOnly && (
                                 isBatchMode ? (
                                     <div className={cn(
-                                        "sm:hidden shrink-0 flex items-center justify-center h-5 w-5 rounded-md border-2 transition-all",
+                                        "sm:hidden shrink-0 flex items-center justify-center h-5 w-5 rounded-full border-2 transition-all",
                                         isChecked
                                             ? 'bg-destructive border-destructive text-white'
-                                            : 'border-border dark:border-white/30'
+                                            : 'border-border/80 dark:border-white/20 bg-white dark:bg-white/5'
                                     )}>
-                                        {isChecked && <Check size={11} strokeWidth={3} />}
+                                        {isChecked && <Check size={11} strokeWidth={3.5} />}
                                     </div>
                                 ) : (
                                      <button 
                                         type="button"
                                         onClick={handleDeleteClick}
                                         className={cn(
-                                            "sm:hidden h-8 px-2 rounded-xl transition-all inline-flex items-center justify-center gap-1 active:scale-95 shrink-0 flex-nowrap",
+                                            "sm:hidden h-8 px-2.5 rounded-full transition-all inline-flex items-center justify-center gap-1 active:scale-95 shrink-0 flex-nowrap",
                                             confirmingDelete
-                                                ? 'bg-primary text-primary-foreground shadow-sm min-w-[52px]'
-                                                : 'text-primary/40 hover:text-primary hover:bg-primary/10 min-w-[32px]'
+                                                ? 'bg-destructive text-white shadow-xs min-w-[54px]'
+                                                : 'text-muted-foreground/60 hover:text-destructive hover:bg-destructive/10 min-w-[32px]'
                                         )}
                                         title="移除商品"
                                     >
@@ -162,19 +175,19 @@ const PurchaseItemRow = memo(({
                                 )
                             )}
                         </div>
-                         <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                        <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
                             {productData.productSku && (
-                                <span className="text-[10px] text-muted-foreground flex items-center gap-1 font-mono">
+                                <span className="text-[10px] font-mono font-semibold text-muted-foreground bg-muted/50 dark:bg-white/5 px-2 py-0.5 rounded-full border border-border/40 dark:border-white/10">
                                     #{productData.productSku}
                                 </span>
                             )}
                             {productData.supplierName && (
-                                <span className="text-[10px] text-muted-foreground flex items-center gap-1 font-mono">
+                                <span className="text-[10px] text-muted-foreground/80 flex items-center gap-1 font-mono">
                                     • {productData.supplierName}
                                 </span>
                             )}
                             {productData.remark && (
-                                <span className="flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded w-fit max-w-full truncate">
+                                <span className="flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20 w-fit max-w-full truncate">
                                     <span className="font-bold opacity-70 shrink-0">注:</span>
                                     <span className="truncate leading-none">{productData.remark}</span>
                                 </span>
@@ -190,7 +203,7 @@ const PurchaseItemRow = memo(({
                                         }
                                     }}
                                     className={cn(
-                                        "flex items-center gap-1 text-[10px] px-2.5 py-0.5 rounded-full w-fit max-w-full font-bold shadow-sm transition-all duration-300 hover:scale-105 active:scale-95 border",
+                                        "flex items-center gap-1 text-[10px] px-2.5 py-0.5 rounded-full w-fit max-w-full font-bold shadow-2xs transition-all duration-300 hover:scale-105 active:scale-95 border",
                                         item.batches && item.batches.length > 0
                                             ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
                                             : "bg-amber-500/10 text-amber-600 dark:text-amber-500 border-amber-500/20 animate-pulse animate-duration-3000"
@@ -210,12 +223,12 @@ const PurchaseItemRow = memo(({
             </div>
             
             {/* Mobile Stats Row / Desktop Columns */}
-            <div className="grid grid-cols-3 sm:contents gap-2 w-full pt-3 sm:pt-0 border-t border-border/10 sm:border-0 items-center">
+            <div className="grid grid-cols-3 sm:contents gap-2 w-full pt-2.5 sm:pt-0 border-t border-border/40 sm:border-0 items-center">
                 {/* Quantity Column */}
                 <div className="flex flex-col sm:block items-center justify-center">
                     <label className="sm:hidden text-[9px] text-muted-foreground/60 font-bold uppercase tracking-tighter mb-0.5">数量</label>
                     {readOnly ? (
-                        <div className="w-full h-[34px] flex items-center justify-center rounded-lg bg-gray-50 dark:bg-white/5 border border-border dark:border-white/10 text-xs font-mono font-bold text-foreground">
+                        <div className="w-full h-9 flex items-center justify-center rounded-full bg-muted/40 dark:bg-white/[0.03] border border-border/70 dark:border-white/10 text-xs font-mono font-bold text-foreground shadow-2xs">
                             {item.quantity}
                         </div>
                     ) : (
@@ -225,7 +238,7 @@ const PurchaseItemRow = memo(({
                             value={quantityInput ?? ""}
                             onChange={(e) => onQuantityInputChange?.(itemKey, e.target.value)}
                             onBlur={() => onQuantityInputBlur?.(itemKey)}
-                            className="w-full h-[34px] rounded-lg bg-white dark:bg-white/5 border border-border dark:border-white/10 px-2 py-1.5 text-foreground outline-none ring-1 ring-transparent text-center focus:ring-2 focus:ring-primary/20 transition-all font-mono text-xs no-spinner"
+                            className="w-full h-9 rounded-full bg-white dark:bg-white/5 border border-border/80 dark:border-white/10 px-2 py-1 text-foreground outline-none text-center focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all font-mono text-xs font-bold no-spinner shadow-2xs"
                         />
                     )}
                 </div>
@@ -234,20 +247,20 @@ const PurchaseItemRow = memo(({
                 <div className="flex flex-col sm:block items-center justify-center">
                     <label className="sm:hidden text-[9px] text-muted-foreground/60 font-bold uppercase tracking-tighter mb-0.5">单价</label>
                     {readOnly && !allowCostEdit ? (
-                        <div className="relative w-full h-[34px] flex items-center justify-center rounded-lg bg-gray-50 dark:bg-white/5 border border-border dark:border-white/10 text-xs font-mono text-foreground">
-                            <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground">￥</span>
+                        <div className="relative w-full h-9 flex items-center justify-center rounded-full bg-muted/40 dark:bg-white/[0.03] border border-border/70 dark:border-white/10 text-xs font-mono font-bold text-foreground shadow-2xs">
+                            <span className="text-[10px] text-muted-foreground mr-0.5">￥</span>
                             {item.costPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </div>
                     ) : (
                         <div className="relative w-full">
-                            <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground">￥</span>
+                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground font-mono">￥</span>
                             <input 
                                 type="number" 
                                 step="0.01"
                                 value={costPriceInput ?? ""}
                                 onChange={(e) => onCostPriceInputChange?.(itemKey, e.target.value)}
                                 onBlur={() => onCostPriceInputBlur?.(itemKey)}
-                                className="w-full h-[34px] rounded-lg bg-white dark:bg-white/5 border border-border dark:border-white/10 pl-5 pr-1 py-1.5 text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all font-mono text-xs no-spinner"
+                                className="w-full h-9 rounded-full bg-white dark:bg-white/5 border border-border/80 dark:border-white/10 pl-6 pr-2 py-1 text-foreground outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all font-mono text-xs font-bold text-center no-spinner shadow-2xs"
                             />
                         </div>
                     )}
@@ -257,13 +270,13 @@ const PurchaseItemRow = memo(({
                 <div className="flex flex-col sm:block items-center justify-center">
                     <label className="sm:hidden text-[9px] text-muted-foreground/60 font-bold uppercase tracking-tighter mb-0.5">小计</label>
                     {readOnly || allowCostEdit ? (
-                        <div className="h-[34px] flex items-center justify-end px-3 rounded-lg bg-gray-50 dark:bg-white/5 border border-border dark:border-white/10 text-foreground font-bold text-xs overflow-hidden whitespace-nowrap">
+                        <div className="h-9 flex items-center justify-end px-3 rounded-full bg-muted/40 dark:bg-white/[0.03] border border-border/70 dark:border-white/10 text-foreground font-bold font-mono text-xs overflow-hidden whitespace-nowrap shadow-2xs">
                             <span className="text-muted-foreground mr-0.5 font-normal text-[10px]">￥</span>
                             {(item.quantity * item.costPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </div>
                     ) : (
                         <div className="relative w-full">
-                            <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground">￥</span>
+                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground font-mono">￥</span>
                             <input
                                 type="number"
                                 step="0.01"
@@ -271,31 +284,22 @@ const PurchaseItemRow = memo(({
                                 value={lineTotalInput ?? ""}
                                 onChange={(e) => onLineTotalInputChange?.(itemKey, e.target.value)}
                                 onBlur={() => onLineTotalInputBlur?.(itemKey)}
-                                className="w-full h-[34px] rounded-lg bg-white dark:bg-white/5 border border-border dark:border-white/10 pl-5 pr-1 py-1.5 text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all font-mono text-xs text-right no-spinner"
+                                className="w-full h-9 rounded-full bg-white dark:bg-white/5 border border-border/80 dark:border-white/10 pl-6 pr-3 py-1 text-foreground outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all font-mono text-xs font-bold text-right no-spinner shadow-2xs"
                             />
                         </div>
                     )}
                 </div>
                 {!readOnly && (
-                    <div className="hidden sm:flex w-full sm:w-auto pt-2 sm:pt-0 justify-end">
-                        {isBatchMode ? (
-                            <div className={cn(
-                                "flex items-center justify-center h-5 w-5 rounded-md border-2 transition-all",
-                                isChecked
-                                    ? 'bg-destructive border-destructive text-white'
-                                    : 'border-border dark:border-white/20'
-                            )}>
-                                {isChecked && <Check size={11} strokeWidth={3} />}
-                            </div>
-                        ) : (
+                    <div className="hidden sm:flex w-full sm:w-auto justify-end">
+                        {!isBatchMode && (
                             <button 
                                 type="button"
                                 onClick={handleDeleteClick}
                                 className={cn(
-                                    "h-8 px-2 rounded-xl transition-all inline-flex items-center justify-center gap-1 active:scale-95 shrink-0 flex-nowrap",
+                                    "h-8 px-2 rounded-full transition-all inline-flex items-center justify-center gap-1 active:scale-95 shrink-0 flex-nowrap",
                                     confirmingDelete
-                                        ? 'bg-primary text-primary-foreground shadow-sm min-w-[52px]'
-                                        : 'text-primary/40 hover:text-primary hover:bg-primary/10 min-w-[32px] sm:opacity-0 group-hover:opacity-100'
+                                        ? 'bg-destructive text-white shadow-xs min-w-[54px]'
+                                        : 'text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 min-w-[32px] sm:opacity-0 group-hover:opacity-100'
                                 )}
                                 title="移除商品"
                             >
@@ -333,22 +337,22 @@ const FeePill = memo(({
     colorClass: string;
     prefix?: string;
 }) => (
-    <div className={cn("flex shrink-0 items-center gap-2 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full bg-white/50 dark:bg-white/5 border border-border/50 shadow-sm transition-all hover:border-orange-500/30 group", colorClass)}>
+    <div className={cn("flex shrink-0 items-center gap-2 px-3 py-1.5 rounded-full bg-white dark:bg-white/5 border border-border/80 dark:border-white/10 shadow-2xs transition-all hover:border-primary/40 group", colorClass)}>
         <div className={cn("p-1 rounded-full", colorClass.replace('border-', 'bg-').replace('/30', '/10'))}>
-            <Icon size={10} />
+            <Icon size={11} />
         </div>
-        <span className="text-[10px] font-bold text-muted-foreground/60">{label}</span>
+        <span className="text-[11px] font-bold text-muted-foreground">{label}</span>
         {readOnly ? (
             <span className="text-xs font-mono font-black text-foreground">{prefix}{value}</span>
         ) : (
             <div className="flex items-center text-xs font-mono font-black border-none outline-none">
-                <span className="text-[9px] opacity-40">{prefix}</span>
+                <span className="text-[10px] text-muted-foreground/60 mr-0.5">{prefix}</span>
                 <input 
                     type="number" 
                     value={inputValue}
                     onChange={(e) => onChange(e.target.value)}
                     onBlur={onBlur}
-                    className="w-10 sm:w-12 bg-transparent text-foreground outline-none no-spinner p-0 h-auto"
+                    className="w-12 sm:w-14 bg-transparent text-foreground outline-none no-spinner p-0 h-auto font-mono font-bold"
                 />
             </div>
         )}
@@ -1026,26 +1030,29 @@ export function PurchaseOrderModal({
     <AnimatePresence>
       {isOpen && (
         <>
+          <div className="fixed inset-0 z-80000 flex items-center justify-center p-3 sm:p-4 md:p-6 overflow-hidden">
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-80000 bg-black/60 backdrop-blur-sm"
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm"
             onClick={onClose}
           />
           <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            initial={{ opacity: 0, scale: 0.96, y: 16 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="fixed left-1/2 top-1/2 z-80001 w-[calc(100%-32px)] sm:w-full max-w-5xl -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-white dark:bg-gray-900/70 backdrop-blur-xl border border-border/50 shadow-2xl overflow-hidden flex flex-col max-h-safe-modal"
+            exit={{ opacity: 0, scale: 0.96, y: 16 }}
+            transition={{ type: "spring", stiffness: 350, damping: 28 }}
+            className="relative z-10 w-full max-w-5xl h-full max-h-[min(92vh,920px)] rounded-[28px] sm:rounded-[32px] border border-border/60 dark:border-white/10 bg-white dark:bg-gray-900/75 backdrop-blur-2xl shadow-2xl overflow-hidden flex flex-col"
           >
             {/* Expiration Batch Form Modal */}
             {shelfLifeModalOpen && activeShelfLifeItem && (
               <div className="fixed inset-0 z-90000 flex items-center justify-center p-4">
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShelfLifeModalOpen(false)} />
-                <div className="relative w-full max-w-md rounded-3xl border border-border/50 bg-white p-6 shadow-2xl dark:bg-gray-900/90 backdrop-blur-xl">
-                  <div className="mb-4 flex items-center justify-between">
-                    <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
+                <div className="relative w-full max-w-md rounded-[28px] border border-border/60 dark:border-white/10 bg-white dark:bg-gray-900/80 backdrop-blur-2xl p-6 shadow-2xl overflow-hidden">
+                  <div className="pointer-events-none absolute -right-12 -top-12 h-36 w-36 rounded-full bg-blue-500/10 blur-2xl" />
+                  <div className="relative mb-4 flex items-center justify-between">
+                    <h3 className="text-lg font-black text-foreground flex items-center gap-2">
                       <Calendar size={18} className="text-primary" />
                       录入到货生产日期
                     </h3>
@@ -1068,8 +1075,8 @@ export function PurchaseOrderModal({
                         onChange={(val) => setSelectedProductionDate(val)}
                         placeholder="请选择生产日期"
                         showClear={true}
-                        className="w-full h-11"
-                        triggerClassName="rounded-xl bg-white dark:bg-white/5 border border-border dark:border-white/10 px-4 h-11 text-sm text-foreground font-mono"
+                        className="w-full h-10"
+                        triggerClassName="rounded-full bg-white dark:bg-white/5 border border-border/80 dark:border-white/10 px-4 h-10 text-sm text-foreground font-mono shadow-2xs"
                       />
                     </div>
 
@@ -1080,21 +1087,21 @@ export function PurchaseOrderModal({
                         placeholder="例如: 瓶身喷码/箱体完好"
                         value={shelfLifeRemark}
                         onChange={(e) => setShelfLifeRemark(e.target.value)}
-                        className="w-full h-11 rounded-xl bg-white dark:bg-white/5 border border-border dark:border-white/10 px-4 py-2 text-foreground text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                        className="w-full h-10 rounded-full bg-white dark:bg-white/5 border border-border/80 dark:border-white/10 px-4 text-foreground text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-2xs"
                       />
                     </div>
 
                     <div className="flex gap-3 pt-2">
                       <button
                         onClick={() => setShelfLifeModalOpen(false)}
-                        className="flex-1 h-11 rounded-xl border border-border text-sm font-bold text-muted-foreground hover:bg-muted/30 transition-all active:scale-95"
+                        className="flex-1 h-10 rounded-full border border-border/80 dark:border-white/10 text-sm font-bold text-muted-foreground hover:bg-black/5 dark:hover:bg-white/5 transition-all active:scale-95 shadow-2xs"
                       >
                         取消
                       </button>
                       <button
                         onClick={handleSaveShelfLife}
                         disabled={isSavingShelfLife || !selectedProductionDate}
-                        className="flex-1 h-11 rounded-xl bg-primary text-primary-foreground text-sm font-bold shadow-lg shadow-primary/20 hover:shadow-primary/45 transition-all active:scale-95 disabled:opacity-50"
+                        className="flex-1 h-10 rounded-full bg-primary text-primary-foreground text-sm font-bold shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all active:scale-95 disabled:opacity-50"
                       >
                         {isSavingShelfLife ? "保存中..." : "保存批次"}
                       </button>
@@ -1104,9 +1111,9 @@ export function PurchaseOrderModal({
               </div>
             )}
             
-            <div className="flex items-center justify-between border-b border-white/10 p-5 sm:p-8 shrink-0">
+            <div className="flex items-center justify-between border-b border-border/60 dark:border-white/10 p-5 sm:px-8 sm:py-6 shrink-0">
               <div className="flex flex-col gap-0.5 min-w-0">
-                <h2 className="text-lg sm:text-2xl font-bold text-foreground flex items-center gap-2 sm:gap-3 truncate">
+                <h2 className="text-lg sm:text-2xl font-black text-foreground flex items-center gap-2 sm:gap-3 truncate">
                   {formData.type === "Inbound" || formData.type === AUTO_INBOUND_TYPE || formData.type === "Return" || formData.type === "InternalReturn" ? (
                       <div className="flex items-center gap-2 truncate">
                           <Package size={20} className="text-primary shrink-0 sm:w-6 sm:h-6" />
@@ -1131,71 +1138,80 @@ export function PurchaseOrderModal({
                   </p>
                 )}
               </div>
-              <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+              <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
                 {initialData && (
-                  <div className="flex items-center gap-0.5 sm:gap-2 mr-1 sm:mr-2 border-r border-border/50 pr-1.5 sm:pr-4">
+                  <div className="flex items-center gap-1.5 sm:gap-2 mr-1 sm:mr-2 border-r border-border/60 dark:border-white/10 pr-2 sm:pr-4">
                     {onOverview && (
                       <button 
                         type="button"
                         onClick={() => onOverview(formData)}
-                        className="h-9 px-2 sm:px-3 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground transition-all flex items-center gap-1.5 sm:gap-2 active:scale-95"
+                        className="h-8.5 px-3.5 rounded-full border border-blue-500/20 bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-500/20 transition-all flex items-center gap-1.5 active:scale-95 shadow-2xs font-bold"
                         title="查看货品明细汇总"
                       >
-                        <BarChart3 size={18} className="text-blue-500 shrink-0" />
-                        <span className="hidden md:inline text-xs font-bold">汇总</span>
+                        <BarChart3 size={15} className="shrink-0" />
+                        <span className="hidden md:inline text-xs">汇总</span>
                       </button>
                     )}
                     {onExport && (
                       <button 
                         type="button"
                         onClick={() => onExport(formData)}
-                        className="h-9 px-2 sm:px-3 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground transition-all flex items-center gap-1.5 sm:gap-2 active:scale-95"
+                        className="h-8.5 px-3.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 transition-all flex items-center gap-1.5 active:scale-95 shadow-2xs font-bold"
                         title="导出采购明细到 Excel"
                       >
-                        <Download size={18} className="text-emerald-500 shrink-0" />
-                        <span className="hidden md:inline text-xs font-bold">导出</span>
+                        <Download size={15} className="shrink-0" />
+                        <span className="hidden md:inline text-xs">导出</span>
                       </button>
                     )}
                   </div>
                 )}
-                <button onClick={onClose} className="rounded-full p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors active:scale-95 shrink-0">
-                  <X className="w-5 h-5 sm:w-6 sm:h-6" />
+                <button onClick={onClose} className="rounded-full p-2 text-muted-foreground hover:bg-black/5 dark:hover:bg-white/10 transition-colors active:scale-95 shrink-0">
+                  <X className="w-5 h-5 sm:w-5.5 sm:h-5.5" />
                 </button>
               </div>
             </div>
 
             <form onSubmit={handleSubmit} className="flex flex-col min-h-0 flex-1 overflow-hidden">
-                <div className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-8 space-y-4 sm:space-y-8">
-                    {/* Basic Info */}
-                    <div className="rounded-3xl border border-border/50 bg-muted/20 p-4 sm:p-6 dark:bg-white/5">
+                <div className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-7 space-y-5 sm:space-y-6">
+                    {/* Basic Info - 通透无套盒的高级卡片 */}
+                    <div className="rounded-[22px] sm:rounded-[26px] border border-border/60 bg-linear-to-br from-white/95 via-white/85 to-background dark:border-white/10 dark:from-white/[0.06] dark:via-white/[0.03] dark:to-transparent p-4 sm:p-5 shadow-xs backdrop-blur-md">
                         {formData.type === "Purchase" ? (
-                            <div className="space-y-4">
-                                <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
-                                    <div className="rounded-2xl border border-border/50 bg-white/70 px-4 py-3 shadow-sm dark:bg-white/5">
-                                        <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                                            <FileText size={13} /> 单据编号
-                                        </div>
-                                        <div className="mt-2 truncate font-mono text-sm font-semibold text-foreground/80">
-                                            {formData.id}
-                                        </div>
-                                    </div>
-
-                                    <div className="rounded-2xl border border-border/50 bg-white/70 px-4 py-3 shadow-sm dark:bg-white/5">
-                                        <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                                            <Calendar size={13} /> {effectiveReadOnly ? "订单时间" : "下单时间"}
-                                        </div>
-                                        <div className="mt-2 text-sm font-semibold text-foreground">
-                                            {formatLocalDateTime(formData.date)}
-                                        </div>
+                            <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-bold text-muted-foreground flex items-center gap-1.5 uppercase tracking-wider">
+                                        <FileText size={13} className="text-primary/70" /> 单据编号
+                                    </label>
+                                    <div className="h-10 px-4 rounded-full bg-white dark:bg-white/5 border border-border/80 dark:border-white/10 flex items-center text-xs sm:text-sm font-mono font-semibold text-foreground/85 shadow-2xs truncate">
+                                        {formData.id}
                                     </div>
                                 </div>
 
-                                <div className="rounded-2xl border border-border/50 bg-white/70 p-4 shadow-sm dark:bg-white/5">
-                                    <div className="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                                        <MapPin size={13} /> 收货地址
-                                    </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-bold text-muted-foreground flex items-center gap-1.5 uppercase tracking-wider">
+                                        <Calendar size={13} className="text-primary/70" /> {effectiveReadOnly ? "订单时间" : "下单时间"}
+                                    </label>
                                     {effectiveReadOnly ? (
-                                        <div className="flex min-h-[42px] items-center text-sm font-semibold text-foreground">
+                                        <div className="h-10 px-4 rounded-full bg-white dark:bg-white/5 border border-border/80 dark:border-white/10 flex items-center text-xs sm:text-sm font-semibold text-foreground shadow-2xs">
+                                            {formatLocalDateTime(formData.date)}
+                                        </div>
+                                    ) : (
+                                        <DatePicker 
+                                            value={formData.date}
+                                            onChange={(val) => setFormData({...formData, date: val})}
+                                            placeholder="选择日期"
+                                            showClear={false}
+                                            className="h-10 w-full"
+                                            triggerClassName="h-10 rounded-full bg-white dark:bg-white/5 border border-border/80 dark:border-white/10 px-4 text-xs sm:text-sm text-foreground shadow-2xs font-mono"
+                                        />
+                                    )}
+                                </div>
+
+                                <div className="space-y-1.5 sm:col-span-2 lg:col-span-1">
+                                    <label className="text-xs font-bold text-muted-foreground flex items-center gap-1.5 uppercase tracking-wider">
+                                        <MapPin size={13} className="text-primary/70" /> 收货地址
+                                    </label>
+                                    {effectiveReadOnly ? (
+                                        <div className="h-10 px-4 rounded-full bg-white dark:bg-white/5 border border-border/80 dark:border-white/10 flex items-center text-xs sm:text-sm font-semibold text-foreground shadow-2xs truncate">
                                             {formData.shippingAddress || "未设置地址"}
                                         </div>
                                     ) : (
@@ -1216,8 +1232,8 @@ export function PurchaseOrderModal({
                                                     label: item.label || item.address || "未命名地址"
                                                 }))}
                                             placeholder="选择个人资料里的收货地址..."
-                                            className="h-[42px]"
-                                            triggerClassName="h-[42px] rounded-xl"
+                                            className="h-10"
+                                            triggerClassName="h-10 rounded-full border border-border/80 dark:border-white/10 bg-white dark:bg-white/5 px-4 text-xs sm:text-sm shadow-2xs"
                                             onAddNew={() => router.push("/profile#address-library")}
                                             addNewLabel="管理地址"
                                         />
@@ -1225,30 +1241,27 @@ export function PurchaseOrderModal({
                                 </div>
                             </div>
                         ) : (
-                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-6">
-                                <div className="flex flex-col gap-2">
-                                    <label className="text-[10px] sm:text-xs font-bold text-muted-foreground flex items-center gap-1.5 uppercase tracking-wider">
-                                        <FileText size={14} /> 单据编号
+                            <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-bold text-muted-foreground flex items-center gap-1.5 uppercase tracking-wider">
+                                        <FileText size={13} className="text-primary/70" /> 单据编号
                                     </label>
-                                    <input 
-                                        disabled
-                                        type="text" 
-                                        value={formData.id}
-                                        className="w-full h-[42px] rounded-xl bg-white dark:bg-white/5 border border-border dark:border-white/10 px-4 text-xs sm:text-sm text-foreground outline-none ring-1 ring-transparent opacity-70 font-mono"
-                                    />
+                                    <div className="h-10 px-4 rounded-full bg-white dark:bg-white/5 border border-border/80 dark:border-white/10 flex items-center text-xs sm:text-sm font-mono font-semibold text-foreground/85 shadow-2xs truncate">
+                                        {formData.id}
+                                    </div>
                                 </div>
-                                <div className="flex flex-col gap-2">
-                                    <label className="text-[10px] sm:text-xs font-bold text-muted-foreground flex items-center gap-1.5 uppercase tracking-wider">
-                                        <Calendar size={14} /> {formData.type === "Inbound" ? "入库时间" : (effectiveReadOnly ? "订单时间" : "时间")}
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-bold text-muted-foreground flex items-center gap-1.5 uppercase tracking-wider">
+                                        <Calendar size={13} className="text-primary/70" /> {formData.type === "Inbound" ? "入库时间" : (effectiveReadOnly ? "订单时间" : "时间")}
                                     </label>
-                                    <div className={`w-full h-[42px] ${effectiveReadOnly ? "pointer-events-none opacity-80" : ""}`}>
+                                    <div className={`h-10 ${effectiveReadOnly ? "pointer-events-none opacity-80" : ""}`}>
                                         <DatePicker 
                                             value={formData.date}
                                             onChange={(val) => setFormData({...formData, date: val})}
                                             placeholder="选择日期"
                                             showClear={false}
-                                            className="h-full"
-                                            triggerClassName="h-[42px] rounded-xl"
+                                            className="h-10 w-full"
+                                            triggerClassName="h-10 rounded-full bg-white dark:bg-white/5 border border-border/80 dark:border-white/10 px-4 text-xs sm:text-sm text-foreground shadow-2xs font-mono"
                                         />
                                     </div>
                                 </div>
@@ -1257,161 +1270,157 @@ export function PurchaseOrderModal({
                     </div>
 
                     {/* Items Section */}
-                        <div className="flex flex-col gap-3 px-2">
-                            {/* Title & Buttons Row */}
-                            <div className="flex items-center justify-between">
-                                <label className="text-sm font-bold text-foreground flex items-center gap-2 shrink-0">
-                                    <ListOrdered size={16} className="text-primary" /> {formData.type === "Inbound" ? "入库项目" : "采购项目"} {formData.items.length > 0 && `(${formData.items.length})`}
-                                </label>
-                                {formData.items.length > 0 && !effectiveReadOnly && (
-                                    <div className="flex items-center gap-1">
-                                        {batchMode ? (
-                                            <>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        const allIds = filteredItems.map(i => getPurchaseItemKey(i)).filter(Boolean);
-                                                        const allSelected = allIds.every(id => batchSelected.has(id));
-                                                        setBatchSelected(allSelected ? new Set() : new Set(allIds));
-                                                    }}
-                                                    className="text-[11px] font-bold text-muted-foreground hover:text-foreground px-2.5 py-1.5 rounded-xl hover:bg-muted/80 transition-all active:scale-95 whitespace-nowrap"
-                                                >
-                                                    {filteredItems.every(i => batchSelected.has(getPurchaseItemKey(i))) ? "取消全选" : "全选"}
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        if (batchConfirming) {
-                                                            batchDelete();
-                                                            setBatchConfirming(false);
-                                                        } else {
-                                                            setBatchConfirming(true);
-                                                            setTimeout(() => setBatchConfirming(false), 3000);
-                                                        }
-                                                    }}
-                                                    disabled={batchSelected.size === 0}
-                                                    className={cn(
-                                                        "flex items-center gap-1 text-[11px] font-bold px-2.5 py-1.5 rounded-xl transition-all active:scale-95 disabled:opacity-30 disabled:pointer-events-none whitespace-nowrap",
-                                                        batchConfirming
-                                                            ? "text-white bg-destructive hover:bg-destructive/90"
-                                                            : "text-destructive bg-destructive/10 hover:bg-destructive/20"
-                                                    )}
-                                                >
-                                                    <Trash2 size={12} /> {batchConfirming ? `确认？` : (batchSelected.size > 0 ? `删除 ${batchSelected.size}` : "删除")}
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => { setBatchMode(false); setBatchSelected(new Set()); setBatchConfirming(false); }}
-                                                    className="text-[11px] font-bold text-muted-foreground px-3 py-1.5 rounded-xl hover:bg-muted/80 transition-all active:scale-95"
-                                                >
-                                                    取消
-                                                </button>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setBatchMode(true)}
-                                                    className="text-[11px] font-bold text-muted-foreground hover:text-destructive hover:bg-destructive/5 px-3 py-1.5 rounded-xl transition-all active:scale-95"
-                                                >
-                                                    批量删除
-                                                </button>
-                                                <button 
-                                                    type="button"
-                                                    onClick={addItem}
-                                                    className="flex items-center gap-1.5 text-[11px] font-bold text-primary hover:bg-primary/10 bg-primary/5 px-3 py-1.5 rounded-xl transition-all active:scale-95"
-                                                >
-                                                    <Plus size={14} /> 继续添加
-                                                </button>
-                                            </>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-                            
-                            {/* Search Bar Row */}
-                            {formData.items.length > 0 && (
-                                <div className="flex items-center gap-3 w-full">
-                                    <div className="relative flex-1">
-                                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/60" />
-                                        <input 
-                                            type="text"
-                                            value={searchQuery}
-                                            onChange={(e) => setSearchQuery(e.target.value)}
-                                            placeholder="搜索商品名或货号..."
-                                            className="w-full h-9 pl-9 pr-8 rounded-xl bg-white dark:bg-white/5 border border-border dark:border-white/10 text-[11px] text-foreground outline-none focus:ring-2 focus:ring-primary/20 transition-all font-bold placeholder:font-normal"
-                                        />
-                                        {searchQuery && (
+                    <div className="space-y-3">
+                        {/* Title & Buttons Row */}
+                        <div className="flex items-center justify-between px-1">
+                            <label className="text-sm font-black text-foreground flex items-center gap-2 shrink-0 tracking-wide">
+                                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-primary">
+                                    <ListOrdered size={13} />
+                                </div>
+                                {formData.type === "Inbound" ? "入库项目" : "采购项目"} {formData.items.length > 0 && `(${formData.items.length})`}
+                            </label>
+                            {formData.items.length > 0 && !effectiveReadOnly && (
+                                <div className="flex items-center gap-2">
+                                    {batchMode ? (
+                                        <>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    const allIds = filteredItems.map(i => getPurchaseItemKey(i)).filter(Boolean);
+                                                    const allSelected = allIds.every(id => batchSelected.has(id));
+                                                    setBatchSelected(allSelected ? new Set() : new Set(allIds));
+                                                }}
+                                                className="text-xs font-bold text-muted-foreground hover:text-foreground px-3.5 py-1.5 rounded-full border border-border/80 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5 transition-all active:scale-95 whitespace-nowrap shadow-2xs"
+                                            >
+                                                {filteredItems.every(i => batchSelected.has(getPurchaseItemKey(i))) ? "取消全选" : "全选"}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    if (batchConfirming) {
+                                                        batchDelete();
+                                                        setBatchConfirming(false);
+                                                    } else {
+                                                        setBatchConfirming(true);
+                                                        setTimeout(() => setBatchConfirming(false), 3000);
+                                                    }
+                                                }}
+                                                disabled={batchSelected.size === 0}
+                                                className={cn(
+                                                    "flex items-center gap-1 text-xs font-bold px-3.5 py-1.5 rounded-full transition-all active:scale-95 disabled:opacity-30 disabled:pointer-events-none whitespace-nowrap shadow-2xs",
+                                                    batchConfirming
+                                                        ? "text-white bg-destructive hover:bg-destructive/90"
+                                                        : "text-destructive bg-destructive/10 hover:bg-destructive/20 border border-destructive/20"
+                                                )}
+                                            >
+                                                <Trash2 size={12} /> {batchConfirming ? `确认？` : (batchSelected.size > 0 ? `删除 ${batchSelected.size}` : "删除")}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => { setBatchMode(false); setBatchSelected(new Set()); setBatchConfirming(false); }}
+                                                className="text-xs font-bold text-muted-foreground px-3.5 py-1.5 rounded-full border border-border/80 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5 transition-all active:scale-95 shadow-2xs"
+                                            >
+                                                取消
+                                            </button>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <button
+                                                type="button"
+                                                onClick={() => setBatchMode(true)}
+                                                className="text-xs font-bold text-muted-foreground hover:text-destructive hover:bg-destructive/5 px-3 py-1.5 rounded-full border border-transparent hover:border-destructive/20 transition-all active:scale-95"
+                                            >
+                                                批量删除
+                                            </button>
                                             <button 
                                                 type="button"
-                                                onClick={() => setSearchQuery("")}
-                                                className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-muted-foreground hover:text-foreground active:scale-90"
+                                                onClick={addItem}
+                                                className="flex items-center gap-1.5 text-xs font-black text-primary hover:bg-primary/15 bg-primary/10 px-4 py-1.5 rounded-full border border-primary/20 transition-all active:scale-95 shadow-2xs"
                                             >
-                                                <X size={12} />
+                                                <Plus size={14} /> 继续添加
                                             </button>
-                                        )}
-                                    </div>
-                                    {/* Desktop only "Add" button placeholder/alignment if needed, but handled above for mobile */}
+                                        </>
+                                    )}
                                 </div>
                             )}
                         </div>
+                        
+                        {/* Search Bar Row */}
+                        {formData.items.length > 0 && (
+                            <div className="relative">
+                                <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                                <input 
+                                    type="text"
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    placeholder="搜索商品名或货号..."
+                                    className="w-full h-10 pl-9.5 pr-8 rounded-full bg-white dark:bg-white/5 border border-border/80 dark:border-white/10 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all font-semibold placeholder:font-normal placeholder:text-muted-foreground/50 shadow-2xs"
+                                />
+                                {searchQuery && (
+                                    <button 
+                                        type="button" 
+                                        onClick={() => setSearchQuery("")}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground active:scale-90 rounded-full"
+                                    >
+                                        <X size={13} />
+                                    </button>
+                                )}
+                            </div>
+                        )}
 
-                        <div className="space-y-3 bg-muted/20 dark:bg-white/5 p-2 sm:p-4 rounded-3xl border border-border/50">
+                        {/* 一体化现代平铺表格容器 */}
+                        <div className="rounded-[22px] sm:rounded-[28px] border border-border/60 bg-linear-to-br from-white/95 via-white/85 to-background dark:border-white/10 dark:from-white/[0.05] dark:via-blue-500/[0.02] dark:to-transparent overflow-hidden shadow-xs backdrop-blur-md">
                             {/* Desktop Header */}
                             {formData.items.length > 0 && (
-                                <div className={`hidden sm:grid ${batchMode ? (effectiveReadOnly ? 'grid-cols-[24px_1fr_100px_120px_120px]' : 'grid-cols-[24px_1fr_80px_120px_120px_40px]') : (effectiveReadOnly ? 'grid-cols-[1fr_100px_120px_120px]' : 'grid-cols-[1fr_80px_120px_120px_40px]')} gap-4 px-3 py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest border-b border-border/10 mb-2`}>
-                                    {batchMode && <div />}
-                                    <div className="text-left pl-2">商品信息 <span className="text-red-500">*</span></div>
+                                <div className={`hidden sm:grid ${batchMode ? (effectiveReadOnly ? 'grid-cols-[1fr_100px_120px_120px]' : 'grid-cols-[1fr_90px_120px_120px_48px]') : (effectiveReadOnly ? 'grid-cols-[1fr_100px_120px_120px]' : 'grid-cols-[1fr_90px_120px_120px_48px]')} gap-4 px-5 py-3 text-xs font-black text-foreground bg-muted/40 dark:bg-white/[0.03] border-b border-border/60 dark:border-white/10`}>
+                                    <div className="text-left">商品明细 <span className="text-red-500">*</span></div>
                                     <div className="text-center">数量 <span className="text-red-500">*</span></div>
                                     <div className="text-center">单价 <span className="text-red-500">*</span></div>
-                                    <div className="text-right pr-4">小计</div>
+                                    <div className="text-right pr-2">小计</div>
                                     {!effectiveReadOnly && <div></div>}
                                 </div>
                             )}
 
-                            {filteredItems.map((item) => (
-                                <PurchaseItemRow 
-                                    key={getPurchaseItemKey(item)}
-                                    item={item}
-                                    readOnly={effectiveReadOnly}
-                                    products={products}
-                                    suppliers={suppliers}
-                                    onUpdate={updateItem}
-                                    onRemove={removeItem}
-                                    quantityInput={quantityDrafts[getPurchaseItemKey(item)] ?? (item.quantity ? String(item.quantity) : "")}
-                                    onQuantityInputChange={handleQuantityInputChange}
-                                    onQuantityInputBlur={handleQuantityInputBlur}
-                                    costPriceInput={costPriceDrafts[getPurchaseItemKey(item)] ?? (item.costPrice ? String(item.costPrice) : "")}
-                                    onCostPriceInputChange={handleCostPriceInputChange}
-                                    onCostPriceInputBlur={handleCostPriceInputBlur}
-                                    lineTotalInput={
-                                        lineTotalDrafts[getPurchaseItemKey(item)] ??
-                                        (item.quantity ? String(Number((item.quantity * (item.costPrice ?? 0)).toFixed(2))) : "")
-                                    }
-                                    onLineTotalInputChange={handleLineTotalInputChange}
-                                    onLineTotalInputBlur={handleLineTotalInputBlur}
-                                    allowCostEdit={canBackfillReceivedCosts}
-                                    isChecked={batchMode ? batchSelected.has(getPurchaseItemKey(item)) : undefined}
-                                    onToggle={batchMode && !effectiveReadOnly ? toggleBatchSelect : undefined}
-                                    onManageShelfLife={handleOpenShelfLifeModal}
-                                />
-                            ))}
+                            <div className="divide-y divide-border/60 dark:divide-white/[0.06]">
+                                {filteredItems.map((item) => (
+                                    <PurchaseItemRow 
+                                        key={getPurchaseItemKey(item)}
+                                        item={item}
+                                        readOnly={effectiveReadOnly}
+                                        products={products}
+                                        suppliers={suppliers}
+                                        onUpdate={updateItem}
+                                        onRemove={removeItem}
+                                        quantityInput={quantityDrafts[getPurchaseItemKey(item)] ?? (item.quantity ? String(item.quantity) : "")}
+                                        onQuantityInputChange={handleQuantityInputChange}
+                                        onQuantityInputBlur={handleQuantityInputBlur}
+                                        costPriceInput={costPriceDrafts[getPurchaseItemKey(item)] ?? (item.costPrice ? String(item.costPrice) : "")}
+                                        onCostPriceInputChange={handleCostPriceInputChange}
+                                        onCostPriceInputBlur={handleCostPriceInputBlur}
+                                        lineTotalInput={
+                                            lineTotalDrafts[getPurchaseItemKey(item)] ??
+                                            (item.quantity ? String(Number((item.quantity * (item.costPrice ?? 0)).toFixed(2))) : "")
+                                        }
+                                        onLineTotalInputChange={handleLineTotalInputChange}
+                                        onLineTotalInputBlur={handleLineTotalInputBlur}
+                                        allowCostEdit={canBackfillReceivedCosts}
+                                        isChecked={batchMode ? batchSelected.has(getPurchaseItemKey(item)) : undefined}
+                                        onToggle={batchMode && !effectiveReadOnly ? toggleBatchSelect : undefined}
+                                        onManageShelfLife={handleOpenShelfLifeModal}
+                                    />
+                                ))}
+                            </div>
                             
                             {formData.items.length > 0 && filteredItems.length === 0 && (
-                                <div className="py-12 flex flex-col items-center justify-center gap-4 text-muted-foreground bg-white dark:bg-white/5 rounded-2xl border-2 border-dashed border-border/50">
-                                    <div className="p-4 rounded-full bg-muted/50">
-                                        <Search size={32} className="opacity-20" />
-                                    </div>
-                                    <div className="flex flex-col items-center gap-1">
-                                        <span className="text-sm font-bold">未找到匹配项</span>
-                                        <button 
-                                            type="button" 
-                                            onClick={() => setSearchQuery("")}
-                                            className="text-xs text-primary hover:underline font-bold"
-                                        >
-                                            清除搜索内容
-                                        </button>
-                                    </div>
+                                <div className="py-12 flex flex-col items-center justify-center gap-2 text-muted-foreground">
+                                    <span className="text-sm font-bold text-foreground">未找到匹配商品</span>
+                                    <button 
+                                        type="button" 
+                                        onClick={() => setSearchQuery("")}
+                                        className="text-xs text-primary hover:underline font-bold"
+                                    >
+                                        清除搜索内容
+                                    </button>
                                 </div>
                             )}
                             
@@ -1419,9 +1428,9 @@ export function PurchaseOrderModal({
                                 <button
                                     type="button"
                                     onClick={addItem}
-                                    className="w-full h-48 flex flex-col items-center justify-center gap-2 p-8 rounded-2xl border-2 border-dashed border-border hover:border-primary/40 hover:bg-primary/5 transition-all text-muted-foreground hover:text-primary group bg-white dark:bg-transparent"
+                                    className="w-full h-44 flex flex-col items-center justify-center gap-2 p-8 hover:bg-primary/5 transition-all text-muted-foreground hover:text-primary group"
                                 >
-                                    <div className="h-10 w-10 rounded-full bg-muted group-hover:bg-primary/10 flex items-center justify-center transition-colors">
+                                    <div className="h-11 w-11 rounded-full bg-muted/60 dark:bg-white/5 group-hover:bg-primary/10 flex items-center justify-center transition-colors">
                                         <Plus size={20} />
                                     </div>
                                     <div className="flex flex-col text-center">
@@ -1433,20 +1442,12 @@ export function PurchaseOrderModal({
                                 </button>
                             )}
                         </div>
-
-
-
-
-
-
-
-
-                    {/* 简化采购流程后，支付凭证与物流包裹不再作为采购页主流程字段展示。 */}
+                    </div>
 
                 </div>
 
-{/* Modern Footer Summary Panel */}
-                <div className="bg-muted/30 dark:bg-white/5 border-t border-border/10 p-3 sm:p-4 px-4 sm:px-8 shrink-0">
+                {/* Modern Footer Summary Panel */}
+                <div className="bg-white/90 dark:bg-gray-900/80 border-t border-border/60 dark:border-white/10 p-3.5 sm:p-4 px-4 sm:px-8 shrink-0 backdrop-blur-xl relative z-10">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-6">
                         {/* Fee Pills Group - Horizontal Scroll on Mobile */}
                         {!isSystemGenerated && formData.type !== "Inbound" && (
@@ -1493,7 +1494,7 @@ export function PurchaseOrderModal({
                         <div className="flex items-center justify-between sm:justify-end gap-4 sm:gap-8">
                             {/* Final Total */}
                             <div className="flex flex-col sm:flex-row sm:items-center gap-0 sm:gap-3">
-                                <span className="text-[8px] sm:text-[10px] font-black text-muted-foreground uppercase tracking-widest opacity-60">实付总计</span>
+                                <span className="text-[9px] sm:text-[10px] font-black text-muted-foreground uppercase tracking-widest opacity-60">实付总计</span>
                                 <div className="flex items-baseline gap-0.5 sm:gap-1">
                                     <span className="text-[10px] sm:text-xs font-bold text-primary">￥</span>
                                     <span className="text-xl sm:text-2xl font-black text-foreground font-mono tabular-nums leading-none">
@@ -1504,12 +1505,12 @@ export function PurchaseOrderModal({
 
                             {/* Actions Container */}
                             {!readOnly && (
-                                <div className="flex items-center gap-2 sm:border-l sm:border-border/10 sm:pl-6 h-9 sm:h-10">
+                                <div className="flex items-center gap-2 sm:border-l sm:border-border/60 dark:border-white/10 sm:pl-6 h-9 sm:h-10">
                                     {canBackfillReceivedCosts && (
                                         <button
                                             type="submit"
                                             disabled={isSubmitting}
-                                            className="px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl text-[10px] sm:text-xs font-black transition-all shadow-lg bg-primary text-primary-foreground shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none flex items-center gap-1.5"
+                                            className="px-4 sm:px-6 py-2 sm:py-2.5 rounded-full text-[10px] sm:text-xs font-black transition-all shadow-lg bg-primary text-primary-foreground shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none flex items-center gap-1.5"
                                         >
                                             {isSubmitting ? <Loader2 size={13} className="animate-spin" /> : null}
                                             {isSubmitting ? "保存中..." : "保存成本"}
@@ -1520,7 +1521,7 @@ export function PurchaseOrderModal({
                                             type="button"
                                             disabled={isSubmitting}
                                             onClick={handleRevokeReceived}
-                                            className="px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl text-[10px] sm:text-xs font-black transition-all shadow-sm bg-amber-500/12 text-amber-600 hover:bg-amber-500/20 dark:text-amber-400 disabled:opacity-50 disabled:pointer-events-none flex items-center gap-1.5"
+                                            className="px-4 sm:px-5 py-2 sm:py-2.5 rounded-full text-[10px] sm:text-xs font-black transition-all shadow-2xs bg-amber-500/12 text-amber-600 hover:bg-amber-500/20 dark:text-amber-400 disabled:opacity-50 disabled:pointer-events-none flex items-center gap-1.5"
                                         >
                                             {isSubmitting ? <Loader2 size={13} className="animate-spin" /> : null}
                                             {isSubmitting ? "处理中..." : "撤销入库"}
@@ -1531,7 +1532,7 @@ export function PurchaseOrderModal({
                                             <button
                                                 type="submit"
                                                 disabled={isSubmitting}
-                                                className="px-3 sm:px-4 py-1.5 sm:py-2 text-[10px] sm:text-xs font-bold text-muted-foreground hover:text-foreground hover:bg-white/5 rounded-xl transition-all disabled:opacity-50 disabled:pointer-events-none flex items-center gap-1.5"
+                                                className="px-3.5 sm:px-4 py-1.5 sm:py-2 text-[10px] sm:text-xs font-bold text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5 rounded-full border border-border/80 dark:border-white/10 transition-all disabled:opacity-50 disabled:pointer-events-none flex items-center gap-1.5 shadow-2xs"
                                             >
                                                 {isSubmitting ? <Loader2 size={13} className="animate-spin" /> : null}
                                                 {isSubmitting ? "保存中..." : "保存采购单"}
@@ -1541,7 +1542,7 @@ export function PurchaseOrderModal({
                                                 <button
                                                     type="submit"
                                                     disabled={isSubmitting}
-                                                    className="px-4 sm:px-6 py-2 sm:py-2.5 bg-primary text-primary-foreground text-[10px] sm:text-xs font-black rounded-xl shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-1.5 sm:gap-2 disabled:opacity-50 disabled:pointer-events-none"
+                                                    className="px-5 sm:px-6 py-2 sm:py-2.5 bg-primary text-primary-foreground text-[10px] sm:text-xs font-black rounded-full shadow-lg shadow-primary/25 hover:shadow-primary/35 hover:-translate-y-0.5 active:translate-y-0 transition-all flex items-center gap-1.5 sm:gap-2 disabled:opacity-50 disabled:pointer-events-none"
                                                 >
                                                     {isSubmitting ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} className="hidden sm:block" />}
                                                     {isSubmitting ? "下单中..." : "确认下单"}
@@ -1551,7 +1552,7 @@ export function PurchaseOrderModal({
                                                     type="button"
                                                     disabled={isSubmitting}
                                                     onClick={() => handleAction("Received")}
-                                                    className="px-6 sm:px-8 py-2 sm:py-2.5 rounded-xl text-[10px] sm:text-xs font-black transition-all shadow-lg bg-emerald-500 text-white shadow-emerald-500/20 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none flex items-center gap-1.5"
+                                                    className="px-6 sm:px-8 py-2 sm:py-2.5 rounded-full text-[10px] sm:text-xs font-black transition-all shadow-lg bg-emerald-500 text-white shadow-emerald-500/25 hover:shadow-emerald-500/35 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:pointer-events-none flex items-center gap-1.5"
                                                 >
                                                     {isSubmitting ? <Loader2 size={14} className="animate-spin" /> : null}
                                                     {isSubmitting ? "入库中..." : "确认入库"}
@@ -1566,33 +1567,35 @@ export function PurchaseOrderModal({
                 </div>
             </form>
           </motion.div>
-          <ProductSelectionModal 
-            isOpen={isSelectionModalOpen}
-            onClose={() => setIsSelectionModalOpen(false)}
-            onSelect={handleBatchAdd}
-            showPrice={true}
-            selectedIds={selectedProductIds}
-            selectedBadgeLabel="已在采购单中"
-            unselectedOnlyLabel="显示未添加"
-            unselectedOnlyTitle="切换是否只显示当前采购单未添加的商品"
-            fetchPath={purchaseCatalogFetchPath}
-            showPlatformSelector={false}
-            query={purchaseCatalogQuery}
-            loadAllOnOpen
-            lockLibraryId={lockedLibraryIdForPurchase}
-            defaultViewMode="list"
-          />
+        </div>
 
-          {/* Image Gallery Preview */}
-          <ImageGallery 
-            isOpen={galleryState.isOpen}
-            images={galleryState.images}
-            initialIndex={galleryState.currentIndex}
-            onClose={() => setGalleryState(prev => ({ ...prev, isOpen: false }))}
-          />
-        </>
-      )}
-    </AnimatePresence>,
+        <ProductSelectionModal 
+          isOpen={isSelectionModalOpen}
+          onClose={() => setIsSelectionModalOpen(false)}
+          onSelect={handleBatchAdd}
+          showPrice={true}
+          selectedIds={selectedProductIds}
+          selectedBadgeLabel="已在采购单中"
+          unselectedOnlyLabel="显示未添加"
+          unselectedOnlyTitle="切换是否只显示当前采购单未添加的商品"
+          fetchPath={purchaseCatalogFetchPath}
+          showPlatformSelector={false}
+          query={purchaseCatalogQuery}
+          loadAllOnOpen
+          lockLibraryId={lockedLibraryIdForPurchase}
+          defaultViewMode="list"
+        />
+
+        {/* Image Gallery Preview */}
+        <ImageGallery 
+          isOpen={galleryState.isOpen}
+          images={galleryState.images}
+          initialIndex={galleryState.currentIndex}
+          onClose={() => setGalleryState(prev => ({ ...prev, isOpen: false }))}
+        />
+      </>
+    )}
+  </AnimatePresence>,
     document.body
   );
 }

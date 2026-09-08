@@ -24,7 +24,10 @@ export async function PATCH(request: Request) {
     }
 
     const result = await prisma.user.updateMany({
-        where: { email: { in: targetEmails } },
+        where: {
+          email: { in: targetEmails },
+          role: { not: "SUPER_ADMIN" },
+        },
         data: { status }
     });
 

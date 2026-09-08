@@ -620,7 +620,7 @@ export function ProductSelectionModal({
         onClick={onClose}
       />
       <div
-        className="fixed left-1/2 top-1/2 z-110001 flex h-[min(94dvh,860px)] sm:h-[min(90dvh,860px)] w-[calc(100%-16px)] sm:w-full max-w-4xl -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-3xl border border-border/60 bg-white/98 shadow-2xl backdrop-blur-xl dark:bg-gray-900/90 dark:border-white/10 animate-modal-content"
+        className="fixed left-1/2 top-1/2 z-110001 flex h-[min(94dvh,860px)] sm:h-[min(90dvh,860px)] w-[calc(100%-16px)] sm:w-full max-w-4xl -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-[28px] sm:rounded-[32px] border border-border/60 dark:border-white/10 bg-white dark:bg-gray-900/75 backdrop-blur-2xl shadow-2xl animate-modal-content"
       >
              <div className="flex items-center justify-between border-b border-border/50 px-4 py-3.5 sm:px-7 sm:py-4.5 shrink-0">
               <div className="flex items-center gap-3">
@@ -865,7 +865,7 @@ export function ProductSelectionModal({
                                      </span>
                                    )}
                                    {product.shopName && (
-                                     <span className="shrink-0 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">
+                                     <span className="shrink-0 rounded-full border border-sky-500/20 bg-sky-500/10 px-2 py-0.5 text-[10px] font-medium text-sky-700 dark:border-sky-500/30 dark:bg-sky-500/15 dark:text-sky-300">
                                        {product.shopName}
                                      </span>
                                    )}
@@ -955,7 +955,7 @@ export function ProductSelectionModal({
                 </div>
             </div>
 
-            <div className="border-t border-border/50 bg-zinc-50/80 p-3 sm:p-5 shrink-0 dark:bg-white/5 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:pb-5">
+            <div className="border-t border-border/60 dark:border-white/10 bg-white/90 dark:bg-gray-900/80 p-3 sm:p-5 shrink-0 backdrop-blur-xl pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:pb-5">
                {showPlatformSelector ? (
                  <div className="flex flex-col gap-1.5 mb-3 sm:mb-4 w-full">
                    <div className="text-xs font-bold text-muted-foreground uppercase tracking-wider pl-1">添加到平台</div>

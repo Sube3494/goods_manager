@@ -50,7 +50,7 @@ export function PurchaseFilters({
   return (
     <div className="flex flex-col md:flex-row md:items-center gap-3 mb-6 md:mb-8 text-foreground">
       <div className="flex items-center gap-2 w-full">
-        <div className="h-10 sm:h-11 px-4 sm:px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-2 sm:gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 flex-1 min-w-0 relative">
+        <div className="h-10 sm:h-11 px-4 sm:px-5 rounded-full bg-white/90 backdrop-blur-md dark:bg-white/4 border border-black/8 dark:border-white/10 shadow-xs flex items-center gap-2 sm:gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all hover:border-black/20 dark:hover:border-white/20 flex-1 min-w-0 relative">
           <Search size={18} className="text-muted-foreground shrink-0" />
           <input
             type="text"
@@ -80,10 +80,10 @@ export function PurchaseFilters({
             placeholder="单据状态"
             className="h-full"
             triggerClassName={cn(
-              "h-full rounded-full border shadow-sm transition-all text-[13px] sm:text-sm",
+              "h-full rounded-full border shadow-xs transition-all text-[13px] sm:text-sm",
               statusFilter !== "All"
                 ? "bg-primary/10 border-primary/20 text-primary dark:bg-primary/20 dark:border-primary/30 dark:text-primary font-medium"
-                : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5 font-normal"
+                : "bg-white/90 dark:bg-white/4 border-black/8 dark:border-white/10 hover:border-black/20 dark:hover:border-white/20 font-normal"
             )}
           />
         </div>
@@ -96,10 +96,10 @@ export function PurchaseFilters({
             placeholder="全部店铺"
             className="h-full"
             triggerClassName={cn(
-              "h-full rounded-full border shadow-sm transition-all text-[13px] sm:text-sm",
+              "h-full rounded-full border shadow-xs transition-all text-[13px] sm:text-sm",
               shopFilter !== "All"
                 ? "bg-primary/10 border-primary/20 text-primary dark:bg-primary/20 dark:border-primary/30 dark:text-primary font-medium"
-                : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5 font-normal"
+                : "bg-white/90 dark:bg-white/4 border-black/8 dark:border-white/10 hover:border-black/20 dark:hover:border-white/20 font-normal"
             )}
           />
         </div>

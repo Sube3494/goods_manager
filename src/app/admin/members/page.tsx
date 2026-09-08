@@ -41,7 +41,7 @@ export default function MembersPage() {
             </div>
             <button 
                 onClick={() => window.location.href = "/"}
-                className="px-6 py-2.5 rounded-xl bg-primary text-primary-foreground font-bold shadow-lg hover:scale-105 transition-all"
+                className="px-6 py-2.5 rounded-full bg-primary text-primary-foreground font-bold shadow-lg shadow-primary/25 hover:-translate-y-0.5 transition-all"
             >
                 返回概览
             </button>
@@ -50,39 +50,58 @@ export default function MembersPage() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/50 pb-5">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-3">
-            <Users className="text-primary" size={28} />
-            成员管理中心
-          </h1>
-          <p className="text-muted-foreground mt-2 text-sm sm:text-base max-w-2xl">
-            在这里统一处理成员账号、准入白名单与邀请关系。页面会按你的实际管理能力显示可执行操作，避免前后端口径不一致。
-          </p>
+    <div className="space-y-6 text-foreground">
+      {/* 顶部标题与环境光晕 Hero */}
+      <div className="relative overflow-hidden rounded-[22px] border border-border/60 bg-linear-to-br from-white/95 via-white/85 to-background p-4 shadow-sm backdrop-blur-md dark:border-white/10 dark:from-white/6 dark:via-white/3 dark:to-transparent sm:rounded-4xl sm:px-7 sm:py-6">
+        <div className="pointer-events-none absolute -right-16 -top-16 hidden h-64 w-64 rounded-full bg-primary/8 blur-3xl sm:block" />
+        <div className="pointer-events-none absolute -bottom-16 -left-16 hidden h-64 w-64 rounded-full bg-sky-500/5 blur-3xl sm:block" />
+
+        <div className="relative flex flex-col gap-4 sm:gap-5">
+          <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center sm:gap-6">
+            <div className="space-y-1 sm:space-y-1.5">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary shadow-2xs sm:h-9 sm:w-9">
+                  <Users size={18} />
+                </div>
+                <h1 className="text-xl font-black tracking-tight text-foreground sm:text-3xl">
+                  成员管理中心
+                </h1>
+              </div>
+              <p className="hidden max-w-2xl text-xs leading-relaxed text-muted-foreground sm:block sm:text-sm">
+                统一维护成员账号、准入白名单与邀请链路。系统依据你的实际管理 Capability 动态呈现可用操作，严密保障协作安全。
+              </p>
+            </div>
+          </div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 gap-8">
-         <UserManager />
+        <UserManager />
       </div>
 
-      {/* Help Section */}
-      <div className="mt-12 p-6 rounded-2xl border border-dashed border-border bg-white/50 dark:bg-transparent">
-        <h3 className="text-sm font-bold text-foreground flex items-center gap-2 mb-3">
-            <LayoutGrid size={16} className="text-primary" />
-            管理控制说明
+      {/* 管理控制说明 */}
+      <div className="relative overflow-hidden rounded-[22px] sm:rounded-[28px] border border-border/60 bg-linear-to-br from-white/80 to-muted/20 dark:from-white/3 dark:to-transparent p-5 sm:p-6 backdrop-blur-xs">
+        <h3 className="text-xs sm:text-sm font-black text-foreground flex items-center gap-2 mb-3 tracking-wide">
+          <div className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-primary">
+            <LayoutGrid size={13} />
+          </div>
+          管理控制说明
         </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs text-muted-foreground leading-relaxed">
-            <div className="space-y-2">
-                <p className="font-bold text-foreground/70">1. 入驻流程</p>
-                <p>成员是否能被邀请、加入白名单或调整状态，都会按当前管理员的 capability 实时决定，不再单靠页面硬编码角色。</p>
-            </div>
-            <div className="space-y-2">
-                <p className="font-bold text-foreground/70">2. 角色分工</p>
-                <p>成员的权责由被分派的“角色模板”决定。如需创建或修改系统现有角色，请前往侧边栏的“角色管理”中心操作。</p>
-            </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 text-xs text-muted-foreground leading-relaxed">
+          <div className="space-y-1.5 rounded-2xl bg-white/50 dark:bg-white/2 border border-border/40 p-3.5">
+            <p className="font-bold text-foreground/80 flex items-center gap-1.5">
+              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-primary/15 text-primary text-[10px] font-black">1</span>
+              入驻流程
+            </p>
+            <p className="text-muted-foreground">成员是否能被邀请、加入白名单或调整状态，都会按当前管理员的 Capability 实时决定，保障前后端口径严格对齐。</p>
+          </div>
+          <div className="space-y-1.5 rounded-2xl bg-white/50 dark:bg-white/2 border border-border/40 p-3.5">
+            <p className="font-bold text-foreground/80 flex items-center gap-1.5">
+              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-primary/15 text-primary text-[10px] font-black">2</span>
+              角色分工
+            </p>
+            <p className="text-muted-foreground">成员的权责由被分派的“角色模板”决定。如需创建或修改系统现有角色，请前往侧边栏的“角色管理”中心操作。</p>
+          </div>
         </div>
       </div>
     </div>

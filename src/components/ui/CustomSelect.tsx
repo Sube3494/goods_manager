@@ -24,7 +24,8 @@ interface CustomSelectProps {
   addNewLabel?: string;
   searchable?: boolean;
   searchPlaceholder?: string;
-  align?: "left" | "center";
+  align?: "left" | "center" | "right";
+  matchTriggerWidth?: boolean;
 }
 
 export function CustomSelect({
@@ -40,6 +41,7 @@ export function CustomSelect({
   searchable,
   searchPlaceholder = "搜索...",
   align,
+  matchTriggerWidth,
 }: CustomSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -123,16 +125,21 @@ export function CustomSelect({
       const showAbove = spaceBelow < dropdownHeight && rect.top > dropdownHeight;
 
       requestAnimationFrame(() => {
+        const minDropdownWidth = 140;
+        const targetWidth = Math.max(rect.width, minDropdownWidth);
+        const preferredLeft = align === "right" ? rect.right - targetWidth : rect.left;
+        const safeLeft = Math.max(8, Math.min(preferredLeft, window.innerWidth - targetWidth - 12));
+
         setDropdownPosition({
           top: showAbove ? rect.top - 8 : rect.bottom + 8,
-          left: rect.left,
+          left: safeLeft,
           width: rect.width,
           showAbove,
           isReady: true
         });
       });
     }
-  }, [isOpen]);
+  }, [align, isOpen]);
 
   useEffect(() => {
     if (isOpen) {
@@ -160,10 +167,10 @@ export function CustomSelect({
         type="button"
         onClick={() => handleOpenChange(!isOpen)}
         className={cn(
-          "flex w-full h-full items-center bg-white dark:bg-white/5 border border-border dark:border-white/10 px-2.5 text-xs transition-all outline-none ring-offset-background",
+          "flex w-full h-full items-center bg-white dark:bg-white/5 border border-border dark:border-white/10 px-2.5 text-xs transition-all outline-none ring-offset-background text-foreground",
           isCenter ? "justify-center text-center" : "justify-between text-left",
           !triggerClassName?.includes("rounded-") && "rounded-lg",
-          isOpen ? "ring-2 ring-primary/20 border-primary/20 bg-background" : "hover:bg-muted/5 dark:hover:bg-white/10",
+          isOpen ? "ring-2 ring-primary/20 border-primary/20 bg-background dark:bg-zinc-900" : "hover:bg-muted/5 dark:hover:bg-white/10",
           triggerClassName
         )}
       >
@@ -216,7 +223,9 @@ export function CustomSelect({
                 position: 'fixed',
                 top: `${dropdownPosition.top}px`,
                 left: `${dropdownPosition.left}px`,
-                width: `${dropdownPosition.width}px`,
+                minWidth: `${Math.max(dropdownPosition.width, 140)}px`,
+                maxWidth: 'calc(100vw - 24px)',
+                width: matchTriggerWidth ? `${dropdownPosition.width}px` : 'max-content',
                 zIndex: 999999,
                 transformOrigin: dropdownPosition.showAbove ? 'bottom' : 'top',
                 translateY: dropdownPosition.showAbove ? '-100%' : '0%',
@@ -264,13 +273,13 @@ export function CustomSelect({
                         handleOpenChange(false);
                       }}
                       className={cn(
-                        "relative flex w-full select-none items-center rounded-xl py-2.5 pl-3 pr-7 text-xs outline-none transition-colors hover:bg-slate-100 dark:hover:bg-white/8 cursor-pointer font-medium text-foreground",
+                        "relative flex w-full select-none items-center rounded-xl py-2.5 pl-3 pr-8 text-xs outline-none transition-colors hover:bg-slate-100 dark:hover:bg-white/8 cursor-pointer font-medium text-foreground",
                         option.value === value && "bg-primary/10 text-primary font-bold dark:bg-primary/20 dark:text-primary"
                       )}
                     >
-                      <span className="whitespace-nowrap font-medium">{option.label}</span>
+                      <span className="whitespace-nowrap font-medium pr-1">{option.label}</span>
                       {option.value === value && (
-                        <span className="absolute right-2 flex h-3.5 w-3.5 items-center justify-center">
+                        <span className="absolute right-2.5 flex h-3.5 w-3.5 items-center justify-center">
                           <Check size={12} />
                         </span>
                       )}
