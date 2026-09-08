@@ -18,6 +18,7 @@ export async function GET(request: NextRequest) {
 
     const requestedUserId = String(request.nextUrl.searchParams.get("userId") || "").trim();
     const canManageMembers = user.role === "SUPER_ADMIN"
+      || hasAdminAccess(user, "members:orders")
       || hasAdminAccess(user, "members:manage")
       || hasAdminAccess(user, "members:status")
       || hasAdminAccess(user, "whitelist:manage")
@@ -81,6 +82,7 @@ export async function POST(request: NextRequest) {
     const { date, shopName, amountMeituan, amountJingdong, amountTaobao, amountOther, userId: requestedUserId } = body;
 
     const canManageMembers = user.role === "SUPER_ADMIN"
+      || hasAdminAccess(user, "members:orders")
       || hasAdminAccess(user, "members:manage")
       || hasAdminAccess(user, "members:status")
       || hasAdminAccess(user, "whitelist:manage")

@@ -257,7 +257,7 @@ export async function GET(request: NextRequest) {
     }
 
     const requestedUserId = String(request.nextUrl.searchParams.get("userId") || request.nextUrl.searchParams.get("targetUserId") || "").trim();
-    const canManageMembers = hasAdminAccess(user, "members:manage") || user.role === "SUPER_ADMIN";
+    const canManageMembers = hasAdminAccess(user, "members:orders") || hasAdminAccess(user, "members:manage") || user.role === "SUPER_ADMIN";
     const targetUserId = (canManageMembers && requestedUserId) ? requestedUserId : user.id;
 
     const targetUserRecord = targetUserId === user.id

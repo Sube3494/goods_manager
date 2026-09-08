@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAuthorizedUser } from "@/lib/auth";
 import { getAddressDetail, isAddressDisabled } from "@/lib/addressBook";
 import prisma from "@/lib/prisma";
+import { hasAdminAccess } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +27,8 @@ export async function GET(request: Request) {
   const isAdmin = Boolean(
     session.role === "SUPER_ADMIN" ||
     (session.role && String(session.role).includes("管理")) ||
+    hasAdminAccess(session, "members:orders") ||
+    hasAdminAccess(session, "members:manage") ||
     (Array.isArray(session.permissions) && (session.permissions.includes("*") || session.permissions.includes("members:manage") || session.permissions.includes("admin")))
   );
   const targetUserId = (isAdmin && requestedUserId) ? requestedUserId : session.id;

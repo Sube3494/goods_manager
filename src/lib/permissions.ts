@@ -2,26 +2,27 @@ import { JWTPayload } from "jose";
 
 export type Permission = 
   | "dashboard:read"
-  | "product:read" | "product:create" | "product:update" | "product:delete"
-  | "category:manage"
-  | "supplier:manage"
-  | "order:manage"
-  | "purchase:manage"
-  | "setup_purchase:manage"
-  | "inbound:manage"
-  | "outbound:manage"
-  | "brush:manage"
+  | "product:read" | "product:create" | "product:update" | "product:delete" | "product:import" | "product:export" | "shop_product:manage"
+  | "category:manage" | "category:create" | "category:update" | "category:delete"
+  | "supplier:manage" | "supplier:create" | "supplier:update" | "supplier:delete"
+  | "order:manage" | "order:sync" | "order:delivery" | "order:match" | "order:cost" | "order:promotion"
+  | "purchase:manage" | "purchase:create" | "purchase:update" | "purchase:delete" | "purchase:inbound" | "purchase:export"
+  | "setup_purchase:manage" | "setup_purchase:create" | "setup_purchase:update" | "setup_purchase:delete" | "setup_purchase:inbound"
+  | "inbound:manage" | "inbound:create" | "inbound:delete" | "inbound:export"
+  | "outbound:manage" | "outbound:create" | "outbound:delete" | "outbound:analytics"
+  | "brush:manage" | "brush:products" | "brush:plans" | "brush:orders"
   | "brush:simulate"
   | "gallery:upload" | "gallery:download" | "gallery:share" | "gallery:copy"
-  | "settlement:manage"
-  | "operating-costs:manage"
-  | "logistics:manage"
+  | "settlement:manage" | "settlement:confirm" | "settlement:export"
+  | "operating-costs:manage" | "operating-costs:update"
+  | "logistics:manage" | "logistics:route" | "logistics:stores"
   | "shelf_life:read" | "shelf_life:manage"
-  | "members:read" | "members:manage" | "members:status" | "whitelist:manage"
-  | "roles:manage"
-  | "settings:manage"
-  | "backup:manage"
-  | "data:transfer"
+  | "door-locks:unlock" | "door-locks:password" | "door-locks:sync"
+  | "members:read" | "members:manage" | "members:status" | "members:orders" | "members:libraries" | "whitelist:manage"
+  | "roles:manage" | "roles:create" | "roles:update" | "roles:delete"
+  | "settings:manage" | "settings:general" | "settings:storage"
+  | "backup:manage" | "backup:create" | "backup:restore" | "backup:delete"
+  | "data:transfer" | "data:import" | "data:export"
   | "system:manage"
   | "all";
 
@@ -43,6 +44,8 @@ export type AdminCapability =
   | "roles:manage"
   | "members:manage"
   | "members:status"
+  | "members:orders"
+  | "members:libraries"
   | "whitelist:manage";
 
 export const PERMISSION_TREE = [
@@ -61,6 +64,9 @@ export const PERMISSION_TREE = [
       { key: "product:create", label: "创建商品" },
       { key: "product:update", label: "更新商品" },
       { key: "product:delete", label: "删除商品" },
+      { key: "product:import", label: "导入商品" },
+      { key: "product:export", label: "导出商品" },
+      { key: "shop_product:manage", label: "店铺商品管理" },
     ]
   },
   {
@@ -68,6 +74,9 @@ export const PERMISSION_TREE = [
     label: "分类管理",
     children: [
       { key: "category:manage", label: "分类管理" },
+      { key: "category:create", label: "创建分类" },
+      { key: "category:update", label: "编辑分类" },
+      { key: "category:delete", label: "删除分类" },
     ]
   },
   {
@@ -75,6 +84,9 @@ export const PERMISSION_TREE = [
     label: "供应商管理",
     children: [
       { key: "supplier:manage", label: "供应商管理" },
+      { key: "supplier:create", label: "创建供应商" },
+      { key: "supplier:update", label: "编辑供应商" },
+      { key: "supplier:delete", label: "删除供应商" },
     ]
   },
   {
@@ -82,6 +94,11 @@ export const PERMISSION_TREE = [
     label: "订单管理",
     children: [
       { key: "order:manage", label: "订单管理" },
+      { key: "order:sync", label: "同步订单" },
+      { key: "order:delivery", label: "配送操作" },
+      { key: "order:match", label: "商品匹配" },
+      { key: "order:cost", label: "成本补录" },
+      { key: "order:promotion", label: "推广费维护" },
     ]
   },
   {
@@ -89,6 +106,11 @@ export const PERMISSION_TREE = [
     label: "日常采购",
     children: [
       { key: "purchase:manage", label: "日常采购管理" },
+      { key: "purchase:create", label: "创建采购单" },
+      { key: "purchase:update", label: "编辑采购单" },
+      { key: "purchase:delete", label: "删除采购单" },
+      { key: "purchase:inbound", label: "采购入库" },
+      { key: "purchase:export", label: "导出采购单" },
     ]
   },
   {
@@ -96,6 +118,10 @@ export const PERMISSION_TREE = [
     label: "开店进货",
     children: [
       { key: "setup_purchase:manage", label: "开店进货管理" },
+      { key: "setup_purchase:create", label: "创建开店批次" },
+      { key: "setup_purchase:update", label: "编辑开店批次" },
+      { key: "setup_purchase:delete", label: "删除开店批次" },
+      { key: "setup_purchase:inbound", label: "开店批次入库" },
     ]
   },
   {
@@ -103,6 +129,9 @@ export const PERMISSION_TREE = [
     label: "入库管理",
     children: [
       { key: "inbound:manage", label: "入库管理" },
+      { key: "inbound:create", label: "新建入库" },
+      { key: "inbound:delete", label: "删除入库记录" },
+      { key: "inbound:export", label: "导出入库记录" },
     ]
   },
   {
@@ -110,6 +139,9 @@ export const PERMISSION_TREE = [
     label: "出库管理",
     children: [
       { key: "outbound:manage", label: "出库管理" },
+      { key: "outbound:create", label: "新建出库" },
+      { key: "outbound:delete", label: "删除出库记录" },
+      { key: "outbound:analytics", label: "查看出库分析" },
     ]
   },
   {
@@ -117,6 +149,9 @@ export const PERMISSION_TREE = [
     label: "刷单中心",
     children: [
       { key: "brush:manage", label: "刷单中心管理" },
+      { key: "brush:products", label: "刷单商品管理" },
+      { key: "brush:plans", label: "刷单计划管理" },
+      { key: "brush:orders", label: "刷单订单管理" },
       { key: "brush:simulate", label: "刷单模拟显示" },
     ]
   },
@@ -135,7 +170,10 @@ export const PERMISSION_TREE = [
     label: "财务结算",
     children: [
       { key: "settlement:manage", label: "结算管理" },
+      { key: "settlement:confirm", label: "确认结算" },
+      { key: "settlement:export", label: "导出对账" },
       { key: "operating-costs:manage", label: "经营成本管理" },
+      { key: "operating-costs:update", label: "编辑成本参数" },
     ]
   },
   {
@@ -143,6 +181,8 @@ export const PERMISSION_TREE = [
     label: "智能调货",
     children: [
       { key: "logistics:manage", label: "调货与网点管理" },
+      { key: "logistics:route", label: "计算配送路线" },
+      { key: "logistics:stores", label: "维护配送网点" },
     ]
   },
   {
@@ -160,11 +200,23 @@ export const PERMISSION_TREE = [
       { key: "members:read", label: "查看成员管理页" },
       { key: "members:manage", label: "编辑成员资料/角色" },
       { key: "members:status", label: "启用/禁用成员" },
+      { key: "members:orders", label: "查看成员麦芽田数据" },
+      { key: "members:libraries", label: "商品库授权" },
       { key: "whitelist:manage", label: "白名单与邀请管理" },
       { key: "roles:manage", label: "角色模板管理" },
+      { key: "roles:create", label: "创建角色" },
+      { key: "roles:update", label: "编辑角色权限" },
+      { key: "roles:delete", label: "删除角色" },
       { key: "settings:manage", label: "系统设置" },
+      { key: "settings:general", label: "常规设置" },
+      { key: "settings:storage", label: "存储设置" },
       { key: "backup:manage", label: "备份与恢复" },
+      { key: "backup:create", label: "创建备份" },
+      { key: "backup:restore", label: "恢复备份" },
+      { key: "backup:delete", label: "删除备份" },
       { key: "data:transfer", label: "数据导入导出" },
+      { key: "data:import", label: "导入数据" },
+      { key: "data:export", label: "导出数据" },
     ]
   }
 ];
@@ -219,28 +271,46 @@ export const PAGE_PERMISSION_TREE: PagePermissionGroup[] = [
         label: "店铺商品",
         description: "按店铺管理经营商品清单",
         accessKey: "product:read",
-        actions: [],
+        actions: [
+          { key: "shop_product:manage", label: "维护店铺商品" },
+          { key: "product:import", label: "导入店铺商品" },
+          { key: "product:export", label: "导出店铺商品" },
+        ],
       },
       {
         key: "categories",
         label: "分类管理",
         description: "维护商品分类结构",
         accessKey: "category:manage",
-        actions: [],
+        actions: [
+          { key: "category:create", label: "创建分类" },
+          { key: "category:update", label: "编辑分类" },
+          { key: "category:delete", label: "删除分类" },
+        ],
       },
       {
         key: "suppliers",
         label: "供应商管理",
         description: "维护供应商资料与联络信息",
         accessKey: "supplier:manage",
-        actions: [],
+        actions: [
+          { key: "supplier:create", label: "创建供应商" },
+          { key: "supplier:update", label: "编辑供应商" },
+          { key: "supplier:delete", label: "删除供应商" },
+        ],
       },
       {
         key: "orders",
         label: "订单管理",
         description: "查看订单并处理配送动作",
         accessKey: "order:manage",
-        actions: [],
+        actions: [
+          { key: "order:sync", label: "同步订单" },
+          { key: "order:delivery", label: "配送与履约操作" },
+          { key: "order:match", label: "订单商品匹配" },
+          { key: "order:cost", label: "订单成本补录" },
+          { key: "order:promotion", label: "推广费维护" },
+        ],
       },
       {
         key: "brush_center",
@@ -248,6 +318,9 @@ export const PAGE_PERMISSION_TREE: PagePermissionGroup[] = [
         description: "刷单商品库、任务与订单",
         accessKey: "brush:manage",
         actions: [
+          { key: "brush:products", label: "刷单商品管理" },
+          { key: "brush:plans", label: "刷单计划管理" },
+          { key: "brush:orders", label: "刷单订单管理" },
           { key: "brush:simulate", label: "刷单模拟显示" },
         ],
       },
@@ -256,28 +329,47 @@ export const PAGE_PERMISSION_TREE: PagePermissionGroup[] = [
         label: "采购管理",
         description: "日常采购与到货记录",
         accessKey: "purchase:manage",
-        actions: [],
+        actions: [
+          { key: "purchase:create", label: "创建采购单" },
+          { key: "purchase:update", label: "编辑采购单" },
+          { key: "purchase:delete", label: "删除采购单" },
+          { key: "purchase:inbound", label: "采购入库" },
+          { key: "purchase:export", label: "导出采购单" },
+        ],
       },
       {
         key: "setup_purchases",
         label: "开店进货",
         description: "开店批次与商品准备",
         accessKey: "setup_purchase:manage",
-        actions: [],
+        actions: [
+          { key: "setup_purchase:create", label: "创建开店批次" },
+          { key: "setup_purchase:update", label: "编辑开店批次" },
+          { key: "setup_purchase:delete", label: "删除开店批次" },
+          { key: "setup_purchase:inbound", label: "开店批次入库" },
+        ],
       },
       {
         key: "inbound",
         label: "入库管理",
         description: "入库登记与批量导入",
         accessKey: "inbound:manage",
-        actions: [],
+        actions: [
+          { key: "inbound:create", label: "新建入库" },
+          { key: "inbound:delete", label: "删除入库记录" },
+          { key: "inbound:export", label: "导出入库记录" },
+        ],
       },
       {
         key: "outbound",
         label: "出库管理",
         description: "销售、领用与损耗出库",
         accessKey: "outbound:manage",
-        actions: [],
+        actions: [
+          { key: "outbound:create", label: "新建出库" },
+          { key: "outbound:delete", label: "删除出库记录" },
+          { key: "outbound:analytics", label: "查看出库分析" },
+        ],
       },
       {
         key: "shelf_life",
@@ -304,7 +396,11 @@ export const PAGE_PERMISSION_TREE: PagePermissionGroup[] = [
         label: "门锁管理",
         description: "配置 TTLock 并管理门锁远程控制",
         accessKey: "settings:manage",
-        actions: [],
+        actions: [
+          { key: "door-locks:unlock", label: "远程开锁" },
+          { key: "door-locks:password", label: "离线密码下发" },
+          { key: "door-locks:sync", label: "同步门锁状态" },
+        ],
       },
     ],
   },
@@ -318,21 +414,29 @@ export const PAGE_PERMISSION_TREE: PagePermissionGroup[] = [
         label: "结算对账",
         description: "对账与结算记录",
         accessKey: "settlement:manage",
-        actions: [],
+        actions: [
+          { key: "settlement:confirm", label: "确认结算" },
+          { key: "settlement:export", label: "导出对账" },
+        ],
       },
       {
         key: "operating_costs",
         label: "经营成本",
         description: "房租、人工、水电物业等经营成本",
         accessKey: "operating-costs:manage",
-        actions: [],
+        actions: [
+          { key: "operating-costs:update", label: "编辑成本参数" },
+        ],
       },
       {
         key: "logistics",
         label: "智能调货",
         description: "智能调货、地图测距和网点管理",
         accessKey: "logistics:manage",
-        actions: [],
+        actions: [
+          { key: "logistics:route", label: "计算配送路线" },
+          { key: "logistics:stores", label: "维护配送网点" },
+        ],
       },
     ],
   },
@@ -349,6 +453,8 @@ export const PAGE_PERMISSION_TREE: PagePermissionGroup[] = [
         actions: [
           { key: "members:manage", label: "编辑成员资料/角色" },
           { key: "members:status", label: "启用/禁用成员" },
+          { key: "members:orders", label: "查看成员麦芽田数据" },
+          { key: "members:libraries", label: "商品库授权" },
           { key: "whitelist:manage", label: "白名单与邀请管理" },
         ],
       },
@@ -357,28 +463,42 @@ export const PAGE_PERMISSION_TREE: PagePermissionGroup[] = [
         label: "角色管理",
         description: "角色模板与权限矩阵",
         accessKey: "roles:manage",
-        actions: [],
+        actions: [
+          { key: "roles:create", label: "创建角色" },
+          { key: "roles:update", label: "编辑角色权限" },
+          { key: "roles:delete", label: "删除角色" },
+        ],
       },
       {
         key: "settings",
         label: "系统设置",
         description: "系统参数与存储配置",
         accessKey: "settings:manage",
-        actions: [],
+        actions: [
+          { key: "settings:general", label: "常规设置" },
+          { key: "settings:storage", label: "存储设置" },
+        ],
       },
       {
         key: "backup",
         label: "备份与恢复",
         description: "系统备份、恢复和备份测试",
         accessKey: "backup:manage",
-        actions: [],
+        actions: [
+          { key: "backup:create", label: "创建备份" },
+          { key: "backup:restore", label: "恢复备份" },
+          { key: "backup:delete", label: "删除备份" },
+        ],
       },
       {
         key: "data_transfer",
         label: "数据导入导出",
         description: "系统级数据迁移和导出",
         accessKey: "data:transfer",
-        actions: [],
+        actions: [
+          { key: "data:import", label: "导入数据" },
+          { key: "data:export", label: "导出数据" },
+        ],
       },
     ],
   },
@@ -415,6 +535,16 @@ export const ADMIN_ACCESS_MATRIX: Record<AdminCapability, {
     label: "成员状态管理",
     description: "启用或禁用成员账号",
     permission: "members:status",
+  },
+  "members:orders": {
+    label: "成员麦芽田数据",
+    description: "查看成员的麦芽田订单和利润数据",
+    permission: "members:orders",
+  },
+  "members:libraries": {
+    label: "成员商品库授权",
+    description: "调整成员可访问的商品模板库",
+    permission: "members:libraries",
   },
   "whitelist:manage": {
     label: "白名单与邀请管理",
@@ -465,14 +595,66 @@ export function getEffectivePermissions(user: SessionUser | null): PermissionMap
 
 const PERMISSION_FALLBACKS: Partial<Record<Permission, Permission[]>> = {
   "dashboard:read": ["product:read", "logistics:manage", "purchase:manage", "brush:manage", "inbound:manage", "outbound:manage", "settlement:manage"],
+  "product:import": ["product:update"],
+  "product:export": ["product:read"],
+  "shop_product:manage": ["product:update"],
+  "category:create": ["category:manage"],
+  "category:update": ["category:manage"],
+  "category:delete": ["category:manage"],
+  "supplier:create": ["supplier:manage"],
+  "supplier:update": ["supplier:manage"],
+  "supplier:delete": ["supplier:manage"],
   "order:manage": ["purchase:manage", "outbound:manage", "brush:manage"],
+  "order:sync": ["order:manage"],
+  "order:delivery": ["order:manage"],
+  "order:match": ["order:manage"],
+  "order:cost": ["order:manage"],
+  "order:promotion": ["order:manage"],
+  "purchase:create": ["purchase:manage"],
+  "purchase:update": ["purchase:manage"],
+  "purchase:delete": ["purchase:manage"],
+  "purchase:inbound": ["purchase:manage"],
+  "purchase:export": ["purchase:manage"],
+  "setup_purchase:create": ["setup_purchase:manage"],
+  "setup_purchase:update": ["setup_purchase:manage"],
+  "setup_purchase:delete": ["setup_purchase:manage"],
+  "setup_purchase:inbound": ["setup_purchase:manage"],
+  "inbound:create": ["inbound:manage"],
+  "inbound:delete": ["inbound:manage"],
+  "inbound:export": ["inbound:manage"],
+  "outbound:create": ["outbound:manage"],
+  "outbound:delete": ["outbound:manage"],
+  "outbound:analytics": ["outbound:manage"],
+  "brush:products": ["brush:manage"],
+  "brush:plans": ["brush:manage"],
+  "brush:orders": ["brush:manage"],
+  "settlement:confirm": ["settlement:manage"],
+  "settlement:export": ["settlement:manage"],
+  "operating-costs:update": ["operating-costs:manage"],
+  "logistics:route": ["logistics:manage"],
+  "logistics:stores": ["logistics:manage"],
+  "door-locks:unlock": ["settings:manage"],
+  "door-locks:password": ["settings:manage"],
+  "door-locks:sync": ["settings:manage"],
   "roles:manage": ["system:manage"],
+  "roles:create": ["roles:manage", "system:manage"],
+  "roles:update": ["roles:manage", "system:manage"],
+  "roles:delete": ["roles:manage", "system:manage"],
   "settings:manage": ["system:manage"],
+  "settings:general": ["settings:manage", "system:manage"],
+  "settings:storage": ["settings:manage", "system:manage"],
   "backup:manage": ["system:manage"],
+  "backup:create": ["backup:manage", "system:manage"],
+  "backup:restore": ["backup:manage", "system:manage"],
+  "backup:delete": ["backup:manage", "system:manage"],
   "data:transfer": ["system:manage"],
-  "members:read": ["members:manage", "members:status", "whitelist:manage", "system:manage"],
+  "data:import": ["data:transfer", "system:manage"],
+  "data:export": ["data:transfer", "system:manage"],
+  "members:read": ["members:manage", "members:status", "members:orders", "members:libraries", "whitelist:manage", "system:manage"],
   "members:manage": ["system:manage"],
   "members:status": ["system:manage"],
+  "members:orders": ["members:manage", "system:manage"],
+  "members:libraries": ["members:manage", "system:manage"],
   "whitelist:manage": ["system:manage"],
 };
 

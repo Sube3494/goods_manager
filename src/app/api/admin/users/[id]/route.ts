@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 
-import { getAuthorizedAdmin } from "@/lib/auth";
-import { normalizePermissionMap } from "@/lib/permissions";
+import { getAuthorizedAdminAny } from "@/lib/auth";
+import { hasAdminAccess, normalizePermissionMap } from "@/lib/permissions";
 
 function asPrismaJsonValue<T>(value: T): Prisma.InputJsonValue {
   return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
@@ -16,14 +16,23 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await getAuthorizedAdmin("members:manage");
-  if (!session) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
   try {
     const { id } = await params;
     const { role, permissions, roleProfileId, isInternal, libraryIds } = await request.json();
+    const session = await getAuthorizedAdminAny("members:manage", "members:libraries");
+    if (!session) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const updatesMemberProfile = role !== undefined || permissions !== undefined || roleProfileId !== undefined || isInternal !== undefined;
+    const updatesLibraries = libraryIds !== undefined;
+    if (updatesMemberProfile && !hasAdminAccess(session, "members:manage")) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    if (updatesLibraries && !hasAdminAccess(session, "members:libraries")) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     const currentUser = await prisma.user.findUnique({
       where: { id },
       select: { permissions: true },

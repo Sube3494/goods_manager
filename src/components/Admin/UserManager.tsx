@@ -434,8 +434,10 @@ export function UserManager() {
   const sessionUser = user as SessionUser | null;
   const canManageMembers = hasAdminAccess(sessionUser, "members:manage");
   const canManageMemberStatus = hasAdminAccess(sessionUser, "members:status");
+  const canViewMemberOrders = hasAdminAccess(sessionUser, "members:orders");
+  const canManageMemberLibraries = hasAdminAccess(sessionUser, "members:libraries");
   const canManageWhitelist = hasAdminAccess(sessionUser, "whitelist:manage");
-  const canViewEntries = canManageWhitelist || canManageMembers || canManageMemberStatus;
+  const canViewEntries = canManageWhitelist || canManageMembers || canManageMemberStatus || canViewMemberOrders || canManageMemberLibraries;
   const [entries, setEntries] = useState<WhitelistEntry[]>([]);
   const [roles, setRoles] = useState<RoleProfile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -1010,7 +1012,7 @@ export function UserManager() {
                        <td className="px-6 py-4 text-center">
                          <div className="flex justify-center">
                             <div className="flex items-center gap-1 bg-muted/20 dark:bg-white/[0.02] p-1 rounded-full border border-border/40">
-                               {isRegistered && canManageMembers ? (
+                               {isRegistered && canViewMemberOrders ? (
                                   <button
                                     onClick={() => {
                                       setViewOrdersUser({
@@ -1051,7 +1053,7 @@ export function UserManager() {
                                     <Settings2 size={15} />
                                   </button>
                                 ) : null}
-                                {isRegistered && canManageMembers && !isSuperAdmin ? (
+                                {isRegistered && canManageMemberLibraries && !isSuperAdmin ? (
                                   <button
                                     onClick={() => {
                                       setAuthLibraryUserId(entry.user!.id);
@@ -1192,7 +1194,7 @@ export function UserManager() {
                           角色分配
                         </button>
                       )}
-                      {isRegistered && canManageMembers && (
+                      {isRegistered && canViewMemberOrders && (
                         <button
                           onClick={() => {
                             setViewOrdersUser({
@@ -1215,7 +1217,7 @@ export function UserManager() {
                           </span>
                         </button>
                       )}
-                      {isRegistered && canManageMembers && !isSuperAdmin && (
+                      {isRegistered && canManageMemberLibraries && !isSuperAdmin && (
                         <button
                           onClick={() => {
                             setAuthLibraryUserId(entry.user!.id);
