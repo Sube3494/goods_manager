@@ -693,7 +693,7 @@ export function AllOrdersView({
                 <input
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
-                  placeholder="搜索订单号、地址、商品名、SKU"
+                  placeholder="搜索订单号、地址、商品名、SKU、电话尾号"
                   className="w-full bg-transparent text-sm outline-none"
                 />
               </label>

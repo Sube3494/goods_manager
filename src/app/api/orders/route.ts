@@ -1123,6 +1123,9 @@ export async function GET(request: NextRequest) {
           { platform: { contains: query, mode: "insensitive" as const } },
           { sourceId: { contains: query, mode: "insensitive" as const } },
           { customerRemark: { contains: query, mode: "insensitive" as const } },
+          { rawPayload: { path: ["customerMaskedPhone"], string_contains: query } },
+          { rawPayload: { path: ["secret_phone"], string_contains: query } },
+          { rawPayload: { path: ["userInfo", "secret_phone"], string_contains: query } },
           {
             items: {
               some: {
