@@ -17,7 +17,7 @@ export type Permission =
   | "operating-costs:manage" | "operating-costs:update"
   | "logistics:manage" | "logistics:route" | "logistics:stores"
   | "shelf_life:read" | "shelf_life:manage"
-  | "door-locks:unlock" | "door-locks:password" | "door-locks:sync"
+  | "door-locks:manage" | "door-locks:unlock" | "door-locks:password" | "door-locks:sync"
   | "members:read" | "members:manage" | "members:status" | "members:orders" | "members:libraries" | "whitelist:manage"
   | "roles:manage" | "roles:create" | "roles:update" | "roles:delete"
   | "settings:manage" | "settings:general" | "settings:storage"
@@ -210,6 +210,10 @@ export const PERMISSION_TREE = [
       { key: "settings:manage", label: "系统设置" },
       { key: "settings:general", label: "常规设置" },
       { key: "settings:storage", label: "存储设置" },
+      { key: "door-locks:manage", label: "门锁管理" },
+      { key: "door-locks:unlock", label: "远程开锁" },
+      { key: "door-locks:password", label: "离线密码下发" },
+      { key: "door-locks:sync", label: "同步门锁状态" },
       { key: "backup:manage", label: "备份与恢复" },
       { key: "backup:create", label: "创建备份" },
       { key: "backup:restore", label: "恢复备份" },
@@ -395,7 +399,7 @@ export const PAGE_PERMISSION_TREE: PagePermissionGroup[] = [
         key: "door_locks",
         label: "门锁管理",
         description: "配置 TTLock 并管理门锁远程控制",
-        accessKey: "settings:manage",
+        accessKey: "door-locks:manage",
         actions: [
           { key: "door-locks:unlock", label: "远程开锁" },
           { key: "door-locks:password", label: "离线密码下发" },
@@ -633,9 +637,10 @@ const PERMISSION_FALLBACKS: Partial<Record<Permission, Permission[]>> = {
   "operating-costs:update": ["operating-costs:manage"],
   "logistics:route": ["logistics:manage"],
   "logistics:stores": ["logistics:manage"],
-  "door-locks:unlock": ["settings:manage"],
-  "door-locks:password": ["settings:manage"],
-  "door-locks:sync": ["settings:manage"],
+  "door-locks:manage": ["settings:manage", "system:manage"],
+  "door-locks:unlock": ["door-locks:manage", "settings:manage"],
+  "door-locks:password": ["door-locks:manage", "settings:manage"],
+  "door-locks:sync": ["door-locks:manage", "settings:manage"],
   "roles:manage": ["system:manage"],
   "roles:create": ["roles:manage", "system:manage"],
   "roles:update": ["roles:manage", "system:manage"],
@@ -714,7 +719,7 @@ const DEFAULT_ROUTE_RULES: RouteAccessRule[] = [
   { href: "/outbound", permission: "outbound:manage" },
   { href: "/settlement", permission: "settlement:manage" },
   { href: "/operating-costs", permission: "operating-costs:manage" },
-  { href: "/door-locks", permission: "settings:manage" },
+  { href: "/door-locks", permission: "door-locks:manage" },
   { href: "/shelf-life", permission: "shelf_life:read" },
   { href: "/gallery", permission: ["gallery:upload", "gallery:download", "gallery:share", "gallery:copy"] },
   { href: "/admin/members", permission: "members:read" },

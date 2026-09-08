@@ -8,7 +8,7 @@ export async function POST(
   _request: NextRequest,
   context: { params: Promise<{ lockId: string }> }
 ) {
-  const session = await getAuthorizedUser("settings:manage");
+  const session = await getAuthorizedUser("door-locks:unlock");
   if (!session) {
     return NextResponse.json({ error: "Permission denied" }, { status: 403 });
   }

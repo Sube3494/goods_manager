@@ -1,24 +1,25 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getAuthorizedAdmin } from "@/lib/auth";
-import { ROLE_TEMPLATES, TEMPLATE_LABELS } from "@/lib/permissions";
+import { getAuthorizedUser, getAuthorizedUserAny } from "@/lib/auth";
+import { hasPermission, ROLE_TEMPLATES, TEMPLATE_LABELS } from "@/lib/permissions";
 
 // 获取所有角色
 export async function GET() {
   try {
-    const session = await getAuthorizedAdmin("roles:manage");
+    const session = await getAuthorizedUser("roles:manage");
     if (!session) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const templateNames = Object.keys(ROLE_TEMPLATES).map((key) => TEMPLATE_LABELS[key] || key);
 
-    // 自动同步内置角色模板
+    // 只补齐缺失的内置角色。不要在读取角色列表时覆盖已保存权限，
+    // 否则用户刚调整过的系统角色会在下一次拉取时被模板重写。
     for (const [key, permissions] of Object.entries(ROLE_TEMPLATES)) {
       const name = TEMPLATE_LABELS[key] || key;
       await prisma.roleProfile.upsert({
         where: { name },
-        update: { permissions, isSystem: true },
+        update: {},
         create: {
           name,
           description: `内置系统角色: ${name}`,
@@ -56,7 +57,7 @@ export async function GET() {
 // 创建新角色
 export async function POST(request: Request) {
   try {
-    const session = await getAuthorizedAdmin("roles:manage");
+    const session = await getAuthorizedUserAny("roles:manage", "roles:create");
     if (!session) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
@@ -96,7 +97,7 @@ export async function POST(request: Request) {
 // 更新角色
 export async function PUT(request: Request) {
   try {
-    const session = await getAuthorizedAdmin("roles:manage");
+    const session = await getAuthorizedUserAny("roles:manage", "roles:update");
     if (!session) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
@@ -143,8 +144,11 @@ export async function PUT(request: Request) {
 // 删除角色
 export async function DELETE(request: Request) {
   try {
-    const session = await getAuthorizedAdmin("roles:manage");
+    const session = await getAuthorizedUserAny("roles:manage", "roles:delete");
     if (!session) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    if (!hasPermission(session, "roles:delete")) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

@@ -136,7 +136,7 @@ function Field({
 export default function DoorLocksPage() {
   const { user, isLoading: userLoading } = useUser();
   const { showToast } = useToast();
-  const canManage = hasPermission(user as SessionUser | null, "settings:manage");
+  const canManage = hasPermission(user as SessionUser | null, "door-locks:manage");
   const hasAutoLoadedLocksRef = useRef(false);
 
   const [config, setConfig] = useState<TTLockIntegrationConfigPublic | null>(null);

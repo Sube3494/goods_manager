@@ -45,9 +45,12 @@ export function QuickActions() {
   const canManageMembers =
     hasAdminAccess(sessionUser, "members:manage") ||
     hasAdminAccess(sessionUser, "members:status") ||
+    hasAdminAccess(sessionUser, "members:orders") ||
+    hasAdminAccess(sessionUser, "members:libraries") ||
     hasAdminAccess(sessionUser, "whitelist:manage");
   const canManageSettings =
     hasPermission(sessionUser, "settings:manage") ||
+    hasPermission(sessionUser, "door-locks:manage") ||
     hasPermission(sessionUser, "backup:manage") ||
     hasPermission(sessionUser, "data:transfer");
   const canAccessGallery =

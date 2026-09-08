@@ -369,12 +369,15 @@ function RoleAssignmentModal({
                                 key={role.id}
                                 type="button"
                                 onClick={() => setSelectedId(role.id)}
-                                className={`w-full p-4 rounded-2xl border transition-all text-left flex items-start justify-between gap-3 group ${
+                                className={`relative w-full overflow-hidden p-4 rounded-2xl border transition-all text-left flex items-start justify-between gap-3 group ${
                                     isSelected 
-                                    ? "bg-primary/5 dark:bg-primary/10 border-primary ring-2 ring-primary/20 shadow-xs" 
-                                    : "bg-zinc-50 dark:bg-white/[0.03] border-border/80 hover:bg-zinc-100/90 dark:hover:bg-white/[0.06] hover:border-primary/40"
+                                    ? "bg-primary/8 dark:bg-primary/12 border-primary/35 shadow-sm shadow-primary/10" 
+                                    : "bg-zinc-50/80 dark:bg-white/[0.03] border-border/70 dark:border-white/10 hover:bg-zinc-100/90 dark:hover:bg-white/[0.06] hover:border-primary/25"
                                 }`}
                             >
+                                {isSelected && (
+                                    <span className="absolute inset-y-3 left-0 w-1 rounded-r-full bg-primary" />
+                                )}
                                 <div className="min-w-0 flex-1">
                                     <div className="font-black text-sm text-foreground flex items-center gap-2 flex-wrap">
                                         {role.name}
@@ -386,10 +389,10 @@ function RoleAssignmentModal({
                                     </div>
                                     <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">{role.description || "无具体权限描述"}</p>
                                 </div>
-                                <div className={`mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all duration-200 ${
+                                <div className={`mt-0.5 w-5 h-5 rounded-full border flex items-center justify-center shrink-0 transition-all duration-200 ${
                                     isSelected 
-                                    ? "bg-primary border-primary text-primary-foreground shadow-xs shadow-primary/40 scale-105" 
-                                    : "border-zinc-300 dark:border-white/20 bg-white dark:bg-zinc-800 group-hover:border-primary/50"
+                                    ? "bg-primary border-primary text-primary-foreground shadow-sm shadow-primary/25 scale-105" 
+                                    : "border-zinc-300 dark:border-white/20 bg-white dark:bg-zinc-800 group-hover:border-primary/40"
                                 }`}>
                                     {isSelected ? <Check size={11} strokeWidth={4} /> : null}
                                 </div>
@@ -639,7 +642,7 @@ export function UserManager() {
       const res = await fetch(`/api/admin/users/${editingUserId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ roleProfileId: roleId }),
+        body: JSON.stringify({ roleProfileId: roleId, resetPermissionOverrides: true }),
       });
 
       if (res.ok) {

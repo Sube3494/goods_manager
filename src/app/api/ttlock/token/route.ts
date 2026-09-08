@@ -9,7 +9,7 @@ import {
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
-  const session = await getAuthorizedUser("settings:manage");
+  const session = await getAuthorizedUser("door-locks:manage");
   if (!session) {
     return NextResponse.json({ error: "Permission denied" }, { status: 403 });
   }

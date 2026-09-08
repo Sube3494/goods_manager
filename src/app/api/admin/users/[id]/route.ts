@@ -18,7 +18,7 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-    const { role, permissions, roleProfileId, isInternal, libraryIds } = await request.json();
+    const { role, permissions, roleProfileId, isInternal, libraryIds, resetPermissionOverrides } = await request.json();
     const session = await getAuthorizedAdminAny("members:manage", "members:libraries");
     if (!session) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -44,8 +44,11 @@ export async function PATCH(
       ? { ...(currentUser.permissions as Record<string, unknown>) }
       : {};
 
+    const shouldResetPermissionOverrides = resetPermissionOverrides === true && roleProfileId !== undefined && permissions === undefined;
     const nextPermissionFlags = permissions !== undefined ? normalizePermissionMap(permissions) : undefined;
-    const mergedPermissions = nextPermissionFlags !== undefined
+    const mergedPermissions = shouldResetPermissionOverrides
+      ? {}
+      : nextPermissionFlags !== undefined
       ? {
           ...currentPermissions,
           ...nextPermissionFlags,

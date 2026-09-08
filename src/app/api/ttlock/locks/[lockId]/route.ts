@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAuthorizedUser } from "@/lib/auth";
+import { getAuthorizedUser, getAuthorizedUserAny } from "@/lib/auth";
+import { hasPermission } from "@/lib/permissions";
 import { getTTLockDetailByUserId, configTTLockPassageModeByUserId, syncTTLockBatteryByUserId, setTTLockAutoLockTimeByUserId, getTTLockKeyboardPwdByUserId, addTTLockCustomKeyboardPwdByUserId } from "@/lib/ttlock";
 import { createHash } from "crypto";
 
@@ -14,7 +15,7 @@ export async function GET(
   _request: NextRequest,
   context: { params: Promise<{ lockId: string }> }
 ) {
-  const session = await getAuthorizedUser("settings:manage");
+  const session = await getAuthorizedUser("door-locks:manage");
   if (!session) {
     return NextResponse.json({ error: "Permission denied" }, { status: 403 });
   }
@@ -46,7 +47,7 @@ export async function POST(
   request: NextRequest,
   context: { params: Promise<{ lockId: string }> }
 ) {
-  const session = await getAuthorizedUser("settings:manage");
+  const session = await getAuthorizedUserAny("door-locks:manage", "door-locks:password", "door-locks:sync");
   if (!session) {
     return NextResponse.json({ error: "Permission denied" }, { status: 403 });
   }
@@ -62,12 +63,18 @@ export async function POST(
 
     // 电量同步逻辑分发
     if (body.action === "syncBattery") {
+      if (!hasPermission(session, "door-locks:sync")) {
+        return NextResponse.json({ error: "Permission denied" }, { status: 403 });
+      }
       const result = await syncTTLockBatteryByUserId(session.id, lockId);
       return NextResponse.json(result);
     }
 
     // 自动锁门时间配置逻辑分发
     if (body.action === "setAutoLockTime") {
+      if (!hasPermission(session, "door-locks:manage")) {
+        return NextResponse.json({ error: "Permission denied" }, { status: 403 });
+      }
       const seconds = Number(body.seconds);
       if (!Number.isFinite(seconds) || seconds < 0) {
         return NextResponse.json({ error: "Invalid seconds parameter" }, { status: 400 });
@@ -78,6 +85,9 @@ export async function POST(
 
     // 获取键盘临时密码逻辑分发
     if (body.action === "getKeyboardPwd") {
+      if (!hasPermission(session, "door-locks:password")) {
+        return NextResponse.json({ error: "Permission denied" }, { status: 403 });
+      }
       const keyboardPwdVersion = Number(body.keyboardPwdVersion) || 4;
       const keyboardPwdType = Number(body.keyboardPwdType) || 3;
       const startDate = Number(body.startDate);
@@ -98,6 +108,9 @@ export async function POST(
 
     // 添加并远程下发自定义密码逻辑分发
     if (body.action === "addCustomKeyboardPwd") {
+      if (!hasPermission(session, "door-locks:password")) {
+        return NextResponse.json({ error: "Permission denied" }, { status: 403 });
+      }
       const keyboardPwd = String(body.keyboardPwd || "").trim();
       const keyboardPwdName = String(body.keyboardPwdName || "").trim();
       const isPermanent = Boolean(body.isPermanent);
@@ -131,6 +144,9 @@ export async function POST(
     }
 
     // 通道模式配置逻辑分发
+    if (!hasPermission(session, "door-locks:manage")) {
+      return NextResponse.json({ error: "Permission denied" }, { status: 403 });
+    }
     const passageMode = Number(body.passageMode);
     if (passageMode !== 1 && passageMode !== 2) {
       return NextResponse.json({ error: "Invalid parameters" }, { status: 400 });
