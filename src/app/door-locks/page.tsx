@@ -1068,31 +1068,42 @@ export default function DoorLocksPage() {
                               </div>
                             </button>
 
-                            {/* 8. ⚡ 远程开锁（核心操作大胶囊） */}
+                            {/* 8. 远程开锁 */}
                             <button
                               type="button"
                               onClick={() => void handleUnlock(lockDetail.lockId)}
                               disabled={isUnlocking || !status.online}
                               className={cn(
-                                "border rounded-2xl p-3.5 flex flex-col justify-between text-left transition-colors shadow-md active:scale-[0.98]",
+                                "border rounded-2xl p-3.5 flex flex-col justify-between text-left transition-colors shadow-2xs active:scale-[0.98]",
                                 !status.online
-                                  ? "bg-muted/30 border-border/40 opacity-60 cursor-not-allowed shadow-none"
-                                  : "bg-linear-to-br from-primary to-sky-600 text-primary-foreground border-primary/30 shadow-primary/20 hover:brightness-110 cursor-pointer"
+                                  ? "bg-muted/30 border-border/40 opacity-60 cursor-not-allowed"
+                                  : "bg-emerald-500/10 border-emerald-500/25 hover:bg-emerald-500/15 cursor-pointer"
                               )}
+                              title={!status.online ? "设备离线，无法远程开锁" : "点击发送远程开锁指令"}
                             >
-                              <div className="text-[10px] font-bold uppercase tracking-wider flex items-center justify-between w-full opacity-90">
-                                <span className="flex items-center gap-1.5">
+                              <div className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider flex items-center justify-between w-full gap-2">
+                                <span className="flex min-w-0 items-center gap-1.5">
                                   {isUnlocking ? (
-                                    <Loader2 size={12} className="animate-spin" />
+                                    <Loader2 size={12} className="animate-spin text-emerald-500" />
                                   ) : (
-                                    <LockKeyhole size={12} />
+                                    <DoorOpen size={12} className={status.online ? "text-emerald-500" : "text-muted-foreground"} />
                                   )}
-                                  <span>远程指令</span>
+                                  <span className="truncate">远程开锁</span>
                                 </span>
-                                <span className="text-[9px] bg-white/20 px-1.5 py-0.5 rounded-full">即时</span>
+                                <span className={cn(
+                                  "shrink-0 rounded-full border px-1.5 py-0.5 text-[9px] font-bold",
+                                  status.online
+                                    ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                                    : "border-border/50 bg-background/60 text-muted-foreground dark:border-white/10"
+                                )}>
+                                  即时
+                                </span>
                               </div>
-                              <div className="text-xs sm:text-sm font-black mt-2 truncate">
-                                {!status.online ? "设备已离线" : isUnlocking ? "正在极速开门..." : "点击远程开锁"}
+                              <div className={cn(
+                                "text-xs sm:text-sm font-bold mt-2 truncate",
+                                status.online ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"
+                              )}>
+                                {!status.online ? "设备离线不可开锁" : isUnlocking ? "正在发送指令..." : "点击立即开门"}
                               </div>
                             </button>
 

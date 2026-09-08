@@ -48,6 +48,14 @@ function getPageKeys(page: PagePermissionNode) {
   return [page.accessKey, ...page.actions.map((action) => action.key)];
 }
 
+function formatPageAccessSummary(enabled: boolean, actionCount: number, totalActions: number) {
+  const accessText = enabled ? "可访问" : "未开放";
+  if (totalActions === 0) {
+    return `${accessText} · 仅页面访问`;
+  }
+  return `${accessText} · ${actionCount}/${totalActions} 项操作`;
+}
+
 function getPermissionStats(permissions: Record<string, boolean> | undefined): PermissionStats {
   return PAGE_PERMISSION_TREE.reduce<PermissionStats>(
     (stats, group) => {
@@ -489,7 +497,7 @@ export const RoleManager = forwardRef<RoleManagerHandle>((props, ref) => {
                                 <div className="min-w-0">
                                   <div className="truncate text-sm font-black text-foreground">{page.label}</div>
                                   <div className="mt-0.5 text-[11px] text-muted-foreground lg:mt-1">
-                                    {enabled ? "可访问" : "未开放"} · {actionCount}/{page.actions.length} 操作
+                                    {formatPageAccessSummary(enabled, actionCount, page.actions.length)}
                                   </div>
                                 </div>
                                 <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", enabled ? "bg-emerald-500" : "bg-muted-foreground/25")} />

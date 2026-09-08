@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
+import Image from "next/image";
+import md5 from "blueimp-md5";
 import { Shield, Settings2, Loader2, User as UserIcon, Mail, Plus, Trash2, AlertCircle, NotebookPen, Search, Check, UserCheck, Ban, MonitorSmartphone, Smartphone, FolderLock, ShoppingBag, X, Crown, ShieldAlert } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { Switch } from "@/components/ui/Switch";
@@ -165,25 +167,40 @@ function RoleBadge({
 
 function MemberAvatar({
   isRegistered,
+  email,
+  name,
   size = "md",
 }: {
   isRegistered: boolean;
+  email: string;
+  name?: string | null;
   size?: "md" | "lg";
 }) {
   const isLg = size === "lg";
+  const avatarSize = isLg ? 40 : 36;
+  const normalizedEmail = email.trim().toLowerCase();
 
   return (
     <div
-      className={`rounded-full flex items-center justify-center shrink-0 transition-all ${
+      className={`relative overflow-hidden rounded-full flex items-center justify-center shrink-0 transition-all ${
         isLg ? "h-10 w-10" : "h-9 w-9"
       } ${
         isRegistered
-          ? "bg-primary/10 text-primary shadow-2xs"
+          ? "bg-primary/10 text-primary shadow-2xs ring-1 ring-border/50 dark:ring-white/10"
           : "bg-muted/40 border border-dashed border-muted-foreground/30 text-muted-foreground"
       }`}
     >
       {isRegistered ? (
-        <UserIcon size={isLg ? 18 : 16} />
+        <>
+          <Image
+            src={`https://cravatar.cn/avatar/${md5(normalizedEmail)}?d=mp&s=${avatarSize * 2}`}
+            alt={`${name || email} 的头像`}
+            fill
+            sizes={`${avatarSize}px`}
+            className="object-cover"
+          />
+          <UserIcon size={isLg ? 18 : 16} className="opacity-0" />
+        </>
       ) : (
         <Mail size={isLg ? 16 : 14} />
       )}
@@ -949,6 +966,8 @@ export function UserManager() {
                         <div className="flex items-center gap-3">
                           <MemberAvatar
                             isRegistered={isRegistered}
+                            email={entry.email}
+                            name={entry.user?.name}
                             size="md"
                           />
                           <div className="flex flex-col min-w-0">
@@ -1095,6 +1114,8 @@ export function UserManager() {
                       <div className="flex min-w-0 flex-1 items-center gap-3">
                         <MemberAvatar
                           isRegistered={isRegistered}
+                          email={entry.email}
+                          name={entry.user?.name}
                           size="lg"
                         />
                         <div className="min-w-0 flex-1">
