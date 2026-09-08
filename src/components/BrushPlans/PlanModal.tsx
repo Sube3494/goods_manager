@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Package, Plus, Trash2, Search, Circle, Store, ChevronDown, ChevronRight, LayoutGrid } from "lucide-react";
+import { X, Package, Plus, Trash2, Search, Circle, Store, ChevronDown, ChevronRight, LayoutGrid, ArrowUp, ArrowDown } from "lucide-react";
 import Image from "next/image";
 import { BrushOrderPlan, BrushOrderPlanItem, Product, AddressItem } from "@/lib/types";
 import { DatePicker } from "@/components/ui/DatePicker";
@@ -103,6 +103,27 @@ export function PlanModal({ isOpen, onClose, onSubmit, initialData, readOnly = f
         });
     };
 
+    const moveItemWithinPlatform = (index: number, direction: -1 | 1) => {
+        const items = [...(formData.items || [])];
+        const currentItem = items[index];
+        if (!currentItem) return;
+
+        const currentPlatform = currentItem.platform || "美团";
+        const platformIndexes = items
+            .map((item, itemIndex) => ({ item, itemIndex }))
+            .filter(({ item }) => {
+                const itemPlatform = item.platform || "美团";
+                return itemPlatform === currentPlatform;
+            })
+            .map(({ itemIndex }) => itemIndex);
+        const position = platformIndexes.indexOf(index);
+        const targetIndex = platformIndexes[position + direction];
+        if (targetIndex === undefined) return;
+
+        [items[index], items[targetIndex]] = [items[targetIndex], items[index]];
+        setFormData({ ...formData, items });
+    };
+
     const updateItem = (index: number, field: keyof BrushOrderPlanItem, value: string | number | boolean) => {
         const newItems = [...(formData.items || [])];
         newItems[index] = { ...newItems[index], [field]: value } as BrushOrderPlanItem;
@@ -129,9 +150,10 @@ export function PlanModal({ isOpen, onClose, onSubmit, initialData, readOnly = f
             return;
         }
 
-        const normalizedItems = (formData.items || []).map((item: BrushOrderPlanItem) => ({
+        const normalizedItems = (formData.items || []).map((item: BrushOrderPlanItem, index) => ({
             ...item,
             quantity: normalizeQuantity(item.quantity),
+            sortOrder: index,
         }));
         if (normalizedItems.some((item) => item.quantity === null)) {
             showToast("请填写有效的商品份数", "error");
@@ -254,9 +276,11 @@ export function PlanModal({ isOpen, onClose, onSubmit, initialData, readOnly = f
 
                                                         {isExpanded && (
                                                             <div className="space-y-4 pl-0 sm:pl-4">
-                                                                {platformItems.map((item: BrushOrderPlanItem) => {
+                                                                {platformItems.map((item: BrushOrderPlanItem, platformIndex) => {
                                                                     // Find the original index in formData.items
                                                                     const originalIndex = (formData.items || []).findIndex(i => i === item);
+                                                                    const isFirstInPlatform = platformIndex === 0;
+                                                                    const isLastInPlatform = platformIndex === platformItems.length - 1;
                                                                     return (
                                                                             <div key={`${platform}-${originalIndex}`} className="flex flex-col gap-2.5 p-3 sm:p-4 rounded-[20px] sm:rounded-[24px] border border-border bg-white dark:bg-white/5 hover:border-primary/30 transition-all shadow-sm">
                                                                                 <div className="flex items-center gap-3 min-w-0">
@@ -271,6 +295,27 @@ export function PlanModal({ isOpen, onClose, onSubmit, initialData, readOnly = f
                                                                                             {item.productName || item.product?.name}
                                                                                         </div>
                                                                                         <div className="text-[9px] font-mono text-muted-foreground/50 uppercase tracking-wider">{item.product?.sku || "NO SKU"}</div>
+                                                                                    </div>
+
+                                                                                    <div className="flex items-center gap-1 shrink-0">
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            onClick={() => moveItemWithinPlatform(originalIndex, -1)}
+                                                                                            disabled={isFirstInPlatform}
+                                                                                            className="p-1.5 text-muted-foreground/50 hover:text-primary hover:bg-primary/10 rounded-full transition-all disabled:opacity-25 disabled:hover:bg-transparent disabled:hover:text-muted-foreground/50"
+                                                                                            title="上移"
+                                                                                        >
+                                                                                            <ArrowUp size={15} />
+                                                                                        </button>
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            onClick={() => moveItemWithinPlatform(originalIndex, 1)}
+                                                                                            disabled={isLastInPlatform}
+                                                                                            className="p-1.5 text-muted-foreground/50 hover:text-primary hover:bg-primary/10 rounded-full transition-all disabled:opacity-25 disabled:hover:bg-transparent disabled:hover:text-muted-foreground/50"
+                                                                                            title="下移"
+                                                                                        >
+                                                                                            <ArrowDown size={15} />
+                                                                                        </button>
                                                                                     </div>
  
                                                                                     <button 

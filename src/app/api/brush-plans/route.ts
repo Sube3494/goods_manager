@@ -209,7 +209,8 @@ export async function GET(req: NextRequest) {
           items: {
             include: {
               product: true
-            }
+            },
+            orderBy: { sortOrder: 'asc' }
           }
         }
       })
@@ -277,7 +278,8 @@ export async function POST(req: NextRequest) {
         items: {
           include: {
             product: true
-          }
+          },
+          orderBy: { sortOrder: 'asc' }
         },
       },
     });
