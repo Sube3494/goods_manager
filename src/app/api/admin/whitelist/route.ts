@@ -9,7 +9,14 @@ import { normalizeAutoPickIntegrationConfig } from "@/lib/autoPickOrders";
  * GET /api/admin/whitelist - List all whitelisted emails and invitations
  */
 export async function GET() {
-  const session = await getAuthorizedAdminAny("members:read", "whitelist:manage", "members:manage", "members:status");
+  const session = await getAuthorizedAdminAny(
+    "members:read",
+    "whitelist:manage",
+    "members:manage",
+    "members:status",
+    "members:orders",
+    "members:libraries"
+  );
   
   if (!session) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });

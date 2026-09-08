@@ -6,7 +6,7 @@ import { hasPermission, ROLE_TEMPLATES, TEMPLATE_LABELS } from "@/lib/permission
 // 获取所有角色
 export async function GET() {
   try {
-    const session = await getAuthorizedUser("roles:manage");
+    const session = await getAuthorizedUserAny("roles:manage", "members:manage", "whitelist:manage");
     if (!session) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }

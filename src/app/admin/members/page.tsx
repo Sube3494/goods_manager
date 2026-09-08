@@ -11,12 +11,18 @@
 import { Users, LayoutGrid, ShieldAlert, Loader2 } from "lucide-react";
 import { UserManager } from "@/components/Admin/UserManager";
 import { useUser } from "@/hooks/useUser";
-import { hasPermission, SessionUser } from "@/lib/permissions";
+import { hasAdminAccess, SessionUser } from "@/lib/permissions";
 
 export default function MembersPage() {
   const { user, isLoading: isUserLoading } = useUser();
   const sessionUser = user as SessionUser | null;
-  const canAccessMembersCenter = hasPermission(sessionUser, "members:read");
+  const canAccessMembersCenter =
+    hasAdminAccess(sessionUser, "members:read") ||
+    hasAdminAccess(sessionUser, "members:manage") ||
+    hasAdminAccess(sessionUser, "members:status") ||
+    hasAdminAccess(sessionUser, "members:orders") ||
+    hasAdminAccess(sessionUser, "members:libraries") ||
+    hasAdminAccess(sessionUser, "whitelist:manage");
 
   if (isUserLoading) {
     return (

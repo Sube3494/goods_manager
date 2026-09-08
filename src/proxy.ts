@@ -92,56 +92,11 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL("/login", request.nextUrl));
   }
 
-  // Extra Security: Super Admin Protection for restricted paths
+  // Admin pages and APIs perform fresh permission checks in their page/API
+  // handlers. Proxy only verifies authentication so role changes do not require
+  // users to log in again just to refresh stale JWT permissions.
   if (path.startsWith("/admin") || path.startsWith("/api/admin")) {
-      if (!session) {
-          return NextResponse.json({ error: "Authentication required" }, { status: 401 });
-      }
-      try {
-          const { payload } = await jwtVerify(session, getJwtKey());
-          const sessionUser = payload as SessionUser;
-          const effectivePermissions = getEffectivePermissions(sessionUser);
-          const hasRolesManage = !!(
-            effectivePermissions["roles:manage"] ||
-            effectivePermissions["system:manage"] ||
-            effectivePermissions["all"]
-          );
-          const isRolesPath = path === "/admin/roles" || path.startsWith("/admin/roles/") || path === "/api/admin/roles" || path.startsWith("/api/admin/roles/");
-          const isMembersPath =
-            path === "/admin/members" ||
-            path.startsWith("/admin/members/") ||
-            path === "/api/admin/whitelist" ||
-            path.startsWith("/api/admin/whitelist?") ||
-            path === "/api/admin/users/status" ||
-            path.startsWith("/api/admin/users/status") ||
-            path === "/api/admin/users" ||
-            path.startsWith("/api/admin/users/");
-          const hasMembersAccess =
-            hasAdminAccess(sessionUser, "members:read") ||
-            hasAdminAccess(sessionUser, "members:manage") ||
-            hasAdminAccess(sessionUser, "members:status") ||
-            hasAdminAccess(sessionUser, "whitelist:manage");
-
-          if (!isRolesPath && !isMembersPath && payload.role !== "SUPER_ADMIN") {
-            return NextResponse.json({ error: "Forbidden: Super Admin only" }, { status: 403 });
-          }
-
-          if (isRolesPath && payload.role !== "SUPER_ADMIN" && !hasRolesManage) {
-            return NextResponse.json({ error: "Forbidden: Role managers only" }, { status: 403 });
-          }
-
-          if (isMembersPath && payload.role !== "SUPER_ADMIN" && !hasMembersAccess) {
-            return NextResponse.json({ error: "Forbidden: Members managers only" }, { status: 403 });
-          }
-
-          // Optimization: Inject role/id into headers for the API to trust later
-          response.headers.set("x-user-role", payload.role as string);
-          response.headers.set("x-user-id", payload.id as string);
-          response.headers.set("x-workspace-id", payload.workspaceId as string);
-
-      } catch {
-          return NextResponse.json({ error: "Invalid session" }, { status: 401 });
-      }
+    return response;
   }
 
   // Redirect authenticated users away from login page

@@ -12,7 +12,7 @@ import { ActionBar } from "@/components/ui/ActionBar";
 import { UserOrdersModal } from "@/components/Admin/UserOrdersModal";
 import { createPortal } from "react-dom";
 import { useUser } from "@/hooks/useUser";
-import { hasAdminAccess, SessionUser } from "@/lib/permissions";
+import { hasAdminAccess, hasDirectPermission, SessionUser } from "@/lib/permissions";
 import { pinyinMatch } from "@/lib/pinyin";
 import { formatLocalDateTime } from "@/lib/dateUtils";
 
@@ -435,12 +435,13 @@ export function UserManager() {
   const { showToast } = useToast();
   const { user } = useUser();
   const sessionUser = user as SessionUser | null;
+  const canReadMembers = hasAdminAccess(sessionUser, "members:read");
   const canManageMembers = hasAdminAccess(sessionUser, "members:manage");
   const canManageMemberStatus = hasAdminAccess(sessionUser, "members:status");
   const canViewMemberOrders = hasAdminAccess(sessionUser, "members:orders");
   const canManageMemberLibraries = hasAdminAccess(sessionUser, "members:libraries");
-  const canManageWhitelist = hasAdminAccess(sessionUser, "whitelist:manage");
-  const canViewEntries = canManageWhitelist || canManageMembers || canManageMemberStatus || canViewMemberOrders || canManageMemberLibraries;
+  const canManageWhitelist = hasDirectPermission(sessionUser, "whitelist:manage");
+  const canViewEntries = canReadMembers || canManageWhitelist || canManageMembers || canManageMemberStatus || canViewMemberOrders || canManageMemberLibraries;
   const [entries, setEntries] = useState<WhitelistEntry[]>([]);
   const [roles, setRoles] = useState<RoleProfile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
