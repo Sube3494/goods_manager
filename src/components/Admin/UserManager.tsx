@@ -900,13 +900,6 @@ export function UserManager() {
         </div>
       )}
 
-      {!canManageWhitelist && (
-        <div className="rounded-[20px] sm:rounded-[22px] border border-border/60 bg-linear-to-br from-white/80 to-muted/20 dark:from-white/[0.03] dark:to-transparent p-4 backdrop-blur-xs">
-          <p className="text-sm font-bold text-foreground">邀请与白名单能力已收起</p>
-          <p className="mt-1 text-xs text-muted-foreground">当前账号可以查看成员信息，但不能新增邀请或撤销准入。</p>
-        </div>
-      )}
-
       <div className="relative">
         <Search size={16} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
         <input
@@ -914,7 +907,7 @@ export function UserManager() {
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="搜索邮箱或备注"
-          className="h-11 w-full rounded-full border border-border/70 bg-white dark:bg-white/5 pl-11 pr-4 text-sm outline-none transition-all shadow-2xs focus:border-primary/40 focus:ring-2 focus:ring-primary/20 backdrop-blur-xs"
+          className="h-11 w-full rounded-full border border-border/70 bg-white dark:bg-white/5 pl-11 pr-4 text-sm outline-none transition-all shadow-2xs focus:border-primary/40 focus:ring-2 focus:ring-primary/20"
         />
       </div>
 
