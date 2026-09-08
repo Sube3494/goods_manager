@@ -57,7 +57,7 @@ export function ThemeToggle({ className }: ThemeToggleProps) {
           clipPath: clipPath,
         },
         {
-          duration: 750,
+          duration: 1200,
           easing: "cubic-bezier(0.16, 1, 0.3, 1)", // Smoother, faster start
           // The new view (next theme) renders on top, effectively "revealing" it
           pseudoElement: "::view-transition-new(root)",

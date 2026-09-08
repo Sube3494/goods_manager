@@ -17,11 +17,14 @@ import {
 import {
   Activity,
   ArrowRight,
+  BarChart3,
+  CalendarCheck,
   ChevronDown,
   ChevronUp,
   CreditCard,
   Package,
   PenSquare,
+  RotateCcw,
   ShoppingBag,
   Sparkles,
   Tags,
@@ -94,30 +97,43 @@ function DashboardCard({
   title,
   subtitle,
   action,
+  icon: Icon,
   children,
   className,
 }: {
   title: string;
   subtitle?: string;
   action?: React.ReactNode;
+  icon?: typeof Activity;
   children: React.ReactNode;
   className?: string;
 }) {
   return (
     <section
       className={cn(
-        "rounded-[24px] border border-border/70 bg-white/95 p-4 shadow-sm dark:bg-white/[0.04] sm:rounded-[28px] sm:p-6",
+        "group relative overflow-hidden rounded-[28px] border border-border/60 bg-linear-to-br from-white/95 via-white/85 to-background p-4 shadow-sm backdrop-blur-md transition-all hover:border-border/80 dark:border-white/10 dark:from-white/[0.06] dark:via-white/[0.03] dark:to-transparent sm:rounded-[32px] sm:p-6",
         className
       )}
     >
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="text-base font-black tracking-tight sm:text-lg">{title}</h2>
-          {subtitle && <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>}
+      {/* 保持与上方卡片一致的微妙环境光晕 */}
+      <div className="pointer-events-none absolute -right-16 -top-16 h-64 w-64 rounded-full bg-primary/6 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-16 -left-16 h-64 w-64 rounded-full bg-sky-500/4 blur-3xl" />
+
+      <div className="relative flex flex-wrap items-start justify-between gap-3 sm:gap-4">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            {Icon && (
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary shadow-2xs">
+                <Icon size={14} />
+              </div>
+            )}
+            <h2 className="text-base font-black tracking-tight text-foreground sm:text-lg">{title}</h2>
+          </div>
+          {subtitle && <p className="mt-1 text-xs sm:text-sm text-muted-foreground">{subtitle}</p>}
         </div>
         {action}
       </div>
-      <div className="mt-4 sm:mt-5">{children}</div>
+      <div className="relative mt-4 sm:mt-5">{children}</div>
     </section>
   );
 }
@@ -138,10 +154,10 @@ function MetricCard({
   href?: string;
 }) {
   const content = (
-    <div className="rounded-[20px] border border-border/60 bg-black/[0.015] px-3.5 py-3.5 dark:bg-white/[0.025] sm:rounded-[24px] sm:px-5 sm:py-4">
+    <div className="rounded-[22px] border border-border/60 bg-black/[0.015] px-4 py-3.5 backdrop-blur-xs transition-all hover:border-primary/30 dark:bg-white/[0.025] sm:rounded-[24px] sm:px-5 sm:py-4">
       <div className="flex items-center justify-between gap-3">
         <div className="text-[11px] font-bold tracking-[0.14em] text-muted-foreground uppercase">{label}</div>
-        <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-border/50 bg-background/60 sm:h-9 sm:w-9 sm:rounded-2xl">
+        <div className="flex h-8 w-8 items-center justify-center rounded-full border border-border/50 bg-background/70 shadow-2xs sm:h-9 sm:w-9">
           <Icon size={16} className="text-muted-foreground" />
         </div>
       </div>
@@ -171,7 +187,7 @@ function MetricCard({
 
 function EmptyState({ message }: { message: string }) {
   return (
-    <div className="flex min-h-[260px] items-center justify-center rounded-[22px] border border-dashed border-border/70 bg-muted/10 px-6 text-sm text-muted-foreground">
+    <div className="flex min-h-[260px] items-center justify-center rounded-[22px] border border-dashed border-border/70 bg-muted/10 px-6 text-center text-sm text-muted-foreground sm:rounded-[26px]">
       {message}
     </div>
   );
@@ -187,7 +203,7 @@ function ChartLoadingState({
   return (
     <div
       className={cn(
-        "flex items-center justify-center rounded-[20px] border border-dashed border-border/60 bg-muted/10 px-4 text-sm text-muted-foreground",
+        "flex items-center justify-center rounded-[22px] border border-dashed border-border/60 bg-muted/10 px-4 text-sm text-muted-foreground sm:rounded-[26px]",
         compact ? "h-[220px]" : "h-[360px]"
       )}
     >
@@ -262,7 +278,7 @@ function ExpenseTooltip({
   if (!active || !payload?.length) return null;
 
   return (
-    <div className="min-w-[156px] rounded-[16px] border border-white/10 bg-slate-950/92 px-3 py-2.5 shadow-xl backdrop-blur-xl">
+    <div className="min-w-[156px] rounded-[18px] border border-white/10 bg-slate-950/92 px-3.5 py-2.5 shadow-xl backdrop-blur-xl">
       <div className="text-sm font-semibold text-white">{label}</div>
       <div className="mt-2 space-y-1.5 text-xs">
         {payload.map((item) => (
@@ -399,14 +415,14 @@ export default function BrushCenterPage() {
       ),
       hint: "按店铺分别统计刷单商品数",
       compact: (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-1.5">
           {counts.map((item) => (
             <span
               key={item.shopName}
-              className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-background/80 px-3 py-1.5 text-xs font-semibold text-foreground"
+              className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-background/80 px-2.5 py-1 text-xs font-semibold text-foreground shadow-2xs"
             >
-              <span className="max-w-[120px] truncate">{item.shopName}</span>
-              <span className="text-muted-foreground">{item.count}</span>
+              <span className="max-w-[110px] truncate">{item.shopName}</span>
+              <span className="rounded-full bg-primary/10 px-1.5 py-0.2 text-[10px] font-bold text-primary">{item.count}</span>
             </span>
           ))}
         </div>
@@ -452,62 +468,6 @@ export default function BrushCenterPage() {
     [filteredOrderDaily, selectedRangeLimit]
   );
 
-  const expenseTrendByShop = useMemo(() => {
-    const topShops = Array.from(
-      dashboardData.orderDailyByShop.reduce((map, item) => {
-        map.set(item.shopName, (map.get(item.shopName) || 0) + item.expense);
-        return map;
-      }, new Map<string, number>())
-    )
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 4)
-      .map(([name]) => name);
-
-    const byDate = new Map<string, Record<string, string | number>>();
-
-    dashboardData.orderDailyByShop.forEach((item) => {
-      if (!topShops.includes(item.shopName)) return;
-      const current = byDate.get(item.dateKey) || { label: item.label };
-      current[item.shopName] = Number(current[item.shopName] || 0) + item.expense;
-      byDate.set(item.dateKey, current);
-    });
-
-    return {
-      shops: topShops,
-      data: Array.from(byDate.entries())
-        .sort(([a], [b]) => a.localeCompare(b))
-        .slice(selectedRangeLimit ? -selectedRangeLimit : undefined)
-        .map(([, value]) => value),
-    };
-  }, [dashboardData.orderDailyByShop, selectedRangeLimit]);
-  const paymentTrendByShop = useMemo(() => {
-    const topShops = Array.from(
-      dashboardData.orderDailyByShop.reduce((map, item) => {
-        map.set(item.shopName, (map.get(item.shopName) || 0) + item.payment);
-        return map;
-      }, new Map<string, number>())
-    )
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 4)
-      .map(([name]) => name);
-
-    const byDate = new Map<string, Record<string, string | number>>();
-
-    dashboardData.orderDailyByShop.forEach((item) => {
-      if (!topShops.includes(item.shopName)) return;
-      const current = byDate.get(item.dateKey) || { label: item.label };
-      current[item.shopName] = Number(current[item.shopName] || 0) + item.payment;
-      byDate.set(item.dateKey, current);
-    });
-
-    return {
-      shops: topShops,
-      data: Array.from(byDate.entries())
-        .sort(([a], [b]) => a.localeCompare(b))
-        .slice(selectedRangeLimit ? -selectedRangeLimit : undefined)
-        .map(([, value]) => value),
-    };
-  }, [dashboardData.orderDailyByShop, selectedRangeLimit]);
   const countTrendByShop = useMemo(() => {
     const source =
       selectedShopView === "all"
@@ -543,6 +503,7 @@ export default function BrushCenterPage() {
         .map(([, value]) => value),
     };
   }, [dashboardData.orderDailyByShop, selectedRangeLimit, selectedShopView]);
+
   const paymentTrendByShopView = useMemo(() => {
     const source =
       selectedShopView === "all"
@@ -578,6 +539,7 @@ export default function BrushCenterPage() {
         .map(([, value]) => value),
     };
   }, [dashboardData.orderDailyByShop, selectedRangeLimit, selectedShopView]);
+
   const expenseTrendByShopView = useMemo(() => {
     const source =
       selectedShopView === "all"
@@ -613,6 +575,7 @@ export default function BrushCenterPage() {
         .map(([, value]) => value),
     };
   }, [dashboardData.orderDailyByShop, selectedRangeLimit, selectedShopView]);
+
   const shopMetricOptions = useMemo(
     () => [
       { value: "count", label: "刷单量" },
@@ -621,6 +584,7 @@ export default function BrushCenterPage() {
     ] as const,
     []
   );
+
   const shopMetricConfig = useMemo(() => {
     if (selectedShopMetric === "payment") {
       return {
@@ -681,6 +645,7 @@ export default function BrushCenterPage() {
       { label: "区间总支出", value: formatExpenseCurrency(total), hint: rangeHint },
     ];
   }, [orderTrendData, selectedRange]);
+
   const orderExpenseCompositionData = useMemo(
     () =>
       orderTrendData.map((item) => ({
@@ -700,6 +665,9 @@ export default function BrushCenterPage() {
             ? "当前商品数"
             : null,
         custom: brushProductShopSummary.compact,
+        icon: Tags,
+        iconColor: "text-violet-500 bg-violet-500/10 dark:text-violet-400 dark:bg-violet-500/15",
+        badge: "商品库存",
       },
       {
         label: "今日刷单",
@@ -708,16 +676,25 @@ export default function BrushCenterPage() {
           stats.todayShopCount > 0
             ? `每店 ${Number.isInteger(stats.averageItemsPerShop) ? stats.averageItemsPerShop : stats.averageItemsPerShop.toFixed(1)} 单`
             : "今天还没安排刷单",
+        icon: Sparkles,
+        iconColor: "text-amber-500 bg-amber-500/10 dark:text-amber-400 dark:bg-amber-500/15",
+        badge: "安排计划",
       },
       {
         label: "今日录单",
         value: `${stats.todayOrderCount} 笔`,
         detail: stats.todayOrderCount > 0 ? "今天已录入的刷单订单" : "今天还没有录单",
+        icon: ShoppingBag,
+        iconColor: "text-sky-500 bg-sky-500/10 dark:text-sky-400 dark:bg-sky-500/15",
+        badge: "订单核销",
       },
       {
         label: "今日支出",
         value: formatExpenseCurrency(stats.todayExpense),
         detail: `差额 ${formatExpenseCurrency(stats.todayPayment - stats.todayReceived)} / 佣金 ${formatExpenseCurrency(stats.todayCommission)}`,
+        icon: CreditCard,
+        iconColor: "text-rose-500 bg-rose-500/10 dark:text-rose-400 dark:bg-rose-500/15",
+        badge: "资金成本",
       },
     ],
     [brushProductShopSummary.compact, dashboardData.brushProductCountByShop.length, stats]
@@ -741,139 +718,184 @@ export default function BrushCenterPage() {
 
   return (
     <div className="space-y-5 sm:space-y-6">
-      <section className="rounded-[26px] border border-border/60 bg-linear-to-br from-white/95 via-white/90 to-white/80 p-4 shadow-sm dark:from-white/[0.05] dark:via-white/[0.035] dark:to-transparent sm:rounded-[32px] sm:p-7">
-        <div className="flex flex-col gap-4 sm:gap-6">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+      {/* 顶部 Hero 统计与工作流导航 */}
+      <section className="relative overflow-hidden rounded-[28px] border border-border/60 bg-linear-to-br from-white/95 via-white/85 to-background p-4 shadow-sm backdrop-blur-md dark:border-white/10 dark:from-white/[0.06] dark:via-white/[0.03] dark:to-transparent sm:rounded-[32px] sm:px-6 sm:py-5">
+        {/* 背景轻微氛围光晕 */}
+        <div className="pointer-events-none absolute -right-16 -top-16 h-64 w-64 rounded-full bg-primary/8 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-16 -left-16 h-64 w-64 rounded-full bg-sky-500/5 blur-3xl" />
+
+        <div className="relative flex flex-col gap-3.5 sm:gap-5">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="min-w-0 flex-1">
-              <div className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-primary/6 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.22em] text-primary/80">
-                <Activity size={12} />
-                Brush Dashboard
-              </div>
-              <h1 className="mt-3 text-[34px] font-black tracking-tight sm:mt-4 sm:text-[40px]">刷单中心</h1>
-              <p className="mt-2 max-w-[50ch] text-[13px] leading-6 text-muted-foreground sm:mt-3 sm:text-base">
+              <h1 className="text-[28px] font-black tracking-tight text-foreground sm:text-[34px]">刷单中心</h1>
+              <p className="mt-1 max-w-[56ch] text-xs leading-relaxed text-muted-foreground sm:text-sm">
                 先看今天节奏，再决定排单和录单。多店信息合并到一条状态带里，首页只保留真正会用到的入口。
               </p>
 
-              <div className="mt-3 flex flex-wrap gap-2">
-                <div className="rounded-full border border-border/60 bg-background/70 px-3 py-1.5 text-xs font-semibold text-muted-foreground">
-                  今日计划 {stats.todayPlanItemCount} 单
+              {/* 今日快报微胶囊 */}
+              <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                <div className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-background/80 px-3.5 py-1 text-xs font-semibold text-foreground/85 shadow-2xs">
+                  <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                  <span>今日计划 {stats.todayPlanItemCount} 单</span>
                 </div>
-                <div className="rounded-full border border-border/60 bg-background/70 px-3 py-1.5 text-xs font-semibold text-muted-foreground">
-                  今日录单 {stats.todayOrderCount} 笔
+                <div className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-background/80 px-3.5 py-1 text-xs font-semibold text-foreground/85 shadow-2xs">
+                  <span className="h-1.5 w-1.5 rounded-full bg-sky-500" />
+                  <span>今日录单 {stats.todayOrderCount} 笔</span>
                 </div>
+                {stats.todayShopCount > 0 && (
+                  <div className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-background/80 px-3.5 py-1 text-xs font-semibold text-foreground/85 shadow-2xs">
+                    <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                    <span>覆盖 {stats.todayShopCount} 家店铺</span>
+                  </div>
+                )}
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:gap-3">
+            {/* 顶部操作按钮组：向胶囊靠齐 */}
+            <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
               <Link
                 href="/brush-products"
-                className="inline-flex h-10 w-full shrink-0 items-center justify-center gap-2 rounded-xl border border-border/60 bg-background/70 px-3 text-sm font-bold text-foreground transition-all hover:border-primary/30 hover:bg-primary/[0.06] sm:h-11 sm:w-auto sm:rounded-2xl sm:px-5"
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-border/70 bg-background/85 px-4 text-xs font-bold text-foreground shadow-2xs backdrop-blur-xs transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:bg-primary/5 hover:text-primary active:scale-95 sm:h-10.5 sm:px-5 sm:text-sm"
               >
-                <Tags size={16} className="text-primary" />
-                商品池
+                <Tags size={15} className="text-primary" />
+                <span>商品池</span>
+              </Link>
+              <Link
+                href="/brush-plans"
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-border/70 bg-background/85 px-4 text-xs font-bold text-foreground shadow-2xs backdrop-blur-xs transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:bg-primary/5 hover:text-primary active:scale-95 sm:h-10.5 sm:px-5 sm:text-sm"
+              >
+                <CalendarCheck size={15} className="text-primary" />
+                <span>安排表</span>
               </Link>
               <Link
                 href="/brush-orders"
-                className="inline-flex h-10 w-full shrink-0 items-center justify-center gap-2 rounded-xl bg-primary px-3 text-sm font-black text-primary-foreground transition-all hover:-translate-y-0.5 sm:h-11 sm:w-auto sm:rounded-2xl sm:px-5"
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-primary px-5 text-xs font-bold text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:-translate-y-0.5 hover:shadow-primary/40 active:scale-95 sm:h-10.5 sm:px-6 sm:text-sm"
               >
-                <PenSquare size={16} />
-                去录单
+                <PenSquare size={15} />
+                <span>去录单</span>
               </Link>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4">
-            {summaryItems.map((item) => (
-              <div
-                key={item.label}
-                className="rounded-[18px] border border-border/60 bg-black/[0.02] px-3.5 py-3 dark:bg-white/[0.02] sm:rounded-[20px] sm:px-4 sm:py-4"
-              >
-                <div className="text-[11px] font-bold tracking-[0.14em] text-muted-foreground uppercase">{item.label}</div>
-                {item.custom ? (
-                  <div className="mt-2.5">{item.custom}</div>
-                ) : (
-                  <>
-                    <div className="mt-2 text-lg font-black tracking-tight sm:mt-3 sm:text-2xl">{item.value}</div>
-                    <div className="mt-1 text-[11px] leading-4.5 text-muted-foreground sm:text-xs">{item.detail}</div>
-                  </>
-                )}
-              </div>
-            ))}
+          {/* 4组指标概览卡片 */}
+          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 sm:gap-3 lg:grid-cols-4">
+            {summaryItems.map((item) => {
+              const ItemIcon = item.icon;
+              return (
+                <div
+                  key={item.label}
+                  className="group relative overflow-hidden rounded-[20px] border border-border/60 bg-background/60 p-3.5 shadow-2xs backdrop-blur-xs transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-xs sm:rounded-[22px] sm:p-4"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[11px] font-bold tracking-[0.14em] text-muted-foreground uppercase">{item.label}</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="rounded-full border border-border/50 bg-background/80 px-2 py-0.5 text-[10px] font-bold text-muted-foreground">
+                        {item.badge}
+                      </span>
+                      <div className={cn("flex h-7 w-7 items-center justify-center rounded-full transition-transform group-hover:scale-110", item.iconColor)}>
+                        <ItemIcon size={14} />
+                      </div>
+                    </div>
+                  </div>
+                  {item.custom ? (
+                    <div className="mt-2.5">{item.custom}</div>
+                  ) : (
+                    <>
+                      <div className="mt-2 text-xl font-black tracking-tight text-foreground sm:mt-2.5 sm:text-2xl">{item.value}</div>
+                      <div className="mt-1 text-[11px] leading-relaxed text-muted-foreground sm:text-xs">{item.detail}</div>
+                    </>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
 
-        <div className="mt-4 grid grid-cols-1 gap-2.5 md:grid-cols-2 sm:mt-5 sm:gap-3">
+        {/* 核心工作流入口卡片 */}
+        <div className="mt-4 grid grid-cols-1 gap-2.5 md:grid-cols-2 sm:mt-5 sm:gap-3.5">
           <Link
             href="/brush-plans"
-            className="group rounded-[18px] border border-border/60 bg-black/[0.02] px-3.5 py-3.5 transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:bg-primary/[0.06] dark:bg-white/[0.02] sm:rounded-[22px] sm:px-4 sm:py-4"
+            className="group relative overflow-hidden rounded-[22px] border border-border/60 bg-linear-to-br from-background/90 via-background/60 to-primary/5 p-4 transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md sm:rounded-[26px] sm:p-5"
           >
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="text-sm font-black">去排今日任务</div>
-                <div className="mt-1 text-[13px] text-muted-foreground sm:text-sm">按店铺安排任务，确认今天的节奏。</div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-black text-foreground sm:text-base">去排今日任务</span>
+                  <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-[11px] font-bold text-primary">计划编排</span>
+                </div>
+                <div className="mt-1.5 text-xs text-muted-foreground sm:text-sm">按店铺安排任务，确认今天的刷单商品与节奏。</div>
               </div>
-              <ShoppingBag size={16} className="text-primary" />
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary transition-transform group-hover:scale-110">
+                <CalendarCheck size={18} />
+              </div>
             </div>
-            <div className="mt-3 flex items-end justify-between sm:mt-4">
+            <div className="mt-4 flex items-end justify-between border-t border-border/40 pt-3">
               <div>
-                <div className="text-lg font-black sm:text-xl">{stats.todayPlanItemCount}</div>
-                <div className="text-xs text-muted-foreground">今天计划单量</div>
+                <div className="text-xl font-black text-foreground sm:text-2xl">{stats.todayPlanItemCount}</div>
+                <div className="text-[11px] text-muted-foreground sm:text-xs">今天计划单量</div>
               </div>
-              <span className="inline-flex items-center gap-1 text-sm font-bold text-primary">
-                排单
-                <ArrowRight size={14} />
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-4 py-1.5 text-xs font-bold text-primary transition-all group-hover:bg-primary group-hover:text-primary-foreground group-hover:shadow-md group-hover:shadow-primary/25">
+                <span>进入排单</span>
+                <ArrowRight size={13} className="transition-transform group-hover:translate-x-0.5" />
               </span>
             </div>
           </Link>
 
           <Link
             href="/brush-orders"
-            className="group rounded-[18px] border border-border/60 bg-black/[0.02] px-3.5 py-3.5 transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:bg-primary/[0.06] dark:bg-white/[0.02] sm:rounded-[22px] sm:px-4 sm:py-4"
+            className="group relative overflow-hidden rounded-[22px] border border-border/60 bg-linear-to-br from-background/90 via-background/60 to-sky-500/5 p-4 transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md sm:rounded-[26px] sm:p-5"
           >
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="text-sm font-black">去录入订单</div>
-                <div className="mt-1 text-[13px] text-muted-foreground sm:text-sm">同步实付、返款和佣金变化。</div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-black text-foreground sm:text-base">去录入订单</span>
+                  <span className="rounded-full bg-sky-500/10 px-2.5 py-0.5 text-[11px] font-bold text-sky-600 dark:text-sky-400">实付核销</span>
+                </div>
+                <div className="mt-1.5 text-xs text-muted-foreground sm:text-sm">同步实付金额、返款状态及佣金支出变化。</div>
               </div>
-              <PenSquare size={16} className="text-primary" />
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sky-500/10 text-sky-600 transition-transform group-hover:scale-110 dark:text-sky-400">
+                <PenSquare size={18} />
+              </div>
             </div>
-            <div className="mt-3 flex items-end justify-between sm:mt-4">
+            <div className="mt-4 flex items-end justify-between border-t border-border/40 pt-3">
               <div>
-                <div className="text-lg font-black sm:text-xl">{stats.todayOrderCount}</div>
-                <div className="text-xs text-muted-foreground">今日已录单</div>
+                <div className="text-xl font-black text-foreground sm:text-2xl">{stats.todayOrderCount}</div>
+                <div className="text-[11px] text-muted-foreground sm:text-xs">今日已录单</div>
               </div>
-              <span className="inline-flex items-center gap-1 text-sm font-bold text-primary">
-                录单
-                <ArrowRight size={14} />
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-500/10 px-4 py-1.5 text-xs font-bold text-sky-600 transition-all group-hover:bg-sky-600 group-hover:text-white group-hover:shadow-md group-hover:shadow-sky-500/25 dark:text-sky-400">
+                <span>开始录单</span>
+                <ArrowRight size={13} className="transition-transform group-hover:translate-x-0.5" />
               </span>
             </div>
           </Link>
         </div>
       </section>
 
+      {/* 图表展示区 */}
       <div className="grid grid-cols-1 items-stretch gap-4 sm:gap-5 xl:grid-cols-[minmax(0,1.3fr)_minmax(420px,0.9fr)] 2xl:grid-cols-[minmax(0,1.34fr)_minmax(460px,0.86fr)]">
         <div className="space-y-4 sm:space-y-5">
           {canManageBrush && (
             <DashboardCard
               title={selectedRange === "all" ? "全部支出走势" : `近 ${selectedRange} 天支出走势`}
               subtitle="先选店铺，再切换最近时间范围，直接看这一段总支出的构成变化。"
+              icon={TrendingUp}
               action={
                 isCompactView ? (
                   <button
                     type="button"
                     onClick={() => setIsExpenseChartOpen((prev) => !prev)}
-                    className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-border/60 px-3 py-1.5 text-xs font-bold text-muted-foreground"
+                    className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-border/70 bg-background/80 px-3.5 py-1.5 text-xs font-bold text-muted-foreground shadow-2xs transition-all hover:border-primary/30 hover:text-foreground active:scale-95"
                   >
-                    {isExpenseChartOpen ? "收起" : "展开"}
-                    {isExpenseChartOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                    <span>{isExpenseChartOpen ? "收起" : "展开"}</span>
+                    {isExpenseChartOpen ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
                   </button>
                 ) : (
                   <Link
                     href="/brush-orders"
-                    className="inline-flex items-center gap-1 text-sm font-bold text-primary transition-colors hover:text-primary/80"
+                    className="group inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-background/80 px-3.5 py-1.5 text-xs font-bold text-foreground shadow-2xs transition-all hover:border-primary/40 hover:bg-primary/5 hover:text-primary active:scale-95"
                   >
-                    订单明细
-                    <ArrowRight size={15} />
+                    <span>订单明细</span>
+                    <ArrowRight size={13} className="transition-transform group-hover:translate-x-0.5" />
                   </Link>
                 )
               }
@@ -881,10 +903,16 @@ export default function BrushCenterPage() {
               {(!isCompactView || isExpenseChartOpen) && orderChartHighlights.length > 0 && (
                 <div className="mb-3 grid grid-cols-1 gap-2 sm:mb-4 md:grid-cols-3">
                   {orderChartHighlights.map((item) => (
-                    <div key={item.label} className="rounded-[14px] border border-border/50 bg-black/[0.02] px-3 py-2.5 dark:bg-white/[0.02] sm:rounded-[16px] sm:py-3">
-                      <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">{item.label}</div>
-                      <div className="mt-1 text-[15px] font-black sm:mt-1.5 sm:text-base">{item.value}</div>
-                      <div className="mt-1 text-[11px] leading-4.5 text-muted-foreground sm:text-xs">{item.hint}</div>
+                    <div
+                      key={item.label}
+                      className="rounded-[18px] border border-border/50 bg-background/50 p-3 shadow-2xs backdrop-blur-xs transition-all hover:border-border sm:rounded-[20px] sm:p-3.5"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                        <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">{item.label}</span>
+                      </div>
+                      <div className="mt-1.5 text-base font-black text-foreground sm:text-lg">{item.value}</div>
+                      <div className="mt-0.5 text-[11px] leading-4 text-muted-foreground sm:text-xs">{item.hint}</div>
                     </div>
                   ))}
                 </div>
@@ -892,132 +920,137 @@ export default function BrushCenterPage() {
 
               {!isCompactView || isExpenseChartOpen ? (
                 <>
-                  <div className="mb-3 flex flex-col gap-2 rounded-[16px] border border-border/60 bg-muted/10 px-3 py-3 sm:mb-4 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2 sm:rounded-[18px] sm:px-4">
-                    <div className="text-xs font-bold uppercase tracking-[0.16em] text-muted-foreground">筛选</div>
+                  {/* 胶囊化筛选栏 */}
+                  <div className="mb-3 rounded-[20px] border border-border/60 bg-background/50 p-2.5 shadow-2xs backdrop-blur-xs sm:mb-4 sm:rounded-[22px] sm:p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2.5">
+                      <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
+                        <div className="w-full sm:w-[136px] shrink-0">
+                          <CustomSelect
+                            options={shopOptions}
+                            value={selectedShop}
+                            onChange={setSelectedShop}
+                            triggerClassName="h-8.5 sm:h-9 rounded-full border-border/70 bg-background/90 px-3.5 text-xs sm:text-sm font-bold shadow-2xs w-full"
+                            className="w-full sm:w-[136px]"
+                          />
+                        </div>
 
-                    <div className="flex items-center gap-2">
-                      <CustomSelect
-                        options={shopOptions}
-                        value={selectedShop}
-                        onChange={setSelectedShop}
-                        triggerClassName="h-9 rounded-xl border-border/70 bg-background/80 px-3 text-sm font-semibold sm:h-10"
-                        className="w-full sm:w-[144px]"
-                      />
-                    </div>
+                        {/* 胶囊药丸时间分段器 */}
+                        <div className="inline-flex max-w-full items-center rounded-full border border-border/60 bg-background/60 p-0.5 shadow-2xs backdrop-blur-xs shrink-0">
+                          {[
+                            { value: "7", label: "7天" },
+                            { value: "14", label: "14天" },
+                            { value: "30", label: "30天" },
+                            { value: "all", label: "全部" },
+                          ].map((range) => (
+                            <button
+                              key={range.value}
+                              type="button"
+                              onClick={() => setSelectedRange(range.value)}
+                              className={cn(
+                                "inline-flex h-7.5 sm:h-8 items-center justify-center rounded-full px-2.5 sm:px-3 text-xs font-bold whitespace-nowrap shrink-0 transition-all active:scale-95",
+                                selectedRange === range.value
+                                  ? "bg-primary text-primary-foreground shadow-xs"
+                                  : "text-muted-foreground hover:text-foreground"
+                              )}
+                            >
+                              {range.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
 
-                    <div className="grid grid-cols-4 gap-2 sm:flex sm:flex-wrap sm:items-center">
-                      {[
-                        { value: "7", label: "7天" },
-                        { value: "14", label: "14天" },
-                        { value: "30", label: "30天" },
-                        { value: "all", label: "全部" },
-                      ].map((range) => (
+                      {(selectedShop !== "all" || selectedRange !== "14") && (
                         <button
-                          key={range.value}
                           type="button"
-                          onClick={() => setSelectedRange(range.value)}
-                          className={cn(
-                            "inline-flex h-9 items-center justify-center rounded-xl border px-2 text-sm font-semibold transition-all sm:h-10 sm:px-3",
-                            selectedRange === range.value
-                              ? "border-primary/30 bg-primary/10 text-primary"
-                              : "border-border/70 bg-background/80 text-muted-foreground hover:bg-background hover:text-foreground"
-                          )}
+                          onClick={() => {
+                            setSelectedShop("all");
+                            setSelectedRange("14");
+                          }}
+                          className="inline-flex h-7.5 sm:h-8 items-center justify-center gap-1.5 rounded-full border border-border/70 bg-background/90 px-3 text-xs font-bold whitespace-nowrap shrink-0 text-muted-foreground transition-all hover:border-border hover:bg-background hover:text-foreground active:scale-95 shadow-2xs"
                         >
-                          {range.label}
+                          <RotateCcw size={12} />
+                          <span>重置</span>
                         </button>
-                      ))}
+                      )}
                     </div>
-
-                    {(selectedShop !== "all" || selectedRange !== "14") && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedShop("all");
-                          setSelectedRange("14");
-                        }}
-                        className="inline-flex h-9 items-center justify-center rounded-xl border border-border/70 px-3 text-sm font-semibold text-muted-foreground transition-all hover:bg-background hover:text-foreground sm:h-10"
-                      >
-                        重置
-                      </button>
-                    )}
                   </div>
 
                   {orderExpenseCompositionData.length > 0 ? (
                     showCharts ? (
-                    <>
-                      {isCompactView ? (
-                        <InlineLegend
-                          compact
-                          items={[
-                            { label: "总支出", color: "#fb7185" },
-                            { label: "平台佣金", color: "#5ba7ff" },
-                            { label: "刷单佣金", color: "#f3b34c", dashed: true },
-                          ]}
-                        />
-                      ) : null}
-                    <div className={cn("h-[360px]", isCompactView && "h-[220px]")}>
-                      <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={orderExpenseCompositionData} margin={{ top: 20, right: 18, left: 8, bottom: 0 }}>
-                          <defs>
-                            <linearGradient id="expenseFill" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="0%" stopColor="#fb7185" stopOpacity={0.24} />
-                              <stop offset="100%" stopColor="#fb7185" stopOpacity={0.02} />
-                            </linearGradient>
-                          </defs>
-                          <CartesianGrid stroke="currentColor" strokeOpacity={0.08} vertical={false} />
-                          <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fill: "currentColor", fontSize: 12 }} />
-                          <YAxis
-                            width={56}
-                            tickLine={false}
-                            axisLine={false}
-                            tick={{ fill: "currentColor", fontSize: 12 }}
-                            tickFormatter={formatYAxisAmount}
-                          />
-                          <Tooltip
-                            contentStyle={{
-                              borderRadius: 18,
-                              border: "1px solid rgba(148,163,184,0.18)",
-                              background: "rgba(15,23,42,0.92)",
-                            }}
-                            isAnimationActive={false}
-                            formatter={(value, name) => [
-                              formatCurrency(Number(Array.isArray(value) ? value[0] ?? 0 : value ?? 0)),
-                              name ?? "",
+                      <>
+                        {isCompactView ? (
+                          <InlineLegend
+                            compact
+                            items={[
+                              { label: "总支出", color: "#fb7185" },
+                              { label: "平台佣金", color: "#5ba7ff" },
+                              { label: "刷单佣金", color: "#f3b34c", dashed: true },
                             ]}
                           />
-                          {!isCompactView && <Legend />}
-                          <Area
-                            type="monotone"
-                            dataKey="expense"
-                            name="总支出"
-                            stroke="#fb7185"
-                            strokeWidth={2.2}
-                            fill="url(#expenseFill)"
-                            dot={{ r: 2.5, fill: "#fb7185", strokeWidth: 0 }}
-                            activeDot={{ r: 4, strokeWidth: 0, fill: "#fb7185" }}
-                          />
-                          <Line
-                            type="monotone"
-                            dataKey="platformCommission"
-                            name="平台佣金"
-                            stroke="#5ba7ff"
-                            strokeWidth={1.8}
-                            strokeDasharray="0"
-                            dot={{ r: 2.2, fill: "#5ba7ff", strokeWidth: 0 }}
-                          />
-                          <Line
-                            type="monotone"
-                            dataKey="commission"
-                            name="刷单佣金"
-                            stroke="#f3b34c"
-                            strokeWidth={1.6}
-                            strokeDasharray="6 6"
-                            dot={false}
-                          />
-                        </AreaChart>
-                      </ResponsiveContainer>
-                    </div>
-                    </>
+                        ) : null}
+                        <div className={cn("h-[360px]", isCompactView && "h-[220px]")}>
+                          <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart data={orderExpenseCompositionData} margin={{ top: 20, right: 18, left: 8, bottom: 0 }}>
+                              <defs>
+                                <linearGradient id="expenseFill" x1="0" y1="0" x2="0" y2="1">
+                                  <stop offset="0%" stopColor="#fb7185" stopOpacity={0.24} />
+                                  <stop offset="100%" stopColor="#fb7185" stopOpacity={0.02} />
+                                </linearGradient>
+                              </defs>
+                              <CartesianGrid stroke="currentColor" strokeOpacity={0.08} vertical={false} />
+                              <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fill: "currentColor", fontSize: 12 }} />
+                              <YAxis
+                                width={56}
+                                tickLine={false}
+                                axisLine={false}
+                                tick={{ fill: "currentColor", fontSize: 12 }}
+                                tickFormatter={formatYAxisAmount}
+                              />
+                              <Tooltip
+                                contentStyle={{
+                                  borderRadius: 18,
+                                  border: "1px solid rgba(148,163,184,0.18)",
+                                  background: "rgba(15,23,42,0.92)",
+                                }}
+                                isAnimationActive={false}
+                                formatter={(value, name) => [
+                                  formatCurrency(Number(Array.isArray(value) ? value[0] ?? 0 : value ?? 0)),
+                                  name ?? "",
+                                ]}
+                              />
+                              {!isCompactView && <Legend />}
+                              <Area
+                                type="monotone"
+                                dataKey="expense"
+                                name="总支出"
+                                stroke="#fb7185"
+                                strokeWidth={2.2}
+                                fill="url(#expenseFill)"
+                                dot={{ r: 2.5, fill: "#fb7185", strokeWidth: 0 }}
+                                activeDot={{ r: 4, strokeWidth: 0, fill: "#fb7185" }}
+                              />
+                              <Line
+                                type="monotone"
+                                dataKey="platformCommission"
+                                name="平台佣金"
+                                stroke="#5ba7ff"
+                                strokeWidth={1.8}
+                                strokeDasharray="0"
+                                dot={{ r: 2.2, fill: "#5ba7ff", strokeWidth: 0 }}
+                              />
+                              <Line
+                                type="monotone"
+                                dataKey="commission"
+                                name="刷单佣金"
+                                stroke="#f3b34c"
+                                strokeWidth={1.6}
+                                strokeDasharray="6 6"
+                                dot={false}
+                              />
+                            </AreaChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </>
                     ) : (
                       <ChartLoadingState
                         compact={isCompactView}
@@ -1029,62 +1062,65 @@ export default function BrushCenterPage() {
                   )}
                 </>
               ) : (
-                <div className="rounded-[20px] border border-dashed border-border/60 bg-muted/10 px-4 py-4 text-sm text-muted-foreground">
+                <div className="rounded-[22px] border border-dashed border-border/60 bg-muted/10 px-4 py-4 text-sm text-muted-foreground sm:rounded-[26px]">
                   已收起趋势图，展开后再看筛选和曲线。
                 </div>
               )}
             </DashboardCard>
           )}
-
         </div>
 
+        {/* 分店铺走势卡片 */}
         <DashboardCard
           title={shopMetricConfig.title}
           subtitle={shopMetricConfig.subtitle}
+          icon={BarChart3}
           className="flex h-full flex-col"
           action={
             isCompactView ? (
               <button
                 type="button"
                 onClick={() => setIsShopMetricChartOpen((prev) => !prev)}
-                className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-border/60 px-3 py-1.5 text-xs font-bold text-muted-foreground"
+                className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-border/70 bg-background/80 px-3.5 py-1.5 text-xs font-bold text-muted-foreground shadow-2xs transition-all hover:border-primary/30 hover:text-foreground active:scale-95"
               >
-                {isShopMetricChartOpen ? "收起" : "展开"}
-                {isShopMetricChartOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                <span>{isShopMetricChartOpen ? "收起" : "展开"}</span>
+                {isShopMetricChartOpen ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
               </button>
             ) : undefined
           }
         >
           {!isCompactView || isShopMetricChartOpen ? (
             <>
-              <div className="mb-3 rounded-[16px] border border-border/60 bg-muted/10 px-3 py-3 sm:mb-4 sm:rounded-[18px] sm:px-4">
-                <div className="flex flex-col gap-3 xl:gap-4">
-                  <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:gap-3">
-                    <div className="text-xs font-bold uppercase tracking-[0.16em] text-muted-foreground">分店铺</div>
+              {/* 胶囊化分店铺与指标控制栏 */}
+              <div className="mb-3 rounded-[22px] border border-border/60 bg-background/50 p-2.5 shadow-2xs backdrop-blur-xs sm:mb-4 sm:p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2.5">
+                  <div className="w-full sm:w-auto min-w-[130px] flex-1 sm:flex-none">
                     <CustomSelect
                       options={[{ value: "all", label: "全部店铺" }, ...dashboardData.shops.map((shop) => ({ value: shop, label: shop }))]}
                       value={selectedShopView}
                       onChange={setSelectedShopView}
-                      triggerClassName="h-9 rounded-xl border-border/70 bg-background/80 px-3 text-sm font-semibold sm:h-10"
-                      className="w-full sm:w-[180px] xl:w-[196px]"
+                      triggerClassName="h-9 rounded-full border-border/70 bg-background/90 px-3.5 text-xs sm:text-sm font-bold shadow-2xs w-full sm:w-[150px]"
+                      className="w-full sm:w-[150px]"
                     />
                   </div>
-                  <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap sm:items-center">
-                  {shopMetricOptions.map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      onClick={() => setSelectedShopMetric(option.value)}
-                      className={cn(
-                        "inline-flex h-9 items-center justify-center rounded-xl border px-2 text-sm font-semibold transition-all sm:h-10 sm:px-3 xl:min-w-[84px]",
-                        selectedShopMetric === option.value
-                          ? "border-primary/30 bg-primary/10 text-primary"
-                          : "border-border/70 bg-background/80 text-muted-foreground hover:bg-background hover:text-foreground"
-                      )}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
+
+                  {/* 胶囊药丸指标选择器 */}
+                  <div className="inline-flex max-w-full items-center overflow-x-auto rounded-full border border-border/60 bg-background/60 p-0.5 shadow-2xs backdrop-blur-xs shrink-0">
+                    {shopMetricOptions.map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => setSelectedShopMetric(option.value)}
+                        className={cn(
+                          "inline-flex h-8 items-center justify-center rounded-full px-3 sm:px-3.5 text-xs font-bold whitespace-nowrap shrink-0 transition-all active:scale-95",
+                          selectedShopMetric === option.value
+                            ? "bg-primary text-primary-foreground shadow-xs"
+                            : "text-muted-foreground hover:text-foreground"
+                        )}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -1102,44 +1138,44 @@ export default function BrushCenterPage() {
                           }))}
                         />
                       ) : null}
-                    <div className={cn("mt-2 h-[360px] w-full xl:h-[440px]", isCompactView && "h-[220px]")}>
-                      <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={shopMetricConfig.data} margin={{ top: 14, right: 20, left: 8, bottom: 0 }}>
-                          <CartesianGrid stroke="currentColor" strokeOpacity={0.08} vertical={false} />
-                          <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fill: "currentColor", fontSize: 12 }} />
-                          <YAxis
-                            width={shopMetricConfig.yAxisWidth}
-                            tickLine={false}
-                            axisLine={false}
-                            allowDecimals={selectedShopMetric !== "count"}
-                            tick={{ fill: "currentColor", fontSize: 12 }}
-                            tickFormatter={selectedShopMetric === "count" ? undefined : formatYAxisAmount}
-                          />
-                          <Tooltip
-                            contentStyle={{
-                              borderRadius: 18,
-                              border: "1px solid rgba(148,163,184,0.18)",
-                              background: "rgba(15,23,42,0.92)",
-                            }}
-                            isAnimationActive={false}
-                            formatter={(value, name) => [shopMetricConfig.formatter(Number(Array.isArray(value) ? value[0] ?? 0 : value ?? 0)), name ?? shopMetricConfig.tooltipName]}
-                          />
-                          {!isCompactView && <Legend />}
-                          {shopMetricConfig.shops.map((shop, index) => (
-                            <Line
-                              key={`${selectedShopMetric}-${shop}`}
-                              type="monotone"
-                              dataKey={shop}
-                              name={shop}
-                              stroke={PLATFORM_COLORS[index % PLATFORM_COLORS.length]}
-                              strokeWidth={2}
-                              dot={{ r: 2.5, fill: PLATFORM_COLORS[index % PLATFORM_COLORS.length], strokeWidth: 0 }}
-                              activeDot={{ r: 4, strokeWidth: 0, fill: PLATFORM_COLORS[index % PLATFORM_COLORS.length] }}
+                      <div className={cn("mt-2 h-[360px] w-full xl:h-[440px]", isCompactView && "h-[220px]")}>
+                        <ResponsiveContainer width="100%" height="100%">
+                          <LineChart data={shopMetricConfig.data} margin={{ top: 14, right: 20, left: 8, bottom: 0 }}>
+                            <CartesianGrid stroke="currentColor" strokeOpacity={0.08} vertical={false} />
+                            <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fill: "currentColor", fontSize: 12 }} />
+                            <YAxis
+                              width={shopMetricConfig.yAxisWidth}
+                              tickLine={false}
+                              axisLine={false}
+                              allowDecimals={selectedShopMetric !== "count"}
+                              tick={{ fill: "currentColor", fontSize: 12 }}
+                              tickFormatter={selectedShopMetric === "count" ? undefined : formatYAxisAmount}
                             />
-                          ))}
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </div>
+                            <Tooltip
+                              contentStyle={{
+                                borderRadius: 18,
+                                border: "1px solid rgba(148,163,184,0.18)",
+                                background: "rgba(15,23,42,0.92)",
+                              }}
+                              isAnimationActive={false}
+                              formatter={(value, name) => [shopMetricConfig.formatter(Number(Array.isArray(value) ? value[0] ?? 0 : value ?? 0)), name ?? shopMetricConfig.tooltipName]}
+                            />
+                            {!isCompactView && <Legend />}
+                            {shopMetricConfig.shops.map((shop, index) => (
+                              <Line
+                                key={`${selectedShopMetric}-${shop}`}
+                                type="monotone"
+                                dataKey={shop}
+                                name={shop}
+                                stroke={PLATFORM_COLORS[index % PLATFORM_COLORS.length]}
+                                strokeWidth={2}
+                                dot={{ r: 2.5, fill: PLATFORM_COLORS[index % PLATFORM_COLORS.length], strokeWidth: 0 }}
+                                activeDot={{ r: 4, strokeWidth: 0, fill: PLATFORM_COLORS[index % PLATFORM_COLORS.length] }}
+                              />
+                            ))}
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </div>
                     </>
                   ) : (
                     <ChartLoadingState compact={isCompactView} message={shopMetricConfig.loading} />
@@ -1150,7 +1186,7 @@ export default function BrushCenterPage() {
               ) : null}
             </>
           ) : (
-            <div className="rounded-[20px] border border-dashed border-border/60 bg-muted/10 px-4 py-4 text-sm text-muted-foreground">
+            <div className="rounded-[22px] border border-dashed border-border/60 bg-muted/10 px-4 py-4 text-sm text-muted-foreground sm:rounded-[26px]">
               {shopMetricConfig.collapsed}
             </div>
           )}
