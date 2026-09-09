@@ -194,10 +194,10 @@ export default function BrushPlansPreviewPage() {
                                                 </div>
 
                                                 <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-                                                    {platformGroup.items.map((item, index) => (
-                                                        <CompactItemCard
-                                                            key={`${shopGroup.shopName}-${platformGroup.platform}-${item.id || index}`}
-                                                            item={item}
+                                                    {groupPlanItemsByOrder(platformGroup.items).map((orderGroup, index) => (
+                                                        <CompactOrderCard
+                                                            key={`${shopGroup.shopName}-${platformGroup.platform}-${orderGroup.group}-${index}`}
+                                                            items={orderGroup.items}
                                                             index={index}
                                                             accentClassName={meta.accentClassName}
                                                         />
@@ -216,60 +216,88 @@ export default function BrushPlansPreviewPage() {
     );
 }
 
-function CompactItemCard({
-    item,
+function CompactOrderCard({
+    items,
     index,
     accentClassName,
 }: {
-    item: PreviewItem;
+    items: PreviewItem[];
     index: number;
     accentClassName: string;
 }) {
-    const imageUrl = resolveProductImage(item.product?.image);
-    const keyword = item.searchKeyword || item.productName || item.product?.name || "未设置关键词";
-    const productName = item.productName || item.product?.name || "未绑定商品";
+    const title = items.length > 1 ? `${items.length} 种商品` : "";
+    const orderKeyword = items.find((item) => item.searchKeyword?.trim())?.searchKeyword || "未设置关键词";
 
     return (
         <div className="overflow-hidden rounded-[20px] border border-border/60 bg-white p-2 shadow-sm transition-all hover:border-primary/25 hover:shadow-md dark:border-white/10 dark:bg-white/6 dark:hover:bg-white/10 sm:rounded-2xl">
-            <div className="relative aspect-square overflow-hidden rounded-[18px] bg-muted/50">
-                <span className={cn("absolute left-1.5 top-1.5 z-10 flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] font-black shadow-sm", accentClassName)}>
-                    {index + 1}
-                </span>
-                <div className="absolute right-1.5 top-1.5 z-10 rounded-full bg-black/55 px-2 py-1 text-[10px] font-black text-white backdrop-blur-md">
-                    x{item.quantity || 1}
+            <div className="mb-2 px-1">
+                <div className="flex min-w-0 items-center justify-between gap-2">
+                <div className={cn("inline-flex h-5 shrink-0 items-center rounded-full px-2 text-[10px] font-black", accentClassName)}>
+                    第 {index + 1} 单
                 </div>
-                {imageUrl ? (
-                    <Image src={imageUrl} alt="" fill className="object-cover" unoptimized />
-                ) : (
-                    <div className="flex h-full w-full items-center justify-center text-muted-foreground/35">
-                        <Package size={18} />
+                {title ? <div className="min-w-0 truncate text-right text-[12px] font-black text-foreground">{title}</div> : null}
+                </div>
+            </div>
+            <div className="relative aspect-square overflow-hidden rounded-[18px] p-1.5">
+                <div className={cn(
+                    "grid h-full w-full gap-1.5",
+                    items.length === 2 ? "grid-cols-1 grid-rows-2" : items.length > 2 ? "grid-cols-2" : "grid-cols-1"
+                )}>
+                    {items.slice(0, 4).map((item, itemIndex) => (
+                        <ProductImageTile key={`${item.id || itemIndex}-image`} item={item} compact={items.length > 1} />
+                    ))}
+                </div>
+                {items.length > 4 ? (
+                    <div className="absolute bottom-1.5 left-1.5 z-10 rounded-full bg-black/55 px-2 py-1 text-[10px] font-black text-white backdrop-blur-md">
+                        +{items.length - 4}
                     </div>
-                )}
+                ) : null}
             </div>
 
-            <div className="mt-2.5">
-                <div className="rounded-2xl bg-black/[0.04] px-2.5 py-2 dark:bg-white/[0.08]">
-                    <div className="flex items-center gap-1.5">
-                        <Search size={12} className="shrink-0 text-muted-foreground" />
-                        <span className="line-clamp-3 break-all text-[13px] font-black leading-5 text-foreground sm:text-[15px] sm:leading-5.5">
-                            {keyword}
-                        </span>
-                    </div>
+            <div className="mt-2.5 min-h-[48px]">
+                <div className="mb-1.5 flex items-center gap-1.5 rounded-xl bg-black/[0.04] px-2 py-1.5 dark:bg-white/[0.08]">
+                    <Search size={11} className="shrink-0 text-muted-foreground" />
+                    <span className="shrink-0 text-[10px] font-black text-muted-foreground">搜索词</span>
+                    <span className="truncate text-[12px] font-black text-foreground">{orderKeyword}</span>
                 </div>
-
-                <div className="mt-2 line-clamp-2 break-all text-[11px] leading-4 text-muted-foreground sm:text-[12px]">
-                    {productName}
-                </div>
-
-                {item.note ? (
-                    <div className="mt-2 flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground">
-                        <ChevronRight size={12} className="shrink-0" />
-                        <span className="truncate">{item.note}</span>
-                    </div>
+                {items.length > 4 ? (
+                    <div className="mt-1.5 text-[10px] font-black text-muted-foreground">另 {items.length - 4} 项未显示图片</div>
                 ) : null}
             </div>
         </div>
     );
+}
+
+function ProductImageTile({ item }: { item: PreviewItem; compact?: boolean }) {
+    const imageUrl = resolveProductImage(item.product?.image);
+
+    return (
+        <div className="relative isolate overflow-hidden rounded-md bg-muted/50">
+            {imageUrl ? (
+                <Image src={imageUrl} alt="" fill className="object-cover" unoptimized />
+            ) : (
+                <div className="flex h-full w-full items-center justify-center text-muted-foreground/35">
+                    <Package size={18} />
+                </div>
+            )}
+            <div className="absolute right-1 top-1 rounded-full bg-white/95 px-1.5 py-0.5 text-[10px] font-black leading-none text-zinc-900 shadow-sm dark:bg-zinc-900/90 dark:text-white">
+                x{item.quantity || 1}
+            </div>
+            <div className="absolute inset-x-0 bottom-0 bg-zinc-900/80 px-1.5 py-0.5 text-[9px] font-black leading-3 text-white">
+                <div className="truncate">{item.productName || item.product?.name || "未绑定商品"}</div>
+            </div>
+        </div>
+    );
+}
+function groupPlanItemsByOrder(items: PreviewItem[]) {
+    const groups = new Map<number, PreviewItem[]>();
+    items.forEach((item, index) => {
+        const group = item.orderGroup || index + 1;
+        const current = groups.get(group) || [];
+        current.push(item);
+        groups.set(group, current);
+    });
+    return Array.from(groups.entries()).map(([group, groupItems]) => ({ group, items: groupItems }));
 }
 
 function normalizePlatform(platform?: string | null) {

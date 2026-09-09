@@ -797,6 +797,7 @@ export interface BrushOrderPlanItem {
   note?: string;
   principal?: number;
   done: boolean;
+  orderGroup?: number | null;
   sortOrder?: number;
 }
 

@@ -90,6 +90,7 @@ export function PlanModal({ isOpen, onClose, onSubmit, initialData, readOnly = f
                     searchKeyword: brushProduct.brushKeyword || "",
                     platform: platform || "美团",
                     done: false,
+                    orderGroup: newItems.length + 1,
                 });
             }
         });
@@ -130,6 +131,20 @@ export function PlanModal({ isOpen, onClose, onSubmit, initialData, readOnly = f
         setFormData({ ...formData, items: newItems });
     };
 
+    const getItemOrderGroup = (item: BrushOrderPlanItem, index: number) => item.orderGroup || index + 1;
+
+    const updateOrderGroup = (index: number, orderGroup: number) => {
+        const newItems = [...(formData.items || [])];
+        newItems[index] = { ...newItems[index], orderGroup };
+        setFormData({ ...formData, items: newItems });
+    };
+
+    const splitToNewOrder = (index: number) => {
+        const items = formData.items || [];
+        const maxGroup = items.reduce((max, item, itemIndex) => Math.max(max, getItemOrderGroup(item, itemIndex)), 0);
+        updateOrderGroup(index, maxGroup + 1);
+    };
+
     const normalizeQuantity = (value: unknown) => {
         const parsed = Number(value);
         return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
@@ -153,6 +168,7 @@ export function PlanModal({ isOpen, onClose, onSubmit, initialData, readOnly = f
         const normalizedItems = (formData.items || []).map((item: BrushOrderPlanItem, index) => ({
             ...item,
             quantity: normalizeQuantity(item.quantity),
+            orderGroup: getItemOrderGroup(item, index),
             sortOrder: index,
         }));
         if (normalizedItems.some((item) => item.quantity === null)) {
@@ -276,13 +292,24 @@ export function PlanModal({ isOpen, onClose, onSubmit, initialData, readOnly = f
 
                                                         {isExpanded && (
                                                             <div className="space-y-4 pl-0 sm:pl-4">
-                                                                {platformItems.map((item: BrushOrderPlanItem, platformIndex) => {
-                                                                    // Find the original index in formData.items
-                                                                    const originalIndex = (formData.items || []).findIndex(i => i === item);
-                                                                    const isFirstInPlatform = platformIndex === 0;
-                                                                    const isLastInPlatform = platformIndex === platformItems.length - 1;
-                                                                    return (
-                                                                            <div key={`${platform}-${originalIndex}`} className="flex flex-col gap-2.5 p-3 sm:p-4 rounded-[20px] sm:rounded-[24px] border border-border bg-white dark:bg-white/5 hover:border-primary/30 transition-all shadow-sm">
+                                                                {groupItemsByOrder(platformItems, formData.items || []).map((orderGroup, orderIndex) => (
+                                                                    <div key={`${platform}-order-${orderGroup.group}`} className="rounded-[22px] border border-primary/10 bg-primary/[0.03] p-3 dark:bg-white/[0.03]">
+                                                                        <div className="mb-3 flex items-center justify-between gap-3">
+                                                                            <div className="flex items-center gap-2">
+                                                                                <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-[11px] font-black text-emerald-600 dark:text-emerald-400">第 {orderIndex + 1} 单</span>
+                                                                                {orderGroup.items.length > 1 ? (
+                                                                                    <span className="text-[11px] font-black text-muted-foreground">{orderGroup.items.length} 种商品</span>
+                                                                                ) : null}
+                                                                            </div>
+                                                                        </div>
+                                                                        <div className="space-y-2.5">
+                                                                            {orderGroup.items.map(({ item, originalIndex, platformIndex }) => {
+                                                                                const isFirstInPlatform = platformIndex === 0;
+                                                                                const isLastInPlatform = platformIndex === platformItems.length - 1;
+                                                                                const isFirstInOrder = orderGroup.items[0]?.originalIndex === originalIndex;
+                                                                                const canMergeToPreviousOrder = isFirstInOrder && orderIndex > 0;
+                                                                                return (
+                                                                            <div key={`${platform}-${originalIndex}`} className="flex flex-col gap-2.5 p-3 sm:p-4 rounded-[18px] border border-border bg-white dark:bg-white/5 hover:border-primary/30 transition-all shadow-sm">
                                                                                 <div className="flex items-center gap-3 min-w-0">
                                                                                     <div className="w-10 h-10 rounded-lg bg-muted border border-border/50 overflow-hidden shrink-0">
                                                                                         {item.product?.image ? (
@@ -298,6 +325,30 @@ export function PlanModal({ isOpen, onClose, onSubmit, initialData, readOnly = f
                                                                                     </div>
 
                                                                                     <div className="flex items-center gap-1 shrink-0">
+                                                                                        {canMergeToPreviousOrder && (
+                                                                                            <button
+                                                                                                type="button"
+                                                                                                onClick={() => {
+                                                                                                    const previousGroupItems = groupItemsByOrder(platformItems, formData.items || [])[orderIndex - 1]?.items || [];
+                                                                                                    const previousItem = previousGroupItems[0];
+                                                                                                    if (previousItem) {
+                                                                                                        updateOrderGroup(originalIndex, getItemOrderGroup(previousItem.item, previousItem.originalIndex));
+                                                                                                    }
+                                                                                                }}
+                                                                                                className="px-2 py-1 text-[10px] font-black text-primary bg-primary/10 hover:bg-primary/20 rounded-full transition-all whitespace-nowrap"
+                                                                                                title="合并到上一单"
+                                                                                            >
+                                                                                                合并到上一单
+                                                                                            </button>
+                                                                                        )}
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            onClick={() => splitToNewOrder(originalIndex)}
+                                                                                            className="px-2 py-1 text-[10px] font-black text-muted-foreground bg-muted/60 hover:bg-muted rounded-full transition-all whitespace-nowrap"
+                                                                                            title="拆成单独一单"
+                                                                                        >
+                                                                                            拆单
+                                                                                        </button>
                                                                                         <button
                                                                                             type="button"
                                                                                             onClick={() => moveItemWithinPlatform(originalIndex, -1)}
@@ -361,8 +412,11 @@ export function PlanModal({ isOpen, onClose, onSubmit, initialData, readOnly = f
                                                                                     </div>
                                                                                 </div>
                                                                             </div>
-                                                                    );
-                                                                })}
+                                                                            );
+                                                                            })}
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
                                                             </div>
                                                         )}
                                                     </div>
@@ -438,4 +492,16 @@ export function PlanModal({ isOpen, onClose, onSubmit, initialData, readOnly = f
             />
         </>
     );
+}
+
+function groupItemsByOrder(platformItems: BrushOrderPlanItem[], allItems: BrushOrderPlanItem[]) {
+    const groups = new Map<number, Array<{ item: BrushOrderPlanItem; originalIndex: number; platformIndex: number }>>();
+    platformItems.forEach((item, platformIndex) => {
+        const originalIndex = allItems.findIndex((candidate) => candidate === item);
+        const group = item.orderGroup || originalIndex + 1;
+        const current = groups.get(group) || [];
+        current.push({ item, originalIndex, platformIndex });
+        groups.set(group, current);
+    });
+    return Array.from(groups.entries()).map(([group, items]) => ({ group, items }));
 }

@@ -99,6 +99,7 @@ export async function GET(
         note: item.note,
         principal: item.principal,
         done: item.done,
+        orderGroup: item.orderGroup,
         product: item.product ? {
           name: item.product.name,
           image: resolvedImage ? storage.resolveUrl(resolvedImage) : null

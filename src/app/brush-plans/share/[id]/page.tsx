@@ -80,7 +80,7 @@ export default function SharedPlanPage() {
                                 <span>•</span>
                                 <span className="flex items-center gap-1"><Store size={12} /> {plan.shopName || "通用店铺"}</span>
                                 <span>•</span>
-                                <span>共 {plan.items.length} 项，合计 {plan.items.reduce((sum, item) => sum + (item.quantity || 1), 0)} 份</span>
+                                <span>共 {groupPlanItemsByOrder(plan.items).length} 单 · {plan.items.length} 项，合计 {plan.items.reduce((sum, item) => sum + (item.quantity || 1), 0)} 份</span>
                             </div>
                         </div>
                     </div>
@@ -144,7 +144,7 @@ export default function SharedPlanPage() {
                                                         {platformName}
                                                     </div>
                                                     <span className="text-xs font-black text-slate-500 dark:text-slate-400">
-                                                        {platformItems.length} 项
+                                                        {groupPlanItemsByOrder(platformItems).length} 单 · {platformItems.length} 项
                                                     </span>
                                                 </div>
                                                 <div className="h-px flex-1 bg-zinc-200 dark:bg-white/5 mx-6 hidden sm:block" />
@@ -154,10 +154,10 @@ export default function SharedPlanPage() {
                                             </div>
 
                                             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
-                                                {platformItems.map((item, pIdx) => (
-                                                    <ItemCard 
-                                                        key={item.id} 
-                                                        item={item} 
+                                                {groupPlanItemsByOrder(platformItems).map((orderGroup, pIdx) => (
+                                                    <ItemCard
+                                                        key={`${platformName}-${orderGroup.group}-${pIdx}`}
+                                                        items={orderGroup.items}
                                                         index={pIdx} 
                                                     />
                                                 ))}
@@ -170,11 +170,11 @@ export default function SharedPlanPage() {
                     } else {
                         return (
                             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
-                                {plan.items.map((item, index) => (
-                                    <ItemCard 
-                                        key={item.id} 
-                                        item={item} 
-                                        index={index} 
+                                {groupPlanItemsByOrder(plan.items).map((orderGroup, index) => (
+                                    <ItemCard
+                                        key={`fallback-${orderGroup.group}-${index}`}
+                                        items={orderGroup.items}
+                                        index={index}
                                     />
                                 ))}
                             </div>
@@ -187,62 +187,88 @@ export default function SharedPlanPage() {
     );
 }
 
-function ItemCard({ item, index }: { item: BrushOrderPlan["items"][number]; index: number }) {
+function ItemCard({ items, index }: { items: BrushOrderPlan["items"]; index: number }) {
+    const title = items.length > 1 ? `${items.length} 种商品` : "";
+    const orderKeyword = items.find((item) => item.searchKeyword?.trim())?.searchKeyword || "暂无关键字";
+
     return (
         <div className={cn(
-            "group relative flex flex-col rounded-2xl overflow-hidden transition-all duration-500 cursor-default",
+            "group relative flex flex-col rounded-2xl overflow-hidden transition-all duration-300 cursor-default",
             "bg-white dark:bg-zinc-900",
             "border border-zinc-200/80 dark:border-white/10 shadow-sm hover:shadow-2xl hover:shadow-primary/5 hover:-translate-y-1"
         )}>
-            {/* Image Area */}
-            <div className="relative aspect-square w-full bg-zinc-100 dark:bg-zinc-800/40 overflow-hidden">
-                {/* 悬浮暗色渐变蒙层，确保即使是白色商品图，也能看清白色文字徽章 */}
-                <div className="absolute inset-0 bg-linear-to-b from-black/20 via-transparent to-black/30 z-10 opacity-50 mix-blend-multiply pointer-events-none transition-opacity group-hover:opacity-30" />
-
-                {/* Number Badge: 圆形毛玻璃 */}
-                <div className="absolute top-2.5 left-2.5 z-20 w-6 h-6 rounded-full bg-white/20 dark:bg-black/40 backdrop-blur-md border border-white/20 text-white text-[11px] font-black shadow-sm flex items-center justify-center pointer-events-none">
-                    {index + 1}
+            <div className="px-3.5 pb-2 pt-3.5 sm:px-4 sm:pt-4">
+                <div className="flex min-w-0 items-center justify-between gap-2">
+                    <span className="shrink-0 text-[10px] font-black text-emerald-600 dark:text-emerald-400">第 {index + 1} 单</span>
+                    {title ? <span className="min-w-0 truncate text-right text-[13px] font-black text-zinc-900 dark:text-zinc-100">
+                        {title}
+                    </span> : null}
                 </div>
-                
-                {/* Quantity Badge: 药丸型高对比度毛玻璃 */}
-                <div className="absolute bottom-2.5 right-2.5 z-20 px-2.5 py-1 rounded-full bg-white/95 dark:bg-zinc-900/90 backdrop-blur-md border border-black/5 dark:border-white/10 text-emerald-600 dark:text-emerald-400 text-[11px] font-black shadow-lg flex items-center gap-1 pointer-events-none tracking-tight">
-                    <span className="opacity-60">x</span> {item.quantity} 份
+            </div>
+            <div className="relative aspect-square w-full overflow-hidden p-1.5">
+                <div className={cn(
+                    "grid h-full w-full gap-1.5",
+                    items.length === 2 ? "grid-cols-1 grid-rows-2" : items.length > 2 ? "grid-cols-2" : "grid-cols-1"
+                )}>
+                    {items.slice(0, 4).map((item, itemIndex) => (
+                        <ProductImageTile key={`${item.id || itemIndex}-image`} item={item} compact={items.length > 1} />
+                    ))}
                 </div>
-
-                {item.product?.image ? (
-                    <Image 
-                        src={item.product.image.startsWith('http') || item.product.image.startsWith('/') 
-                            ? item.product.image 
-                            : `/api/uploads/${item.product.image.replace(/^\/?uploads\//, '')}`} 
-                        fill 
-                        className={cn(
-                            "object-cover transition-transform duration-700 ease-[cubic-bezier(0.2,0.8,0.2,1)]",
-                            "group-hover:scale-105"
-                        )} 
-                        alt="" 
-                        unoptimized 
-                    />
-                ) : (
-                    <div className="absolute inset-0 flex items-center justify-center text-muted-foreground/30">
-                        <Package size={24} />
+                {items.length > 4 ? (
+                    <div className="absolute bottom-2.5 left-2.5 z-20 rounded-full bg-black/55 px-2 py-1 text-[10px] font-black text-white backdrop-blur-md">
+                        +{items.length - 4}
                     </div>
-                )}
+                ) : null}
             </div>
 
-            {/* Content Area - 清新极简排版 */}
-            <div className="flex flex-col p-3.5 sm:p-4 bg-white dark:bg-zinc-900/30">
-                <div className="flex items-start gap-2.5">
-                    <Search className="w-3.5 h-3.5 mt-[3px] text-primary opacity-60 shrink-0" strokeWidth={3} />
-                    <div className="flex flex-col gap-0.5">
-                        <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest leading-none">
-                            搜索词
-                        </span>
-                        <span className="text-[13px] sm:text-[14px] font-black text-zinc-800 dark:text-zinc-100 leading-snug line-clamp-2 break-all group-hover:text-primary transition-colors">
-                            {item.searchKeyword || "暂无关键字"}
-                        </span>
-                    </div>
+            <div className="flex min-h-[64px] flex-col p-3.5 sm:p-4">
+                <div className="flex items-center gap-2 rounded-xl bg-zinc-100 px-2.5 py-2 dark:bg-white/6">
+                    <Search size={12} className="shrink-0 text-primary opacity-70" />
+                    <span className="shrink-0 text-[10px] font-black text-zinc-500 dark:text-zinc-400">搜索词</span>
+                    <span className="truncate text-[13px] font-black text-zinc-900 dark:text-zinc-100">{orderKeyword}</span>
                 </div>
+                {items.length > 4 ? (
+                    <div className="text-[10px] font-black text-muted-foreground">另 {items.length - 4} 项未显示图片</div>
+                ) : null}
             </div>
         </div>
     );
+}
+
+function ProductImageTile({ item, compact = false }: { item: BrushOrderPlan["items"][number]; compact?: boolean }) {
+    const image = item.product?.image;
+    const src = image
+        ? image.startsWith("http") || image.startsWith("/")
+            ? image
+            : `/api/uploads/${image.replace(/^\/?uploads\//, "")}`
+        : "";
+
+    return (
+        <div className="relative isolate overflow-hidden rounded-md bg-zinc-200 dark:bg-zinc-800">
+            {src ? (
+                <Image src={src} fill className="object-cover" alt="" unoptimized />
+            ) : (
+                <div className="absolute inset-0 flex items-center justify-center text-muted-foreground/30">
+                    <Package size={24} />
+                </div>
+            )}
+            <div className="absolute right-1.5 top-1.5 rounded-full bg-white/95 px-2 py-0.5 text-[10px] font-black text-zinc-900 shadow-sm dark:bg-zinc-900/90 dark:text-white">
+                x{item.quantity || 1}
+            </div>
+            <div className="absolute inset-x-0 bottom-0 bg-zinc-900/80 px-2 py-1 text-[10px] font-black leading-3.5 text-white">
+                <div className="truncate">{item.productName || item.product?.name || "未绑定商品"}</div>
+            </div>
+        </div>
+    );
+}
+
+function groupPlanItemsByOrder(items: BrushOrderPlan["items"]) {
+    const groups = new Map<number, BrushOrderPlan["items"]>();
+    items.forEach((item, index) => {
+        const group = item.orderGroup || index + 1;
+        const current = groups.get(group) || [];
+        current.push(item);
+        groups.set(group, current);
+    });
+    return Array.from(groups.entries()).map(([group, groupItems]) => ({ group, items: groupItems }));
 }

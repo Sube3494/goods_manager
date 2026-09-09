@@ -11,12 +11,26 @@ interface BrushPlanItemInput {
   platform?: string | null;
   note?: string | null;
   done?: boolean;
+  orderGroup?: number | string | null;
   sortOrder?: number;
 }
 
 function normalizePlanItemQuantity(value: unknown) {
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : 1;
+}
+
+function normalizeOrderGroup(value: unknown, fallback: number) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+let brushPlanOrderGroupColumnReady = false;
+
+async function ensureBrushPlanOrderGroupColumn() {
+  if (brushPlanOrderGroupColumnReady) return;
+  await prisma.$executeRawUnsafe('ALTER TABLE "BrushOrderPlanItem" ADD COLUMN IF NOT EXISTS "orderGroup" INTEGER');
+  brushPlanOrderGroupColumnReady = true;
 }
 
 async function resolvePlanProductImages<T extends {
@@ -190,6 +204,7 @@ export async function PUT(
     }
 
     const body = await req.json();
+    await ensureBrushPlanOrderGroupColumn();
     const {
       date,
       title,
@@ -223,6 +238,7 @@ export async function PUT(
                 platform: item.platform || null,
                 note: item.note || null,
                 done: item.done || false,
+                orderGroup: normalizeOrderGroup(item.orderGroup, index + 1),
                 sortOrder: item.sortOrder !== undefined ? item.sortOrder : index,
               })),
             },

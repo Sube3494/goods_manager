@@ -159,8 +159,16 @@ export async function POST(request: Request) {
         const normK = k.trim().toLowerCase();
         if (normK.includes("id") || normK.includes("编码") || normK.includes("code")) {
           if (String(v).trim() === clean && clean !== "") {
-            // 如果该列本身就是以 id 命名的（如 id, ID, 商品ID 等），则判定为 ID
-            if (normK === "id" || normK.endsWith("id") || normK.includes("商品id") || normK.includes("平台id")) {
+            // ID / 商品编码 / 平台编码 都属于外部平台标识，不允许回填到本系统 SKU。
+            if (
+              normK === "id" ||
+              normK === "编码" ||
+              normK.endsWith("id") ||
+              normK.includes("商品id") ||
+              normK.includes("平台id") ||
+              normK.includes("商品编码") ||
+              normK.includes("平台编码")
+            ) {
               return true;
             }
           }
@@ -250,16 +258,9 @@ export async function POST(request: Request) {
             const galleryText = String(item['图库图片'] || "");
             const galleryUrls = galleryText ? galleryText.split(/[\n,，]/).map(url => url.trim()).filter(Boolean) : [];
 
-            // 如果未填 SKU，且有商品名称，按当前库最大编码格式智能自动递增；若无商品名称则拒绝
-            let finalSku = sku;
-            if (!finalSku) {
-              if (!name) {
-                failCount++;
-                errors.push({ sku: "未知", reason: "缺少商品名称，且未填写 SKU" });
-                continue;
-              }
-              finalSku = generateNextSku();
-            } else {
+            // 导入不再强制补商品编码：只有表格明确提供真实店内码时才写入 SKU。
+            let finalSku: string | null = sku || null;
+            if (finalSku) {
               const match = finalSku.trim().match(skuRegex);
               if (match && match[1] === globalMaxPrefix) {
                 const num = parseInt(match[2], 10);
@@ -298,6 +299,9 @@ export async function POST(request: Request) {
                     specs: Object.keys(specs).length > 0 ? specs : undefined,
                     ...(remarkText ? { remark: remarkText } : {})
                 };
+                if (!sku && product.sku && isPlatformIdValue(product.sku, item, [...normalizedMeituanSkuIds, ...normalizedJdSkuIds])) {
+                    updateData.sku = null;
+                }
 
                 // Handle supplier update
                 if (supplierName && !isInvalidSupplier(supplierName)) {
@@ -381,9 +385,9 @@ export async function POST(request: Request) {
                     errors.push({ sku, reason: "系统内未找到平台商品 ID，且导入数据中缺少商品名称，无法创建商品" });
                     continue;
                 }
-                if (globalExistingSkuSet.has(finalSku)) {
+                if (finalSku && globalExistingSkuSet.has(finalSku)) {
                     finalSku = generateNextSku();
-                } else {
+                } else if (finalSku) {
                     globalExistingSkuSet.add(finalSku);
                 }
 

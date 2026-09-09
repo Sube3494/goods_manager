@@ -1,0 +1,1 @@
+ALTER TABLE "BrushOrderPlanItem" ADD COLUMN IF NOT EXISTS "orderGroup" INTEGER;

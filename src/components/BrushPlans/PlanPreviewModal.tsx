@@ -161,20 +161,23 @@ export function PlanPreviewModal({ isOpen, onClose, plan = null, plans = [], tit
                                                         {platformGroup.platform}
                                                     </span>
                                                     <span className="text-xs font-medium text-muted-foreground dark:text-zinc-400">
-                                                        {platformGroup.items.length} 款任务
+                                                        {groupPlanItemsByOrder(platformGroup.items).length} 单 · {platformGroup.items.length} 款任务
                                                     </span>
                                                 </div>
 
                                                 <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-                                                    {platformGroup.items.map((item, index) => (
-                                                        <div key={`${shopGroup.shopName}-${platformGroup.platform}-${index}`} className="flex gap-3 rounded-2xl border border-zinc-200 bg-white p-2.5 shadow-sm dark:border-white/8 dark:bg-[#1b1f27] min-[420px]:flex-col min-[420px]:p-1.5 min-[420px]:gap-2">
+                                                    {groupPlanItemsByOrder(platformGroup.items).map((orderGroup, index) => {
+                                                        const leadItem = orderGroup.items[0];
+                                                        const totalQuantity = orderGroup.items.reduce((sum, item) => sum + (item.quantity || 1), 0);
+                                                        return (
+                                                        <div key={`${shopGroup.shopName}-${platformGroup.platform}-${orderGroup.group}-${index}`} className="flex gap-3 rounded-2xl border border-zinc-200 bg-white p-2.5 shadow-sm dark:border-white/8 dark:bg-[#1b1f27] min-[420px]:flex-col min-[420px]:p-1.5 min-[420px]:gap-2">
                                                             <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl bg-zinc-100 dark:bg-[#0f1218] min-[420px]:aspect-square min-[420px]:h-auto min-[420px]:w-full">
                                                                 <div className="absolute top-1.5 left-1.5 z-10 px-2 py-0.5 rounded-md bg-black/40 backdrop-blur-md text-white text-[11px] font-black shadow-sm flex items-center justify-center pointer-events-none">
                                                                     #{index + 1}
                                                                 </div>
-                                                                {item.product?.image ? (
+                                                                {leadItem.product?.image ? (
                                                                     <Image 
-                                                                        src={item.product.image} 
+                                                                        src={leadItem.product.image}
                                                                         fill 
                                                                         className="object-contain p-1" 
                                                                         alt="" 
@@ -189,15 +192,21 @@ export function PlanPreviewModal({ isOpen, onClose, plan = null, plans = [], tit
                                                             <div className="flex min-w-0 flex-1 flex-col gap-2 p-0.5 min-[420px]:p-2">
                                                                 <div className="flex items-start gap-1 p-1.5 rounded-md bg-zinc-100 text-zinc-700 text-[11px] leading-snug w-full dark:bg-white/6 dark:text-zinc-100">
                                                                     <Search size={10} className="shrink-0 mt-[2px]" />
-                                                                    <span className="line-clamp-2 break-all font-black">{item.searchKeyword || "暂无"}</span>
+                                                                    <span className="line-clamp-2 break-all font-black">{orderGroup.items.map((item) => item.searchKeyword || item.productName || item.product?.name || "暂无").join(" / ")}</span>
                                                                 </div>
+                                                                {orderGroup.items.length > 1 ? (
+                                                                    <div className="line-clamp-2 px-1 text-[10px] font-bold leading-4 text-muted-foreground">
+                                                                        {orderGroup.items.map((item) => `${item.productName || item.product?.name || "未绑定商品"} x${item.quantity || 1}`).join(" / ")}
+                                                                    </div>
+                                                                ) : null}
                                                                 <div className="mt-auto flex items-center justify-between pl-1">
-                                                                    <span className="text-zinc-500 dark:text-zinc-400 text-[11px] font-black">x{item.quantity}</span>
-                                                                    {item.done ? <CheckCircle2 size={16} className="text-emerald-500" /> : <div className="w-4" />}
+                                                                    <span className="text-zinc-500 dark:text-zinc-400 text-[11px] font-black">x{totalQuantity}</span>
+                                                                    {orderGroup.items.every((item) => item.done) ? <CheckCircle2 size={16} className="text-emerald-500" /> : <div className="w-4" />}
                                                                 </div>
                                                             </div>
                                                         </div>
-                                                    ))}
+                                                    );
+                                                    })}
                                                 </div>
                                             </div>
                                         );
@@ -212,6 +221,17 @@ export function PlanPreviewModal({ isOpen, onClose, plan = null, plans = [], tit
         </AnimatePresence>,
         document.body
     );
+}
+
+function groupPlanItemsByOrder<T extends BrushOrderPlanItem>(items: T[]) {
+    const groups = new Map<number, T[]>();
+    items.forEach((item, index) => {
+        const group = item.orderGroup || index + 1;
+        const current = groups.get(group) || [];
+        current.push(item);
+        groups.set(group, current);
+    });
+    return Array.from(groups.entries()).map(([group, groupItems]) => ({ group, items: groupItems }));
 }
 
 function normalizePlatform(platform?: string | null) {

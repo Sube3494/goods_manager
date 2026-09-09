@@ -340,6 +340,7 @@ export default function BrushPlansPage() {
                         <div className="flex flex-col gap-4">
                             {group.items.map(plan => {
                                 const platforms = Array.from(new Set(plan.items.map((i: BrushOrderPlanItem) => i.platform).filter((p): p is string => !!p)));
+                                const orderGroups = groupPlanItemsByOrder(plan.items);
                                 const totalQuantity = plan.items.reduce((sum, item) => sum + (item.quantity || 1), 0);
 
                                 return (
@@ -353,6 +354,8 @@ export default function BrushPlansPage() {
                                                         </h3>
                                                         <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[11px] font-bold text-muted-foreground">
                                                             <span className="rounded-full bg-primary/10 px-2 py-0.5 text-primary uppercase tracking-wider">{totalQuantity} 份</span>
+                                                            <span className="opacity-40">•</span>
+                                                            <span>{orderGroups.length} 单</span>
                                                             <span className="opacity-40">•</span>
                                                             <span>{plan.items.length} 个任务</span>
                                                             <span className="opacity-40">•</span>
@@ -422,18 +425,23 @@ export default function BrushPlansPage() {
                                             </div>
 
                                             <div className="flex flex-wrap gap-2.5">
-                                                {plan.items.map((item, index) => {
-                                                    const imageUrl = item.product?.image 
-                                                        ? (item.product.image.startsWith('http') || item.product.image.startsWith('/') 
-                                                            ? item.product.image 
-                                                            : `/api/uploads/${item.product.image.replace(/^\/?uploads\//, '')}`)
+                                                {orderGroups.map((orderGroup, index) => {
+                                                    const leadItem = orderGroup.items[0];
+                                                    const imageUrl = leadItem.product?.image
+                                                        ? (leadItem.product.image.startsWith('http') || leadItem.product.image.startsWith('/')
+                                                            ? leadItem.product.image 
+                                                            : `/api/uploads/${leadItem.product.image.replace(/^\/?uploads\//, '')}`)
                                                         : null;
+                                                    const orderQuantity = orderGroup.items.reduce((sum, item) => sum + (item.quantity || 1), 0);
+                                                    const orderTitle = orderGroup.items
+                                                        .map((item) => `${item.productName || item.product?.name || "未命名"} x${item.quantity || 1}`)
+                                                        .join(" / ");
 
                                                     return (
                                                         <div 
-                                                            key={`${plan.id}-item-${index}`} 
+                                                            key={`${plan.id}-order-${orderGroup.group}-${index}`} 
                                                             className="group relative flex items-center gap-2 rounded-full bg-white dark:bg-white/6 border border-border/60 dark:border-white/10 p-1 pr-3.5 shadow-sm transition-all hover:shadow-md hover:border-primary/40 dark:hover:bg-white/10 cursor-default"
-                                                            title={`商品：${item.productName || item.product?.name || "未命名"}\n关键词：${item.searchKeyword || "无"}\n平台：${item.platform || "无"}`}
+                                                            title={`第 ${index + 1} 单：${orderTitle}\n关键词：${orderGroup.items.map((item) => item.searchKeyword || "无").join(" / ")}\n平台：${leadItem.platform || "无"}`}
                                                         >
                                                             {/* 小圆图 */}
                                                             <div className="relative w-8 h-8 rounded-full overflow-hidden bg-muted/50 shrink-0 shadow-inner">
@@ -450,14 +458,14 @@ export default function BrushPlansPage() {
                                                             {/* 简要信息：仅展示关键词和数量 */}
                                                             <div className="flex flex-col max-w-[100px] sm:max-w-[140px]">
                                                                 <div className="truncate text-[11px] font-bold text-foreground">
-                                                                    {item.searchKeyword || item.productName || item.product?.name || "未设置"}
+                                                                    {orderGroup.items.length > 1 ? `${orderGroup.items.length} 种物品` : (leadItem.searchKeyword || leadItem.productName || leadItem.product?.name || "未设置")}
                                                                 </div>
                                                                 <div className="flex items-center gap-1.5 mt-0.5">
                                                                     <span className="text-[9px] font-black uppercase text-muted-foreground opacity-70">
-                                                                        {item.platform || "未知"}
+                                                                        第 {index + 1} 单
                                                                     </span>
                                                                     <span className="text-[9px] font-black text-primary">
-                                                                        x{item.quantity || 1}
+                                                                        x{orderQuantity}
                                                                     </span>
                                                                 </div>
                                                             </div>
@@ -508,4 +516,15 @@ export default function BrushPlansPage() {
             />
         </div>
     );
+}
+
+function groupPlanItemsByOrder(items: BrushOrderPlanItem[]) {
+    const groups = new Map<number, BrushOrderPlanItem[]>();
+    items.forEach((item, index) => {
+        const group = item.orderGroup || index + 1;
+        const current = groups.get(group) || [];
+        current.push(item);
+        groups.set(group, current);
+    });
+    return Array.from(groups.entries()).map(([group, groupItems]) => ({ group, items: groupItems }));
 }
