@@ -320,6 +320,7 @@ export async function PATCH(
         id: true,
         productNo: true,
         productName: true,
+        quantity: true,
         thumb: true,
         platformSkuId: true,
         rawPayload: true,
@@ -575,7 +576,8 @@ export async function PATCH(
       return NextResponse.json({ error: "只能匹配当前店铺商品，模板库商品不参与订单匹配" }, { status: 404 });
     }
 
-    const singleQty = itemsQtyMap.get(shopProduct.id) || (body?.quantity ? Number(body.quantity) : undefined);
+    const rawSingleQty = itemsQtyMap.get(shopProduct.id) || (body?.quantity ? Number(body.quantity) : undefined);
+    const singleQty = rawSingleQty && rawSingleQty > 0 ? rawSingleQty : undefined;
     const rawSingleImage = shopProduct.productImage || shopProduct.product?.image || null;
     const matchedProduct = {
       id: shopProduct.id,

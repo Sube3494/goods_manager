@@ -3954,7 +3954,8 @@ export default function OrdersPage() {
             void saveManualMatch("", [], { clear: true });
             return;
           }
-          void saveManualMatch(resolvedIds.join("+"), items);
+          const shouldSendItemQuantities = items.length > 1 || items.some((item) => item.quantity > 1);
+          void saveManualMatch(resolvedIds.join("+"), shouldSendItemQuantities ? items : undefined);
         }}
         selectedIds={matchEditorTarget?.currentMatchedProductId ? matchEditorTarget.currentMatchedProductId.split("+").filter(Boolean) : []}
         singleSelect={true}

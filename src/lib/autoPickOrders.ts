@@ -6876,10 +6876,13 @@ async function resolveOutboundItemsForAutoPickOrder(
         ).trim() || null;
       }
 
+      const manualQuantity = Number((manualMatchedProduct as any).quantity || 0) || 0;
+      const orderItemQuantity = Math.max(1, Number(item.quantity || 1) || 1);
+
       resolvedItems.push({
         productId: manualResolvedProductId,
         shopProductId: manualShopProductId,
-        quantity: Math.max(1, Number((manualMatchedProduct as any).quantity || item.quantity || 1) || 1),
+        quantity: manualQuantity > 1 ? Math.max(1, manualQuantity) : orderItemQuantity,
         price: priceShare,
       });
       continue;
