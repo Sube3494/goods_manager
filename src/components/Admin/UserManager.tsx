@@ -375,9 +375,6 @@ function RoleAssignmentModal({
                                     : "bg-zinc-50/80 dark:bg-white/[0.03] border-border/70 dark:border-white/10 hover:bg-zinc-100/90 dark:hover:bg-white/[0.06] hover:border-primary/25"
                                 }`}
                             >
-                                {isSelected && (
-                                    <span className="absolute inset-y-3 left-0 w-1 rounded-r-full bg-primary" />
-                                )}
                                 <div className="min-w-0 flex-1">
                                     <div className="font-black text-sm text-foreground flex items-center gap-2 flex-wrap">
                                         {role.name}
