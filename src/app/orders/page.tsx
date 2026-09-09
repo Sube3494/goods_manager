@@ -2567,7 +2567,10 @@ export default function OrdersPage() {
         });
       }
 
-      showToast(data.maiyatian?.message || (data.ok ? `${target === "plugin" ? "脚本" : "Cookie"} 测试通过` : `${target === "plugin" ? "脚本" : "Cookie"} 测试未通过`), data.ok ? "success" : "error");
+      const resultMessage = target === "plugin"
+        ? data.legacyPlugin?.message
+        : data.maiyatian?.message;
+      showToast(resultMessage || (data.ok ? `${target === "plugin" ? "脚本" : "Cookie"} 测试通过` : `${target === "plugin" ? "脚本" : "Cookie"} 测试未通过`), data.ok ? "success" : "error");
     } catch (error) {
       console.error("Failed to test order integration config:", error);
       showToast(error instanceof Error ? error.message : `${target === "plugin" ? "脚本" : "Cookie"} 测试失败`, "error");
