@@ -58,12 +58,12 @@ export async function POST(request: Request) {
         // Determine initial role and permissions
         if (isInitialAdmin) {
             role = "SUPER_ADMIN";
-        } else if (invitation) {
-            role = "USER";
-            roleProfileId = invitation.roleProfileId;
         } else if (whitelisted) {
             role = "USER";
             roleProfileId = whitelisted.roleProfileId;
+        } else if (invitation) {
+            role = "USER";
+            roleProfileId = invitation.roleProfileId;
         }
 
         // Create user

@@ -340,10 +340,18 @@ export async function login(userData: Partial<SessionUser>) {
   const expires = new Date(Date.now() + SESSION_DURATION * 1000);
   const sessionId = randomUUID();
   const sessionCookieOptions = await getSessionCookieOptions();
-  const session = await encrypt({ 
-    ...userData,
+  // Keep role profiles and permission maps out of the size-limited cookie.
+  // Authorization reads their current values through getFreshSession().
+  const identity = {
+    id: userData.id,
+    email: userData.email,
+    name: userData.name,
+    role: userData.role,
+  };
+  const session = await encrypt({
+    ...identity,
     sessionId,
-    user: userData, 
+    user: identity,
     expires 
   });
   

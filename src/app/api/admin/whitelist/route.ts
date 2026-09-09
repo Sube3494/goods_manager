@@ -253,6 +253,10 @@ export async function PATCH(request: Request) {
       }
 
       if (roleProfileId !== undefined) {
+        await tx.invitation.updateMany({
+          where: { email: { in: targetEmails }, usedAt: null },
+          data: { roleProfileId: roleProfileId || null },
+        });
         await tx.user.updateMany({
           where: { email: { in: targetEmails } },
           data: {
