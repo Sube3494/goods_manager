@@ -7132,6 +7132,9 @@ export async function createOutboundFromAutoPickOrder(
       items: {
         select: {
           id: true,
+          productId: true,
+          shopProductId: true,
+          quantity: true,
         },
       },
     },
@@ -7149,7 +7152,44 @@ export async function createOutboundFromAutoPickOrder(
         where: { id: existingOutbound.id },
       }).catch(() => null);
     } else {
+      const expectedResolved = await prisma.$transaction((tx) =>
+        resolveOutboundItemsForAutoPickOrder(tx, userId, {
+          platform: order.platform,
+          shopId: order.shopId,
+          rawPayload: order.rawPayload,
+          actualPaid: order.actualPaid,
+          preferredMappedShopName: options?.preferredMappedShopName || null,
+          items: order.items.map((item) => ({
+            productName: item.productName,
+            productNo: item.productNo,
+            platformSkuId: item.platformSkuId,
+            quantity: item.quantity,
+            thumb: item.thumb,
+            rawPayload: item.rawPayload,
+          })),
+        })
+      );
+      const buildOutboundQuantityKey = (item: {
+        productId?: string | null;
+        shopProductId?: string | null;
+      }) => `${String(item.shopProductId || "").trim()}::${String(item.productId || "").trim()}`;
+      const expectedQuantities = new Map<string, number>();
+      for (const item of expectedResolved.items) {
+        const key = buildOutboundQuantityKey(item);
+        expectedQuantities.set(key, (expectedQuantities.get(key) || 0) + Math.max(1, Number(item.quantity || 1) || 1));
+      }
+      const existingQuantities = new Map<string, number>();
+      for (const item of existingOutbound.items || []) {
+        const key = buildOutboundQuantityKey(item);
+        existingQuantities.set(key, (existingQuantities.get(key) || 0) + Math.max(1, Number(item.quantity || 1) || 1));
+      }
+      const quantityChanged = expectedQuantities.size !== existingQuantities.size
+        || Array.from(expectedQuantities.entries()).some(([key, quantity]) => existingQuantities.get(key) !== quantity);
+      if (quantityChanged) {
+        await returnOutboundOrderById(userId, existingOutbound.id, "订单商品匹配数量变更，自动重建出库单");
+      } else {
       return { ok: true, duplicated: true, outboundOrderId: existingOutbound.id };
+      }
     }
   }
 
