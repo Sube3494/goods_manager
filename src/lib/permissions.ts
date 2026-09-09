@@ -694,7 +694,7 @@ export function hasDirectPermission(user: SessionUser | null, permission: Permis
 }
 
 export function canAccessDashboardPage(user: SessionUser | null): boolean {
-  return hasDirectPermission(user, "dashboard:read");
+  return hasPermission(user, "dashboard:read");
 }
 
 type RouteAccessRule = {
