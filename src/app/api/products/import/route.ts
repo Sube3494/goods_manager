@@ -385,9 +385,11 @@ export async function POST(request: Request) {
                     errors.push({ sku, reason: "系统内未找到平台商品 ID，且导入数据中缺少商品名称，无法创建商品" });
                     continue;
                 }
-                if (finalSku && globalExistingSkuSet.has(finalSku)) {
+                if (!finalSku) {
                     finalSku = generateNextSku();
-                } else if (finalSku) {
+                } else if (globalExistingSkuSet.has(finalSku)) {
+                    finalSku = generateNextSku();
+                } else {
                     globalExistingSkuSet.add(finalSku);
                 }
 
