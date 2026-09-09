@@ -3185,7 +3185,7 @@ export const OrderCard = memo(function OrderCard({
                           {order.userAddress || "地址待同步"}
                         </span>
                       </div>
-                      {showPlatformActions && !displayAsOfflineOrder && !deleted && !readOnly ? (
+                      {showPlatformActions && !displayAsOfflineOrder && !deleted && !readOnly && !order.isSubscribe ? (
                         <button
                           type="button"
                           onClick={(e) => {
@@ -3322,7 +3322,7 @@ export const OrderCard = memo(function OrderCard({
                 </span>
               </span>
             ) : null}
-            {showPlatformActions && !displayAsOfflineOrder && !deleted && !readOnly ? (
+            {showPlatformActions && !displayAsOfflineOrder && !deleted && !readOnly && !order.isSubscribe ? (
               <button
                 type="button"
                 onClick={() => onRunAction(order.id, "self-delivery")}
