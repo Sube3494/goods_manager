@@ -64,6 +64,7 @@ function normalizeMatchedProductCandidate(input: unknown) {
     sourceType,
     shopProductId,
     shopName: String(record.shopName || "").trim() || null,
+    quantity: Number(record.quantity || 0) > 0 ? Math.max(1, Number(record.quantity || 1) || 1) : undefined,
     bundleItems: Array.isArray(record.bundleItems) ? record.bundleItems : undefined,
   };
 }
@@ -591,7 +592,8 @@ export async function PATCH(
       ...(singleQty && singleQty > 0 ? { quantity: singleQty } : {}),
     };
 
-    if (autoMatchedProduct?.shopProductId && autoMatchedProduct.shopProductId === matchedProduct.shopProductId) {
+    const hasQuantityOverride = Boolean(singleQty && singleQty > 1);
+    if (!hasQuantityOverride && autoMatchedProduct?.shopProductId && autoMatchedProduct.shopProductId === matchedProduct.shopProductId) {
       await prisma.$transaction(async (tx) => {
         await tx.autoPickOrderItem.update({
           where: { id: orderItem.id },

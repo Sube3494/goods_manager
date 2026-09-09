@@ -4975,6 +4975,7 @@ function readManualMatchedProductFromOrderItemRawPayload(rawPayload: unknown) {
     sourceType,
     shopProductId,
     shopName: String(manual.shopName || "").trim() || null,
+    quantity: Number((manual as any).quantity || 0) > 0 ? Math.max(1, Number((manual as any).quantity || 1) || 1) : undefined,
     bundleItems: Array.isArray(manual.bundleItems) ? manual.bundleItems : undefined,
   };
 }
