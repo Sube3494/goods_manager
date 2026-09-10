@@ -470,6 +470,30 @@ export function UserManager() {
   } | null>(null);
 
   // 新增：商品库授权状态
+  const [cookieStatuses, setCookieStatuses] = useState<Record<string, string>>({});
+  const cookieLabel = (id: string) => ({ valid: "可用", partial: "部分账号不可用", invalid: "Cookie 不可用，请更新或重试", missing: "未配置", checking: "检测中", error: "检测失败，请重试" }[cookieStatuses[id]] || "未检测");
+  const cookieTone = (id: string) => cookieStatuses[id] === "valid"
+    ? "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10"
+    : cookieStatuses[id] === "invalid" ? "text-red-500 bg-red-500/10"
+    : cookieStatuses[id] === "partial" || cookieStatuses[id] === "error" ? "text-amber-500 bg-amber-500/10"
+    : "text-muted-foreground bg-muted/20";
+  useEffect(() => {
+    if (!viewOrdersUser) return;
+    const id = viewOrdersUser.id;
+    const controller = new AbortController();
+    setCookieStatuses((prev) => ({ ...prev, [id]: "checking" }));
+    void fetch(`/api/admin/users/${id}/cookie-status`, { cache: "no-store", signal: controller.signal })
+      .then(async (res) => {
+        if (!res.ok) throw new Error("Cookie status check failed");
+        const data = await res.json();
+        setCookieStatuses((prev) => ({ ...prev, [id]: data.status }));
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setCookieStatuses((prev) => ({ ...prev, [id]: "error" }));
+      });
+    return () => controller.abort();
+  }, [viewOrdersUser]);
+
   const [authLibraryUserId, setAuthLibraryUserId] = useState<string | null>(null);
   const [selectedLibraryIds, setSelectedLibraryIds] = useState<string[]>([]);
   const [allLibraries, setAllLibraries] = useState<ProductLibraryOption[]>([]);
@@ -1017,19 +1041,15 @@ export function UserManager() {
                                       });
                                     }}
                                     className={`relative h-8 w-8 rounded-full flex items-center justify-center transition-all hover:scale-110 active:scale-95 cursor-pointer ${
-                                      Boolean(entry.user?.hasMaiyatianCookie)
-                                        ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/25 shadow-2xs shadow-emerald-500/10"
-                                        : "text-muted-foreground/45 hover:text-muted-foreground hover:bg-muted/40"
+                                      cookieTone(entry.user!.id)
                                     }`}
                                     title={
-                                      Boolean(entry.user?.hasMaiyatianCookie)
-                                        ? `查看麦芽田订单数据（已接入${entry.user?.maiyatianCookieCount && entry.user.maiyatianCookieCount > 1 ? ` ${entry.user.maiyatianCookieCount}号` : ""}）`
-                                        : "查看麦芽田订单数据（未接入）"
+                                      `查看麦芽田订单数据（${cookieLabel(entry.user!.id)}）`
                                     }
                                   >
                                     <ShoppingBag size={15} />
                                     {entry.user?.hasMaiyatianCookie && entry.user?.maiyatianCookieCount && entry.user.maiyatianCookieCount > 1 ? (
-                                      <span className="absolute -top-1 -right-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-emerald-600 px-0.5 text-[8px] font-black text-white ring-2 ring-background leading-none">
+                                      <span className="absolute -top-1 -right-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-muted px-0.5 text-[8px] font-black text-foreground ring-2 ring-background leading-none">
                                         {entry.user.maiyatianCookieCount}
                                       </span>
                                     ) : null}
@@ -1199,15 +1219,13 @@ export function UserManager() {
                             });
                           }}
                           className={`col-span-2 h-9 rounded-full text-xs font-bold transition-all hover:scale-[1.01] active:scale-95 flex items-center justify-center gap-2 border ${
-                            Boolean(entry.user?.hasMaiyatianCookie)
-                              ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/25 hover:bg-emerald-500/20"
-                              : "bg-muted/20 text-muted-foreground/60 border-border/40 hover:bg-muted/40 hover:text-muted-foreground"
+                            cookieTone(entry.user!.id)
                           }`}
                         >
-                          <ShoppingBag size={14} className={Boolean(entry.user?.hasMaiyatianCookie) ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground/50"} />
+                          <ShoppingBag size={14} />
                           <span>查看麦芽田订单数据</span>
-                          <span className={`text-[10px] font-semibold ${Boolean(entry.user?.hasMaiyatianCookie) ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground/50"}`}>
-                            ({Boolean(entry.user?.hasMaiyatianCookie) ? `已接入${entry.user?.maiyatianCookieCount && entry.user.maiyatianCookieCount > 1 ? ` ${entry.user.maiyatianCookieCount}号` : ""}` : "未接入"})
+                          <span className="text-[10px] font-semibold">
+                            ({cookieLabel(entry.user!.id)})
                           </span>
                         </button>
                       )}

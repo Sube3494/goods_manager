@@ -2250,6 +2250,7 @@ async function fetchMaiyatianHtml(pathname: string, cookie: string) {
     },
     cache: "no-store",
     redirect: "manual",
+    signal: AbortSignal.timeout(15000),
   });
 
   const text = await response.text();
