@@ -3,7 +3,7 @@ import prisma from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 
 import { getAuthorizedAdminAny } from "@/lib/auth";
-import { hasAdminAccess, normalizePermissionMap } from "@/lib/permissions";
+import { clearUserPermissionOverrides, hasAdminAccess, normalizePermissionMap } from "@/lib/permissions";
 
 function asPrismaJsonValue<T>(value: T): Prisma.InputJsonValue {
   return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
@@ -24,7 +24,7 @@ export async function PATCH(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const updatesMemberProfile = role !== undefined || permissions !== undefined || roleProfileId !== undefined || isInternal !== undefined;
+    const updatesMemberProfile = role !== undefined || permissions !== undefined || roleProfileId !== undefined || isInternal !== undefined || resetPermissionOverrides === true;
     const updatesLibraries = libraryIds !== undefined;
     if (updatesMemberProfile && !hasAdminAccess(session, "members:manage")) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -47,7 +47,7 @@ export async function PATCH(
     const shouldResetPermissionOverrides = resetPermissionOverrides === true && roleProfileId !== undefined && permissions === undefined;
     const nextPermissionFlags = permissions !== undefined ? normalizePermissionMap(permissions) : undefined;
     const mergedPermissions = shouldResetPermissionOverrides
-      ? {}
+      ? clearUserPermissionOverrides(currentPermissions)
       : nextPermissionFlags !== undefined
       ? {
           ...currentPermissions,

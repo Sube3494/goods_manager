@@ -697,6 +697,19 @@ export function canAccessDashboardPage(user: SessionUser | null): boolean {
   return hasPermission(user, "dashboard:read");
 }
 
+export function clearUserPermissionOverrides(source: Record<string, unknown>): Record<string, unknown> {
+  const permissionKeys = new Set([
+    "all",
+    "system:manage",
+    ...PERMISSION_TREE.flatMap((group) => group.children.map((item) => item.key)),
+    ...PAGE_PERMISSION_TREE.flatMap((group) => group.pages.flatMap((page) => [
+      page.accessKey,
+      ...page.actions.map((action) => action.key),
+    ])),
+  ]);
+  return Object.fromEntries(Object.entries(source).filter(([key]) => !permissionKeys.has(key)));
+}
+
 type RouteAccessRule = {
   href: string;
   superAdminOnly?: boolean;
