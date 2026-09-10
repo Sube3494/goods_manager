@@ -2279,7 +2279,7 @@ export async function GET(request: NextRequest) {
         ? 0
         : (shopRateMap.get(matchedShopName) ?? 0.06);
       const productCost = outboundMeta?.productCost || 0;
-      const deliveryFee = readDeliveryFee(order.delivery, order.isMainSystemSelfDelivery);
+      const deliveryFee = readDeliveryFee(order.delivery, order.rawPayload ?? order.isMainSystemSelfDelivery);
       const hasOutbound = Boolean(outboundMeta);
       const hasFulfillmentItems = hasAutoPickFulfillmentItems(order.items);
       const cancelledDeliveryLoss = (isAutoPickOrderCancelledStatus(order.status) || isAutoPickOrderDeletedStatus(order.status))
