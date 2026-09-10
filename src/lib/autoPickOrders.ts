@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma";
+import { assertMaiyatianCookieResponse } from "@/lib/maiyatianCookieResponse";
 import { formatLocalDate, parseAsShanghaiTime } from "@/lib/dateUtils";
 import {
   getBaseAutoPickStatusDisplay,
@@ -2248,14 +2249,12 @@ async function fetchMaiyatianHtml(pathname: string, cookie: string) {
       "User-Agent": "Mozilla/5.0",
     },
     cache: "no-store",
+    redirect: "manual",
   });
 
-  if (!response.ok) {
-    const text = await response.text().catch(() => "");
-    throw new Error(text.trim().slice(0, 200) || `麦芽田请求失败 ${response.status}`);
-  }
-
-  return await response.text();
+  const text = await response.text();
+  assertMaiyatianCookieResponse(response, text);
+  return text;
 }
 
 async function fetchMaiyatianText(pathname: string, cookie: string, init?: RequestInit) {
