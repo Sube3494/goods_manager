@@ -4015,15 +4015,26 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
     );
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { resolvedShop: _previousResolvedShop, ...systemMetaWithoutResolvedShop } = existingSystemMeta;
-    const nextSystemMeta: AutoPickSystemMeta = resolvedInternalShop
+    // 若用户曾手动改过店铺归属（manualShopOverride），同步时不用平台数据覆盖，保留手动设置
+    const hasManualShopOverride = Boolean(
+      existingSystemMeta.manualShopOverride &&
+      typeof existingSystemMeta.manualShopOverride === "object" &&
+      (existingSystemMeta.manualShopOverride as Record<string, unknown>).shopId
+    );
+    const nextSystemMeta: AutoPickSystemMeta = hasManualShopOverride
       ? {
           ...systemMetaWithoutResolvedShop,
-          resolvedShop: {
-            id: resolvedInternalShop.id,
-            name: resolvedInternalShop.name,
-          },
+          resolvedShop: _previousResolvedShop,
         }
-      : systemMetaWithoutResolvedShop;
+      : resolvedInternalShop
+        ? {
+            ...systemMetaWithoutResolvedShop,
+            resolvedShop: {
+              id: resolvedInternalShop.id,
+              name: resolvedInternalShop.name,
+            },
+          }
+        : systemMetaWithoutResolvedShop;
 
     const currentIncomingDelivery = normalized.delivery && typeof normalized.delivery === "object" && !Array.isArray(normalized.delivery)
       ? normalized.delivery as Record<string, unknown>
