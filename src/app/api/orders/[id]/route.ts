@@ -4,6 +4,7 @@ import { getAuthorizedUser, getAuthorizedUserAny } from "@/lib/auth";
 import { Prisma } from "../../../../../prisma/generated-client";
 import { returnOutboundOrderById } from "@/lib/outboundReturns";
 import { cancelAutoCompleteJob } from "@/lib/autoPickAutoComplete";
+import { hasAdminAccess } from "@/lib/permissions";
 import {
   getAutoPickIntegrationConfigByUserId,
   normalizeAutoPickOrderPayload,
@@ -24,7 +25,7 @@ export async function GET(
   context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const user = await getAuthorizedUser("order:manage");
+    const user = await getAuthorizedUserAny("order:manage", "members:orders");
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -33,7 +34,7 @@ export async function GET(
     const order = await prisma.autoPickOrder.findFirst({
       where: {
         id,
-        userId: user.id,
+        ...(hasAdminAccess(user, "members:orders") ? {} : { userId: user.id }),
       },
       select: {
         id: true,

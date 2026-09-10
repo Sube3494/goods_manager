@@ -1,20 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getAuthorizedUser } from "@/lib/auth";
+import { getAuthorizedUserAny } from "@/lib/auth";
+import { hasAdminAccess } from "@/lib/permissions";
 import { fetchMaiyatianCourierPhotos } from "@/lib/autoPickOrders";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(_: NextRequest, context: { params: Promise<{ id: string }> }) {
-  const session = await getAuthorizedUser("order:manage");
+  const session = await getAuthorizedUserAny("order:manage", "members:orders");
   if (!session) return NextResponse.json({ error: "无权查看配送照片" }, { status: 403 });
 
   const { id } = await context.params;
-  const isAdmin =
-    session.role === "SUPER_ADMIN" ||
-    Boolean(session.role && String(session.role).includes("管理")) ||
-    (Array.isArray(session.permissions) &&
-      session.permissions.some((value) => ["*", "members:manage", "admin"].includes(value)));
+  const isAdmin = hasAdminAccess(session, "members:orders");
 
   const order = await prisma.autoPickOrder.findFirst({
     where: { id, ...(isAdmin ? {} : { userId: session.id }) },
