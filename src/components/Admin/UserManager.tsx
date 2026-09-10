@@ -478,21 +478,71 @@ export function UserManager() {
     : cookieStatuses[id] === "partial" || cookieStatuses[id] === "error" ? "text-amber-500 bg-amber-500/10"
     : "text-muted-foreground bg-muted/20";
   useEffect(() => {
-    if (!viewOrdersUser) return;
-    const id = viewOrdersUser.id;
+    if (!canViewMemberOrders || !entries.length) return;
     const controller = new AbortController();
-    setCookieStatuses((prev) => ({ ...prev, [id]: "checking" }));
-    void fetch(`/api/admin/users/${id}/cookie-status`, { cache: "no-store", signal: controller.signal })
-      .then(async (res) => {
-        if (!res.ok) throw new Error("Cookie status check failed");
-        const data = await res.json();
-        setCookieStatuses((prev) => ({ ...prev, [id]: data.status }));
-      })
-      .catch(() => {
-        if (!controller.signal.aborted) setCookieStatuses((prev) => ({ ...prev, [id]: "error" }));
-      });
-    return () => controller.abort();
-  }, [viewOrdersUser]);
+    const ids = [...new Set(entries.flatMap((entry) => entry.user ? [entry.user.id] : []))];
+    const dayMs = 24 * 60 * 60 * 1000;
+    const cache = new Map<string, { status: string; checkedAt: number }>();
+    for (const id of ids) {
+      try {
+        const value = JSON.parse(localStorage.getItem(`member-cookie-status:${id}`) || "null");
+        if (value && ["valid", "partial", "invalid", "missing", "error"].includes(value.status)
+          && Number.isFinite(value.checkedAt) && value.checkedAt <= Date.now()) {
+          cache.set(id, value);
+        }
+      } catch { /* Storage may be unavailable. Keep an in-memory cache. */ }
+    }
+    const saveStatus = (id: string, status: string) => {
+      if (controller.signal.aborted) return;
+      const value = { status, checkedAt: Date.now() };
+      cache.set(id, value);
+      try { localStorage.setItem(`member-cookie-status:${id}`, JSON.stringify(value)); } catch { /* Use the in-memory result. */ }
+      setCookieStatuses((prev) => ({ ...prev, [id]: status }));
+    };
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let running = false;
+    const checkAll = async () => {
+      if (running || controller.signal.aborted || document.hidden) return;
+      running = true;
+      clearTimeout(timer);
+      let cursor = 0;
+      const worker = async () => {
+        while (cursor < ids.length && !controller.signal.aborted) {
+          const id = ids[cursor++];
+          const cached = cache.get(id);
+          if (cached && Date.now() - cached.checkedAt < dayMs) {
+            setCookieStatuses((prev) => ({ ...prev, [id]: cached.status }));
+            continue;
+          }
+          setCookieStatuses((prev) => ({ ...prev, [id]: "checking" }));
+          try {
+            const res = await fetch(`/api/admin/users/${id}/cookie-status`, {
+              cache: "no-store", signal: controller.signal,
+            });
+            if (!res.ok) throw new Error("Cookie status check failed");
+            const data = await res.json();
+            saveStatus(id, data.status);
+          } catch {
+            saveStatus(id, "error");
+          }
+        }
+      };
+      await Promise.all(Array.from({ length: Math.min(3, ids.length) }, worker));
+      running = false;
+      if (!controller.signal.aborted) {
+        const nextCheckIn = Math.min(dayMs, ...ids.map((id) => Math.max(1000, (cache.get(id)?.checkedAt || Date.now()) + dayMs - Date.now())));
+        timer = setTimeout(() => void checkAll(), nextCheckIn);
+      }
+    };
+    const onVisible = () => { if (!document.hidden) void checkAll(); };
+    document.addEventListener("visibilitychange", onVisible);
+    void checkAll();
+    return () => {
+      controller.abort();
+      clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [canViewMemberOrders, entries]);
 
   const [authLibraryUserId, setAuthLibraryUserId] = useState<string | null>(null);
   const [selectedLibraryIds, setSelectedLibraryIds] = useState<string[]>([]);
