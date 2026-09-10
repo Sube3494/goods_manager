@@ -6,7 +6,7 @@ import { InventoryService } from "@/services/inventoryService";
 import { FinanceMath } from "@/lib/math";
 import { getStorageStrategy } from "@/lib/storage";
 import { getOutboundOrderItemSchemaErrorMessage } from "@/lib/prismaSchemaCompat";
-import { getOutboundReturnedQuantityMap, parseOutboundReturnMeta } from "@/lib/outboundReturnMeta";
+import { getOutboundReturnedQuantityMap, getOutboundSalesReturnedQuantityMap, parseOutboundReturnMeta } from "@/lib/outboundReturnMeta";
 import { getPlatformMeta, parseOutboundNote } from "@/lib/utils";
  
 interface OutboundItem {
@@ -56,13 +56,20 @@ function sortOutboundPlatforms(platforms: string[]) {
 
 function getOutboundItemReturnedQuantity(
   order: { note?: string | null; status?: string | null },
-  item: { id: string; quantity: number }
+  item: { id: string; quantity: number },
+  forAnalytics = false
 ) {
   const returnEntries = parseOutboundReturnMeta(order.note).returns;
   if (returnEntries.length > 0) {
-    return Math.min(item.quantity, getOutboundReturnedQuantityMap(returnEntries).get(item.id) || 0);
+    // 商品分析场景：排除改匹配重建出库单产生的系统性退货，避免污染退货率统计
+    const quantityMap = forAnalytics
+      ? getOutboundSalesReturnedQuantityMap(returnEntries)
+      : getOutboundReturnedQuantityMap(returnEntries);
+    return Math.min(item.quantity, quantityMap.get(item.id) || 0);
   }
 
+  // 老数据兼容：status === "Returned" 但无 RETURN_META 的订单，
+  // 无法区分是否改匹配操作，分析场景下也计入真实退货（保守处理）
   return order.status === "Returned" ? item.quantity : 0;
 }
 
@@ -263,7 +270,7 @@ export async function GET(request: NextRequest) {
         const returnedQuantity = getOutboundItemReturnedQuantity(order, {
           id: item.id,
           quantity,
-        });
+        }, true);
 
         existing.soldQuantity += quantity;
         existing.returnedQuantity += returnedQuantity;

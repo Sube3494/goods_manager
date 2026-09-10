@@ -141,6 +141,16 @@ export function buildOutboundReturnMetaNote(
   return `${visibleNote}${summarySuffix}${metaBlock}`.trim();
 }
 
+/** 改匹配/重建出库单产生的系统性退货 reason 集合，不计入销售退货率 */
+const REMATCH_RETURN_REASONS = new Set([
+  "订单商品匹配数量变更，自动重建出库单",
+  "订单商品重匹配自动回滚旧出库",
+]);
+
+export function isRematchReturnReason(reason: string) {
+  return REMATCH_RETURN_REASONS.has(reason);
+}
+
 export function getOutboundReturnedQuantityMap(entries: OutboundReturnMetaEntry[]) {
   const map = new Map<string, number>();
   entries.forEach((entry) => {
@@ -151,6 +161,25 @@ export function getOutboundReturnedQuantityMap(entries: OutboundReturnMetaEntry[
       );
     });
   });
+  return map;
+}
+
+/**
+ * 仅统计真实销售退货数量，排除因改匹配重建出库单产生的系统性退货。
+ * 用于商品分析退货率计算，避免改匹配操作污染退货数据。
+ */
+export function getOutboundSalesReturnedQuantityMap(entries: OutboundReturnMetaEntry[]) {
+  const map = new Map<string, number>();
+  entries
+    .filter((entry) => !isRematchReturnReason(entry.reason))
+    .forEach((entry) => {
+      entry.items.forEach((item) => {
+        map.set(
+          item.outboundOrderItemId,
+          (map.get(item.outboundOrderItemId) || 0) + Math.max(0, Number(item.quantity || 0))
+        );
+      });
+    });
   return map;
 }
 
