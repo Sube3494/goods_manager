@@ -463,8 +463,8 @@ export async function PATCH(
         },
       });
 
-      if (shopProducts.length === 0) {
-        return NextResponse.json({ error: "未找到对应的店铺商品" }, { status: 404 });
+      if (shopProducts.length !== new Set(productIds).size) {
+        return NextResponse.json({ error: "部分店铺商品已不存在或无权访问，请重新选择完整组合" }, { status: 400 });
       }
 
       const firstImage = shopProducts[0]?.productImage || shopProducts[0]?.product?.image || null;
@@ -591,39 +591,6 @@ export async function PATCH(
       isManual: true,
       ...(singleQty && singleQty > 0 ? { quantity: singleQty } : {}),
     };
-
-    const hasQuantityOverride = Boolean(singleQty && singleQty > 1);
-    if (!hasQuantityOverride && autoMatchedProduct?.shopProductId && autoMatchedProduct.shopProductId === matchedProduct.shopProductId) {
-      await prisma.$transaction(async (tx) => {
-        await tx.autoPickOrderItem.update({
-          where: { id: orderItem.id },
-          data: {
-            rawPayload: (Object.keys(restPayload).length > 0 ? restPayload : Prisma.JsonNull) as Prisma.InputJsonValue,
-          },
-        });
-      });
-
-      await returnLegacyOutbound(orderItem.order.orderNo);
-
-      const isCompositeItemSku = /[+＋]/.test(String(orderItem.productNo || ""));
-      if (!isCompositeItemSku) {
-        await syncPlatformIdForMatchedShopProduct(
-          prisma,
-          targetUserId,
-          shopProduct.id,
-          orderItem.order.platform,
-          currentPlatformSkuId
-        ).catch(() => null);
-      }
-
-      return NextResponse.json({
-        ok: true,
-        matchedProduct: {
-          ...autoMatchedProduct,
-          isManual: false,
-        },
-      });
-    }
 
     await prisma.$transaction(async (tx) => {
       const targetJdSkuId = String(
