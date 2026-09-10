@@ -91,6 +91,10 @@ export async function POST(request: Request) {
       },
     });
 
+    if (process.env.LOG_LOGIN_CODES === "true") {
+      console.info("[auth:login-code]", JSON.stringify({ email, code, expiresAt: expires.toISOString() }));
+    }
+
     // Send email
     const sent = await sendVerificationEmail(email, code);
 

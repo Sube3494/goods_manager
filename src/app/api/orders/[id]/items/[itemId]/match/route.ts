@@ -4,6 +4,7 @@ import { getAuthorizedUser } from "@/lib/auth";
 import { getStorageStrategy } from "@/lib/storage";
 import { Prisma } from "../../../../../../../../prisma/generated-client";
 import {
+  createOutboundFromAutoPickOrder,
   syncAutoOutboundFromCompletedAutoPickOrder,
   syncJdSkuIdForShopProduct,
   syncMeituanSkuIdForShopProduct,
@@ -341,20 +342,28 @@ export async function PATCH(
     }
 
     const targetUserId = orderItem.order.userId || user.id;
+    let needsOutboundRebuild = false;
+    const rebuildOutbound = async () => {
+      if (!needsOutboundRebuild) {
+        await syncAutoOutboundFromCompletedAutoPickOrder(targetUserId, id);
+        return;
+      }
+      const result = await createOutboundFromAutoPickOrder(targetUserId, id);
+      if (!result.ok && result.reason !== "no-items" && result.reason !== "delivery-fee-only") {
+        throw new Error(`匹配已保存，但出库重建失败（${result.reason}），请检查库存后重新出库`);
+      }
+    };
 
     const returnLegacyOutbound = async (orderNo: string) => {
       const existingOutbounds = await prisma.outboundOrder.findMany({
         where: {
           userId: targetUserId,
-          status: {
-            not: "Returned",
-          },
           note: {
             contains: `平台单号: ${orderNo}`,
             mode: "insensitive",
           },
         },
-        select: { id: true, note: true },
+        select: { id: true, note: true, status: true },
       });
 
       const filteredOutbounds = existingOutbounds.filter((outbound: any) => {
@@ -364,6 +373,11 @@ export async function PATCH(
       });
 
       for (const outbound of filteredOutbounds) {
+        if (outbound.status === "Returned") {
+          if (outbound.note?.includes("订单商品重匹配自动回滚旧出库")) needsOutboundRebuild = true;
+          continue;
+        }
+        needsOutboundRebuild = true;
         await returnOutboundOrderById(targetUserId, outbound.id, "订单商品重匹配自动回滚旧出库");
       }
     };
@@ -411,7 +425,7 @@ export async function PATCH(
         }
       }
 
-      await syncAutoOutboundFromCompletedAutoPickOrder(targetUserId, id).catch(() => null);
+      await rebuildOutbound();
 
       return NextResponse.json({
         ok: true,
@@ -536,9 +550,7 @@ export async function PATCH(
       // 组合匹配只是把一个平台订单项拆成多个本地出库商品。
       // 平台 SKU 仍然只代表原始订单项，不能写到组合里的每个商品上，否则会把无关商品标成“已占用”。
 
-      await syncAutoOutboundFromCompletedAutoPickOrder(targetUserId, id).catch((error) => {
-        console.error("Failed to auto-create outbound after manual product match:", error);
-      });
+      await rebuildOutbound();
 
       return NextResponse.json({ ok: true, matchedProduct });
     }
@@ -660,9 +672,7 @@ export async function PATCH(
       ).catch(() => null);
     }
 
-    await syncAutoOutboundFromCompletedAutoPickOrder(targetUserId, id).catch((error) => {
-        console.error("Failed to auto-create outbound after manual product match:", error);
-      });
+    await rebuildOutbound();
 
     return NextResponse.json({
       ok: true,

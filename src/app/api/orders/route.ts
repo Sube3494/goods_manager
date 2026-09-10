@@ -1596,6 +1596,8 @@ export async function GET(request: NextRequest) {
       const match = note.match(/平台单号:\s*([^\s|]+)/);
       const orderNo = String(match?.[1] || "").trim();
       const isCurrentReturned = outbound.status === "Returned";
+      // A rematch rollback is superseded bookkeeping, not a customer return.
+      if (isCurrentReturned && note.includes("订单商品重匹配自动回滚旧出库")) continue;
       const existing = outboundByOrderNo.get(orderNo);
       const shouldSet = !existing || (!isCurrentReturned);
       if (orderNo && shouldSet) {
