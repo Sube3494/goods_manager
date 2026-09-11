@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthorizedUser } from "@/lib/auth";
 import { syncBrushOrderFromCompletedAutoPickOrder } from "@/lib/autoPickOrders";
 
+import prisma from "@/lib/prisma";
+import { Prisma } from "@/../prisma/generated-client";
+
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
@@ -23,6 +26,34 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
       ? (parsedCommission as number)
       : undefined;
 
+    // 1. 优先将用户修改的刷单佣金直接持久化到 AutoPickOrder 订单本身，确保订单利润计算永远以用户传入的为准
+    if (typeof commission === "number") {
+      const orderRecord = await prisma.autoPickOrder.findFirst({
+        where: { id, userId: session.id },
+        select: { id: true, rawPayload: true },
+      });
+      if (orderRecord) {
+        const rawPayload = (orderRecord.rawPayload && typeof orderRecord.rawPayload === "object" && !Array.isArray(orderRecord.rawPayload))
+          ? orderRecord.rawPayload as Record<string, unknown>
+          : {};
+        const systemMeta = (rawPayload.systemMeta && typeof rawPayload.systemMeta === "object" && !Array.isArray(rawPayload.systemMeta))
+          ? rawPayload.systemMeta as Record<string, unknown>
+          : {};
+        await prisma.autoPickOrder.update({
+          where: { id: orderRecord.id },
+          data: {
+            rawPayload: {
+              ...rawPayload,
+              systemMeta: {
+                ...systemMeta,
+                manualBrushCommission: commission,
+              },
+            } as Prisma.InputJsonValue,
+          },
+        });
+      }
+    }
+
     const result = await syncBrushOrderFromCompletedAutoPickOrder(session.id, id, {
       allowSelfDeliveryFallback: true,
       forceInclude: true,
@@ -30,8 +61,12 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
       commission,
     });
 
-    if (result.ok) {
-      return NextResponse.json(result);
+    if (result.ok || typeof commission === "number") {
+      return NextResponse.json({
+        ok: true,
+        commission,
+        syncResult: result,
+      });
     }
 
     switch (result.reason) {

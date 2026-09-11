@@ -140,6 +140,36 @@ function isVoidedOfflineOrder(order: {
   return Boolean(voided && typeof voided === "object" && !Array.isArray(voided));
 }
 
+function isManualDeliveryPlaceholderOrderItem(item: {
+  productName?: string | null;
+  productNo?: string | null;
+  rawPayload?: unknown;
+}) {
+  const rawPayload = item.rawPayload && typeof item.rawPayload === "object" && !Array.isArray(item.rawPayload)
+    ? item.rawPayload as Record<string, unknown>
+    : null;
+  return String(item.productNo || "").trim() === "__manual_delivery_placeholder__"
+    || rawPayload?.isManualDeliveryPlaceholder === true
+    || String(item.productName || "").trim() === "手工配送占位商品";
+}
+
+function hasAutoPickFulfillmentItems(items?: Array<{
+  productName?: string | null;
+  productNo?: string | null;
+  rawPayload?: unknown;
+}> | null) {
+  if (!items || !Array.isArray(items)) return false;
+  return items.some((item) => {
+    if (!isManualDeliveryPlaceholderOrderItem(item)) {
+      return true;
+    }
+    const rawPayload = item.rawPayload && typeof item.rawPayload === "object" && !Array.isArray(item.rawPayload)
+      ? item.rawPayload as Record<string, unknown>
+      : null;
+    return Boolean(rawPayload?.matchedProduct || rawPayload?.matchedShopProduct);
+  });
+}
+
 const DASHBOARD_PLATFORMS = ["美团", "京东", "淘宝", "抖店", "线下交易"] as const;
 
 type OutboundCostLookupRow = {
@@ -615,6 +645,25 @@ export async function GET(request: NextRequest) {
         .filter((b): b is typeof b & { platformOrderId: string } => Boolean(b.platformOrderId))
         .map((b) => [b.platformOrderId, b.commission])
     );
+    const allAutoPickOrderNos = Array.from(new Set(
+      autoPickOrdersInRange
+        .map((o) => String(o.orderNo || "").trim())
+        .filter(Boolean)
+    ));
+    if (allAutoPickOrderNos.length > 0) {
+      const extraBrushOrders = await prisma.brushOrder.findMany({
+        where: {
+          userId: targetUserId,
+          platformOrderId: { in: allAutoPickOrderNos },
+        },
+        select: { platformOrderId: true, commission: true },
+      });
+      extraBrushOrders.forEach((b) => {
+        if (b.platformOrderId && typeof b.commission === "number") {
+          customBrushCommissionMap.set(b.platformOrderId, b.commission);
+        }
+      });
+    }
 
     const filteredAutoPickOrdersInRange = shopName
       ? autoPickOrdersInRange.filter((order) => resolveExistingMatchedShopName(order) === shopName)
@@ -706,22 +755,26 @@ export async function GET(request: NextRequest) {
       );
     const outboundLookupOrderNos = Array.from(new Set(
       filteredAutoPickOrdersInRange
-        .filter((order) => !isVoidedOfflineOrder(order))
         .map((order) => String(order.orderNo || "").trim())
         .filter(Boolean)
     ));
     const outboundOrdersForCost: OutboundCostLookupRow[] = [];
     if (outboundLookupOrderNos.length > 0) {
+      const orderNoSet = new Set(outboundLookupOrderNos);
+      const matchedOrderNos = new Set<string>();
+
+      const orderTimes = filteredAutoPickOrdersInRange
+        .map((o) => (o.orderTime ? new Date(o.orderTime).getTime() : 0))
+        .filter((t) => t > 0);
+      const minDate = orderTimes.length > 0 ? new Date(Math.min(...orderTimes) - 24 * 60 * 60 * 1000) : startDate;
+      const maxDate = orderTimes.length > 0 ? new Date(Math.max(...orderTimes) + 24 * 60 * 60 * 1000) : endDate;
+
+      // 1. 优先按日期范围批量加载出库单，在内存中提取单号比对（效率最高且支持各种格式的冒号与空格）
       try {
-        outboundOrdersForCost.push(...(await prisma.outboundOrder.findMany({
+        const rows = await prisma.outboundOrder.findMany({
           where: {
             userId: targetUserId,
-            OR: outboundLookupOrderNos.flatMap((orderNo) => [
-              { note: { contains: `平台单号: ${orderNo}` } },
-              { note: { contains: `平台单号:${orderNo}` } },
-              { note: { contains: `平台单号：${orderNo}` } },
-              { note: { contains: `平台单号： ${orderNo}` } },
-            ]),
+            date: { gte: minDate, lte: maxDate },
           },
           select: {
             note: true,
@@ -730,55 +783,107 @@ export async function GET(request: NextRequest) {
               select: {
                 quantity: true,
                 costSnapshot: true,
-                shopProduct: {
-                  select: {
-                    costPrice: true,
-                  },
-                },
-                product: {
-                  select: {
-                    costPrice: true,
-                  },
-                },
+                shopProduct: { select: { costPrice: true } },
+                product: { select: { costPrice: true } },
               },
             },
           },
-        }) as unknown as OutboundCostLookupRow[]));
-      } catch (error) {
-        if (!isPrismaMissingColumnError(error, "OutboundOrderItem.costSnapshot")) {
-          throw error;
-        }
+          orderBy: { createdAt: "desc" },
+        }) as unknown as OutboundCostLookupRow[];
 
-        outboundOrdersForCost.push(...(await prisma.outboundOrder.findMany({
-          where: {
-            userId: targetUserId,
-            OR: outboundLookupOrderNos.flatMap((orderNo) => [
-              { note: { contains: `平台单号: ${orderNo}` } },
-              { note: { contains: `平台单号:${orderNo}` } },
-              { note: { contains: `平台单号：${orderNo}` } },
-              { note: { contains: `平台单号： ${orderNo}` } },
-            ]),
-          },
-          select: {
-            note: true,
-            status: true,
-            items: {
+        rows.forEach((row) => {
+          const orderNo = extractOrderNoFromNote(row.note);
+          if (orderNo && orderNoSet.has(orderNo)) {
+            outboundOrdersForCost.push(row);
+            matchedOrderNos.add(orderNo);
+          }
+        });
+      } catch (error) {
+        if (isPrismaMissingColumnError(error, "OutboundOrderItem.costSnapshot")) {
+          try {
+            const rows = await prisma.outboundOrder.findMany({
+              where: {
+                userId: targetUserId,
+                date: { gte: minDate, lte: maxDate },
+              },
               select: {
-                quantity: true,
-                shopProduct: {
+                note: true,
+                status: true,
+                items: {
                   select: {
-                    costPrice: true,
-                  },
-                },
-                product: {
-                  select: {
-                    costPrice: true,
+                    quantity: true,
+                    shopProduct: { select: { costPrice: true } },
+                    product: { select: { costPrice: true } },
                   },
                 },
               },
+              orderBy: { createdAt: "desc" },
+            }) as unknown as OutboundCostLookupRow[];
+
+            rows.forEach((row) => {
+              const orderNo = extractOrderNoFromNote(row.note);
+              if (orderNo && orderNoSet.has(orderNo)) {
+                outboundOrdersForCost.push(row);
+                matchedOrderNos.add(orderNo);
+              }
+            });
+          } catch (_) {}
+        }
+      }
+
+      // 2. 对于日期范围外跨天的出库单，采用单号精确 OR 兜底查找
+      const remainingOrderNos = outboundLookupOrderNos.filter((no) => !matchedOrderNos.has(no));
+      if (remainingOrderNos.length > 0) {
+        try {
+          outboundOrdersForCost.push(...(await prisma.outboundOrder.findMany({
+            where: {
+              userId: targetUserId,
+              OR: remainingOrderNos.flatMap((orderNo) => [
+                { note: { contains: `平台单号: ${orderNo}` } },
+                { note: { contains: `平台单号:${orderNo}` } },
+                { note: { contains: `平台单号：${orderNo}` } },
+                { note: { contains: `平台单号： ${orderNo}` } },
+              ]),
             },
-          },
-        }) as unknown as OutboundCostLookupRow[]));
+            select: {
+              note: true,
+              status: true,
+              items: {
+                select: {
+                  quantity: true,
+                  costSnapshot: true,
+                  shopProduct: { select: { costPrice: true } },
+                  product: { select: { costPrice: true } },
+                },
+              },
+            },
+          }) as unknown as OutboundCostLookupRow[]));
+        } catch (error) {
+          if (isPrismaMissingColumnError(error, "OutboundOrderItem.costSnapshot")) {
+            outboundOrdersForCost.push(...(await prisma.outboundOrder.findMany({
+              where: {
+                userId: targetUserId,
+                OR: remainingOrderNos.flatMap((orderNo) => [
+                  { note: { contains: `平台单号: ${orderNo}` } },
+                  { note: { contains: `平台单号:${orderNo}` } },
+                  { note: { contains: `平台单号：${orderNo}` } },
+                  { note: { contains: `平台单号： ${orderNo}` } },
+                ]),
+              },
+              select: {
+                note: true,
+                status: true,
+                items: {
+                  select: {
+                    quantity: true,
+                    shopProduct: { select: { costPrice: true } },
+                    product: { select: { costPrice: true } },
+                  },
+                },
+              },
+            }) as unknown as OutboundCostLookupRow[]));
+          }
+        }
       }
     }
     const outboundMetaByOrderNo = new Map<string, {
@@ -804,7 +909,7 @@ export async function GET(request: NextRequest) {
         const snapshot = parseOutboundCostSnapshot(item.costSnapshot);
         const unitCost = snapshot
           ? Number(snapshot.averageUnitCost || 0)
-          : (Number(item.shopProduct?.costPrice) || 0);
+          : (Number(item.shopProduct?.costPrice || item.product?.costPrice) || 0);
         const hasCostSnapshot = item.costSnapshot !== null && item.costSnapshot !== undefined;
         if (!hasCostSnapshot && unitCost <= 0) {
           missingCostItemCount += 1;
@@ -883,13 +988,18 @@ export async function GET(request: NextRequest) {
 
         const isBrush = readMainSystemSelfDeliveryFlag(order.rawPayload);
         const matchedShopName = resolveExistingMatchedShopName(order) || "未匹配店铺";
-        const customCommission = order.orderNo ? customBrushCommissionMap.get(order.orderNo) : undefined;
+        const orderSystemMeta = readAutoPickSystemMeta(order.rawPayload);
+        const manualBrushCommission = typeof orderSystemMeta?.manualBrushCommission === "number" && orderSystemMeta.manualBrushCommission >= 0
+          ? Number(orderSystemMeta.manualBrushCommission)
+          : undefined;
+        const customCommission = manualBrushCommission ?? (order.orderNo ? customBrushCommissionMap.get(order.orderNo) : undefined);
         const orderBrushCommission = typeof customCommission === "number" && customCommission >= 0
           ? customCommission
           : resolveShopBrushCommission(integrationConfig, {
               maiyatianShopId: readShopIdFromRawPayload(order.rawPayload),
               shopName: readShopNameFromRawPayload(order.rawPayload) || order.shopId,
               shopAddress: readShopAddressFromRawPayload(order.rawPayload) || order.shopAddress,
+              localShopName: matchedShopName || null,
               rawPayload: order.rawPayload,
             });
         if (!isBrush) {
@@ -905,7 +1015,8 @@ export async function GET(request: NextRequest) {
         }
         deliveryExpense = FinanceMath.add(deliveryExpense, deliveryYuan);
       } else {
-        if (orderCostMeta && !isRefundableMeituanDelivery(order.platform, order.delivery)) {
+        const isOffline = order.platform === "线下交易" || String(order.platform || "").toLowerCase() === "other";
+        if (!isOffline && orderCostMeta && !isRefundableMeituanDelivery(order.platform, order.delivery)) {
           const deliveryYuan = getDeliveryFee(order.delivery, order.rawPayload) / 100;
           deliveryExpense = FinanceMath.add(deliveryExpense, deliveryYuan);
         }
@@ -1025,11 +1136,17 @@ export async function GET(request: NextRequest) {
       }
       platformBuckets.set(platform, current);
 
+      const deliveryFee = getDeliveryFee(order.delivery, order.rawPayload);
+      const deliveryYuan = deliveryFee / 100;
+      const hasOutbound = Boolean(orderCostMeta);
+
       if (isOther) {
-        const deliveryYuan = orderCostMeta && !isRefundableMeituanDelivery(order.platform, order.delivery)
-          ? getDeliveryFee(order.delivery, order.rawPayload) / 100
-          : 0;
-        if (deliveryYuan > 0) {
+        const isOffline = order.platform === "线下交易" || String(order.platform || "").toLowerCase() === "other";
+        const hasRealizedDeliveryCost = !isOffline
+          && deliveryFee > 0
+          && hasOutbound
+          && !isRefundableMeituanDelivery(order.platform, order.delivery);
+        if (hasRealizedDeliveryCost) {
           if (point) {
             point.deliveryExpense = FinanceMath.add(point.deliveryExpense, deliveryYuan);
             point.pureProfit = FinanceMath.add(point.pureProfit, -deliveryYuan);
@@ -1059,7 +1176,6 @@ export async function GET(request: NextRequest) {
             expectedIncomeCents = Math.round(paidYuan * 100);
           }
         }
-        const deliveryYuan = getDeliveryFee(order.delivery, order.rawPayload) / 100;
         const commissionCents = manualAmountOverride && Number.isFinite(Number(manualAmountOverride.platformCommission))
           ? Number(manualAmountOverride.platformCommission)
           : manualAmountOverride?.onlyExpectedIncome
@@ -1104,16 +1220,23 @@ export async function GET(request: NextRequest) {
         }
 
         if (isBrush) {
-          const customCommission = order.orderNo ? customBrushCommissionMap.get(order.orderNo) : undefined;
+          const orderSystemMeta = readAutoPickSystemMeta(order.rawPayload);
+          const manualBrushCommission = typeof orderSystemMeta?.manualBrushCommission === "number" && orderSystemMeta.manualBrushCommission >= 0
+            ? Number(orderSystemMeta.manualBrushCommission)
+            : undefined;
+          const customCommission = manualBrushCommission ?? (order.orderNo ? customBrushCommissionMap.get(order.orderNo) : undefined);
           const orderBrushCommission = typeof customCommission === "number" && customCommission >= 0
             ? customCommission
             : resolveShopBrushCommission(integrationConfig, {
                 maiyatianShopId: readShopIdFromRawPayload(order.rawPayload),
                 shopName: readShopNameFromRawPayload(order.rawPayload) || order.shopId,
                 shopAddress: readShopAddressFromRawPayload(order.rawPayload) || order.shopAddress,
+                localShopName: matchedShopName || null,
                 rawPayload: order.rawPayload,
               });
-          const brushPureProfit = -commissionYuan - orderBrushCommission - returnExtraExpenseYuan;
+          const orderBrushCommissionCents = Math.round(orderBrushCommission * 100);
+          const brushPureProfitCents = -Math.round(commissionYuan * 100) - orderBrushCommissionCents - Math.round(returnExtraExpenseYuan * 100);
+          const brushPureProfit = brushPureProfitCents / 100;
           if (point) {
             point.brushPaid = FinanceMath.add(point.brushPaid, adjustedPaidYuan);
             point.pureProfit = FinanceMath.add(point.pureProfit, brushPureProfit);
@@ -1128,8 +1251,6 @@ export async function GET(request: NextRequest) {
           }
         } else {
           const orderCostYuan = orderCostMeta?.productCost || 0;
-          const returnExtraExpenseYuan = orderCostMeta?.extraExpense || 0;
-
           if (point) {
             point.productCost = FinanceMath.add(point.productCost, orderCostYuan);
           }
@@ -1137,16 +1258,32 @@ export async function GET(request: NextRequest) {
             platformPoint.productCost = FinanceMath.add(platformPoint.productCost, orderCostYuan);
           }
 
-           const isOffline = order.platform === "线下交易";
-           const rate = isOffline ? 0 : (shopRateMap.get(matchedShopName) ?? 0.06);
-           const deliveryYuan = getDeliveryFee(order.delivery, order.rawPayload) / 100;
-           const isManualDeliveryLoss = isOffline && deliveryYuan > 0 && paidYuan <= 0 && expectedIncomeYuan <= 0;
-           const pureProfit = isManualDeliveryLoss
-             ? -deliveryYuan
-             : FinanceMath.add(
-                 FinanceMath.multiply(expectedIncomeYuan, 1 - rate),
-                 -deliveryYuan - orderCostYuan - returnExtraExpenseYuan
-               );
+          const hasFulfillmentItems = hasAutoPickFulfillmentItems(order.items);
+          const isManualDeliveryLoss = isOffline && deliveryYuan > 0 && paidYuan <= 0 && expectedIncomeYuan <= 0 && !hasFulfillmentItems;
+          const missingCostItemCount = orderCostMeta?.missingCostItemCount || 0;
+          const productCostStatus = isManualDeliveryLoss
+            ? "ready" as const
+            : !hasOutbound
+            ? "pending-outbound" as const
+            : missingCostItemCount > 0
+              ? "pending-backfill" as const
+              : "ready" as const;
+
+          const rate = isOffline ? 0 : (shopRateMap.get(matchedShopName) ?? 0.06);
+          const expectedIncomeCents = Math.round(expectedIncomeYuan * 100);
+          const deliveryFeeCents = deliveryFee;
+          const productCostCents = Math.round(orderCostYuan * 100);
+          const returnExtraExpenseCents = Math.round(returnExtraExpenseYuan * 100);
+
+          const pureProfitCents = isManualDeliveryLoss
+            ? -deliveryFeeCents
+            : (productCostStatus === "ready"
+              ? Math.round(expectedIncomeCents * (1 - rate)) - deliveryFeeCents - productCostCents - returnExtraExpenseCents
+              : null);
+
+          const pureProfit = typeof pureProfitCents === "number" && Number.isFinite(pureProfitCents)
+            ? pureProfitCents / 100
+            : 0;
 
           if (point) {
             point.pureProfit = FinanceMath.add(point.pureProfit, pureProfit);

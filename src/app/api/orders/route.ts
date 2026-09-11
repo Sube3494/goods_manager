@@ -194,6 +194,7 @@ type AutoPickSystemMeta = {
     updatedAt?: string;
     updatedBy?: string;
   };
+  manualBrushCommission?: number | null;
 };
 
 function toAutoPickBaseProductName(value: string | null | undefined) {
@@ -973,6 +974,10 @@ function hasRealizedCancelledDeliveryCost(input: {
   delivery?: unknown;
   hasOutbound?: boolean;
 }) {
+  const isOffline = String(input.platform || "").trim() === "线下交易" || String(input.platform || "").toLowerCase() === "other";
+  if (isOffline) {
+    return false;
+  }
   return input.deliveryFee > 0
     && Boolean(input.hasOutbound)
     && !isRefundableMeituanDelivery(input.platform, input.delivery);
@@ -1945,7 +1950,11 @@ export async function GET(request: NextRequest) {
               : missingCostItemCount > 0
                 ? "pending-backfill" as const
                 : "ready" as const;
-            const customCommission = order.orderNo ? customBrushCommissionMap.get(order.orderNo) : undefined;
+            const orderSystemMeta = readAutoPickSystemMeta(order.rawPayload);
+            const manualBrushCommission = typeof orderSystemMeta?.manualBrushCommission === "number" && orderSystemMeta.manualBrushCommission >= 0
+              ? Number(orderSystemMeta.manualBrushCommission)
+              : undefined;
+            const customCommission = manualBrushCommission ?? (order.orderNo ? customBrushCommissionMap.get(order.orderNo) : undefined);
             const orderBrushCommissionYuan = typeof customCommission === "number" && customCommission >= 0
               ? customCommission
               : resolveShopBrushCommission(integrationConfig, {
@@ -2305,7 +2314,11 @@ export async function GET(request: NextRequest) {
         : missingCostItemCount > 0
           ? "pending-backfill" as const
           : "ready" as const;
-      const customCommission = order.orderNo ? customBrushCommissionMap.get(order.orderNo) : undefined;
+      const orderSystemMeta = readAutoPickSystemMeta(order.rawPayload);
+      const manualBrushCommission = typeof orderSystemMeta?.manualBrushCommission === "number" && orderSystemMeta.manualBrushCommission >= 0
+        ? Number(orderSystemMeta.manualBrushCommission)
+        : undefined;
+      const customCommission = manualBrushCommission ?? (order.orderNo ? customBrushCommissionMap.get(order.orderNo) : undefined);
       const orderBrushCommissionYuan = typeof customCommission === "number" && customCommission >= 0
         ? customCommission
         : resolveShopBrushCommission(integrationConfig, {
@@ -2332,7 +2345,7 @@ export async function GET(request: NextRequest) {
       const normalizedDelivery = order.delivery && typeof order.delivery === "object" && !Array.isArray(order.delivery)
         ? {
             ...(order.delivery as Record<string, unknown>),
-            sendFee: isSelfDeliveryOrCancelledDelivery(order.delivery, order.isMainSystemSelfDelivery)
+            sendFee: (hiddenDeletedOfflineIncome || isSelfDeliveryOrCancelledDelivery(order.delivery, order.isMainSystemSelfDelivery))
               ? 0
               : ((order.delivery as Record<string, unknown>).sendFee != null
                   ? Number((order.delivery as Record<string, unknown>).sendFee)
