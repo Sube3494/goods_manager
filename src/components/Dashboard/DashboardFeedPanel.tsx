@@ -157,7 +157,12 @@ export function DashboardFeedPanel({
           return (
             <div
               key={item.id}
-              className="min-w-0 overflow-hidden flex flex-col gap-3 rounded-[16px] border border-black/6 bg-white/78 px-3 py-3 transition-colors hover:border-black/10 hover:bg-white dark:border-white/8 dark:bg-white/3 dark:hover:border-white/12 dark:hover:bg-white/5 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:py-2.5"
+              className={cn(
+                "min-w-0 overflow-hidden flex flex-col gap-3 rounded-[16px] border bg-white/78 px-3 py-3 transition-colors hover:bg-white dark:bg-white/3 dark:hover:bg-white/5 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:py-2.5",
+                isReturnInbound
+                  ? "border-amber-500/20 hover:border-amber-500/35 dark:border-amber-400/20 dark:hover:border-amber-400/35"
+                  : "border-black/6 hover:border-black/10 dark:border-white/8 dark:hover:border-white/12"
+              )}
             >
               <div className="flex min-w-0 flex-1 items-start gap-3">
                 <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-black/5 bg-black/5 dark:border-white/10 dark:bg-muted/20 sm:h-10 sm:w-10 sm:rounded-lg">
@@ -183,14 +188,19 @@ export function DashboardFeedPanel({
                     <span className="font-mono">编号</span>
                     <span className="h-1 w-1 rounded-full bg-black/10 dark:bg-white/12" />
                     <span className="max-w-full truncate font-mono">{productSku || "未填写"}</span>
-                    <span className="rounded-full bg-primary/10 px-1.5 py-0.5 font-medium text-primary">数量 {item.quantity}</span>
+                    <span className={cn(
+                      "rounded-full px-1.5 py-0.5 font-medium",
+                      isReturnInbound ? "bg-amber-500/10 text-amber-700 dark:text-amber-400" : "bg-primary/10 text-primary"
+                    )}>
+                      数量 {item.quantity}
+                    </span>
                   </div>
                 </div>
               </div>
               <div className="flex items-center justify-between gap-3 border-t border-black/6 pt-2 dark:border-white/8 sm:w-[88px] sm:shrink-0 sm:flex-col sm:items-end sm:border-t-0 sm:border-l sm:pt-0 sm:pl-3 sm:text-right">
                 <div className={cn(
                   "text-[10px] font-bold sm:w-full sm:text-right",
-                  isReturnInbound ? "text-violet-500 dark:text-violet-300" : "text-muted-foreground"
+                  isReturnInbound ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground"
                 )}>
                   {sourceLabel}
                 </div>

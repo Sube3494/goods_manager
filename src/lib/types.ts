@@ -692,6 +692,7 @@ export interface DashboardCustomerTrendPoint {
 export interface DashboardCustomerTopProduct {
   productName: string;
   sku?: string | null;
+  image?: string | null;
   quantity: number;
   orderCount: number;
 }

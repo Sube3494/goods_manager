@@ -552,6 +552,7 @@ export async function GET(request: NextRequest) {
               quantity: true,
               productNo: true,
               productName: true,
+              thumb: true,
               rawPayload: true,
             },
           },
@@ -1265,7 +1266,7 @@ export async function GET(request: NextRequest) {
         },
       ])
     );
-    const returningProductMap = new Map<string, { productName: string; sku: string | null; quantity: number; orderNos: Set<string> }>();
+    const returningProductMap = new Map<string, { productName: string; sku: string | null; image: string | null; quantity: number; orderNos: Set<string> }>();
     let newCustomerOrders = 0;
     let returningCustomerOrders = 0;
     let unknownCustomerOrders = 0;
@@ -1306,6 +1307,16 @@ export async function GET(request: NextRequest) {
           if (payloadObj?.ignoreOutbound === true || payloadObj?.isManualIgnored === true) return;
           if (manualMatched?.id === "__ignored__" || (manualMatched as any)?.ignoreOutbound === true) return;
 
+          const itemImage = String(
+            item.thumb
+            || (manualMatched as any)?.image
+            || payloadObj?.imageUrl
+            || payloadObj?.picture
+            || payloadObj?.picUrl
+            || payloadObj?.image
+            || ""
+          ).trim() || null;
+
           // 如果匹配了组合商品，展开统计组合中的真实商品
           const bundleItems = Array.isArray((manualMatched as any)?.bundleItems)
             ? ((manualMatched as any).bundleItems as any[])
@@ -1316,14 +1327,17 @@ export async function GET(request: NextRequest) {
             bundleItems.forEach((b) => {
               const bName = String(b?.name || "").trim() || "未命名商品";
               const bSku = String(b?.sku || "").trim() || null;
+              const bImg = String((b as any)?.image || itemImage || "").trim() || null;
               const bQty = Math.max(1, Number(b?.quantity || 1) || 1);
               const bKey = `${bSku || ""}::${bName}`;
               const current = returningProductMap.get(bKey) || {
                 productName: bName,
                 sku: bSku,
+                image: bImg,
                 quantity: 0,
                 orderNos: new Set<string>(),
               };
+              if (!current.image && bImg) current.image = bImg;
               current.quantity += bQty * orderItemQty;
               current.orderNos.add(order.orderNo);
               returningProductMap.set(bKey, current);
@@ -1340,9 +1354,11 @@ export async function GET(request: NextRequest) {
           const current = returningProductMap.get(key) || {
             productName,
             sku,
+            image: itemImage,
             quantity: 0,
             orderNos: new Set<string>(),
           };
+          if (!current.image && itemImage) current.image = itemImage;
           current.quantity += Math.max(1, Number(item.quantity || 1) || 1);
           current.orderNos.add(order.orderNo);
           returningProductMap.set(key, current);
@@ -1352,6 +1368,43 @@ export async function GET(request: NextRequest) {
         if (daily) daily.unknownCustomerOrders += 1;
       }
     });
+
+    const returningTop5 = Array.from(returningProductMap.values())
+      .map((item) => ({
+        productName: item.productName,
+        sku: item.sku,
+        image: item.image,
+        quantity: item.quantity,
+        orderCount: item.orderNos.size,
+      }))
+      .sort((a, b) => b.quantity - a.quantity || b.orderCount - a.orderCount)
+      .slice(0, 5);
+
+    const missingImgItems = returningTop5.filter((p) => !p.image);
+    if (missingImgItems.length > 0) {
+      const skus = missingImgItems.map((p) => p.sku).filter(Boolean) as string[];
+      const names = missingImgItems.map((p) => p.productName).filter(Boolean) as string[];
+      if (skus.length > 0 || names.length > 0) {
+        const dbProducts = await prisma.product.findMany({
+          where: {
+            userId: targetUserId,
+            OR: [
+              ...(skus.length > 0 ? [{ sku: { in: skus } }] : []),
+              ...(names.length > 0 ? [{ name: { in: names } }] : []),
+            ],
+            image: { not: null },
+          },
+          select: { sku: true, name: true, image: true },
+        });
+        returningTop5.forEach((p) => {
+          if (!p.image) {
+            const hit = dbProducts.find((db) => (p.sku && db.sku === p.sku) || db.name === p.productName);
+            if (hit?.image) p.image = hit.image;
+          }
+        });
+      }
+    }
+
     const totalKnownOrders = newCustomerOrders + returningCustomerOrders;
     const customerAnalysis = {
       totalKnownOrders,
@@ -1361,15 +1414,7 @@ export async function GET(request: NextRequest) {
       newRate: totalKnownOrders > 0 ? newCustomerOrders / totalKnownOrders : 0,
       returningRate: totalKnownOrders > 0 ? returningCustomerOrders / totalKnownOrders : 0,
       daily: Array.from(customerDailyMap.values()),
-      returningCustomerTopProducts: Array.from(returningProductMap.values())
-        .map((item) => ({
-          productName: item.productName,
-          sku: item.sku,
-          quantity: item.quantity,
-          orderCount: item.orderNos.size,
-        }))
-        .sort((a, b) => b.quantity - a.quantity || b.orderCount - a.orderCount)
-        .slice(0, 5),
+      returningCustomerTopProducts: returningTop5,
     };
 
     const shopBreakdownMap = new Map<string, { shopId: string; shopName: string; skuCount: number; stock: number; lowStockCount: number; value: number }>();
