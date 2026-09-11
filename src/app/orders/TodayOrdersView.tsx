@@ -114,6 +114,7 @@ interface TodayOrdersViewProps {
   userId?: string | null;
   shopFilterSignal?: { value: string; nonce: number } | null;
   onShopChange?: (shop: string) => void;
+  readOnly?: boolean;
 }
 
 const TODAY_TAB_PAGE_SIZE = 40;
@@ -188,6 +189,7 @@ export function TodayOrdersView({
   userId,
   shopFilterSignal,
   onShopChange,
+  readOnly = false,
 }: TodayOrdersViewProps) {
   const { showToast } = useToast();
   const todayDate = useMemo(() => formatLocalDate(new Date()), []);
@@ -893,6 +895,7 @@ export function TodayOrdersView({
                         onOpenMatchEditor={onOpenMatchEditor}
                         onRefresh={handleRefreshOrder}
                         isProfitUpdating={profitUpdatingOrderIds.includes(order.id)}
+                        readOnly={readOnly}
                       />
                     </OrderCardErrorBoundary>
                   ))}
@@ -929,6 +932,7 @@ export function TodayOrdersView({
                             onOpenMatchEditor={onOpenMatchEditor}
                             onRefresh={handleRefreshOrder}
                             isProfitUpdating={profitUpdatingOrderIds.includes(order.id)}
+                            readOnly={readOnly}
                           />
                         </OrderCardErrorBoundary>
                       ))}
@@ -967,6 +971,7 @@ export function TodayOrdersView({
                             onOpenMatchEditor={onOpenMatchEditor}
                             onRefresh={handleRefreshOrder}
                             isProfitUpdating={profitUpdatingOrderIds.includes(order.id)}
+                            readOnly={readOnly}
                           />
                         </OrderCardErrorBoundary>
                       ))}

@@ -1932,6 +1932,7 @@ export function UserOrdersModal({
                       onOpenMatchEditor={() => {}}
                       onDataLoad={handleTodayDataLoad}
                       localShops={localShops}
+                      readOnly={true}
                     />
                   </div>
 
@@ -1945,6 +1946,7 @@ export function UserOrdersModal({
                         onOpenMatchEditor={() => {}}
                         onDataLoad={handleAllDataLoad}
                         localShops={localShops}
+                        readOnly={true}
                       />
                     </div>
                   )}

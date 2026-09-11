@@ -134,6 +134,7 @@ interface AllOrdersViewProps {
   userId?: string | null;
   shopFilterSignal?: { value: string; nonce: number } | null;
   onShopChange?: (shop: string) => void;
+  readOnly?: boolean;
 }
 
 const ALL_ORDERS_BATCH_SIZE = 30;
@@ -149,6 +150,7 @@ export function AllOrdersView({
   profitUpdatingOrderIds = [],
   shopFilterSignal,
   onShopChange,
+  readOnly = false,
 }: AllOrdersViewProps) {
   const { showToast } = useToast();
   const [orders, setOrders] = useState<AutoPickOrder[]>([]);
@@ -806,6 +808,7 @@ export function AllOrdersView({
                       onOpenMatchEditor={onOpenMatchEditor}
                       onRefresh={handleRefreshOrder}
                       isProfitUpdating={profitUpdatingOrderIds.includes(order.id)}
+                      readOnly={readOnly}
                     />
                   </OrderCardErrorBoundary>
                 ))}

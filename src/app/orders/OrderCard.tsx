@@ -2568,12 +2568,12 @@ export const OrderCard = memo(function OrderCard({
     }
     return acc;
   }, new Map<string, Array<{ createdAt: string; reason: string; quantity: number; refundAmount?: number; extraExpense?: number }>>());
-  const canEditProductCost = order.productCostStatus === "pending-backfill" || productCostBreakdown.length > 0;
+  const canEditProductCost = !readOnly && (order.productCostStatus === "pending-backfill" || productCostBreakdown.length > 0);
   const settlementAfterRate = Math.round(expectedIncome * (1 - serviceFeeRate));
   const isJdPlatformOrder = isJdOrder(order.platform);
   const isDoudianPlatformOrder = isDoudianOrder(order.platform);
   const isMeituanPlatformOrder = isMeituanOrder(order.platform);
-  const canEditExpectedIncome = isJdPlatformOrder || isDoudianPlatformOrder || legacyManualDeliveryPlaceholderOrder;
+  const canEditExpectedIncome = !readOnly && (isJdPlatformOrder || isDoudianPlatformOrder || legacyManualDeliveryPlaceholderOrder);
   const pureProfitTooltipRows: Array<{ label: string; value: string; editable?: boolean; onEdit?: () => void }> = hasPureProfit
     ? (showManualDeliveryMarker
       ? [
@@ -2586,8 +2586,8 @@ export const OrderCard = memo(function OrderCard({
           {
             label: "扣刷单佣金",
             value: toCurrency(- (typeof order.brushCommission === "number" ? Math.round(order.brushCommission * 100) : -pureProfit - Number(order.platformCommission || 0))),
-            editable: true,
-            onEdit: () => {
+            editable: !readOnly,
+            onEdit: readOnly ? undefined : () => {
               const currentVal = typeof order.brushCommission === "number"
                 ? order.brushCommission
                 : (-pureProfit - Number(order.platformCommission || 0)) / 100;
@@ -2708,81 +2708,91 @@ export const OrderCard = memo(function OrderCard({
                     </span>
                   ) : null}
                   {autoOutboundFailed && !deleted && !cancelled ? (
-                    <span className="group/outbound relative inline-flex">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          // 清除当前焦点，避免悬浮层在弹窗打开时产生残留闪烁
-                          (e.currentTarget as HTMLElement)?.blur();
-
-                          const errorText = order.autoOutboundError || "";
-
-                          // 查找所有未匹配且未显式忽略的商品
-                          const unmatchedItems = (order.items || []).filter((it) => {
-                            const rawPayload = it.rawPayload && typeof it.rawPayload === "object" && !Array.isArray(it.rawPayload)
-                              ? it.rawPayload as Record<string, unknown>
-                              : {};
-                            const isIgnored = rawPayload.ignoreOutbound === true
-                              || rawPayload.isManualIgnored === true
-                              || (it.matchedProduct as any)?.ignoreOutbound === true;
-                            if (isIgnored) return false;
-                            return !it.matchedProduct;
-                          });
-
-                          // 只有在【确实存在未匹配商品】时，才拦截并拉起改匹配弹窗
-                          if (unmatchedItems.length > 0) {
-                            // 优先匹配报错信息中提及的具体商品，否则取第一个未匹配商品
-                            const targetItem = unmatchedItems.find((it) => {
-                              if (it.productNo && errorText.includes(it.productNo)) return true;
-                              if (it.platformSkuId && errorText.includes(it.platformSkuId)) return true;
-                              if (it.productName && errorText.includes(it.productName)) return true;
-                              return false;
-                            }) || unmatchedItems[0];
-
-                            onOpenMatchEditor(order, targetItem, { autoOutbound: true });
-                            return;
-                          }
-
-                          // 已经全部配对好，直接执行出库操作，进入出库环节
-                          void onRunAction(order.id, "outbound");
-                        }}
-                        disabled={actingId === `${order.id}:outbound`}
-                        className={cn(
-                          "group/outbound-btn inline-flex h-7 items-center gap-1 rounded-full border px-2 text-[11px] font-medium leading-none cursor-pointer transition-all duration-150 active:opacity-80 sm:h-8 sm:gap-1.5 sm:px-2.5 sm:text-[13px]",
-                          "border-rose-500/25 bg-rose-500/10 text-rose-700 hover:border-rose-500/40 hover:bg-rose-500/15 dark:text-rose-400",
-                          "disabled:cursor-not-allowed disabled:opacity-60"
-                        )}
+                    readOnly ? (
+                      <span
+                        title={order.autoOutboundError || "自动出库失败"}
+                        className="inline-flex h-7 items-center gap-1 rounded-full border border-rose-500/25 bg-rose-500/10 px-2 text-[11px] font-medium leading-none text-rose-700 dark:text-rose-400 sm:h-8 sm:gap-1.5 sm:px-2.5 sm:text-[13px]"
                       >
-                        {actingId === `${order.id}:outbound` ? (
-                          <Loader2 className="h-2.5 w-2.5 sm:h-3 sm:w-3 animate-spin text-rose-500 shrink-0" />
-                        ) : (
-                          <span className="h-1.5 w-1.5 rounded-full bg-rose-500 shrink-0" />
-                        )}
-                        <span>{actingId === `${order.id}:outbound` ? "处理中..." : "出库待处理"}</span>
-                      </button>
-                      
-                      {/* Tooltip 浮层 */}
-                      <div className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 w-72 -translate-x-1/2 scale-95 opacity-0 transition-all duration-200 ease-out group-hover/outbound:pointer-events-auto group-hover/outbound:scale-100 group-hover/outbound:opacity-100">
-                        <div className="relative rounded-xl border border-slate-200/90 bg-white/98 px-3.5 py-2.5 text-xs shadow-xl dark:border-white/12 dark:bg-[#171b22]/96">
-                          {/* 小三角 */}
-                          <div className="absolute top-full left-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1 rotate-45 border-r border-b border-slate-200/90 bg-white dark:border-white/12 dark:bg-[#171b22]" />
-                          <div className="font-semibold text-rose-600 dark:text-rose-400 mb-1 flex items-center justify-between">
-                            <div className="flex items-center gap-1.5">
-                              <TriangleAlert size={12} className="shrink-0" />
-                              <span>自动出库失败原因</span>
+                        <span className="h-1.5 w-1.5 rounded-full bg-rose-500 shrink-0" />
+                        <span>出库待处理</span>
+                      </span>
+                    ) : (
+                      <span className="group/outbound relative inline-flex">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            // 清除当前焦点，避免悬浮层在弹窗打开时产生残留闪烁
+                            (e.currentTarget as HTMLElement)?.blur();
+
+                            const errorText = order.autoOutboundError || "";
+
+                            // 查找所有未匹配且未显式忽略的商品
+                            const unmatchedItems = (order.items || []).filter((it) => {
+                              const rawPayload = it.rawPayload && typeof it.rawPayload === "object" && !Array.isArray(it.rawPayload)
+                                ? it.rawPayload as Record<string, unknown>
+                                : {};
+                              const isIgnored = rawPayload.ignoreOutbound === true
+                                || rawPayload.isManualIgnored === true
+                                || (it.matchedProduct as any)?.ignoreOutbound === true;
+                              if (isIgnored) return false;
+                              return !it.matchedProduct;
+                            });
+
+                            // 只有在【确实存在未匹配商品】时，才拦截并拉起改匹配弹窗
+                            if (unmatchedItems.length > 0) {
+                              // 优先匹配报错信息中提及的具体商品，否则取第一个未匹配商品
+                              const targetItem = unmatchedItems.find((it) => {
+                                if (it.productNo && errorText.includes(it.productNo)) return true;
+                                if (it.platformSkuId && errorText.includes(it.platformSkuId)) return true;
+                                if (it.productName && errorText.includes(it.productName)) return true;
+                                return false;
+                              }) || unmatchedItems[0];
+
+                              onOpenMatchEditor(order, targetItem, { autoOutbound: true });
+                              return;
+                            }
+
+                            // 已经全部配对好，直接执行出库操作，进入出库环节
+                            void onRunAction(order.id, "outbound");
+                          }}
+                          disabled={actingId === `${order.id}:outbound`}
+                          className={cn(
+                            "group/outbound-btn inline-flex h-7 items-center gap-1 rounded-full border px-2 text-[11px] font-medium leading-none cursor-pointer transition-all duration-150 active:opacity-80 sm:h-8 sm:gap-1.5 sm:px-2.5 sm:text-[13px]",
+                            "border-rose-500/25 bg-rose-500/10 text-rose-700 hover:border-rose-500/40 hover:bg-rose-500/15 dark:text-rose-400",
+                            "disabled:cursor-not-allowed disabled:opacity-60"
+                          )}
+                        >
+                          {actingId === `${order.id}:outbound` ? (
+                            <Loader2 className="h-2.5 w-2.5 sm:h-3 sm:w-3 animate-spin text-rose-500 shrink-0" />
+                          ) : (
+                            <span className="h-1.5 w-1.5 rounded-full bg-rose-500 shrink-0" />
+                          )}
+                          <span>{actingId === `${order.id}:outbound` ? "处理中..." : "出库待处理"}</span>
+                        </button>
+                        
+                        {/* Tooltip 浮层 */}
+                        <div className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 w-72 -translate-x-1/2 scale-95 opacity-0 transition-all duration-200 ease-out group-hover/outbound:pointer-events-auto group-hover/outbound:scale-100 group-hover/outbound:opacity-100">
+                          <div className="relative rounded-xl border border-slate-200/90 bg-white/98 px-3.5 py-2.5 text-xs shadow-xl dark:border-white/12 dark:bg-[#171b22]/96">
+                            {/* 小三角 */}
+                            <div className="absolute top-full left-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1 rotate-45 border-r border-b border-slate-200/90 bg-white dark:border-white/12 dark:bg-[#171b22]" />
+                            <div className="font-semibold text-rose-600 dark:text-rose-400 mb-1 flex items-center justify-between">
+                              <div className="flex items-center gap-1.5">
+                                <TriangleAlert size={12} className="shrink-0" />
+                                <span>自动出库失败原因</span>
+                              </div>
+                              <span className="text-[10px] font-normal text-rose-500/80 bg-rose-500/10 px-1.5 py-0.5 rounded-full">可点击重试</span>
                             </div>
-                            <span className="text-[10px] font-normal text-rose-500/80 bg-rose-500/10 px-1.5 py-0.5 rounded-full">可点击重试</span>
-                          </div>
-                          <div className="text-[11px] leading-relaxed text-zinc-600 dark:text-zinc-300 wrap-break-word font-normal text-left">
-                            {order.autoOutboundError || "未知异常，请检查库存或点击按钮重新尝试出库。"}
-                          </div>
-                          <div className="mt-2 pt-1.5 border-t border-slate-100 dark:border-white/10 flex items-center justify-between text-[10px] text-rose-600 dark:text-rose-400 font-medium">
-                            <span>点击按钮立即重新执行出库</span>
+                            <div className="text-[11px] leading-relaxed text-zinc-600 dark:text-zinc-300 wrap-break-word font-normal text-left">
+                              {order.autoOutboundError || "未知异常，请检查库存或点击按钮重新尝试出库。"}
+                            </div>
+                            <div className="mt-2 pt-1.5 border-t border-slate-100 dark:border-white/10 flex items-center justify-between text-[10px] text-rose-600 dark:text-rose-400 font-medium">
+                              <span>点击按钮立即重新执行出库</span>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </span>
+                      </span>
+                    )
                   ) : null}
                   <StatusBadge order={order} />
                   {hasRefundAmount ? (
@@ -3436,10 +3446,11 @@ export const OrderCard = memo(function OrderCard({
                   <div className="flex items-center p-0.5 rounded-xl border border-black/8 dark:border-white/10 bg-black/2 dark:bg-black/20 w-full mt-2 h-8.5">
                     <button
                       type="button"
-                      disabled={isUpdatingBrush || cancelled || deleted}
+                      disabled={readOnly || isUpdatingBrush || cancelled || deleted}
                       onClick={() => void handleUpdateBrush(true)}
                       className={cn(
-                        "flex-1 h-full rounded-[10px] text-xs font-medium transition-all duration-200 cursor-pointer disabled:cursor-not-allowed flex items-center justify-center",
+                        "flex-1 h-full rounded-[10px] text-xs font-medium transition-all duration-200 flex items-center justify-center",
+                        readOnly ? "cursor-not-allowed opacity-80" : "cursor-pointer disabled:cursor-not-allowed",
                         order.isMainSystemSelfDelivery
                           ? "bg-white dark:bg-white/10 shadow-[0_1px_2.5px_rgba(0,0,0,0.15)] text-black dark:text-white"
                           : "bg-transparent text-zinc-400 dark:text-zinc-500 hover:text-foreground/80"
@@ -3449,10 +3460,11 @@ export const OrderCard = memo(function OrderCard({
                     </button>
                     <button
                       type="button"
-                      disabled={isUpdatingBrush || cancelled || deleted}
+                      disabled={readOnly || isUpdatingBrush || cancelled || deleted}
                       onClick={() => void handleUpdateBrush(false)}
                       className={cn(
-                        "flex-1 h-full rounded-[10px] text-xs font-medium transition-all duration-200 cursor-pointer disabled:cursor-not-allowed flex items-center justify-center",
+                        "flex-1 h-full rounded-[10px] text-xs font-medium transition-all duration-200 flex items-center justify-center",
+                        readOnly ? "cursor-not-allowed opacity-80" : "cursor-pointer disabled:cursor-not-allowed",
                         !order.isMainSystemSelfDelivery
                           ? "bg-white dark:bg-white/10 shadow-[0_1px_2.5px_rgba(0,0,0,0.15)] text-black dark:text-white"
                           : "bg-transparent text-zinc-400 dark:text-zinc-500 hover:text-foreground/80"
@@ -3477,17 +3489,23 @@ export const OrderCard = memo(function OrderCard({
                   <DetailBlock
                     label="门店地址"
                     labelAccessory={
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setIsShopEditorOpen(true);
-                        }}
-                        className="inline-flex max-w-[45%] items-center rounded-full border border-sky-400/20 bg-sky-500/12 px-2 py-0.5 text-[10px] font-medium leading-none text-sky-300 hover:bg-sky-500/20 transition-colors"
-                        title="点击修改归属门店"
-                      >
-                        <span className="truncate">{order.matchedShopName || "未绑定门店"}</span>
-                      </button>
+                      readOnly ? (
+                        <span className="inline-flex max-w-[45%] items-center rounded-full border border-sky-400/20 bg-sky-500/12 px-2 py-0.5 text-[10px] font-medium leading-none text-sky-300">
+                          <span className="truncate">{order.matchedShopName || "未绑定门店"}</span>
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setIsShopEditorOpen(true);
+                          }}
+                          className="inline-flex max-w-[45%] items-center rounded-full border border-sky-400/20 bg-sky-500/12 px-2 py-0.5 text-[10px] font-medium leading-none text-sky-300 hover:bg-sky-500/20 transition-colors"
+                          title="点击修改归属门店"
+                        >
+                          <span className="truncate">{order.matchedShopName || "未绑定门店"}</span>
+                        </button>
+                      )
                     }
                     value={order.shopAddress || order.rawShopAddress || "-"}
                     className="sm:col-span-2"
