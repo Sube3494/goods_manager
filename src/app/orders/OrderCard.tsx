@@ -2681,17 +2681,25 @@ export const OrderCard = memo(function OrderCard({
                     </span>
                     <span className="pr-0.5 text-[12px] font-bold leading-none tracking-tight sm:text-[13px]">#{order.dailyPlatformSequence || 0}</span>
                   </span>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setIsShopEditorOpen(true);
-                    }}
-                    title="点击修改订单归属门店"
-                    className="inline-flex h-7 min-w-0 max-w-[calc(100vw-10rem)] items-center rounded-full border border-black/8 bg-black/3 px-2 text-[11px] font-medium leading-none text-muted-foreground transition-colors hover:border-sky-500/30 hover:bg-sky-500/10 hover:text-sky-600 dark:border-white/10 dark:bg-white/4 dark:hover:border-sky-400/30 dark:hover:bg-sky-500/15 dark:hover:text-sky-300 sm:h-8 sm:max-w-55 sm:px-2.5 sm:text-[13px]"
-                  >
-                    <span className="truncate">{sourceLabel || "+ 绑定门店"}</span>
-                  </button>
+                  {readOnly ? (
+                    <span
+                      className="inline-flex h-7 min-w-0 max-w-[calc(100vw-10rem)] items-center rounded-full border border-black/8 bg-black/3 px-2 text-[11px] font-medium leading-none text-muted-foreground dark:border-white/10 dark:bg-white/4 sm:h-8 sm:max-w-55 sm:px-2.5 sm:text-[13px]"
+                    >
+                      <span className="truncate">{sourceLabel || "未绑定门店"}</span>
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsShopEditorOpen(true);
+                      }}
+                      title="点击修改订单归属门店"
+                      className="inline-flex h-7 min-w-0 max-w-[calc(100vw-10rem)] items-center rounded-full border border-black/8 bg-black/3 px-2 text-[11px] font-medium leading-none text-muted-foreground transition-colors hover:border-sky-500/30 hover:bg-sky-500/10 hover:text-sky-600 dark:border-white/10 dark:bg-white/4 dark:hover:border-sky-400/30 dark:hover:bg-sky-500/15 dark:hover:text-sky-300 sm:h-8 sm:max-w-55 sm:px-2.5 sm:text-[13px]"
+                    >
+                      <span className="truncate">{sourceLabel || "+ 绑定门店"}</span>
+                    </button>
+                  )}
                   {orderTypeLabel ? (
                     <span className="inline-flex h-7 items-center rounded-full border border-violet-500/15 bg-violet-500/10 px-2 text-[11px] font-medium leading-none text-violet-700 dark:text-violet-400 sm:h-8 sm:px-2.5 sm:text-[13px]">
                       {orderTypeLabel}
@@ -2826,6 +2834,13 @@ export const OrderCard = memo(function OrderCard({
                           <span className="shrink-0">纯利润</span>
                           <span className="truncate font-semibold">{toCurrency(pureProfit)}</span>
                         </button>
+                      ) : readOnly ? (
+                        <span
+                          className="inline-flex h-7 min-w-0 items-center gap-1 rounded-full border border-orange-500/20 bg-orange-500/10 px-2 text-[11px] font-medium leading-none text-orange-700 dark:text-orange-300 sm:h-8 sm:gap-1.5 sm:px-2.5 sm:text-[13px]"
+                        >
+                          <span className="shrink-0">成本</span>
+                          <span className="truncate">{productCostStatusText}</span>
+                        </span>
                       ) : (
                         <button
                           type="button"
@@ -3770,7 +3785,7 @@ export const OrderCard = memo(function OrderCard({
           </div>
         </div>
       ) : null}
-      {isShopEditorOpen ? (
+      {isShopEditorOpen && !readOnly ? (
         <OrderShopEditModal
           order={order}
           onClose={() => setIsShopEditorOpen(false)}
