@@ -889,9 +889,9 @@ export function PromotionCalendarModal({
         {/* 右侧编辑侧边栏 */}
         {/* 右侧编辑侧边栏 */}
         {activeTab === "calendar" && (
-          <div className="flex w-full flex-col p-5 md:w-[320px] md:p-6 justify-between border-t border-border/60 bg-zinc-50/65 dark:bg-white/[0.035] md:border-t-0">
+          <div className="flex w-full flex-col md:w-[340px] md:h-full md:max-h-full border-t border-border/60 bg-zinc-50/65 dark:bg-white/[0.035] md:border-t-0 overflow-hidden">
           
-          <div className="space-y-5">
+            <div className="flex-1 overflow-y-auto overscroll-contain p-5 md:p-6 space-y-4 sm:space-y-5 custom-scrollbar">
             {/* 选中日期标题与关闭按钮 */}
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -1018,7 +1018,7 @@ export function PromotionCalendarModal({
           </div>
 
           {/* 表单底部合计与保存按钮 */}
-          <div className="pt-4 border-t border-border/50 mt-4 flex items-center justify-between gap-3">
+            <div className="shrink-0 border-t border-border/60 bg-white/95 dark:bg-[#111827]/95 backdrop-blur-sm p-4 md:px-6 md:py-4 flex items-center justify-between gap-3 shadow-xs">
             <div className="text-xs text-muted-foreground">
               <span className="text-[10px] font-bold uppercase tracking-wider block">当日合计</span>
               <div className="text-base font-black text-foreground mt-0.5 tabular-nums">
