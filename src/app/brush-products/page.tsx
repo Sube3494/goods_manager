@@ -568,14 +568,14 @@ export default function BrushProductsPage() {
         <div className="min-w-0">
           <Link
             href="/brush"
-            className="group inline-flex items-center gap-2 rounded-full border border-border/70 bg-white/70 px-3 py-1.5 text-sm font-medium text-muted-foreground transition-all hover:border-primary/30 hover:text-foreground dark:bg-white/5"
+            className="group inline-flex h-10 items-center gap-2 rounded-full border border-black/8 bg-white/76 px-4 text-sm font-bold text-muted-foreground shadow-2xs transition-all hover:border-black/12 hover:bg-white hover:text-foreground dark:border-white/10 dark:bg-white/[0.04] dark:hover:bg-white/[0.08]"
           >
             <ArrowLeft size={16} className="transition-transform group-hover:-translate-x-0.5" />
             <span>返回刷单中心</span>
           </Link>
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-4xl">刷单商品库</h1>
-            <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-2xl border border-border/70 bg-white/70 px-3 text-xs font-bold leading-none text-foreground dark:bg-white/5">
+            <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-full border border-black/8 bg-white/76 px-3 text-xs font-bold leading-none text-foreground shadow-2xs dark:border-white/10 dark:bg-white/[0.04]">
               {items.length}
             </span>
           </div>
@@ -585,14 +585,14 @@ export default function BrushProductsPage() {
         <div className="grid grid-cols-3 gap-2 sm:flex sm:items-center sm:justify-end">
           <button
             onClick={() => setIsImportOpen(true)}
-            className="inline-flex h-11 min-w-0 items-center justify-center gap-2 rounded-2xl border border-border bg-white/80 px-4 text-sm font-bold text-foreground transition-all active:scale-95 hover:bg-white dark:bg-white/5 dark:hover:bg-white/10 sm:h-12 sm:px-5"
+            className="inline-flex h-11 min-w-0 items-center justify-center gap-2 rounded-full border border-black/8 bg-white/76 px-4 text-sm font-bold text-foreground shadow-2xs transition-all hover:border-black/12 hover:bg-white active:scale-95 dark:border-white/10 dark:bg-white/[0.04] dark:hover:bg-white/[0.08] sm:h-12 sm:px-5"
           >
             <Plus size={16} />
             <span className="truncate">导入</span>
           </button>
           <button
             onClick={handleExport}
-            className="inline-flex h-11 min-w-0 items-center justify-center gap-2 rounded-2xl border border-border bg-white/80 px-4 text-sm font-bold text-foreground transition-all active:scale-95 hover:bg-white dark:bg-white/5 dark:hover:bg-white/10 sm:h-12 sm:px-5"
+            className="inline-flex h-11 min-w-0 items-center justify-center gap-2 rounded-full border border-black/8 bg-white/76 px-4 text-sm font-bold text-foreground shadow-2xs transition-all hover:border-black/12 hover:bg-white active:scale-95 dark:border-white/10 dark:bg-white/[0.04] dark:hover:bg-white/[0.08] sm:h-12 sm:px-5"
           >
             <Download size={16} className="rotate-180" />
             <span className="truncate">导出</span>
@@ -606,7 +606,7 @@ export default function BrushProductsPage() {
               setIsPickerOpen(true);
             }}
             disabled={!selectedShopId}
-            className="inline-flex h-11 min-w-0 items-center justify-center gap-2 rounded-2xl bg-primary px-4 text-sm font-black text-primary-foreground shadow-lg shadow-primary/20 transition-all active:scale-95 hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 sm:h-12 sm:px-6"
+            className="inline-flex h-11 min-w-0 items-center justify-center gap-2 rounded-full bg-primary px-4 text-sm font-black text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:-translate-y-0.5 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 sm:h-12 sm:px-6"
           >
             <Plus size={18} />
             <span className="truncate sm:hidden">添加</span>
@@ -616,7 +616,7 @@ export default function BrushProductsPage() {
       </div>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-[minmax(0,1fr)_220px_220px_auto]">
-        <div className="col-span-2 flex h-11 items-center gap-3 rounded-2xl border border-border bg-white px-5 transition-all focus-within:ring-2 focus-within:ring-primary/10 dark:bg-white/5 md:col-span-1">
+        <div className="col-span-2 flex h-11 items-center gap-3 rounded-full border border-black/8 bg-white/85 px-5 shadow-2xs transition-all focus-within:border-primary/30 focus-within:ring-2 focus-within:ring-primary/10 dark:border-white/10 dark:bg-white/[0.04] dark:focus-within:bg-white/[0.06] md:col-span-1">
           <Search size={18} className="text-muted-foreground" />
           <input
             type="text"
@@ -634,7 +634,7 @@ export default function BrushProductsPage() {
             onChange={setSelectedShopId}
             placeholder="先选择店铺"
             className="h-full"
-            triggerClassName="h-full rounded-2xl text-sm"
+            triggerClassName="h-full rounded-full border border-black/8 bg-white/85 px-4 text-sm shadow-2xs dark:border-white/10 dark:bg-white/[0.04]"
           />
         </div>
 
@@ -647,14 +647,14 @@ export default function BrushProductsPage() {
             value={supplierFilter}
             onChange={setSupplierFilter}
             className="h-full"
-            triggerClassName="h-full rounded-2xl text-sm"
+            triggerClassName="h-full rounded-full border border-black/8 bg-white/85 px-4 text-sm shadow-2xs dark:border-white/10 dark:bg-white/[0.04]"
           />
         </div>
 
         {(searchQuery || supplierFilter) && (
           <button
             onClick={resetFilters}
-            className="col-span-2 inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-primary/20 bg-primary/5 px-4 text-xs font-bold text-primary transition-all hover:bg-primary/10 md:col-span-1 md:justify-self-start"
+            className="col-span-2 inline-flex h-11 items-center justify-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 text-xs font-bold text-primary transition-all hover:bg-primary/10 active:scale-95 md:col-span-1 md:justify-self-start"
           >
             <RotateCcw size={14} />
             重置
@@ -674,13 +674,13 @@ export default function BrushProductsPage() {
             return (
               <div
                 key={item.id}
-                className={`group relative flex flex-col overflow-hidden rounded-[18px] border bg-white transition-all duration-200 cursor-pointer dark:bg-white/5 sm:rounded-2xl ${
+                className={`group relative flex flex-col overflow-hidden rounded-[22px] border bg-white/78 shadow-2xs backdrop-blur-xl transition-all duration-200 cursor-pointer dark:bg-white/[0.04] sm:rounded-[24px] ${
                   isSelected
-                    ? "border-primary/40 ring-2 ring-primary/10 shadow-lg shadow-primary/10 bg-primary/5"
-                    : "border-border hover:-translate-y-1 hover:shadow-xl hover:shadow-primary/10 sm:hover:-translate-y-1.5 sm:hover:shadow-2xl"
+                    ? "border-primary/40 bg-primary/5 ring-2 ring-primary/10 shadow-lg shadow-primary/10 dark:bg-primary/10"
+                    : "border-black/8 hover:-translate-y-1 hover:border-black/12 hover:bg-white hover:shadow-xl hover:shadow-primary/10 dark:border-white/10 dark:hover:border-white/16 dark:hover:bg-white/[0.065] sm:hover:-translate-y-1.5 sm:hover:shadow-2xl"
                 }`}
               >
-                <div className="relative aspect-[0.98/1] w-full overflow-hidden bg-secondary/30 sm:aspect-4/3">
+                <div className="relative aspect-[0.98/1] w-full overflow-hidden bg-black/3 dark:bg-white/[0.03] sm:aspect-4/3">
                     {product.image ? (
                       <Image
                         src={product.image}
@@ -734,21 +734,21 @@ export default function BrushProductsPage() {
                     )}
                   </div>
 
-                  <div className="mt-3 border-t border-white/10 pt-3 sm:mt-4 sm:pt-4">
+                  <div className="mt-3 border-t border-black/6 pt-3 dark:border-white/8 sm:mt-4 sm:pt-4">
                     <div className="text-[10px] font-black uppercase tracking-wider text-muted-foreground/60">刷单关键词</div>
                     <textarea
                       value={editingValue}
                       onChange={(e) => handleKeywordChange(item.id, e.target.value)}
                       placeholder="填写刷单提示词"
                       rows={2}
-                      className="mt-2 w-full resize-none rounded-xl border border-border/60 bg-background/70 px-2.5 py-2 text-xs font-medium outline-none transition-all focus:border-primary/40 sm:px-3 sm:text-sm"
+                      className="mt-2 w-full resize-none rounded-[18px] border border-black/8 bg-white/82 px-2.5 py-2 text-xs font-medium outline-none shadow-inner transition-all focus:border-primary/40 focus:ring-2 focus:ring-primary/10 dark:border-white/10 dark:bg-black/20 sm:px-3 sm:text-sm"
                     />
                     <div className="mt-2 flex items-center justify-end">
                       <button
                         type="button"
                         onClick={() => handleSaveKeyword(item)}
                         disabled={!isDirty || savingProductId === item.id}
-                        className="inline-flex h-8 items-center rounded-xl bg-primary px-2.5 text-[11px] font-black text-primary-foreground transition-all disabled:cursor-not-allowed disabled:opacity-40 sm:h-9 sm:px-3 sm:text-xs"
+                        className="inline-flex h-8 items-center rounded-full bg-primary px-3 text-[11px] font-black text-primary-foreground shadow-sm shadow-primary/15 transition-all hover:-translate-y-0.5 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:translate-y-0 sm:h-9 sm:px-4 sm:text-xs"
                       >
                         {savingProductId === item.id ? "保存中..." : "保存关键词"}
                       </button>

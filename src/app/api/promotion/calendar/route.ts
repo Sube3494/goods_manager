@@ -123,7 +123,15 @@ export async function GET(request: NextRequest) {
       realOrderTaobao: number;
       realOrderDoudian: number;
       brushOrderCount: number;
+      brushOrderMeituan: number;
+      brushOrderJingdong: number;
+      brushOrderTaobao: number;
+      brushOrderDoudian: number;
       cancelledOrderCount: number;
+      cancelledOrderMeituan: number;
+      cancelledOrderJingdong: number;
+      cancelledOrderTaobao: number;
+      cancelledOrderDoudian: number;
       // 各店铺的推广费明细（仅在未过滤时携带，用于悬停展示）
       shopBreakdown: Record<string, number>;
     }> = {};
@@ -144,7 +152,15 @@ export async function GET(request: NextRequest) {
         realOrderTaobao: 0,
         realOrderDoudian: 0,
         brushOrderCount: 0,
+        brushOrderMeituan: 0,
+        brushOrderJingdong: 0,
+        brushOrderTaobao: 0,
+        brushOrderDoudian: 0,
         cancelledOrderCount: 0,
+        cancelledOrderMeituan: 0,
+        cancelledOrderJingdong: 0,
+        cancelledOrderTaobao: 0,
+        cancelledOrderDoudian: 0,
         shopBreakdown: {},
       };
       cursor.setDate(cursor.getDate() + 1);
@@ -181,22 +197,28 @@ export async function GET(request: NextRequest) {
       if (dataMap[key]) {
         const isBrush = readMainSystemSelfDeliveryFlag(order.rawPayload);
         const isCancelled = isAutoPickOrderCancelledStatus(order.status) || isAutoPickOrderDeletedStatus(order.status);
+        const platform = String(order.platform || "").trim();
+        const addPlatformCount = (prefix: "realOrder" | "brushOrder" | "cancelledOrder") => {
+          if (platform === "美团") {
+            dataMap[key][`${prefix}Meituan`] += 1;
+          } else if (platform === "京东") {
+            dataMap[key][`${prefix}Jingdong`] += 1;
+          } else if (platform === "淘宝") {
+            dataMap[key][`${prefix}Taobao`] += 1;
+          } else if (platform.includes("抖店") || platform.includes("抖音") || platform.toLowerCase() === "doudian" || platform.toLowerCase() === "douyin") {
+            dataMap[key][`${prefix}Doudian`] += 1;
+          }
+        };
 
         if (isCancelled) {
           dataMap[key].cancelledOrderCount += 1;
+          addPlatformCount("cancelledOrder");
         } else if (isBrush) {
           dataMap[key].brushOrderCount += 1;
+          addPlatformCount("brushOrder");
         } else {
           dataMap[key].realOrderCount += 1;
-          if (order.platform === "美团") {
-            dataMap[key].realOrderMeituan += 1;
-          } else if (order.platform === "京东") {
-            dataMap[key].realOrderJingdong += 1;
-          } else if (order.platform === "淘宝") {
-            dataMap[key].realOrderTaobao += 1;
-          } else if (String(order.platform || "").includes("抖店") || String(order.platform || "").includes("抖音") || String(order.platform || "").toLowerCase() === "doudian" || String(order.platform || "").toLowerCase() === "douyin") {
-            dataMap[key].realOrderDoudian += 1;
-          }
+          addPlatformCount("realOrder");
         }
       }
     });

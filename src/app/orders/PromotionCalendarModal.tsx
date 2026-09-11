@@ -129,7 +129,15 @@ interface DayData {
   realOrderTaobao: number;
   realOrderDoudian: number;
   brushOrderCount: number;
+  brushOrderMeituan?: number;
+  brushOrderJingdong?: number;
+  brushOrderTaobao?: number;
+  brushOrderDoudian?: number;
   cancelledOrderCount: number;
+  cancelledOrderMeituan?: number;
+  cancelledOrderJingdong?: number;
+  cancelledOrderTaobao?: number;
+  cancelledOrderDoudian?: number;
   shopBreakdown?: Record<string, number>;
 }
 
@@ -506,23 +514,56 @@ export function PromotionCalendarModal({
     const cancelled = detail.cancelledOrderCount || 0;
     const total = real + brush + cancelled;
     return {
+      detail,
       real,
       brush,
       cancelled,
       total,
-      realPercent: total > 0 ? (real / total) * 100 : 0,
-      brushPercent: total > 0 ? (brush / total) * 100 : 0,
-      cancelledPercent: total > 0 ? (cancelled / total) * 100 : 0,
     };
   }, [selectedDateStr, calendarData]);
+
+  const orderCompositionCards = useMemo(() => {
+    if (!selectedDayInfo) return [];
+    const detail = selectedDayInfo.detail;
+    const platformRows = [
+      { label: "美团", logo: "/platform/美团.svg", real: detail.realOrderMeituan || 0, brush: detail.brushOrderMeituan || 0, cancelled: detail.cancelledOrderMeituan || 0 },
+      { label: "京东", logo: "/platform/京东.svg", real: detail.realOrderJingdong || 0, brush: detail.brushOrderJingdong || 0, cancelled: detail.cancelledOrderJingdong || 0 },
+      { label: "淘宝", logo: "/platform/淘宝.svg", real: detail.realOrderTaobao || 0, brush: detail.brushOrderTaobao || 0, cancelled: detail.cancelledOrderTaobao || 0 },
+      { label: "抖店", logo: "/platform/doudian.svg", real: detail.realOrderDoudian || 0, brush: detail.brushOrderDoudian || 0, cancelled: detail.cancelledOrderDoudian || 0 },
+    ];
+
+    return [
+      {
+        key: "real",
+        title: "真单",
+        count: selectedDayInfo.real,
+        rows: platformRows.filter((row) => row.real > 0).map((row) => ({ label: row.label, logo: row.logo, count: row.real })),
+        className: "border-sky-500/20 bg-sky-500/[0.08] text-sky-600 dark:bg-sky-500/[0.12] dark:text-sky-300",
+      },
+      {
+        key: "brush",
+        title: "刷单",
+        count: selectedDayInfo.brush,
+        rows: platformRows.filter((row) => row.brush > 0).map((row) => ({ label: row.label, logo: row.logo, count: row.brush })),
+        className: "border-rose-500/20 bg-rose-500/[0.08] text-rose-600 dark:bg-rose-500/[0.12] dark:text-rose-300",
+      },
+      {
+        key: "cancelled",
+        title: "取消",
+        count: selectedDayInfo.cancelled,
+        rows: platformRows.filter((row) => row.cancelled > 0).map((row) => ({ label: row.label, logo: row.logo, count: row.cancelled })),
+        className: "border-amber-500/20 bg-amber-500/[0.08] text-amber-600 dark:bg-amber-500/[0.12] dark:text-amber-300",
+      },
+    ];
+  }, [selectedDayInfo]);
 
   return createPortal(
     <div className="fixed inset-0 z-100000 flex items-center justify-center p-3 sm:p-4">
       {/* 蒙层 */}
-      <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-slate-950/45 backdrop-blur-md" onClick={onClose} />
       
       {/* 弹窗主体（高阶微质感与现代全胶囊体系） */}
-      <div className="relative flex h-auto max-h-[95dvh] md:h-[90dvh] md:max-h-[700px] w-full max-w-5xl flex-col overflow-y-auto overscroll-contain md:overflow-hidden rounded-[28px] sm:rounded-[32px] border border-border/70 bg-white dark:bg-zinc-900 shadow-2xl shadow-black/10 dark:shadow-black/50 md:flex-row">
+      <div className="relative flex h-auto max-h-[95dvh] md:h-[90dvh] md:max-h-[700px] w-full max-w-5xl flex-col overflow-y-auto overscroll-contain md:overflow-hidden rounded-[28px] sm:rounded-[32px] border border-black/8 bg-white/95 shadow-2xl shadow-black/10 backdrop-blur-2xl dark:border-white/10 dark:bg-[#111827]/92 dark:shadow-black/50 md:flex-row">
         
         {/* 左侧日历主栏 */}
         <div className={`flex flex-col shrink-0 md:shrink p-4 sm:p-6 ${
@@ -570,27 +611,27 @@ export function PromotionCalendarModal({
             <div className="flex items-center justify-end gap-1.5 w-full sm:w-auto">
               <button
                 onClick={handleBackToToday}
-                className="rounded-full border border-border/70 bg-white px-3 py-1.5 text-xs font-bold text-foreground hover:bg-zinc-100 dark:border-white/10 dark:bg-zinc-800 dark:hover:bg-zinc-700 transition-all cursor-pointer active:scale-95 whitespace-nowrap shadow-2xs"
+                className="rounded-full border border-border/70 bg-white px-3 py-1.5 text-xs font-bold text-foreground hover:bg-zinc-100 dark:border-white/10 dark:bg-white/[0.06] dark:hover:bg-white/[0.1] transition-all cursor-pointer active:scale-95 whitespace-nowrap shadow-2xs"
               >
                 今天
               </button>
               <button
                 onClick={handlePrevMonth}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border/70 bg-white text-muted-foreground hover:text-foreground hover:bg-zinc-100 dark:border-white/10 dark:bg-zinc-800 dark:hover:bg-zinc-700 cursor-pointer active:scale-90 shadow-2xs transition-all"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border/70 bg-white text-muted-foreground hover:text-foreground hover:bg-zinc-100 dark:border-white/10 dark:bg-white/[0.06] dark:hover:bg-white/[0.1] cursor-pointer active:scale-90 shadow-2xs transition-all"
                 title="上个月"
               >
                 <ChevronLeft size={16} />
               </button>
               <button
                 onClick={handleNextMonth}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border/70 bg-white text-muted-foreground hover:text-foreground hover:bg-zinc-100 dark:border-white/10 dark:bg-zinc-800 dark:hover:bg-zinc-700 cursor-pointer active:scale-90 shadow-2xs transition-all"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border/70 bg-white text-muted-foreground hover:text-foreground hover:bg-zinc-100 dark:border-white/10 dark:bg-white/[0.06] dark:hover:bg-white/[0.1] cursor-pointer active:scale-90 shadow-2xs transition-all"
                 title="下个月"
               >
                 <ChevronRight size={16} />
               </button>
               <button
                 onClick={onClose}
-                className={`${activeTab === "chart" ? "" : "md:hidden"} inline-flex h-8 w-8 items-center justify-center rounded-full border border-border/70 bg-white text-muted-foreground hover:text-foreground hover:bg-zinc-100 dark:border-white/10 dark:bg-zinc-800 dark:hover:bg-zinc-700 cursor-pointer shadow-2xs transition-all`}
+                className={`${activeTab === "chart" ? "" : "md:hidden"} inline-flex h-8 w-8 items-center justify-center rounded-full border border-border/70 bg-white text-muted-foreground hover:text-foreground hover:bg-zinc-100 dark:border-white/10 dark:bg-white/[0.06] dark:hover:bg-white/[0.1] cursor-pointer shadow-2xs transition-all`}
               >
                 <X size={16} />
               </button>
@@ -644,7 +685,7 @@ export function PromotionCalendarModal({
                           ? "border-orange-500 bg-orange-50 dark:border-orange-500 dark:bg-orange-950/20 shadow-sm"
                           : isToday
                           ? "border-orange-500/50 bg-orange-50/50 dark:border-orange-500/30 dark:bg-orange-500/4 shadow-2xs"
-                          : "border-slate-100 bg-slate-50/70 hover:bg-slate-100/50 dark:border-white/5 dark:bg-white/2 dark:hover:bg-white/5"
+                          : "border-black/6 bg-white/72 hover:bg-white dark:border-white/8 dark:bg-white/[0.045] dark:hover:bg-white/[0.075]"
                       }`}
                     >
                       {/* 顶部：日期数字 */}
@@ -719,7 +760,7 @@ export function PromotionCalendarModal({
                       className={`flex items-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-xs transition-all cursor-pointer ${
                         chartPlatform === p.key
                           ? p.activeColor
-                          : "border-slate-100 bg-slate-50/50 text-muted-foreground hover:text-foreground dark:border-white/10 dark:bg-white/4 dark:hover:bg-white/6"
+                          : "border-black/6 bg-white/72 text-muted-foreground hover:bg-white hover:text-foreground dark:border-white/10 dark:bg-white/[0.045] dark:hover:bg-white/[0.075]"
                       }`}
                     >
                       <img src={p.logo} alt={p.label} className="h-3.5 w-3.5 object-contain" />
@@ -738,13 +779,13 @@ export function PromotionCalendarModal({
                       ...localShops.map((shop) => ({ value: shop.name, label: shop.name })),
                     ]}
                     className="h-8 w-32 shrink-0"
-                    triggerClassName="h-full rounded-full border border-border/70 bg-white px-3 text-xs font-bold shadow-2xs dark:border-white/10 dark:bg-zinc-800"
+                    triggerClassName="h-full rounded-full border border-border/70 bg-white px-3 text-xs font-bold shadow-2xs dark:border-white/10 dark:bg-white/[0.06]"
                    />
                 )}
               </div>
 
               {/* 折线图图表 */}
-              <div className="h-[260px] md:h-[380px] bg-zinc-50/70 dark:bg-white/[0.02] rounded-2xl border border-border/60 p-3 sm:p-4 flex flex-col justify-between">
+              <div className="h-[260px] md:h-[380px] rounded-2xl border border-black/6 bg-white/72 p-3 shadow-2xs dark:border-white/8 dark:bg-white/[0.04] sm:p-4 flex flex-col justify-between">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart
                     data={chartData}
@@ -818,19 +859,19 @@ export function PromotionCalendarModal({
 
               {/* 汇总指标卡片 */}
               <div className="grid grid-cols-3 gap-1.5 sm:gap-3">
-                <div className="rounded-2xl border border-border/60 bg-white p-2.5 sm:p-3 shadow-2xs dark:border-white/8 dark:bg-white/[0.02] overflow-hidden">
+                <div className="rounded-2xl border border-black/6 bg-white/78 p-2.5 sm:p-3 shadow-2xs dark:border-white/8 dark:bg-white/[0.04] overflow-hidden">
                   <span className="text-[9px] sm:text-[10px] font-bold text-muted-foreground block uppercase truncate tracking-wider">累计推广费</span>
                   <span className="text-xs sm:text-sm font-black text-foreground mt-0.5 block tabular-nums truncate">
                     {summaryInfo.totalPromo > 0 ? "-" : ""}¥{summaryInfo.totalPromo.toFixed(2)}
                   </span>
                 </div>
-                <div className="rounded-2xl border border-border/60 bg-white p-2.5 sm:p-3 shadow-2xs dark:border-white/8 dark:bg-white/[0.02] overflow-hidden">
+                <div className="rounded-2xl border border-black/6 bg-white/78 p-2.5 sm:p-3 shadow-2xs dark:border-white/8 dark:bg-white/[0.04] overflow-hidden">
                   <span className="text-[9px] sm:text-[10px] font-bold text-muted-foreground block uppercase truncate tracking-wider">真实订单量</span>
                   <span className="text-xs sm:text-sm font-black text-foreground mt-0.5 block tabular-nums truncate">
                     {summaryInfo.totalOrders} 单
                   </span>
                 </div>
-                <div className="rounded-2xl border border-border/60 bg-white p-2.5 sm:p-3 shadow-2xs dark:border-white/8 dark:bg-white/[0.02] overflow-hidden">
+                <div className="rounded-2xl border border-black/6 bg-white/78 p-2.5 sm:p-3 shadow-2xs dark:border-white/8 dark:bg-white/[0.04] overflow-hidden">
                   <span className="text-[9px] sm:text-[10px] font-bold text-muted-foreground block uppercase truncate tracking-wider">单均推广成本</span>
                   <span className="text-xs sm:text-sm font-black text-foreground mt-0.5 block tabular-nums truncate">
                     ¥{summaryInfo.avgCostPerOrder.toFixed(2)}
@@ -844,7 +885,7 @@ export function PromotionCalendarModal({
         {/* 右侧编辑侧边栏 */}
         {/* 右侧编辑侧边栏 */}
         {activeTab === "calendar" && (
-          <div className="flex w-full flex-col p-5 md:w-[320px] md:p-6 justify-between border-t md:border-t-0 border-border/60 bg-zinc-50/40 dark:bg-white/[0.01]">
+          <div className="flex w-full flex-col p-5 md:w-[320px] md:p-6 justify-between border-t border-border/60 bg-zinc-50/65 dark:bg-white/[0.035] md:border-t-0">
           
           <div className="space-y-5">
             {/* 选中日期标题与关闭按钮 */}
@@ -860,7 +901,7 @@ export function PromotionCalendarModal({
               </div>
               <button
                 onClick={onClose}
-                className="hidden md:inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border/70 bg-white text-muted-foreground transition-all hover:text-foreground hover:bg-zinc-100 dark:border-white/10 dark:bg-zinc-800 dark:hover:bg-zinc-700 cursor-pointer shadow-2xs"
+                className="hidden md:inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border/70 bg-white text-muted-foreground transition-all hover:text-foreground hover:bg-zinc-100 dark:border-white/10 dark:bg-white/[0.06] dark:hover:bg-white/[0.1] cursor-pointer shadow-2xs"
                 title="关闭"
               >
                 <X size={16} />
@@ -869,35 +910,33 @@ export function PromotionCalendarModal({
 
             {/* 每日订单统计卡片 */}
             {selectedDayInfo && (
-              <div className="rounded-2xl border border-border/60 bg-white dark:bg-zinc-800/50 p-4 shadow-2xs space-y-3">
+              <div className="rounded-2xl border border-black/6 bg-white/78 p-4 shadow-2xs space-y-3 dark:border-white/8 dark:bg-white/[0.045]">
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
                   <span className="font-bold">订单构成</span>
                   <span className="font-mono font-bold text-foreground">{selectedDayInfo.total} 单</span>
                 </div>
-                
-                {/* 胶囊纯色进度条 */}
-                <div className="relative h-3 w-full overflow-hidden rounded-full bg-muted flex shadow-inner">
-                  {selectedDayInfo.total > 0 ? (
-                    <>
-                      <div className="bg-emerald-500" style={{ width: `${selectedDayInfo.realPercent}%` }} />
-                      <div className="bg-rose-500" style={{ width: `${selectedDayInfo.brushPercent}%` }} />
-                      <div className="bg-slate-400 dark:bg-slate-600" style={{ width: `${selectedDayInfo.cancelledPercent}%` }} />
-                    </>
-                  ) : (
-                    <div className="h-full w-full bg-muted/60" />
-                  )}
-                </div>
-
-                <div className="grid grid-cols-3 gap-2 text-center text-xs">
-                  <div className="rounded-full bg-emerald-500/10 py-1.5 border border-emerald-500/20">
-                    <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">真实 {selectedDayInfo.real}</span>
-                  </div>
-                  <div className="rounded-full bg-rose-500/10 py-1.5 border border-rose-500/20">
-                    <span className="text-[11px] font-bold text-rose-600 dark:text-rose-400">刷单 {selectedDayInfo.brush}</span>
-                  </div>
-                  <div className="rounded-full bg-zinc-500/10 py-1.5 border border-zinc-500/20">
-                    <span className="text-[11px] font-bold text-zinc-600 dark:text-zinc-400">取消 {selectedDayInfo.cancelled}</span>
-                  </div>
+                <div className="grid gap-2">
+                  {orderCompositionCards.map((card) => (
+                    <div key={card.key} className={cn("rounded-2xl border p-3", card.className)}>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-black">{card.title}</span>
+                        <span className="font-mono font-black text-foreground">{card.count}单</span>
+                      </div>
+                      <div className="mt-2 space-y-1.5">
+                        {card.rows.length > 0 ? card.rows.map((row) => (
+                          <div key={row.label} className="flex items-center justify-between gap-3 text-[11px] text-foreground">
+                            <span className="flex min-w-0 items-center gap-1.5 font-bold">
+                              <img src={row.logo} alt={row.label} className="h-3.5 w-3.5 shrink-0 object-contain" />
+                              <span className="truncate">{row.label}</span>
+                            </span>
+                            <span className="shrink-0 font-mono font-bold">{row.count}单</span>
+                          </div>
+                        )) : (
+                          <div className="text-[11px] font-bold text-muted-foreground/70">暂无订单</div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
@@ -914,7 +953,7 @@ export function PromotionCalendarModal({
                     label: shop.name,
                   }))}
                   className="h-10"
-                  triggerClassName="h-full rounded-full border border-border/70 bg-white px-4 text-xs font-bold shadow-2xs dark:border-white/10 dark:bg-zinc-800"
+                  triggerClassName="h-full rounded-full border border-border/70 bg-white px-4 text-xs font-bold shadow-2xs dark:border-white/10 dark:bg-white/[0.06]"
                 />
               </div>
             )}
@@ -930,7 +969,7 @@ export function PromotionCalendarModal({
               {PROMOTION_PLATFORM_ROWS.map((row) => (
                 <label
                   key={row.key}
-                  className="flex items-center gap-3 rounded-full border border-border/70 bg-white px-3.5 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary/50 transition-all dark:border-white/10 dark:bg-zinc-800/80 cursor-text shadow-2xs hover:border-border"
+                  className="flex items-center gap-3 rounded-full border border-border/70 bg-white px-3.5 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary/50 transition-all dark:border-white/10 dark:bg-white/[0.06] cursor-text shadow-2xs hover:border-border dark:hover:bg-white/[0.08]"
                 >
                   {/* 平台 Logo */}
                   <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted/60 p-0.5">

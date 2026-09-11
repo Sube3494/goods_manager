@@ -14,7 +14,7 @@ import {
   normalizeExternalId,
   normalizeShopNameKey,
 } from "@/lib/shopIdentity";
-import { normalizeAutoPickIntegrationConfig, readMaiyatianUserCoordinate } from "@/lib/autoPickOrders";
+import { normalizeAutoPickIntegrationConfig } from "@/lib/autoPickOrders";
 
 export const dynamic = "force-dynamic";
 
@@ -414,11 +414,6 @@ export async function GET(request: NextRequest) {
         latitude: s.latitude,
       })),
       orders: renderableOrders.map((o) => {
-        const rawPayload = o.rawPayload && typeof o.rawPayload === "object" && !Array.isArray(o.rawPayload)
-          ? o.rawPayload as Record<string, unknown>
-          : {};
-        const preciseLng = readMaiyatianUserCoordinate(rawPayload, "longitude");
-        const preciseLat = readMaiyatianUserCoordinate(rawPayload, "latitude");
         return {
           id: o.id,
           orderNo: o.orderNo,
@@ -426,8 +421,8 @@ export async function GET(request: NextRequest) {
           platform: normalizeDisplayPlatform(o.platform),
           orderTime: o.orderTime,
           userAddress: o.userAddress,
-          lng: preciseLng || o.longitude,
-          lat: preciseLat || o.latitude,
+          lng: o.longitude,
+          lat: o.latitude,
           actualPaid: o.actualPaid,
           status: o.status,
           distanceKm: o.distanceKm,

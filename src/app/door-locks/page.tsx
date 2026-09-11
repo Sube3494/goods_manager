@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Battery, ChevronDown, Copy, Cpu, DoorOpen, Fingerprint, KeyRound, Layers, Loader2, LockKeyhole, ShieldCheck, Timer, Wifi, WifiOff, X } from "lucide-react";
+import { Battery, ChevronDown, Copy, Cpu, DoorOpen, Fingerprint, KeyRound, Layers, Loader2, LockKeyhole, Timer, Wifi, WifiOff, X } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { TimePicker } from "@/components/ui/TimePicker";
@@ -556,30 +556,26 @@ export default function DoorLocksPage() {
   return (
     <div className="space-y-6 pb-20 animate-in fade-in duration-300">
       {/* 门锁管理平铺大标题 Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black tracking-widest uppercase bg-primary/10 border border-primary/20 text-primary mb-2 shadow-2xs">
-            <ShieldCheck size={12} />
-            <span>TTLOCK 智能硬件中枢</span>
-          </div>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
           <h1 className="text-2xl sm:text-4xl font-bold tracking-tight text-foreground">门锁管理</h1>
-          <p className="hidden sm:block text-muted-foreground mt-1.5 text-sm">
+          <p className="mt-1.5 max-w-[260px] text-xs leading-relaxed text-muted-foreground sm:max-w-none sm:text-sm">
             集成 TTLock 智能云门锁体系，支持实时在线监测、离线密码生成与远程极速开门。
           </p>
         </div>
 
         {/* 状态徽章组合 */}
-        <div className="flex items-center gap-2.5 shrink-0">
-          <div className="flex items-center gap-2 px-4 py-2 rounded-full border border-border/60 bg-white/70 dark:bg-white/5 dark:border-white/10 shadow-2xs backdrop-blur-md">
+        <div className="flex shrink-0 items-center justify-end gap-2.5 sm:items-center">
+          <div className="flex h-9 items-center gap-2 rounded-full border border-border/60 bg-white/70 px-3 shadow-2xs backdrop-blur-md dark:border-white/10 dark:bg-white/5 sm:h-auto sm:px-4 sm:py-2">
             <span className={cn("h-2 w-2 rounded-full", config?.linked ? "bg-emerald-500 animate-pulse" : "bg-muted-foreground")} />
-            <span className="text-xs font-bold text-foreground">
+            <span className="text-[11px] font-bold text-foreground sm:text-xs">
               {config?.linked ? "已授权连接" : "未授权连接"}
             </span>
           </div>
 
-          <div className="flex items-center gap-1.5 px-4 py-2 rounded-full border border-border/60 bg-white/70 dark:bg-white/5 dark:border-white/10 shadow-2xs backdrop-blur-md">
+          <div className="flex h-9 items-center gap-1.5 rounded-full border border-border/60 bg-white/70 px-3 shadow-2xs backdrop-blur-md dark:border-white/10 dark:bg-white/5 sm:h-auto sm:px-4 sm:py-2">
             <DoorOpen size={14} className="text-primary" />
-            <span className="text-xs font-bold text-foreground">{locks.length}</span>
+            <span className="text-[11px] font-bold text-foreground sm:text-xs">{locks.length}</span>
             <span className="text-[11px] text-muted-foreground">台门锁</span>
           </div>
         </div>

@@ -13,6 +13,7 @@ export async function GET(request: NextRequest) {
     }
 
     const storage = await getStorageStrategy();
+    await prisma.$transaction((tx) => InventoryService.reconcileShelfLifeBatchesForUser(tx, user.id));
 
     const search = request.nextUrl.searchParams.get("search") || "";
     const status = request.nextUrl.searchParams.get("status") || "all"; // all, expired, critical, warning, safe

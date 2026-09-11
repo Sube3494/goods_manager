@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
 import { startOfDay } from "date-fns";
+import { InventoryService } from "@/services/inventoryService";
 
 export async function GET() {
   try {
@@ -12,6 +13,7 @@ export async function GET() {
 
     const now = new Date();
     const today = startOfDay(now);
+    await prisma.$transaction((tx) => InventoryService.reconcileShelfLifeBatchesForUser(tx, user.id));
 
     // 获取该用户所有开启了保质期的批次，且仅限制在个人中心地址库店铺
     const allBatches = await prisma.productBatch.findMany({

@@ -16,6 +16,87 @@ type OutboundFifoItemSnapshot = {
  * 库存核心服务
  */
 export class InventoryService {
+  static async reconcileShelfLifeBatchesForUser(
+    tx: Prisma.TransactionClient,
+    userId: string
+  ) {
+    const batches = await tx.productBatch.findMany({
+      where: {
+        OR: [
+          { userId },
+          { product: { userId } },
+        ],
+        purchaseOrderItemId: { not: null },
+      },
+      select: {
+        id: true,
+        remainingStock: true,
+        purchaseOrderItem: {
+          select: {
+            quantity: true,
+            remainingQuantity: true,
+            purchaseOrder: {
+              select: { status: true },
+            },
+          },
+        },
+      },
+    });
+
+    for (const batch of batches) {
+      const isReceived = batch.purchaseOrderItem?.purchaseOrder?.status === "Received";
+      const expectedRemaining = isReceived
+        ? Math.max(0, Number(batch.purchaseOrderItem?.remainingQuantity ?? batch.purchaseOrderItem?.quantity ?? 0) || 0)
+        : 0;
+
+      if (batch.remainingStock !== expectedRemaining) {
+        await tx.productBatch.update({
+          where: { id: batch.id },
+          data: { remainingStock: expectedRemaining },
+        });
+      }
+    }
+  }
+
+  private static async syncShelfLifeBatchesFromPurchaseItems(
+    tx: Prisma.TransactionClient,
+    productId: string | null,
+    shopProductId: string | null
+  ) {
+    const batches = await tx.productBatch.findMany({
+      where: {
+        ...(shopProductId ? { shopProductId } : productId ? { productId } : {}),
+        purchaseOrderItemId: { not: null },
+        purchaseOrderItem: {
+          purchaseOrder: { status: "Received" },
+        },
+      },
+      select: {
+        id: true,
+        remainingStock: true,
+        purchaseOrderItem: {
+          select: {
+            quantity: true,
+            remainingQuantity: true,
+          },
+        },
+      },
+    });
+
+    for (const batch of batches) {
+      const expectedRemaining = Math.max(
+        0,
+        Number(batch.purchaseOrderItem?.remainingQuantity ?? batch.purchaseOrderItem?.quantity ?? 0) || 0
+      );
+      if (batch.remainingStock !== expectedRemaining) {
+        await tx.productBatch.update({
+          where: { id: batch.id },
+          data: { remainingStock: expectedRemaining },
+        });
+      }
+    }
+  }
+
   /**
    * 处理出库的 FIFO (先进先出) 扣减逻辑
    * @param tx Prisma 事务客户端
@@ -165,6 +246,8 @@ export class InventoryService {
     shopProductId: string | null
   ) {
     if (shopProductId) {
+      await this.syncShelfLifeBatchesFromPurchaseItems(tx, null, shopProductId);
+
       // 聚合所有有效的店铺采购批次
       const aggregateResult = await tx.purchaseOrderItem.aggregate({
         where: {
@@ -192,6 +275,8 @@ export class InventoryService {
         await this.syncStockFromBatches(tx, sp.productId, null);
       }
     } else if (productId) {
+      await this.syncShelfLifeBatchesFromPurchaseItems(tx, productId, null);
+
       // 聚合所有有效的全局采购批次（包括所有店铺的）
       const aggregateResult = await tx.purchaseOrderItem.aggregate({
         where: {

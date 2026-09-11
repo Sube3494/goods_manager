@@ -371,6 +371,15 @@ export async function PUT(
           })
         : undefined;
 
+      if (sanitizedItems && existingPurchase.status === "Received") {
+        await tx.productBatch.updateMany({
+          where: {
+            purchaseOrderItemId: { in: existingPurchase.items.map((item) => item.id) },
+          },
+          data: { remainingStock: 0 },
+        });
+      }
+
       const p = await tx.purchaseOrder.update({
         where: { id },
         data: {
@@ -526,6 +535,12 @@ export async function PUT(
           where: { purchaseOrderId: id },
           data: { remainingQuantity: null },
         });
+        await tx.productBatch.updateMany({
+          where: {
+            purchaseOrderItemId: { in: existingPurchase.items.map((item) => item.id) },
+          },
+          data: { remainingStock: 0 },
+        });
 
         // 撤销入库后，同步物理库存
         for (const item of existingPurchase.items) {
@@ -614,6 +629,13 @@ export async function DELETE(
           }
         }
       }
+
+      await tx.productBatch.updateMany({
+        where: {
+          purchaseOrderItemId: { in: existingPurchase.items.map((item) => item.id) },
+        },
+        data: { remainingStock: 0 },
+      });
 
       await tx.purchaseOrderItem.deleteMany({
         where: { purchaseOrderId: id }
