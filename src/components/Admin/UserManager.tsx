@@ -12,7 +12,7 @@ import { ActionBar } from "@/components/ui/ActionBar";
 import { UserOrdersModal } from "@/components/Admin/UserOrdersModal";
 import { createPortal } from "react-dom";
 import { useUser } from "@/hooks/useUser";
-import { hasAdminAccess, hasDirectPermission, SessionUser } from "@/lib/permissions";
+import { hasAdminAccess, hasDirectPermission, SessionUser, PAGE_PERMISSION_TREE } from "@/lib/permissions";
 import { pinyinMatch } from "@/lib/pinyin";
 import { formatLocalDateTime } from "@/lib/dateUtils";
 
@@ -60,39 +60,78 @@ interface WhitelistEntry {
   };
 }
 
-export function getMemberPermissionCount(entry: WhitelistEntry): number {
+export function parsePermissions(raw: unknown): Record<string, boolean> {
+  if (!raw) return {};
+  if (typeof raw === "string") {
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object") return parsed as Record<string, boolean>;
+    } catch {
+      return {};
+    }
+  }
+  if (typeof raw === "object" && !Array.isArray(raw)) {
+    return raw as Record<string, boolean>;
+  }
+  return {};
+}
+
+export function getMemberPermissionCount(
+  entry: WhitelistEntry,
+  rolesList?: RoleProfile[]
+): number {
   if (entry.user?.role === "SUPER_ADMIN") {
     return 999999;
   }
 
-  const profile = entry.user?.roleProfile || entry.roleProfile;
-  const profilePermissions = (profile?.permissions && typeof profile.permissions === "object")
-    ? (profile.permissions as Record<string, boolean>)
-    : {};
+  // 优先通过角色 ID 在完整角色列表中查找，确保获得最完整的 permissions
+  const roleId =
+    entry.user?.roleProfileId ||
+    entry.roleProfileId ||
+    entry.user?.roleProfile?.id ||
+    entry.roleProfile?.id;
+  const profileFromList = rolesList && roleId ? rolesList.find((r) => r.id === roleId) : null;
+  const profile = profileFromList || entry.user?.roleProfile || entry.roleProfile;
 
-  const basePermissions: Record<string, boolean> = profile?.name === "基础访客" ? {
-    "gallery:download": true,
-    "gallery:share": true,
-    "gallery:copy": true,
-  } : {};
+  const profilePermissions = parsePermissions(profile?.permissions);
 
-  const rawUserOverrides = entry.user?.permissions;
-  const userOverrides: Record<string, boolean> = {};
-  if (rawUserOverrides && typeof rawUserOverrides === "object" && !Array.isArray(rawUserOverrides)) {
-    for (const [key, val] of Object.entries(rawUserOverrides)) {
-      if (typeof val === "boolean") {
-        userOverrides[key] = val;
-      }
-    }
+  if (profilePermissions["all"] === true) {
+    return 99999;
   }
 
-  const effective = {
+  const basePermissions: Record<string, boolean> =
+    profile?.name === "基础访客"
+      ? {
+          "gallery:download": true,
+          "gallery:share": true,
+          "gallery:copy": true,
+        }
+      : {};
+
+  const rawUserOverrides = parsePermissions(entry.user?.permissions);
+
+  const effective: Record<string, boolean> = {
     ...basePermissions,
     ...profilePermissions,
-    ...userOverrides,
+    ...rawUserOverrides,
   };
 
-  return Object.values(effective).filter((val) => val === true).length;
+  if (effective["all"] === true) {
+    return 99999;
+  }
+
+  let treeCount = 0;
+  PAGE_PERMISSION_TREE.forEach((group) => {
+    group.pages.forEach((page) => {
+      if (effective[page.accessKey]) treeCount += 1;
+      page.actions.forEach((action) => {
+        if (effective[action.key]) treeCount += 1;
+      });
+    });
+  });
+
+  const directCount = Object.values(effective).filter((val) => val === true).length;
+  return Math.max(treeCount, directCount);
 }
 
 export function getRegisteredTime(entry: WhitelistEntry): number {
@@ -620,8 +659,8 @@ export function UserManager() {
     }
 
     return [...result].sort((a, b) => {
-      // 1. 权限项多的排在前面
-      const permDiff = getMemberPermissionCount(b) - getMemberPermissionCount(a);
+      // 1. 权限项多的排在前面（优先结合权威 roles 列表计算）
+      const permDiff = getMemberPermissionCount(b, roles) - getMemberPermissionCount(a, roles);
       if (permDiff !== 0) return permDiff;
 
       // 2. 权限一样按注册时间排在前面
@@ -631,7 +670,7 @@ export function UserManager() {
       // 3. 邮箱字符序兜底
       return a.email.localeCompare(b.email);
     });
-  }, [entries, searchQuery]);
+  }, [entries, roles, searchQuery]);
 
   const selectedEntries = useMemo(
     () => filteredEntries.filter((entry) => selectedEmails.includes(entry.email)),
