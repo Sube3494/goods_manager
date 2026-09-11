@@ -10,13 +10,14 @@ export function DataOverviewSkeleton() {
       {/* 1. 顶部经营概况核心卡片区 */}
       <div className="grid items-stretch gap-4 sm:gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(340px,0.85fr)]">
         {/* 左侧：经营概况核心大卡片 */}
-        <section className="flex h-full min-w-0 flex-col justify-between rounded-[28px] border border-black/8 bg-white/75 p-4 shadow-xs backdrop-blur-sm dark:border-white/10 dark:bg-white/4 sm:p-5 lg:p-6">
+        <section className="relative overflow-hidden flex h-full min-w-0 flex-col justify-between rounded-[28px] border border-black/8 bg-white/75 p-4.5 shadow-xs backdrop-blur-md dark:border-white/10 dark:bg-white/4 sm:p-5 lg:p-6">
           <div>
             {/* 顶栏标题与状态胶囊 */}
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <div className="h-5 w-5 rounded-md bg-black/6 dark:bg-white/8" />
                 <div className="h-4 w-16 rounded-md bg-black/6 dark:bg-white/8" />
+                <div className="h-4 w-20 rounded-full bg-black/5 dark:bg-white/6" />
               </div>
               <div className="h-6 w-20 rounded-full bg-black/6 dark:bg-white/8" />
             </div>

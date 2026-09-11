@@ -682,147 +682,218 @@ export function DataOverview({
         <div className={cn("space-y-5 sm:space-y-8 transition-opacity duration-300", isLoading && "opacity-65 pointer-events-none")}>
           <div className="grid items-stretch gap-4 sm:gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(340px,0.85fr)]">
             {/* 左侧：经营概况核心卡片 */}
-            <section className="flex h-full min-w-0 flex-col justify-between rounded-[28px] border border-black/8 bg-white/75 p-4 shadow-xs backdrop-blur-sm dark:border-white/10 dark:bg-white/4 sm:p-5 lg:p-6">
-            {/* 顶部净利润核心指标 */}
-            <div>
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <span className="flex h-5 w-5 items-center justify-center rounded-md bg-primary/10 text-primary">
-                    <Layers className="h-3.5 w-3.5" />
-                  </span>
-                  <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground">经营概况</span>
-                </div>
-
-                <div className={cn(
-                  "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-bold transition-colors",
+            <section className="relative overflow-hidden flex h-full min-w-0 flex-col justify-between rounded-[28px] border border-black/8 bg-white/75 p-4.5 shadow-xs backdrop-blur-md dark:border-white/10 dark:bg-white/4 sm:p-5 lg:p-6">
+              {/* 顶部环境柔和光晕 (Ambient Glow) */}
+              <div
+                className={cn(
+                  "pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full blur-3xl transition-all duration-700",
                   Number(data?.netProfit || 0) >= 0
-                    ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                    : "border-rose-500/25 bg-rose-500/10 text-rose-500 dark:text-rose-400"
-                )}>
-                  <span className={cn(
-                    "h-1.5 w-1.5 rounded-full",
-                    Number(data?.netProfit || 0) >= 0 ? "bg-emerald-500 animate-pulse" : "bg-rose-500 animate-pulse"
-                  )} />
-                  {Number(data?.netProfit || 0) >= 0 ? "净利润为正" : "净利润承压"}
-                </div>
-              </div>
-              
-              <div className="mt-2 sm:mt-2.5">
-                <div className="flex items-baseline gap-1">
-                  <span className={cn(
-                    "text-2xl font-black sm:text-3xl",
-                    Number(data?.netProfit || 0) < 0 ? "text-rose-500 dark:text-rose-400" : "text-foreground"
-                  )}>
-                    {Number(data?.netProfit || 0) < 0 ? "-" : ""}¥
-                  </span>
-                  <h2 className={cn(
-                    "overflow-hidden text-[clamp(2.2rem,3.8vw,3.6rem)] font-black leading-none tracking-tight tabular-nums",
-                    Number(data?.netProfit || 0) < 0 ? "text-rose-500 dark:text-rose-400" : "text-foreground"
-                  )}>
-                    {Math.abs(Number(data?.netProfit || 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </h2>
-                </div>
+                    ? "bg-emerald-500/[0.08] dark:bg-emerald-500/[0.12]"
+                    : "bg-rose-500/[0.08] dark:bg-rose-500/[0.12]"
+                )}
+              />
 
-                <p className="mt-1.5 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-muted-foreground/50" />
-                  {contextLabel}
-                </p>
-              </div>
-            </div>
-
-            {/* 中间收支流水三要素 */}
-            <div className="my-2.5 grid grid-cols-3 gap-1.5 rounded-2xl border border-black/5 bg-black/[0.02] p-2.5 dark:border-white/6 dark:bg-white/[0.025] sm:my-3 sm:gap-3 sm:p-3.5">
-              {[
-                { label: "用户实付", value: money(data?.userPaid), hint: "全渠道实付流水", tone: "text-foreground" },
-                { label: "商品成本", value: money(data?.productCost), hint: "货品出库总成本", tone: "text-foreground" },
-                {
-                  label: "刷单支出",
-                  value: money(data?.brushExpense),
-                  hint: "营销补单支出",
-                  tone: Number(data?.brushExpense || 0) > 0 ? "text-rose-500 dark:text-rose-400" : "text-foreground",
-                },
-              ].map((item) => (
-                <div key={item.label} className="min-w-0">
-                  <div className="text-[10px] font-bold text-muted-foreground sm:text-[11px]">{item.label}</div>
-                  <div className={cn("mt-0.5 truncate text-sm font-black tabular-nums tracking-tight sm:mt-1 sm:text-xl", item.tone)}>
-                    {item.value}
+              {/* 顶部净利润核心指标 */}
+              <div className="relative z-10">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-md bg-primary/10 text-primary">
+                      <Layers className="h-3.5 w-3.5" />
+                    </span>
+                    <span className="text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground">经营概况</span>
+                    <span className="rounded-full border border-black/6 bg-black/[0.025] px-2 py-0.5 font-mono text-[10px] font-bold text-muted-foreground dark:border-white/8 dark:bg-white/[0.04]">
+                      {contextLabel}
+                    </span>
                   </div>
-                  <div className="mt-0.5 truncate text-[9px] font-medium text-muted-foreground/80 sm:text-[11px]">{item.hint}</div>
-                </div>
-              ))}
-            </div>
 
-            {/* 底部利润构成 4 拆解项 */}
-            <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4 sm:gap-2.5">
-              {[
-                {
-                  label: "商品毛利",
-                  value: money(grossProfit),
-                  hint: "实付 - 成本",
-                  tone: grossProfit < 0 ? "text-rose-500 dark:text-rose-400" : "text-emerald-500 dark:text-emerald-400",
-                  breakdown: null,
-                },
-                {
-                  label: "渠道与扣点",
-                  value: money(commissionTotal),
-                  hint: "平台佣金与技术费",
-                  tone: "text-foreground",
-                  breakdown: [
-                    { label: "平台佣金", value: Number(data?.platformCommission || 0) },
-                    { label: "公司扣点", value: Number(data?.companyCommission || 0) },
-                  ].filter((b) => b.value !== 0),
-                },
-                {
-                  label: "运营与支出",
-                  value: money(extraExpenseTotal),
-                  hint: "配送/推广/经营成本",
-                  tone: extraExpenseTotal > 0 ? "text-rose-500 dark:text-rose-400" : "text-foreground",
-                  breakdown: [
-                    { label: "配送费", value: Number(data?.deliveryExpense || 0) },
-                    { label: "推广费", value: Number(data?.promotionExpense || 0) },
-                    { label: "刷单支出", value: Number(data?.brushExpense || 0) },
-                    { label: "经营成本", value: Number(data?.operatingExpense || 0) },
-                    { label: "其他支出", value: Number(data?.otherExpense || 0) },
-                  ].filter((b) => b.value !== 0),
-                },
-                {
-                  label: "百元净利",
-                  value: `${netMargin.toFixed(1)}元`,
-                  hint: "综合净利润率",
-                  tone: netMargin < 0 ? "text-rose-500 dark:text-rose-400" : "text-emerald-500 dark:text-emerald-400",
-                  breakdown: null,
-                },
-              ].map((item) => {
-                const hasBreakdown = Boolean(item.breakdown && item.breakdown.length > 0);
-                return (
-                  <div
-                    key={item.label}
-                    className="relative group/breakdown min-w-0 z-10 hover:z-30"
-                  >
-                    <div
-                      onClick={() => {
-                        if (hasBreakdown && typeof window !== "undefined" && window.innerWidth < 768) {
-                          setActiveBreakdown({ label: item.label, items: item.breakdown! });
-                        }
-                      }}
-                      className={cn(
-                        "relative min-w-0 rounded-2xl border border-black/5 bg-black/[0.02] p-2 transition-colors duration-150 dark:border-white/6 dark:bg-white/[0.025] sm:p-3",
-                        hasBreakdown && "cursor-default sm:cursor-pointer hover:border-black/15 hover:bg-black/[0.04] dark:hover:border-white/15 dark:hover:bg-white/[0.05]"
-                      )}
-                    >
-                      <div className="flex items-center justify-between gap-1">
-                        <div className="truncate text-[11px] font-bold text-muted-foreground sm:text-xs">{item.label}</div>
-                        {hasBreakdown ? (
-                          <span className="flex shrink-0 items-center gap-0.5 text-[10px] font-bold text-primary/80 transition-colors group-hover/breakdown:text-primary">
-                            明细 <ArrowUpRight className="h-2.5 w-2.5" />
-                          </span>
-                        ) : null}
+                  <div className={cn(
+                    "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-bold shadow-2xs transition-colors",
+                    Number(data?.netProfit || 0) >= 0
+                      ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                      : "border-rose-500/20 bg-rose-500/10 text-rose-500 dark:text-rose-400"
+                  )}>
+                    <span className={cn(
+                      "h-1.5 w-1.5 rounded-full",
+                      Number(data?.netProfit || 0) >= 0 ? "bg-emerald-500 animate-pulse" : "bg-rose-500 animate-pulse"
+                    )} />
+                    {Number(data?.netProfit || 0) >= 0 ? "净利润为正" : "净利润承压"}
+                  </div>
+                </div>
+                
+                {/* 净利润金融大字阶排印 */}
+                {(() => {
+                  const netVal = Number(data?.netProfit || 0);
+                  const isNeg = netVal < 0;
+                  const absVal = Math.abs(netVal);
+                  const formatted = absVal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                  const [intPart, decPart] = formatted.split(".");
+
+                  return (
+                    <div className="mt-2 sm:mt-2.5">
+                      <div className="flex items-baseline gap-1">
+                        <span className={cn(
+                          "font-mono text-lg sm:text-xl font-bold transition-colors mr-0.5",
+                          isNeg ? "text-rose-500 dark:text-rose-400" : "text-muted-foreground/80"
+                        )}>
+                          {isNeg ? "-¥" : "¥"}
+                        </span>
+                        <h2 className={cn(
+                          "overflow-hidden font-mono text-3xl sm:text-4xl font-black leading-none tracking-tight tabular-nums transition-colors",
+                          isNeg ? "text-rose-500 dark:text-rose-400" : "text-foreground"
+                        )}>
+                          {intPart}
+                        </h2>
+                        <span className={cn(
+                          "font-mono text-lg sm:text-xl font-bold tabular-nums transition-colors",
+                          isNeg ? "text-rose-500/80 dark:text-rose-400/80" : "text-muted-foreground/70"
+                        )}>
+                          .{decPart}
+                        </span>
                       </div>
-                      <div className={cn("mt-1 truncate text-base font-black tabular-nums tracking-tight sm:text-lg", item.tone)}>
-                        {item.value}
+
+                      <div className="mt-1.5 flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                        <span>周期综合净利润</span>
+                        <span className="h-1 w-1 rounded-full bg-muted-foreground/30" />
+                        <span className="font-mono text-[11px]">
+                          净利率 <strong className={cn("font-bold", netMargin < 0 ? "text-rose-500 dark:text-rose-400" : "text-emerald-500 dark:text-emerald-400")}>{netMargin.toFixed(1)}%</strong>
+                        </span>
                       </div>
-                      <div className="mt-0.5 truncate text-[10px] font-medium text-muted-foreground/75 sm:text-[11px]">{item.hint}</div>
                     </div>
+                  );
+                })()}
+              </div>
+
+              {/* 中间收支流水三要素：流转通透面板 */}
+              <div className="relative z-10 my-3 sm:my-3.5 grid grid-cols-3 gap-1.5 sm:gap-2.5 rounded-2xl border border-black/6 bg-gradient-to-b from-black/[0.015] to-black/[0.03] p-2.5 sm:p-3.5 dark:border-white/8 dark:from-white/[0.02] dark:to-white/[0.01]">
+                {/* 用户实付 */}
+                <div className="min-w-0 pr-1">
+                  <div className="flex items-center gap-1 text-[10px] sm:text-[11px] font-bold text-muted-foreground">
+                    <span>用户实付</span>
+                    <span className="hidden xs:inline-block rounded-xs bg-emerald-500/10 px-1 py-0.2 font-mono text-[9px] font-bold text-emerald-600 dark:text-emerald-400">
+                      流入
+                    </span>
+                  </div>
+                  <div className="mt-1 truncate text-sm sm:text-lg font-black font-mono tabular-nums tracking-tight text-foreground">
+                    {money(data?.userPaid)}
+                  </div>
+                  <div className="mt-0.5 truncate text-[9px] sm:text-[10px] text-muted-foreground/75">
+                    全渠道实付流水
+                  </div>
+                </div>
+
+                {/* 商品成本 */}
+                <div className="min-w-0 border-l border-black/6 dark:border-white/6 pl-2 sm:pl-3">
+                  <div className="flex items-center gap-1 text-[10px] sm:text-[11px] font-bold text-muted-foreground">
+                    <span>商品成本</span>
+                    {Number(data?.userPaid || 0) > 0 ? (
+                      <span className="hidden xs:inline-block rounded-xs bg-black/5 dark:bg-white/5 px-1 py-0.2 font-mono text-[9px] font-medium text-muted-foreground">
+                        {((Number(data?.productCost || 0) / Number(data?.userPaid || 0)) * 100).toFixed(0)}%
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="mt-1 truncate text-sm sm:text-lg font-black font-mono tabular-nums tracking-tight text-foreground">
+                    {money(data?.productCost)}
+                  </div>
+                  <div className="mt-0.5 truncate text-[9px] sm:text-[10px] text-muted-foreground/75">
+                    货品出库总成本
+                  </div>
+                </div>
+
+                {/* 刷单支出 */}
+                <div className="min-w-0 border-l border-black/6 dark:border-white/6 pl-2 sm:pl-3">
+                  <div className="flex items-center gap-1 text-[10px] sm:text-[11px] font-bold text-muted-foreground">
+                    <span>刷单支出</span>
+                    {Number(data?.brushExpense || 0) > 0 ? (
+                      <span className="hidden xs:inline-block rounded-xs bg-rose-500/10 px-1 py-0.2 font-mono text-[9px] font-bold text-rose-500">
+                        补单
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className={cn(
+                    "mt-1 truncate text-sm sm:text-lg font-black font-mono tabular-nums tracking-tight",
+                    Number(data?.brushExpense || 0) > 0 ? "text-rose-500 dark:text-rose-400" : "text-foreground"
+                  )}>
+                    {money(data?.brushExpense)}
+                  </div>
+                  <div className="mt-0.5 truncate text-[9px] sm:text-[10px] text-muted-foreground/75">
+                    {Number(data?.userPaid || 0) > 0 && Number(data?.brushExpense || 0) > 0
+                      ? `占流水 ${((Number(data?.brushExpense || 0) / Number(data?.userPaid || 0)) * 100).toFixed(1)}%`
+                      : "营销补单支出"}
+                  </div>
+                </div>
+              </div>
+
+              {/* 底部利润构成 4 拆解项：磨砂微卡片 */}
+              <div className="relative z-10 grid grid-cols-2 gap-1.5 sm:grid-cols-4 sm:gap-2">
+                {[
+                  {
+                    label: "商品毛利",
+                    value: money(grossProfit),
+                    hint: "实付 - 成本",
+                    tone: grossProfit < 0 ? "text-rose-500 dark:text-rose-400 font-bold" : "text-emerald-600 dark:text-emerald-400 font-black",
+                    breakdown: null,
+                  },
+                  {
+                    label: "渠道与扣点",
+                    value: money(commissionTotal),
+                    hint: "平台佣金与技术费",
+                    tone: "text-foreground font-bold",
+                    breakdown: [
+                      { label: "平台佣金", value: Number(data?.platformCommission || 0) },
+                      { label: "公司扣点", value: Number(data?.companyCommission || 0) },
+                    ].filter((b) => b.value !== 0),
+                  },
+                  {
+                    label: "运营与支出",
+                    value: money(extraExpenseTotal),
+                    hint: "配送/推广/经营成本",
+                    tone: extraExpenseTotal > 0 ? "text-rose-500 dark:text-rose-400 font-bold" : "text-foreground font-bold",
+                    breakdown: [
+                      { label: "配送费", value: Number(data?.deliveryExpense || 0) },
+                      { label: "推广费", value: Number(data?.promotionExpense || 0) },
+                      { label: "刷单支出", value: Number(data?.brushExpense || 0) },
+                      { label: "经营成本", value: Number(data?.operatingExpense || 0) },
+                      { label: "其他支出", value: Number(data?.otherExpense || 0) },
+                    ].filter((b) => b.value !== 0),
+                  },
+                  {
+                    label: "百元净利",
+                    value: `${netMargin.toFixed(1)}元`,
+                    hint: "综合净利润率",
+                    tone: netMargin < 0 ? "text-rose-500 dark:text-rose-400 font-bold" : "text-emerald-600 dark:text-emerald-400 font-black",
+                    breakdown: null,
+                  },
+                ].map((item) => {
+                  const hasBreakdown = Boolean(item.breakdown && item.breakdown.length > 0);
+                  return (
+                    <div
+                      key={item.label}
+                      className="relative group/breakdown min-w-0 z-10 hover:z-30"
+                    >
+                      <div
+                        onClick={() => {
+                          if (hasBreakdown && typeof window !== "undefined" && window.innerWidth < 768) {
+                            setActiveBreakdown({ label: item.label, items: item.breakdown! });
+                          }
+                        }}
+                        className={cn(
+                          "relative min-w-0 rounded-2xl border border-black/6 bg-white/65 p-2 transition-all duration-200 dark:border-white/8 dark:bg-white/[0.025] sm:p-2.5",
+                          hasBreakdown && "cursor-default sm:cursor-pointer hover:border-primary/30 hover:bg-white/90 dark:hover:border-primary/40 dark:hover:bg-white/[0.05]"
+                        )}
+                      >
+                        <div className="flex items-center justify-between gap-1">
+                          <div className="truncate text-[10px] sm:text-[11px] font-bold text-muted-foreground">{item.label}</div>
+                          {hasBreakdown ? (
+                            <span className="flex shrink-0 items-center gap-0.5 text-[9px] sm:text-[10px] font-bold text-primary/80 transition-colors group-hover/breakdown:text-primary">
+                              明细 <ArrowUpRight className="h-2.5 w-2.5" />
+                            </span>
+                          ) : null}
+                        </div>
+                        <div className={cn("mt-1 truncate font-mono text-sm sm:text-base tracking-tight tabular-nums", item.tone)}>
+                          {item.value}
+                        </div>
+                        <div className="mt-0.5 truncate text-[9px] sm:text-[10px] text-muted-foreground/70">{item.hint}</div>
+                      </div>
 
                     {/* PC 端原生 120fps 丝滑悬停浮层：锚定在当前卡片正上方，绝对不可能双卡片重叠 */}
                     {hasBreakdown ? (
@@ -853,20 +924,27 @@ export function DataOverview({
             </div>
           </section>
 
-          {/* 右侧：平台利润核心卡片 */}
-          <section className="flex h-full min-w-0 flex-col justify-between rounded-[28px] border border-black/8 bg-white/75 p-4 shadow-xs backdrop-blur-sm dark:border-white/10 dark:bg-white/4 sm:p-5 lg:p-6">
-            <div>
+          {/* 右侧：平台利润核心卡片（与左侧卡片完美对齐等高） */}
+          <section className="relative overflow-hidden flex h-full min-w-0 flex-col justify-between rounded-[28px] border border-black/8 bg-white/75 p-4.5 shadow-xs backdrop-blur-md dark:border-white/10 dark:bg-white/4 sm:p-5 lg:p-6">
+            {/* 顶部微光环境光晕 */}
+            <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full blur-3xl transition-all duration-700 bg-sky-500/[0.06] dark:bg-sky-500/[0.09]" />
+
+            {/* 顶栏：与左卡严格对仗统一 */}
+            <div className="relative z-10">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <span className="flex h-5 w-5 items-center justify-center rounded-md bg-emerald-500/10 text-emerald-500">
                     <Store className="h-3.5 w-3.5" />
                   </span>
-                  <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground">平台利润</span>
+                  <span className="text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground">平台利润</span>
+                  <span className="rounded-full border border-black/6 bg-black/[0.025] px-2 py-0.5 font-mono text-[10px] font-bold text-muted-foreground dark:border-white/8 dark:bg-white/[0.04]">
+                    渠道贡献排行
+                  </span>
                 </div>
 
                 {platformProfitSummary[0] ? (
                   <div className={cn(
-                    "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-bold backdrop-blur-sm",
+                    "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-bold shadow-2xs backdrop-blur-sm",
                     platformProfitSummary[0].profit < 0
                       ? "border-rose-500/20 bg-rose-500/10 text-rose-500"
                       : "border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
@@ -879,135 +957,134 @@ export function DataOverview({
                   </div>
                 ) : null}
               </div>
-              <p className="mt-1.5 text-xs font-medium text-muted-foreground">{contextLabel}</p>
+
+              <div className="mt-2 sm:mt-2.5">
+                <div className="flex items-baseline gap-2">
+                  <div className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                    渠道盈利构成
+                  </div>
+                  <span className="text-[11px] font-medium text-muted-foreground/70">
+                    各平台净利与单均产出
+                  </span>
+                </div>
+              </div>
             </div>
 
+            {/* 中间：现代通透流线排行（彻底告别沉重死板的黑表格） */}
             {platformProfitSummary.length > 0 ? (
-              <div className="my-2.5 overflow-hidden rounded-2xl border border-black/6 bg-white/50 shadow-2xs backdrop-blur-sm dark:border-white/8 dark:bg-white/[0.02] sm:my-3">
-                {/* 表头 Header */}
-                <div className="grid grid-cols-[minmax(0,1.2fr)_3.2rem_4.2rem_4.8rem] items-center gap-1.5 border-b border-black/6 bg-black/[0.02] px-2.5 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80 dark:border-white/8 dark:bg-white/[0.02] sm:grid-cols-[minmax(0,1.2fr)_3.8rem_4.5rem_5.2rem] sm:gap-2 sm:px-3.5 sm:py-2.5">
-                  <div>渠道平台</div>
-                  <div className="text-right">订单量</div>
-                  <div className="text-right">单均利润</div>
-                  <div className="text-right">累计净利</div>
-                </div>
+              <div className="relative z-10 my-3 sm:my-3.5 space-y-1.5 rounded-2xl border border-black/6 bg-gradient-to-b from-black/[0.015] to-black/[0.03] p-2 dark:border-white/8 dark:from-white/[0.02] dark:to-white/[0.01]">
+                {platformProfitSummary.slice(0, 3).map((item, index) => {
+                  const meta = getPlatformMeta(item.platform);
+                  const isTop = index === 0;
 
-                {/* 平台列表 */}
-                <div className="divide-y divide-black/5 dark:divide-white/6">
-                  {platformProfitSummary.slice(0, 4).map((item, index) => {
-                    const meta = getPlatformMeta(item.platform);
-                    const rankStyle = index === 0
-                      ? "bg-amber-500/15 text-amber-500 border border-amber-500/30"
-                      : index === 1
-                      ? "bg-slate-400/15 text-slate-400 border border-slate-400/30"
-                      : "bg-amber-700/15 text-amber-600 border border-amber-700/30";
+                  return (
+                    <div
+                      key={item.platform}
+                      className="flex items-center justify-between rounded-xl px-2.5 py-2 transition-colors hover:bg-black/[0.025] dark:hover:bg-white/[0.035]"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className={cn(
+                          "flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full text-[9px] font-mono font-black",
+                          isTop
+                            ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25"
+                            : "bg-black/5 dark:bg-white/8 text-muted-foreground"
+                        )}>
+                          {index + 1}
+                        </span>
 
-                    return (
-                      <div
-                        key={item.platform}
-                        className="grid grid-cols-[minmax(0,1.2fr)_3.2rem_4.2rem_4.8rem] items-center gap-1.5 px-2.5 py-2 transition-colors hover:bg-black/[0.02] dark:hover:bg-white/[0.035] sm:grid-cols-[minmax(0,1.2fr)_3.8rem_4.5rem_5.2rem] sm:gap-2 sm:px-3.5 sm:py-2.5"
-                      >
-                        <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
-                          <span className={cn("flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full text-[8px] font-black sm:h-4 sm:w-4 sm:text-[9px]", rankStyle)}>
-                            {index + 1}
-                          </span>
-                          {meta?.iconSrc ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={meta.iconSrc} alt={meta.name || item.platform} className="h-3.5 w-3.5 shrink-0 object-contain rounded-xs sm:h-4 sm:w-4" />
-                          ) : null}
-                          <div className="truncate text-[11px] font-black text-foreground sm:text-xs">{meta?.name || item.platform}</div>
-                        </div>
-                        <div className="text-right text-[11px] font-bold text-muted-foreground tabular-nums sm:text-xs">
+                        {meta?.iconSrc ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={meta.iconSrc} alt={item.platform} className="h-4 w-4 shrink-0 object-contain rounded-xs" />
+                        ) : (
+                          <Store className="h-3.5 w-3.5 text-muted-foreground" />
+                        )}
+
+                        <span className="truncate text-xs font-bold text-foreground">{item.platform}</span>
+
+                        <span className="font-mono text-[10px] text-muted-foreground bg-black/5 dark:bg-white/5 px-1.5 py-0.2 rounded-md font-medium">
                           {int(item.orders)}单
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2.5 sm:gap-4 shrink-0 text-right">
+                        <div className="text-[10px] text-muted-foreground font-mono">
+                          单均 {money(item.averageProfit)}
                         </div>
-                        <div className={cn("text-right text-[11px] font-black tabular-nums font-mono sm:text-xs", item.averageProfit < 0 ? "text-rose-500 dark:text-rose-400" : "text-foreground")}>
-                          {money(item.averageProfit)}
-                        </div>
-                        <div className={cn("text-right text-xs font-black tabular-nums font-mono sm:text-sm", item.profit < 0 ? "text-rose-500 dark:text-rose-400" : "text-emerald-500 dark:text-emerald-400")}>
+                        <div className={cn(
+                          "font-mono text-xs sm:text-sm font-black tabular-nums min-w-[4.2rem] text-right",
+                          item.profit < 0 ? "text-rose-500 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"
+                        )}>
                           {money(item.profit)}
                         </div>
                       </div>
-                    );
-                  })}
-
-                  {platformProfitSummary.length > 4 ? (
-                    <div className="grid grid-cols-[minmax(0,1.2fr)_3.2rem_4.2rem_4.8rem] items-center gap-1.5 bg-black/[0.01] px-2.5 py-2 dark:bg-white/[0.015] sm:grid-cols-[minmax(0,1.2fr)_3.8rem_4.5rem_5.2rem] sm:gap-2 sm:px-3.5 sm:py-2.5">
-                      <div className="flex items-center gap-1.5 truncate text-[11px] font-bold text-muted-foreground sm:text-xs">
-                        <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40" />
-                        其余 {platformProfitSummary.length - 4} 个平台
-                      </div>
-                      <div className="text-right text-[11px] font-bold text-muted-foreground tabular-nums sm:text-xs">
-                        {int(platformProfitSummary.slice(4).reduce((sum, i) => sum + i.orders, 0))}单
-                      </div>
-                      <div className="text-right text-[11px] font-black tabular-nums font-mono text-foreground sm:text-xs">
-                        -
-                      </div>
-                      <div className={cn("text-right text-xs font-black tabular-nums font-mono sm:text-sm", platformProfitSummary.slice(4).reduce((sum, i) => sum + i.profit, 0) < 0 ? "text-rose-500 dark:text-rose-400" : "text-emerald-500 dark:text-emerald-400")}>
-                        {money(platformProfitSummary.slice(4).reduce((sum, i) => sum + i.profit, 0))}
-                      </div>
                     </div>
-                  ) : null}
+                  );
+                })}
 
-                  {/* 全渠道合计汇总行 */}
-                  <div className="grid grid-cols-[minmax(0,1.2fr)_3.2rem_4.2rem_4.8rem] items-center gap-1.5 border-t border-black/8 bg-black/[0.025] px-2.5 py-2 dark:border-white/10 dark:bg-white/[0.035] sm:grid-cols-[minmax(0,1.2fr)_3.8rem_4.5rem_5.2rem] sm:gap-2 sm:px-3.5 sm:py-2.5">
-                    <div className="flex items-center gap-1.5 truncate text-[11px] font-black text-foreground sm:text-xs">
-                      <span className="h-1.5 w-1.5 rounded-full bg-primary" />
-                      全渠道合计
-                    </div>
-                    <div className="text-right text-[11px] font-black text-foreground tabular-nums sm:text-xs">
+                {/* 全渠道合计沉稳底栏 */}
+                <div className="flex items-center justify-between border-t border-black/6 dark:border-white/8 px-2.5 pt-2 mt-1">
+                  <div className="flex items-center gap-2 text-xs font-bold text-foreground">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src="/platform/全渠道.svg" alt="全渠道" className="h-4 w-4 shrink-0 object-contain" />
+                    <span>全渠道合计</span>
+                    <span className="font-mono text-[10px] text-primary bg-primary/10 px-1.5 py-0.2 rounded-md font-bold">
                       {int(totalPlatformOrders)}单
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2.5 sm:gap-4 shrink-0 text-right">
+                    <div className="text-[10px] text-muted-foreground font-mono">
+                      单均 {money(avgNetProfitPerOrder)}
                     </div>
-                    <div className={cn("text-right text-[11px] font-black tabular-nums font-mono sm:text-xs", avgNetProfitPerOrder < 0 ? "text-rose-500 dark:text-rose-400" : "text-foreground")}>
-                      {money(avgNetProfitPerOrder)}
-                    </div>
-                    <div className={cn("text-right text-xs font-black tabular-nums font-mono sm:text-sm", Number(data?.netProfit || 0) < 0 ? "text-rose-500 dark:text-rose-400" : "text-emerald-500 dark:text-emerald-400")}>
+                    <div className={cn(
+                      "font-mono text-xs sm:text-sm font-black tabular-nums min-w-[4.2rem] text-right",
+                      Number(data?.netProfit || 0) < 0 ? "text-rose-500 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"
+                    )}>
                       {money(data?.netProfit)}
                     </div>
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="rounded-2xl border border-dashed border-black/10 py-6 text-center text-xs text-muted-foreground dark:border-white/10 sm:py-8">
+              <div className="relative z-10 my-3 sm:my-3.5 rounded-2xl border border-dashed border-black/10 py-8 text-center text-xs text-muted-foreground dark:border-white/10">
                 当前范围暂无平台利润数据
               </div>
             )}
 
-            {/* 底部 3 项渠道核心洞察指标 */}
-            {platformProfitSummary.length > 0 ? (
-              <div className="grid grid-cols-3 gap-1.5 sm:gap-2.5">
-                {[
-                  {
-                    label: "渠道平均客单",
-                    value: money(avgOrderValue),
-                    hint: "全渠道单均实付",
-                    tone: "text-foreground",
-                  },
-                  {
-                    label: "主力渠道贡献",
-                    value: `${topPlatformShare}%`,
-                    hint: `${getPlatformMeta(topPlatform?.platform)?.name || topPlatform?.platform || "-"} · ${int(topPlatform?.orders || 0)}单`,
-                    tone: "text-foreground",
-                  },
-                  {
-                    label: "综合单均净利",
-                    value: money(avgNetProfitPerOrder),
-                    hint: "全渠道每单实得",
-                    tone: avgNetProfitPerOrder < 0 ? "text-rose-500 dark:text-rose-400" : "text-emerald-500 dark:text-emerald-400",
-                  },
-                ].map((item) => (
-                  <div
-                    key={item.label}
-                    className="group relative min-w-0 rounded-2xl border border-black/5 bg-black/[0.02] p-2 transition-all duration-200 dark:border-white/6 dark:bg-white/[0.025] sm:p-3"
-                  >
-                    <div className="truncate text-[10px] font-bold text-muted-foreground sm:text-[11px]">{item.label}</div>
-                    <div className={cn("mt-0.5 truncate text-sm font-black tabular-nums tracking-tight sm:mt-1 sm:text-lg", item.tone)}>
-                      {item.value}
-                    </div>
-                    <div className="mt-0.5 truncate text-[9px] font-medium text-muted-foreground/80 sm:text-[10px]">{item.hint}</div>
+            {/* 底部 3 项渠道核心洞察指标（与左侧4项微卡片完美等高对齐） */}
+            <div className="relative z-10 grid grid-cols-3 gap-1.5 sm:gap-2">
+              {[
+                {
+                  label: "渠道平均客单",
+                  value: money(avgOrderValue),
+                  hint: "全渠道单均实付",
+                  tone: "text-foreground font-bold",
+                },
+                {
+                  label: "主力渠道贡献",
+                  value: `${topPlatformShare}%`,
+                  hint: `${getPlatformMeta(topPlatform?.platform)?.name || topPlatform?.platform || "-"} · ${int(topPlatform?.orders || 0)}单`,
+                  tone: "text-foreground font-bold",
+                },
+                {
+                  label: "综合单均净利",
+                  value: money(avgNetProfitPerOrder),
+                  hint: "全渠道每单实得",
+                  tone: avgNetProfitPerOrder < 0 ? "text-rose-500 dark:text-rose-400 font-bold" : "text-emerald-600 dark:text-emerald-400 font-black",
+                },
+              ].map((item) => (
+                <div
+                  key={item.label}
+                  className="relative min-w-0 rounded-2xl border border-black/6 bg-white/65 p-2 transition-all duration-200 dark:border-white/8 dark:bg-white/[0.025] sm:p-2.5"
+                >
+                  <div className="truncate text-[10px] sm:text-[11px] font-bold text-muted-foreground">{item.label}</div>
+                  <div className={cn("mt-1 truncate font-mono text-sm sm:text-base tracking-tight tabular-nums", item.tone)}>
+                    {item.value}
                   </div>
-                ))}
-              </div>
-            ) : null}
+                  <div className="mt-0.5 truncate text-[9px] sm:text-[10px] text-muted-foreground/70">{item.hint}</div>
+                </div>
+              ))}
+            </div>
           </section>
         </div>
 
