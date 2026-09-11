@@ -124,12 +124,7 @@ export function RecentInbound({ items, isLoading }: Props) {
             <motion.div
               key={item.id}
               variants={itemAnim}
-              className={cn(
-                "group flex items-center justify-between gap-3 rounded-[16px] border bg-white/78 dark:bg-white/[0.03] px-3 py-2.5 transition-colors hover:bg-white dark:hover:bg-white/[0.05] w-full min-w-0",
-                isReturnInbound
-                  ? "border-violet-500/18 hover:border-violet-500/30 dark:border-violet-400/18 dark:hover:border-violet-400/30"
-                  : "border-black/6 dark:border-white/8 hover:border-black/10 dark:hover:border-white/12"
-              )}
+              className="group flex items-center justify-between gap-3 rounded-[16px] border border-black/6 dark:border-white/8 bg-white/78 dark:bg-white/[0.03] px-3 py-2.5 transition-colors hover:border-black/10 dark:hover:border-white/12 hover:bg-white dark:hover:bg-white/[0.05] w-full min-w-0"
             >
               <div className="flex items-center gap-3 w-full flex-1 min-w-0">
                 <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-black/5 dark:bg-muted/20 border border-black/5 dark:border-white/10">
@@ -166,18 +161,13 @@ export function RecentInbound({ items, isLoading }: Props) {
                             <span className="h-1 w-1 rounded-full bg-black/10 dark:bg-white/12" />
                           </>
                         ) : null}
-                        <span className={cn(
-                          "rounded-full px-1.5 py-0.5 font-medium",
-                          isReturnInbound ? "bg-violet-500/10 text-violet-600 dark:text-violet-300" : "bg-primary/10 text-primary"
-                        )}>
-                          数量 {item.quantity}
-                        </span>
+                        <span className="rounded-full bg-primary/10 px-1.5 py-0.5 font-medium text-primary">数量 {item.quantity}</span>
                       </div>
                     </div>
                     <span className={cn(
-                      "hidden shrink-0 rounded-full border px-1.5 py-0.5 text-[9px] font-bold sm:inline-flex",
+                      "hidden shrink-0 rounded-full border px-1.5 py-0.5 text-[9px] font-bold leading-none sm:inline-flex",
                       isReturnInbound
-                        ? "border-violet-500/20 bg-violet-500/10 text-violet-600 dark:text-violet-300"
+                        ? "border-violet-500/15 bg-violet-500/8 text-violet-500 dark:text-violet-300"
                         : "border-black/8 bg-black/[0.03] text-muted-foreground dark:border-white/10 dark:bg-white/[0.04]"
                     )}>
                       {sourceLabel}
@@ -185,9 +175,9 @@ export function RecentInbound({ items, isLoading }: Props) {
                   </div>
                   <div className="mt-2 flex items-center justify-between gap-3 sm:hidden">
                     <span className={cn(
-                      "inline-flex shrink-0 rounded-full border px-1.5 py-0.5 text-[9px] font-bold",
+                      "inline-flex shrink-0 rounded-full border px-1.5 py-0.5 text-[9px] font-bold leading-none",
                       isReturnInbound
-                        ? "border-violet-500/20 bg-violet-500/10 text-violet-600 dark:text-violet-300"
+                        ? "border-violet-500/15 bg-violet-500/8 text-violet-500 dark:text-violet-300"
                         : "border-black/8 bg-black/[0.03] text-muted-foreground dark:border-white/10 dark:bg-white/[0.04]"
                     )}>
                       {sourceLabel}
