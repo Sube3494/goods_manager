@@ -573,9 +573,11 @@ export interface RecentInboundItem {
   costPrice: number;
   purchaseOrder: {
     id: string;
+    type?: string;
     date: string;
     status: string;
     shopName?: string;
+    note?: string;
   };
   subtotal: number;
 }

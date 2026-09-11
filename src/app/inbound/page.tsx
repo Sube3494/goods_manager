@@ -562,6 +562,9 @@ function InboundContent() {
                   const cleanId = getCleanShortId(po.id);
                   const shortIdText = serialMatch && serialMatch[1] !== '无' ? `#${serialMatch[1]}` : `#${cleanId}`;
                   const displayAmount = getInboundDisplayAmount(po);
+                  const inboundTypeLabel = getInboundTypeLabel(po);
+                  const isReturnInbound = po.type === "Return" || po.type === "InternalReturn";
+                  const isAutoInbound = isAutoInboundOrderLike(po);
 
                   return (
                   <div
@@ -572,9 +575,13 @@ function InboundContent() {
                     <div className="flex items-center justify-between mb-3">
                        <div className="flex flex-wrap items-center gap-1.5 min-w-0 flex-1">
                           <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border shadow-2xs ${
-                             po.id.startsWith('PO-AUTO') ? 'bg-orange-500/10 text-orange-600 border-orange-500/20 dark:text-orange-400' : 'bg-blue-500/10 text-blue-600 border-blue-500/20 dark:text-blue-400'
+                             isAutoInbound
+                               ? 'bg-orange-500/10 text-orange-600 border-orange-500/20 dark:text-orange-400'
+                               : isReturnInbound
+                               ? 'bg-violet-500/10 text-violet-600 border-violet-500/20 dark:text-violet-400'
+                               : 'bg-blue-500/10 text-blue-600 border-blue-500/20 dark:text-blue-400'
                           }`}>
-                            {po.id.startsWith('PO-AUTO') ? '系统补库' : '采购入库'}
+                            {inboundTypeLabel}
                           </span>
                           {po.shopName && (
                             <span className="inline-flex items-center gap-1 rounded-full border border-sky-500/20 bg-sky-500/10 px-2 py-0.5 text-[10px] font-bold text-sky-700 dark:border-sky-500/30 dark:bg-sky-500/15 dark:text-sky-300 shadow-2xs">

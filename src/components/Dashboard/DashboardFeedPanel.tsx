@@ -48,6 +48,12 @@ const TIME_RANGE_OPTIONS: { key: TopTimeRange; label: string }[] = [
   { key: "all", label: "全部" },
 ];
 
+function isReturnInboundItem(item: RecentInboundItem) {
+  const type = String(item.purchaseOrder?.type || "").trim();
+  const note = String(item.purchaseOrder?.note || "");
+  return type === "Return" || type === "InternalReturn" || note.includes("出库退回") || note.includes("退货入库");
+}
+
 export function DashboardFeedPanel({
   recentInboundItems,
   isLoading = false,
@@ -145,11 +151,18 @@ export function DashboardFeedPanel({
           const rawSku = item.product?.sku;
           const productSku = String(rawSku || "").replace(/\(自编\)|（自编）/gi, "").trim();
           const productImage = item.product?.image;
+          const isReturnInbound = isReturnInboundItem(item);
+          const sourceLabel = isReturnInbound ? "退货入库" : "最近入库";
 
           return (
             <div
               key={item.id}
-              className="min-w-0 overflow-hidden flex flex-col gap-3 rounded-[16px] border border-black/6 bg-white/78 px-3 py-3 transition-colors hover:border-black/10 hover:bg-white dark:border-white/8 dark:bg-white/3 dark:hover:border-white/12 dark:hover:bg-white/5 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:py-2.5"
+              className={cn(
+                "min-w-0 overflow-hidden flex flex-col gap-3 rounded-[16px] border bg-white/78 px-3 py-3 transition-colors hover:bg-white dark:bg-white/3 dark:hover:bg-white/5 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:py-2.5",
+                isReturnInbound
+                  ? "border-violet-500/18 hover:border-violet-500/30 dark:border-violet-400/18 dark:hover:border-violet-400/30"
+                  : "border-black/6 hover:border-black/10 dark:border-white/8 dark:hover:border-white/12"
+              )}
             >
               <div className="flex min-w-0 flex-1 items-start gap-3">
                 <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-black/5 bg-black/5 dark:border-white/10 dark:bg-muted/20 sm:h-10 sm:w-10 sm:rounded-lg">
@@ -175,13 +188,21 @@ export function DashboardFeedPanel({
                     <span className="font-mono">编号</span>
                     <span className="h-1 w-1 rounded-full bg-black/10 dark:bg-white/12" />
                     <span className="max-w-full truncate font-mono">{productSku || "未填写"}</span>
-                    <span className="rounded-full bg-primary/10 px-1.5 py-0.5 font-medium text-primary">数量 {item.quantity}</span>
+                    <span className={cn(
+                      "rounded-full px-1.5 py-0.5 font-medium",
+                      isReturnInbound ? "bg-violet-500/10 text-violet-600 dark:text-violet-300" : "bg-primary/10 text-primary"
+                    )}>
+                      数量 {item.quantity}
+                    </span>
                   </div>
                 </div>
               </div>
               <div className="flex items-center justify-between gap-3 border-t border-black/6 pt-2 dark:border-white/8 sm:w-[88px] sm:shrink-0 sm:flex-col sm:items-end sm:border-t-0 sm:border-l sm:pt-0 sm:pl-3 sm:text-right">
-                <div className="text-[10px] font-bold text-muted-foreground sm:w-full sm:text-right">
-                  最近入库
+                <div className={cn(
+                  "text-[10px] font-bold sm:w-full sm:text-right",
+                  isReturnInbound ? "text-violet-600 dark:text-violet-300" : "text-muted-foreground"
+                )}>
+                  {sourceLabel}
                 </div>
                 <div className="flex items-center gap-1 text-[10px] font-medium text-muted-foreground sm:mt-1 sm:w-full sm:justify-end sm:text-[9px]">
                   <Clock size={10} strokeWidth={3} className="shrink-0" />

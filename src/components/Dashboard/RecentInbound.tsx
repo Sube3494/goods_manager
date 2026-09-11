@@ -38,6 +38,12 @@ const itemAnim: Variants = {
 
 const headerCardClass = "rounded-[22px] border border-black/8 dark:border-white/10 bg-zinc-50/55 dark:bg-white/[0.04] shadow-xs dark:shadow-none backdrop-blur-xl";
 
+function isReturnInboundItem(item: RecentInboundItem) {
+  const type = String(item.purchaseOrder?.type || "").trim();
+  const note = String(item.purchaseOrder?.note || "");
+  return type === "Return" || type === "InternalReturn" || note.includes("出库退回") || note.includes("退货入库");
+}
+
 const TitleSection = ({ onViewAll }: { onViewAll: () => void }) => (
   <div className="flex items-center justify-between gap-3 border-b border-black/6 dark:border-white/8 px-4 py-3 sm:px-5">
     <div className="min-w-0">
@@ -111,12 +117,19 @@ export function RecentInbound({ items, isLoading }: Props) {
           const rawSku = item.product?.sku;
           const productSku = String(rawSku || "").replace(/\(自编\)|（自编）/gi, "").trim();
           const productImage = item.product?.image;
+          const isReturnInbound = isReturnInboundItem(item);
+          const sourceLabel = isReturnInbound ? "退货入库" : "入库";
 
           return (
             <motion.div
               key={item.id}
               variants={itemAnim}
-              className="group flex items-center justify-between gap-3 rounded-[16px] border border-black/6 dark:border-white/8 bg-white/78 dark:bg-white/[0.03] px-3 py-2.5 transition-colors hover:border-black/10 dark:hover:border-white/12 hover:bg-white dark:hover:bg-white/[0.05] w-full min-w-0"
+              className={cn(
+                "group flex items-center justify-between gap-3 rounded-[16px] border bg-white/78 dark:bg-white/[0.03] px-3 py-2.5 transition-colors hover:bg-white dark:hover:bg-white/[0.05] w-full min-w-0",
+                isReturnInbound
+                  ? "border-violet-500/18 hover:border-violet-500/30 dark:border-violet-400/18 dark:hover:border-violet-400/30"
+                  : "border-black/6 dark:border-white/8 hover:border-black/10 dark:hover:border-white/12"
+              )}
             >
               <div className="flex items-center gap-3 w-full flex-1 min-w-0">
                 <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-black/5 dark:bg-muted/20 border border-black/5 dark:border-white/10">
@@ -153,16 +166,31 @@ export function RecentInbound({ items, isLoading }: Props) {
                             <span className="h-1 w-1 rounded-full bg-black/10 dark:bg-white/12" />
                           </>
                         ) : null}
-                        <span className="rounded-full bg-primary/10 px-1.5 py-0.5 font-medium text-primary">数量 {item.quantity}</span>
+                        <span className={cn(
+                          "rounded-full px-1.5 py-0.5 font-medium",
+                          isReturnInbound ? "bg-violet-500/10 text-violet-600 dark:text-violet-300" : "bg-primary/10 text-primary"
+                        )}>
+                          数量 {item.quantity}
+                        </span>
                       </div>
                     </div>
-                    <span className="hidden shrink-0 rounded-full border border-black/8 bg-black/[0.03] px-1.5 py-0.5 text-[9px] font-bold text-muted-foreground dark:border-white/10 dark:bg-white/[0.04] sm:inline-flex">
-                      入库
+                    <span className={cn(
+                      "hidden shrink-0 rounded-full border px-1.5 py-0.5 text-[9px] font-bold sm:inline-flex",
+                      isReturnInbound
+                        ? "border-violet-500/20 bg-violet-500/10 text-violet-600 dark:text-violet-300"
+                        : "border-black/8 bg-black/[0.03] text-muted-foreground dark:border-white/10 dark:bg-white/[0.04]"
+                    )}>
+                      {sourceLabel}
                     </span>
                   </div>
                   <div className="mt-2 flex items-center justify-between gap-3 sm:hidden">
-                    <span className="inline-flex shrink-0 rounded-full border border-black/8 bg-black/[0.03] px-1.5 py-0.5 text-[9px] font-bold text-muted-foreground dark:border-white/10 dark:bg-white/[0.04]">
-                      入库
+                    <span className={cn(
+                      "inline-flex shrink-0 rounded-full border px-1.5 py-0.5 text-[9px] font-bold",
+                      isReturnInbound
+                        ? "border-violet-500/20 bg-violet-500/10 text-violet-600 dark:text-violet-300"
+                        : "border-black/8 bg-black/[0.03] text-muted-foreground dark:border-white/10 dark:bg-white/[0.04]"
+                    )}>
+                      {sourceLabel}
                     </span>
                   </div>
                 </div>

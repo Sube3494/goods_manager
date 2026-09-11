@@ -454,7 +454,7 @@ export async function GET(request: NextRequest) {
               shop: { select: { id: true, name: true } },
             },
           },
-          purchaseOrder: { select: { id: true, date: true, status: true, shopName: true, shippingAddress: true } },
+          purchaseOrder: { select: { id: true, type: true, date: true, status: true, shopName: true, shippingAddress: true, note: true } },
         },
         orderBy: { purchaseOrder: { date: "desc" } },
       }),
