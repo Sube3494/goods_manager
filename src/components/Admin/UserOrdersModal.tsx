@@ -1679,11 +1679,16 @@ export function UserOrdersModal({
                       {typeof document !== "undefined" && isProfitDetailsOpen && createPortal(
                         <div
                           className="fixed inset-0 z-[100000] flex items-center justify-center bg-black/45 p-2 backdrop-blur-sm sm:p-4"
-                          onMouseDown={() => setIsProfitDetailsOpen(false)}
+                          onMouseDown={(event) => {
+                            event.stopPropagation();
+                            setIsProfitDetailsOpen(false);
+                          }}
+                          onClick={(event) => event.stopPropagation()}
                         >
                           <div
                             ref={profitModalRef}
                             onMouseDown={(event) => event.stopPropagation()}
+                            onClick={(event) => event.stopPropagation()}
                             className="flex max-h-[94vh] w-full max-w-6xl flex-col overflow-hidden rounded-[18px] border border-black/10 bg-white text-slate-950 shadow-2xl dark:border-white/10 dark:bg-[#111827] dark:text-white sm:max-h-[88vh] sm:rounded-[20px]"
                           >
                             <div className="flex items-start justify-between gap-3 border-b border-black/8 px-4 py-3 dark:border-white/10 sm:gap-4 sm:px-5 sm:py-4">
@@ -1698,7 +1703,11 @@ export function UserOrdersModal({
                               </div>
                               <button
                                 type="button"
-                                onClick={() => setIsProfitDetailsOpen(false)}
+                                onMouseDown={(event) => event.stopPropagation()}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  setIsProfitDetailsOpen(false);
+                                }}
                                 className="rounded-full p-2 text-muted-foreground transition hover:bg-black/5 hover:text-foreground dark:hover:bg-white/10"
                                 aria-label="关闭"
                               >
