@@ -157,12 +157,7 @@ export function DashboardFeedPanel({
           return (
             <div
               key={item.id}
-              className={cn(
-                "min-w-0 overflow-hidden flex flex-col gap-3 rounded-[16px] border bg-white/78 px-3 py-3 transition-colors hover:bg-white dark:bg-white/3 dark:hover:bg-white/5 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:py-2.5",
-                isReturnInbound
-                  ? "border-amber-500/20 hover:border-amber-500/35 dark:border-amber-400/20 dark:hover:border-amber-400/35"
-                  : "border-black/6 hover:border-black/10 dark:border-white/8 dark:hover:border-white/12"
-              )}
+              className="min-w-0 overflow-hidden flex flex-col gap-3 rounded-[16px] border border-black/6 hover:border-black/10 dark:border-white/8 dark:hover:border-white/12 bg-white/78 px-3 py-3 transition-colors hover:bg-white dark:bg-white/3 dark:hover:bg-white/5 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:py-2.5"
             >
               <div className="flex min-w-0 flex-1 items-start gap-3">
                 <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-black/5 bg-black/5 dark:border-white/10 dark:bg-muted/20 sm:h-10 sm:w-10 sm:rounded-lg">
@@ -255,7 +250,7 @@ export function DashboardFeedPanel({
           >
             <div className="flex min-w-0 flex-1 items-start gap-3">
               <div className={cn(
-                "flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl border text-[10px] font-black tabular-nums shadow-inner",
+                "flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-[10px] font-black tabular-nums shadow-inner",
                 index < 3
                   ? "border-amber-500/25 bg-amber-500/12 text-amber-500"
                   : "border-black/8 bg-black/3 text-muted-foreground dark:border-white/10 dark:bg-white/4"

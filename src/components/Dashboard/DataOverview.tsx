@@ -13,6 +13,29 @@ import { format } from "date-fns";
 import { cn, getPlatformMeta } from "@/lib/utils";
 import { OverviewAiPanel } from "@/components/Dashboard/OverviewAiPanel";
 
+const PLATFORM_THEMES: Record<string, { bar: string; dot: string }> = {
+  美团: {
+    bar: "bg-[#FFD000]",
+    dot: "bg-[#FFD000]",
+  },
+  京东: {
+    bar: "bg-red-500",
+    dot: "bg-red-500",
+  },
+  线下交易: {
+    bar: "bg-emerald-500",
+    dot: "bg-emerald-500",
+  },
+  淘宝: {
+    bar: "bg-orange-500",
+    dot: "bg-orange-500",
+  },
+  抖店: {
+    bar: "bg-sky-500",
+    dot: "bg-sky-500",
+  },
+};
+
 function Panel({
   title,
   subtitle,
@@ -1171,6 +1194,70 @@ export function DataOverview({
               </div>
             </div>
 
+            {/* 老客价值与客单深度指标 Pod 组（饱满填充卡片，消除空旷感） */}
+            <div className="grid grid-cols-3 gap-2 sm:gap-2.5">
+              {/* 老客客单价 */}
+              <div className="rounded-2xl border border-black/6 bg-white/60 p-2.5 sm:p-3 transition-colors hover:border-black/12 hover:bg-white/80 dark:border-white/8 dark:bg-white/[0.02] dark:hover:border-white/14 dark:hover:bg-white/[0.04]">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  老客客单价
+                </div>
+                <div className="mt-1 flex items-baseline gap-0.5">
+                  <span className="text-xs font-semibold text-muted-foreground">¥</span>
+                  <span className="text-base font-black tabular-nums tracking-tight text-foreground sm:text-lg">
+                    {customerAnalysis?.returningCustomerAvgOrderValue ?? 0}
+                  </span>
+                </div>
+                <div className="mt-1 text-[10px] text-muted-foreground/70 truncate">
+                  新客 ¥{customerAnalysis?.newCustomerAvgOrderValue ?? 0}
+                  {customerAnalysis?.returningCustomerAvgOrderValue && customerAnalysis?.newCustomerAvgOrderValue && customerAnalysis.newCustomerAvgOrderValue > 0 ? (
+                    <span className={cn(
+                      "ml-1 font-bold font-mono",
+                      customerAnalysis.returningCustomerAvgOrderValue >= customerAnalysis.newCustomerAvgOrderValue ? "text-emerald-500" : "text-amber-500"
+                    )}>
+                      {customerAnalysis.returningCustomerAvgOrderValue >= customerAnalysis.newCustomerAvgOrderValue ? "+" : ""}
+                      {(((customerAnalysis.returningCustomerAvgOrderValue - customerAnalysis.newCustomerAvgOrderValue) / customerAnalysis.newCustomerAvgOrderValue) * 100).toFixed(0)}%
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+
+              {/* 老客销售贡献 */}
+              <div className="rounded-2xl border border-black/6 bg-white/60 p-2.5 sm:p-3 transition-colors hover:border-black/12 hover:bg-white/80 dark:border-white/8 dark:bg-white/[0.02] dark:hover:border-white/14 dark:hover:bg-white/[0.04]">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  老客销售额
+                </div>
+                <div className="mt-1 flex items-baseline gap-0.5">
+                  <span className="text-xs font-semibold text-muted-foreground">¥</span>
+                  <span className="text-base font-black tabular-nums tracking-tight text-foreground sm:text-lg">
+                    {customerAnalysis?.returningCustomerAmount ? int(customerAnalysis.returningCustomerAmount) : 0}
+                  </span>
+                </div>
+                <div className="mt-1 text-[10px] text-muted-foreground/70 truncate">
+                  {customerAnalysis?.returningCustomerAmount && customerAnalysis?.newCustomerAmount && (customerAnalysis.returningCustomerAmount + customerAnalysis.newCustomerAmount) > 0 ? (
+                    <span>占比 <strong className="font-mono font-bold text-foreground">{((customerAnalysis.returningCustomerAmount / (customerAnalysis.returningCustomerAmount + customerAnalysis.newCustomerAmount)) * 100).toFixed(1)}%</strong></span>
+                  ) : (
+                    <span>销售贡献</span>
+                  )}
+                </div>
+              </div>
+
+              {/* 客均件数 */}
+              <div className="rounded-2xl border border-black/6 bg-white/60 p-2.5 sm:p-3 transition-colors hover:border-black/12 hover:bg-white/80 dark:border-white/8 dark:bg-white/[0.02] dark:hover:border-white/14 dark:hover:bg-white/[0.04]">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  客均件数
+                </div>
+                <div className="mt-1 flex items-baseline gap-1">
+                  <span className="text-base font-black tabular-nums tracking-tight text-foreground sm:text-lg">
+                    {customerAnalysis?.returningCustomerAvgQuantity ?? 1}
+                  </span>
+                  <span className="text-[10px] font-semibold text-muted-foreground">件/单</span>
+                </div>
+                <div className="mt-1 text-[10px] text-muted-foreground/70 truncate">
+                  老客连带深度
+                </div>
+              </div>
+            </div>
+
             {/* 底栏：极简未识别画像状态条 */}
             <div className="flex items-center justify-between rounded-xl border border-black/6 bg-black/[0.02] px-3 py-1.5 text-[11px] text-muted-foreground dark:border-white/8 dark:bg-white/[0.02]">
               <div className="flex items-center gap-1.5">
@@ -1209,7 +1296,7 @@ export function DataOverview({
                       className="group flex items-center gap-2.5 rounded-2xl border border-black/6 bg-white/70 p-2 transition-all hover:border-black/12 hover:bg-white dark:border-white/8 dark:bg-white/[0.03] dark:hover:border-white/15 dark:hover:bg-white/[0.06] sm:gap-3 sm:p-2.5"
                     >
                       {/* 排名徽章 */}
-                      <div className={cn("flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border text-xs font-black tabular-nums", rankClass)}>
+                      <div className={cn("flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-xs font-black tabular-nums", rankClass)}>
                         {index + 1}
                       </div>
 
@@ -1273,234 +1360,246 @@ export function DataOverview({
         title="平台结构"
         subtitle="按平台查看真单与刷单的订单构成"
         action={(
-          <div className="inline-flex shrink-0 items-center overflow-hidden rounded-full border border-black/8 bg-black/[0.025] p-0.5 text-xs font-bold dark:border-white/10 dark:bg-white/[0.04]">
-            <div className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-emerald-600 dark:text-emerald-400">
-              <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
+          <div className="inline-flex shrink-0 items-center overflow-hidden rounded-full border border-black/8 bg-black/[0.025] p-0.5 text-[11px] sm:text-xs font-bold dark:border-white/10 dark:bg-white/[0.04]">
+            <div className="inline-flex items-center gap-1 sm:gap-1.5 rounded-full bg-emerald-500/15 px-2 py-0.5 sm:px-3 sm:py-1 text-emerald-600 dark:text-emerald-400">
+              <ShieldCheck className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" />
               <span><span className="hidden sm:inline">全渠道</span>真单率 {matrix?.grandTotal ? ((matrix.trueOrderTotal / matrix.grandTotal) * 100).toFixed(1) : "100.0"}%</span>
             </div>
-            <div className="px-2.5 py-0.5 text-muted-foreground">
-              <span><span className="hidden sm:inline">有效</span>{int(matrix?.grandTotal)} 单</span>
+            <div className="px-2 py-0.5 sm:px-3 sm:py-1 text-muted-foreground font-mono">
+              共 {int(matrix?.grandTotal)} 单
             </div>
           </div>
         )}
       >
-        {/* 移动端展示 */}
-        <div className="space-y-2.5 sm:hidden">
-          {[
-            {
-              key: "true",
-              label: "真单 (实销履约)",
-              total: matrix?.trueOrderTotal,
-              tone: "text-emerald-500",
-              dot: "bg-emerald-500",
-              values: matrix?.columns.map((col) => ({ platform: col.platform, value: col.trueOrderCount })) || [],
-            },
-            {
-              key: "brush",
-              label: "刷单 (营销补单)",
-              total: matrix?.brushOrderTotal,
-              tone: "text-rose-500",
-              dot: "bg-rose-500",
-              values: matrix?.columns.map((col) => ({ platform: col.platform, value: col.brushOrderCount })) || [],
-            },
-            {
-              key: "all",
-              label: "渠道合计",
-              total: matrix?.grandTotal,
-              tone: "text-foreground",
-              dot: "bg-primary",
-              values: matrix?.columns.map((col) => ({ platform: col.platform, value: col.totalCount })) || [],
-            },
-          ].map((row) => (
-            <div key={row.key} className="rounded-2xl border border-black/6 bg-black/2 p-3 dark:border-white/10 dark:bg-white/3">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-1.5">
-                  <span className={cn("h-2 w-2 rounded-full", row.dot)} />
-                  <span className="text-xs font-black text-foreground">{row.label}</span>
-                </div>
-                <span className={cn("text-base font-black tabular-nums", row.tone)}>{int(row.total)}</span>
+        {/* 1. 全渠道平台分布彩色分段流体条 */}
+        {matrix && matrix.grandTotal > 0 ? (
+          <div className="mb-3 space-y-2 rounded-2xl border border-black/6 bg-white/60 p-2.5 sm:mb-4 sm:space-y-2.5 sm:p-3.5 backdrop-blur-sm dark:border-white/8 dark:bg-white/[0.02]">
+            <div className="flex items-center justify-between text-xs">
+              <div className="flex items-center gap-1.5 sm:gap-2 font-black text-foreground">
+                <span className="h-2 w-2 rounded-full bg-primary" />
+                <span className="text-[11px] sm:text-xs">全渠道份额分布</span>
               </div>
-              <div className="mt-2.5 grid grid-cols-3 gap-1.5">
-                {row.values.map((item) => {
-                  const meta = getPlatformMeta(item.platform);
-                  return (
-                    <div
-                      key={`${row.key}-${item.platform}`}
-                      className="flex items-center justify-between rounded-xl border border-black/6 bg-white/70 px-2 py-1.5 dark:border-white/10 dark:bg-white/4"
-                    >
-                      <div className="flex items-center gap-1 min-w-0">
-                        {meta?.iconSrc ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={meta.iconSrc} alt={item.platform} className="h-3.5 w-3.5 shrink-0 object-contain rounded-xs" />
-                        ) : null}
-                        <div className="truncate text-[11px] font-bold text-muted-foreground">{item.platform}</div>
-                      </div>
-                      <div className={cn("text-xs font-black tabular-nums shrink-0 ml-1", row.tone)}>
-                        {item.value > 0 ? int(item.value) : "-"}
-                      </div>
-                    </div>
-                  );
-                })}
+              <div className="flex items-center gap-2 sm:gap-3 text-[10px] sm:text-[11px] text-muted-foreground">
+                <span className="flex items-center gap-1">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                  真单 {int(matrix.trueOrderTotal)}
+                </span>
+                {matrix.brushOrderTotal > 0 ? (
+                  <span className="flex items-center gap-1">
+                    <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
+                    刷单 {int(matrix.brushOrderTotal)}
+                  </span>
+                ) : null}
               </div>
             </div>
-          ))}
-        </div>
 
-        {/* 桌面端高质感表格 */}
-        <div className="hidden overflow-hidden rounded-[22px] border border-black/6 bg-white/40 shadow-2xs backdrop-blur-sm dark:border-white/10 dark:bg-white/[0.02] sm:block">
-          <table className="w-full table-fixed text-sm">
-            <thead>
-              <tr className="border-b border-black/6 bg-black/[0.025] text-muted-foreground dark:border-white/8 dark:bg-white/[0.03]">
-                <th className="w-36 px-4 py-3.5 text-left font-bold">
-                  <div className="text-xs uppercase tracking-wider text-muted-foreground/80">渠道构成</div>
-                </th>
-                {matrix?.columns.map((col) => {
+            {/* 分段多彩流体条 */}
+            <div className="flex h-2.5 sm:h-3 w-full overflow-hidden rounded-full bg-black/5 dark:bg-white/5 p-0.5 gap-0.5">
+              {matrix.columns
+                .filter((col) => col.totalCount > 0)
+                .map((col) => {
+                  const pct = (col.totalCount / matrix.grandTotal) * 100;
+                  const theme = PLATFORM_THEMES[col.platform] || { bar: "bg-primary" };
+                  return (
+                    <div
+                      key={col.platform}
+                      style={{ width: `${pct}%` }}
+                      className={cn("h-full rounded-full transition-all duration-500", theme.bar)}
+                      title={`${col.platform}: ${int(col.totalCount)}单 (${pct.toFixed(1)}%)`}
+                    />
+                  );
+                })}
+            </div>
+
+            {/* 平台份额图例标签（桌面端展示，移动端由下方横滑卡片自解释） */}
+            <div className="hidden sm:flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs">
+              {matrix.columns
+                .filter((col) => col.totalCount > 0)
+                .map((col) => {
                   const meta = getPlatformMeta(col.platform);
-                  const grandTotal = matrix?.grandTotal || 0;
-                  const share = grandTotal > 0 && col.totalCount > 0 ? ((col.totalCount / grandTotal) * 100).toFixed(1) : null;
-                  const hasOrders = col.totalCount > 0;
-
+                  const theme = PLATFORM_THEMES[col.platform];
+                  const pct = ((col.totalCount / matrix.grandTotal) * 100).toFixed(1);
                   return (
-                    <th key={col.platform} className="px-3 py-3.5 text-center font-bold">
-                      <div className={cn("flex flex-col items-center gap-1", !hasOrders && "opacity-45")}>
-                        <div className="flex items-center gap-1.5">
-                          {meta?.iconSrc ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={meta.iconSrc} alt={col.platform} className="h-4.5 w-4.5 shrink-0 object-contain rounded-xs" />
-                          ) : null}
-                          <span className="text-xs font-black text-foreground">{col.platform}</span>
-                        </div>
-                        {share ? (
-                          <span className="inline-block rounded-full bg-black/5 px-2 py-0.2 text-[10px] font-bold text-muted-foreground dark:bg-white/8">
-                            {share}%
-                          </span>
-                        ) : (
-                          <span className="text-[10px] font-medium text-muted-foreground/60">-</span>
-                        )}
-                      </div>
-                    </th>
-                  );
-                })}
-                <th className="w-32 px-4 py-3.5 text-center font-bold">
-                  <div className="flex flex-col items-center gap-1">
-                    <div className="flex items-center gap-1 text-xs font-black text-foreground">
-                      <span className="h-1.5 w-1.5 rounded-full bg-primary" />
-                      全渠道合计
-                    </div>
-                    <span className="inline-block rounded-full bg-primary/10 px-2 py-0.2 text-[10px] font-bold text-primary">
-                      100%
-                    </span>
-                  </div>
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-black/5 dark:divide-white/6">
-              {/* 真单行 */}
-              <tr className="transition-colors hover:bg-black/[0.015] dark:hover:bg-white/[0.02]">
-                <td className="px-4 py-3.5 font-black text-foreground">
-                  <div className="flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full bg-emerald-500 shadow-xs shadow-emerald-500/50" />
-                    <span>真单</span>
-                    <span className="text-[10px] font-medium text-muted-foreground">履约</span>
-                  </div>
-                </td>
-                {matrix?.columns.map((col) => (
-                  <td key={`true-${col.platform}`} className="px-3 py-3.5 text-center font-mono font-black tabular-nums">
-                    {col.trueOrderCount > 0 ? (
-                      <span className="inline-block rounded-lg bg-emerald-500/10 px-2.5 py-1 text-sm font-black text-emerald-600 dark:text-emerald-400">
-                        {int(col.trueOrderCount)}
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground/40 font-normal">-</span>
-                    )}
-                  </td>
-                ))}
-                <td className="px-4 py-3.5 text-center font-mono font-black tabular-nums">
-                  <span className="inline-block rounded-lg bg-emerald-500/15 px-3 py-1 text-base font-black text-emerald-600 dark:text-emerald-400">
-                    {int(matrix?.trueOrderTotal)}
-                  </span>
-                </td>
-              </tr>
-
-              {/* 刷单行 */}
-              <tr className="transition-colors hover:bg-black/[0.015] dark:hover:bg-white/[0.02]">
-                <td className="px-4 py-3.5 font-black text-foreground">
-                  <div className="flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full bg-rose-500/70" />
-                    <span>刷单</span>
-                    <span className="text-[10px] font-medium text-muted-foreground">补单</span>
-                  </div>
-                </td>
-                {matrix?.columns.map((col) => (
-                  <td key={`brush-${col.platform}`} className="px-3 py-3.5 text-center font-mono font-bold tabular-nums">
-                    {col.brushOrderCount > 0 ? (
-                      <span className="inline-block rounded-lg bg-rose-500/10 px-2.5 py-1 text-sm font-black text-rose-500 dark:text-rose-400">
-                        {int(col.brushOrderCount)}
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground/40 font-normal">-</span>
-                    )}
-                  </td>
-                ))}
-                <td className="px-4 py-3.5 text-center font-mono font-bold tabular-nums">
-                  {Number(matrix?.brushOrderTotal || 0) > 0 ? (
-                    <span className="inline-block rounded-lg bg-rose-500/15 px-3 py-1 text-base font-black text-rose-500 dark:text-rose-400">
-                      {int(matrix?.brushOrderTotal)}
-                    </span>
-                  ) : (
-                    <span className="text-muted-foreground/40 font-normal">-</span>
-                  )}
-                </td>
-              </tr>
-
-              {/* 渠道总单量合计行 */}
-              <tr className="border-t border-black/8 bg-black/[0.02] font-black dark:border-white/10 dark:bg-white/[0.025]">
-                <td className="px-4 py-3.5 text-foreground">
-                  <div className="flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full bg-primary" />
-                    <span>合计</span>
-                    <span className="text-[10px] font-medium text-muted-foreground">总单量</span>
-                  </div>
-                </td>
-                {matrix?.columns.map((col) => (
-                  <td key={`total-${col.platform}`} className="px-3 py-3.5 text-center font-mono font-black tabular-nums text-foreground">
-                    {col.totalCount > 0 ? (
-                      <span className="text-sm">{int(col.totalCount)}</span>
-                    ) : (
-                      <span className="text-muted-foreground/40 font-normal">-</span>
-                    )}
-                  </td>
-                ))}
-                <td className="px-4 py-3.5 text-center font-mono text-base font-black tabular-nums text-foreground">
-                  {int(matrix?.grandTotal)}
-                </td>
-              </tr>
-
-              {/* 平台健康度 / 真实率行 */}
-              <tr className="bg-black/[0.01] text-xs dark:bg-white/[0.01]">
-                <td className="px-4 py-2.5 font-bold text-muted-foreground">
-                  <span>真实率</span>
-                </td>
-                {matrix?.columns.map((col) => {
-                  const trueRate = col.totalCount > 0 ? ((col.trueOrderCount / col.totalCount) * 100).toFixed(0) : null;
-                  return (
-                    <td key={`rate-${col.platform}`} className="px-3 py-2.5 text-center font-bold tabular-nums text-muted-foreground">
-                      {trueRate ? (
-                        <span className={cn(Number(trueRate) === 100 ? "text-emerald-500/90" : "text-amber-500")}>
-                          {trueRate}%
-                        </span>
+                    <div key={col.platform} className="flex items-center gap-1.5 font-medium">
+                      {meta?.iconSrc ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={meta.iconSrc} alt={col.platform} className="h-3.5 w-3.5 shrink-0 object-contain" />
                       ) : (
-                        <span className="text-muted-foreground/30">-</span>
+                        <span className={cn("h-2 w-2 rounded-full", theme?.dot || "bg-primary")} />
                       )}
-                    </td>
+                      <span className="text-foreground font-bold">{col.platform}</span>
+                      <span className="font-mono text-muted-foreground">{pct}%</span>
+                      <span className="text-[10px] text-muted-foreground/60">({int(col.totalCount)}单)</span>
+                    </div>
                   );
                 })}
-                <td className="px-4 py-2.5 text-center font-bold tabular-nums text-emerald-500/90">
-                  {matrix?.grandTotal ? ((matrix.trueOrderTotal / matrix.grandTotal) * 100).toFixed(0) : "100"}%
-                </td>
-              </tr>
-            </tbody>
-          </table>
+            </div>
+          </div>
+        ) : null}
+
+        {/* 2. 主体：移动端极简横滑卡尺轨 / 桌面端6列立体网格 */}
+        <div className="flex gap-2.5 overflow-x-auto pb-2 pt-0.5 -mx-1 px-1 snap-x scrollbar-none sm:mx-0 sm:px-0 sm:pb-0 sm:pt-0 sm:grid sm:grid-cols-3 xl:grid-cols-6 sm:gap-3">
+          {/* 全渠道合计卡片 */}
+          <div className="group relative flex w-[152px] shrink-0 snap-start flex-col justify-between rounded-2xl border border-primary/20 bg-gradient-to-b from-primary/[0.05] via-white/80 to-white/60 p-3.5 shadow-[0_1px_3px_rgba(0,0,0,0.02)] transition-all hover:border-primary/35 hover:shadow-sm dark:from-primary/[0.08] dark:via-white/[0.03] dark:to-white/[0.02] sm:w-auto sm:p-4">
+            <div>
+              <div className="flex items-center justify-between gap-1.5">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src="/platform/全渠道.svg"
+                    alt="全渠道合计"
+                    className="h-4.5 w-4.5 shrink-0 object-contain rounded-xs"
+                  />
+                  <span className="truncate text-xs font-black tracking-tight text-foreground sm:text-[13px]">
+                    全渠道合计
+                  </span>
+                </div>
+                <span className="shrink-0 rounded-md border border-primary/20 bg-primary/10 px-1.5 py-0.5 font-mono text-[10px] font-bold text-primary">
+                  总盘
+                </span>
+              </div>
+
+              <div className="mt-2.5 flex items-baseline gap-1 sm:mt-3">
+                <span className="text-2xl font-black font-mono tracking-tight text-foreground sm:text-3xl">
+                  {int(matrix?.grandTotal)}
+                </span>
+                <span className="text-[11px] font-semibold text-muted-foreground sm:text-xs">单</span>
+              </div>
+
+              {/* 微型质量指示条 */}
+              <div className="mt-2 flex h-1 w-full overflow-hidden rounded-full bg-black/5 dark:bg-white/10">
+                <div
+                  style={{ width: `${matrix?.grandTotal ? (matrix.trueOrderTotal / matrix.grandTotal) * 100 : 100}%` }}
+                  className="h-full bg-emerald-500 rounded-full transition-all duration-500"
+                />
+                {Number(matrix?.brushOrderTotal || 0) > 0 && matrix?.grandTotal ? (
+                  <div
+                    style={{ width: `${(matrix.brushOrderTotal / matrix.grandTotal) * 100}%` }}
+                    className="h-full bg-rose-500 rounded-full transition-all duration-500"
+                  />
+                ) : null}
+              </div>
+            </div>
+
+            {/* 底部指标行：极简呼吸感 */}
+            <div className="mt-3 flex items-center justify-between text-[11px]">
+              <div className="flex items-center gap-1 text-muted-foreground">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
+                <span>真单</span>
+                <span className="font-mono font-black text-foreground">
+                  {int(matrix?.trueOrderTotal)}
+                </span>
+              </div>
+
+              {Number(matrix?.brushOrderTotal || 0) > 0 ? (
+                <div className="flex items-center gap-0.5 text-rose-500 font-mono font-bold text-[10px] bg-rose-500/10 px-1.5 py-0.5 rounded-md">
+                  刷 {int(matrix?.brushOrderTotal)}
+                </div>
+              ) : (
+                <div className="font-mono text-[10px] font-semibold text-emerald-600/80 dark:text-emerald-400/80">
+                  100% 真实
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* 各平台渠道独立卡片 */}
+          {matrix?.columns.map((col) => {
+            const meta = getPlatformMeta(col.platform);
+            const grandTotal = matrix?.grandTotal || 0;
+            const share = grandTotal > 0 && col.totalCount > 0 ? ((col.totalCount / grandTotal) * 100).toFixed(1) : null;
+            const truePct = col.totalCount > 0 ? (col.trueOrderCount / col.totalCount) * 100 : 100;
+            const brushPct = col.totalCount > 0 ? (col.brushOrderCount / col.totalCount) * 100 : 0;
+            const hasOrders = col.totalCount > 0;
+
+            return (
+              <div
+                key={col.platform}
+                className={cn(
+                  "group relative flex w-[152px] shrink-0 snap-start flex-col justify-between rounded-2xl border border-black/8 bg-white/80 p-3.5 shadow-[0_1px_3px_rgba(0,0,0,0.02)] transition-all hover:border-black/16 hover:shadow-sm dark:border-white/8 dark:bg-white/[0.03] dark:hover:border-white/16 sm:w-auto sm:p-4",
+                  !hasOrders && "opacity-45 hover:opacity-75"
+                )}
+              >
+                <div>
+                  <div className="flex items-center justify-between gap-1.5">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      {meta?.iconSrc ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={meta.iconSrc}
+                          alt={col.platform}
+                          className="h-4.5 w-4.5 shrink-0 object-contain rounded-xs"
+                        />
+                      ) : (
+                        <span className="flex h-4.5 w-4.5 items-center justify-center rounded-xs bg-black/5 text-muted-foreground dark:bg-white/10">
+                          <Store className="h-3 w-3" />
+                        </span>
+                      )}
+                      <span className="truncate text-xs font-black tracking-tight text-foreground sm:text-[13px]">
+                        {col.platform}
+                      </span>
+                    </div>
+
+                    {share ? (
+                      <span className="shrink-0 rounded-md border border-black/6 bg-black/[0.03] px-1.5 py-0.5 font-mono text-[10px] font-bold text-muted-foreground dark:border-white/6 dark:bg-white/5">
+                        {share}%
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-medium text-muted-foreground/50">0%</span>
+                    )}
+                  </div>
+
+                  <div className="mt-2.5 flex items-baseline gap-1 sm:mt-3">
+                    <span className={cn("text-2xl font-black font-mono tracking-tight sm:text-3xl", hasOrders ? "text-foreground" : "text-muted-foreground/40")}>
+                      {int(col.totalCount)}
+                    </span>
+                    <span className="text-[11px] font-semibold text-muted-foreground sm:text-xs">单</span>
+                  </div>
+
+                  {/* 微型质量指示条 */}
+                  <div className="mt-2 flex h-1 w-full overflow-hidden rounded-full bg-black/5 dark:bg-white/10">
+                    {hasOrders ? (
+                      <>
+                        <div
+                          style={{ width: `${truePct}%` }}
+                          className="h-full bg-emerald-500 rounded-full transition-all duration-500"
+                        />
+                        {brushPct > 0 ? (
+                          <div
+                            style={{ width: `${brushPct}%` }}
+                            className="h-full bg-rose-500 rounded-full transition-all duration-500"
+                          />
+                        ) : null}
+                      </>
+                    ) : (
+                      <div className="h-full w-full bg-black/5 dark:bg-white/10" />
+                    )}
+                  </div>
+                </div>
+
+                {/* 底部指标行：极简无横线割裂 */}
+                <div className="mt-3 flex items-center justify-between text-[11px]">
+                  <div className="flex items-center gap-1 text-muted-foreground">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
+                    <span>真单</span>
+                    <span className={cn("font-mono font-bold", col.trueOrderCount > 0 ? "text-foreground font-black" : "text-muted-foreground/50")}>
+                      {int(col.trueOrderCount)}
+                    </span>
+                  </div>
+
+                  {col.brushOrderCount > 0 ? (
+                    <div className="flex items-center gap-0.5 text-rose-500 font-mono font-bold text-[10px] bg-rose-500/10 px-1.5 py-0.5 rounded-md">
+                      刷 {int(col.brushOrderCount)}
+                    </div>
+                  ) : (
+                    <div className="font-mono text-[10px] font-semibold text-emerald-600/80 dark:text-emerald-400/80">
+                      {hasOrders ? "100% 真实" : "-"}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </Panel>
 

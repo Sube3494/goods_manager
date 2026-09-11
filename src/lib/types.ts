@@ -706,6 +706,11 @@ export interface DashboardCustomerAnalysis {
   returningRate: number;
   daily: DashboardCustomerTrendPoint[];
   returningCustomerTopProducts: DashboardCustomerTopProduct[];
+  newCustomerAmount?: number;
+  returningCustomerAmount?: number;
+  newCustomerAvgOrderValue?: number;
+  returningCustomerAvgOrderValue?: number;
+  returningCustomerAvgQuantity?: number;
 }
 
 export type BrushStatus = "Draft" | "Completed";

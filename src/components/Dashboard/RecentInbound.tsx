@@ -124,12 +124,7 @@ export function RecentInbound({ items, isLoading }: Props) {
             <motion.div
               key={item.id}
               variants={itemAnim}
-              className={cn(
-                "group flex items-center justify-between gap-3 rounded-[16px] border bg-white/78 dark:bg-white/[0.03] px-3 py-2.5 transition-colors hover:bg-white dark:hover:bg-white/[0.05] w-full min-w-0",
-                isReturnInbound
-                  ? "border-amber-500/20 hover:border-amber-500/35 dark:border-amber-400/20 dark:hover:border-amber-400/35"
-                  : "border-black/6 dark:border-white/8 hover:border-black/10 dark:hover:border-white/12"
-              )}
+              className="group flex items-center justify-between gap-3 rounded-[16px] border border-black/6 dark:border-white/8 hover:border-black/10 dark:hover:border-white/12 bg-white/78 dark:bg-white/[0.03] px-3 py-2.5 transition-colors hover:bg-white dark:hover:bg-white/[0.05] w-full min-w-0"
             >
               <div className="flex items-center gap-3 w-full flex-1 min-w-0">
                 <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-black/5 dark:bg-muted/20 border border-black/5 dark:border-white/10">

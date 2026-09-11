@@ -1,0 +1,66 @@
+<svg viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- 顶层板渐变：高明度靓丽蓝紫 -->
+    <linearGradient id="omniTop" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6366F1"/>
+      <stop offset="100%" stop-color="#4F46E5"/>
+    </linearGradient>
+    <!-- 顶层板侧边厚度 -->
+    <linearGradient id="omniTopSide" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4338CA"/>
+      <stop offset="100%" stop-color="#3730A3"/>
+    </linearGradient>
+
+    <!-- 中层板渐变：活力科技天蓝至青紫 -->
+    <linearGradient id="omniMid" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38BDF8"/>
+      <stop offset="100%" stop-color="#6366F1"/>
+    </linearGradient>
+    <linearGradient id="omniMidSide" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0284C7"/>
+      <stop offset="100%" stop-color="#4338CA"/>
+    </linearGradient>
+
+    <!-- 底层板渐变：深邃紫罗兰 -->
+    <linearGradient id="omniBot" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#A855F7"/>
+      <stop offset="100%" stop-color="#7C3AED"/>
+    </linearGradient>
+    <linearGradient id="omniBotSide" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7E22CE"/>
+      <stop offset="100%" stop-color="#581C87"/>
+    </linearGradient>
+
+    <!-- 柔和立体阴影 -->
+    <filter id="stackShadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="24" stdDeviation="20" flood-color="#0F172A" flood-opacity="0.28"/>
+    </filter>
+  </defs>
+
+  <!-- 纯透明背景，绝无外底板 -->
+
+  <!-- 底层全渠道数据基盘 (带侧边厚度立体结构) -->
+  <g filter="url(#stackShadow)">
+    <!-- 侧边厚度 -->
+    <path d="M128 660 L512 852 L896 660 L896 708 L512 900 L128 708 Z" fill="url(#omniBotSide)"/>
+    <!-- 顶面 -->
+    <path d="M512 468 L896 660 L512 852 L128 660 Z" fill="url(#omniBot)"/>
+  </g>
+
+  <!-- 中层多渠道枢纽流转盘 -->
+  <g filter="url(#stackShadow)">
+    <path d="M128 440 L512 632 L896 440 L896 488 L512 680 L128 488 Z" fill="url(#omniMidSide)"/>
+    <path d="M512 248 L896 440 L512 632 L128 440 Z" fill="url(#omniMid)"/>
+  </g>
+
+  <!-- 顶层全域决策总览盘 -->
+  <g filter="url(#stackShadow)">
+    <path d="M128 220 L512 412 L896 220 L896 268 L512 460 L128 268 Z" fill="url(#omniTopSide)"/>
+    <path d="M512 28 L896 220 L512 412 L128 220 Z" fill="url(#omniTop)"/>
+
+    <!-- 顶层高光全域汇聚同心晶环与光核 -->
+    <ellipse cx="512" cy="220" rx="130" ry="65" fill="#FFFFFF" fill-opacity="0.22"/>
+    <ellipse cx="512" cy="220" rx="60" ry="30" fill="#FFFFFF" fill-opacity="0.95"/>
+    <ellipse cx="512" cy="220" rx="28" ry="14" fill="#4F46E5"/>
+  </g>
+</svg>

@@ -421,7 +421,21 @@ export async function GET(request: NextRequest) {
     const matchedShopIds = matchedShops.map((s) => s.id);
     const shopCoreKeyword = stripShopSuffix(shopName) || shopName;
 
-    const [shopCount, localShops, shopProductRows, recentInboundItems, purchaseOrdersInRange, outboundOrdersInRange, pendingOrders, autoPickOrdersInRange] = await Promise.all([
+    const [
+      shopCount,
+      localShops,
+      shopProductRows,
+      recentInboundItems,
+      purchaseOrdersInRange,
+      allOutboundOrders,
+      pendingOrders,
+      autoPickOrdersInRange,
+      brushOrdersInRange,
+      promotionExpensesInRange,
+      operatingCostProfiles,
+      operatingCostBills,
+      userDb,
+    ] = await Promise.all([
       prisma.shop.count({
         where: {
           userId: targetUserId,
@@ -519,17 +533,23 @@ export async function GET(request: NextRequest) {
       prisma.outboundOrder.findMany({
         where: {
           userId: targetUserId,
-          ...(shopName ? { note: { contains: `[店铺:${shopName}]` } } : {}),
-          date: { gte: startDate, lte: endDate },
+          date: {
+            gte: new Date(startDate.getTime() - 24 * 60 * 60 * 1000),
+            lte: new Date(endDate.getTime() + 24 * 60 * 60 * 1000),
+          },
         },
         select: {
           id: true,
           date: true,
           note: true,
+          status: true,
           items: {
             select: {
               quantity: true,
               price: true,
+              costSnapshot: true,
+              shopProduct: { select: { costPrice: true } },
+              product: { select: { costPrice: true } },
             },
           },
         },
@@ -589,16 +609,6 @@ export async function GET(request: NextRequest) {
         },
         orderBy: { orderTime: "asc" },
       }),
-    ]);
-    perf.lap("core-queries");
-    const localShopByNameKey = new Map(localShops.map((shop) => [normalizeShopNameKey(shop.name), shop.name]));
-    const resolveExistingMatchedShopName = (order: Parameters<typeof resolveAutoPickMatchedShopName>[0]) => {
-      const matchedName = resolveAutoPickMatchedShopName(order, permissionsObj);
-      const nameKey = normalizeShopNameKey(matchedName);
-      return nameKey ? localShopByNameKey.get(nameKey) || null : null;
-    };
-
-    const [brushOrdersInRange, promotionExpensesInRange] = await Promise.all([
       prisma.brushOrder.findMany({
         where: {
           userId: targetUserId,
@@ -631,14 +641,34 @@ export async function GET(request: NextRequest) {
           amountTaobao: true,
         },
       }),
+      prisma.operatingCostProfile.findMany({
+        where: { userId: targetUserId, ...(shopName ? { shopName } : {}) },
+      }),
+      prisma.operatingCostMonthlyBill.findMany({
+        where: { userId: targetUserId, ...(shopName ? { shopName } : {}) },
+      }),
+      prisma.user.findUnique({
+        where: { id: targetUserId },
+        select: { shippingAddresses: true },
+      }),
     ]);
-    const operatingCostProfiles = await prisma.operatingCostProfile.findMany({
-      where: { userId: targetUserId, ...(shopName ? { shopName } : {}) },
+    perf.lap("all-core-queries");
+
+    const outboundOrdersInRange = allOutboundOrders.filter((order) => {
+      const inDateRange = order.date >= startDate && order.date <= endDate;
+      if (!inDateRange) return false;
+      if (shopName) {
+        return isShopNameMatch(extractShopNameFromNote(order.note), shopName);
+      }
+      return true;
     });
-    const operatingCostBills = await prisma.operatingCostMonthlyBill.findMany({
-      where: { userId: targetUserId, ...(shopName ? { shopName } : {}) },
-    });
-    perf.lap("secondary-queries");
+
+    const localShopByNameKey = new Map(localShops.map((shop) => [normalizeShopNameKey(shop.name), shop.name]));
+    const resolveExistingMatchedShopName = (order: Parameters<typeof resolveAutoPickMatchedShopName>[0]) => {
+      const matchedName = resolveAutoPickMatchedShopName(order, permissionsObj);
+      const nameKey = normalizeShopNameKey(matchedName);
+      return nameKey ? localShopByNameKey.get(nameKey) || null : null;
+    };
 
     const customBrushCommissionMap = new Map<string, number>(
       brushOrdersInRange
@@ -650,11 +680,12 @@ export async function GET(request: NextRequest) {
         .map((o) => String(o.orderNo || "").trim())
         .filter(Boolean)
     ));
-    if (allAutoPickOrderNos.length > 0) {
+    const missingBrushOrderNos = allAutoPickOrderNos.filter((no) => !customBrushCommissionMap.has(no));
+    if (missingBrushOrderNos.length > 0) {
       const extraBrushOrders = await prisma.brushOrder.findMany({
         where: {
           userId: targetUserId,
-          platformOrderId: { in: allAutoPickOrderNos },
+          platformOrderId: { in: missingBrushOrderNos },
         },
         select: { platformOrderId: true, commission: true },
       });
@@ -712,11 +743,6 @@ export async function GET(request: NextRequest) {
     });
     const duplicateSourceProductCount = Array.from(duplicateSourceMap.values()).filter((shops) => shops.size > 1).length;
 
-    // 先获取收货地址库中的店铺抽出率
-    const userDb = await prisma.user.findUnique({
-      where: { id: targetUserId },
-      select: { shippingAddresses: true }
-    });
     const userAddresses = userDb && Array.isArray(userDb.shippingAddresses) 
       ? (userDb.shippingAddresses as Array<Record<string, unknown>>).filter((address) => !isAddressDisabled(address))
       : [];
@@ -753,139 +779,9 @@ export async function GET(request: NextRequest) {
         (sum, order) => FinanceMath.add(sum, FinanceMath.add((order.paymentAmount || 0) - (order.receivedAmount || 0), order.commission || 0)),
         0
       );
-    const outboundLookupOrderNos = Array.from(new Set(
-      filteredAutoPickOrdersInRange
-        .map((order) => String(order.orderNo || "").trim())
-        .filter(Boolean)
-    ));
-    const outboundOrdersForCost: OutboundCostLookupRow[] = [];
-    if (outboundLookupOrderNos.length > 0) {
-      const orderNoSet = new Set(outboundLookupOrderNos);
-      const matchedOrderNos = new Set<string>();
 
-      const orderTimes = filteredAutoPickOrdersInRange
-        .map((o) => (o.orderTime ? new Date(o.orderTime).getTime() : 0))
-        .filter((t) => t > 0);
-      const minDate = orderTimes.length > 0 ? new Date(Math.min(...orderTimes) - 24 * 60 * 60 * 1000) : startDate;
-      const maxDate = orderTimes.length > 0 ? new Date(Math.max(...orderTimes) + 24 * 60 * 60 * 1000) : endDate;
-
-      // 1. 优先按日期范围批量加载出库单，在内存中提取单号比对（效率最高且支持各种格式的冒号与空格）
-      try {
-        const rows = await prisma.outboundOrder.findMany({
-          where: {
-            userId: targetUserId,
-            date: { gte: minDate, lte: maxDate },
-          },
-          select: {
-            note: true,
-            status: true,
-            items: {
-              select: {
-                quantity: true,
-                costSnapshot: true,
-                shopProduct: { select: { costPrice: true } },
-                product: { select: { costPrice: true } },
-              },
-            },
-          },
-          orderBy: { createdAt: "desc" },
-        }) as unknown as OutboundCostLookupRow[];
-
-        rows.forEach((row) => {
-          const orderNo = extractOrderNoFromNote(row.note);
-          if (orderNo && orderNoSet.has(orderNo)) {
-            outboundOrdersForCost.push(row);
-            matchedOrderNos.add(orderNo);
-          }
-        });
-      } catch (error) {
-        if (isPrismaMissingColumnError(error, "OutboundOrderItem.costSnapshot")) {
-          try {
-            const rows = await prisma.outboundOrder.findMany({
-              where: {
-                userId: targetUserId,
-                date: { gte: minDate, lte: maxDate },
-              },
-              select: {
-                note: true,
-                status: true,
-                items: {
-                  select: {
-                    quantity: true,
-                    shopProduct: { select: { costPrice: true } },
-                    product: { select: { costPrice: true } },
-                  },
-                },
-              },
-              orderBy: { createdAt: "desc" },
-            }) as unknown as OutboundCostLookupRow[];
-
-            rows.forEach((row) => {
-              const orderNo = extractOrderNoFromNote(row.note);
-              if (orderNo && orderNoSet.has(orderNo)) {
-                outboundOrdersForCost.push(row);
-                matchedOrderNos.add(orderNo);
-              }
-            });
-          } catch (_) {}
-        }
-      }
-
-      // 2. 对于日期范围外跨天的出库单，采用单号精确 OR 兜底查找
-      const remainingOrderNos = outboundLookupOrderNos.filter((no) => !matchedOrderNos.has(no));
-      if (remainingOrderNos.length > 0) {
-        try {
-          outboundOrdersForCost.push(...(await prisma.outboundOrder.findMany({
-            where: {
-              userId: targetUserId,
-              OR: remainingOrderNos.flatMap((orderNo) => [
-                { note: { contains: `平台单号: ${orderNo}` } },
-                { note: { contains: `平台单号:${orderNo}` } },
-                { note: { contains: `平台单号：${orderNo}` } },
-                { note: { contains: `平台单号： ${orderNo}` } },
-              ]),
-            },
-            select: {
-              note: true,
-              status: true,
-              items: {
-                select: {
-                  quantity: true,
-                  costSnapshot: true,
-                  shopProduct: { select: { costPrice: true } },
-                  product: { select: { costPrice: true } },
-                },
-              },
-            },
-          }) as unknown as OutboundCostLookupRow[]));
-        } catch (error) {
-          if (isPrismaMissingColumnError(error, "OutboundOrderItem.costSnapshot")) {
-            outboundOrdersForCost.push(...(await prisma.outboundOrder.findMany({
-              where: {
-                userId: targetUserId,
-                OR: remainingOrderNos.flatMap((orderNo) => [
-                  { note: { contains: `平台单号: ${orderNo}` } },
-                  { note: { contains: `平台单号:${orderNo}` } },
-                  { note: { contains: `平台单号：${orderNo}` } },
-                  { note: { contains: `平台单号： ${orderNo}` } },
-                ]),
-              },
-              select: {
-                note: true,
-                status: true,
-                items: {
-                  select: {
-                    quantity: true,
-                    shopProduct: { select: { costPrice: true } },
-                    product: { select: { costPrice: true } },
-                  },
-                },
-              },
-            }) as unknown as OutboundCostLookupRow[]));
-          }
-        }
-      }
-    }
+    const outboundOrdersForCost: OutboundCostLookupRow[] = allOutboundOrders as unknown as OutboundCostLookupRow[];
+    perf.lap("outbound-indexing");
     const outboundMetaByOrderNo = new Map<string, {
       itemCount: number;
       productCost: number;
@@ -1408,6 +1304,9 @@ export async function GET(request: NextRequest) {
     let newCustomerOrders = 0;
     let returningCustomerOrders = 0;
     let unknownCustomerOrders = 0;
+    let newCustomerAmount = 0;
+    let returningCustomerAmount = 0;
+    let returningCustomerTotalQuantity = 0;
 
     filteredAutoPickOrdersInRange.forEach((order) => {
       const isBrush = readMainSystemSelfDeliveryFlag(order.rawPayload);
@@ -1419,16 +1318,29 @@ export async function GET(request: NextRequest) {
         || isAutoPickOrderDeletedStatus(order.status);
       if (isBrush || isOther || isOffline) return;
 
+      const manualAmountOverride = readManualAmountOverride(order.rawPayload);
+      let paidYuan = (order.actualPaid || 0) / 100;
+      let expectedIncomeCents = manualAmountOverride && Number.isFinite(Number(manualAmountOverride.expectedIncome))
+        ? Number(manualAmountOverride.expectedIncome)
+        : typeof order.expectedIncome === "number"
+          ? order.expectedIncome
+          : null;
+      let expectedIncomeYuan = typeof expectedIncomeCents === "number" ? expectedIncomeCents / 100 : 0;
+      const orderAmount = Math.max(0, expectedIncomeYuan > 0 ? expectedIncomeYuan : paidYuan);
+
       const dateKey = resolveAutoPickOrderDateKey(order);
       const daily = customerDailyMap.get(dateKey);
       const customerType = readCustomerTypeFromRawPayload(order.rawPayload);
       if (customerType === "new") {
         newCustomerOrders += 1;
+        newCustomerAmount = FinanceMath.add(newCustomerAmount, orderAmount);
         if (daily) daily.newCustomerOrders += 1;
       } else if (customerType === "returning") {
         returningCustomerOrders += 1;
+        returningCustomerAmount = FinanceMath.add(returningCustomerAmount, orderAmount);
         if (daily) daily.returningCustomerOrders += 1;
         order.items.forEach((item) => {
+          returningCustomerTotalQuantity += Math.max(1, Number(item.quantity || 1) || 1);
           const payloadObj = item.rawPayload && typeof item.rawPayload === "object" && !Array.isArray(item.rawPayload)
             ? item.rawPayload as Record<string, unknown>
             : null;
@@ -1551,6 +1463,11 @@ export async function GET(request: NextRequest) {
       unknownCustomerOrders,
       newRate: totalKnownOrders > 0 ? newCustomerOrders / totalKnownOrders : 0,
       returningRate: totalKnownOrders > 0 ? returningCustomerOrders / totalKnownOrders : 0,
+      newCustomerAmount: Math.round(newCustomerAmount * 100) / 100,
+      returningCustomerAmount: Math.round(returningCustomerAmount * 100) / 100,
+      newCustomerAvgOrderValue: newCustomerOrders > 0 ? Number((newCustomerAmount / newCustomerOrders).toFixed(1)) : 0,
+      returningCustomerAvgOrderValue: returningCustomerOrders > 0 ? Number((returningCustomerAmount / returningCustomerOrders).toFixed(1)) : 0,
+      returningCustomerAvgQuantity: returningCustomerOrders > 0 ? Number((returningCustomerTotalQuantity / returningCustomerOrders).toFixed(1)) : 0,
       daily: Array.from(customerDailyMap.values()),
       returningCustomerTopProducts: returningTop5,
     };

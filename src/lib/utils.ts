@@ -177,6 +177,14 @@ export function getPlatformMeta(platform: string | undefined | null): PlatformBa
   let name = platform.trim();
   const normalized = name.toLowerCase();
 
+  if (name.includes("全渠道") || normalized === "all") {
+    return {
+      name: "全渠道",
+      iconSrc: "/platform/全渠道.svg",
+      className: "bg-primary/10 text-primary border border-primary/20",
+    };
+  }
+
   if (normalized === "other" || name.includes("线下") || name.includes("线下交易")) {
     return {
       name: "线下交易",
