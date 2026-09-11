@@ -34,12 +34,15 @@ interface WhitelistEntry {
   roleProfile?: RoleProfile;
   invitationToken?: string | null;
   invitationExpiresAt?: string | null;
+  createdAt?: string | Date;
   user?: {
     id: string;
     name: string;
     role: string;
     status: string;
+    createdAt?: string | Date;
     lastActiveAt?: string | null;
+    permissions?: Record<string, unknown> | null;
     deviceSessions?: Array<{
       id: string;
       deviceType: string;
@@ -55,6 +58,48 @@ interface WhitelistEntry {
     maiyatianCookieCount?: number;
     accessibleLibraries?: Array<{ id: string; name: string }>;
   };
+}
+
+export function getMemberPermissionCount(entry: WhitelistEntry): number {
+  if (entry.user?.role === "SUPER_ADMIN") {
+    return 999999;
+  }
+
+  const profile = entry.user?.roleProfile || entry.roleProfile;
+  const profilePermissions = (profile?.permissions && typeof profile.permissions === "object")
+    ? (profile.permissions as Record<string, boolean>)
+    : {};
+
+  const basePermissions: Record<string, boolean> = profile?.name === "基础访客" ? {
+    "gallery:download": true,
+    "gallery:share": true,
+    "gallery:copy": true,
+  } : {};
+
+  const rawUserOverrides = entry.user?.permissions;
+  const userOverrides: Record<string, boolean> = {};
+  if (rawUserOverrides && typeof rawUserOverrides === "object" && !Array.isArray(rawUserOverrides)) {
+    for (const [key, val] of Object.entries(rawUserOverrides)) {
+      if (typeof val === "boolean") {
+        userOverrides[key] = val;
+      }
+    }
+  }
+
+  const effective = {
+    ...basePermissions,
+    ...profilePermissions,
+    ...userOverrides,
+  };
+
+  return Object.values(effective).filter((val) => val === true).length;
+}
+
+export function getRegisteredTime(entry: WhitelistEntry): number {
+  const timeStr = entry.user?.createdAt || entry.createdAt;
+  if (!timeStr) return 0;
+  const time = new Date(timeStr).getTime();
+  return Number.isNaN(time) ? 0 : time;
 }
 
 interface ProductLibraryOption {
@@ -562,16 +607,29 @@ export function UserManager() {
   }, [authLibraryUserId]);
 
   const filteredEntries = useMemo(() => {
+    let result = entries;
     const keyword = searchQuery.trim();
-    if (!keyword) return entries;
-
-    return entries.filter((entry) => {
+    if (keyword) {
       const normalizedKeyword = keyword.toLowerCase();
+      result = result.filter((entry) => {
+        return (
+          entry.email.toLowerCase().includes(normalizedKeyword) ||
+          pinyinMatch(entry.remark || "", keyword)
+        );
+      });
+    }
 
-      return (
-        entry.email.toLowerCase().includes(normalizedKeyword) ||
-        pinyinMatch(entry.remark || "", keyword)
-      );
+    return [...result].sort((a, b) => {
+      // 1. 权限项多的排在前面
+      const permDiff = getMemberPermissionCount(b) - getMemberPermissionCount(a);
+      if (permDiff !== 0) return permDiff;
+
+      // 2. 权限一样按注册时间排在前面
+      const timeDiff = getRegisteredTime(b) - getRegisteredTime(a);
+      if (timeDiff !== 0) return timeDiff;
+
+      // 3. 邮箱字符序兜底
+      return a.email.localeCompare(b.email);
     });
   }, [entries, searchQuery]);
 

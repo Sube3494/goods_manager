@@ -40,6 +40,7 @@ export async function GET() {
             name: true,
             role: true,
             status: true,
+            createdAt: true,
             lastActiveAt: true,
             permissions: true,
             roleProfileId: true,
@@ -114,10 +115,34 @@ export async function GET() {
         invitationToken: null,
         invitationExpiresAt: null,
         user: buildUserWithConfig(user),
-        createdAt: user.lastActiveAt ?? new Date(0),
+        createdAt: user.createdAt,
       }));
 
-    return NextResponse.json([...userOnlyEntries, ...combined]);
+    const getEntryPermCount = (entry: (typeof combined)[number] | (typeof userOnlyEntries)[number]) => {
+      if (entry.user?.role === "SUPER_ADMIN") return 999999;
+      const profile = entry.user?.roleProfile || entry.roleProfile;
+      const perms = (profile?.permissions && typeof profile.permissions === "object") ? profile.permissions as Record<string, unknown> : {};
+      const baseCount = profile?.name === "基础访客" ? 3 : 0;
+      const count = Object.values(perms).filter(Boolean).length;
+      return Math.max(count, baseCount);
+    };
+
+    const getRegisteredTime = (entry: (typeof combined)[number] | (typeof userOnlyEntries)[number]) => {
+      const timeStr = entry.user?.createdAt || (entry as any).createdAt;
+      if (!timeStr) return 0;
+      const time = new Date(timeStr).getTime();
+      return Number.isNaN(time) ? 0 : time;
+    };
+
+    const sortedEntries = [...userOnlyEntries, ...combined].sort((a, b) => {
+      const pDiff = getEntryPermCount(b) - getEntryPermCount(a);
+      if (pDiff !== 0) return pDiff;
+      const timeDiff = getRegisteredTime(b) - getRegisteredTime(a);
+      if (timeDiff !== 0) return timeDiff;
+      return a.email.localeCompare(b.email);
+    });
+
+    return NextResponse.json(sortedEntries);
   } catch (error) {
     console.error("Failed to fetch whitelist:", error);
     return NextResponse.json({ error: "Failed to fetch whitelist" }, { status: 500 });
