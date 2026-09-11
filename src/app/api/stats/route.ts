@@ -1141,15 +1141,12 @@ export async function GET(request: NextRequest) {
            const rate = isOffline ? 0 : (shopRateMap.get(matchedShopName) ?? 0.06);
            const deliveryYuan = getDeliveryFee(order.delivery, order.rawPayload) / 100;
            const isManualDeliveryLoss = isOffline && deliveryYuan > 0 && paidYuan <= 0 && expectedIncomeYuan <= 0;
-           const hasReadyCost = isManualDeliveryLoss || (Boolean(orderCostMeta) && (orderCostMeta?.missingCostItemCount || 0) <= 0);
            const pureProfit = isManualDeliveryLoss
              ? -deliveryYuan
-             : hasReadyCost
-              ? FinanceMath.add(
-                  FinanceMath.multiply(expectedIncomeYuan, 1 - rate),
-                  -deliveryYuan - orderCostYuan - returnExtraExpenseYuan
-                )
-             : 0;
+             : FinanceMath.add(
+                 FinanceMath.multiply(expectedIncomeYuan, 1 - rate),
+                 -deliveryYuan - orderCostYuan - returnExtraExpenseYuan
+               );
 
           if (point) {
             point.pureProfit = FinanceMath.add(point.pureProfit, pureProfit);
@@ -1236,6 +1233,10 @@ export async function GET(request: NextRequest) {
     };
 
     const businessTrend = buildTrendSeries(businessTrendMap);
+    const operatingExpense = businessTrend.reduce(
+      (sum, point) => FinanceMath.add(sum, point.operatingExpense || 0),
+      0
+    );
     const netProfit = businessTrend.reduce(
       (sum, point) => FinanceMath.add(sum, point.netProfit || 0),
       0
@@ -1522,6 +1523,7 @@ export async function GET(request: NextRequest) {
       productCost,
       promotionExpense,
       brushExpense,
+      operatingExpense,
       otherExpense,
       netProfit,
       platformMatrix: {

@@ -747,13 +747,13 @@ export function DataOverview({
                 {
                   label: "运营与支出",
                   value: money(extraExpenseTotal),
-                  hint: "配送/推广/其他",
+                  hint: "配送/推广/经营成本",
                   tone: extraExpenseTotal > 0 ? "text-rose-500 dark:text-rose-400" : "text-foreground",
                   breakdown: [
                     { label: "配送费", value: Number(data?.deliveryExpense || 0) },
                     { label: "推广费", value: Number(data?.promotionExpense || 0) },
                     { label: "刷单支出", value: Number(data?.brushExpense || 0) },
-                    { label: "运营支出", value: Number(data?.operatingExpense || 0) },
+                    { label: "经营成本", value: Number(data?.operatingExpense || 0) },
                     { label: "其他支出", value: Number(data?.otherExpense || 0) },
                   ].filter((b) => b.value !== 0),
                 },
