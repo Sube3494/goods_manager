@@ -1964,6 +1964,7 @@ export function UserOrdersModal({
           localShops={localShops}
           userId={userId || undefined}
           userName={userName || undefined}
+          readOnly={true}
           onClose={() => {
             setIsPromotionModalOpen(false);
             void fetchPromotionExpense();

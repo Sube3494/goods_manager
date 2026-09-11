@@ -147,6 +147,7 @@ interface PromotionCalendarModalProps {
   userId?: string;
   userName?: string;
   onClose: () => void;
+  readOnly?: boolean;
 }
 
 function formatDate(date: Date): string {
@@ -162,6 +163,7 @@ export function PromotionCalendarModal({
   userId,
   userName,
   onClose,
+  readOnly = false,
 }: PromotionCalendarModalProps) {
   const { showToast } = useToast();
   const today = useMemo(() => new Date(), []);
@@ -445,6 +447,7 @@ export function PromotionCalendarModal({
 
   // 字段修改输入
   const handleFieldChange = (key: keyof PromotionPlatformAmounts, rawValue: string) => {
+    if (readOnly) return;
     if (!/^\d*(\.\d{0,2})?$/.test(rawValue)) {
       return;
     }
@@ -461,6 +464,7 @@ export function PromotionCalendarModal({
 
   // 保存当日推广费
   const handleSave = async () => {
+    if (readOnly) return;
     setIsSaving(true);
     try {
       const res = await fetch("/api/promotion", {
@@ -961,7 +965,10 @@ export function PromotionCalendarModal({
             {/* 各平台金额输入 */}
             <div className="space-y-2.5">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">渠道推广费用录入</span>
+                <span className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">{readOnly ? "渠道推广费用明细" : "渠道推广费用录入"}</span>
+                {readOnly ? (
+                  <span className="text-[10px] font-medium text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full">只读模式</span>
+                ) : null}
                 {isDetailLoading && (
                   <Loader2 size={12} className="animate-spin text-primary" />
                 )}
@@ -969,7 +976,12 @@ export function PromotionCalendarModal({
               {PROMOTION_PLATFORM_ROWS.map((row) => (
                 <label
                   key={row.key}
-                  className="flex items-center gap-3 rounded-full border border-border/70 bg-white px-3.5 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary/50 transition-all dark:border-white/10 dark:bg-white/[0.06] cursor-text shadow-2xs hover:border-border dark:hover:bg-white/[0.08]"
+                  className={cn(
+                    "flex items-center gap-3 rounded-full border border-border/70 bg-white px-3.5 transition-all dark:border-white/10 dark:bg-white/[0.06] shadow-2xs",
+                    readOnly
+                      ? "cursor-default opacity-85"
+                      : "focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary/50 cursor-text hover:border-border dark:hover:bg-white/[0.08]"
+                  )}
                 >
                   {/* 平台 Logo */}
                   <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted/60 p-0.5">
@@ -991,10 +1003,14 @@ export function PromotionCalendarModal({
                     pattern="^\d*(\.\d{0,2})?$"
                     placeholder="0.00"
                     value={editInputs[row.key]}
-                    onChange={(e) => handleFieldChange(row.key, e.target.value)}
-                    disabled={isSaving}
-                    onKeyDown={(e) => { if (e.key === "Enter") handleSave(); }}
-                    className="h-10 flex-1 bg-transparent text-xs font-mono font-bold text-foreground outline-none placeholder:text-muted-foreground/30 tabular-nums"
+                    onChange={(e) => !readOnly && handleFieldChange(row.key, e.target.value)}
+                    disabled={isSaving || readOnly}
+                    readOnly={readOnly}
+                    onKeyDown={(e) => { if (!readOnly && e.key === "Enter") handleSave(); }}
+                    className={cn(
+                      "h-10 flex-1 bg-transparent text-xs font-mono font-bold text-foreground outline-none placeholder:text-muted-foreground/30 tabular-nums",
+                      readOnly && "cursor-default"
+                    )}
                   />
                 </label>
               ))}
@@ -1010,6 +1026,7 @@ export function PromotionCalendarModal({
               </div>
             </div>
             <div className="flex items-center gap-2">
+{!readOnly ? (
               <button
                 onClick={handleSave}
                 disabled={isSaving}
@@ -1018,6 +1035,11 @@ export function PromotionCalendarModal({
                 {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} strokeWidth={2.5} />}
                 保存数据
               </button>
+            ) : (
+              <span className="text-[11px] text-muted-foreground/80 px-2 py-1 font-medium select-none">
+                仅供查看，不可修改
+              </span>
+            )}
             </div>
           </div>
 

@@ -81,14 +81,11 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { date, shopName, amountMeituan, amountJingdong, amountTaobao, amountOther, userId: requestedUserId } = body;
 
-    const canManageMembers = user.role === "SUPER_ADMIN"
-      || hasAdminAccess(user, "members:orders")
-      || hasAdminAccess(user, "members:manage")
-      || hasAdminAccess(user, "members:status")
-      || hasAdminAccess(user, "whitelist:manage")
-      || hasAdminAccess(user, "roles:manage")
-      || String(user.roleProfile?.name || "").includes("管理");
-    const targetUserId = requestedUserId && canManageMembers ? String(requestedUserId).trim() : user.id;
+    const cleanRequestedUserId = requestedUserId ? String(requestedUserId).trim() : "";
+    if (cleanRequestedUserId && cleanRequestedUserId !== user.id) {
+      return NextResponse.json({ error: "不允许修改其他成员的推广费数据" }, { status: 403 });
+    }
+    const targetUserId = user.id;
 
     if (!date) {
       return NextResponse.json({ error: "Invalid date" }, { status: 400 });
