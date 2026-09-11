@@ -1389,33 +1389,6 @@ export function UserOrdersModal({
                           </div>
                         </div>
 
-                        {/* 订单成分比例进度条 */}
-                        {activeOverview.totalCount > 0 && (
-                          <div className="flex h-2 w-full items-stretch overflow-hidden rounded-full bg-black/6 dark:bg-white/10 [transform:translateZ(0)] isolate">
-                            {activeOverview.trueOrderCount > 0 && (
-                              <div
-                                style={{ width: `${(activeOverview.trueOrderCount / activeOverview.totalCount) * 100}%` }}
-                                className="h-full shrink-0 self-stretch bg-sky-500 transition-[width] duration-500 ease-out"
-                                title={`真单 ${activeOverview.trueOrderCount}单`}
-                              />
-                            )}
-                            {activeOverview.brushCount > 0 && (
-                              <div
-                                style={{ width: `${(activeOverview.brushCount / activeOverview.totalCount) * 100}%` }}
-                                className="h-full shrink-0 self-stretch bg-rose-500 transition-[width] duration-500 ease-out"
-                                title={`刷单 ${activeOverview.brushCount}单`}
-                              />
-                            )}
-                            {activeOverview.cancelledCount > 0 && (
-                              <div
-                                style={{ width: `${(activeOverview.cancelledCount / activeOverview.totalCount) * 100}%` }}
-                                className="h-full shrink-0 self-stretch bg-slate-400 dark:bg-slate-500 transition-[width] duration-500 ease-out"
-                                title={`取消 ${activeOverview.cancelledCount}单`}
-                              />
-                            )}
-                          </div>
-                        )}
-
                         {/* 看板网格（移动端自适应为流式横条卡片，零截断无空白，0单项自动隐藏；桌面端保持三竖列大看板） */}
                         <div className="flex flex-col sm:grid sm:grid-cols-3 gap-2 sm:gap-4 mt-1 border-t border-black/4 pt-3 dark:border-white/5 text-[10px]">
                           {/* 第一列：真单 */}
