@@ -831,9 +831,12 @@ export function UserOrdersModal({
   const [isIncomeDetailsOpen, setIsIncomeDetailsOpen] = useState(false);
   const incomeContainerRef = useRef<HTMLDivElement>(null);
   const incomeModalRef = useRef<HTMLDivElement>(null);
+  const [isProfitDetailsOpen, setIsProfitDetailsOpen] = useState(false);
+  const profitContainerRef = useRef<HTMLDivElement>(null);
+  const profitModalRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!isIncomeDetailsOpen) return;
+    if (!isIncomeDetailsOpen && !isProfitDetailsOpen) return;
     const handleOutsideClick = (e: MouseEvent | TouchEvent) => {
       const target = e.target as Node;
       if (incomeContainerRef.current && incomeContainerRef.current.contains(target)) {
@@ -842,7 +845,14 @@ export function UserOrdersModal({
       if (incomeModalRef.current && incomeModalRef.current.contains(target)) {
         return;
       }
+      if (profitContainerRef.current && profitContainerRef.current.contains(target)) {
+        return;
+      }
+      if (profitModalRef.current && profitModalRef.current.contains(target)) {
+        return;
+      }
       setIsIncomeDetailsOpen(false);
+      setIsProfitDetailsOpen(false);
     };
     document.addEventListener("mousedown", handleOutsideClick);
     document.addEventListener("touchstart", handleOutsideClick);
@@ -850,7 +860,7 @@ export function UserOrdersModal({
       document.removeEventListener("mousedown", handleOutsideClick);
       document.removeEventListener("touchstart", handleOutsideClick);
     };
-  }, [isIncomeDetailsOpen]);
+  }, [isIncomeDetailsOpen, isProfitDetailsOpen]);
 
   const shopReceivedEntries = useMemo(() => {
     return Object.entries(activeSummary.shopProfit || {})
@@ -862,6 +872,19 @@ export function UserOrdersModal({
         return bReceived - aReceived;
       });
   }, [activeSummary.shopProfit]);
+
+  const shopProfitEntries = useMemo(() => {
+    return Object.entries(activeSummary.shopProfit || {})
+      .map(([key, info]) => ({ key, ...info }))
+      .filter((info) => info.amount !== 0 || info.count > 0 || (info.realOrderCount || 0) > 0 || (info.brushOrderCount || 0) > 0)
+      .sort((a, b) => b.amount - a.amount);
+  }, [activeSummary.shopProfit]);
+
+  const platformProfitEntries = useMemo(() => {
+    return Object.entries(activeSummary.platformProfit || {})
+      .filter(([, info]) => info.amount !== 0 || info.count > 0)
+      .sort(([, a], [, b]) => b.amount - a.amount);
+  }, [activeSummary.platformProfit]);
 
   const [localShops, setLocalShops] = useState<Array<{ id: string; name: string; address: string }>>([]);
 
@@ -1576,7 +1599,20 @@ export function UserOrdersModal({
                     </div>
 
                     {/* 2. 平台纯利润分布卡片 */}
-                    <div className="group min-w-0 h-full rounded-[20px] border border-black/8 bg-white/76 px-4 py-3.5 text-left shadow-xs transition hover:border-emerald-400/40 hover:bg-emerald-50/60 dark:border-white/10 dark:bg-white/5 dark:hover:border-emerald-300/35 dark:hover:bg-emerald-400/8 flex flex-col gap-2.5">
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      ref={profitContainerRef}
+                      onClick={() => setIsProfitDetailsOpen(true)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          setIsProfitDetailsOpen(true);
+                        }
+                      }}
+                      title="查看利润明细"
+                      className="group min-w-0 h-full rounded-[20px] border border-black/8 bg-white/76 px-4 py-3.5 text-left shadow-xs transition hover:border-emerald-400/40 hover:bg-emerald-50/60 dark:border-white/10 dark:bg-white/5 dark:hover:border-emerald-300/35 dark:hover:bg-emerald-400/8 flex flex-col gap-2.5 cursor-pointer active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40"
+                    >
                       <div className="flex flex-col w-full">
                         <div className="flex items-center justify-between sm:block">
                           <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
@@ -1584,17 +1620,10 @@ export function UserOrdersModal({
                               <span>纯利润</span>
                               <Store className="h-3.5 w-3.5 opacity-0 transition group-hover:opacity-100" />
                             </span>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setActiveTab("profit-trend");
-                              }}
-                              className="inline-flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400 hover:underline font-bold"
-                            >
-                              <span>查看曲线</span>
+                            <span className="inline-flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400 group-hover:underline font-bold">
+                              <span>查看明细</span>
                               <ArrowUpRight size={11} />
-                            </button>
+                            </span>
                           </div>
                           <div className={cn(
                             "sm:hidden text-[22px] font-bold leading-none tracking-tight",
@@ -1638,6 +1667,98 @@ export function UserOrdersModal({
                           })}
                         </div>
                       ) : null}
+                      {typeof document !== "undefined" && isProfitDetailsOpen && createPortal(
+                        <div
+                          className="fixed inset-0 z-[100000] flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs animate-in fade-in duration-200"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setIsProfitDetailsOpen(false);
+                          }}
+                        >
+                          <div
+                            ref={profitModalRef}
+                            onClick={(e) => e.stopPropagation()}
+                            className="relative flex w-full max-w-[420px] max-h-[85vh] flex-col overflow-hidden rounded-3xl border border-black/10 bg-white text-left shadow-2xl backdrop-blur-xl dark:border-white/15 dark:bg-[#0c1220] animate-in zoom-in-95 duration-200"
+                          >
+                            <div className="flex items-center justify-between border-b border-black/6 px-4 py-3 dark:border-white/8">
+                              <div className="flex items-center gap-2 font-semibold text-foreground dark:text-white">
+                                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400">
+                                  <Store size={15} />
+                                </div>
+                                <span className="text-sm font-bold">利润明细</span>
+                                <span className="rounded-full bg-black/5 px-2 py-0.5 text-[11px] font-medium text-muted-foreground dark:bg-white/10 dark:text-white/70">
+                                  {activeTab === "all-orders" ? "全部订单" : "今日"}
+                                </span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setIsProfitDetailsOpen(false);
+                                }}
+                                className="flex h-7 w-7 items-center justify-center rounded-full bg-black/5 text-muted-foreground transition-all hover:bg-black/10 hover:text-foreground active:scale-95 dark:bg-white/10 dark:text-white/80 dark:hover:bg-white/20 dark:hover:text-white"
+                                aria-label="关闭"
+                              >
+                                <X size={15} />
+                              </button>
+                            </div>
+
+                            <div className="flex-1 space-y-3 overflow-y-auto p-3.5">
+                              <div className="rounded-2xl border border-emerald-500/15 bg-emerald-500/8 px-3 py-2.5">
+                                <div className="flex items-baseline justify-between gap-3">
+                                  <span className="text-xs font-semibold text-foreground dark:text-white">纯利润总计</span>
+                                  <span className={cn("text-lg font-black tabular-nums", activeSummary.pureProfit < 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400")}>
+                                    {toCurrency(activeSummary.pureProfit || 0)}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="space-y-1.5">
+                                <div className="px-1 text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">平台利润</div>
+                                {platformProfitEntries.length > 0 ? platformProfitEntries.map(([platform, info]) => {
+                                  const meta = getPlatformBadgeMeta(platform);
+                                  return (
+                                    <div key={platform} className="flex items-center justify-between gap-3 rounded-2xl border border-black/4 bg-black/[0.025] px-3 py-2 text-xs dark:border-white/6 dark:bg-white/[0.035]">
+                                      <span className="flex min-w-0 items-center gap-1.5">
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img src={meta.iconSrc} alt={meta.iconAlt} className="h-4 w-4 shrink-0 object-contain" onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                                        <span className="truncate font-semibold text-foreground dark:text-white">{platform}</span>
+                                        <span className="text-muted-foreground">{info.count}单</span>
+                                      </span>
+                                      <span className={cn("shrink-0 font-bold tabular-nums", info.amount < 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400")}>
+                                        {toCurrency(info.amount)}
+                                      </span>
+                                    </div>
+                                  );
+                                }) : (
+                                  <div className="rounded-2xl border border-dashed border-border/70 py-5 text-center text-xs text-muted-foreground">暂无平台利润明细</div>
+                                )}
+                              </div>
+
+                              <div className="space-y-1.5">
+                                <div className="px-1 text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">店铺利润</div>
+                                {shopProfitEntries.length > 0 ? shopProfitEntries.map((shop, idx) => {
+                                  const displayShopName = shop.name === "未匹配店铺" ? shop.name : simplifyShopName(shop.name) || shop.name;
+                                  return (
+                                    <div key={shop.key || idx} className="flex items-center justify-between gap-3 rounded-2xl border border-black/4 bg-black/[0.025] px-3 py-2 text-xs dark:border-white/6 dark:bg-white/[0.035]">
+                                      <div className="min-w-0">
+                                        <div className="truncate text-sm font-semibold text-foreground dark:text-white" title={shop.name}>{displayShopName}</div>
+                                        <div className="mt-0.5 text-xs text-muted-foreground">{shop.count}单</div>
+                                      </div>
+                                      <span className={cn("shrink-0 font-bold tabular-nums", shop.amount < 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400")}>
+                                        {toCurrency(shop.amount)}
+                                      </span>
+                                    </div>
+                                  );
+                                }) : (
+                                  <div className="rounded-2xl border border-dashed border-border/70 py-5 text-center text-xs text-muted-foreground">暂无店铺利润明细</div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>,
+                        document.body
+                      )}
                     </div>
 
                     {/* 3. 最右侧：总配送费与推广费垂直组合列（严格对齐 orders/page.tsx，填满第4列，杜绝突出折行） */}
