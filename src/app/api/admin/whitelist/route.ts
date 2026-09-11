@@ -4,7 +4,7 @@ import { getAuthorizedAdmin, getAuthorizedAdminAny, getOnlineDeviceCutoff } from
 import { sendInvitationEmail } from "@/lib/email";
 import { getRequestOrigin } from "@/lib/utils";
 import { normalizeAutoPickIntegrationConfig } from "@/lib/autoPickOrders";
-import { PAGE_PERMISSION_TREE } from "@/lib/permissions";
+import { calculateMemberPermissionWeight } from "@/lib/permissions";
 
 /**
  * GET /api/admin/whitelist - List all whitelisted emails and invitations
@@ -120,47 +120,6 @@ export async function GET() {
       }));
 
     const allRoles = await prisma.roleProfile.findMany();
-    const roleMap = new Map(allRoles.map((r) => [r.id, r]));
-
-    const parsePermissions = (raw: unknown): Record<string, boolean> => {
-      if (!raw) return {};
-      if (typeof raw === "string") {
-        try {
-          const parsed = JSON.parse(raw);
-          if (parsed && typeof parsed === "object") return parsed as Record<string, boolean>;
-        } catch {
-          return {};
-        }
-      }
-      if (typeof raw === "object" && !Array.isArray(raw)) {
-        return raw as Record<string, boolean>;
-      }
-      return {};
-    };
-
-    const getEntryPermCount = (entry: (typeof combined)[number] | (typeof userOnlyEntries)[number]) => {
-      if (entry.user?.role === "SUPER_ADMIN") return 999999;
-
-      const roleId = entry.user?.roleProfileId || (entry as any).roleProfileId || entry.user?.roleProfile?.id || (entry as any).roleProfile?.id;
-      const profile = (roleId ? roleMap.get(roleId) : null) || entry.user?.roleProfile || (entry as any).roleProfile;
-      const perms = parsePermissions(profile?.permissions);
-
-      if (perms["all"] === true) return 99999;
-
-      let treeCount = 0;
-      PAGE_PERMISSION_TREE.forEach((group) => {
-        group.pages.forEach((page) => {
-          if (perms[page.accessKey]) treeCount += 1;
-          page.actions.forEach((action) => {
-            if (perms[action.key]) treeCount += 1;
-          });
-        });
-      });
-
-      const baseCount = profile?.name === "基础访客" ? 3 : 0;
-      const directCount = Object.values(perms).filter(Boolean).length;
-      return Math.max(treeCount, directCount, baseCount);
-    };
 
     const getRegisteredTime = (entry: (typeof combined)[number] | (typeof userOnlyEntries)[number]) => {
       const timeStr = entry.user?.createdAt || (entry as any).createdAt;
@@ -170,8 +129,10 @@ export async function GET() {
     };
 
     const sortedEntries = [...userOnlyEntries, ...combined].sort((a, b) => {
-      const pDiff = getEntryPermCount(b) - getEntryPermCount(a);
-      if (pDiff !== 0) return pDiff;
+      const weightDiff =
+        calculateMemberPermissionWeight(b, allRoles) -
+        calculateMemberPermissionWeight(a, allRoles);
+      if (weightDiff !== 0) return weightDiff;
       const timeDiff = getRegisteredTime(b) - getRegisteredTime(a);
       if (timeDiff !== 0) return timeDiff;
       return a.email.localeCompare(b.email);

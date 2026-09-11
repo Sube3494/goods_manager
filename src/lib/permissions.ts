@@ -793,8 +793,7 @@ export function getDefaultAuthorizedPath(user: SessionUser | null): string {
   const firstAccessibleRoute = DEFAULT_ROUTE_RULES.find((rule) => canAccessRoute(user, rule));
   return firstAccessibleRoute?.href ?? "/gallery";
 }
-
-export function hasAdminAccess(user: SessionUser | null, capability: AdminCapability): boolean {
+export function hasAdminAccess(user: SessionUser | null, capability: AdminCapability): boolean {
   if (!user) return false;
 
   const rule = ADMIN_ACCESS_MATRIX[capability];
@@ -808,6 +807,7 @@ export function hasAdminAccess(user: SessionUser | null, capability: AdminCapabi
 
   return false;
 }
+
 /**
  * Predefined permission templates for common roles
  */
@@ -818,3 +818,168 @@ export const ROLE_TEMPLATES: Record<string, Record<string, boolean>> = {
 export const TEMPLATE_LABELS: Record<string, string> = {
   BASIC_VISITOR: "基础访客",
 };
+
+/**
+ * 所有系统定义的权限集合（包括页面访问与操作权限）
+ */
+export const ALL_SYSTEM_PERMISSIONS: Permission[] = Array.from(
+  new Set([
+    "all",
+    "system:manage",
+    ...PERMISSION_TREE.flatMap((group) => group.children.map((item) => item.key as Permission)),
+    ...PAGE_PERMISSION_TREE.flatMap((group) => group.pages.flatMap((page) => [
+      page.accessKey,
+      ...page.actions.map((action) => action.key),
+    ])),
+  ])
+) as Permission[];
+
+/**
+ * 核心管理权限集合（用于衡量成员在组织架构中的管理层级）
+ */
+export const CORE_ADMIN_PERMISSIONS: readonly Permission[] = [
+  "system:manage",
+  "roles:manage",
+  "roles:create",
+  "roles:update",
+  "roles:delete",
+  "members:manage",
+  "members:status",
+  "members:orders",
+  "members:libraries",
+  "whitelist:manage",
+  "settings:manage",
+  "settings:general",
+  "settings:storage",
+  "backup:manage",
+  "backup:create",
+  "backup:restore",
+  "backup:delete",
+  "data:transfer",
+  "data:import",
+  "data:export",
+  "door-locks:manage",
+  "settlement:manage",
+  "settlement:confirm",
+  "operating-costs:manage",
+];
+
+export function parseRawPermissions(raw: unknown): Record<string, boolean> {
+  if (!raw) return {};
+  if (typeof raw === "string") {
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        return parsed as Record<string, boolean>;
+      }
+    } catch {
+      return {};
+    }
+  }
+  if (typeof raw === "object" && !Array.isArray(raw)) {
+    return raw as Record<string, boolean>;
+  }
+  return {};
+}
+
+export interface MemberWeightContext {
+  email?: string;
+  roleProfileId?: string | null;
+  roleProfile?: { id?: string; name?: string; permissions?: unknown } | null;
+  createdAt?: string | Date | null;
+  user?: {
+    id?: string;
+    role?: string;
+    roleProfileId?: string | null;
+    roleProfile?: { id?: string; name?: string; permissions?: unknown } | null;
+    permissions?: unknown;
+    createdAt?: string | Date | null;
+  } | null;
+}
+
+/**
+ * 计算成员的综合权限权重值：
+ * 1. 超级管理员绝对置顶 (100,000,000)
+ * 2. 具备 all: true 超级授权 (50,000,000)
+ * 3. 角色层级语义赋分（例如“高级管理员/主管/经理”优先于“基础管理员”）
+ * 4. 核心系统管理权限（每个核心管理权限 +2,000）
+ * 5. 全系统权限展开（包含 Fallback 继承展开，每个实际可用权限 +50）
+ * 6. 直接配置项总数微调（每个直接配置 +1）
+ */
+export function calculateMemberPermissionWeight(
+  entry: MemberWeightContext,
+  rolesList?: Array<{ id: string; name: string; permissions: unknown }>
+): number {
+  if (entry.user?.role === "SUPER_ADMIN") {
+    return 100_000_000;
+  }
+
+  const roleId =
+    entry.user?.roleProfileId ||
+    entry.roleProfileId ||
+    entry.user?.roleProfile?.id ||
+    entry.roleProfile?.id;
+  const matchedRole = rolesList && roleId ? rolesList.find((r) => r.id === roleId) : null;
+  const profile = matchedRole || entry.user?.roleProfile || entry.roleProfile;
+
+  const roleName = (profile?.name || "").trim();
+  const profilePerms = parseRawPermissions(profile?.permissions);
+  const userOverrides = parseRawPermissions(entry.user?.permissions);
+
+  const basePerms: Record<string, boolean> =
+    roleName === "基础访客" ? { ...BASIC_VISITOR_DEFAULTS } : {};
+
+  const effective: Record<string, boolean> = {
+    ...basePerms,
+    ...profilePerms,
+    ...userOverrides,
+  };
+
+  if (effective["all"] === true) {
+    return 50_000_000;
+  }
+
+  // 1. 角色层级语义赋分
+  let roleTierScore = 10_000;
+  if (/高级|主管|店长|经理|总监|核心|领导|高管/i.test(roleName)) {
+    roleTierScore = 200_000;
+  } else if (/管理|Admin/i.test(roleName)) {
+    roleTierScore = 30_000;
+  } else if (/访客|Guest|只读|临时/i.test(roleName)) {
+    roleTierScore = 0;
+  }
+
+  // 2. 构造临时用户上下文评估生效权限（含 Fallback 继承）
+  const simulatedUser: SessionUser = {
+    id: entry.user?.id || "temp",
+    email: entry.email || "temp@example.com",
+    role: "USER",
+    permissions: userOverrides,
+    roleProfile: {
+      id: profile?.id,
+      name: roleName,
+      permissions: profilePerms,
+    },
+  };
+
+  let activePermCount = 0;
+  let coreAdminCount = 0;
+
+  for (const perm of ALL_SYSTEM_PERMISSIONS) {
+    if (hasPermission(simulatedUser, perm)) {
+      activePermCount += 1;
+      if (CORE_ADMIN_PERMISSIONS.includes(perm)) {
+        coreAdminCount += 1;
+      }
+    }
+  }
+
+  const directCount = Object.values(effective).filter(Boolean).length;
+
+  return (
+    roleTierScore +
+    coreAdminCount * 2_000 +
+    activePermCount * 50 +
+    directCount
+  );
+}
