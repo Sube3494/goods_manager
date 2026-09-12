@@ -62,7 +62,7 @@ export function DashboardFeedPanel({
   onShopChange,
 }: Props) {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<TabKey>("inbound");
+  const [activeTab, setActiveTab] = useState<TabKey>("top");
   const [topTimeRange, setTopTimeRange] = useState<TopTimeRange>("30d");
   const [topItems, setTopItems] = useState<TopOutboundProduct[]>([]);
   const [isTopLoading, setIsTopLoading] = useState(true);
@@ -310,19 +310,6 @@ export function DashboardFeedPanel({
           <div className="inline-flex rounded-full border border-black/8 bg-black/3 p-0.5 dark:border-white/10 dark:bg-white/4 sm:p-1">
             <button
               type="button"
-              onClick={() => setActiveTab("inbound")}
-              className={cn(
-                `${tabClass} whitespace-nowrap`,
-                activeTab === "inbound"
-                  ? "border-transparent bg-background text-foreground shadow-xs dark:bg-white/8"
-                  : "border-transparent bg-transparent text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <BadgePlus size={11} className="mr-0.5 shrink-0 sm:mr-1 sm:size-[13px]" />
-              最近入库
-            </button>
-            <button
-              type="button"
               onClick={() => setActiveTab("top")}
               className={cn(
                 `${tabClass} whitespace-nowrap`,
@@ -333,6 +320,19 @@ export function DashboardFeedPanel({
             >
               <TrendingUp size={11} className="mr-0.5 shrink-0 sm:mr-1 sm:size-[13px]" />
               热销榜
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("inbound")}
+              className={cn(
+                `${tabClass} whitespace-nowrap`,
+                activeTab === "inbound"
+                  ? "border-transparent bg-background text-foreground shadow-xs dark:bg-white/8"
+                  : "border-transparent bg-transparent text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <BadgePlus size={11} className="mr-0.5 shrink-0 sm:mr-1 sm:size-[13px]" />
+              最近入库
             </button>
           </div>
         </div>
