@@ -82,6 +82,7 @@ interface ProductSelectionModalProps {
   externalLoading?: boolean;
   loadAllOnOpen?: boolean;
   respectPublicVisibility?: boolean;
+  defaultLibraryId?: string;
   lockLibraryId?: string;
   allowLibrarySwitch?: boolean;
   showQuantityControls?: boolean;
@@ -143,6 +144,7 @@ export function ProductSelectionModal({
   loadAllOnOpen = false,
   respectPublicVisibility = true,
   allowMultipleToggle = false,
+  defaultLibraryId,
   lockLibraryId,
   allowLibrarySwitch = true,
   showQuantityControls = false,
@@ -183,7 +185,7 @@ export function ProductSelectionModal({
   const observerTarget = useRef<HTMLDivElement>(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const [libraries, setLibraries] = useState<any[]>([]);
-  const [activeLibraryId, setActiveLibraryId] = useState<string>(lockLibraryId || "all");
+  const [activeLibraryId, setActiveLibraryId] = useState<string>(lockLibraryId || defaultLibraryId || "all");
   const shouldLockLibraryScope = !allowLibrarySwitch || Boolean(lockLibraryId);
 
   const [viewMode, setViewMode] = useState<"grid" | "list">(() => {
@@ -209,9 +211,12 @@ export function ProductSelectionModal({
       if (defaultViewMode) {
         setViewMode(defaultViewMode);
       }
-      setActiveLibraryId(shouldLockLibraryScope ? lockLibraryId || "all" : activeLibraryId || "all");
+      const initialLib = shouldLockLibraryScope 
+        ? (lockLibraryId || "all") 
+        : (lockLibraryId || defaultLibraryId || (libraries.length > 0 ? libraries[0].id : "all"));
+      setActiveLibraryId(initialLib);
     }
-  }, [activeLibraryId, defaultViewMode, isOpen, lockLibraryId, shouldLockLibraryScope]);
+  }, [defaultLibraryId, defaultViewMode, isOpen, libraries, lockLibraryId, shouldLockLibraryScope]);
 
   useEffect(() => {
     if (isOpen) {
@@ -227,18 +232,24 @@ export function ProductSelectionModal({
           if (Array.isArray(data)) {
             setLibraries(data);
             if (data.length > 0) {
-              const hasLocked = data.some(lib => lib.id === lockLibraryId);
-              if (lockLibraryId && hasLocked) {
-                setActiveLibraryId(lockLibraryId);
+              const targetId = lockLibraryId || defaultLibraryId;
+              const hasTarget = targetId && data.some((lib) => lib.id === targetId);
+              if (hasTarget) {
+                setActiveLibraryId(targetId);
               } else {
-                setActiveLibraryId(data[0].id);
+                setActiveLibraryId((prev) => {
+                  if (prev && prev !== "all" && data.some((lib) => lib.id === prev)) {
+                    return prev;
+                  }
+                  return data[0].id;
+                });
               }
             }
           }
         })
         .catch(() => {});
     }
-  }, [allowLibrarySwitch, isOpen, lockLibraryId]);
+  }, [allowLibrarySwitch, defaultLibraryId, isOpen, lockLibraryId]);
 
   const [showUnselectedOnly, setShowUnselectedOnly] = useState(true);
   const [localVisibleCount, setLocalVisibleCount] = useState(50);
@@ -448,6 +459,12 @@ export function ProductSelectionModal({
     if (usesPrefetchedData) return;
     if (!isOpen || !isInitialized) return;
 
+    // 如果开启了商品库切换，且没有锁定库和默认库，且商品库列表尚未加载完成，
+    // 则先不盲目使用 "all" 发起全库查询，避免把全部库成千上万件商品全量拉取导致卡死
+    if (allowLibrarySwitch && !lockLibraryId && !defaultLibraryId && libraries.length === 0) {
+      return;
+    }
+
     if (lastLoadedSignatureRef.current === querySignature) {
       setIsLoading(false);
       setShowInitialSkeleton(false);
@@ -457,7 +474,7 @@ export function ProductSelectionModal({
     setHasMore(false);
     pageRef.current = 1;
     fetchData('initial');
-  }, [fetchData, isInitialized, isOpen, querySignature, usesPrefetchedData]);
+  }, [allowLibrarySwitch, defaultLibraryId, fetchData, isInitialized, isOpen, libraries.length, lockLibraryId, querySignature, usesPrefetchedData]);
 
   const filterVisibleProducts = useCallback((candidates: Product[], categoryName = selectedCategoryName) => {
     const normalizedSearch = debouncedSearch.trim().toLowerCase();
