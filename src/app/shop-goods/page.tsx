@@ -1240,10 +1240,12 @@ export default function ShopGoodsPage() {
       if (!isCurrentShopValid) {
         setSelectedShopId(filteredShops[0].id);
       }
-    } else {
+    } else if (shops.length > 0 && (!activeLibraryId || activeLibraryId === "all")) {
+      setSelectedShopId(shops[0].id);
+    } else if (shops.length === 0) {
       setSelectedShopId("");
     }
-  }, [filteredShops, selectedShopId]);
+  }, [filteredShops, selectedShopId, shops, activeLibraryId]);
 
   useEffect(() => {
     fetch("/api/product-libraries")
@@ -1251,9 +1253,6 @@ export default function ShopGoodsPage() {
       .then((data) => {
         if (Array.isArray(data)) {
           setLibraries(data);
-          if (data.length > 0) {
-            setActiveLibraryId(data[0].id);
-          }
         }
       })
       .catch(() => {});
@@ -2314,9 +2313,22 @@ export default function ShopGoodsPage() {
 
       {libraries.length > 1 && (
         <div className="flex flex-wrap gap-2 border-b border-border/50 pb-3">
+          <button
+            type="button"
+            onClick={() => setActiveLibraryId("all")}
+            className={cn(
+              "px-4 py-2 text-sm font-bold rounded-xl transition-all duration-200",
+              activeLibraryId === "all"
+                ? "bg-primary text-primary-foreground shadow-md shadow-primary/10"
+                : "text-muted-foreground hover:bg-muted/10 hover:text-foreground"
+            )}
+          >
+            全部商品库
+          </button>
           {libraries.map((lib) => (
             <button
               key={lib.id}
+              type="button"
               onClick={() => setActiveLibraryId(lib.id)}
               className={cn(
                 "px-4 py-2 text-sm font-bold rounded-xl transition-all duration-200",
