@@ -195,8 +195,24 @@ export async function GET(
     const page = Math.max(1, parseInt(request.nextUrl.searchParams.get("page") || "1", 10));
     const allMode = request.nextUrl.searchParams.get("all") === "true";
     const idsOnly = request.nextUrl.searchParams.get("idsOnly") === "true";
+    const templateIdsOnly = request.nextUrl.searchParams.get("templateIdsOnly") === "true";
     const pageSize = allMode ? 999999 : Math.min(parseInt(request.nextUrl.searchParams.get("pageSize") || "20", 10), 2000);
     const skip = (page - 1) * pageSize;
+
+    if (templateIdsOnly) {
+      const templateItems = await prisma.shopProduct.findMany({
+        where: { shopId },
+        select: { productId: true, sourceProductId: true },
+      });
+      const ids = Array.from(
+        new Set(
+          templateItems
+            .flatMap((i) => [i.productId, i.sourceProductId])
+            .filter((id): id is string => Boolean(id && typeof id === "string" && id.trim().length > 0))
+        )
+      );
+      return NextResponse.json({ ids, total: ids.length });
+    }
 
     const where = {
       shopId,

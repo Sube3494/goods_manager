@@ -227,7 +227,17 @@ export class ProductService {
             const detailedProducts = pickerView
               ? await prisma.product.findMany({
                   where: { id: { in: pageIds } },
-                  select: { id: true, name: true, image: true, categoryId: true, category: true },
+                  select: {
+                    id: true,
+                    name: true,
+                    sku: true,
+                    image: true,
+                    costPrice: true,
+                    isPublic: true,
+                    isDiscontinued: true,
+                    categoryId: true,
+                    category: { select: { id: true, name: true } },
+                  },
                 })
               : await prisma.product.findMany({
                   where: { id: { in: pageIds } },
@@ -255,7 +265,17 @@ export class ProductService {
       pickerView
         ? prisma.product.findMany({
             where,
-            select: { id: true, name: true, image: true, categoryId: true, category: true },
+            select: {
+              id: true,
+              name: true,
+              sku: true,
+              image: true,
+              costPrice: true,
+              isPublic: true,
+              isDiscontinued: true,
+              categoryId: true,
+              category: { select: { id: true, name: true } },
+            },
             orderBy: standardOrderBy,
             skip,
             take: pageSize,

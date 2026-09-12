@@ -374,11 +374,12 @@ export function ProductSelectionModal({
       const targetPage = pageRef.current;
       const queryParams = new URLSearchParams({
         page: targetPage.toString(),
-        ...(loadAllOnOpen ? { all: "true" } : { pageSize: "20" }),
+        ...(loadAllOnOpen ? { all: "true" } : { pageSize: "40" }),
         ...(remoteSearch ? { search: remoteSearch } : {}),
         ...(queryRef.current || {}),
         ...(effectiveLibraryId && effectiveLibraryId !== "all" ? { libraryId: effectiveLibraryId } : {}),
         ...(remoteCategoryName !== "all" ? { category: remoteCategoryName, categoryName: remoteCategoryName } : {}),
+        ...(fetchPath === "/api/products" && minimalView ? { view: "picker" } : {}),
       });
 
       const shopId = queryRef.current?.shopId;
@@ -574,6 +575,7 @@ export function ProductSelectionModal({
         ...(query || {}),
         ...(effectiveLibraryId && effectiveLibraryId !== "all" ? { libraryId: effectiveLibraryId } : {}),
         category: selectedCategoryName,
+        ...(fetchPath === "/api/products" && minimalView ? { view: "picker" } : {}),
       });
       const res = await fetch(`${fetchPath}?${queryParams.toString()}`);
       if (!res.ok) throw new Error("Failed to fetch all products");

@@ -1581,17 +1581,15 @@ export default function ShopGoodsPage() {
       }
 
       try {
-        const params = new URLSearchParams({
-          all: "true",
-          pageSize: "2000",
-        });
-        const res = await fetch(`/api/shops/${selectedShopId}/products?${params.toString()}`);
+        const res = await fetch(`/api/shops/${selectedShopId}/products?templateIdsOnly=true`);
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
           throw new Error(data?.error || "Failed to fetch assigned template ids");
         }
 
-        const nextIds = Array.isArray(data?.items)
+        const nextIds = Array.isArray(data?.ids)
+          ? data.ids
+          : Array.isArray(data?.items)
           ? data.items
               .map((item: ShopCatalogItem) => String(item.productId || item.sourceProductId || "").trim())
               .filter(Boolean)
@@ -2446,7 +2444,6 @@ export default function ShopGoodsPage() {
         minimalView={true}
         query={templateCatalogQuery}
         emptyStateText="主库里还没有商品"
-        loadAllOnOpen={true}
         respectPublicVisibility={false}
         defaultViewMode="list"
         defaultLibraryId={selectedShop?.libraryId || (activeLibraryId !== "all" ? activeLibraryId : undefined)}
