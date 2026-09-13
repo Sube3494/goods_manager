@@ -679,15 +679,15 @@ export function readCustomerPhoneFromRawPayload(rawPayload: unknown): string | n
 
   const directValue = readTrimmedCandidateValue([
     splitPrivacyPhoneValue(root.customerPhone).phone,
-    root.unencryptedPhone,
-    root.unencrypted_phone,
+    splitPrivacyPhoneValue(root.unencryptedPhone).phone,
+    splitPrivacyPhoneValue(root.unencrypted_phone).phone,
     splitPrivacyPhoneValue(root.phone).phone,
-    root.secret_phone,
-    userInfo?.unencrypted_phone,
-    userInfo?.unencryptedPhone,
+    splitPrivacyPhoneValue(root.secret_phone).phone,
+    splitPrivacyPhoneValue(userInfo?.unencrypted_phone).phone,
+    splitPrivacyPhoneValue(userInfo?.unencryptedPhone).phone,
     splitPrivacyPhoneValue(userInfo?.customerPhone).phone,
     splitPrivacyPhoneValue(userInfo?.phone).phone,
-    userInfo?.secret_phone,
+    splitPrivacyPhoneValue(userInfo?.secret_phone).phone,
   ]);
   if (directValue) {
     return directValue;
@@ -700,10 +700,10 @@ export function readCustomerPhoneFromRawPayload(rawPayload: unknown): string | n
     const nested = candidate as Record<string, unknown>;
     const nestedValue = readTrimmedCandidateValue([
       splitPrivacyPhoneValue(nested.customerPhone).phone,
-      nested.unencryptedPhone,
-      nested.unencrypted_phone,
+      splitPrivacyPhoneValue(nested.unencryptedPhone).phone,
+      splitPrivacyPhoneValue(nested.unencrypted_phone).phone,
       splitPrivacyPhoneValue(nested.phone).phone,
-      nested.secret_phone,
+      splitPrivacyPhoneValue(nested.secret_phone).phone,
     ]);
     if (nestedValue) {
       return nestedValue;
@@ -765,8 +765,12 @@ export function readCustomerPhoneExtensionFromRawPayload(rawPayload: unknown): s
     root.customerPhoneExtension,
     root.phone_extend,
     splitPrivacyPhoneValue(root.customerPhone).extension,
+    splitPrivacyPhoneValue(root.unencryptedPhone).extension,
+    splitPrivacyPhoneValue(root.unencrypted_phone).extension,
     splitPrivacyPhoneValue(root.phone).extension,
     userInfo?.phone_extend,
+    splitPrivacyPhoneValue(userInfo?.unencrypted_phone).extension,
+    splitPrivacyPhoneValue(userInfo?.unencryptedPhone).extension,
     splitPrivacyPhoneValue(userInfo?.customerPhone).extension,
     splitPrivacyPhoneValue(userInfo?.phone).extension,
   ]);
@@ -783,6 +787,8 @@ export function readCustomerPhoneExtensionFromRawPayload(rawPayload: unknown): s
       nested.customerPhoneExtension,
       nested.phone_extend,
       splitPrivacyPhoneValue(nested.customerPhone).extension,
+      splitPrivacyPhoneValue(nested.unencryptedPhone).extension,
+      splitPrivacyPhoneValue(nested.unencrypted_phone).extension,
       splitPrivacyPhoneValue(nested.phone).extension,
     ]);
     if (nestedValue) {
@@ -2412,8 +2418,10 @@ async function enrichMaiyatianOrderByCookie(cookie: string, order: AutoPickInbou
     || detailDataObj?.unencryptedPhone
     || ""
   ).trim();
+  const splitUnencryptedPhone = splitPrivacyPhoneValue(unencryptedPhone);
   const splitUserPhone = splitPrivacyPhoneValue(userInfoObj?.phone);
   const splitDetailPhone = splitPrivacyPhoneValue(detailDataObj?.phone);
+  const resolvedCustomerPhone = splitUnencryptedPhone.phone || unencryptedPhone;
   const maskedPhone = String(
     userInfoObj?.secret_phone
     || userInfoObj?.secretPhone
@@ -2426,6 +2434,7 @@ async function enrichMaiyatianOrderByCookie(cookie: string, order: AutoPickInbou
   const phoneExtension = String(
     userInfoObj?.phone_extend
     || detailDataObj?.phone_extend
+    || splitUnencryptedPhone.extension
     || splitUserPhone.extension
     || splitDetailPhone.extension
     || ""
@@ -2449,7 +2458,7 @@ async function enrichMaiyatianOrderByCookie(cookie: string, order: AutoPickInbou
 
   if (unencryptedPhone) {
     orderObj.unencryptedPhone = unencryptedPhone;
-    orderObj.customerPhone = unencryptedPhone;
+    orderObj.customerPhone = resolvedCustomerPhone;
   } else if (maskedPhone) {
     orderObj.customerPhone = maskedPhone;
   }
@@ -3441,7 +3450,9 @@ export function normalizeAutoPickOrderPayload(payload: unknown): AutoPickInbound
         ? input.user_info as Record<string, unknown>
         : null);
 
-  const unencryptedPhone = String(input.unencryptedPhone || input.unencrypted_phone || userInfo?.unencryptedPhone || userInfo?.unencrypted_phone || "").trim();
+  const rawUnencryptedPhone = String(input.unencryptedPhone || input.unencrypted_phone || userInfo?.unencryptedPhone || userInfo?.unencrypted_phone || "").trim();
+  const splitUnencryptedPhone = splitPrivacyPhoneValue(rawUnencryptedPhone);
+  const unencryptedPhone = splitUnencryptedPhone.phone || rawUnencryptedPhone;
   const unencryptedMapAddress = String(input.unencryptedMapAddress || input.unencrypted_map_address || "").trim();
   const unencryptedAddress = String(input.unencryptedAddress || input.unencrypted_address || "").trim();
   const splitInputPhone = splitPrivacyPhoneValue(input.phone);
@@ -3459,6 +3470,7 @@ export function normalizeAutoPickOrderPayload(payload: unknown): AutoPickInbound
     input.customerPhoneExtension,
     input.phone_extend,
     userInfo?.phone_extend,
+    splitUnencryptedPhone.extension,
     splitInputPhone.extension,
     splitUserPhone.extension,
   ]) || "";

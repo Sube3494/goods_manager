@@ -2497,9 +2497,24 @@ export const OrderCard = memo(function OrderCard({
   const customerPhone = getDisplayText(order.customerPhone);
   const customerMaskedPhone = getDisplayText(order.customerMaskedPhone);
   const customerPhoneExtension = getDisplayText(order.customerPhoneExtension);
-  const customerPrivacyPhone = customerPhoneExtension !== "-"
-    ? `${customerPhone}${customerPhone !== "-" ? "_" : ""}${customerPhoneExtension}`
-    : customerPhone;
+  const customerPrivacyPhone = (() => {
+    if (customerPhone === "-") return "-";
+    if (customerPhoneExtension === "-") return customerPhone;
+    const ext = customerPhoneExtension.trim();
+    if (!ext) return customerPhone;
+    if (customerPhone.endsWith(`_${ext}`) || customerPhone.endsWith(`-${ext}`) || customerPhone.endsWith(`#${ext}`)) {
+      return customerPhone;
+    }
+    const match = customerPhone.match(/^(.+?)[_#-]([0-9]+)$/);
+    if (match) {
+      const existingExt = match[2];
+      if (existingExt === ext) {
+        return customerPhone;
+      }
+      return `${match[1]}_${ext}`;
+    }
+    return `${customerPhone}_${ext}`;
+  })();
   const isUnsupportedPlatform = order.platform === "淘宝"
     || order.platform === "京东"
     || order.platform === "线下交易"
