@@ -2604,7 +2604,7 @@ export default function ShopGoodsPage() {
           setTransferItem(null);
         }}
         item={transferItem}
-        shops={filteredShops.length > 0 ? filteredShops : shops}
+        shops={shops}
         onSuccess={handleTransferSuccess}
       />
       <ShopSortWorkbench

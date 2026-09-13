@@ -73,7 +73,12 @@ interface TransferStockModalProps {
   isOpen: boolean;
   onClose: () => void;
   item: TransferItem | null;
-  shops: Array<{ id: string; name: string }>;
+  shops: Array<{
+    id: string;
+    name: string;
+    libraryId?: string | null;
+    library?: { id: string; name: string } | null;
+  }>;
   onSuccess?: (result: {
     shopProductId: string;
     sourceStock: number;
@@ -369,7 +374,13 @@ export function TransferStockModal({
 
   if (typeof window === "undefined" || !isOpen || !item) return null;
 
+  const sourceShop = shops.find((s) => s.id === item.shopId);
   const selectedTargetShop = shops.find((s) => s.id === targetShopId);
+  const isCrossLibrary = Boolean(
+    sourceShop?.libraryId &&
+    selectedTargetShop?.libraryId &&
+    sourceShop.libraryId !== selectedTargetShop.libraryId
+  );
   const imageUrl = resolveImageUrl(item.image);
 
   return createPortal(
@@ -750,9 +761,16 @@ export function TransferStockModal({
 
                 {/* 目标门店选择（统一系统 CustomSelect 药丸风格） */}
                 <div className="space-y-1.5 pt-1">
-                  <label className="text-xs font-bold text-muted-foreground/80 flex items-center gap-1.5 px-1 uppercase tracking-wider">
-                    <Store size={13} className="text-emerald-500" /> 调入目标门店
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-muted-foreground/80 flex items-center gap-1.5 px-1 uppercase tracking-wider">
+                      <Store size={13} className="text-emerald-500" /> 调入目标门店
+                    </label>
+                    {isCrossLibrary && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-600 dark:text-purple-400">
+                        跨商品库调货
+                      </span>
+                    )}
+                  </div>
                   {candidateShops.length === 0 ? (
                     <div className="text-xs text-destructive font-medium p-3 rounded-full border border-destructive/20 bg-destructive/10">
                       暂无可调入的其他门店
@@ -764,7 +782,10 @@ export function TransferStockModal({
                         setTargetShopId(val);
                         setTargetProduct(null);
                       }}
-                      options={candidateShops.map((s) => ({ value: s.id, label: s.name }))}
+                      options={candidateShops.map((s) => ({
+                        value: s.id,
+                        label: s.library?.name ? `${s.name} (${s.library.name})` : s.name,
+                      }))}
                       placeholder="请选择接收门店"
                       triggerClassName="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 h-11 px-4 text-xs dark:hover:bg-white/10"
                     />
