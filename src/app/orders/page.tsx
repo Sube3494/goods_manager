@@ -1516,6 +1516,7 @@ function BrushSyncPickerModal({
               onChange={setSelectedPlatform}
               options={platformOptions}
               align="center"
+              matchTriggerWidth
               className="h-11 w-full"
               triggerClassName="h-full rounded-full border border-black/8 bg-white px-3.5 text-xs sm:text-sm shadow-none dark:border-white/10 dark:bg-white/3 whitespace-nowrap text-center justify-center"
             />
@@ -1524,6 +1525,7 @@ function BrushSyncPickerModal({
               onChange={setSelectedShop}
               options={shopOptions}
               align="center"
+              matchTriggerWidth
               className="h-11 w-full"
               triggerClassName="h-full rounded-full border border-black/8 bg-white px-3.5 text-xs sm:text-sm shadow-none dark:border-white/10 dark:bg-white/3 whitespace-nowrap text-center justify-center"
             />

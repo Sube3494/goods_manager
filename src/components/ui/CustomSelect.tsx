@@ -47,7 +47,7 @@ export function CustomSelect({
   const [searchQuery, setSearchQuery] = useState("");
   const [isMobile, setIsMobile] = useState(false);
 
-  const isSearchable = searchable ?? options.length >= 5;
+  const isSearchable = searchable ?? options.length >= 8;
 
   useEffect(() => {
     const checkMobile = () => {
@@ -120,14 +120,18 @@ export function CustomSelect({
     if (isOpen && containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect();
       const windowHeight = window.innerHeight;
-      const dropdownHeight = 300; 
+      const dropdownHeight = 240; 
       const spaceBelow = windowHeight - rect.bottom;
       const showAbove = spaceBelow < dropdownHeight && rect.top > dropdownHeight;
 
       requestAnimationFrame(() => {
-        const minDropdownWidth = 140;
-        const targetWidth = Math.max(rect.width, minDropdownWidth);
-        const preferredLeft = align === "right" ? rect.right - targetWidth : rect.left;
+        const targetWidth = matchTriggerWidth ? rect.width : Math.max(rect.width, 120);
+        let preferredLeft = rect.left;
+        if (align === "right") {
+          preferredLeft = rect.right - targetWidth;
+        } else if (align === "center") {
+          preferredLeft = rect.left + (rect.width - targetWidth) / 2;
+        }
         const safeLeft = Math.max(8, Math.min(preferredLeft, window.innerWidth - targetWidth - 12));
 
         setDropdownPosition({
@@ -139,19 +143,26 @@ export function CustomSelect({
         });
       });
     }
-  }, [align, isOpen]);
+  }, [align, isOpen, matchTriggerWidth]);
 
   useEffect(() => {
     if (isOpen) {
       updatePosition();
-      window.addEventListener("scroll", updatePosition, true);
+      const handleScroll = (e: Event) => {
+        const target = e.target as HTMLElement;
+        if (target?.closest?.(".select-dropdown-container")) {
+          return;
+        }
+        handleOpenChange(false);
+      };
+      window.addEventListener("scroll", handleScroll, { passive: true, capture: true });
       window.addEventListener("resize", updatePosition);
-    } 
-    return () => {
-      window.removeEventListener("scroll", updatePosition, true);
-      window.removeEventListener("resize", updatePosition);
-    };
-  }, [isOpen, updatePosition]);
+      return () => {
+        window.removeEventListener("scroll", handleScroll, true);
+        window.removeEventListener("resize", updatePosition);
+      };
+    }
+  }, [isOpen, updatePosition, handleOpenChange]);
 
   // Always use custom styled select dropdown even on mobile to maintain visual aesthetics
 
@@ -223,7 +234,7 @@ export function CustomSelect({
                 position: 'fixed',
                 top: `${dropdownPosition.top}px`,
                 left: `${dropdownPosition.left}px`,
-                minWidth: `${Math.max(dropdownPosition.width, 140)}px`,
+                minWidth: matchTriggerWidth ? `${dropdownPosition.width}px` : `${Math.max(dropdownPosition.width, 120)}px`,
                 maxWidth: 'calc(100vw - 24px)',
                 width: matchTriggerWidth ? `${dropdownPosition.width}px` : 'max-content',
                 zIndex: 999999,
@@ -231,10 +242,10 @@ export function CustomSelect({
                 translateY: dropdownPosition.showAbove ? '-100%' : '0%',
                 willChange: 'transform, opacity'
               } as React.CSSProperties}
-              className="select-dropdown-container rounded-xl bg-white/95 dark:bg-[#0c1222]/95 backdrop-blur-xl border border-border/70 dark:border-white/10 shadow-xl dark:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.7)] focus:outline-none overflow-hidden"
+              className="select-dropdown-container rounded-2xl bg-white/95 dark:bg-[#0c1222]/95 backdrop-blur-2xl border border-black/8 dark:border-white/10 shadow-2xl dark:shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] focus:outline-none overflow-hidden"
             >
               {isSearchable && (
-                <div className="p-1.5 border-b border-border/40 sticky top-0 bg-white/95 dark:bg-[#0c1222]/95 backdrop-blur-md z-10">
+                <div className="p-2 border-b border-border/40 sticky top-0 bg-white/95 dark:bg-[#0c1222]/95 backdrop-blur-md z-10">
                   <div className="relative flex items-center">
                     <Search size={12} className="absolute left-2.5 text-muted-foreground pointer-events-none" />
                     <input
@@ -262,7 +273,7 @@ export function CustomSelect({
                   </div>
                 </div>
               )}
-              <div className="max-h-56 overflow-auto p-1">
+              <div className="max-h-56 overflow-auto p-1.5">
                 {filteredOptions.length > 0 ? (
                   filteredOptions.map((option, index) => (
                     <button
@@ -273,13 +284,13 @@ export function CustomSelect({
                         handleOpenChange(false);
                       }}
                       className={cn(
-                        "relative flex w-full select-none items-center rounded-lg py-1.5 pl-2.5 pr-7 text-xs outline-none transition-colors hover:bg-slate-100 dark:hover:bg-white/8 cursor-pointer font-medium text-foreground",
+                        "relative flex w-full select-none items-center rounded-xl py-2 pl-3 pr-7 text-xs outline-none transition-colors hover:bg-slate-100 dark:hover:bg-white/8 cursor-pointer font-medium text-foreground",
                         option.value === value && "bg-primary/10 text-primary font-bold dark:bg-primary/20 dark:text-primary"
                       )}
                     >
                       <span className="whitespace-nowrap font-medium pr-1">{option.label}</span>
                       {option.value === value && (
-                        <span className="absolute right-2 flex h-3.5 w-3.5 items-center justify-center">
+                        <span className="absolute right-2.5 flex h-3.5 w-3.5 items-center justify-center">
                           <Check size={12} />
                         </span>
                       )}
