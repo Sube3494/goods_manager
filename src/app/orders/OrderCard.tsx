@@ -2487,9 +2487,7 @@ export const OrderCard = memo(function OrderCard({
   const commissionDisplay = getCommissionDisplay(displayedPlatformCommission);
   const rawDeliveryFeeInOrder = Number((order.delivery as Record<string, unknown> | undefined)?.sendFee || 0);
   const hasPureProfit = typeof order.pureProfit === "number" && Number.isFinite(order.pureProfit);
-  const pureProfit = hasPureProfit
-    ? (isSelfDeliveryOrCancelled && rawDeliveryFeeInOrder > 0 ? Number(order.pureProfit) + rawDeliveryFeeInOrder : Number(order.pureProfit))
-    : 0;
+  const pureProfit = hasPureProfit ? Number(order.pureProfit) : 0;
   const productCostStatusText = getProductCostStatusText(order);
   const refundAmount = Math.max(0, Number(order.refundAmount || 0));
   const hasRefundAmount = refundAmount > 0;
@@ -2812,7 +2810,7 @@ export const OrderCard = memo(function OrderCard({
                       <span className="truncate font-semibold">{toCurrency(refundAmount)}</span>
                     </span>
                   ) : null}
-                  {completed && (hasPureProfit || order.productCostStatus === "pending-backfill") ? (
+                  {(hasPureProfit || (completed && order.productCostStatus === "pending-backfill")) ? (
                     <div
                       ref={profitTooltipRef}
                       className="group/profit relative"

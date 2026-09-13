@@ -951,12 +951,11 @@ function normalizeOrderPlatformForSummary(platform?: string | null) {
   return raw;
 }
 
-function isRefundableMeituanDelivery(platform: unknown, delivery: unknown) {
+function isRefundableMeituanDelivery(delivery: unknown) {
   const deliveryObj = delivery && typeof delivery === "object" && !Array.isArray(delivery)
     ? delivery as Record<string, unknown>
     : {};
   const haystack = [
-    platform,
     deliveryObj.logisticName,
     deliveryObj.logistic_name,
     deliveryObj.track,
@@ -980,7 +979,7 @@ function hasRealizedCancelledDeliveryCost(input: {
   }
   return input.deliveryFee > 0
     && Boolean(input.hasOutbound)
-    && !isRefundableMeituanDelivery(input.platform, input.delivery);
+    && !isRefundableMeituanDelivery(input.delivery);
 }
 
 type ParsedOutboundCostSnapshot = {
