@@ -281,6 +281,7 @@ model User {
   meituanSkuMappings    ProductMeituanSku[]
   meituanImportBatches  MeituanImportBatch[]
   meituanImportItems    MeituanImportItem[]
+  shopTransfers         ShopTransferRecord[]
 }
 
 model UserDeviceSession {
@@ -612,6 +613,8 @@ model Shop {
   shopProducts ShopProduct[]
   libraryId   String?
   library     ProductLibrary?     @relation(fields: [libraryId], references: [id])
+  transfersOut ShopTransferRecord[] @relation("TransferSourceShop")
+  transfersIn  ShopTransferRecord[] @relation("TransferTargetShop")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -659,6 +662,8 @@ model ShopProduct {
   brushProducts BrushProduct[]
   purchaseOrderItems PurchaseOrderItem[]
   outboundOrderItems OutboundOrderItem[]
+  transfersOut       ShopTransferRecord[] @relation("TransferSourceProduct")
+  transfersIn        ShopTransferRecord[] @relation("TransferTargetProduct")
 
   @@unique([shopId, productId])
   @@unique([shopId, sku])
@@ -931,5 +936,36 @@ model MeituanImportItem {
   @@index([userId, platform, meituanSkuId])
   @@index([status])
 }
+
+model ShopTransferRecord {
+  id                  String       @id @default(cuid())
+  sourceShopId        String
+  targetShopId        String
+  sourceShopProductId String?
+  targetShopProductId String?
+  productId           String?
+  productName         String
+  sku                 String?
+  quantity            Int
+  shippingFee         Float?       @default(0)
+  sourceCostPrice     Float?       @default(0)
+  targetCostPrice     Float?       @default(0)
+  remark              String?
+  userId              String?
+  createdAt           DateTime     @default(now())
+
+  sourceShop          Shop         @relation("TransferSourceShop", fields: [sourceShopId], references: [id], onDelete: Cascade)
+  targetShop          Shop         @relation("TransferTargetShop", fields: [targetShopId], references: [id], onDelete: Cascade)
+  sourceShopProduct   ShopProduct? @relation("TransferSourceProduct", fields: [sourceShopProductId], references: [id], onDelete: SetNull)
+  targetShopProduct   ShopProduct? @relation("TransferTargetProduct", fields: [targetShopProductId], references: [id], onDelete: SetNull)
+  user                User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([sourceShopId, createdAt(sort: Desc)])
+  @@index([targetShopId, createdAt(sort: Desc)])
+  @@index([sourceShopProductId])
+  @@index([targetShopProductId])
+  @@index([userId, createdAt(sort: Desc)])
+}
+
 
 

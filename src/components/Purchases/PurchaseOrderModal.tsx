@@ -1120,6 +1120,8 @@ export function PurchaseOrderModal({
                           <span className="truncate">
                             {formData.type === AUTO_INBOUND_TYPE
                               ? "自动补库存详情"
+                              : (Boolean(formData.id?.startsWith("PO-TR-")) || Boolean(formData.note?.includes("调货入库")) || Boolean(formData.note?.includes("调拨入库")))
+                              ? "调货入库详情"
                               : effectiveReadOnly
                               ? "单据详情"
                               : (initialData ? "编辑单据" : "新增入库")}

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { Search, Plus, Store, X, ArrowUp, Trash2, AlertCircle, ListOrdered, Save, Check, Link2 } from "lucide-react";
+import { Search, Plus, Store, X, ArrowUp, Trash2, AlertCircle, ListOrdered, Save, Check, Link2, ArrowRightLeft, ChevronUp, ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { ImportModal } from "@/components/Goods/ImportModal";
 import { GoodsCard } from "@/components/Goods/GoodsCard";
@@ -14,6 +14,7 @@ import { GoodsCardSkeleton } from "@/components/Goods/GoodsCardSkeleton";
 import { ProductFormModal } from "@/components/Goods/ProductFormModal";
 import { ProductSelectionModal } from "@/components/Purchases/ProductSelectionModal";
 import { MeituanMappingModal } from "@/components/ShopGoods/MeituanMappingModal";
+import { TransferStockModal, TransferItem } from "@/components/ShopGoods/TransferStockModal";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { ActionBar } from "@/components/ui/ActionBar";
 import { useToast } from "@/components/ui/Toast";
@@ -647,6 +648,36 @@ function ShopSortWorkbench({
     });
   }, [categories, renumberRowsByCategoryOrder, rows, sortedPreview]);
 
+  const moveRowInCategory = useCallback((rowId: string, direction: 'up' | 'down') => {
+    const targetRow = rows.find((row) => row.id === rowId);
+    if (!targetRow) return;
+    const targetGroup = (targetRow.sortGroupNameInput || targetRow.categoryName || "未分组").trim();
+    const groupRows = sortedPreview.filter((row) => (row.sortGroupNameInput || row.categoryName || "未分组").trim() === targetGroup);
+    const currentIndex = groupRows.findIndex((row) => row.id === rowId);
+    if (currentIndex < 0) return;
+    const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+    if (targetIndex < 0 || targetIndex >= groupRows.length) return;
+
+    const nextGroupRows = [...groupRows];
+    const [moved] = nextGroupRows.splice(currentIndex, 1);
+    nextGroupRows.splice(targetIndex, 0, moved);
+
+    const groupOrderById = new Map(nextGroupRows.map((row, index) => [row.id, index]));
+
+    setRows((prev) => {
+      const sourceOrderById = new Map(prev.map((row, index) => [row.id, index]));
+      const nextRows = [...prev].sort((a, b) => {
+        const groupA = (a.sortGroupNameInput || a.categoryName || "未分组").trim();
+        const groupB = (b.sortGroupNameInput || b.categoryName || "未分组").trim();
+        if (groupA === targetGroup && groupB === targetGroup) {
+          return (groupOrderById.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (groupOrderById.get(b.id) ?? Number.MAX_SAFE_INTEGER);
+        }
+        return (sourceOrderById.get(a.id) ?? 0) - (sourceOrderById.get(b.id) ?? 0);
+      });
+      return renumberRowsByCategoryOrder(nextRows, categories);
+    });
+  }, [categories, renumberRowsByCategoryOrder, rows, sortedPreview]);
+
   const changedCount = useMemo(
     () =>
       rows.filter((row) =>
@@ -960,15 +991,34 @@ function ShopSortWorkbench({
                       <div className="line-clamp-1 text-sm font-bold text-foreground">{row.name}</div>
                       <div className="mt-1 text-xs font-bold text-muted-foreground">顺序 {index + 1}</div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => pinRowToCategoryTop(row.id)}
-                      disabled={firstRowIdByGroup.get((row.sortGroupNameInput || row.categoryName || "未分组").trim()) === row.id}
-                      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-35"
-                      title="置顶到当前分类"
-                    >
-                      <ArrowUp size={14} />
-                    </button>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => moveRowInCategory(row.id, 'up')}
+                        disabled={firstRowIdByGroup.get((row.sortGroupNameInput || row.categoryName || "未分组").trim()) === row.id}
+                        className="inline-flex h-8 w-7 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted active:scale-95 disabled:cursor-not-allowed disabled:opacity-30"
+                        title="上移一位"
+                      >
+                        <ChevronUp size={15} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => moveRowInCategory(row.id, 'down')}
+                        className="inline-flex h-8 w-7 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted active:scale-95 disabled:cursor-not-allowed disabled:opacity-30"
+                        title="下移一位"
+                      >
+                        <ChevronDown size={15} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => pinRowToCategoryTop(row.id)}
+                        disabled={firstRowIdByGroup.get((row.sortGroupNameInput || row.categoryName || "未分组").trim()) === row.id}
+                        className="inline-flex h-8 w-7 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted active:scale-95 disabled:cursor-not-allowed disabled:opacity-30"
+                        title="置顶到当前分类"
+                      >
+                        <ArrowUp size={13} />
+                      </button>
+                    </div>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <label className="text-[11px] font-bold text-muted-foreground">
@@ -1343,6 +1393,8 @@ export default function ShopGoodsPage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isSortOpen, setIsSortOpen] = useState(false);
   const [isMeituanMappingOpen, setIsMeituanMappingOpen] = useState(false);
+  const [isTransferOpen, setIsTransferOpen] = useState(false);
+  const [transferItem, setTransferItem] = useState<TransferItem | null>(null);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingItemId, setEditingItemId] = useState("");
   const [editingShopId, setEditingShopId] = useState("");
@@ -1933,6 +1985,52 @@ export default function ShopGoodsPage() {
     void openEditModal(rawTarget);
   }, [displayedItems, items, openEditModal, selectedIds, showToast]);
 
+  const handleOpenTransferModal = useCallback((targetProduct: Product | ShopCatalogItem) => {
+    const rawTarget = items.find((item) => item.id === targetProduct.id) || (targetProduct as ShopCatalogItem);
+    const currentShopId = rawTarget.shopId || selectedShop?.id || "";
+    const currentShopName = rawTarget.shopName || selectedShop?.name || shops.find((s) => s.id === currentShopId)?.name || "当前店铺";
+
+    if (!currentShopId) {
+      showToast("无法获取当前店铺信息，请先选择店铺", "error");
+      return;
+    }
+
+    const availableStock = Number(rawTarget.stock) || 0;
+    if (availableStock <= 0) {
+      showToast(`【${rawTarget.name}】当前库存为 0，无法调拨`, "warning");
+      return;
+    }
+
+    setTransferItem({
+      id: rawTarget.id,
+      name: rawTarget.name,
+      sku: rawTarget.sku,
+      image: rawTarget.image,
+      stock: availableStock,
+      shopId: currentShopId,
+      shopName: currentShopName,
+      productId: rawTarget.productId,
+      costPrice: rawTarget.costPrice ?? 0,
+    });
+    setIsTransferOpen(true);
+  }, [items, selectedShop, shops, showToast]);
+
+  const handleTransferSuccess = useCallback((result: {
+    shopProductId: string;
+    sourceStock: number;
+    quantity: number;
+    targetShopName: string;
+  }) => {
+    setItems((prevItems) =>
+      prevItems.map((item) =>
+        item.id === result.shopProductId
+          ? { ...item, stock: result.sourceStock }
+          : item
+      )
+    );
+    void fetchShopProducts(false);
+  }, [fetchShopProducts]);
+
   const handleSaveEdit = useCallback(async (formData: Omit<Product, "id"> & { id?: string }) => {
     if (!editingShopId || !editingItemId) return;
     let nextCategories = categories;
@@ -2444,7 +2542,35 @@ export default function ShopGoodsPage() {
         </>
       ) : null}
 
-      <ActionBar selectedCount={selectedIds.length} totalCount={totalResults} onToggleSelectAll={handleToggleSelectAll} onClear={() => setSelectedIds([])} onEdit={() => { if (selectedIds.length === 1) { handleEditSelected(); return; } setIsBatchEditOpen(true); }} label="个商品" extraActions={[{ label: "删除商品", icon: <Trash2 size={16} />, onClick: handleRemoveSelected, variant: "danger" }]} />
+      <ActionBar
+        selectedCount={selectedIds.length}
+        totalCount={totalResults}
+        onToggleSelectAll={handleToggleSelectAll}
+        onClear={() => setSelectedIds([])}
+        onEdit={() => { if (selectedIds.length === 1) { handleEditSelected(); return; } setIsBatchEditOpen(true); }}
+        label="个商品"
+        extraActions={[
+          ...(selectedIds.length === 1
+            ? (() => {
+                const target = displayedItems.find((item) => item.displayId === selectedIds[0]);
+                if (!target) return [];
+                const rawTarget = items.find((item) => item.id === target.linkedIds[0]) || target;
+                const availableStock = Number(rawTarget.stock) || 0;
+                // 只有库存大于 0 的商品才展示调拨入口
+                if (availableStock <= 0) return [];
+
+                return [{
+                  label: "调拨到其他店",
+                  icon: <ArrowRightLeft size={16} />,
+                  onClick: () => {
+                    handleOpenTransferModal(rawTarget);
+                  },
+                }];
+              })()
+            : []),
+          { label: "删除商品", icon: <Trash2 size={16} />, onClick: handleRemoveSelected, variant: "danger" }
+        ]}
+      />
       <ProductSelectionModal
         isOpen={isPickerOpen}
         onClose={() => setIsPickerOpen(false)}
@@ -2470,6 +2596,24 @@ export default function ShopGoodsPage() {
         currentShop={selectedShop}
         shops={filteredShops.length > 0 ? filteredShops : shops}
         onShopChange={(shop) => setSelectedShopId(shop.id)}
+      />
+      <TransferStockModal
+        isOpen={isTransferOpen}
+        onClose={() => {
+          setIsTransferOpen(false);
+          setTransferItem(null);
+        }}
+        item={transferItem}
+        shops={filteredShops.length > 0 ? filteredShops : shops}
+        onSuccess={handleTransferSuccess}
+      />
+      <ShopSortWorkbench
+        isOpen={isSortOpen}
+        shop={selectedShop}
+        onClose={() => setIsSortOpen(false)}
+        onSaved={async () => {
+          await fetchShopProducts(false);
+        }}
       />
 
       {typeof document !== "undefined" && createPortal(

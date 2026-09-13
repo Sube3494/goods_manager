@@ -64,6 +64,8 @@ next-env.d.ts
 # Temporary directories
 /tmp
 /backups/
+/public/backups/
 /rank/
 *.xlsx
+*.pnk
 

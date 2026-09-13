@@ -15,6 +15,7 @@ import { useUser } from "@/hooks/useUser";
 import { hasAdminAccess, hasDirectPermission, SessionUser, PAGE_PERMISSION_TREE, calculateMemberPermissionWeight } from "@/lib/permissions";
 import { pinyinMatch } from "@/lib/pinyin";
 import { formatLocalDateTime } from "@/lib/dateUtils";
+import { cn } from "@/lib/utils";
 
 
 
@@ -168,14 +169,21 @@ function DevicePresence({
 function RoleBadge({
   isSuperAdmin,
   roleName,
+  size = "md",
 }: {
   isSuperAdmin: boolean;
   roleName?: string | null;
+  size?: "sm" | "md";
 }) {
+  const isSm = size === "sm";
+
   if (isSuperAdmin) {
     return (
-      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black bg-orange-500/12 text-orange-600 dark:text-orange-400 border border-orange-500/30 shadow-xs whitespace-nowrap">
-        <Crown size={12} className="text-orange-500 dark:text-orange-400 shrink-0" />
+      <span className={cn(
+        "inline-flex items-center rounded-full font-black bg-orange-500/12 text-orange-600 dark:text-orange-400 border border-orange-500/30 shadow-xs whitespace-nowrap",
+        isSm ? "gap-1 px-2 py-0.5 text-[10px]" : "gap-1.5 px-3 py-1 text-[11px]"
+      )}>
+        <Crown size={isSm ? 10 : 12} className="text-orange-500 dark:text-orange-400 shrink-0" />
         超级管理员
       </span>
     );
@@ -183,16 +191,22 @@ function RoleBadge({
 
   if (roleName) {
     return (
-      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/20 shadow-xs whitespace-nowrap">
-        <Shield size={11} className="text-sky-600 dark:text-sky-400 shrink-0" />
+      <span className={cn(
+        "inline-flex items-center rounded-full font-bold bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/20 shadow-xs whitespace-nowrap",
+        isSm ? "gap-1 px-2 py-0.5 text-[10px]" : "gap-1.5 px-3 py-1 text-[11px]"
+      )}>
+        <Shield size={isSm ? 10 : 11} className="text-sky-600 dark:text-sky-400 shrink-0" />
         {roleName}
       </span>
     );
   }
 
   return (
-    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-zinc-100 text-zinc-500 dark:bg-white/5 dark:text-zinc-400 border border-dashed border-zinc-300 dark:border-zinc-700 whitespace-nowrap">
-      <ShieldAlert size={10} className="shrink-0 text-amber-500/80" />
+    <span className={cn(
+      "inline-flex items-center gap-1 rounded-full font-semibold bg-zinc-100 text-zinc-500 dark:bg-white/5 dark:text-zinc-400 border border-dashed border-zinc-300 dark:border-zinc-700 whitespace-nowrap",
+      isSm ? "px-1.5 py-0.5 text-[9px]" : "px-2.5 py-0.5 text-[10px]"
+    )}>
+      <ShieldAlert size={isSm ? 9 : 10} className="shrink-0 text-amber-500/80" />
       未分配角色
     </span>
   );
@@ -505,6 +519,15 @@ export function UserManager() {
   // 新增：商品库授权状态
   const [cookieStatuses, setCookieStatuses] = useState<Record<string, string>>({});
   const cookieLabel = (id: string) => ({ valid: "可用", partial: "部分账号不可用", invalid: "Cookie 不可用，请更新或重试", missing: "未配置", checking: "检测中", error: "检测失败，请重试" }[cookieStatuses[id]] || "未检测");
+  const cookieShortLabel = (id: string) => ({ valid: "可用", partial: "部分异常", invalid: "不可用", missing: "未配置", checking: "检测中", error: "失败" }[cookieStatuses[id]] || "未检测");
+  const isMaiyatianConfigured = (user?: WhitelistEntry["user"]) => {
+    if (!user) return false;
+    const status = cookieStatuses[user.id];
+    if (status) {
+      return status !== "missing";
+    }
+    return Boolean(user.hasMaiyatianCookie);
+  };
   const cookieTone = (id: string) => cookieStatuses[id] === "valid"
     ? "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10"
     : cookieStatuses[id] === "invalid" ? "text-red-500 bg-red-500/10"
@@ -1126,30 +1149,45 @@ export function UserManager() {
                        <td className="px-6 py-4 text-center">
                          <div className="flex justify-center">
                             <div className="flex items-center gap-1 bg-muted/20 dark:bg-white/[0.02] p-1 rounded-full border border-border/40">
-                               {isRegistered && canViewMemberOrders ? (
-                                  <button
-                                    onClick={() => {
-                                      setViewOrdersUser({
-                                        id: entry.user!.id,
-                                        name: entry.user?.name || entry.email,
-                                        email: entry.email,
-                                        roleName: entry.user?.roleProfile?.name || entry.roleProfile?.name,
-                                      });
-                                    }}
-                                    className={`relative h-8 w-8 rounded-full flex items-center justify-center transition-all hover:scale-110 active:scale-95 cursor-pointer ${
-                                      cookieTone(entry.user!.id)
-                                    }`}
-                                    title={
-                                      `查看麦芽田订单数据（${cookieLabel(entry.user!.id)}）`
-                                    }
-                                  >
-                                    <ShoppingBag size={15} />
-                                    {entry.user?.hasMaiyatianCookie && entry.user?.maiyatianCookieCount && entry.user.maiyatianCookieCount > 1 ? (
-                                      <span className="absolute -top-1 -right-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-muted px-0.5 text-[8px] font-black text-foreground ring-2 ring-background leading-none">
-                                        {entry.user.maiyatianCookieCount}
-                                      </span>
-                                    ) : null}
-                                  </button>
+                                {isRegistered && canViewMemberOrders ? (
+                                  (() => {
+                                    const isConfigured = isMaiyatianConfigured(entry.user);
+                                    return (
+                                      <button
+                                        onClick={() => {
+                                          if (!isConfigured) {
+                                            showToast("该成员未配置麦芽田账号凭证", "info");
+                                            return;
+                                          }
+                                          setViewOrdersUser({
+                                            id: entry.user!.id,
+                                            name: entry.user?.name || entry.email,
+                                            email: entry.email,
+                                            roleName: entry.user?.roleProfile?.name || entry.roleProfile?.name,
+                                          });
+                                        }}
+                                        disabled={!isConfigured}
+                                        className={cn(
+                                          "relative h-8 w-8 rounded-full flex items-center justify-center transition-all",
+                                          isConfigured
+                                            ? cn(cookieTone(entry.user!.id), "hover:scale-110 active:scale-95 cursor-pointer")
+                                            : "text-muted-foreground/30 bg-muted/10 cursor-not-allowed opacity-40 border border-transparent"
+                                        )}
+                                        title={
+                                          isConfigured
+                                            ? `查看麦芽田订单数据（${cookieLabel(entry.user!.id)}）`
+                                            : "该成员未配置麦芽田账号凭证"
+                                        }
+                                      >
+                                        <ShoppingBag size={15} />
+                                        {entry.user?.hasMaiyatianCookie && entry.user?.maiyatianCookieCount && entry.user.maiyatianCookieCount > 1 ? (
+                                          <span className="absolute -top-1 -right-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-muted px-0.5 text-[8px] font-black text-foreground ring-2 ring-background leading-none">
+                                            {entry.user.maiyatianCookieCount}
+                                          </span>
+                                        ) : null}
+                                      </button>
+                                    );
+                                  })()
                                 ) : null}
                                {isRegistered && canManageMembers && !isSuperAdmin ? (
                                   <button
@@ -1220,75 +1258,83 @@ export function UserManager() {
               const roleName = isSuperAdmin ? "超级管理员" : (isRegistered ? entry.user?.roleProfile?.name : entry.roleProfile?.name);
               
               return (
-                <div key={entry.id} className="p-4 transition-colors hover:bg-muted/10">
-                  <div className="rounded-[22px] border border-border/60 bg-linear-to-br from-white/95 via-white/85 to-background dark:border-white/10 dark:from-white/[0.06] dark:via-white/[0.03] dark:to-transparent p-4 shadow-sm backdrop-blur-md">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex min-w-0 flex-1 items-center gap-3">
+                <div key={entry.id} className="p-2.5 sm:p-3 transition-colors hover:bg-muted/10">
+                  <div className="rounded-2xl border border-border/60 bg-linear-to-br from-white/95 via-white/85 to-background dark:border-white/10 dark:from-white/[0.06] dark:via-white/[0.03] dark:to-transparent p-3 sm:p-3.5 shadow-xs backdrop-blur-md">
+                    {/* 顶部 Header：头像 + 姓名/角色/邮箱/备注 + 状态Switch与勾选 */}
+                    <div className="flex items-start justify-between gap-2.5">
+                      <div className="flex min-w-0 flex-1 items-center gap-2.5">
                         <MemberAvatar
                           isRegistered={isRegistered}
                           email={entry.email}
                           name={entry.user?.name}
-                          size="lg"
+                          size="md"
                         />
                         <div className="min-w-0 flex-1">
-                          <span className="block text-sm font-bold truncate">{isRegistered ? entry.user?.name : "待邀请成员"}</span>
-                          <span className="mt-0.5 block text-[10px] text-muted-foreground font-mono break-all leading-relaxed">{entry.email}</span>
-                          {entry.remark && entry.remark !== "系统超级管理员" ? (
-                            <div className="mt-1 flex items-center gap-1.5 flex-wrap">
-                              <span className="inline-flex max-w-full items-center rounded-full bg-amber-500/10 px-2.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300 border border-amber-500/20 break-all">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-sm font-bold truncate">
+                              {isRegistered ? (entry.user?.name || entry.email.split('@')[0]) : "待邀请成员"}
+                            </span>
+                            <RoleBadge isSuperAdmin={isSuperAdmin} roleName={roleName} size="sm" />
+                          </div>
+                          <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-muted-foreground font-mono flex-wrap">
+                            <span className="truncate max-w-[190px]">{entry.email}</span>
+                            {entry.remark && entry.remark !== "系统超级管理员" ? (
+                              <span className="inline-flex max-w-[120px] items-center rounded-md bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300 border border-amber-500/20 truncate">
                                 {entry.remark}
                               </span>
-                            </div>
-                          ) : null}
+                            ) : null}
+                          </div>
                         </div>
                       </div>
-                      {isSuperAdmin ? (
-                        <SelectionCircleButton
-                          checked={false}
-                          disabled
-                          title="不可勾选"
-                        />
-                      ) : (
-                        <SelectionCircleButton checked={selectedEmails.includes(entry.email)} onClick={() => toggleSelectEmail(entry.email)} />
-                      )}
-                    </div>
 
-                    <div className="mt-4 flex items-center justify-between gap-3">
-                      <RoleBadge isSuperAdmin={isSuperAdmin} roleName={roleName} />
-                      {isRegistered ? (
-                        <Switch
-                          checked={entry.user?.status === 'ACTIVE'}
-                          onChange={() => handleStatusToggle(entry.email, entry.user?.status || 'ACTIVE')}
-                          disabled={!canManageMemberStatus || isSuperAdmin}
-                        />
-                      ) : (
-                        <span className="shrink-0 rounded-full border border-amber-500/20 bg-amber-500/10 px-2.5 py-1 text-[10px] font-bold text-amber-600 dark:text-amber-400">等待加入</span>
-                      )}
-                    </div>
-
-                    <div className="mt-3 rounded-2xl bg-muted/30 dark:bg-white/[0.02] px-3.5 py-2.5 border border-border/30">
-                      <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">最后活动</div>
-                      <div className="mt-1 text-xs font-semibold text-foreground">
-                        {isRegistered ? formatLastActiveAt(entry.user?.lastActiveAt) : "暂无记录"}
+                      <div className="flex items-center gap-2 shrink-0 pt-0.5">
+                        {isRegistered ? (
+                          <Switch
+                            checked={entry.user?.status === 'ACTIVE'}
+                            onChange={() => handleStatusToggle(entry.email, entry.user?.status || 'ACTIVE')}
+                            disabled={!canManageMemberStatus || isSuperAdmin}
+                          />
+                        ) : (
+                          <span className="shrink-0 rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold text-amber-600 dark:text-amber-400">等待加入</span>
+                        )}
+                        {isSuperAdmin ? (
+                          <SelectionCircleButton
+                            checked={false}
+                            disabled
+                            title="不可勾选"
+                          />
+                        ) : (
+                          <SelectionCircleButton checked={selectedEmails.includes(entry.email)} onClick={() => toggleSelectEmail(entry.email)} />
+                        )}
                       </div>
                     </div>
 
-                    <div className="mt-3 rounded-2xl bg-muted/30 dark:bg-white/[0.02] px-3.5 py-2.5 border border-border/30">
-                      <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">在线设备</div>
-                      <div className="mt-2 flex flex-wrap gap-1.5">
-                        <DevicePresence devices={entry.user?.deviceSessions} />
+                    {/* 元数据行：最后活动与在线设备合并为紧凑双列 */}
+                    <div className="mt-2.5 grid grid-cols-2 gap-2 rounded-xl bg-muted/30 dark:bg-white/[0.02] px-3 py-2 border border-border/40 text-xs">
+                      <div className="min-w-0">
+                        <div className="text-[10px] font-semibold text-muted-foreground">最后活动</div>
+                        <div className="mt-0.5 text-xs font-semibold text-foreground truncate">
+                          {isRegistered ? formatLastActiveAt(entry.user?.lastActiveAt) : "暂无记录"}
+                        </div>
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-[10px] font-semibold text-muted-foreground">在线设备</div>
+                        <div className="mt-0.5 flex flex-wrap gap-1 items-center truncate">
+                          <DevicePresence devices={entry.user?.deviceSessions} />
+                        </div>
                       </div>
                     </div>
 
-                    <div className="mt-4 grid grid-cols-2 gap-2">
+                    {/* 操作按钮区 */}
+                    <div className="mt-2.5 grid grid-cols-2 gap-1.5">
                       {canManageWhitelist && (
                         <button
                           onClick={() => setEditingRemarkEntry(entry)}
-                          className={`h-9 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-300 text-xs font-bold transition-all hover:bg-amber-500/20 active:scale-95 flex items-center justify-center gap-2 border border-amber-500/20 ${
-                            isRegistered ? "" : "col-span-2"
+                          className={`h-8 rounded-xl bg-amber-500/10 text-amber-700 dark:text-amber-300 text-xs font-bold transition-all hover:bg-amber-500/20 active:scale-95 flex items-center justify-center gap-1.5 border border-amber-500/20 ${
+                            !isRegistered ? "col-span-1" : ""
                           }`}
                         >
-                          <NotebookPen size={14} />
+                          <NotebookPen size={13} />
                           备注
                         </button>
                       )}
@@ -1298,32 +1344,46 @@ export function UserManager() {
                             setEditingUserId(entry.user!.id);
                             setCurrentRoleId(entry.user!.roleProfileId);
                           }}
-                          className="h-9 rounded-full bg-primary/10 text-primary text-xs font-bold transition-all hover:bg-primary/20 active:scale-95 flex items-center justify-center gap-2 border border-primary/20"
+                          className="h-8 rounded-xl bg-primary/10 text-primary text-xs font-bold transition-all hover:bg-primary/20 active:scale-95 flex items-center justify-center gap-1.5 border border-primary/20"
                         >
-                          <Settings2 size={14} />
+                          <Settings2 size={13} />
                           角色分配
                         </button>
                       )}
                       {isRegistered && canViewMemberOrders && (
-                        <button
-                          onClick={() => {
-                            setViewOrdersUser({
-                              id: entry.user!.id,
-                              name: entry.user?.name || entry.email,
-                              email: entry.email,
-                              roleName: entry.user?.roleProfile?.name || entry.roleProfile?.name,
-                            });
-                          }}
-                          className={`col-span-2 h-9 rounded-full text-xs font-bold transition-all hover:scale-[1.01] active:scale-95 flex items-center justify-center gap-2 border ${
-                            cookieTone(entry.user!.id)
-                          }`}
-                        >
-                          <ShoppingBag size={14} />
-                          <span>查看麦芽田订单数据</span>
-                          <span className="text-[10px] font-semibold">
-                            ({cookieLabel(entry.user!.id)})
-                          </span>
-                        </button>
+                        (() => {
+                          const isConfigured = isMaiyatianConfigured(entry.user);
+                          return (
+                            <button
+                              onClick={() => {
+                                if (!isConfigured) {
+                                  showToast("该成员未配置麦芽田账号凭证", "info");
+                                  return;
+                                }
+                                setViewOrdersUser({
+                                  id: entry.user!.id,
+                                  name: entry.user?.name || entry.email,
+                                  email: entry.email,
+                                  roleName: entry.user?.roleProfile?.name || entry.roleProfile?.name,
+                                });
+                              }}
+                              disabled={!isConfigured}
+                              className={cn(
+                                "h-8 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 border",
+                                isConfigured
+                                  ? cn(cookieTone(entry.user!.id), "hover:scale-[1.01] active:scale-95 cursor-pointer")
+                                  : "border-border/30 text-muted-foreground/40 bg-muted/10 cursor-not-allowed opacity-50 shadow-none"
+                              )}
+                              title={isConfigured ? undefined : "未配置麦芽田账号凭证"}
+                            >
+                              <ShoppingBag size={13} className="shrink-0" />
+                              <span className="truncate">麦芽田订单</span>
+                              <span className="text-[10px] font-semibold shrink-0">
+                                ({cookieShortLabel(entry.user!.id)})
+                              </span>
+                            </button>
+                          );
+                        })()
                       )}
                       {isRegistered && canManageMemberLibraries && !isSuperAdmin && (
                         <button
@@ -1331,18 +1391,21 @@ export function UserManager() {
                             setAuthLibraryUserId(entry.user!.id);
                             setSelectedLibraryIds(entry.user!.accessibleLibraries?.map(l => l.id) || []);
                           }}
-                          className="col-span-2 h-9 rounded-full bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 text-xs font-bold transition-all hover:bg-indigo-500/20 active:scale-95 flex items-center justify-center gap-2 border border-indigo-500/20"
+                          className="h-8 rounded-xl bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 text-xs font-bold transition-all hover:bg-indigo-500/20 active:scale-95 flex items-center justify-center gap-1.5 border border-indigo-500/20"
                         >
-                          <FolderLock size={14} />
+                          <FolderLock size={13} className="shrink-0" />
                           商品库授权
                         </button>
                       )}
                       {canManageWhitelist && !isSuperAdmin && (
                         <button
                           onClick={() => setDeleteEmail(entry.email)}
-                          className="col-span-2 h-9 rounded-full bg-red-500/10 text-red-500 text-xs font-bold transition-all hover:bg-red-500/20 active:scale-95 flex items-center justify-center gap-2 border border-red-500/20"
+                          className={cn(
+                            "h-7.5 rounded-lg text-xs font-semibold text-red-500 hover:bg-red-500/10 transition-all flex items-center justify-center gap-1.5 active:scale-95",
+                            isRegistered ? "col-span-2 mt-0.5 border border-red-500/15" : "col-span-1 h-8 rounded-xl bg-red-500/10 border border-red-500/20"
+                          )}
                         >
-                          <Trash2 size={14} />
+                          <Trash2 size={13} className="shrink-0" />
                           {isRegistered ? "移除成员" : "撤销邀请"}
                         </button>
                       )}

@@ -212,6 +212,7 @@ export function TodayOrdersView({
   
   // 筛选状态
   const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [platform, setPlatform] = useState("all");
   const [shop, setShop] = useState("all");
   const [status, setStatus] = useState("all");
@@ -226,6 +227,8 @@ export function TodayOrdersView({
   const [showCancelledToday, setShowCancelledToday] = useState(false);
   
   const isFetchingRef = useRef(false);
+  const fetchAbortRef = useRef<AbortController | null>(null);
+  const fetchSequenceRef = useRef(0);
   const realtimeRefreshTimerRef = useRef<number | null>(null);
   const realtimePollingTimerRef = useRef<number | null>(null);
   const sseHealthyRef = useRef(false);
@@ -240,10 +243,22 @@ export function TodayOrdersView({
     setShop(shopFilterSignal.value);
   }, [shopFilterSignal?.nonce, shopFilterSignal?.value]);
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedQuery(query), 250);
+    return () => window.clearTimeout(timer);
+  }, [query]);
+
   // 1. 获取订单列表
   const fetchOrders = useCallback(async (options?: { silent?: boolean; force?: boolean; append?: boolean; targetPage?: number }) => {
     if (isFetchingRef.current && !options?.force) return;
+    if (options?.force) {
+      fetchAbortRef.current?.abort();
+    }
     isFetchingRef.current = true;
+    const requestSequence = fetchSequenceRef.current + 1;
+    fetchSequenceRef.current = requestSequence;
+    const abortController = new AbortController();
+    fetchAbortRef.current = abortController;
     
     const silent = Boolean(options?.silent);
     const append = Boolean(options?.append);
@@ -262,7 +277,7 @@ export function TodayOrdersView({
         endDate: todayDate,
       });
 
-      if (query.trim()) params.set("query", query.trim());
+      if (debouncedQuery.trim()) params.set("query", debouncedQuery.trim());
       if (platform !== "all") params.set("platform", platform);
       if (status !== "all") params.set("status", status);
       if (shop !== "all") params.set("shop", shop);
@@ -273,12 +288,14 @@ export function TodayOrdersView({
         params.set("_metrics", "1");
       }
 
-      const response = await fetch(`/api/orders?${params.toString()}`, { cache: "no-store" });
+      const response = await fetch(`/api/orders?${params.toString()}`, { cache: "no-store", signal: abortController.signal });
       const data = await response.json().catch(() => ({}));
 
       if (!response.ok) {
         throw new Error(data?.error || "加载今日订单失败");
       }
+
+      if (fetchSequenceRef.current !== requestSequence) return;
 
       const nextItems = Array.isArray(data.items) ? data.items : [];
       setOrders((current) => {
@@ -319,7 +336,7 @@ export function TodayOrdersView({
       if (data.overview) setOverview(data.overview);
 
       // 在默认无特定过滤且第一页时更新瞬时内存缓存
-      if (!append && !query.trim() && platform === "all" && status === "all" && shop === "all") {
+      if (!append && !debouncedQuery.trim() && platform === "all" && status === "all" && shop === "all") {
         todayOrdersMemoryCache.set(cacheKey, {
           orders: nextItems,
           summary: data.summary || defaultTodaySummary,
@@ -342,14 +359,20 @@ export function TodayOrdersView({
       }
 
     } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return;
+      }
       console.error("Failed to fetch orders:", error);
       showToast(error instanceof Error ? error.message : "加载订单失败", "error");
     } finally {
-      isFetchingRef.current = false;
-      setIsLoading(false);
-      setIsLoadingMore(false);
+      if (fetchSequenceRef.current === requestSequence) {
+        isFetchingRef.current = false;
+        fetchAbortRef.current = null;
+        setIsLoading(false);
+        setIsLoadingMore(false);
+      }
     }
-  }, [platform, query, shop, status, todayDate, showToast, userId, cacheKey]);
+  }, [platform, debouncedQuery, shop, status, todayDate, showToast, userId, cacheKey]);
 
   const handleRefreshOrder = useCallback(() => {
     void fetchOrders({ silent: true, force: true });
@@ -408,8 +431,8 @@ export function TodayOrdersView({
       void fetchOrders({ silent: hasValidCache });
       return;
     }
-    void fetchOrders();
-  }, [platform, query, shop, status, fetchOrders]);
+    void fetchOrders({ force: true });
+  }, [platform, debouncedQuery, shop, status, fetchOrders]);
 
   useEffect(() => {
     const handleScroll = () => {

@@ -229,6 +229,8 @@ export function AllOrdersView({
   const [actingId, setActingId] = useState("");
   const [expandedIds, setExpandedIds] = useState<string[]>([]);
   const isFetchingRef = useRef(false);
+  const fetchAbortRef = useRef<AbortController | null>(null);
+  const fetchSequenceRef = useRef(0);
   const loadMoreTriggerRef = useRef<HTMLDivElement | null>(null);
 
   // 搜索输入 300ms 防抖
@@ -251,7 +253,14 @@ export function AllOrdersView({
   // 获取全部订单列表
   const fetchOrders = useCallback(async (options?: { silent?: boolean; append?: boolean; targetPage?: number; force?: boolean; refreshMetrics?: boolean }) => {
     if (isFetchingRef.current && !options?.force) return;
+    if (options?.force) {
+      fetchAbortRef.current?.abort();
+    }
     isFetchingRef.current = true;
+    const requestSequence = fetchSequenceRef.current + 1;
+    fetchSequenceRef.current = requestSequence;
+    const abortController = new AbortController();
+    fetchAbortRef.current = abortController;
 
     const silent = Boolean(options?.silent);
     const append = Boolean(options?.append);
@@ -280,12 +289,14 @@ export function AllOrdersView({
       }
       if (silent && !options?.refreshMetrics) params.set("_lite", "1");
 
-      const response = await fetch(`/api/orders?${params.toString()}`, { cache: "no-store" });
+      const response = await fetch(`/api/orders?${params.toString()}`, { cache: "no-store", signal: abortController.signal });
       const data = await response.json().catch(() => ({}));
 
       if (!response.ok) {
         throw new Error(data?.error || "加载订单失败");
       }
+
+      if (fetchSequenceRef.current !== requestSequence) return;
 
       const nextItems = Array.isArray(data.items) ? data.items : [];
       setOrders((current) => {
@@ -324,12 +335,18 @@ export function AllOrdersView({
       if (data.overview) setOverview(data.overview);
 
     } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return;
+      }
       console.error("Failed to fetch orders:", error);
       showToast(error instanceof Error ? error.message : "加载订单失败", "error");
     } finally {
-      isFetchingRef.current = false;
-      setIsLoading(false);
-      setIsLoadingMore(false);
+      if (fetchSequenceRef.current === requestSequence) {
+        isFetchingRef.current = false;
+        fetchAbortRef.current = null;
+        setIsLoading(false);
+        setIsLoadingMore(false);
+      }
     }
   }, [platform, debouncedQuery, startDate, endDate, status, shop, showToast, userId]);
 
@@ -341,7 +358,7 @@ export function AllOrdersView({
   // 筛选项联动加载 (重置为第一页)
   useEffect(() => {
     setCurrentPage(1);
-    void fetchOrders();
+    void fetchOrders({ force: true });
   }, [platform, debouncedQuery, startDate, endDate, status, shop, fetchOrders]);
 
   // 日期范围自适应

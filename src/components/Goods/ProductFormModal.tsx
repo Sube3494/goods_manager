@@ -1229,7 +1229,7 @@ export function ProductFormModal({
     if (!initialData || inboundHistory.length === 0) return [];
     const data = inboundHistory
       .map(order => {
-        const item = order.items.find((i: PurchaseOrderItem) => i.productId === initialData.id);
+        const item = order.items.find((i: PurchaseOrderItem) => i.productId === initialData.id || i.shopProductId === initialData.id);
         if (!item) return null;
         return {
           dateText: new Date(order.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),

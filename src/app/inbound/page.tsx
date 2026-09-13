@@ -79,12 +79,24 @@ const INBOUND_TYPE_ALL = "全部类型";
 const INBOUND_TYPE_OPTIONS = [
   { value: INBOUND_TYPE_ALL, label: INBOUND_TYPE_ALL },
   { value: "Inbound", label: "采购入库" },
+  { value: "Transfer", label: "调货入库" },
   { value: AUTO_INBOUND_TYPE, label: "自动补库存" },
   { value: "ReturnGroup", label: "退回入库" },
 ] as const;
 
+function isTransferInboundOrder(order: PurchaseOrder) {
+  return (
+    Boolean(order.id?.startsWith("PO-TR-")) ||
+    order.type === "Transfer" ||
+    order.type === "TransferIn" ||
+    Boolean(order.note?.includes("调货入库")) ||
+    Boolean(order.note?.includes("调拨入库"))
+  );
+}
+
 function getInboundTypeLabel(order: PurchaseOrder) {
   if (isAutoInboundOrderLike(order)) return "自动补库存";
+  if (isTransferInboundOrder(order)) return "调货入库";
   if (order.type === "Purchase" && order.status === "Received") return "采购入库";
   switch (order.type) {
     case "Return":
@@ -218,6 +230,8 @@ function InboundContent() {
     // Inbound type filter
     const orderType = isAutoInboundOrderLike(p)
       ? AUTO_INBOUND_TYPE
+      : isTransferInboundOrder(p)
+      ? "Transfer"
       : p.type === "Purchase" && p.status === "Received"
       ? "Inbound"
       : p.type === "Return" || p.type === "InternalReturn"
@@ -340,6 +354,7 @@ function InboundContent() {
               onChange={setSelectedInboundType}
               options={INBOUND_TYPE_OPTIONS.map((item) => ({ value: item.value, label: item.label }))}
               placeholder="全部类型"
+              searchable={false}
               className="h-full"
               triggerClassName={cn(
                 "h-full rounded-full border shadow-2xs text-xs font-bold transition-all px-3.5 gap-1.5 justify-center text-foreground whitespace-nowrap",
@@ -437,6 +452,8 @@ function InboundContent() {
                               <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border shadow-2xs ${
                                 isAutoInboundOrderLike(po)
                                   ? 'bg-orange-500/10 text-orange-600 border-orange-500/20 dark:text-orange-400'
+                                  : isTransferInboundOrder(po)
+                                  ? 'bg-teal-500/10 text-teal-600 border-teal-500/20 dark:text-teal-400'
                                   : po.type === "Return" || po.type === "InternalReturn"
                                   ? 'bg-violet-500/10 text-violet-600 border-violet-500/20 dark:text-violet-400'
                                   : 'bg-blue-500/10 text-blue-600 border-blue-500/20 dark:text-blue-400'
@@ -565,6 +582,7 @@ function InboundContent() {
                   const inboundTypeLabel = getInboundTypeLabel(po);
                   const isReturnInbound = po.type === "Return" || po.type === "InternalReturn";
                   const isAutoInbound = isAutoInboundOrderLike(po);
+                  const isTransferInbound = isTransferInboundOrder(po);
 
                   return (
                   <div
@@ -577,6 +595,8 @@ function InboundContent() {
                           <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border shadow-2xs ${
                              isAutoInbound
                                ? 'bg-orange-500/10 text-orange-600 border-orange-500/20 dark:text-orange-400'
+                               : isTransferInbound
+                               ? 'bg-teal-500/10 text-teal-600 border-teal-500/20 dark:text-teal-400'
                                : isReturnInbound
                                ? 'bg-violet-500/10 text-violet-600 border-violet-500/20 dark:text-violet-400'
                                : 'bg-blue-500/10 text-blue-600 border-blue-500/20 dark:text-blue-400'
