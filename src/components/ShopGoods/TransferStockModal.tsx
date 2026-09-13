@@ -24,6 +24,8 @@ import {
   SlidersHorizontal,
   ArrowLeft,
   Coins,
+  Minus,
+  Plus,
 } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { CustomSelect } from "@/components/ui/CustomSelect";
@@ -855,20 +857,69 @@ export function TransferStockModal({
                         <SlidersHorizontal size={12} className="text-indigo-500" />
                         <span>调拨件数</span>
                       </label>
-                      <span className="text-[11px] text-muted-foreground">
-                        最多可调: <strong className="text-foreground font-mono font-bold">{maxStock}</strong> 件
-                      </span>
+                      <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                        <span>
+                          最多可调: <strong className="text-foreground font-mono font-bold">{maxStock}</strong> 件
+                        </span>
+                        {maxStock > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setQuantity(String(maxStock))}
+                            className="px-1.5 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-bold hover:bg-primary/20 transition-all active:scale-95 cursor-pointer"
+                            title="一键调拨全部库存"
+                          >
+                            全部
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    <input
-                      type="number"
-                      min={1}
-                      max={maxStock}
-                      value={quantity}
-                      onChange={(e) => setQuantity(e.target.value)}
-                      disabled={maxStock <= 0}
-                      placeholder="请输入调拨件数"
-                      className="h-11 w-full rounded-full border border-border/60 bg-white dark:bg-white/5 px-4 text-xs font-bold font-number text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:opacity-50 transition-all shadow-xs"
-                    />
+                    <div className="relative flex items-center">
+                      <button
+                        type="button"
+                        disabled={maxStock <= 0 || numQuantity <= 1}
+                        onClick={() => setQuantity(String(Math.max(1, numQuantity - 1)))}
+                        className="absolute left-1.5 z-10 h-8 w-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/10 disabled:opacity-30 disabled:pointer-events-none transition-all active:scale-90"
+                      >
+                        <Minus size={14} />
+                      </button>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={quantity}
+                        onChange={(e) => {
+                          const raw = e.target.value.replace(/\D/g, "");
+                          if (raw === "") {
+                            setQuantity("");
+                            return;
+                          }
+                          const val = parseInt(raw, 10);
+                          if (val > maxStock) {
+                            setQuantity(String(maxStock));
+                          } else {
+                            setQuantity(String(val));
+                          }
+                        }}
+                        onBlur={() => {
+                          const val = parseInt(quantity, 10);
+                          if (isNaN(val) || val < 1) {
+                            setQuantity(maxStock > 0 ? "1" : "0");
+                          } else if (val > maxStock) {
+                            setQuantity(String(maxStock));
+                          }
+                        }}
+                        disabled={maxStock <= 0}
+                        placeholder="请输入调拨件数"
+                        className="h-11 w-full rounded-full border border-border/60 bg-white dark:bg-white/5 px-10 text-center text-xs font-bold font-number text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:opacity-50 transition-all shadow-xs"
+                      />
+                      <button
+                        type="button"
+                        disabled={maxStock <= 0 || numQuantity >= maxStock}
+                        onClick={() => setQuantity(String(Math.min(maxStock, numQuantity + 1)))}
+                        className="absolute right-1.5 z-10 h-8 w-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/10 disabled:opacity-30 disabled:pointer-events-none transition-all active:scale-90"
+                      >
+                        <Plus size={14} />
+                      </button>
+                    </div>
                   </div>
 
                   {/* 整单调拨总运费 */}
