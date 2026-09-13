@@ -263,10 +263,11 @@ export async function POST(
         });
       }
 
-      // 计算本次调入的单件实际采购成本（到岸进价）
+      // 计算本次调入的单件实际采购成本（到岸进价 = 原进价 + 单件均摊总运费）
+      const perItemShipping = quantity > 0 ? shippingFee / quantity : 0;
       const inboundUnitCost = explicitTargetCostPrice !== null
         ? explicitTargetCostPrice
-        : Math.round((sourceCost + shippingFee) * 100) / 100;
+        : Math.round((sourceCost + perItemShipping) * 100) / 100;
 
       if (targetProduct) {
         // 目标店铺已存在该商品，增加库存并更新最新采购价格（具体出库成本由生成的入库采购批次独立管理）
@@ -335,8 +336,8 @@ export async function POST(
       const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
       const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
       const inboundOrderNo = `PO-TR-${dateStr}-${randomSuffix}`;
-      const inboundTotalAmount = Math.round(inboundUnitCost * quantity * 100) / 100;
-      const inboundShippingTotal = Math.round(shippingFee * quantity * 100) / 100;
+      const inboundTotalAmount = Math.round((sourceCost * quantity + shippingFee) * 100) / 100;
+      const inboundShippingTotal = shippingFee;
 
       const purchaseOrder = await tx.purchaseOrder.create({
         data: {

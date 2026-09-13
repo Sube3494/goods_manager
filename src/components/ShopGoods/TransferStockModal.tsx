@@ -295,11 +295,14 @@ export function TransferStockModal({
   const numQuantity = Number(quantity) || 0;
   const isQuantityValid = numQuantity > 0 && numQuantity <= maxStock;
 
-  // 成本与运费计算
+  // 成本与运费计算（总运费与单件分摊）
   const sourceCost = Number(item?.costPrice) || 0;
-  const numShippingFee = Math.max(0, Number(shippingFee) || 0);
-  // 单件自动核算到岸采购成本（原进价 + 运费）
-  const inboundUnitCost = Math.round((sourceCost + numShippingFee) * 100) / 100;
+  const numShippingFee = Math.max(0, Number(shippingFee) || 0); // 本次调拨整单总运费
+  const unitShippingFee = numQuantity > 0 ? numShippingFee / numQuantity : 0; // 单件分摊运费
+  // 单件自动核算到岸采购成本（原进价 + 单件分摊运费）
+  const inboundUnitCost = Math.round((sourceCost + unitShippingFee) * 100) / 100;
+  // 调拨整单总货值（含运费）
+  const totalInboundAmount = Math.round((sourceCost * numQuantity + numShippingFee) * 100) / 100;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -526,15 +529,20 @@ export function TransferStockModal({
                         <div className="flex flex-wrap items-center gap-1.5 py-0.5">
                           {rec.shippingFee !== undefined && rec.shippingFee !== null && rec.shippingFee > 0 && (
                             <span className="px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 text-[10px] font-bold font-mono">
-                              运费: ¥{rec.shippingFee}/件
+                              整单运费: ¥{rec.shippingFee}
+                              {rec.quantity > 1 && (
+                                <span className="opacity-80 font-normal ml-1">
+                                  (均摊 ¥{(rec.shippingFee / rec.quantity).toFixed(2)}/件)
+                                </span>
+                              )}
                             </span>
                           )}
                           {rec.targetCostPrice !== undefined && rec.targetCostPrice !== null && (
                             <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[10px] font-bold font-mono">
-                              调入采购价: ¥{rec.targetCostPrice}
+                              到岸采购价: ¥{rec.targetCostPrice}/件
                               {rec.sourceCostPrice !== undefined && rec.sourceCostPrice !== null && (
                                 <span className="text-muted-foreground font-normal ml-1">
-                                  (原进价 ¥{rec.sourceCostPrice} + 运费 ¥{rec.shippingFee ?? 0})
+                                  (原进价 ¥{rec.sourceCostPrice}{rec.shippingFee ? ` + 均摊运费 ¥${(rec.shippingFee / rec.quantity).toFixed(2)}` : ""})
                                 </span>
                               )}
                             </span>
@@ -863,14 +871,20 @@ export function TransferStockModal({
                     />
                   </div>
 
-                  {/* 单件调拨运费 */}
+                  {/* 整单调拨总运费 */}
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between text-xs">
                       <label className="font-bold text-muted-foreground/80 flex items-center gap-1">
-                        <span>单件运费 (元/件)</span>
+                        <span>调拨总运费 (元)</span>
                       </label>
                       <span className="text-[11px] text-muted-foreground">
-                        总运费: <strong className="font-mono text-primary font-bold">¥{(numShippingFee * numQuantity).toFixed(2)}</strong>
+                        {numQuantity > 1 && numShippingFee > 0 ? (
+                          <>
+                            单件均摊: <strong className="font-mono text-primary font-bold">¥{unitShippingFee.toFixed(2)}</strong>/件
+                          </>
+                        ) : (
+                          <span>本次整单配送运费</span>
+                        )}
                       </span>
                     </div>
                     <div className="relative">
@@ -881,7 +895,7 @@ export function TransferStockModal({
                         type="number"
                         min={0}
                         step={0.01}
-                        placeholder="0.00"
+                        placeholder="0.00 (整单运费)"
                         value={shippingFee}
                         onChange={(e) => setShippingFee(e.target.value)}
                         className="h-11 w-full rounded-full border border-border/60 bg-white dark:bg-white/5 pl-8 pr-4 text-xs font-bold font-number text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all shadow-xs"
@@ -900,13 +914,27 @@ export function TransferStockModal({
                       </strong>
                       <span className="text-[10px] text-muted-foreground font-normal">/件</span>
                     </div>
+                    {numQuantity > 0 && (
+                      <span className="text-[11px] text-muted-foreground font-mono">
+                        入库总额: <strong className="text-foreground font-bold font-number">¥{totalInboundAmount.toFixed(2)}</strong>
+                      </span>
+                    )}
                   </div>
 
                   {/* 成本计算分解公式 */}
-                  <div className="text-[11px] text-muted-foreground flex items-center gap-1.5 bg-black/2 dark:bg-white/3 p-2.5 rounded-lg font-mono">
+                  <div className="text-[11px] text-muted-foreground flex flex-wrap items-center gap-1.5 bg-black/2 dark:bg-white/3 p-2.5 rounded-lg font-mono">
                     <span>原进价 ¥{sourceCost.toFixed(2)}</span>
-                    <span>+</span>
-                    <span>运费 ¥{numShippingFee.toFixed(2)}</span>
+                    {numShippingFee > 0 ? (
+                      <>
+                        <span>+</span>
+                        <span>
+                          均摊运费 ¥{unitShippingFee.toFixed(2)}
+                          {numQuantity > 1 && (
+                            <span className="text-[10px] opacity-75 font-normal"> (总运费¥{numShippingFee.toFixed(2)} ÷ {numQuantity}件)</span>
+                          )}
+                        </span>
+                      </>
+                    ) : null}
                     <span>=</span>
                     <span className="font-bold text-foreground">
                       ¥{inboundUnitCost.toFixed(2)} / 件
@@ -922,7 +950,11 @@ export function TransferStockModal({
                     <strong className="text-foreground font-mono font-bold">
                       ¥{inboundUnitCost.toFixed(2)}
                     </strong>{" "}
-                    元/件），按系统采购批次独立核算库存与成本。
+                    元/件，总额:{" "}
+                    <strong className="text-foreground font-mono font-bold">
+                      ¥{totalInboundAmount.toFixed(2)}
+                    </strong>{" "}
+                    元），按系统采购批次独立核算库存与成本。
                   </span>
                 </div>
               </div>
