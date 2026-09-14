@@ -227,19 +227,10 @@ export async function GET(request: NextRequest) {
     if (libraryId && libraryId !== "all") {
       andWhere.push({
         OR: [
+          { shop: { libraryId } },
+          { shopProduct: { shop: { libraryId } } },
           { product: { libraryId } },
           { shopProduct: { product: { libraryId } } },
-          {
-            AND: [
-              { product: { libraryId: null } },
-              {
-                OR: [
-                  { shop: { libraryId } },
-                  { shopProduct: { shop: { libraryId } } },
-                ],
-              },
-            ],
-          },
         ],
       });
     }

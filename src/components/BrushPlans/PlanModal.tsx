@@ -45,12 +45,6 @@ export function PlanModal({ isOpen, onClose, onSubmit, initialData, readOnly = f
         status: initialData?.status || "Draft",
     }));
 
-    const currentShopLibraryId = useMemo(() => {
-        if (!formData.shopName) return undefined;
-        const matched = activeShippingAddresses.find((addr: AddressItem) => addr.label === formData.shopName);
-        return matched?.libraryId || undefined;
-    }, [activeShippingAddresses, formData.shopName]);
-
     const [expandedPlatforms, setExpandedPlatforms] = useState<Record<string, boolean>>({
         "美团": true,
         "淘宝": true,
@@ -493,11 +487,8 @@ export function PlanModal({ isOpen, onClose, onSubmit, initialData, readOnly = f
                 fetchPath="/api/brush-products/products"
                 query={{
                     ...(formData.shopName ? { shopName: formData.shopName } : {}),
-                    ...(currentShopLibraryId ? { libraryId: currentShopLibraryId } : {}),
                 }}
                 allowLibrarySwitch={false}
-                lockLibraryId={currentShopLibraryId}
-                defaultLibraryId={currentShopLibraryId}
                 title="选择刷单商品"
                 hideUnselectedOnlyToggle
                 imageOnly

@@ -77,6 +77,9 @@ export async function GET(request: NextRequest) {
 
   try {
     const searchKeyword = search.trim();
+    const normalizedShopName = normalizeShopName(shopName);
+    const shouldFilterByShopName = Boolean(normalizedShopName);
+
     const andWhere: Prisma.BrushProductWhereInput[] = [];
     if (shopId) {
       andWhere.push({
@@ -86,22 +89,13 @@ export async function GET(request: NextRequest) {
         ],
       });
     }
-    if (libraryId && libraryId !== "all") {
+    if (libraryId && libraryId !== "all" && !shouldFilterByShopName) {
       andWhere.push({
         OR: [
+          { shop: { libraryId } },
+          { shopProduct: { shop: { libraryId } } },
           { product: { libraryId } },
           { shopProduct: { product: { libraryId } } },
-          {
-            AND: [
-              { product: { libraryId: null } },
-              {
-                OR: [
-                  { shop: { libraryId } },
-                  { shopProduct: { shop: { libraryId } } },
-                ],
-              },
-            ],
-          },
         ],
       });
     }
@@ -150,9 +144,6 @@ export async function GET(request: NextRequest) {
         },
       },
     } satisfies Prisma.BrushProductInclude;
-
-    const normalizedShopName = normalizeShopName(shopName);
-    const shouldFilterByShopName = Boolean(normalizedShopName);
 
     const [items, total] = shouldFilterByShopName
       ? await Promise.all([
@@ -215,15 +206,22 @@ export async function GET(request: NextRequest) {
           : null
       );
       const resolvedImage = matchedShopProduct?.productImage || item.product.image;
-      const resolvedLibraryId = item.product.libraryId 
-        || matchedShopProduct?.product?.libraryId 
-        || matchedShopProduct?.shop?.libraryId 
-        || item.shop?.libraryId 
-        || null;
+      const resolvedLibraryId =
+        item.shop?.libraryId ||
+        matchedShopProduct?.shop?.libraryId ||
+        item.shopProduct?.shop?.libraryId ||
+        item.product.libraryId ||
+        matchedShopProduct?.product?.libraryId ||
+        null;
+      const sourceLibraryId =
+        item.product.libraryId ||
+        matchedShopProduct?.product?.libraryId ||
+        null;
 
       return {
         ...item.product,
         libraryId: resolvedLibraryId,
+        sourceLibraryId,
         brushKeyword: item.brushKeyword || "",
         sourceProductId: item.product.id,
         shopId: matchedShopProduct?.shopId || item.shopId || undefined,
@@ -241,11 +239,11 @@ export async function GET(request: NextRequest) {
     });
 
     const filteredByLibrary = (libraryId && libraryId !== "all")
-      ? products.filter((product) => product.libraryId === libraryId)
+      ? products.filter((product) => product.libraryId === libraryId || (product as any).sourceLibraryId === libraryId)
       : products;
 
     const filteredProducts = normalizedShopName
-      ? filteredByLibrary.filter((product) => isShopNameMatch(product.shopName, normalizedShopName))
+      ? products.filter((product) => isShopNameMatch(product.shopName, normalizedShopName))
       : filteredByLibrary;
 
     filteredProducts.sort((a, b) => {
