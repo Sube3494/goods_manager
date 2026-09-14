@@ -16,6 +16,7 @@ import {
   readCustomerTypeFromRawPayload,
   readRiderPhoneFromDelivery,
   readRiderPhoneFromRawPayload,
+  resolveAutoPickMatchedShopName,
   syncAutoOutboundFromCompletedAutoPickOrder,
   syncBrushOrderFromCompletedAutoPickOrder,
 } from "@/lib/autoPickOrders";
@@ -487,6 +488,7 @@ export async function PATCH(
           allowSelfDeliveryFallback: true,
           forceInclude: true,
           overwriteExisting: true,
+          preferredMappedShopName: targetShopName || resolveAutoPickMatchedShopName(order, user.permissions),
         });
       } else {
         const deleteResult = await prisma.brushOrder.deleteMany({

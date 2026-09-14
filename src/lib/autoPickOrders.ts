@@ -6558,17 +6558,31 @@ async function resolveBrushOrderItemsForAutoPickOrder(
       shopId: item.shop?.id || null,
       shopName: item.shop?.name || null,
     };
-    const normalizedSku = normalizeShopProductSkuForPlatformMatch(order.platform, item);
-    if (normalizedSku) {
-      const current = shopProductSkuMap.get(normalizedSku) || [];
-      current.push(entry);
-      shopProductSkuMap.set(normalizedSku, current);
+
+    const platformKeys = isMeituanPlatform(order.platform)
+      ? normalizeMeituanSkuIds(item.meituanSkuId).map((value) => normalizeAutoPickSkuForMatch(value))
+      : [normalizeShopProductSkuForPlatformMatch(order.platform, item)];
+
+    for (const key of platformKeys.filter(Boolean)) {
+      const current = shopProductSkuMap.get(key) || [];
+      if (!current.some((c) => c.id === entry.id)) {
+        current.push(entry);
+      }
+      shopProductSkuMap.set(key, current);
     }
-    const normalizedFallbackSku = normalizeAutoPickSkuForMatch(item.sku || item.jdSkuId);
-    if (normalizedFallbackSku && normalizedFallbackSku !== normalizedSku) {
-      const current = shopProductSkuMap.get(normalizedFallbackSku) || [];
-      current.push(entry);
-      shopProductSkuMap.set(normalizedFallbackSku, current);
+
+    const fallbackKeys = [
+      normalizeAutoPickSkuForMatch(item.sku),
+      normalizeAutoPickSkuForMatch(item.jdSkuId),
+      ...normalizeMeituanSkuIds(item.meituanSkuId).map((value) => normalizeAutoPickSkuForMatch(value)),
+    ].filter(Boolean);
+
+    for (const fallbackKey of fallbackKeys) {
+      const current = shopProductSkuMap.get(fallbackKey) || [];
+      if (!current.some((c) => c.id === entry.id)) {
+        current.push(entry);
+      }
+      shopProductSkuMap.set(fallbackKey, current);
     }
   }
 
@@ -6578,17 +6592,21 @@ async function resolveBrushOrderItemsForAutoPickOrder(
 
   for (const item of order.items) {
     const manualMatchedProduct = readManualMatchedProductFromOrderItemRawPayload(item.rawPayload);
-    if (manualMatchedProduct?.shopProductId) {
-      const productIds = manualMatchedProduct.shopProductId.split(/[+＋]/).map(id => id.trim()).filter(Boolean);
+    if (manualMatchedProduct?.shopProductId || manualMatchedProduct?.id) {
+      const candidateManualId = String(manualMatchedProduct.shopProductId || manualMatchedProduct.id || "").trim();
+      const productIds = candidateManualId.split(/[+＋]/).map(id => id.trim()).filter(Boolean);
       if (productIds.length > 1) {
         let hasUnresolved = false;
         const subResolvedItems: Array<{ productId: string; quantity: number }> = [];
 
         for (const subShopProductId of productIds) {
-          const matchedShopProduct = shopProducts.find((product) => product.id === subShopProductId);
+          const matchedShopProduct = shopProducts.find((product) =>
+            product.id === subShopProductId || product.productId === subShopProductId || product.sourceProductId === subShopProductId
+          );
           const resolvedProductId = String(
             matchedShopProduct?.productId
             || matchedShopProduct?.sourceProductId
+            || (matchedShopProduct ? "" : subShopProductId)
             || ""
           ).trim();
 
@@ -6607,22 +6625,23 @@ async function resolveBrushOrderItemsForAutoPickOrder(
           continue;
         }
       } else {
-        const matchedShopProduct = shopProducts.find((product) => product.id === manualMatchedProduct.shopProductId);
+        const matchedShopProduct = shopProducts.find((product) =>
+          product.id === candidateManualId || product.productId === candidateManualId || product.sourceProductId === candidateManualId
+        );
 
-        if (matchedShopProduct) {
-          const resolvedProductId = String(
-            matchedShopProduct.productId
-            || matchedShopProduct.sourceProductId
-            || ""
-          ).trim();
+        const resolvedProductId = String(
+          matchedShopProduct?.productId
+          || matchedShopProduct?.sourceProductId
+          || (matchedShopProduct ? "" : candidateManualId)
+          || ""
+        ).trim();
 
-          if (resolvedProductId) {
-            resolvedItems.push({
-              productId: resolvedProductId,
-              quantity: Math.max(1, Number(item.quantity || 1) || 1),
-            });
-            continue;
-          }
+        if (resolvedProductId) {
+          resolvedItems.push({
+            productId: resolvedProductId,
+            quantity: Math.max(1, Number(item.quantity || 1) || 1),
+          });
+          continue;
         }
       }
 
@@ -6631,39 +6650,106 @@ async function resolveBrushOrderItemsForAutoPickOrder(
     }
 
     const productName = toAutoPickBaseProductName(item.productName);
-    const platformProductId = normalizeAutoPickSkuForMatch(item.platformSkuId) || readAutoPickPlatformProductIdForMatch(order.platform, item.rawPayload, item.productNo);
-    const normalizedSku = normalizeAutoPickSkuForMatch(item.productNo);
-    const matchKeys = Array.from(new Set([platformProductId, normalizedSku].filter(Boolean)));
-    const allSameSkuCandidates = matchKeys.flatMap((key) => shopProductSkuMap.get(key) || []);
+    const isCompositeProductNo = /[+＋]/.test(String(item.productNo || ""));
+    const platformProductId = isCompositeProductNo
+      ? null
+      : (normalizeAutoPickSkuForMatch(item.platformSkuId) || readAutoPickPlatformProductIdForMatch(order.platform, item.rawPayload, item.productNo));
 
-    const sameSkuCandidates = allSameSkuCandidates.filter((candidate) => isCandidateInMappedShop(candidate.shopId, candidate.shopName));
-    const sameShopSkuCandidate = sameSkuCandidates.find((candidate) => {
-      const candidateProductId = candidate.productId || candidate.sourceProductId;
-      return Boolean(candidateProductId);
-    });
+    let matchedCandidate: {
+      id: string;
+      productId: string | null;
+      sourceProductId: string | null;
+      shopId: string | null;
+      shopName: string | null;
+    } | null = null;
 
-    const resolvedProductId = String(
-      sameShopSkuCandidate?.productId
-      || sameShopSkuCandidate?.sourceProductId
-      || ""
-    ).trim();
+    // 1. 优先平台规格 ID 匹配 (与订单列表 ID 匹配逻辑完全对齐)
+    if (platformProductId) {
+      const allCandidates = shopProductSkuMap.get(platformProductId) || [];
+      const shopCandidates = allCandidates.filter((candidate) => isCandidateInMappedShop(candidate.shopId, candidate.shopName));
+      matchedCandidate = shopCandidates.find((c) => Boolean(c.productId || c.sourceProductId)) || null;
 
-    if (!resolvedProductId) {
-      missingItems.push(`${productName}${matchKeys[0] ? ` / SKU ${matchKeys[0]}` : ""}`);
-      continue;
+      // 若当前店铺没有精确对齐，但全局存在有效候选，平滑回退使用唯一有效候选
+      if (!matchedCandidate && allCandidates.length > 0) {
+        const validCandidates = allCandidates.filter((c) => Boolean(c.productId || c.sourceProductId));
+        const uniqueProductIds = Array.from(new Set(validCandidates.map((c) => c.productId || c.sourceProductId)));
+        if (uniqueProductIds.length === 1) {
+          matchedCandidate = validCandidates[0];
+        }
+      }
     }
 
-    await backfillMeituanIdForAutoPickMatchedShopProduct(prisma, userId, sameShopSkuCandidate?.id, item.rawPayload, order.platform, item.platformSkuId);
+    if (matchedCandidate) {
+      const resolvedProductId = String(
+        matchedCandidate.productId
+        || matchedCandidate.sourceProductId
+        || ""
+      ).trim();
 
-    const resolvedCandidateShopName = String(sameShopSkuCandidate?.shopName || "").trim();
-    if (resolvedCandidateShopName) {
-      resolvedCandidateShopNames.add(resolvedCandidateShopName);
+      if (resolvedProductId) {
+        await backfillMeituanIdForAutoPickMatchedShopProduct(prisma, userId, matchedCandidate.id, item.rawPayload, order.platform, item.platformSkuId);
+
+        const resolvedCandidateShopName = String(matchedCandidate.shopName || "").trim();
+        if (resolvedCandidateShopName) {
+          resolvedCandidateShopNames.add(resolvedCandidateShopName);
+        }
+
+        resolvedItems.push({
+          productId: resolvedProductId,
+          quantity: Math.max(1, Number(item.quantity || 1) || 1),
+        });
+        continue;
+      }
     }
 
-    resolvedItems.push({
-      productId: resolvedProductId,
-      quantity: Math.max(1, Number(item.quantity || 1) || 1),
-    });
+    // 2. 降级通过货号/编码 item.productNo 匹配 (支持组合商品拆分)
+    const skuFallbacks = splitCompositeAutoPickSku(item.productNo);
+    const skuParts = skuFallbacks.length > 0 ? skuFallbacks : [normalizeAutoPickSkuForMatch(item.productNo)].filter(Boolean);
+
+    if (skuParts.length > 0) {
+      let allPartsResolved = true;
+      const subResolvedItems: Array<{ productId: string; quantity: number }> = [];
+
+      for (const normalizedSku of skuParts) {
+        const allCandidates = shopProductSkuMap.get(normalizedSku) || [];
+        const shopCandidates = allCandidates.filter((candidate) => isCandidateInMappedShop(candidate.shopId, candidate.shopName));
+        let partCandidate = shopCandidates.find((c) => Boolean(c.productId || c.sourceProductId)) || null;
+
+        if (!partCandidate && allCandidates.length > 0) {
+          const validCandidates = allCandidates.filter((c) => Boolean(c.productId || c.sourceProductId));
+          const uniqueProductIds = Array.from(new Set(validCandidates.map((c) => c.productId || c.sourceProductId)));
+          if (uniqueProductIds.length === 1) {
+            partCandidate = validCandidates[0];
+          }
+        }
+
+        const resolvedPartProductId = String(
+          partCandidate?.productId
+          || partCandidate?.sourceProductId
+          || ""
+        ).trim();
+
+        if (resolvedPartProductId) {
+          if (partCandidate?.shopName) {
+            resolvedCandidateShopNames.add(partCandidate.shopName);
+          }
+          subResolvedItems.push({
+            productId: resolvedPartProductId,
+            quantity: Math.max(1, Number(item.quantity || 1) || 1),
+          });
+        } else {
+          allPartsResolved = false;
+          break;
+        }
+      }
+
+      if (allPartsResolved && subResolvedItems.length > 0) {
+        resolvedItems.push(...subResolvedItems);
+        continue;
+      }
+    }
+
+    missingItems.push(`${productName}${platformProductId ? ` / SKU ${platformProductId}` : (item.productNo ? ` / 编码 ${item.productNo}` : "")}`);
   }
 
   const resolvedShopNameFromCandidates = resolvedCandidateShopNames.size === 1
@@ -7607,10 +7693,11 @@ export async function syncBrushOrderFromCompletedAutoPickOrder(
     platform: order.platform,
     shopId: order.shopId,
     rawPayload: order.rawPayload,
-    preferredMappedShopName: options?.preferredMappedShopName || null,
+    preferredMappedShopName: options?.preferredMappedShopName || resolveAutoPickMatchedShopName(order, null) || null,
     items: order.items.map((item) => ({
       productName: item.productName,
       productNo: item.productNo,
+      platformSkuId: item.platformSkuId,
       quantity: item.quantity,
       rawPayload: item.rawPayload,
     })),
