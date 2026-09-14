@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, Suspense, useMemo, useTransition, type ReactNode } from "react";
+import { useState, useEffect, useCallback, Suspense, useMemo, useTransition, useRef, type ReactNode } from "react";
 import { Plus, ShoppingBag, Calendar, Trash2, Eye, Store, Package, Wallet, Archive, ReceiptText, Check, ArrowUp, X, FileSpreadsheet, FileText, Download, Loader2, CheckCircle2, BarChart3 } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { PurchaseOrderModal } from "@/components/Purchases/PurchaseOrderModal";
@@ -452,12 +452,6 @@ function PurchasesContent() {
     });
   };
 
-  const togglePurchaseSelection = useCallback((id: string) => {
-    setSelectedPurchaseIds((prev) => (
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
-    ));
-  }, []);
-
 
 
 
@@ -529,6 +523,44 @@ function PurchasesContent() {
   const filteredPurchases = purchases;
   const paginatedPurchases = purchases;
   const selectedPurchases = purchases.filter((purchase) => selectedPurchaseIds.includes(purchase.id));
+
+  const lastSelectedIdRef = useRef<string | null>(null);
+
+  const togglePurchaseSelection = useCallback((id: string, e?: React.MouseEvent) => {
+    if (e?.shiftKey && lastSelectedIdRef.current) {
+      if (typeof window !== "undefined") {
+        window.getSelection()?.removeAllRanges();
+      }
+      const allIds = paginatedPurchases.map((p) => p.id);
+      const lastIndex = allIds.indexOf(lastSelectedIdRef.current);
+      const currentIndex = allIds.indexOf(id);
+
+      if (lastIndex !== -1 && currentIndex !== -1) {
+        const start = Math.min(lastIndex, currentIndex);
+        const end = Math.max(lastIndex, currentIndex);
+        const rangeIds = allIds.slice(start, end + 1);
+
+        setSelectedPurchaseIds((prev) => {
+          const nextSet = new Set(prev);
+          rangeIds.forEach((rangeId) => nextSet.add(rangeId));
+          return Array.from(nextSet);
+        });
+        lastSelectedIdRef.current = id;
+        return;
+      }
+    }
+
+    setSelectedPurchaseIds((prev) => {
+      const isSelecting = !prev.includes(id);
+      if (isSelecting) {
+        lastSelectedIdRef.current = id;
+        return [...prev, id];
+      } else {
+        lastSelectedIdRef.current = null;
+        return prev.filter((item) => item !== id);
+      }
+    });
+  }, [paginatedPurchases]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -1634,6 +1666,7 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
                     <button
                       type="button"
                       onClick={() => {
+                        lastSelectedIdRef.current = null;
                         if (selectedPurchaseIds.length === filteredPurchases.length) {
                           setSelectedPurchaseIds([]);
                         } else {
@@ -1683,7 +1716,7 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            togglePurchaseSelection(po.id);
+                            togglePurchaseSelection(po.id, e);
                           }}
                           className={`relative flex h-[18px] w-[18px] items-center justify-center rounded-full border-2 transition-all duration-300 lg:h-5 lg:w-5 ${
                             selectedPurchaseIds.includes(po.id)
@@ -1839,7 +1872,7 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
-                        togglePurchaseSelection(po.id);
+                        togglePurchaseSelection(po.id, e);
                       }}
                       className={`relative flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border-2 transition-all duration-300 ${
                         selectedPurchaseIds.includes(po.id)
@@ -2021,13 +2054,17 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
         selectedCount={selectedPurchaseIds.length}
         totalCount={filteredPurchases.length}
         onToggleSelectAll={() => {
+          lastSelectedIdRef.current = null;
           if (selectedPurchaseIds.length === filteredPurchases.length) {
             setSelectedPurchaseIds([]);
           } else {
             setSelectedPurchaseIds(filteredPurchases.map((purchase) => purchase.id));
           }
         }}
-        onClear={() => setSelectedPurchaseIds([])}
+        onClear={() => {
+          lastSelectedIdRef.current = null;
+          setSelectedPurchaseIds([]);
+        }}
         label="张采购单"
         onDelete={canEdit ? handleBatchDelete : undefined}
         extraActions={[
