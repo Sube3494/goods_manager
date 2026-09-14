@@ -79,60 +79,94 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { date, shopName, amountMeituan, amountJingdong, amountTaobao, amountOther, userId: requestedUserId } = body;
 
-    const cleanRequestedUserId = requestedUserId ? String(requestedUserId).trim() : "";
-    if (cleanRequestedUserId && cleanRequestedUserId !== user.id) {
-      return NextResponse.json({ error: "不允许修改其他成员的推广费数据" }, { status: 403 });
+    let itemsToProcess: Array<{
+      date: string;
+      shopName?: string;
+      amountMeituan?: number;
+      amountJingdong?: number;
+      amountTaobao?: number;
+      amountOther?: number;
+      userId?: string;
+    }> = [];
+
+    if (Array.isArray(body)) {
+      itemsToProcess = body;
+    } else if (Array.isArray(body?.items)) {
+      const { date, userId } = body;
+      itemsToProcess = body.items.map((item: any) => ({
+        ...item,
+        date: item.date || date,
+        userId: item.userId || userId,
+      }));
+    } else if (body && typeof body === "object") {
+      itemsToProcess = [body];
     }
+
+    if (itemsToProcess.length === 0) {
+      return NextResponse.json({ error: "没有需要保存的数据" }, { status: 400 });
+    }
+
     const targetUserId = user.id;
 
-    if (!date) {
-      return NextResponse.json({ error: "Invalid date" }, { status: 400 });
+    for (const item of itemsToProcess) {
+      const cleanRequestedUserId = item.userId ? String(item.userId).trim() : "";
+      if (cleanRequestedUserId && cleanRequestedUserId !== user.id) {
+        return NextResponse.json({ error: "不允许修改其他成员的推广费数据" }, { status: 403 });
+      }
+      if (!item.date) {
+        return NextResponse.json({ error: "Invalid date" }, { status: 400 });
+      }
     }
 
-    const finalShopName = String(shopName || "").trim();
-    const meituan = Math.max(0, Number(amountMeituan) || 0);
-    const jingdong = Math.max(0, Number(amountJingdong) || 0);
-    const taobao = Math.max(0, Number(amountTaobao) || 0);
-    const other = Math.max(0, Number(amountOther) || 0);
-    const total = meituan + jingdong + taobao + other;
+    const results = await prisma.$transaction(
+      itemsToProcess.map((item) => {
+        const targetDate = startOfDay(new Date(item.date));
+        const finalShopName = String(item.shopName || "").trim();
+        const meituan = Math.max(0, Number(item.amountMeituan) || 0);
+        const jingdong = Math.max(0, Number(item.amountJingdong) || 0);
+        const taobao = Math.max(0, Number(item.amountTaobao) || 0);
+        const other = Math.max(0, Number(item.amountOther) || 0);
+        const total = meituan + jingdong + taobao + other;
 
-    const targetDate = startOfDay(new Date(date));
-
-    const record = await prisma.dailyPromotionExpense.upsert({
-      where: {
-        userId_date_shopName: {
-          userId: targetUserId,
-          date: targetDate,
-          shopName: finalShopName,
-        },
-      },
-      update: {
-        amount: total,
-        amountMeituan: meituan,
-        amountJingdong: jingdong,
-        amountTaobao: taobao,
-      },
-      create: {
-        userId: targetUserId,
-        date: targetDate,
-        shopName: finalShopName,
-        amount: total,
-        amountMeituan: meituan,
-        amountJingdong: jingdong,
-        amountTaobao: taobao,
-      },
-    });
+        return prisma.dailyPromotionExpense.upsert({
+          where: {
+            userId_date_shopName: {
+              userId: targetUserId,
+              date: targetDate,
+              shopName: finalShopName,
+            },
+          },
+          update: {
+            amount: total,
+            amountMeituan: meituan,
+            amountJingdong: jingdong,
+            amountTaobao: taobao,
+          },
+          create: {
+            userId: targetUserId,
+            date: targetDate,
+            shopName: finalShopName,
+            amount: total,
+            amountMeituan: meituan,
+            amountJingdong: jingdong,
+            amountTaobao: taobao,
+          },
+        });
+      })
+    );
 
     return NextResponse.json({
       success: true,
-      shopName: record.shopName,
-      amount: record.amount,
-      amountMeituan: record.amountMeituan,
-      amountJingdong: record.amountJingdong,
-      amountTaobao: record.amountTaobao,
-      amountOther: Math.max(0, record.amount - record.amountMeituan - record.amountJingdong - record.amountTaobao),
+      count: results.length,
+      items: results.map((record) => ({
+        shopName: record.shopName,
+        amount: record.amount,
+        amountMeituan: record.amountMeituan,
+        amountJingdong: record.amountJingdong,
+        amountTaobao: record.amountTaobao,
+        amountOther: Math.max(0, record.amount - record.amountMeituan - record.amountJingdong - record.amountTaobao),
+      })),
     });
   } catch (error) {
     console.error("[Promotion API POST Error]:", error);
