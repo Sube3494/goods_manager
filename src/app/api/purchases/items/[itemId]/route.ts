@@ -55,12 +55,7 @@ export async function DELETE(
       const originalQuantity = Number(purchaseItem.quantity || 0);
       const remainingQuantity = Number(purchaseItem.remainingQuantity ?? originalQuantity);
 
-      // 1. 如果剩余数量小于入库数量，说明已被后续出库消耗，禁止删除
-      if (remainingQuantity < originalQuantity) {
-        throw new Error("该批次已产生出库记录（剩余库存已扣减），无法删除");
-      }
-
-      // 2. 检查是否有出库单明细引用该批次
+      // 1. 检查是否有有效出库单明细引用该批次 (未退回的净扣减数量)
       const itemWhere: Array<{ productId?: string; shopProductId?: string }> = [
         ...(purchaseItem.shopProductId ? [{ shopProductId: purchaseItem.shopProductId }] : []),
         ...(purchaseItem.productId ? [{ productId: purchaseItem.productId }] : []),
@@ -101,7 +96,7 @@ export async function DELETE(
 
         const netConsumed = Math.max(0, consumedQuantity - returnedQuantity);
         if (netConsumed > 0) {
-          throw new Error(`该批次在出库单中已有 ${netConsumed} 件出库流向记录，无法删除`);
+          throw new Error(`该批次在出库单中已有 ${netConsumed} 件出库流向记录未退回，无法删除`);
         }
       }
 
@@ -148,10 +143,31 @@ export async function DELETE(
         purchaseItem.shopProductId || null
       );
 
+      let latestProductStock: number | null = null;
+      let latestShopProductStock: number | null = null;
+
+      if (purchaseItem.productId) {
+        const p = await tx.product.findUnique({
+          where: { id: purchaseItem.productId },
+          select: { stock: true },
+        });
+        if (p) latestProductStock = p.stock;
+      }
+
+      if (purchaseItem.shopProductId) {
+        const sp = await tx.shopProduct.findUnique({
+          where: { id: purchaseItem.shopProductId },
+          select: { stock: true },
+        });
+        if (sp) latestShopProductStock = sp.stock;
+      }
+
       return {
         purchaseOrderDeleted,
         productId: purchaseItem.productId,
         shopProductId: purchaseItem.shopProductId,
+        latestProductStock,
+        latestShopProductStock,
       };
     });
 

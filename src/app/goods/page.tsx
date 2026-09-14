@@ -246,6 +246,20 @@ export default function GoodsPage() {
     itemsRef.current = items;
   }, [items]);
 
+  useEffect(() => {
+    const handleGlobalStockUpdate = (event: Event) => {
+      const customEvent = event as CustomEvent<{ productId?: string; shopProductId?: string; stock?: number }>;
+      const { productId, stock } = customEvent.detail || {};
+      if (typeof stock !== "number" || !productId) return;
+      setItems((prev) =>
+        prev.map((item) => (item.id === productId ? { ...item, stock } : item))
+      );
+    };
+
+    window.addEventListener("product-stock-updated", handleGlobalStockUpdate);
+    return () => window.removeEventListener("product-stock-updated", handleGlobalStockUpdate);
+  }, []);
+
   // 新增：拉取有权访问的商品库的方法
   const fetchLibraries = useCallback(() => {
     fetch("/api/product-libraries")

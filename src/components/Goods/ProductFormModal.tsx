@@ -199,6 +199,7 @@ interface ProductFormModalProps {
   mainImageUploadEndpoint?: string;
   showJdSkuField?: boolean;
   showMeituanSkuField?: boolean;
+  onStockChange?: (productId: string, newStock: number) => void;
 }
 
 import { createPortal } from "react-dom";
@@ -226,6 +227,7 @@ export function ProductFormModal({
   mainImageUploadEndpoint,
   showJdSkuField = false,
   showMeituanSkuField = false,
+  onStockChange,
 }: ProductFormModalProps) {
   const { user } = useUser();
   const [formData, setFormData] = useState({
@@ -388,13 +390,35 @@ export function ProductFormModal({
           .filter((order) => order.items.length > 0);
       });
 
-      setFormData((prev) => {
-        const currentStock = Number(prev.stock || 0);
-        return {
-          ...prev,
-          stock: String(Math.max(0, currentStock - batchQuantity)),
-        };
-      });
+      const backendStock = typeof data?.data?.latestShopProductStock === "number"
+        ? data.data.latestShopProductStock
+        : typeof data?.data?.latestProductStock === "number"
+        ? data.data.latestProductStock
+        : null;
+
+      const currentStock = Number(formData.stock || 0);
+      const calculatedStock = Math.max(0, currentStock - batchQuantity);
+      const nextStock = backendStock !== null ? backendStock : calculatedStock;
+
+      setFormData((prev) => ({
+        ...prev,
+        stock: String(nextStock),
+      }));
+
+      if (initialData?.id) {
+        onStockChange?.(initialData.id, nextStock);
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(
+            new CustomEvent("product-stock-updated", {
+              detail: {
+                productId: initialData.id,
+                shopProductId: data?.data?.shopProductId || initialData.id,
+                stock: nextStock,
+              },
+            })
+          );
+        }
+      }
 
       showToast("批次已成功删除，总库存已同步更新", "success");
     } catch (error) {
@@ -1782,28 +1806,21 @@ export function ProductFormModal({
                                                                     {itemId ? (
                                                                         <button
                                                                             type="button"
-                                                                            disabled={hasOutbound || isDeletingBatchId === itemId}
+                                                                            disabled={isDeletingBatchId === itemId}
                                                                             onClick={() => {
-                                                                                if (hasOutbound) {
-                                                                                    showToast("该批次已有出库记录，无法删除", "warning");
-                                                                                    return;
-                                                                                }
                                                                                 setConfirmConfig({
                                                                                     isOpen: true,
                                                                                     title: "确认删除入库批次",
                                                                                     confirmLabel: isDeletingBatchId === itemId ? "删除中..." : "确认删除",
                                                                                     variant: "danger",
-                                                                                    message: `确定要删除该入库批次（入库 ${originalQty} 件，进价 ¥${item.costPrice}）吗？删除后将同步扣减商品总物理库存。`,
-                                                                                    onConfirm: () => void handleDeleteBatch(itemId, originalQty),
+                                                                                    message: hasOutbound
+                                                                                        ? `该批次入库 ${originalQty} 件，当前剩余 ${remainingQty} 件。若相关出库单已全部退回对冲，将安全删除该批次并扣减剩余 ${remainingQty} 件实际库存；若仍有未退回的出库流向，系统将自动阻止。确认删除吗？`
+                                                                                        : `确定要删除该入库批次（入库 ${originalQty} 件，进价 ¥${item.costPrice}）吗？删除后将同步扣减商品总物理库存。`,
+                                                                                    onConfirm: () => void handleDeleteBatch(itemId, remainingQty),
                                                                                 });
                                                                             }}
-                                                                            className={cn(
-                                                                                "inline-flex items-center justify-center p-1 rounded-full transition-all",
-                                                                                hasOutbound
-                                                                                    ? "text-muted-foreground/30 cursor-not-allowed opacity-40 hover:bg-transparent"
-                                                                                    : "text-muted-foreground hover:text-destructive hover:bg-destructive/10 active:scale-95 cursor-pointer"
-                                                                            )}
-                                                                            title={hasOutbound ? "该批次已产生出库记录，禁止删除" : "删除此入库批次"}
+                                                                            className="inline-flex items-center justify-center p-1 rounded-full transition-all text-muted-foreground hover:text-destructive hover:bg-destructive/10 active:scale-95 cursor-pointer"
+                                                                            title="删除此入库批次"
                                                                         >
                                                                             <Trash2 size={12} />
                                                                         </button>
@@ -2543,78 +2560,111 @@ export function ProductFormModal({
                         ) : viewingBatchTrace ? (
                             <div className="overflow-y-auto overscroll-contain bg-black/2 p-2.5 dark:bg-black/15 sm:p-4 space-y-4">
                                 {(() => {
-                                    const manualOrders = (Array.isArray(viewingBatchTrace.orders) ? viewingBatchTrace.orders : []).filter((e) => !e.salesOrder);
-                                    if (manualOrders.length === 0) return null;
-                                    return (
-                                        <div className="space-y-2">
-                                            <div className="flex items-center gap-2 text-xs font-bold text-foreground">
-                                                <Package size={14} className="text-primary" />
-                                                <span>手动 / 内部出库记录 ({manualOrders.length})</span>
-                                            </div>
-                                            <div className="grid gap-3">
-                                                {manualOrders.map((entry) => {
-                                                    const isLoss = entry.type === "Loss";
-                                                    const isUse = entry.type === "Use";
-                                                    const typeLabel = isLoss ? "损耗出库" : isUse ? "领用出库" : entry.type === "SalesOrder" ? "销售订单" : "手动出库";
-                                                    const typeBadgeClass = isLoss
-                                                        ? "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20"
-                                                        : isUse
-                                                        ? "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20"
-                                                        : "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20";
+                                    const allManualOrders = (Array.isArray(viewingBatchTrace.orders) ? viewingBatchTrace.orders : []).filter((e) => !e.salesOrder);
+                                    if (allManualOrders.length === 0) return null;
+                                    const activeManualOrders = allManualOrders.filter((e) => Number(e.netQuantity || 0) > 0);
+                                    const returnedManualOrders = allManualOrders.filter((e) => Number(e.netQuantity || 0) <= 0);
 
-                                                    return (
-                                                        <div
-                                                            key={entry.key || entry.outboundOrderId}
-                                                            className="rounded-xl border border-border/80 bg-white p-3.5 shadow-sm transition-all hover:border-primary/40 dark:border-white/10 dark:bg-gray-900"
-                                                        >
-                                                            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/50 pb-2.5 dark:border-white/5">
-                                                                <div className="flex items-center gap-2">
-                                                                    <span className={cn("inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-bold", typeBadgeClass)}>
-                                                                        {typeLabel}
-                                                                    </span>
-                                                                    <span className="font-mono text-xs font-bold text-foreground truncate max-w-[160px] sm:max-w-none" title={entry.orderNo || entry.outboundOrder?.orderNo || entry.outboundOrderId}>
-                                                                        {entry.orderNo || entry.outboundOrder?.orderNo || entry.outboundOrderId}
-                                                                    </span>
-                                                                </div>
-                                                                <span className="text-xs text-muted-foreground">
-                                                                    {entry.date ? new Date(entry.date).toLocaleString("zh-CN", { hour12: false }) : "-"}
-                                                                </span>
-                                                            </div>
-                                                            <div className="mt-3 grid grid-cols-2 gap-2.5 text-xs sm:gap-3 sm:grid-cols-4">
-                                                                <div>
-                                                                    <span className="text-muted-foreground">出库门店：</span>
-                                                                    <span className="font-bold text-foreground ml-1">
-                                                                        {entry.shopName || entry.outboundOrder?.shopName || "默认门店"}
-                                                                    </span>
-                                                                </div>
-                                                                <div>
-                                                                    <span className="text-muted-foreground">本批次扣减：</span>
-                                                                    <span className="font-black text-rose-600 dark:text-rose-400 ml-1">
-                                                                        {entry.netQuantity} 件
-                                                                    </span>
-                                                                    {entry.returnedQuantity > 0 && (
-                                                                        <span className="ml-1 text-[11px] text-muted-foreground">
-                                                                            (出库 {entry.batchQuantity} / 退回 {entry.returnedQuantity})
-                                                                        </span>
-                                                                    )}
-                                                                </div>
-                                                                <div>
-                                                                    <span className="text-muted-foreground">对应批次成本：</span>
-                                                                    <span className="font-bold text-foreground ml-1">
-                                                                        ¥{Number(entry.batchCost || 0).toFixed(2)}
-                                                                    </span>
-                                                                </div>
-                                                                <div>
-                                                                    <span className="text-muted-foreground">单据状态：</span>
-                                                                    <span className="font-bold text-emerald-600 dark:text-emerald-400 ml-1">
-                                                                        {entry.status === "COMPLETED" ? "已出库" : entry.status || "已完成"}
-                                                                    </span>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                })}
+                                    const renderOrderCard = (entry: typeof allManualOrders[number], isReturned: boolean) => {
+                                        const isLoss = entry.type === "Loss";
+                                        const isUse = entry.type === "Use";
+                                        const typeLabel = isLoss ? "损耗出库" : isUse ? "领用出库" : entry.type === "SalesOrder" ? "销售订单" : "手动出库";
+                                        const typeBadgeClass = isReturned
+                                            ? "bg-gray-500/10 text-gray-500 border-gray-500/20"
+                                            : isLoss
+                                            ? "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20"
+                                            : isUse
+                                            ? "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20"
+                                            : "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20";
+
+                                        return (
+                                            <div
+                                                key={entry.key || entry.outboundOrderId}
+                                                className={cn(
+                                                    "rounded-xl border p-3.5 shadow-sm transition-all dark:bg-gray-900",
+                                                    isReturned
+                                                        ? "border-border/40 bg-muted/20 opacity-75 dark:border-white/5"
+                                                        : "border-border/80 bg-white hover:border-primary/40 dark:border-white/10"
+                                                )}
+                                            >
+                                                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/50 pb-2.5 dark:border-white/5">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className={cn("inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-bold", typeBadgeClass)}>
+                                                            {typeLabel}
+                                                        </span>
+                                                        <span className="font-mono text-xs font-bold text-foreground truncate max-w-[160px] sm:max-w-none" title={entry.orderNo || entry.outboundOrder?.orderNo || entry.outboundOrderId}>
+                                                            {entry.orderNo || entry.outboundOrder?.orderNo || entry.outboundOrderId}
+                                                        </span>
+                                                        {isReturned && (
+                                                            <span className="rounded bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                                                                已全额退回 (0件占用)
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <span className="text-xs text-muted-foreground">
+                                                        {entry.date ? new Date(entry.date).toLocaleString("zh-CN", { hour12: false }) : "-"}
+                                                    </span>
+                                                </div>
+                                                <div className="mt-3 grid grid-cols-2 gap-2.5 text-xs sm:gap-3 sm:grid-cols-4">
+                                                    <div>
+                                                        <span className="text-muted-foreground">出库门店：</span>
+                                                        <span className="font-bold text-foreground ml-1">
+                                                            {entry.shopName || entry.outboundOrder?.shopName || "默认门店"}
+                                                        </span>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-muted-foreground">本批次扣减：</span>
+                                                        <span className={cn("font-black ml-1", isReturned ? "text-muted-foreground" : "text-rose-600 dark:text-rose-400")}>
+                                                            {entry.netQuantity} 件
+                                                        </span>
+                                                        {entry.returnedQuantity > 0 && (
+                                                            <span className="ml-1 text-[11px] text-muted-foreground">
+                                                                (出库 {entry.batchQuantity} / 退回 {entry.returnedQuantity})
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-muted-foreground">对应批次成本：</span>
+                                                        <span className="font-bold text-foreground ml-1">
+                                                            ¥{Number(entry.batchCost || 0).toFixed(2)}
+                                                        </span>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-muted-foreground">单据状态：</span>
+                                                        <span className={cn("font-bold ml-1", isReturned ? "text-gray-500" : "text-emerald-600 dark:text-emerald-400")}>
+                                                            {entry.status === "Returned" ? "已退回 (Returned)" : entry.status === "COMPLETED" ? "已出库" : entry.status || "已完成"}
+                                                        </span>
+                                                    </div>
+                                                </div>
                                             </div>
+                                        );
+                                    };
+
+                                    return (
+                                        <div className="space-y-4">
+                                            {activeManualOrders.length > 0 && (
+                                                <div className="space-y-2">
+                                                    <div className="flex items-center gap-2 text-xs font-bold text-foreground">
+                                                        <Package size={14} className="text-primary" />
+                                                        <span>手动 / 内部出库扣减记录 ({activeManualOrders.length})</span>
+                                                    </div>
+                                                    <div className="grid gap-3">
+                                                        {activeManualOrders.map((entry) => renderOrderCard(entry, false))}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {returnedManualOrders.length > 0 && (
+                                                <div className="space-y-2">
+                                                    <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground">
+                                                        <RotateCw size={14} className="text-emerald-500" />
+                                                        <span>已对冲退回记录 ({returnedManualOrders.length} 笔，净扣减 0 件，不占用库存)</span>
+                                                    </div>
+                                                    <div className="grid gap-3">
+                                                        {returnedManualOrders.map((entry) => renderOrderCard(entry, true))}
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     );
                                 })()}

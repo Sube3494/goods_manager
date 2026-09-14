@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 
-import { Plus, Search, Package, History, RotateCcw, AlertCircle, Store, Eye, Filter, Pencil, BarChart3, TrendingUp, ArrowDownUp, X } from "lucide-react";
+import { Plus, Search, Package, History, RotateCcw, AlertCircle, Store, Eye, Filter, Pencil, BarChart3, TrendingUp, ArrowDownUp, X, Trash2 } from "lucide-react";
 import { createPortal } from "react-dom";
 import { useToast } from "@/components/ui/Toast";
 import { OutboundModal } from "@/components/Outbound/OutboundModal";
@@ -275,6 +275,25 @@ export default function OutboundPage() {
 
   const handleReturn = (order: OutboundOrder) => {
     setReturningOrder(order);
+  };
+
+  const handleDeleteOrder = async (order: OutboundOrder) => {
+    if (!confirm(`确定要彻底删除该出库单（单号：${order.id}）吗？此操作不可撤销。`)) return;
+    try {
+      const res = await fetch(`/api/outbound/${order.id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(data?.error || "删除出库单失败");
+      }
+      setOrders((prev) => prev.filter((o) => o.id !== order.id));
+      showToast("出库单记录已彻底清除", "success");
+      void fetchOrders();
+    } catch (error) {
+      console.error("Failed to delete outbound order:", error);
+      showToast(error instanceof Error ? error.message : "删除出库单失败", "error");
+    }
   };
 
   // 从 note 中提取店铺名的辅助函数
@@ -669,9 +688,18 @@ export default function OutboundPage() {
                                 <RotateCcw size={15} />
                               </button>
                             ) : (
-                              <div className="p-2 text-muted-foreground/20" title="该记录已对冲，不可重复操作">
-                                <RotateCcw size={15} />
-                              </div>
+                              <>
+                                <div className="p-2 text-muted-foreground/20" title="该记录已对冲，不可重复操作">
+                                  <RotateCcw size={15} />
+                                </div>
+                                <button
+                                  onClick={() => handleDeleteOrder(order)}
+                                  className="p-2 rounded-full border border-border/60 dark:border-white/10 bg-white/70 dark:bg-white/5 text-muted-foreground hover:text-destructive hover:border-destructive/30 hover:bg-destructive/5 transition-all cursor-pointer active:scale-95 shadow-2xs"
+                                  title="彻底删除此已对冲出库单"
+                                >
+                                  <Trash2 size={15} />
+                                </button>
+                              </>
                             )}
                           </div>
                         </td>
@@ -785,13 +813,21 @@ export default function OutboundPage() {
                     >
                       <Eye size={13} />
                     </button>
-                    {!isReturned && (
+                    {!isReturned ? (
                       <button 
                         onClick={() => handleReturn(order)}
                         className="p-1.5 text-amber-600 bg-white/80 dark:bg-white/5 rounded-full border border-border/60 dark:border-white/10 active:scale-90 transition-transform shadow-2xs cursor-pointer"
                         title={isPartialReturned ? "继续退货入库" : "对冲退回"}
                       >
                         <RotateCcw size={13} />
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleDeleteOrder(order)}
+                        className="p-1.5 text-destructive bg-white/80 dark:bg-white/5 rounded-full border border-border/60 dark:border-white/10 active:scale-90 transition-transform shadow-2xs cursor-pointer"
+                        title="彻底删除此已对冲出库单"
+                      >
+                        <Trash2 size={13} />
                       </button>
                     )}
                   </div>

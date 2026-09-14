@@ -338,54 +338,95 @@ export class InventoryService {
     productId: string | null,
     shopProductId: string | null
   ) {
-    if (shopProductId) {
-      await this.syncShelfLifeBatchesFromPurchaseItems(tx, null, shopProductId);
+    const targetShopProductIds = new Set<string>();
+    const targetProductIds = new Set<string>();
 
-      // 聚合所有有效的店铺采购批次
+    const rawShopProductId = String(shopProductId || "").trim();
+    const rawProductId = String(productId || "").trim();
+
+    if (rawShopProductId) {
+      targetShopProductIds.add(rawShopProductId);
+      const sp = await tx.shopProduct.findUnique({
+        where: { id: rawShopProductId },
+        select: { productId: true },
+      });
+      if (sp?.productId) {
+        targetProductIds.add(sp.productId);
+      }
+    }
+
+    if (rawProductId) {
+      // 检查 rawProductId 是否实际上是 shopProduct 的 ID
+      const asShopProduct = await tx.shopProduct.findUnique({
+        where: { id: rawProductId },
+        select: { id: true, productId: true },
+      });
+
+      if (asShopProduct) {
+        targetShopProductIds.add(asShopProduct.id);
+        if (asShopProduct.productId) {
+          targetProductIds.add(asShopProduct.productId);
+        }
+      } else {
+        targetProductIds.add(rawProductId);
+      }
+
+      // 如果有主库商品 ID，找出其下所有关联的店铺商品，确保全店物理库存保持最新
+      const relatedShopProducts = await tx.shopProduct.findMany({
+        where: { productId: rawProductId },
+        select: { id: true },
+      });
+      for (const rsp of relatedShopProducts) {
+        targetShopProductIds.add(rsp.id);
+      }
+    }
+
+    // 1. 同步所有目标店铺商品的物理库存及保质期批次
+    for (const spId of targetShopProductIds) {
+      await this.syncShelfLifeBatchesFromPurchaseItems(tx, null, spId);
+
       const aggregateResult = await tx.purchaseOrderItem.aggregate({
         where: {
-          shopProductId,
+          OR: [
+            { shopProductId: spId },
+            { productId: spId },
+          ],
           remainingQuantity: { gt: 0 },
-          purchaseOrder: { status: "Received" }
+          purchaseOrder: { status: "Received" },
         },
         _sum: {
-          remainingQuantity: true
-        }
+          remainingQuantity: true,
+        },
       });
+
       const sum = aggregateResult._sum.remainingQuantity || 0;
 
       await tx.shopProduct.update({
-        where: { id: shopProductId },
-        data: { stock: sum }
+        where: { id: spId },
+        data: { stock: sum },
       });
+    }
 
-      // 联动同步主库商品
-      const sp = await tx.shopProduct.findUnique({
-        where: { id: shopProductId },
-        select: { productId: true }
-      });
-      if (sp?.productId) {
-        await this.syncStockFromBatches(tx, sp.productId, null);
-      }
-    } else if (productId) {
-      await this.syncShelfLifeBatchesFromPurchaseItems(tx, productId, null);
+    // 2. 同步所有目标主库商品的物理库存及保质期批次
+    for (const pId of targetProductIds) {
+      await this.syncShelfLifeBatchesFromPurchaseItems(tx, pId, null);
 
-      // 聚合所有有效的全局采购批次（包括所有店铺的）
       const aggregateResult = await tx.purchaseOrderItem.aggregate({
         where: {
-          productId,
+          productId: pId,
           remainingQuantity: { gt: 0 },
-          purchaseOrder: { status: "Received" }
+          purchaseOrder: { status: "Received" },
         },
         _sum: {
-          remainingQuantity: true
-        }
+          remainingQuantity: true,
+        },
       });
+
       const sum = aggregateResult._sum.remainingQuantity || 0;
 
       await tx.product.update({
-        where: { id: productId },
-        data: { stock: sum }
+        where: { id: pId },
+        data: { stock: sum },
       });
     }
   }

@@ -304,8 +304,43 @@ export async function GET(
       netQuantity: 0,
       totalCost: 0,
     });
-    const actualRemainingQuantity = purchaseItem.remainingQuantity ?? purchaseItem.quantity;
-    const expectedRemainingQuantity = Math.max(0, purchaseItem.quantity - totals.netQuantity);
+
+    let actualRemainingQuantity = purchaseItem.remainingQuantity ?? purchaseItem.quantity;
+    let expectedRemainingQuantity = Math.max(0, purchaseItem.quantity - totals.netQuantity);
+
+    // 自动修复逻辑：若该批次的所有出库已全部退回对冲(totals.netQuantity === 0)，但历史剩余数量落后
+    // 自动补正该批次剩余库存，并同步商品物理库存，彻底消除“检测到批次库存差异”横幅
+    if (totals.netQuantity === 0 && actualRemainingQuantity !== expectedRemainingQuantity) {
+      const beforeQty = actualRemainingQuantity;
+      const targetQty = expectedRemainingQuantity;
+      await prisma.$transaction(async (tx) => {
+        await tx.purchaseOrderItem.update({
+          where: { id: purchaseItemId },
+          data: { remainingQuantity: targetQty },
+        });
+        await tx.productBatch.updateMany({
+          where: { purchaseOrderItemId: purchaseItemId },
+          data: { remainingStock: targetQty },
+        });
+        await InventoryService.syncStockFromBatches(tx, purchaseItem.productId, purchaseItem.shopProductId);
+        await tx.$executeRawUnsafe(ENSURE_INVENTORY_ADJUSTMENT_TABLE_SQL);
+        await tx.$executeRawUnsafe(
+          `INSERT INTO "InventoryAdjustment"
+            ("id", "userId", "purchaseOrderItemId", "quantity", "beforeQuantity", "afterQuantity", "reason")
+           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          randomUUID(),
+          user.id,
+          purchaseItemId,
+          targetQty - beforeQty,
+          beforeQty,
+          targetQty,
+          "出库已全部退回，系统自动补正批次剩余库存"
+        );
+      }).catch((err) => console.error("Auto heal batch remaining quantity failed:", err));
+      actualRemainingQuantity = targetQty;
+      expectedRemainingQuantity = targetQty;
+    }
+
     await prisma.$executeRawUnsafe(ENSURE_INVENTORY_ADJUSTMENT_TABLE_SQL);
     const adjustments = await prisma.$queryRawUnsafe<Array<{
       id: string;
@@ -324,7 +359,10 @@ export async function GET(
     );
 
     return NextResponse.json({
-      purchaseItem,
+      purchaseItem: {
+        ...purchaseItem,
+        remainingQuantity: actualRemainingQuantity,
+      },
       totals,
       reconciliation: {
         actualRemainingQuantity,
@@ -332,7 +370,10 @@ export async function GET(
         adjustmentQuantity: expectedRemainingQuantity - actualRemainingQuantity,
       },
       adjustments,
-      orders: groupedOrders,
+      orders: groupedOrders.map((o) => ({
+        ...o,
+        isFullyReturned: o.netQuantity === 0 && o.returnedQuantity > 0,
+      })),
     });
   } catch (error) {
     console.error("Failed to fetch purchase item outbound trace:", error);
