@@ -215,10 +215,14 @@ function PurchasesContent() {
     onConfirm: () => void;
     message: string;
     title?: string;
+    confirmLabel?: string;
+    variant?: "primary" | "danger" | "warning" | "info" | "success";
   }>({
     isOpen: false,
     onConfirm: () => {},
     message: "",
+    confirmLabel: "确定",
+    variant: "warning",
   });
   const [exportProgress, setExportProgress] = useState<{
     isOpen: boolean;
@@ -427,6 +431,8 @@ function PurchasesContent() {
       isOpen: true,
       title: isReceived ? "删除已入库单据" : "删除采购单",
       message,
+      confirmLabel: "确认删除",
+      variant: "danger",
       onConfirm: async () => {
         try {
           const res = await fetch(`/api/purchases/${id}`, { method: "DELETE" });
@@ -546,6 +552,8 @@ function PurchasesContent() {
       isOpen: true,
       title: "批量删除采购单",
       message,
+      confirmLabel: "确认删除",
+      variant: "danger",
       onConfirm: async () => {
         try {
           const results = await Promise.allSettled(
@@ -602,6 +610,8 @@ function PurchasesContent() {
       isOpen: true,
       title: "批量确认入库",
       message,
+      confirmLabel: "确认入库",
+      variant: "success",
       onConfirm: async () => {
         try {
           const results = await Promise.allSettled(
@@ -1981,8 +1991,8 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
         onConfirm={confirmConfig.onConfirm}
         message={confirmConfig.message}
         title={confirmConfig.title}
-        confirmLabel="确认删除"
-        variant="danger"
+        confirmLabel={confirmConfig.confirmLabel || "确定"}
+        variant={confirmConfig.variant || "warning"}
       />
       {/* Purchase Overview Modal */}
       <PurchaseOverviewModal

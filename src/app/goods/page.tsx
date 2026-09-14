@@ -136,11 +136,15 @@ export default function GoodsPage() {
     isOpen: boolean;
     title: string;
     message: string;
+    confirmLabel?: string;
+    variant?: "primary" | "danger" | "warning" | "info" | "success";
     onConfirm: () => void;
   }>({
     isOpen: false,
     title: "",
     message: "",
+    confirmLabel: "确定",
+    variant: "warning",
     onConfirm: () => {},
   });
 
@@ -1432,8 +1436,8 @@ export default function GoodsPage() {
         onConfirm={confirmConfig.onConfirm}
         message={confirmConfig.message}
         title={confirmConfig.title}
-        confirmLabel="确认删除"
-        variant="danger"
+        confirmLabel={confirmConfig.confirmLabel || "确定"}
+        variant={confirmConfig.variant || "warning"}
       />
 
       <ActionBar 
