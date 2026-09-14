@@ -12,6 +12,7 @@ import { QuickEditTable } from "@/components/Goods/QuickEditTable";
 import { BatchEditModal } from "@/components/Goods/BatchEditModal";
 import { GoodsCardSkeleton } from "@/components/Goods/GoodsCardSkeleton";
 import { ProductFormModal } from "@/components/Goods/ProductFormModal";
+import { PurchaseOrderModal } from "@/components/Purchases/PurchaseOrderModal";
 import { ProductSelectionModal } from "@/components/Purchases/ProductSelectionModal";
 import { MeituanMappingModal } from "@/components/ShopGoods/MeituanMappingModal";
 import { TransferStockModal, TransferItem } from "@/components/ShopGoods/TransferStockModal";
@@ -20,7 +21,7 @@ import { ActionBar } from "@/components/ui/ActionBar";
 import { useToast } from "@/components/ui/Toast";
 import { useDebounce } from "@/hooks/useDebounce";
 import { ExportProgressModal } from "@/components/ui/ExportProgressModal";
-import { Category, Product, Shop, ShopCatalogItem, Supplier } from "@/lib/types";
+import { Category, Product, Shop, ShopCatalogItem, Supplier, PurchaseOrder } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 interface ShopProductsResponse {
@@ -1318,6 +1319,7 @@ export default function ShopGoodsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const debouncedSearch = useDebounce(searchQuery, 400);
   const [viewMode, setViewMode] = useState<"card" | "quickEdit">("card");
+  const [purchaseDraft, setPurchaseDraft] = useState<PurchaseOrder | null>(null);
 
   const handleQuickSaveItem = useCallback(
     async (id: string, updates: { sku: string; costPrice: number }) => {
@@ -2031,6 +2033,72 @@ export default function ShopGoodsPage() {
     void fetchShopProducts(false);
   }, [fetchShopProducts]);
 
+  const handleStartPurchase = useCallback((displayProduct: any, rawItem?: ShopCatalogItem) => {
+    const today = new Date();
+    const targetShopName = rawItem?.shopName || selectedShop?.name || "";
+    const targetShop = shops.find((s) => s.name === targetShopName || s.id === (rawItem?.shopId || selectedShopId));
+    const shopProductId = rawItem?.id || displayProduct.id;
+    const productId = rawItem?.productId || rawItem?.sourceProductId || null;
+    const price = typeof displayProduct.costPrice === "number" ? displayProduct.costPrice : (rawItem?.costPrice || 0);
+
+    const draft: any = {
+      id: `PO-${today.toISOString().slice(0, 10).replace(/-/g, "")}-${Math.floor(Math.random() * 1000).toString().padStart(3, "0")}`,
+      status: "Confirmed",
+      type: "Purchase",
+      date: today.toLocaleString("sv-SE").slice(0, 16).replace("T", " "),
+      items: [
+        {
+          productId: productId,
+          shopProductId: shopProductId,
+          shopProduct: rawItem,
+          product: {
+            id: shopProductId,
+            name: displayProduct.name,
+            sku: displayProduct.sku || "",
+            image: displayProduct.image || null,
+            costPrice: price,
+            supplierId: displayProduct.supplierId || null,
+            supplier: displayProduct.supplier || null,
+          },
+          image: displayProduct.image || null,
+          supplierId: displayProduct.supplierId || null,
+          quantity: 1,
+          costPrice: price,
+        },
+      ],
+      shippingFees: 0,
+      extraFees: 0,
+      totalAmount: price,
+      discountAmount: 0,
+      shippingAddress: targetShop?.address || "",
+      shopName: targetShopName,
+      isDraft: true,
+    };
+    setPurchaseDraft(draft);
+  }, [selectedShop, shops, selectedShopId]);
+
+  const handleSavePurchase = async (data: PurchaseOrder) => {
+    try {
+      const res = await fetch("/api/purchases", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      const result = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(result?.error || "创建采购单失败");
+      }
+      showToast(data.status === "Received" ? "采购单已入库，店铺商品库存已更新" : "采购单已成功创建", "success");
+      setPurchaseDraft(null);
+      if (data.status === "Received") {
+        fetchShopProducts(true);
+      }
+    } catch (error) {
+      console.error("Failed to create purchase order:", error);
+      showToast(error instanceof Error ? error.message : "创建采购单失败", "error");
+    }
+  };
+
   const handleSaveEdit = useCallback(async (formData: Omit<Product, "id"> & { id?: string }) => {
     if (!editingShopId || !editingItemId) return;
     let nextCategories = categories;
@@ -2567,6 +2635,9 @@ export default function ShopGoodsPage() {
               <GoodsCard key={product.displayId} product={{ id: product.displayId, sku: product.sku || undefined, name: product.name, categoryId: product.categoryId || "", category: product.categoryName ? { id: product.categoryId || "", name: product.categoryName, count: 0 } : undefined, costPrice: product.costPrice || 0, stock: product.stock || 0, image: product.image || undefined, isPublic: product.isPublic ?? true, isDiscontinued: product.isDiscontinued ?? false, remark: product.remark || undefined, specs: product.specs || undefined, supplierId: product.supplierId || undefined, supplier: product.supplier || undefined }} onEdit={() => {
                 const rawTarget = items.find((item) => item.id === product.linkedIds[0]);
                 if (rawTarget) openEditModal(rawTarget);
+              }} onPurchase={() => {
+                const rawTarget = items.find((item) => item.id === product.linkedIds[0]);
+                handleStartPurchase(product, rawTarget);
               }} isSelected={selectedIds.includes(product.displayId)} anySelected={selectedIds.length > 0} onToggleSelect={handleToggleSelect} priority={index < 4} hideDiscontinuedState={true} />
             ))}
           </div>
@@ -2648,6 +2719,16 @@ export default function ShopGoodsPage() {
           await fetchShopProducts(false);
         }}
       />
+
+      {purchaseDraft ? (
+        <PurchaseOrderModal
+          isOpen={Boolean(purchaseDraft)}
+          onClose={() => setPurchaseDraft(null)}
+          onSubmit={handleSavePurchase}
+          initialData={purchaseDraft}
+          defaultType="Purchase"
+        />
+      ) : null}
 
       {typeof document !== "undefined" && createPortal(
         <AnimatePresence>

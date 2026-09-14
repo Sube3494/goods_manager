@@ -1,5 +1,5 @@
 import { memo, useState } from "react";
-import { Edit, Package, Truck, Trash2, Check } from "lucide-react";
+import { Edit, Package, Truck, Trash2, Check, ShoppingBag } from "lucide-react";
 import Image from "next/image";
 import { Product } from "@/lib/types";
 import { getCategoryName, cn } from "@/lib/utils";
@@ -24,6 +24,7 @@ export const GoodsCard = memo(function GoodsCard({
   product, 
   onEdit,
   onDelete,
+  onPurchase,
   lowStockThreshold = 10,
   isSelected = false,
   anySelected = false,
@@ -38,6 +39,7 @@ export const GoodsCard = memo(function GoodsCard({
   product: Product; 
   onEdit?: (product: Product) => void;
   onDelete?: (id: string, name: string) => void;
+  onPurchase?: (product: Product) => void;
   lowStockThreshold?: number;
   isSelected?: boolean;
   anySelected?: boolean;
@@ -230,6 +232,18 @@ export const GoodsCard = memo(function GoodsCard({
         {/* Mobile Actions Bar */}
         <div className="mt-4 flex sm:hidden items-center justify-end pt-3 border-t border-border/50">
             <div className="flex gap-4">
+              {onPurchase && (
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onPurchase?.(product);
+                  }}
+                  className="p-1 text-muted-foreground hover:text-emerald-600 transition-colors active:scale-95"
+                  title="采购进货"
+                >
+                  <ShoppingBag size={20} />
+                </button>
+              )}
               {onEdit && (
                 <button 
                   onClick={(e) => {
@@ -260,6 +274,18 @@ export const GoodsCard = memo(function GoodsCard({
       
       {/* Quick Actions Overlay (PC only) */}
       <div className="hidden sm:flex absolute top-3 right-3 flex-col gap-2 translate-x-0 opacity-100 lg:translate-x-10 lg:opacity-0 lg:group-hover:translate-x-0 lg:group-hover:opacity-100 transition-all duration-300">
+           {onPurchase && (
+             <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onPurchase?.(product);
+                }}
+                className="bg-white/90 dark:bg-zinc-800/90 backdrop-blur text-zinc-800 dark:text-zinc-100 hover:text-emerald-600 dark:hover:text-emerald-400 p-2 rounded-full shadow-lg hover:shadow-xl transition-all border border-white/50 dark:border-white/10 group/btn"
+                title="采购进货"
+             >
+               <ShoppingBag size={16} className="group-hover/btn:scale-110 transition-transform" />
+             </button>
+           )}
            {onEdit && (
              <button 
                 onClick={(e) => {
@@ -267,6 +293,7 @@ export const GoodsCard = memo(function GoodsCard({
                   onEdit?.(product);
                 }}
                 className="bg-white/90 dark:bg-zinc-800/90 backdrop-blur text-zinc-800 dark:text-zinc-100 hover:text-primary p-2 rounded-full shadow-lg hover:shadow-xl transition-all border border-white/50 dark:border-white/10 group/btn"
+                title="编辑"
              >
                <Edit size={16} className="group-hover/btn:scale-110 transition-transform" />
              </button>
@@ -278,6 +305,7 @@ export const GoodsCard = memo(function GoodsCard({
                   onDelete?.(product.id, product.name);
                 }}
                 className="bg-white/90 dark:bg-zinc-800/90 backdrop-blur text-destructive hover:bg-destructive hover:text-white p-2 rounded-full shadow-lg hover:shadow-xl transition-all border border-white/50 dark:border-white/10 group/btn"
+                title="删除"
              >
                <Trash2 size={16} className="group-hover/btn:scale-110 transition-transform" />
              </button>
@@ -291,6 +319,7 @@ export const GoodsCard = memo(function GoodsCard({
   return (
     prev.onEdit === next.onEdit &&
     prev.onDelete === next.onDelete &&
+    prev.onPurchase === next.onPurchase &&
     prev.isSelected === next.isSelected &&
     prev.anySelected === next.anySelected &&
     prev.lowStockThreshold === next.lowStockThreshold &&

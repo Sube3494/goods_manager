@@ -6,8 +6,9 @@ import { GoodsCardSkeleton } from "@/components/Goods/GoodsCardSkeleton";
 import { QuickEditTable } from "@/components/Goods/QuickEditTable";
 import { ImportModal } from "@/components/Goods/ImportModal";
 import { ProductFormModal } from "@/components/Goods/ProductFormModal";
+import { PurchaseOrderModal } from "@/components/Purchases/PurchaseOrderModal";
 import { Search, Plus, Download, ArrowUp, X, RotateCcw, Settings, AlertCircle, Zap } from "lucide-react";
-import { Product, Category, Supplier, GalleryItem } from "@/lib/types";
+import { Product, Category, Supplier, GalleryItem, PurchaseOrder } from "@/lib/types";
 import { ManageLibrariesModal } from "@/components/Goods/ManageLibrariesModal";
 import { BatchEditModal } from "@/components/Goods/BatchEditModal";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
@@ -156,6 +157,7 @@ export default function GoodsPage() {
   const [isBatchEditOpen, setIsBatchEditOpen] = useState(false);
   const [sortBy, setSortBy] = useState<string>("sku-desc");
   const [viewMode, setViewMode] = useState<"card" | "quickEdit">("card");
+  const [purchaseDraft, setPurchaseDraft] = useState<PurchaseOrder | null>(null);
 
   const debouncedSearch = useDebounce(searchQuery, 500);
 
@@ -233,7 +235,66 @@ export default function GoodsPage() {
   const canCreate = hasPermission(user as SessionUser | null, "product:create");
   const canUpdate = hasPermission(user as SessionUser | null, "product:update");
   const canDelete = hasPermission(user as SessionUser | null, "product:delete");
+  const canPurchase = hasPermission(user as SessionUser | null, "purchase:create") || hasPermission(user as SessionUser | null, "purchase:manage");
   const isSuperAdmin = user?.role === "SUPER_ADMIN";
+
+  const handleStartPurchase = useCallback((product: Product) => {
+    const today = new Date();
+    const draft: any = {
+      id: `PO-${today.toISOString().slice(0, 10).replace(/-/g, "")}-${Math.floor(Math.random() * 1000).toString().padStart(3, "0")}`,
+      status: "Confirmed",
+      type: "Purchase",
+      date: today.toLocaleString("sv-SE").slice(0, 16).replace("T", " "),
+      items: [
+        {
+          productId: product.id,
+          product: {
+            id: product.id,
+            name: product.name,
+            sku: product.sku || "",
+            image: product.image || null,
+            costPrice: product.costPrice || 0,
+            supplierId: product.supplierId || null,
+            supplier: product.supplier || null,
+          },
+          image: product.image || null,
+          supplierId: product.supplierId || null,
+          quantity: 1,
+          costPrice: product.costPrice || 0,
+        },
+      ],
+      shippingFees: 0,
+      extraFees: 0,
+      totalAmount: product.costPrice || 0,
+      discountAmount: 0,
+      shippingAddress: "",
+      shopName: "",
+      isDraft: true,
+    };
+    setPurchaseDraft(draft);
+  }, []);
+
+  const handleSavePurchase = async (data: PurchaseOrder) => {
+    try {
+      const res = await fetch("/api/purchases", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      const result = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(result?.error || "创建采购单失败");
+      }
+      showToast(data.status === "Received" ? "采购单已入库，商品库存已更新" : "采购单已成功创建", "success");
+      setPurchaseDraft(null);
+      if (data.status === "Received") {
+        fetchGoods(true);
+      }
+    } catch (error) {
+      console.error("Failed to create purchase order:", error);
+      showToast(error instanceof Error ? error.message : "创建采购单失败", "error");
+    }
+  };
 
   useEffect(() => {
     if (user && !isSuperAdmin) {
@@ -1266,6 +1327,7 @@ export default function GoodsPage() {
               product={{ ...product, stock: product.assignedShopIds?.length || 0 }} 
               onEdit={canUpdate ? handleEdit : undefined} 
               onDelete={canDelete ? handleDelete : undefined} 
+              onPurchase={canPurchase ? handleStartPurchase : undefined}
               lowStockThreshold={0}
               isSelected={selectedIds.includes(product.id)}
               anySelected={selectedIds.length > 0}
@@ -1344,6 +1406,16 @@ export default function GoodsPage() {
         showJdSkuField={true}
         showMeituanSkuField={true}
       />
+
+      {purchaseDraft ? (
+        <PurchaseOrderModal
+          isOpen={Boolean(purchaseDraft)}
+          onClose={() => setPurchaseDraft(null)}
+          onSubmit={handleSavePurchase}
+          initialData={purchaseDraft}
+          defaultType="Purchase"
+        />
+      ) : null}
 
       <BatchEditModal 
         isOpen={isBatchEditOpen}

@@ -20,6 +20,7 @@ import { SessionUser } from "@/lib/permissions";
 import { cn, parseOutboundNote, getPlatformMeta } from "@/lib/utils";
 import { Pagination } from "@/components/ui/Pagination";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 
 function OutboundTableSkeleton() {
   return (
@@ -162,6 +163,20 @@ export default function OutboundPage() {
   const { user } = useUser();
   const canCreate = hasPermission(user as SessionUser | null, "outbound:manage");
 
+  const [confirmConfig, setConfirmConfig] = useState<{
+    isOpen: boolean;
+    title?: string;
+    message: React.ReactNode;
+    confirmLabel?: string;
+    cancelLabel?: string;
+    variant?: "primary" | "danger" | "warning" | "info" | "success";
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    message: "",
+    onConfirm: () => {},
+  });
+
   useEffect(() => {
     fetchOrders();
   }, [currentPage, pageSize, searchQuery, startDate, endDate, typeFilter, platformFilter, selectedShop]);
@@ -277,23 +292,38 @@ export default function OutboundPage() {
     setReturningOrder(order);
   };
 
-  const handleDeleteOrder = async (order: OutboundOrder) => {
-    if (!confirm(`确定要彻底删除该出库单（单号：${order.id}）吗？此操作不可撤销。`)) return;
-    try {
-      const res = await fetch(`/api/outbound/${order.id}`, {
-        method: "DELETE",
-      });
-      const data = await res.json().catch(() => null);
-      if (!res.ok) {
-        throw new Error(data?.error || "删除出库单失败");
-      }
-      setOrders((prev) => prev.filter((o) => o.id !== order.id));
-      showToast("出库单记录已彻底清除", "success");
-      void fetchOrders();
-    } catch (error) {
-      console.error("Failed to delete outbound order:", error);
-      showToast(error instanceof Error ? error.message : "删除出库单失败", "error");
-    }
+  const handleDeleteOrder = (order: OutboundOrder) => {
+    setConfirmConfig({
+      isOpen: true,
+      title: "确认删除出库单",
+      confirmLabel: "彻底删除",
+      variant: "danger",
+      message: (
+        <div className="space-y-2 text-center">
+          <p>确定要彻底删除该出库单吗？此操作不可撤销。</p>
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-black/5 dark:bg-white/5 text-xs font-mono text-muted-foreground">
+            单号：{order.id}
+          </div>
+        </div>
+      ),
+      onConfirm: async () => {
+        try {
+          const res = await fetch(`/api/outbound/${order.id}`, {
+            method: "DELETE",
+          });
+          const data = await res.json().catch(() => null);
+          if (!res.ok) {
+            throw new Error(data?.error || "删除出库单失败");
+          }
+          setOrders((prev) => prev.filter((o) => o.id !== order.id));
+          showToast("出库单记录已彻底清除", "success");
+          void fetchOrders();
+        } catch (error) {
+          console.error("Failed to delete outbound order:", error);
+          showToast(error instanceof Error ? error.message : "删除出库单失败", "error");
+        }
+      },
+    });
   };
 
   // 从 note 中提取店铺名的辅助函数
@@ -1189,6 +1219,17 @@ export default function OutboundPage() {
           setReturningOrder(null);
           fetchOrders();
         }}
+      />
+
+      <ConfirmModal
+        isOpen={confirmConfig.isOpen}
+        onClose={() => setConfirmConfig((prev) => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmConfig.onConfirm}
+        title={confirmConfig.title}
+        message={confirmConfig.message}
+        confirmLabel={confirmConfig.confirmLabel}
+        cancelLabel={confirmConfig.cancelLabel}
+        variant={confirmConfig.variant}
       />
     </div>
   );

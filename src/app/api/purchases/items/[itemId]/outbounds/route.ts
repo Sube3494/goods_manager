@@ -486,6 +486,48 @@ export async function POST(
         data: { remainingStock: expectedRemainingQuantity },
       });
       await InventoryService.syncStockFromBatches(tx, purchaseItem.productId, purchaseItem.shopProductId);
+
+      let latestProductStock: number | null = null;
+      let latestShopProductStock: number | null = null;
+      let targetProductId = purchaseItem.productId;
+      let targetShopProductId = purchaseItem.shopProductId;
+
+      if (!targetProductId && targetShopProductId) {
+        const sp = await tx.shopProduct.findUnique({
+          where: { id: targetShopProductId },
+          select: { productId: true },
+        });
+        if (sp?.productId) {
+          targetProductId = sp.productId;
+        }
+      }
+
+      if (targetProductId && !targetShopProductId) {
+        const sp = await tx.shopProduct.findFirst({
+          where: { productId: targetProductId },
+          select: { id: true },
+        });
+        if (sp?.id) {
+          targetShopProductId = sp.id;
+        }
+      }
+
+      if (targetProductId) {
+        const p = await tx.product.findUnique({
+          where: { id: targetProductId },
+          select: { stock: true },
+        });
+        if (p) latestProductStock = p.stock;
+      }
+
+      if (targetShopProductId) {
+        const sp = await tx.shopProduct.findUnique({
+          where: { id: targetShopProductId },
+          select: { stock: true },
+        });
+        if (sp) latestShopProductStock = sp.stock;
+      }
+
       const adjustmentId = randomUUID();
       await tx.$executeRawUnsafe(
         `INSERT INTO "InventoryAdjustment"
@@ -507,7 +549,14 @@ export async function POST(
         reason,
       };
 
-      return { adjustment, expectedRemainingQuantity };
+      return {
+        adjustment,
+        expectedRemainingQuantity,
+        productId: targetProductId,
+        shopProductId: targetShopProductId,
+        latestProductStock,
+        latestShopProductStock,
+      };
     });
 
     return NextResponse.json({ success: true, ...result });

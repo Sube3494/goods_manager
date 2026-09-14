@@ -409,7 +409,7 @@ export function PurchaseOrderModal({
 
   // Only 'Received' status or system-generated records are truly read-only for core product/price info
   const effectiveReadOnly = readOnly || formData.status === "Received" || (initialData?.status === "Received");
-  const isNewPurchase = !initialData && formData.type === "Purchase";
+  const isNewPurchase = (!initialData || Boolean((initialData as any)?.isDraft)) && formData.type === "Purchase";
   
   // Derived: system-generated records (auto-created from outbound returns) are always locked
   const isSystemGenerated =
@@ -646,7 +646,13 @@ export function PurchaseOrderModal({
                 (item) => item.product?.sku,
                 (item) => item.product?.name
             );
-            setFormData({ ...initialData, items: sortedItems });
+            const defaultAddress = activeShippingAddresses.find((address) => address.isDefault) || activeShippingAddresses[0];
+            setFormData({
+              ...initialData,
+              items: sortedItems,
+              shippingAddress: initialData.shippingAddress || defaultAddress?.address || "",
+              shopName: initialData.shopName || defaultAddress?.label || "",
+            });
             setShippingFeeInput(initialData.shippingFees?.toString() || "0");
             setExtraFeeInput(initialData.extraFees?.toString() || "0");
             setDiscountInput(initialData.discountAmount?.toString() || "0");
@@ -1130,7 +1136,7 @@ export function PurchaseOrderModal({
                   ) : (
                       <div className="flex items-center gap-2 truncate">
                           <ShoppingBag size={20} className="text-secondary shrink-0 sm:w-6 sm:h-6" />
-                          <span className="truncate">{effectiveReadOnly ? "采购详情" : (initialData ? "编辑采购单" : "新建采购单")}</span>
+                          <span className="truncate">{effectiveReadOnly ? "采购详情" : (initialData && !(initialData as any)?.isDraft ? "编辑采购单" : "新建采购单")}</span>
                       </div>
                   )}
                 </h2>
@@ -1141,7 +1147,7 @@ export function PurchaseOrderModal({
                 )}
               </div>
               <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-                {initialData && (
+                {initialData && !(initialData as any)?.isDraft && (
                   <div className="flex items-center gap-1.5 sm:gap-2 mr-1 sm:mr-2 border-r border-border/60 dark:border-white/10 pr-2 sm:pr-4">
                     {onOverview && (
                       <button 

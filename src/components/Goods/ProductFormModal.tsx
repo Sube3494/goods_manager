@@ -357,7 +357,37 @@ export function ProductFormModal({
           ? { ...item, remainingQuantity: data.expectedRemainingQuantity }
           : item),
       })));
-      showToast(`库存校准成功，批次剩余已更新为 ${data.expectedRemainingQuantity}`, "success");
+
+      const backendStock = typeof data?.latestShopProductStock === "number"
+        ? data.latestShopProductStock
+        : typeof data?.latestProductStock === "number"
+        ? data.latestProductStock
+        : null;
+
+      if (backendStock !== null) {
+        setFormData((prev) => ({
+          ...prev,
+          stock: String(backendStock),
+        }));
+
+        if (initialData?.id) {
+          onStockChange?.(initialData.id, backendStock);
+        }
+
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(
+            new CustomEvent("product-stock-updated", {
+              detail: {
+                productId: data?.productId || initialData?.id,
+                shopProductId: data?.shopProductId || initialData?.id,
+                stock: backendStock,
+              },
+            })
+          );
+        }
+      }
+
+      showToast(`库存校准成功，批次剩余已更新为 ${data.expectedRemainingQuantity}，商品总库存已同步`, "success");
       await openBatchTrace(purchaseOrderItemId);
     } catch (error) {
       showToast(error instanceof Error ? error.message : "库存校准失败", "error");
@@ -411,7 +441,7 @@ export function ProductFormModal({
           window.dispatchEvent(
             new CustomEvent("product-stock-updated", {
               detail: {
-                productId: initialData.id,
+                productId: data?.data?.productId || initialData.id,
                 shopProductId: data?.data?.shopProductId || initialData.id,
                 stock: nextStock,
               },
