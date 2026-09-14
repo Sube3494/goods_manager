@@ -765,6 +765,10 @@ export interface OutboundOrderItem {
   quantity: number;
   price: number;
   costSnapshot?: OutboundCostSnapshot | null;
+  batchAllocations?: Array<{
+    purchaseOrderItemId: string;
+    quantity: number;
+  }>;
 }
 
 export interface OutboundOrder {

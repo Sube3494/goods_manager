@@ -14,6 +14,10 @@ interface OutboundItem {
   shopProductId?: string;
   quantity: number;
   price?: number;
+  batchAllocations?: Array<{
+    purchaseOrderItemId: string;
+    quantity: number;
+  }>;
 }
 
 function normalizeOutboundType(value: string | null) {
@@ -398,6 +402,12 @@ export async function POST(request: Request) {
         shopProductId: shopProduct?.id || null,
         quantity: item.quantity,
         price: item.price,
+        batchAllocations: Array.isArray(item.batchAllocations) && item.batchAllocations.length > 0
+          ? item.batchAllocations.map((a) => ({
+              purchaseOrderItemId: String(a.purchaseOrderItemId || "").trim(),
+              quantity: Math.max(0, Number(a.quantity || 0)),
+            })).filter((a) => a.purchaseOrderItemId && a.quantity > 0)
+          : undefined,
       };
     });
 
@@ -410,6 +420,7 @@ export async function POST(request: Request) {
           productId: item.productId || null,
           shopProductId: item.shopProductId || null,
           quantity: item.quantity,
+          batchAllocations: item.batchAllocations,
         }))
       );
 

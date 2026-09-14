@@ -12,6 +12,16 @@ type OutboundFifoItemSnapshot = {
   }>;
 };
 
+export type OutboundItemInput = {
+  productId?: string | null;
+  shopProductId?: string | null;
+  quantity: number;
+  batchAllocations?: Array<{
+    purchaseOrderItemId: string;
+    quantity: number;
+  }>;
+};
+
 /**
  * 库存核心服务
  */
@@ -97,126 +107,209 @@ export class InventoryService {
     }
   }
 
+  private static resolveBatchUnitCost(batch: {
+    quantity: number;
+    costPrice: Prisma.Decimal | number | null;
+    purchaseOrder?: {
+      shippingFees?: Prisma.Decimal | number | null;
+      extraFees?: Prisma.Decimal | number | null;
+      items?: Array<{ id: string; quantity: number; costPrice: Prisma.Decimal | number | null }>;
+    } | null;
+  }) {
+    let unitCost = Number(batch.costPrice || 0);
+    const po = batch.purchaseOrder;
+    if (po && (Number(po.shippingFees || 0) > 0 || Number(po.extraFees || 0) > 0) && Array.isArray(po.items)) {
+      const totalAdditionalFees = Number(po.shippingFees || 0) + Number(po.extraFees || 0);
+      const totalItemValue = po.items.reduce((sum: number, it) => sum + (Number(it.costPrice || 0) * Number(it.quantity || 0)), 0);
+      const totalQuantity = po.items.reduce((sum: number, it) => sum + Number(it.quantity || 0), 0);
+      const itemQty = Math.max(0, Number(batch.quantity || 0));
+      if (totalItemValue > 0 && itemQty > 0) {
+        const itemValue = Number(batch.costPrice || 0) * itemQty;
+        const allocatedFee = totalAdditionalFees * (itemValue / totalItemValue);
+        unitCost = Number(batch.costPrice || 0) + (allocatedFee / itemQty);
+      } else if (totalQuantity > 0) {
+        unitCost = Number(batch.costPrice || 0) + (totalAdditionalFees / totalQuantity);
+      }
+    }
+    return unitCost;
+  }
+
   /**
-   * 处理出库的 FIFO (先进先出) 扣减逻辑
+   * 处理出库扣减逻辑 (支持指定批次分配或默认 FIFO 先进先出)
    * @param tx Prisma 事务客户端
    * @param userId 操作用户 ID
-   * @param items 出库明细
+   * @param items 出库明细 (支持 batchAllocations)
    */
   static async processOutboundFIFO(
     tx: Prisma.TransactionClient,
     userId: string,
-    items: { productId?: string | null; shopProductId?: string | null; quantity: number }[]
+    items: OutboundItemInput[]
   ): Promise<OutboundFifoItemSnapshot[]> {
     const snapshots: OutboundFifoItemSnapshot[] = [];
     for (const item of items) {
-      let remainingToDeduct = item.quantity;
       const consumedBatches: OutboundFifoItemSnapshot["batches"] = [];
 
       if (!item.shopProductId && !item.productId) {
         throw new Error("出库商品缺少关联标识，无法扣减库存");
       }
 
-      // 1. 查找该商品所有可用的入库批次，按日期升序排列 (先进先出)
-      // 增加 userId 校验以确保数据隔离安全性
-      const batches = await tx.purchaseOrderItem.findMany({
-        where: {
-          ...(item.shopProductId ? { shopProductId: item.shopProductId } : { productId: item.productId! }),
-          remainingQuantity: {
-            gt: 0
-          },
-          purchaseOrder: {
-            userId: userId,
-            status: "Received"
-          }
-        },
-        include: {
-          purchaseOrder: {
-            select: {
-              shippingFees: true,
-              extraFees: true,
-              items: {
+      // 如果指定了具体批次分配
+      if (item.batchAllocations && item.batchAllocations.length > 0) {
+        const totalAllocated = item.batchAllocations.reduce((sum, a) => sum + Math.max(0, Number(a.quantity || 0)), 0);
+        if (totalAllocated !== item.quantity) {
+          throw new Error(`批次分配数量(${totalAllocated})与出库数量(${item.quantity})不一致`);
+        }
+
+        for (const alloc of item.batchAllocations) {
+          const allocQty = Math.max(0, Number(alloc.quantity || 0));
+          if (allocQty <= 0) continue;
+
+          const batch = await tx.purchaseOrderItem.findFirst({
+            where: {
+              id: alloc.purchaseOrderItemId,
+              purchaseOrder: {
+                userId,
+                status: "Received",
+              },
+            },
+            include: {
+              purchaseOrder: {
                 select: {
-                  id: true,
-                  quantity: true,
-                  costPrice: true,
-                }
-              }
-            }
+                  shippingFees: true,
+                  extraFees: true,
+                  items: {
+                    select: {
+                      id: true,
+                      quantity: true,
+                      costPrice: true,
+                    },
+                  },
+                },
+              },
+            },
+          });
+
+          if (!batch) {
+            throw new Error(`指定的采购批次不存在或未入库：${alloc.purchaseOrderItemId}`);
           }
-        },
-        orderBy: {
-          purchaseOrder: {
-            date: 'asc'
+
+          const batchRemaining = Number(batch.remainingQuantity ?? 0);
+          if (batchRemaining < allocQty) {
+            throw new Error(`批次库存不足：批次剩余 ${batchRemaining} 件，申请出库 ${allocQty} 件`);
           }
+
+          const updateResult = await tx.purchaseOrderItem.updateMany({
+            where: {
+              id: batch.id,
+              remainingQuantity: { gte: allocQty },
+            },
+            data: {
+              remainingQuantity: { decrement: allocQty },
+            },
+          });
+
+          if (updateResult.count === 0) {
+            throw new Error(`批次库存并发扣减冲突：批次 ${batch.id}`);
+          }
+
+          await tx.productBatch.updateMany({
+            where: { purchaseOrderItemId: batch.id },
+            data: { remainingStock: { decrement: allocQty } },
+          });
+
+          const unitCost = this.resolveBatchUnitCost(batch);
+          consumedBatches.push({
+            purchaseOrderItemId: batch.id,
+            quantity: allocQty,
+            unitCost,
+            totalCost: unitCost * allocQty,
+          });
         }
-      });
-
-      for (const batch of batches) {
-        if (remainingToDeduct <= 0) break;
-
-        const batchRemaining = batch.remainingQuantity || 0;
-        const deductFromThisBatch = Math.min(batchRemaining, remainingToDeduct);
-
-        // 2. 更新批次剩余数量（带防超卖并发校验）
-        const updateResult = await tx.purchaseOrderItem.updateMany({
-          where: { 
-            id: batch.id,
-            remainingQuantity: {
-              gte: deductFromThisBatch // 确保库存依然足够
-            }
-          },
-          data: {
-            remainingQuantity: {
-              decrement: deductFromThisBatch
-            }
-          }
-        });
-
-        if (updateResult.count === 0) {
-          throw new Error(`并发冲突：商品 ID ${item.shopProductId || item.productId} 在该批次库存不足。请重试。`);
-        }
-
-        // 同时更新关联的保质期批次库存 ProductBatch（如果有的话）
-        await tx.productBatch.updateMany({
+      } else {
+        // 默认按先进先出 (FIFO) 自动扣减
+        let remainingToDeduct = item.quantity;
+        const batches = await tx.purchaseOrderItem.findMany({
           where: {
-            purchaseOrderItemId: batch.id
+            ...(item.shopProductId ? { shopProductId: item.shopProductId } : { productId: item.productId! }),
+            remainingQuantity: {
+              gt: 0,
+            },
+            purchaseOrder: {
+              userId: userId,
+              status: "Received",
+            },
           },
-          data: {
-            remainingStock: {
-              decrement: deductFromThisBatch
-            }
-          }
+          include: {
+            purchaseOrder: {
+              select: {
+                shippingFees: true,
+                extraFees: true,
+                items: {
+                  select: {
+                    id: true,
+                    quantity: true,
+                    costPrice: true,
+                  },
+                },
+              },
+            },
+          },
+          orderBy: {
+            purchaseOrder: {
+              date: "asc",
+            },
+          },
         });
 
-        let unitCost = Number(batch.costPrice || 0);
-        const po = (batch as any).purchaseOrder;
-        if (po && (Number(po.shippingFees || 0) > 0 || Number(po.extraFees || 0) > 0) && Array.isArray(po.items)) {
-          const totalAdditionalFees = Number(po.shippingFees || 0) + Number(po.extraFees || 0);
-          const totalItemValue = po.items.reduce((sum: number, it: any) => sum + (Number(it.costPrice || 0) * Number(it.quantity || 0)), 0);
-          const totalQuantity = po.items.reduce((sum: number, it: any) => sum + Number(it.quantity || 0), 0);
-          const itemQty = Math.max(0, Number(batch.quantity || 0));
-          if (totalItemValue > 0 && itemQty > 0) {
-            const itemValue = Number(batch.costPrice || 0) * itemQty;
-            const allocatedFee = totalAdditionalFees * (itemValue / totalItemValue);
-            unitCost = Number(batch.costPrice || 0) + (allocatedFee / itemQty);
-          } else if (totalQuantity > 0) {
-            unitCost = Number(batch.costPrice || 0) + (totalAdditionalFees / totalQuantity);
+        for (const batch of batches) {
+          if (remainingToDeduct <= 0) break;
+
+          const batchRemaining = batch.remainingQuantity || 0;
+          const deductFromThisBatch = Math.min(batchRemaining, remainingToDeduct);
+
+          const updateResult = await tx.purchaseOrderItem.updateMany({
+            where: {
+              id: batch.id,
+              remainingQuantity: {
+                gte: deductFromThisBatch,
+              },
+            },
+            data: {
+              remainingQuantity: {
+                decrement: deductFromThisBatch,
+              },
+            },
+          });
+
+          if (updateResult.count === 0) {
+            throw new Error(`并发冲突：商品 ID ${item.shopProductId || item.productId} 在该批次库存不足。请重试。`);
           }
+
+          await tx.productBatch.updateMany({
+            where: {
+              purchaseOrderItemId: batch.id,
+            },
+            data: {
+              remainingStock: {
+                decrement: deductFromThisBatch,
+              },
+            },
+          });
+
+          const unitCost = this.resolveBatchUnitCost(batch);
+          consumedBatches.push({
+            purchaseOrderItemId: batch.id,
+            quantity: deductFromThisBatch,
+            unitCost,
+            totalCost: unitCost * deductFromThisBatch,
+          });
+
+          remainingToDeduct -= deductFromThisBatch;
         }
-        consumedBatches.push({
-          purchaseOrderItemId: batch.id,
-          quantity: deductFromThisBatch,
-          unitCost,
-          totalCost: unitCost * deductFromThisBatch,
-        });
 
-        remainingToDeduct -= deductFromThisBatch;
-      }
-
-      // 3. 校验库存是否足够 (虽然前端通常有校验，但后端逻辑必须闭环)
-      if (remainingToDeduct > 0) {
-        throw new Error(`商品 ID ${item.shopProductId || item.productId} 库存不足，缺口: ${remainingToDeduct}`);
+        if (remainingToDeduct > 0) {
+          throw new Error(`商品 ID ${item.shopProductId || item.productId} 库存不足，缺口: ${remainingToDeduct}`);
+        }
       }
 
       // 4. 根据实际扣减完的批次，统一同步该商品及其关联的主库商品物理库存

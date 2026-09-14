@@ -71,6 +71,8 @@ export async function GET(
         quantity: true,
         remainingQuantity: true,
         costPrice: true,
+        productId: true,
+        shopProductId: true,
         purchaseOrder: {
           select: {
             id: true,
@@ -100,10 +102,41 @@ export async function GET(
       return NextResponse.json({ error: "入库批次不存在" }, { status: 404 });
     }
 
-    const itemWhere = [
-      purchaseItem.shopProduct?.id ? { shopProductId: purchaseItem.shopProduct.id } : null,
-      purchaseItem.product?.id ? { productId: purchaseItem.product.id } : null,
-    ].filter((item): item is { shopProductId: string } | { productId: string } => Boolean(item));
+    // 聚合该商品在系统中的所有可能关联标识（包括店铺商品ID、主库商品ID、以及同源主库商品的其他店铺商品ID）
+    const relatedProductIds = new Set<string>();
+    const relatedShopProductIds = new Set<string>();
+
+    if (purchaseItem.productId) {
+      relatedProductIds.add(purchaseItem.productId);
+    }
+    if (purchaseItem.shopProductId) {
+      relatedShopProductIds.add(purchaseItem.shopProductId);
+      const sp = await prisma.shopProduct.findUnique({
+        where: { id: purchaseItem.shopProductId },
+        select: { productId: true },
+      });
+      if (sp?.productId) {
+        relatedProductIds.add(sp.productId);
+      }
+    }
+
+    if (relatedProductIds.size > 0) {
+      const peerShopProducts = await prisma.shopProduct.findMany({
+        where: {
+          productId: { in: Array.from(relatedProductIds) },
+          shop: { userId: user.id },
+        },
+        select: { id: true },
+      });
+      for (const p of peerShopProducts) {
+        relatedShopProductIds.add(p.id);
+      }
+    }
+
+    const itemWhere: Array<{ productId?: string; shopProductId?: string }> = [
+      ...Array.from(relatedShopProductIds).map((id) => ({ shopProductId: id })),
+      ...Array.from(relatedProductIds).map((id) => ({ productId: id })),
+    ];
 
     const outbounds = itemWhere.length > 0 ? await prisma.outboundOrder.findMany({
       where: {
@@ -231,6 +264,7 @@ export async function GET(
         shopName: row.shopName,
         date: row.date,
         status: row.status,
+        type: row.type,
         outboundOrderId: row.outboundOrderId,
         batchQuantity: row.quantity,
         returnedQuantity: row.returnedQuantity,
@@ -247,6 +281,7 @@ export async function GET(
       shopName: string | null;
       date: Date;
       status: string;
+      type: string;
       outboundOrderId: string;
       batchQuantity: number;
       returnedQuantity: number;
@@ -335,20 +370,49 @@ export async function POST(
       });
       if (!purchaseItem) throw new Error("入库批次不存在或尚未入库");
 
-      const outbounds = await tx.outboundOrder.findMany({
+      const relatedProductIds = new Set<string>();
+      const relatedShopProductIds = new Set<string>();
+      if (purchaseItem.productId) relatedProductIds.add(purchaseItem.productId);
+      if (purchaseItem.shopProductId) {
+        relatedShopProductIds.add(purchaseItem.shopProductId);
+        const sp = await tx.shopProduct.findUnique({
+          where: { id: purchaseItem.shopProductId },
+          select: { productId: true },
+        });
+        if (sp?.productId) relatedProductIds.add(sp.productId);
+      }
+      if (relatedProductIds.size > 0) {
+        const peerShopProducts = await tx.shopProduct.findMany({
+          where: {
+            productId: { in: Array.from(relatedProductIds) },
+            shop: { userId: user.id },
+          },
+          select: { id: true },
+        });
+        for (const p of peerShopProducts) {
+          relatedShopProductIds.add(p.id);
+        }
+      }
+
+      const itemWhere: Array<{ productId?: string; shopProductId?: string }> = [
+        ...Array.from(relatedShopProductIds).map((id) => ({ shopProductId: id })),
+        ...Array.from(relatedProductIds).map((id) => ({ productId: id })),
+      ];
+
+      const outbounds = itemWhere.length > 0 ? await tx.outboundOrder.findMany({
         where: {
           userId: user.id,
           items: {
-            some: purchaseItem.shopProductId
-              ? { shopProductId: purchaseItem.shopProductId }
-              : { productId: purchaseItem.productId || undefined },
+            some: {
+              OR: itemWhere,
+            },
           },
         },
         select: {
           note: true,
           items: { select: { costSnapshot: true } },
         },
-      });
+      }) : [];
 
       let consumedQuantity = 0;
       let returnedQuantity = 0;

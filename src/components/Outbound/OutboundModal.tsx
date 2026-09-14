@@ -2,13 +2,31 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, CheckCircle, Package, Minus, Plus, Search, Store } from "lucide-react";
+import { X, CheckCircle, Package, Minus, Plus, Search, Store, Layers, ChevronDown, ChevronUp, RotateCcw, ChevronLeft, ChevronRight } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { Product, OutboundOrder, Shop } from "@/lib/types";
 import { createPortal } from "react-dom";
 import Image from "next/image";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { useDebounce } from "@/hooks/useDebounce";
+import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
+
+function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
+
+interface ProductBatchOption {
+  id: string;
+  purchaseOrderId: string;
+  purchaseDate: string;
+  costPrice: number;
+  quantity: number;
+  remainingQuantity: number;
+  note?: string | null;
+  productionDate?: string | null;
+  expirationDate?: string | null;
+}
 
 interface SelectedOutboundItem {
   productId?: string | null;
@@ -20,6 +38,10 @@ interface SelectedOutboundItem {
   price: number;
   image: string;
   stock: number;
+  batchAllocations?: Array<{
+    purchaseOrderItemId: string;
+    quantity: number;
+  }>;
 }
 
 interface OutboundModalProps {
@@ -46,6 +68,9 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
   const { showToast } = useToast();
 
   const [mobileView, setMobileView] = useState<"selection" | "review">("selection");
+  const [itemBatchesMap, setItemBatchesMap] = useState<Record<string, ProductBatchOption[]>>({});
+  const [loadingBatchesMap, setLoadingBatchesMap] = useState<Record<string, boolean>>({});
+  const [expandedBatchItemKey, setExpandedBatchItemKey] = useState<string | null>(null);
   const getItemKey = useCallback(
     (item: { productId?: string | null; shopProductId?: string | null }) => item.shopProductId || item.productId || "",
     []
@@ -111,6 +136,9 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
       setNote("");
       setType("Sale");
       setMobileView("selection");
+      setItemBatchesMap({});
+      setLoadingBatchesMap({});
+      setExpandedBatchItemKey(null);
     }
     return () => {
       document.body.style.overflow = '';
@@ -225,6 +253,57 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
     }));
   };
 
+  const toggleItemBatches = async (item: SelectedOutboundItem) => {
+    const itemKey = getItemKey(item);
+    if (expandedBatchItemKey === itemKey) {
+      setExpandedBatchItemKey(null);
+      return;
+    }
+    setExpandedBatchItemKey(itemKey);
+    if (itemBatchesMap[itemKey]) return;
+
+    setLoadingBatchesMap((prev) => ({ ...prev, [itemKey]: true }));
+    try {
+      const targetId = item.shopProductId || item.productId;
+      const url = `/api/products/${targetId}/batches${item.shopProductId ? `?shopProductId=${encodeURIComponent(item.shopProductId)}` : ""}`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        setItemBatchesMap((prev) => ({ ...prev, [itemKey]: Array.isArray(data) ? data : [] }));
+      }
+    } catch (err) {
+      console.error("Failed to load batches:", err);
+    } finally {
+      setLoadingBatchesMap((prev) => ({ ...prev, [itemKey]: false }));
+    }
+  };
+
+  const handleBatchAllocationChange = (itemKey: string, batchId: string, value: string, maxAvailable: number) => {
+    const num = Math.max(0, Math.min(maxAvailable, parseInt(value, 10) || 0));
+    setSelectedItems((prev) => prev.map((item) => {
+      if (getItemKey(item) !== itemKey) return item;
+      const currentAlloc = item.batchAllocations || [];
+      const filtered = currentAlloc.filter((a) => a.purchaseOrderItemId !== batchId);
+      const nextAlloc = num > 0 ? [...filtered, { purchaseOrderItemId: batchId, quantity: num }] : filtered;
+      const totalAllocated = nextAlloc.reduce((sum, a) => sum + a.quantity, 0);
+      return {
+        ...item,
+        batchAllocations: nextAlloc.length > 0 ? nextAlloc : undefined,
+        quantity: nextAlloc.length > 0 ? totalAllocated : item.quantity,
+      };
+    }));
+  };
+
+  const resetItemToAutoBatch = (itemKey: string) => {
+    setSelectedItems((prev) => prev.map((item) => {
+      if (getItemKey(item) !== itemKey) return item;
+      return {
+        ...item,
+        batchAllocations: undefined,
+      };
+    }));
+  };
+
   const handleSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
 
@@ -233,20 +312,31 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
       return;
     }
 
+    // 移动端第一步优先切到第二步设置门店与批次
+    if (mobileView === "selection" && typeof window !== "undefined" && window.innerWidth < 768) {
+      setMobileView("review");
+      return;
+    }
+
     if (shops.length > 0 && !selectedShopId) {
       showToast("请先选择出库门店", "error");
       return;
     }
-    
-    if (mobileView === "selection" && window.innerWidth < 768) {
-        setMobileView("review");
-        return;
-    }
 
     const invalidItem = selectedItems.find(item => item.quantity <= 0);
     if (invalidItem) {
-        showToast(`请检查 ${invalidItem.name} 的出库数量`, "error");
-        return;
+      showToast(`请检查 ${invalidItem.name} 的出库数量`, "error");
+      return;
+    }
+
+    for (const item of selectedItems) {
+      if (item.batchAllocations && item.batchAllocations.length > 0) {
+        const totalAlloc = item.batchAllocations.reduce((sum, a) => sum + Math.max(0, Number(a.quantity || 0)), 0);
+        if (totalAlloc !== item.quantity) {
+          showToast(`商品 [${item.name}] 指定批次总数(${totalAlloc})与出库数量(${item.quantity})不一致`, "error");
+          return;
+        }
+      }
     }
 
     onSubmit({
@@ -256,7 +346,8 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
         productId: item.productId,
         shopProductId: item.shopProductId,
         quantity: item.quantity,
-        price: item.price
+        price: item.price,
+        batchAllocations: item.batchAllocations && item.batchAllocations.length > 0 ? item.batchAllocations : undefined,
       }))
     });
   };
@@ -267,7 +358,7 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
 
   return createPortal(
     <AnimatePresence>
-      <div className="fixed inset-0 z-9999 flex items-center justify-center p-3 sm:p-4">
+      <div className="fixed inset-0 z-9999 flex items-center justify-center p-2 sm:p-4">
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -279,28 +370,44 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          className="relative w-[calc(100%-16px)] sm:w-full max-w-4xl h-[640px] max-h-safe-modal overflow-hidden rounded-[32px] bg-white dark:bg-gray-900/75 backdrop-blur-2xl border border-border/60 dark:border-white/10 shadow-2xl flex flex-col"
+          className="relative w-full max-w-4xl h-[92dvh] sm:h-[680px] max-h-[92dvh] sm:max-h-[85vh] overflow-hidden rounded-[24px] sm:rounded-[32px] bg-white dark:bg-gray-900/95 backdrop-blur-2xl border border-border/60 dark:border-white/10 shadow-2xl flex flex-col mx-1 sm:mx-0"
         >
           {/* Header */}
-          <div className="flex items-center justify-between border-b border-border/60 dark:border-white/10 px-5 sm:px-6 py-4.5 shrink-0 bg-white/50 dark:bg-white/[0.03]">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-2xl bg-primary/10 text-primary hidden sm:flex items-center justify-center shadow-2xs">
-                <Plus size={22} />
+          <div className="flex items-center justify-between border-b border-border/60 dark:border-white/10 px-4 sm:px-6 py-3.5 sm:py-4.5 shrink-0 bg-white/50 dark:bg-white/[0.03]">
+            <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+              {mobileView === "review" && (
+                <button
+                  type="button"
+                  onClick={() => setMobileView("selection")}
+                  className="md:hidden -ml-1 p-1.5 rounded-full hover:bg-black/5 dark:hover:bg-white/5 text-muted-foreground hover:text-foreground transition-all shrink-0"
+                  title="返回选择商品"
+                >
+                  <ChevronLeft size={20} />
+                </button>
+              )}
+              <div className="p-2 rounded-2xl bg-primary/10 text-primary hidden sm:flex items-center justify-center shadow-2xs shrink-0">
+                <Plus size={20} />
               </div>
-              <div>
-                <h2 className="text-lg sm:text-xl font-black tracking-tight text-foreground">
-                    {mobileView === "review" ? "确认出库清单" : "选择出库商品"}
+              <div className="min-w-0">
+                <h2 className="text-base sm:text-xl font-black tracking-tight text-foreground truncate">
+                    {mobileView === "review" ? "出库信息与批次确认" : "选择出库商品"}
                 </h2>
-                <p className="hidden sm:block text-xs text-muted-foreground mt-0.5">记录销售、领用或库存损耗，并自动从账目中扣减余值</p>
+                <p className="hidden sm:block text-xs text-muted-foreground mt-0.5">记录销售、领用或库存损耗，支持指定批次精确扣减</p>
+                <p className="sm:hidden text-[11px] text-muted-foreground mt-0.5 truncate">
+                  {mobileView === "review" 
+                    ? `已选 ${selectedItems.length} 项商品，请设置门店与批次` 
+                    : "点击商品加入出库清单，下一步可指定具体批次"}
+                </p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 shrink-0">
                 {mobileView === "review" && (
                     <button 
+                        type="button"
                         onClick={() => setMobileView("selection")}
-                        className="text-xs font-bold text-primary px-3 py-1.5 rounded-full bg-primary/10 md:hidden"
+                        className="text-[11px] font-bold text-primary px-2.5 py-1 rounded-full bg-primary/10 hover:bg-primary/15 md:hidden transition-colors"
                     >
-                        继续选择
+                        加商品
                     </button>
                 )}
                 <button onClick={onClose} className="rounded-full p-2 text-muted-foreground hover:text-foreground hover:bg-muted dark:hover:bg-white/10 transition-colors active:scale-95">
@@ -379,9 +486,16 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
                                   </span>
                                 )}
                               </div>
-                               <div className={`text-[10px] font-bold px-2 py-0.5 rounded-full transition-all ${isSelected ? 'bg-primary/20 text-primary border border-primary/20 shadow-2xs' : 'bg-muted/60 text-muted-foreground border border-transparent'}`}>
-                                  库存 {p.stock}
-                              </div>
+                               <div className="flex items-center gap-1.5 shrink-0">
+                                  <div className={`text-[10px] font-bold px-2 py-0.5 rounded-full transition-all ${isSelected ? 'bg-primary/20 text-primary border border-primary/20 shadow-2xs' : 'bg-muted/60 text-muted-foreground border border-transparent'}`}>
+                                      库存 {p.stock}
+                                  </div>
+                                  {isSelected && (
+                                    <span className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded-full">
+                                      已加入
+                                    </span>
+                                  )}
+                               </div>
                             </div>
                           </button>
                       );
@@ -466,56 +580,183 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
                     <div className="flex-1 overflow-y-auto p-4 bg-muted/10 dark:bg-transparent">
                         <div className="space-y-2.5">
                             {selectedItems.length > 0 ? (
-                                selectedItems.map(item => (
-                                    <div key={getItemKey(item)} className="flex items-center gap-3 sm:gap-4 p-3 rounded-[20px] border border-border/60 dark:border-white/10 bg-white/70 dark:bg-white/[0.04] group shadow-2xs">
-                                        <div className="relative h-12 w-12 rounded-xl overflow-hidden border border-border/60 dark:border-white/10 bg-muted shrink-0 shadow-2xs">
-                                            {item.image ? <Image src={item.image} alt={item.name} fill className="object-cover" /> : <Package className="w-full h-full p-3 text-muted-foreground/40" />}
+                                selectedItems.map(item => {
+                                    const itemKey = getItemKey(item);
+                                    const isExpanded = expandedBatchItemKey === itemKey;
+                                    const batches = itemBatchesMap[itemKey] || [];
+                                    const isLoadingBatches = Boolean(loadingBatchesMap[itemKey]);
+                                    const hasCustomBatches = Boolean(item.batchAllocations && item.batchAllocations.length > 0);
+
+                                    return (
+                                    <div key={itemKey} className="flex flex-col rounded-[22px] border border-border/60 dark:border-white/10 bg-white/70 dark:bg-white/[0.04] p-3 shadow-2xs transition-all">
+                                        <div className="flex items-center gap-3 sm:gap-4">
+                                            <div className="relative h-12 w-12 rounded-xl overflow-hidden border border-border/60 dark:border-white/10 bg-muted shrink-0 shadow-2xs">
+                                                {item.image ? <Image src={item.image} alt={item.name} fill className="object-cover" /> : <Package className="w-full h-full p-3 text-muted-foreground/40" />}
+                                            </div>
+                                            <div className="flex-1 min-w-0 py-0.5">
+                                                <p className="text-xs font-bold text-foreground leading-snug line-clamp-2" title={item.name}>
+                                                    {item.name}
+                                                </p>
+                                                <p className="text-[10px] text-muted-foreground font-mono mt-0.5 opacity-60">
+                                                    {item.sku}
+                                                </p>
+                                                {item.shopName && (
+                                                    <span className="inline-flex items-center gap-0.5 rounded-full border border-sky-500/20 bg-sky-500/10 px-2 py-0.5 text-[9px] font-bold text-sky-700 dark:border-sky-500/30 dark:bg-sky-500/15 dark:text-sky-300 shadow-2xs mt-1">
+                                                        <Store size={9} className="text-sky-600 dark:text-sky-400 shrink-0" />
+                                                        <span>{item.shopName}</span>
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="flex items-center bg-muted/40 dark:bg-white/5 rounded-full border border-border/60 dark:border-white/10 p-0.5 ml-auto shadow-2xs">
+                                                <button 
+                                                    type="button"
+                                                    disabled={hasCustomBatches}
+                                                    onClick={() => updateQuantity(itemKey, -1)}
+                                                    className="h-6 w-6 flex items-center justify-center rounded-full hover:bg-white dark:hover:bg-white/15 text-muted-foreground transition-all active:scale-90 disabled:opacity-40 disabled:pointer-events-none"
+                                                    title={hasCustomBatches ? "已指定批次，总数由批次合计自动计算" : "减少数量"}
+                                                >
+                                                    <Minus size={11} />
+                                                </button>
+                                                <input 
+                                                    type="number"
+                                                    disabled={hasCustomBatches}
+                                                    value={item.quantity}
+                                                    onChange={(e) => handleManualQuantityChange(itemKey, e.target.value)}
+                                                    className="w-8 text-center text-xs font-bold bg-transparent no-spinner outline-none tabular-nums disabled:opacity-75"
+                                                    title={hasCustomBatches ? "已指定批次，总数由批次合计自动计算" : "输入数量"}
+                                                />
+                                                <button 
+                                                    type="button"
+                                                    disabled={hasCustomBatches}
+                                                    onClick={() => updateQuantity(itemKey, 1)}
+                                                    className="h-6 w-6 flex items-center justify-center rounded-full hover:bg-white dark:hover:bg-white/15 text-muted-foreground transition-all active:scale-90 disabled:opacity-40 disabled:pointer-events-none"
+                                                    title={hasCustomBatches ? "已指定批次，总数由批次合计自动计算" : "增加数量"}
+                                                >
+                                                    <Plus size={11} />
+                                                </button>
+                                            </div>
+                                            <button 
+                                                type="button"
+                                                onClick={() => removeItem(itemKey)}
+                                                className="p-1.5 text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10 rounded-full transition-all active:scale-90"
+                                            >
+                                                <X size={16} />
+                                            </button>
                                         </div>
-                                        <div className="flex-1 min-w-0 py-0.5">
-                                            <p className="text-xs font-bold text-foreground leading-snug line-clamp-2" title={item.name}>
-                                                {item.name}
-                                            </p>
-                                            <p className="text-[10px] text-muted-foreground font-mono mt-0.5 opacity-60">
-                                                {item.sku}
-                                            </p>
-                                            {item.shopName && (
-                                                <span className="inline-flex items-center gap-0.5 rounded-full border border-sky-500/20 bg-sky-500/10 px-2 py-0.5 text-[9px] font-bold text-sky-700 dark:border-sky-500/30 dark:bg-sky-500/15 dark:text-sky-300 shadow-2xs mt-1">
-                                                    <Store size={9} className="text-sky-600 dark:text-sky-400 shrink-0" />
-                                                    <span>{item.shopName}</span>
+
+                                        {/* 批次选择控制栏 */}
+                                        <div className="mt-2.5 flex items-center justify-between border-t border-black/4 pt-2 dark:border-white/4">
+                                            <button
+                                                type="button"
+                                                onClick={() => void toggleItemBatches(item)}
+                                                className={cn(
+                                                    "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold transition-all",
+                                                    hasCustomBatches
+                                                        ? "border border-amber-500/25 bg-amber-500/10 text-amber-700 hover:bg-amber-500/15 dark:text-amber-300"
+                                                        : "border border-black/6 bg-black/4 text-muted-foreground hover:bg-black/8 hover:text-foreground dark:border-white/8 dark:bg-white/4 dark:hover:bg-white/8"
+                                                )}
+                                            >
+                                                <Layers size={11} className={hasCustomBatches ? "text-amber-600 dark:text-amber-400" : ""} />
+                                                <span>
+                                                    {hasCustomBatches
+                                                        ? `已选 ${item.batchAllocations?.length} 个批次 (${item.quantity} 件)`
+                                                        : "指定出库批次 (默认自动先进先出)"}
                                                 </span>
+                                                {isExpanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+                                            </button>
+
+                                            {hasCustomBatches && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => resetItemToAutoBatch(itemKey)}
+                                                    className="inline-flex items-center gap-1 text-[10px] font-medium text-muted-foreground transition hover:text-foreground"
+                                                    title="清除指定批次，恢复系统自动先进先出"
+                                                >
+                                                    <RotateCcw size={10} />
+                                                    <span>恢复自动</span>
+                                                </button>
                                             )}
                                         </div>
-                                         <div className="flex items-center bg-muted/40 dark:bg-white/5 rounded-full border border-border/60 dark:border-white/10 p-0.5 ml-auto shadow-2xs">
-                                             <button 
-                                                 type="button"
-                                                 onClick={() => updateQuantity(getItemKey(item), -1)}
-                                                 className="h-6 w-6 flex items-center justify-center rounded-full hover:bg-white dark:hover:bg-white/15 text-muted-foreground transition-all active:scale-90"
-                                             >
-                                                 <Minus size={11} />
-                                             </button>
-                                             <input 
-                                                 type="number"
-                                                 value={item.quantity}
-                                                 onChange={(e) => handleManualQuantityChange(getItemKey(item), e.target.value)}
-                                                 className="w-8 text-center text-xs font-bold bg-transparent no-spinner outline-none tabular-nums"
-                                             />
-                                             <button 
-                                                 type="button"
-                                                 onClick={() => updateQuantity(getItemKey(item), 1)}
-                                                 className="h-6 w-6 flex items-center justify-center rounded-full hover:bg-white dark:hover:bg-white/15 text-muted-foreground transition-all active:scale-90"
-                                             >
-                                                 <Plus size={11} />
-                                             </button>
-                                         </div>
-                                        <button 
-                                            type="button"
-                                            onClick={() => removeItem(getItemKey(item))}
-                                            className="p-1.5 text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10 rounded-full transition-all active:scale-90"
-                                        >
-                                            <X size={16} />
-                                        </button>
+
+                                        {/* 展开的批次明细列表 */}
+                                        {isExpanded && (
+                                            <div className="mt-2 rounded-xl border border-black/5 bg-black/2 p-2 dark:border-white/6 dark:bg-white/2 space-y-1.5">
+                                                {isLoadingBatches ? (
+                                                    <div className="py-3 text-center text-[10px] text-muted-foreground">正在获取可用批次...</div>
+                                                ) : batches.length === 0 ? (
+                                                    <div className="py-2.5 text-center text-[10px] text-muted-foreground">暂无可用的已入库批次，出库将走常规库存扣减</div>
+                                                ) : (
+                                                    batches.map((b) => {
+                                                        const alloc = (item.batchAllocations || []).find((a) => a.purchaseOrderItemId === b.id);
+                                                        const currentAllocQty = alloc ? alloc.quantity : 0;
+
+                                                        return (
+                                                            <div key={b.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl bg-white/90 p-2.5 sm:p-2 text-xs dark:bg-white/5 border border-black/5 dark:border-white/5 shadow-2xs">
+                                                                <div className="min-w-0 flex-1">
+                                                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                                                        <span className="font-mono text-[11px] sm:text-[10px] font-bold sm:font-semibold text-foreground sm:text-muted-foreground">
+                                                                            {new Date(b.purchaseDate).toLocaleDateString()}
+                                                                        </span>
+                                                                        <span className="text-[11px] sm:text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">
+                                                                            ¥{b.costPrice.toFixed(2)}
+                                                                        </span>
+                                                                        <span className="rounded bg-sky-500/10 px-1.5 py-0.5 text-[10px] sm:text-[9px] font-bold text-sky-600 dark:text-sky-400">
+                                                                            余 {b.remainingQuantity} 件
+                                                                        </span>
+                                                                        {b.expirationDate && (
+                                                                            <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] sm:text-[9px] font-medium text-amber-700 dark:text-amber-300">
+                                                                                到期: {new Date(b.expirationDate).toLocaleDateString()}
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                    <div className="mt-1 sm:mt-0.5 truncate text-[10px] sm:text-[9px] font-mono text-muted-foreground/60" title={`采购单号: ${b.purchaseOrderId}`}>
+                                                                        单号: {b.purchaseOrderId} {b.note ? `(${b.note})` : ""}
+                                                                    </div>
+                                                                </div>
+
+                                                                <div className="flex items-center justify-between sm:justify-end gap-2 shrink-0 pt-2 sm:pt-0 border-t border-black/4 sm:border-0 dark:border-white/4">
+                                                                    <span className="text-[11px] text-muted-foreground font-medium sm:hidden">出库此批次：</span>
+                                                                    <div className="flex items-center gap-1.5">
+                                                                        <input
+                                                                            type="number"
+                                                                            min="0"
+                                                                            max={b.remainingQuantity}
+                                                                            value={currentAllocQty || ""}
+                                                                            placeholder="0"
+                                                                            onChange={(e) => handleBatchAllocationChange(itemKey, b.id, e.target.value, b.remainingQuantity)}
+                                                                            className="h-7 sm:h-6 w-16 sm:w-12 rounded-lg border border-black/10 bg-white px-1.5 text-center font-mono text-xs sm:text-[11px] font-bold text-foreground focus:border-primary focus:outline-none dark:border-white/10 dark:bg-white/5"
+                                                                        />
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => handleBatchAllocationChange(itemKey, b.id, String(b.remainingQuantity), b.remainingQuantity)}
+                                                                            className="h-7 sm:h-6 rounded-lg bg-black/5 px-2.5 sm:px-1.5 text-xs sm:text-[9px] font-bold text-muted-foreground transition hover:bg-primary/10 hover:text-primary active:scale-95 dark:bg-white/5"
+                                                                        >
+                                                                            全出
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })
+                                                )}
+                                                {item.batchAllocations && item.batchAllocations.length > 0 && (
+                                                    <div className="flex items-center justify-between px-2 pt-1.5 text-[11px] font-bold border-t border-black/5 dark:border-white/5">
+                                                        <span className="text-muted-foreground">已分配批次合计：</span>
+                                                        <span className={cn(
+                                                            item.batchAllocations.reduce((sum, a) => sum + (a.quantity || 0), 0) === item.quantity
+                                                                ? "text-emerald-600 dark:text-emerald-400"
+                                                                : "text-amber-600 dark:text-amber-400"
+                                                        )}>
+                                                            {item.batchAllocations.reduce((sum, a) => sum + (a.quantity || 0), 0)} / {item.quantity} 件
+                                                            {item.batchAllocations.reduce((sum, a) => sum + (a.quantity || 0), 0) === item.quantity ? " ✓ 齐平" : " ⚠ 数量不符"}
+                                                        </span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
-                                ))
+                                    );
+                                })
                             ) : (
                                 <div className="py-20 flex flex-col items-center justify-center text-center">
                                     <div className="p-4 rounded-full bg-muted/20 text-muted-foreground/30 mb-4 border border-dashed border-border dark:border-white/10">
@@ -545,30 +786,36 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
           </div>
 
           {/* Mobile Bottom Bar - Fixed at bottom of modal body */}
-          <div className="md:hidden border-t border-border/60 dark:border-white/10 p-4 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl shrink-0">
-              <div className="flex items-center justify-between mb-3">
+          <div className="md:hidden border-t border-border/60 dark:border-white/10 p-3.5 bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl shrink-0">
+              <div className="flex items-center justify-between mb-2.5">
                   <div className="flex flex-col">
-                      <span className="text-xs font-bold text-foreground">共选择 {selectedItems.length} 项商品</span>
-                      <span className="text-[10px] text-muted-foreground">清单实时更新</span>
+                      <span className="text-xs font-bold text-foreground">
+                        已选 {selectedItems.length} 项商品 · 共 {selectedItems.reduce((acc, it) => acc + Math.max(0, it.quantity), 0)} 件
+                      </span>
+                      <span className="text-[10px] text-muted-foreground">
+                        {mobileView === "selection" ? "点击下一步可配置门店与出库批次" : "确认门店与批次分配后提交"}
+                      </span>
                   </div>
                   {mobileView === "review" && (
                     <button 
+                        type="button"
                         onClick={() => setMobileView("selection")}
-                        className="text-[10px] font-bold text-primary"
+                        className="text-xs font-bold text-primary px-2.5 py-1 rounded-lg bg-primary/10 hover:bg-primary/15 transition-colors"
                     >
-                        返回修改
+                        继续加品
                     </button>
                   )}
               </div>
               <button
+                  type="button"
                   onClick={handleSubmit}
                   disabled={selectedItems.length === 0}
-                  className="w-full h-11 rounded-full bg-primary text-primary-foreground font-black text-sm shadow-lg shadow-primary/25 flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95 transition-all"
+                  className="w-full h-11 rounded-xl bg-primary text-primary-foreground font-black text-sm shadow-lg shadow-primary/25 flex items-center justify-center gap-2 disabled:opacity-50 active:scale-98 transition-all"
               >
                   {mobileView === "selection" ? (
                       <>
-                          <span>确认清单并下一步</span>
-                          <Plus size={16} className="rotate-45" />
+                          <span>下一步：确认门店与批次 ({selectedItems.length})</span>
+                          <ChevronRight size={16} />
                       </>
                   ) : (
                       <>
