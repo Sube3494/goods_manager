@@ -34,13 +34,6 @@ export function PlanModal({ isOpen, onClose, onSubmit, initialData, readOnly = f
         () => (user?.shippingAddresses || []).filter((address: AddressItem) => !isAddressDisabled(address)),
         [user?.shippingAddresses]
     );
-    const [expandedPlatforms, setExpandedPlatforms] = useState<Record<string, boolean>>({
-        "美团": true,
-        "淘宝": true,
-        "京东": true,
-        "其他": true
-    });
-
     // Initial state
     const [formData, setFormData] = useState<Partial<BrushOrderPlan>>(() => ({
         id: initialData?.id || "",
@@ -51,6 +44,19 @@ export function PlanModal({ isOpen, onClose, onSubmit, initialData, readOnly = f
         note: initialData?.note || "",
         status: initialData?.status || "Draft",
     }));
+
+    const currentShopLibraryId = useMemo(() => {
+        if (!formData.shopName) return undefined;
+        const matched = activeShippingAddresses.find((addr: AddressItem) => addr.label === formData.shopName);
+        return matched?.libraryId || undefined;
+    }, [activeShippingAddresses, formData.shopName]);
+
+    const [expandedPlatforms, setExpandedPlatforms] = useState<Record<string, boolean>>({
+        "美团": true,
+        "淘宝": true,
+        "京东": true,
+        "其他": true
+    });
 
     useEffect(() => {
         const timer = setTimeout(() => setMounted(true), 0);
@@ -485,7 +491,13 @@ export function PlanModal({ isOpen, onClose, onSubmit, initialData, readOnly = f
                 onSelect={(products, platform) => handleBatchAdd(products, platform)}
                 selectedIds={(formData.items || []).map((item) => item.product?.shopProductId || item.productId!).filter(Boolean)}
                 fetchPath="/api/brush-products/products"
-                query={formData.shopName ? { shopName: formData.shopName } : undefined}
+                query={{
+                    ...(formData.shopName ? { shopName: formData.shopName } : {}),
+                    ...(currentShopLibraryId ? { libraryId: currentShopLibraryId } : {}),
+                }}
+                allowLibrarySwitch={false}
+                lockLibraryId={currentShopLibraryId}
+                defaultLibraryId={currentShopLibraryId}
                 title="选择刷单商品"
                 hideUnselectedOnlyToggle
                 imageOnly

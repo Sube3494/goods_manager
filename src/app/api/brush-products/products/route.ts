@@ -72,6 +72,7 @@ export async function GET(request: NextRequest) {
   const search = searchParams.get("search") || "";
   const shopId = searchParams.get("shopId") || "";
   const shopName = searchParams.get("shopName") || "";
+  const libraryId = searchParams.get("libraryId") || "";
   const skip = (page - 1) * pageSize;
 
   try {
@@ -82,6 +83,25 @@ export async function GET(request: NextRequest) {
         OR: [
           { shopProduct: { shopId } },
           { shopProductId: null, shopId },
+        ],
+      });
+    }
+    if (libraryId && libraryId !== "all") {
+      andWhere.push({
+        OR: [
+          { product: { libraryId } },
+          { shopProduct: { product: { libraryId } } },
+          {
+            AND: [
+              { product: { libraryId: null } },
+              {
+                OR: [
+                  { shop: { libraryId } },
+                  { shopProduct: { shop: { libraryId } } },
+                ],
+              },
+            ],
+          },
         ],
       });
     }
@@ -110,6 +130,7 @@ export async function GET(request: NextRequest) {
         select: {
           id: true,
           name: true,
+          libraryId: true,
         },
       },
       shopProduct: {
@@ -118,6 +139,12 @@ export async function GET(request: NextRequest) {
             select: {
               id: true,
               name: true,
+              libraryId: true,
+            },
+          },
+          product: {
+            select: {
+              libraryId: true,
             },
           },
         },
@@ -162,7 +189,8 @@ export async function GET(request: NextRequest) {
             ],
           },
           include: {
-            shop: { select: { id: true, name: true } },
+            shop: { select: { id: true, name: true, libraryId: true } },
+            product: { select: { libraryId: true } },
           },
         })
       : [];
@@ -187,9 +215,15 @@ export async function GET(request: NextRequest) {
           : null
       );
       const resolvedImage = matchedShopProduct?.productImage || item.product.image;
+      const resolvedLibraryId = item.product.libraryId 
+        || matchedShopProduct?.product?.libraryId 
+        || matchedShopProduct?.shop?.libraryId 
+        || item.shop?.libraryId 
+        || null;
 
       return {
         ...item.product,
+        libraryId: resolvedLibraryId,
         brushKeyword: item.brushKeyword || "",
         sourceProductId: item.product.id,
         shopId: matchedShopProduct?.shopId || item.shopId || undefined,
@@ -206,9 +240,13 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    const filteredProducts = normalizedShopName
-      ? products.filter((product) => isShopNameMatch(product.shopName, normalizedShopName))
+    const filteredByLibrary = (libraryId && libraryId !== "all")
+      ? products.filter((product) => product.libraryId === libraryId)
       : products;
+
+    const filteredProducts = normalizedShopName
+      ? filteredByLibrary.filter((product) => isShopNameMatch(product.shopName, normalizedShopName))
+      : filteredByLibrary;
 
     filteredProducts.sort((a, b) => {
       const skuCompare = naturalSortCollator.compare(

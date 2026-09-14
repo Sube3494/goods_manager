@@ -259,7 +259,7 @@ export function ProductSelectionModal({
   const [targetPlatform, setTargetPlatform] = useState("美团");
   const PLATFORMS = ["美团", "淘宝", "京东"];
   const shouldShowCategoryFilter = !imageOnly && (showCategoryFilter !== undefined ? showCategoryFilter : !minimalView);
-  const effectiveLibraryId = allowLibrarySwitch ? activeLibraryId : "all";
+  const effectiveLibraryId = allowLibrarySwitch ? activeLibraryId : (lockLibraryId || defaultLibraryId || "all");
   const shouldShowLibraryTabs = allowLibrarySwitch && libraries.length > 1 && !lockLibraryId;
   const loadingDelayRef = useRef<NodeJS.Timeout | null>(null);
   const lastLoadedSignatureRef = useRef("");
@@ -490,10 +490,11 @@ export function ProductSelectionModal({
       const searchableText = [p.name, p.sku, p.jdSkuId].filter(Boolean).join(" ").toLowerCase();
       const matchesSearch = !normalizedSearch || searchableText.includes(normalizedSearch);
       const matchesShop = !scopedShopName || isShopNameMatch(p.shopName, scopedShopName);
+      const matchesLibrary = !allowLibrarySwitch || effectiveLibraryId === "all" || !p.libraryId || p.libraryId === effectiveLibraryId;
 
-      return isVisible && matchesCategory && matchesUnselected && matchesSearch && matchesShop;
+      return isVisible && matchesCategory && matchesUnselected && matchesSearch && matchesShop && matchesLibrary;
     });
-  }, [debouncedSearch, disableAlreadySelected, getSelectionKey, respectPublicVisibility, selectedCategoryName, selectedIds, showUnselectedOnly]);
+  }, [allowLibrarySwitch, debouncedSearch, disableAlreadySelected, effectiveLibraryId, getSelectionKey, respectPublicVisibility, selectedCategoryName, selectedIds, showUnselectedOnly]);
 
   const displayCategoryName = selectedCategoryName;
 

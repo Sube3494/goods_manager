@@ -91,6 +91,7 @@ export interface Product {
   isStandaloneShopProduct?: boolean;
   isShelfLife?: boolean;
   shelfLifeDays?: number | null;
+  libraryId?: string | null;
 }
 
 export interface Shop {

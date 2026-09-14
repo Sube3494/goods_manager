@@ -15,8 +15,12 @@ interface AddressItem {
   contactName?: string;
   contactPhone?: string;
   isDefault: boolean;
+  disabled?: boolean;
+  isDisabled?: boolean;
+  serviceFeeRate?: number;
   longitude?: number;
   latitude?: number;
+  libraryId?: string;
 }
 
 interface User {

@@ -210,6 +210,7 @@ export async function GET(request: NextRequest) {
   const search = searchParams.get("search") || "";
   const supplierId = searchParams.get("supplierId") || "";
   const shopId = searchParams.get("shopId") || "";
+  const libraryId = searchParams.get("libraryId") || "";
   const skip = (page - 1) * pageSize;
 
   try {
@@ -220,6 +221,25 @@ export async function GET(request: NextRequest) {
         OR: [
           { shopProduct: { shopId } },
           { shopProductId: null, shopId },
+        ],
+      });
+    }
+    if (libraryId && libraryId !== "all") {
+      andWhere.push({
+        OR: [
+          { product: { libraryId } },
+          { shopProduct: { product: { libraryId } } },
+          {
+            AND: [
+              { product: { libraryId: null } },
+              {
+                OR: [
+                  { shop: { libraryId } },
+                  { shopProduct: { shop: { libraryId } } },
+                ],
+              },
+            ],
+          },
         ],
       });
     }
