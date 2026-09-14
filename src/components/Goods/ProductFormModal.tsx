@@ -365,6 +365,47 @@ export function ProductFormModal({
     }
   };
 
+  const [isDeletingBatchId, setIsDeletingBatchId] = useState<string | null>(null);
+
+  const handleDeleteBatch = async (purchaseOrderItemId: string, batchQuantity: number) => {
+    if (!purchaseOrderItemId || isDeletingBatchId) return;
+    setIsDeletingBatchId(purchaseOrderItemId);
+    try {
+      const res = await fetch(`/api/purchases/items/${purchaseOrderItemId}`, {
+        method: "DELETE",
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(data?.error || "删除批次失败");
+      }
+
+      setInboundHistory((current) => {
+        return current
+          .map((order) => ({
+            ...order,
+            items: order.items.filter((item) => item.id !== purchaseOrderItemId),
+          }))
+          .filter((order) => order.items.length > 0);
+      });
+
+      setFormData((prev) => {
+        const currentStock = Number(prev.stock || 0);
+        return {
+          ...prev,
+          stock: String(Math.max(0, currentStock - batchQuantity)),
+        };
+      });
+
+      showToast("批次已成功删除，总库存已同步更新", "success");
+    } catch (error) {
+      console.error("Failed to delete batch:", error);
+      showToast(error instanceof Error ? error.message : "删除批次失败", "error");
+    } finally {
+      setIsDeletingBatchId(null);
+      setConfirmConfig((current) => ({ ...current, isOpen: false }));
+    }
+  };
+
   const handleSaveCost = async (purchaseOrderItemId: string, orderId: string) => {
     const costPrice = Number(editingCostValue);
     if (isNaN(costPrice) || costPrice < 0) {
@@ -1712,27 +1753,64 @@ export function ProductFormModal({
                                                         </button>
                                                     </div>
                                                     <div className="text-right flex flex-col items-end gap-0.5">
-                                                        <div className="flex items-center justify-end gap-1.5">
-                                                            <div className="text-xs font-semibold text-foreground">
-                                                                x{item.quantity} 
-                                                                {item.remainingQuantity !== undefined && item.remainingQuantity !== null && order.status === 'Received' && (
-                                                                    <span className="text-[10px] font-normal text-muted-foreground ml-1">
-                                                                         (余: <span className={cn("font-medium", item.remainingQuantity > 0 ? "text-primary" : "text-muted-foreground")}>{item.remainingQuantity}</span>)
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                            {order.status === "Received" && itemId ? (
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => void openBatchTrace(itemId)}
-                                                                    className="inline-flex items-center gap-1 rounded-full border border-sky-500/15 bg-sky-500/10 px-2 py-0.5 text-[10px] font-bold text-sky-600 transition hover:bg-sky-500/15 dark:text-sky-300"
-                                                                    title="查看这批入库货的出库流向"
-                                                                >
-                                                                    出库
-                                                                    <ArrowUpRight size={10} />
-                                                                </button>
-                                                            ) : null}
-                                                        </div>
+                                                        {(() => {
+                                                            const originalQty = Number(item.quantity || 0);
+                                                            const remainingQty = Number(item.remainingQuantity ?? originalQty);
+                                                            const hasOutbound = remainingQty < originalQty;
+
+                                                            return (
+                                                                <div className="flex items-center justify-end gap-1.5">
+                                                                    <div className="text-xs font-semibold text-foreground">
+                                                                        x{item.quantity} 
+                                                                        {item.remainingQuantity !== undefined && item.remainingQuantity !== null && order.status === 'Received' && (
+                                                                            <span className="text-[10px] font-normal text-muted-foreground ml-1">
+                                                                                 (余: <span className={cn("font-medium", item.remainingQuantity > 0 ? "text-primary" : "text-muted-foreground")}>{item.remainingQuantity}</span>)
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                    {order.status === "Received" && itemId ? (
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => void openBatchTrace(itemId)}
+                                                                            className="inline-flex items-center gap-1 rounded-full border border-sky-500/15 bg-sky-500/10 px-2 py-0.5 text-[10px] font-bold text-sky-600 transition hover:bg-sky-500/15 dark:text-sky-300"
+                                                                            title="查看这批入库货的出库流向"
+                                                                        >
+                                                                            出库
+                                                                            <ArrowUpRight size={10} />
+                                                                        </button>
+                                                                    ) : null}
+                                                                    {itemId ? (
+                                                                        <button
+                                                                            type="button"
+                                                                            disabled={hasOutbound || isDeletingBatchId === itemId}
+                                                                            onClick={() => {
+                                                                                if (hasOutbound) {
+                                                                                    showToast("该批次已有出库记录，无法删除", "warning");
+                                                                                    return;
+                                                                                }
+                                                                                setConfirmConfig({
+                                                                                    isOpen: true,
+                                                                                    title: "确认删除入库批次",
+                                                                                    confirmLabel: isDeletingBatchId === itemId ? "删除中..." : "确认删除",
+                                                                                    variant: "danger",
+                                                                                    message: `确定要删除该入库批次（入库 ${originalQty} 件，进价 ¥${item.costPrice}）吗？删除后将同步扣减商品总物理库存。`,
+                                                                                    onConfirm: () => void handleDeleteBatch(itemId, originalQty),
+                                                                                });
+                                                                            }}
+                                                                            className={cn(
+                                                                                "inline-flex items-center justify-center p-1 rounded-full transition-all",
+                                                                                hasOutbound
+                                                                                    ? "text-muted-foreground/30 cursor-not-allowed opacity-40 hover:bg-transparent"
+                                                                                    : "text-muted-foreground hover:text-destructive hover:bg-destructive/10 active:scale-95 cursor-pointer"
+                                                                            )}
+                                                                            title={hasOutbound ? "该批次已产生出库记录，禁止删除" : "删除此入库批次"}
+                                                                        >
+                                                                            <Trash2 size={12} />
+                                                                        </button>
+                                                                    ) : null}
+                                                                </div>
+                                                            );
+                                                        })()}
                                                         {order.status === "Received" ? (
                                                             editingItemId === itemId ? (
                                                                 <div className="flex items-center gap-1 mt-0.5 justify-end" onClick={(e) => e.stopPropagation()}>

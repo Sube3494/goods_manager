@@ -105,13 +105,6 @@ export async function returnOutboundOrderById(
     }
 
     const requestMap = new Map(requestedItems.map((item) => [item.outboundOrderItemId, item.quantity]));
-    const inboundItems: Array<{
-      productId: string | null;
-      shopProductId: string | null;
-      quantity: number;
-      remainingQuantity: number;
-      costPrice: number;
-    }> = [];
     let inboundTotalAmount = 0;
     let returnedItemCount = 0;
     const returnMetaItems: OutboundReturnMetaEntry["items"] = [];
@@ -142,6 +135,20 @@ export async function returnOutboundOrderById(
           const restoreToThisBatch = Math.min(batchReturnableQuantity, amountToRestore);
           if (restoreToThisBatch <= 0) continue;
 
+          // 核心：从哪来回哪去，原路递增该采购批次的剩余库存
+          await tx.purchaseOrderItem.update({
+            where: { id: batch.purchaseOrderItemId },
+            data: {
+              remainingQuantity: { increment: restoreToThisBatch },
+            },
+          });
+          await tx.productBatch.updateMany({
+            where: { purchaseOrderItemId: batch.purchaseOrderItemId },
+            data: {
+              remainingStock: { increment: restoreToThisBatch },
+            },
+          });
+
           restoredAmount = FinanceMath.add(
             restoredAmount,
             FinanceMath.multiply(Number(batch.unitCost) || 0, restoreToThisBatch)
@@ -155,6 +162,7 @@ export async function returnOutboundOrderById(
         }
       }
 
+      // 如果快照中没有批次信息或未填满退回数量，尝试回退给最近未满的已有批次
       if (amountToRestore > 0) {
         const batches = await tx.purchaseOrderItem.findMany({
           where: {
@@ -176,10 +184,23 @@ export async function returnOutboundOrderById(
 
           const currentRemaining = batch.remainingQuantity || 0;
           const originalQty = batch.quantity;
-          const spaceInBatch = originalQty - currentRemaining;
+          const spaceInBatch = Math.max(0, originalQty - currentRemaining);
           const restoreToThisBatch = Math.min(spaceInBatch, amountToRestore);
 
           if (restoreToThisBatch > 0) {
+            await tx.purchaseOrderItem.update({
+              where: { id: batch.id },
+              data: {
+                remainingQuantity: { increment: restoreToThisBatch },
+              },
+            });
+            await tx.productBatch.updateMany({
+              where: { purchaseOrderItemId: batch.id },
+              data: {
+                remainingStock: { increment: restoreToThisBatch },
+              },
+            });
+
             restoredAmount = FinanceMath.add(
               restoredAmount,
               FinanceMath.multiply(Number(batch.costPrice) || 0, restoreToThisBatch)
@@ -200,19 +221,9 @@ export async function returnOutboundOrderById(
         restoredAmount,
         FinanceMath.multiply(fallbackCostPrice, missingQuantity)
       );
-      const itemCostPrice = requestedQuantity > 0
-        ? FinanceMath.divide(itemTotalAmount, requestedQuantity)
-        : fallbackCostPrice;
 
       inboundTotalAmount = FinanceMath.add(inboundTotalAmount, itemTotalAmount);
       returnedItemCount += requestedQuantity;
-      inboundItems.push({
-        productId: item.productId || null,
-        shopProductId: item.shopProductId || null,
-        quantity: requestedQuantity,
-        remainingQuantity: requestedQuantity,
-        costPrice: itemCostPrice,
-      });
       returnMetaItems.push({
         outboundOrderItemId: item.id,
         productId: item.productId || null,
@@ -223,25 +234,11 @@ export async function returnOutboundOrderById(
       });
     }
 
-    if (inboundItems.length === 0 || returnedItemCount <= 0) {
-      throw new Error("No valid return quantity found");
+    if (returnMetaItems.length === 0 || returnedItemCount <= 0) {
+      throw new Error("未找到可退回的有效商品数量");
     }
 
-    const inboundType = order.type === "Sample" ? "InternalReturn" : "Return";
-    const inboundOrder = await tx.purchaseOrder.create({
-      data: {
-        type: inboundType,
-        status: "Received",
-        date: new Date(),
-        totalAmount: inboundTotalAmount,
-        userId,
-        note: `单据由出库退回自动产生。关联出库单: ${order.id}`,
-        items: {
-          create: inboundItems,
-        },
-      },
-    });
-
+    // 真正做到“从哪来回哪去”：不再创建虚假的 type: 'Return' 采购单生成假批次，直接同步刷新商品物理总库存
     for (const item of order.items) {
       await InventoryService.syncStockFromBatches(tx, item.productId || null, item.shopProductId || null);
     }
@@ -253,7 +250,7 @@ export async function returnOutboundOrderById(
       refundAmount: Math.max(0, Number(payload.refundAmount || 0)),
       extraExpense: Math.max(0, Number(payload.extraExpense || 0)),
       returnedCost: inboundTotalAmount,
-      inboundOrderId: inboundOrder.id,
+      inboundOrderId: undefined,
       items: returnMetaItems,
     };
     const nextReturns = [...existingReturns, newReturnEntry];
