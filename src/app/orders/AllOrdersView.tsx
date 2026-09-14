@@ -596,14 +596,34 @@ export function AllOrdersView({
       } else {
         showToast("操作成功", "success");
         if (data.order) {
-          patchOrder(orderId, (order) => ({
-            ...order,
-            ...data.order,
-            items: data.order.items && data.order.items.some((i: any) => i.matchedProduct)
-              ? data.order.items
-              : order.items,
-            delivery: data.order.delivery ?? order.delivery,
-          }));
+          patchOrder(orderId, (order) => {
+            const rawShopName = String(data.order.rawShopName || order.rawShopName || "").trim();
+            const matchedShopName = String(data.order.matchedShopName || order.matchedShopName || "").trim();
+            const isAddressLike = (addr: string | null | undefined) => {
+              if (!addr) return false;
+              const trimmed = addr.trim();
+              if (!trimmed) return false;
+              if (rawShopName && (trimmed === rawShopName || rawShopName.includes(trimmed))) return false;
+              if (matchedShopName && (trimmed === matchedShopName || matchedShopName.includes(trimmed))) return false;
+              return true;
+            };
+
+            const safeShopAddress = isAddressLike(data.order.shopAddress)
+              ? data.order.shopAddress
+              : (isAddressLike(order.shopAddress) ? order.shopAddress : (data.order.shopAddress || order.shopAddress));
+
+            return {
+              ...order,
+              ...data.order,
+              matchedShopName: data.order.matchedShopName || order.matchedShopName,
+              matchedShopId: data.order.matchedShopId || order.matchedShopId,
+              shopAddress: safeShopAddress,
+              items: data.order.items && data.order.items.some((i: any) => i.matchedProduct)
+                ? data.order.items
+                : order.items,
+              delivery: data.order.delivery ?? order.delivery,
+            };
+          });
         } else {
           void fetchOrders({ silent: true });
         }

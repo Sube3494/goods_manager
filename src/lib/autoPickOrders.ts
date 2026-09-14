@@ -3587,8 +3587,6 @@ export function normalizeAutoPickOrderPayload(payload: unknown): AutoPickInbound
       || extend?.merchant_address
       || extend?.channelAddress
       || extend?.channel_address
-      || input.shop_name
-      || input.shopName
       || ""
     ).trim() || undefined,
     rawShopAddress: String(
@@ -3606,8 +3604,6 @@ export function normalizeAutoPickOrderPayload(payload: unknown): AutoPickInbound
       || extend?.merchant_address
       || extend?.channelAddress
       || extend?.channel_address
-      || input.shop_name
-      || input.shopName
       || ""
     ).trim() || undefined,
     isSubscribe: input.isSubscribe === true || input.isSubscribe === 1 || input.isSubscribe === "1" || input.is_subscribe === true || input.is_subscribe === 1 || input.is_subscribe === "1",
@@ -3982,9 +3978,23 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
     const sourceId = normalized.id || existing?.sourceId || "";
     const deliveryId = normalized.deliveryId || existing?.deliveryId || null;
     const shopId = normalized.shopId || existing?.shopId || null;
-    const shopAddress = (normalized.shopAddress && normalized.shopAddress !== normalized.rawShopName)
-      ? normalized.shopAddress
-      : (existing?.shopAddress || null);
+    const rawShopName = String(normalized.rawShopName || (existing?.rawPayload ? readShopNameFromRawPayload(existing.rawPayload) : "") || "").trim();
+    const resolvedShopName = String(resolvedInternalShop?.name || "").trim();
+    const isAddressLike = (addr: string | null | undefined) => {
+      if (!addr) return false;
+      const trimmed = addr.trim();
+      if (!trimmed) return false;
+      if (rawShopName && (trimmed === rawShopName || rawShopName.includes(trimmed))) return false;
+      if (resolvedShopName && (trimmed === resolvedShopName || resolvedShopName.includes(trimmed))) return false;
+      return true;
+    };
+
+    const candidateShopAddress = isAddressLike(normalized.shopAddress) ? normalized.shopAddress : null;
+    const existingShopAddress = isAddressLike(existing?.shopAddress) ? existing?.shopAddress : null;
+    const shopAddress = candidateShopAddress
+      || existingShopAddress
+      || resolvedInternalShop?.address
+      || null;
     const isExistingCompleted = isAutoPickOrderCompletedStatus(existing?.status);
     const isIncomingTerminal = isAutoPickOrderTerminalStatus(normalized.status);
     const shouldKeepCompletedStatus = isExistingCompleted && !isIncomingTerminal;
@@ -5653,6 +5663,7 @@ async function resolveAutoPickInternalShop(
       return {
         id: mappedShop.id,
         name: mappedShop.name || mappedShopName,
+        address: mappedShop.address || null,
       };
     }
   }
@@ -5666,6 +5677,7 @@ async function resolveAutoPickInternalShop(
     return {
       id: shop.id,
       name: shop.name || "",
+      address: shop.address || null,
     };
   }
 
@@ -5686,6 +5698,7 @@ async function resolveAutoPickInternalShop(
     return {
       id: partialAddressMatchedShops[0].id,
       name: partialAddressMatchedShops[0].name || "",
+      address: partialAddressMatchedShops[0].address || null,
     };
   }
 
@@ -6156,7 +6169,16 @@ export async function backfillPersistedAutoPickOrderFields(
     }
 
     // 门店地址更新逻辑
-    if (normalized.shopAddress) {
+    const rawShopName = String(normalized.rawShopName || (order.rawPayload ? readShopNameFromRawPayload(order.rawPayload) : "") || "").trim();
+    const isAddressLike = (addr: string | null | undefined) => {
+      if (!addr) return false;
+      const trimmed = addr.trim();
+      if (!trimmed) return false;
+      if (rawShopName && (trimmed === rawShopName || rawShopName.includes(trimmed))) return false;
+      return true;
+    };
+
+    if (normalized.shopAddress && isAddressLike(normalized.shopAddress)) {
       if (isForce) {
         if (order.shopAddress !== normalized.shopAddress) {
           nextData.shopAddress = normalized.shopAddress;

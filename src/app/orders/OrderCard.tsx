@@ -3535,7 +3535,21 @@ export const OrderCard = memo(function OrderCard({
                         </button>
                       )
                     }
-                    value={order.shopAddress || order.rawShopAddress || "-"}
+                    value={(() => {
+                      const rawShopName = String(order.rawShopName || "").trim();
+                      const matchedShopName = String(order.matchedShopName || "").trim();
+                      const isAddressLike = (addr: string | null | undefined) => {
+                        if (!addr) return false;
+                        const trimmed = addr.trim();
+                        if (!trimmed) return false;
+                        if (rawShopName && (trimmed === rawShopName || rawShopName.includes(trimmed))) return false;
+                        if (matchedShopName && (trimmed === matchedShopName || matchedShopName.includes(trimmed))) return false;
+                        return true;
+                      };
+                      if (isAddressLike(order.shopAddress)) return String(order.shopAddress);
+                      if (isAddressLike(order.rawShopAddress)) return String(order.rawShopAddress);
+                      return "-";
+                    })()}
                     className="sm:col-span-2"
                   />
                   <DetailBlock

@@ -1282,7 +1282,7 @@ export async function GET(request: NextRequest) {
       }),
       prisma.shop.findMany({
         where: { userId: targetUserId },
-        select: { id: true, name: true },
+        select: { id: true, name: true, address: true },
       }),
       liteMode
         ? Promise.resolve([])
@@ -2269,6 +2269,20 @@ export async function GET(request: NextRequest) {
       const existingMappedShop = resolveExistingLocalShop({ name: mappingDebug.localShopName });
       const matchedShopId = existingLockedShop?.id || existingMappedShop?.id || null;
       const matchedShopName = String(existingLockedShop?.name || existingMappedShop?.name || "").trim();
+      const rawShopName = String(order.rawShopName || "").trim();
+      const isAddressLike = (addr: string | null | undefined) => {
+        if (!addr) return false;
+        const trimmed = addr.trim();
+        if (!trimmed) return false;
+        if (rawShopName && (trimmed === rawShopName || rawShopName.includes(trimmed))) return false;
+        if (matchedShopName && (trimmed === matchedShopName || matchedShopName.includes(trimmed))) return false;
+        return true;
+      };
+      const effectiveShopAddress = isAddressLike(order.shopAddress)
+        ? order.shopAddress
+        : (isAddressLike(order.rawShopAddress)
+          ? order.rawShopAddress
+          : (existingLockedShop?.address || existingMappedShop?.address || null));
       const autoOutboundMeta = readAutoOutboundMeta(order.rawPayload);
       const outboundMeta = outboundByOrderNo.get(order.orderNo) || null;
       const hiddenDeletedOfflineIncome = order.isDeleted && order.platform === "线下交易";
@@ -2354,6 +2368,7 @@ export async function GET(request: NextRequest) {
 
       return {
         ...order,
+        shopAddress: effectiveShopAddress,
         delivery: normalizedDelivery,
         actualPaid: order.actualPaid,
         expectedIncome: safeExpectedIncome,

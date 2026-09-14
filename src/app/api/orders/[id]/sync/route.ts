@@ -13,8 +13,10 @@ import {
   readCustomerTypeFromRawPayload,
   readRiderPhoneFromDelivery,
   readRiderPhoneFromRawPayload,
+  readShopNameFromRawPayload,
   refreshAutoPickOrderFromPlugin,
   resolveAutoPickCommandPlatform,
+  resolveAutoPickMatchedShopName,
   syncAutoOutboundFromCompletedAutoPickOrder,
   syncBrushOrderFromCompletedAutoPickOrder,
 } from "@/lib/autoPickOrders";
@@ -167,6 +169,49 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
       computedPlatformCommission = Math.max(0, Math.round(Number(refreshedOrder.platformCommission || 0)));
     }
 
+    const user = await prisma.user.findUnique({
+      where: { id: order.userId },
+      select: { permissions: true },
+    });
+    const matchedShopName = resolveAutoPickMatchedShopName(refreshedOrder, user?.permissions);
+    let matchedShopId: string | null = null;
+    let localShopAddress: string | null = null;
+    if (matchedShopName) {
+      const localShop = await prisma.shop.findFirst({
+        where: {
+          userId: order.userId,
+          name: matchedShopName,
+        },
+        select: { id: true, address: true },
+      });
+      if (localShop) {
+        matchedShopId = localShop.id;
+        localShopAddress = localShop.address;
+      }
+    }
+
+    const rawShopName = readShopNameFromRawPayload(refreshedOrder.rawPayload) || "";
+    const isAddressLike = (addr: string | null | undefined) => {
+      if (!addr) return false;
+      const trimmed = addr.trim();
+      if (!trimmed) return false;
+      if (rawShopName && (trimmed === rawShopName || rawShopName.includes(trimmed))) return false;
+      if (matchedShopName && (trimmed === matchedShopName || matchedShopName.includes(trimmed))) return false;
+      return true;
+    };
+
+    const existingSafeAddress = isAddressLike(refreshedOrder.shopAddress)
+      ? refreshedOrder.shopAddress
+      : (isAddressLike(order.shopAddress) ? order.shopAddress : null);
+    const effectiveShopAddress = existingSafeAddress || localShopAddress || null;
+
+    if (effectiveShopAddress && refreshedOrder.shopAddress !== effectiveShopAddress) {
+      await prisma.autoPickOrder.update({
+        where: { id: refreshedOrder.id },
+        data: { shopAddress: effectiveShopAddress },
+      }).catch(() => {});
+    }
+
     const customerType = readCustomerTypeFromRawPayload(refreshedOrder.rawPayload)
       || normalized?.customerType
       || null;
@@ -191,6 +236,9 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
 
       const syncedOrder = {
         ...refreshedOrder,
+        shopAddress: effectiveShopAddress || (isAddressLike(refreshedOrder.shopAddress) ? refreshedOrder.shopAddress : null),
+        matchedShopId,
+        matchedShopName,
         isMainSystemSelfDelivery,
         expectedIncome: computedExpectedIncome,
         platformCommission: computedPlatformCommission,
