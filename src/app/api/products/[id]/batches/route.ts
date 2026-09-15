@@ -49,12 +49,15 @@ export async function GET(
       }
     }
 
-    const whereConditions: Array<{ productId?: string; shopProductId?: string }> = [];
+    const whereConditions: Array<{ productId?: string; shopProductId?: string | null }> = [];
     if (resolvedShopProductId) {
+      // 门店商品：只查属于该门店商品的批次（包括历史兼容 productId 等于该 shopProductId）
+      // 严禁包含母商品 productId，否则会导致其他门店采购该母商品的批次被全部误查出
       whereConditions.push({ shopProductId: resolvedShopProductId });
-    }
-    if (resolvedProductId) {
-      whereConditions.push({ productId: resolvedProductId });
+      whereConditions.push({ productId: resolvedShopProductId });
+    } else if (resolvedProductId) {
+      // 总库商品：只查属于总库本身的入库批次，排除各门店批次
+      whereConditions.push({ productId: resolvedProductId, shopProductId: null });
     }
 
     if (whereConditions.length === 0) {

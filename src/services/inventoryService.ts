@@ -171,6 +171,19 @@ export class InventoryService {
                 userId,
                 status: "Received",
               },
+              ...(item.shopProductId
+                ? {
+                    OR: [
+                      { shopProductId: item.shopProductId },
+                      { productId: item.shopProductId },
+                    ],
+                  }
+                : item.productId
+                ? {
+                    productId: item.productId,
+                    shopProductId: null,
+                  }
+                : {}),
             },
             include: {
               purchaseOrder: {
@@ -190,7 +203,7 @@ export class InventoryService {
           });
 
           if (!batch) {
-            throw new Error(`指定的采购批次不存在或未入库：${alloc.purchaseOrderItemId}`);
+            throw new Error(`指定的采购批次不存在、未入库或不属于当前出库商品：${alloc.purchaseOrderItemId}`);
           }
 
           const batchRemaining = Number(batch.remainingQuantity ?? 0);
@@ -230,7 +243,17 @@ export class InventoryService {
         let remainingToDeduct = item.quantity;
         const batches = await tx.purchaseOrderItem.findMany({
           where: {
-            ...(item.shopProductId ? { shopProductId: item.shopProductId } : { productId: item.productId! }),
+            ...(item.shopProductId
+              ? {
+                  OR: [
+                    { shopProductId: item.shopProductId },
+                    { productId: item.shopProductId },
+                  ],
+                }
+              : {
+                  productId: item.productId!,
+                  shopProductId: null,
+                }),
             remainingQuantity: {
               gt: 0,
             },
