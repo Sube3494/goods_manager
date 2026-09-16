@@ -15,6 +15,7 @@ export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const rawTail = String(searchParams.get("phoneTail") || "").trim();
   const currentOrderNo = String(searchParams.get("currentOrderNo") || "").trim();
+  const rawShopId = String(searchParams.get("shopId") || "").trim();
 
   // 必须只搜索尾号（4位数字）
   const tailMatch = rawTail.match(/(\d{4})$/);
@@ -23,27 +24,27 @@ export async function GET(request: NextRequest) {
   }
   const phoneTail = tailMatch[1];
 
-  const isAdmin = Boolean(
-    session.role === "SUPER_ADMIN" ||
-    (session.role && String(session.role).includes("管理")) ||
-    (Array.isArray(session.permissions) && (session.permissions.includes("*") || session.permissions.includes("members:manage") || session.permissions.includes("admin")))
-  );
-
   try {
-    // 查询当前商户/用户的非删除订单
+    // 若未直接传入 shopId 但提供了当前订单号，先查询当前订单获取其 shopId
+    let effectiveShopId = rawShopId || null;
+    if (!effectiveShopId && currentOrderNo) {
+      const currentOrder = await prisma.autoPickOrder.findFirst({
+        where: {
+          orderNo: currentOrderNo,
+          userId: session.id,
+        },
+        select: { shopId: true },
+      });
+      if (currentOrder?.shopId) {
+        effectiveShopId = currentOrder.shopId;
+      }
+    }
+
+    // 严格限定在当前账号、当前店铺的所有订单（绝不跨账号、绝不跨店铺）
     const allOrders = await prisma.autoPickOrder.findMany({
       where: {
-        ...(isAdmin ? {} : { userId: session.id }),
-        OR: [
-          { status: null },
-          {
-            NOT: [
-              { status: { contains: "删除", mode: "insensitive" } },
-              { status: { equals: "delete", mode: "insensitive" } },
-              { status: { equals: "deleted", mode: "insensitive" } },
-            ],
-          },
-        ],
+        userId: session.id,
+        ...(effectiveShopId ? { shopId: effectiveShopId } : {}),
       },
       include: {
         items: true,
@@ -51,7 +52,6 @@ export async function GET(request: NextRequest) {
       orderBy: {
         orderTime: "desc",
       },
-      take: 2000,
     });
 
     // 严格按真实尾号过滤

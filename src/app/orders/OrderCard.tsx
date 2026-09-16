@@ -2722,6 +2722,7 @@ export const OrderCard = memo(function OrderCard({
           onClose={() => setHistoryModalOpen(false)}
           phoneTail={customerPhoneTail}
           currentOrderNo={order.orderNo}
+          shopId={order.shopId || undefined}
           maskedPhone={customerMaskedPhone !== "-" ? customerMaskedPhone : undefined}
         />
       ) : null}

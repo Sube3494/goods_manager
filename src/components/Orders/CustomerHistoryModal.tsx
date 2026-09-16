@@ -17,7 +17,6 @@ import {
   CheckCircle2,
   XCircle,
   Truck,
-  Sparkles,
 } from "lucide-react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
@@ -64,6 +63,7 @@ interface CustomerHistoryModalProps {
   onClose: () => void;
   phoneTail: string;
   currentOrderNo?: string;
+  shopId?: string;
   maskedPhone?: string | null;
 }
 
@@ -72,6 +72,7 @@ export function CustomerHistoryModal({
   onClose,
   phoneTail: initialPhoneTail,
   currentOrderNo,
+  shopId,
   maskedPhone: initialMaskedPhone,
 }: CustomerHistoryModalProps) {
   const [phoneTail, setPhoneTail] = useState(initialPhoneTail);
@@ -95,6 +96,7 @@ export function CustomerHistoryModal({
       const query = new URLSearchParams({
         phoneTail: tail,
         ...(currentOrderNo ? { currentOrderNo } : {}),
+        ...(shopId ? { shopId } : {}),
       });
       const res = await fetch(`/api/orders/customer-history?${query.toString()}`);
       const json = await res.json();
@@ -107,7 +109,7 @@ export function CustomerHistoryModal({
     } finally {
       setLoading(false);
     }
-  }, [currentOrderNo]);
+  }, [currentOrderNo, shopId]);
 
   useEffect(() => {
     if (isOpen && phoneTail) {
@@ -144,44 +146,44 @@ export function CustomerHistoryModal({
 
   return createPortal(
     <AnimatePresence>
-      <div className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-5">
+      <div className="fixed inset-0 z-110000 flex items-center justify-center p-3 sm:p-5">
         {/* 背景遮罩 */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           onClick={onClose}
-          className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm transition-all"
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-all"
         />
 
-        {/* 弹窗主体 */}
+        {/* 弹窗主体容器 */}
         <motion.div
-          initial={{ opacity: 0, scale: 0.95, y: 15 }}
+          initial={{ opacity: 0, scale: 0.96, y: 12 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 15 }}
+          exit={{ opacity: 0, scale: 0.96, y: 12 }}
           transition={{ duration: 0.2, ease: "easeOut" }}
-          className="relative flex flex-col w-full max-w-2xl max-h-[88vh] rounded-2xl border border-slate-200/80 bg-white shadow-2xl dark:border-white/10 dark:bg-[#151921] overflow-hidden"
+          className="relative z-110001 flex flex-col w-full max-w-2xl max-h-[88vh] rounded-[28px] border border-border/70 dark:border-white/10 bg-background/98 dark:bg-[#141822]/95 backdrop-blur-2xl shadow-2xl overflow-hidden text-foreground"
           onClick={(e) => e.stopPropagation()}
         >
           {/* 头部 Header */}
-          <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/70 px-5 py-4 dark:border-white/5 dark:bg-white/[0.02]">
-            <div className="flex items-center gap-2.5">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary dark:bg-primary/20">
+          <div className="flex items-center justify-between border-b border-border/50 px-5 py-4 shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
                 <History size={18} />
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                  <h3 className="text-base font-bold text-foreground">
                     老客历史订单档案
                   </h3>
-                  <span className="inline-flex items-center rounded-full border border-slate-400/20 bg-slate-500/8 px-1.5 py-0.5 text-[10.5px] font-medium text-slate-500 dark:text-slate-300">
+                  <span className="inline-flex h-[15px] items-center justify-center rounded-full border border-slate-400/20 bg-slate-500/8 px-1 text-[9.5px] font-medium leading-none text-slate-500 dark:text-slate-300">
                     老客
                   </span>
                 </div>
-                <div className="mt-0.5 flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
                   <span className="flex items-center gap-1">
                     <Phone size={11} className="shrink-0" />
-                    <span>真实尾号: <strong className="font-mono text-slate-700 dark:text-slate-200">{phoneTail}</strong></span>
+                    <span>真实尾号: <strong className="font-mono text-foreground">{phoneTail}</strong></span>
                   </span>
                   {(data?.representativeMaskedPhone || initialMaskedPhone) && (
                     <>
@@ -194,22 +196,20 @@ export function CustomerHistoryModal({
             </div>
 
             <div className="flex items-center gap-2">
-              {/* 尾号快捷搜索 */}
+              {/* 尾号快捷搜索框 */}
               <form onSubmit={handleSearch} className="hidden sm:flex items-center gap-1.5">
-                <div className="relative">
-                  <input
-                    type="text"
-                    maxLength={4}
-                    value={inputTail}
-                    onChange={(e) => setInputTail(e.target.value.replace(/\D/g, ""))}
-                    placeholder="尾号4位"
-                    className="h-8 w-24 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-mono text-slate-800 placeholder-slate-400 focus:border-primary focus:outline-none dark:border-white/10 dark:bg-white/5 dark:text-white"
-                  />
-                </div>
+                <input
+                  type="text"
+                  maxLength={4}
+                  value={inputTail}
+                  onChange={(e) => setInputTail(e.target.value.replace(/\D/g, ""))}
+                  placeholder="尾号4位"
+                  className="h-8 w-24 rounded-xl border border-border/70 bg-background/80 px-2.5 text-xs font-mono text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
+                />
                 <button
                   type="submit"
                   title="按尾号搜索"
-                  className="inline-flex h-8 items-center justify-center rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10"
+                  className="inline-flex h-8 items-center justify-center rounded-xl border border-border/70 bg-background/80 px-2.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                 >
                   <Search size={13} />
                 </button>
@@ -218,7 +218,7 @@ export function CustomerHistoryModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-white/5 dark:hover:text-white"
+                className="rounded-full p-2 text-muted-foreground hover:bg-black/5 dark:hover:bg-white/10 hover:text-foreground transition-all active:scale-90"
               >
                 <X size={18} />
               </button>
@@ -227,28 +227,28 @@ export function CustomerHistoryModal({
 
           {/* 统计概览条 */}
           {data && !loading && (
-            <div className="grid grid-cols-2 gap-2 border-b border-slate-100 bg-slate-50/40 px-5 py-2.5 dark:border-white/5 dark:bg-white/[0.01] sm:grid-cols-3">
-              <div className="text-xs">
-                <span className="text-slate-400 dark:text-slate-500">历史单数：</span>
-                <span className="font-bold text-slate-800 dark:text-white">{data.totalCount} 笔</span>
+            <div className="grid grid-cols-2 gap-2 border-b border-border/40 bg-muted/20 px-5 py-2.5 text-xs sm:grid-cols-3 shrink-0">
+              <div>
+                <span className="text-muted-foreground">本店历史单数：</span>
+                <span className="font-bold text-foreground">{data.totalCount} 笔</span>
               </div>
-              <div className="text-xs">
-                <span className="text-slate-400 dark:text-slate-500">累计消费：</span>
+              <div>
+                <span className="text-muted-foreground">累计消费：</span>
                 <span className="font-bold font-mono text-emerald-600 dark:text-emerald-400">¥{data.totalActualPaidYuan}</span>
               </div>
-              <div className="hidden sm:block text-xs text-right">
-                <span className="text-slate-400 dark:text-slate-500">匹配依据：</span>
-                <span className="text-slate-600 dark:text-slate-300">平台脱敏真实手机尾号</span>
+              <div className="hidden sm:block text-right">
+                <span className="text-muted-foreground">匹配依据：</span>
+                <span className="text-foreground/80">平台脱敏真实手机尾号</span>
               </div>
             </div>
           )}
 
           {/* 列表主体 Content */}
-          <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3.5 custom-scrollbar">
+          <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3 custom-scrollbar">
             {loading ? (
-              <div className="flex flex-col items-center justify-center py-16 text-slate-400">
+              <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
                 <Loader2 className="h-8 w-8 animate-spin text-primary mb-2" />
-                <span className="text-xs">正在基于真实尾号检索历史订单...</span>
+                <span className="text-xs">正在检索本店真实尾号历史订单...</span>
               </div>
             ) : error ? (
               <div className="flex flex-col items-center justify-center py-12 text-rose-500">
@@ -256,19 +256,19 @@ export function CustomerHistoryModal({
                 <span className="text-sm font-medium">{error}</span>
                 <button
                   onClick={() => fetchHistory(phoneTail)}
-                  className="mt-3 rounded-lg bg-rose-50 px-3 py-1 text-xs text-rose-600 hover:bg-rose-100 dark:bg-rose-500/10 dark:text-rose-400"
+                  className="mt-3 rounded-xl bg-rose-500/10 px-3 py-1.5 text-xs text-rose-600 hover:bg-rose-500/15 dark:text-rose-400 transition-colors"
                 >
                   重新尝试
                 </button>
               </div>
             ) : !data || data.orders.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 text-slate-400">
-                <ShoppingBag size={36} className="mb-2 text-slate-300 dark:text-slate-600" />
-                <span className="text-sm font-medium text-slate-600 dark:text-slate-300">暂未查找到该真实尾号的历史订单</span>
-                <span className="mt-1 text-xs text-slate-400">该顾客可能仅有一笔当前订单或使用不同号码下单</span>
+              <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+                <ShoppingBag size={36} className="mb-2 text-muted-foreground/40" />
+                <span className="text-sm font-medium text-foreground">本店暂无该真实尾号的历史订单</span>
+                <span className="mt-1 text-xs text-muted-foreground">该顾客可能首次在本店下单或使用不同号码下单</span>
               </div>
             ) : (
-              data.orders.map((order, index) => {
+              data.orders.map((order) => {
                 const isCancelled = order.statusDisplay === "已取消" || order.status?.includes("取消");
                 const isDelivering = order.statusDisplay === "配送中";
                 const isCompleted = order.statusDisplay === "已完成";
@@ -277,19 +277,19 @@ export function CustomerHistoryModal({
                   <div
                     key={order.id}
                     className={cn(
-                      "relative rounded-xl border p-3.5 transition-all text-left",
+                      "relative rounded-2xl border p-3.5 sm:p-4 transition-all text-left shadow-xs",
                       order.isCurrentOrder
-                        ? "border-primary/40 bg-primary/[0.03] shadow-sm dark:border-primary/30 dark:bg-primary/[0.02]"
-                        : "border-slate-200/70 bg-white hover:border-slate-300 dark:border-white/8 dark:bg-[#181d26] dark:hover:border-white/15"
+                        ? "border-primary/40 bg-primary/[0.03] dark:border-primary/30 dark:bg-primary/[0.02]"
+                        : "border-border/60 bg-card/60 hover:border-border/90 hover:bg-muted/15"
                     )}
                   >
                     {/* 顶部：平台、订单号、时间、状态 */}
-                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2.5 dark:border-white/5">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/40 pb-2.5">
                       <div className="flex items-center gap-2">
-                        <span className="inline-flex items-center rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-700 dark:bg-white/10 dark:text-slate-200">
+                        <span className="inline-flex items-center rounded-lg bg-muted px-2 py-0.5 text-[10.5px] font-semibold text-foreground">
                           {order.platform}
                         </span>
-                        <span className="font-mono text-xs font-medium text-slate-600 dark:text-slate-300">
+                        <span className="font-mono text-xs font-medium text-foreground/85">
                           #{order.orderNo}
                         </span>
                         {order.isCurrentOrder && (
@@ -300,20 +300,20 @@ export function CustomerHistoryModal({
                       </div>
 
                       <div className="flex items-center gap-2">
-                        <span className="flex items-center gap-1 text-[11px] text-slate-400">
+                        <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
                           <Clock size={11} />
                           {formatLocalDateTime(order.orderTime)}
                         </span>
                         <span
                           className={cn(
-                            "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium",
+                            "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium border",
                             isCancelled
-                              ? "bg-rose-500/10 text-rose-600 dark:text-rose-400"
+                              ? "border-rose-500/20 bg-rose-500/10 text-rose-600 dark:text-rose-400"
                               : isDelivering
-                              ? "bg-sky-500/10 text-sky-600 dark:text-sky-400"
+                              ? "border-sky-500/20 bg-sky-500/10 text-sky-600 dark:text-sky-400"
                               : isCompleted
-                              ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                              : "bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-300"
+                              ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                              : "border-border/50 bg-muted text-muted-foreground"
                           )}
                         >
                           {isCancelled ? <XCircle size={11} /> : isCompleted ? <CheckCircle2 size={11} /> : isDelivering ? <Truck size={11} /> : null}
@@ -326,29 +326,29 @@ export function CustomerHistoryModal({
                     <div className="py-2.5 space-y-2">
                       {order.items.map((item, itemIdx) => (
                         <div key={item.id || itemIdx} className="flex items-center justify-between gap-3 text-xs">
-                          <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <div className="flex items-center gap-2.5 min-w-0 flex-1">
                             {item.imageUrl ? (
-                              <div className="relative h-8 w-8 shrink-0 overflow-hidden rounded-md border border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-white/5">
+                              <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-xl border border-border/50 bg-muted/30">
                                 <Image
                                   src={item.imageUrl}
                                   alt={item.productName}
                                   fill
-                                  sizes="32px"
+                                  sizes="36px"
                                   className="object-cover"
                                   unoptimized
                                 />
                               </div>
                             ) : (
-                              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-slate-100 bg-slate-50 text-slate-400 dark:border-white/5 dark:bg-white/5">
-                                <ShoppingBag size={14} />
+                              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-border/50 bg-muted/30 text-muted-foreground">
+                                <ShoppingBag size={15} />
                               </div>
                             )}
                             <div className="min-w-0 flex-1">
-                              <p className="truncate font-medium text-slate-800 dark:text-slate-200" title={item.productName}>
+                              <p className="truncate font-medium text-foreground" title={item.productName}>
                                 {item.productName}
                               </p>
                               {item.spec && (
-                                <p className="truncate text-[10.5px] text-slate-400">
+                                <p className="truncate text-[10.5px] text-muted-foreground">
                                   规格: {item.spec}
                                 </p>
                               )}
@@ -356,11 +356,11 @@ export function CustomerHistoryModal({
                           </div>
 
                           <div className="flex items-center gap-2.5 shrink-0">
-                            <span className="font-mono text-slate-500 dark:text-slate-400">
+                            <span className="font-mono text-muted-foreground">
                               x{item.quantity}
                             </span>
                             {item.price && (
-                              <span className="font-mono font-medium text-slate-700 dark:text-slate-200">
+                              <span className="font-mono font-medium text-foreground">
                                 ¥{item.price}
                               </span>
                             )}
@@ -370,17 +370,17 @@ export function CustomerHistoryModal({
                     </div>
 
                     {/* 底部：实付金额与收货地址 */}
-                    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-2 text-xs dark:border-white/5">
-                      <div className="flex items-center gap-1.5 text-slate-500 max-w-[70%] truncate">
-                        <MapPin size={12} className="shrink-0 text-slate-400" />
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/40 pt-2 text-xs">
+                      <div className="flex items-center gap-1.5 text-muted-foreground max-w-[70%] truncate">
+                        <MapPin size={12} className="shrink-0" />
                         <span className="truncate" title={order.userAddress}>
                           {order.userAddress || "无需配送/地址未提供"}
                         </span>
                       </div>
 
                       <div className="flex items-center gap-1">
-                        <span className="text-slate-400 text-[11px]">实付:</span>
-                        <span className="font-bold font-mono text-sm text-slate-900 dark:text-white">
+                        <span className="text-muted-foreground text-[11px]">实付:</span>
+                        <span className="font-bold font-mono text-sm text-foreground">
                           ¥{order.actualPaidYuan}
                         </span>
                       </div>
@@ -388,7 +388,7 @@ export function CustomerHistoryModal({
 
                     {/* 顾客备注 */}
                     {order.customerRemark && (
-                      <div className="mt-1.5 flex items-start gap-1 rounded bg-amber-500/5 px-2 py-1 text-[11px] text-amber-700 dark:text-amber-400">
+                      <div className="mt-1.5 flex items-start gap-1.5 rounded-xl border border-amber-500/15 bg-amber-500/8 px-2.5 py-1.5 text-[11px] text-amber-700 dark:text-amber-400">
                         <FileText size={11} className="mt-0.5 shrink-0" />
                         <span className="line-clamp-1">备注: {order.customerRemark}</span>
                       </div>
@@ -400,12 +400,12 @@ export function CustomerHistoryModal({
           </div>
 
           {/* 底部 Footer */}
-          <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/50 px-5 py-3 text-xs text-slate-400 dark:border-white/5 dark:bg-white/[0.01]">
-            <span>* 仅基于脱敏真实手机号末4位（如 155****1737 的 1737）精确聚合</span>
+          <div className="flex items-center justify-between border-t border-border/50 bg-muted/10 px-5 py-3 text-xs text-muted-foreground shrink-0">
+            <span>* 仅限本店全部历史订单，基于脱敏真实手机号末4位精确聚合</span>
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg bg-slate-200/80 px-4 py-1.5 font-medium text-slate-700 hover:bg-slate-300 dark:bg-white/10 dark:text-slate-200 dark:hover:bg-white/15"
+              className="h-8.5 inline-flex items-center justify-center rounded-xl border border-border/70 bg-background px-4 text-xs font-medium text-foreground hover:bg-muted transition-colors"
             >
               关闭
             </button>
