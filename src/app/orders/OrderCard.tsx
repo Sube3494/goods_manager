@@ -43,6 +43,8 @@ import {
 import { formatLocalDate, formatLocalDateTime } from "@/lib/dateUtils";
 
 const OrderRouteModal = dynamic(() => import("@/components/Orders/OrderRouteModal").then((module) => module.OrderRouteModal), { ssr: false });
+const CustomerHistoryModal = dynamic(() => import("@/components/Orders/CustomerHistoryModal").then((module) => module.CustomerHistoryModal), { ssr: false });
+import { extractCustomerPhoneTail } from "@/lib/customerPhoneTail";
 import { CourierPhotosViewer } from "@/components/Orders/CourierPhotosViewer";
 
 export function createDefaultSelfDeliveryTiming() {
@@ -2273,6 +2275,7 @@ export const OrderCard = memo(function OrderCard({
   const [editCommissionValue, setEditCommissionValue] = useState("");
   const [isSavingCommission, setIsSavingCommission] = useState(false);
   const [isShopEditorOpen, setIsShopEditorOpen] = useState(false);
+  const [historyModalOpen, setHistoryModalOpen] = useState(false);
   const { showToast } = useToast();
   const profitTooltipHoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -2535,6 +2538,42 @@ export const OrderCard = memo(function OrderCard({
       ? "老客"
       : "-";
   const showCustomerTypeBadge = customerTypeText !== "-";
+  const customerPhoneTail = extractCustomerPhoneTail(order);
+  const renderCustomerTypeBadge = (extraClassName?: string) => {
+    if (!showCustomerTypeBadge) return null;
+    const isReturning = resolvedCustomerType === "returning" && Boolean(customerPhoneTail);
+    if (isReturning) {
+      return (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setHistoryModalOpen(true);
+          }}
+          title={`点击查看此老客历史订单（真实尾号: ${customerPhoneTail}）`}
+          className={cn(
+            "inline-flex h-[15px] shrink-0 cursor-pointer items-center justify-center rounded-full border border-slate-400/20 bg-slate-500/8 px-1 text-[9.5px] font-medium leading-none text-slate-500 hover:bg-slate-500/15 hover:border-slate-400/30 dark:text-slate-300 dark:hover:bg-slate-500/20",
+            extraClassName
+          )}
+        >
+          老客
+        </button>
+      );
+    }
+    return (
+      <span
+        className={cn(
+          "inline-flex h-[15px] shrink-0 items-center justify-center rounded-full border px-1 text-[9.5px] font-medium leading-none",
+          resolvedCustomerType === "new"
+            ? "border-orange-500/25 bg-orange-500/10 text-orange-600 dark:text-orange-400"
+            : "border-slate-400/20 bg-slate-500/8 text-slate-500 dark:text-slate-300",
+          extraClassName
+        )}
+      >
+        {customerTypeText}
+      </span>
+    );
+  };
   const logisticPlatform = getDisplayText(order.delivery?.logisticName || "第三方平台");
   const riderName = getDisplayText(order.delivery?.riderName);
   const riderPhone = getDisplayText(order.delivery?.riderPhone);
@@ -2677,6 +2716,15 @@ export const OrderCard = memo(function OrderCard({
   return (
     <>
       {routeOpen && <OrderRouteModal order={order} onClose={() => setRouteOpen(false)} />}
+      {historyModalOpen && customerPhoneTail ? (
+        <CustomerHistoryModal
+          isOpen={historyModalOpen}
+          onClose={() => setHistoryModalOpen(false)}
+          phoneTail={customerPhoneTail}
+          currentOrderNo={order.orderNo}
+          maskedPhone={customerMaskedPhone !== "-" ? customerMaskedPhone : undefined}
+        />
+      ) : null}
       <article className="overflow-visible rounded-[26px] border border-black/8 bg-white/78 shadow-xs transition-all hover:border-black/12 dark:border-white/10 dark:bg-white/4 sm:rounded-[30px]">
         <div className="border-b border-black/6 px-3.5 py-3.5 dark:border-white/6 sm:px-5 sm:py-4">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between sm:gap-4">
@@ -3152,16 +3200,7 @@ export const OrderCard = memo(function OrderCard({
                       <MapPin size={13} className="shrink-0 text-slate-400 dark:text-zinc-500" />
                       <span className="truncate shrink-0">{pickup ? "-" : (order.distanceKm != null ? formatDistanceKm(order.distanceKm) : "距离待同步")}</span>
                     </button>
-                    {showCustomerTypeBadge ? (
-                      <span className={cn(
-                        "inline-flex h-[15px] shrink-0 items-center justify-center rounded-full border px-1 text-[9.5px] font-medium leading-none",
-                        resolvedCustomerType === "new"
-                          ? "border-orange-500/25 bg-orange-500/10 text-orange-600 dark:text-orange-400"
-                          : "border-slate-400/20 bg-slate-500/8 text-slate-500 dark:text-slate-300"
-                      )}>
-                        {customerTypeText}
-                      </span>
-                    ) : null}
+                    {renderCustomerTypeBadge()}
                     {!pickup && order.userAddress ? (
                       <>
                         <span className="mx-1 text-slate-300 dark:text-zinc-700 font-normal shrink-0">·</span>
@@ -3196,16 +3235,7 @@ export const OrderCard = memo(function OrderCard({
                           <MapPin size={12} className="shrink-0 text-slate-400 dark:text-zinc-500" />
                           <span>{order.distanceKm != null ? formatDistanceKm(order.distanceKm) : "距离待同步"}</span>
                         </button>
-                        {showCustomerTypeBadge ? (
-                          <span className={cn(
-                            "inline-flex h-[15px] items-center justify-center rounded-full border px-1 text-[9.5px] font-medium leading-none",
-                            resolvedCustomerType === "new"
-                              ? "border-orange-500/25 bg-orange-500/10 text-orange-600 dark:text-orange-400"
-                              : "border-slate-400/20 bg-slate-500/8 text-slate-500 dark:text-slate-300"
-                          )}>
-                            {customerTypeText}
-                          </span>
-                        ) : null}
+                        {renderCustomerTypeBadge()}
                       </div>
                     </div>
                     
@@ -3573,16 +3603,7 @@ export const OrderCard = memo(function OrderCard({
                   <DetailStat
                     label="顾客电话"
                     value={customerMaskedPhone}
-                    labelAccessory={showCustomerTypeBadge ? (
-                      <span className={cn(
-                        "inline-flex h-[15px] items-center justify-center rounded-full border px-1 text-[9.5px] font-medium leading-none align-middle ml-1.5",
-                        resolvedCustomerType === "new"
-                          ? "border-orange-500/25 bg-orange-500/10 text-orange-600 dark:text-orange-400"
-                          : "border-slate-400/20 bg-slate-500/8 text-slate-500 dark:text-slate-300"
-                      )}>
-                        {customerTypeText}
-                      </span>
-                    ) : null}
+                    labelAccessory={renderCustomerTypeBadge("align-middle ml-1.5")}
                     valueClassName="break-all text-[13px] sm:text-sm"
                   />
                   <DetailStat
