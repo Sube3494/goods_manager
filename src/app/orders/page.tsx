@@ -2144,6 +2144,13 @@ export default function OrdersPage() {
     setRefreshTrigger((prev) => prev + 1);
   }, []);
 
+  const [targetRefreshOrder, setTargetRefreshOrder] = useState<{ id: string; timestamp: number } | null>(null);
+
+  const triggerSingleOrderRefresh = useCallback((orderId: string) => {
+    if (!orderId) return;
+    setTargetRefreshOrder({ id: orderId, timestamp: Date.now() });
+  }, []);
+
   const markProfitUpdating = useCallback((orderId: string) => {
     if (!orderId) return;
     setProfitUpdatingOrderIds((current) => (
@@ -2880,6 +2887,7 @@ export default function OrdersPage() {
         const outboundPayload = await outboundResponse.json().catch(() => ({}));
 
         if (!outboundResponse.ok) {
+          clearProfitUpdating(sourceOrderId);
           const outboundMessage = getOrderActionErrorMessage(
             outboundPayload?.error || outboundPayload?.message || "自动出库失败"
           );
@@ -2888,15 +2896,23 @@ export default function OrdersPage() {
           triggerParentRefresh();
           return;
         }
-      } finally {
+
+        showToast("采购单已创建入库，并已自动出库", "success");
+        setPurchaseDraft(null);
+        triggerSingleOrderRefresh(sourceOrderId);
+        return;
+      } catch {
         clearProfitUpdating(sourceOrderId);
+        setPurchaseDraft(null);
+        triggerParentRefresh();
+        return;
       }
     }
 
-    showToast(sourceOrderId ? "采购单已创建入库，并已自动出库" : "采购单已创建并入库", "success");
+    showToast("采购单已创建并入库", "success");
     setPurchaseDraft(null);
     triggerParentRefresh();
-  }, [clearProfitUpdating, markProfitUpdating, showToast, triggerParentRefresh]);
+  }, [clearProfitUpdating, markProfitUpdating, showToast, triggerParentRefresh, triggerSingleOrderRefresh]);
 
   return (
     <div className="relative px-2 sm:px-1">
@@ -3642,6 +3658,8 @@ export default function OrdersPage() {
         <div className={activeTab === "today" ? "block" : "hidden"}>
           <TodayOrdersView
             refreshTrigger={refreshTrigger}
+            targetRefreshOrder={targetRefreshOrder}
+            onClearProfitUpdating={clearProfitUpdating}
             onOpenCostBackfill={setBackfillTarget}
             onOpenMatchEditor={openMatchEditor}
             onOpenPurchaseDraft={setPurchaseDraft}
@@ -3656,6 +3674,8 @@ export default function OrdersPage() {
           <div className={activeTab === "all" ? "block" : "hidden"}>
             <AllOrdersView
               refreshTrigger={refreshTrigger}
+              targetRefreshOrder={targetRefreshOrder}
+              onClearProfitUpdating={clearProfitUpdating}
               onOpenCostBackfill={setBackfillTarget}
               onOpenMatchEditor={openMatchEditor}
               onOpenPurchaseDraft={setPurchaseDraft}

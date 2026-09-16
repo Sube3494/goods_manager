@@ -98,6 +98,8 @@ function normalizeDisplayPlatform(platform?: string | null) {
 
 interface TodayOrdersViewProps {
   refreshTrigger: number;
+  targetRefreshOrder?: { id: string; timestamp: number } | null;
+  onClearProfitUpdating?: (orderId: string) => void;
   onOpenCostBackfill: (order: AutoPickOrder) => void;
   onOpenMatchEditor: (order: AutoPickOrder, item: AutoPickOrderItem, options?: { autoOutbound?: boolean }) => void;
   onOpenPurchaseDraft?: (draft: PurchaseDraftPayload) => void;
@@ -180,6 +182,8 @@ const defaultTodayOverview = {
 
 export function TodayOrdersView({
   refreshTrigger,
+  targetRefreshOrder,
+  onClearProfitUpdating,
   onOpenCostBackfill,
   onOpenMatchEditor,
   onDataLoad,
@@ -550,6 +554,68 @@ export function TodayOrdersView({
       showToast(error instanceof Error ? error.message : "读取订单详情失败", "error");
     }
   }, [orders, patchOrder, showToast]);
+
+  const refreshSingleOrder = useCallback(async (orderId: string) => {
+    try {
+      const response = await fetch(`/api/orders/${orderId}`, { cache: "no-store" });
+      const data = await response.json().catch(() => ({}));
+      if (response.ok && data?.order) {
+        patchOrder(orderId, (order) => ({
+          ...order,
+          ...data.order,
+          delivery: data.order.delivery ?? order.delivery,
+          detailLoaded: true,
+          detailLoading: false,
+        }));
+      }
+    } catch (error) {
+      console.error("Failed to refresh single order in TodayOrdersView:", error);
+    } finally {
+      onClearProfitUpdating?.(orderId);
+    }
+
+    // 后台静默刷新 summary 与 overview 指标，不替换 orders 列表 DOM
+    try {
+      const params = new URLSearchParams({
+        page: "1",
+        pageSize: "1",
+        startDate: todayDate,
+        endDate: todayDate,
+        _metrics: "1",
+      });
+      if (debouncedQuery.trim()) params.set("query", debouncedQuery.trim());
+      if (platform !== "all") params.set("platform", platform);
+      if (status !== "all") params.set("status", status);
+      if (shop !== "all") params.set("shop", shop);
+      if (userId) params.set("userId", userId);
+
+      const metricsRes = await fetch(`/api/orders?${params.toString()}`, { cache: "no-store" });
+      const metricsData = await metricsRes.json().catch(() => ({}));
+      if (metricsRes.ok) {
+        if (metricsData.summary) setSummary(metricsData.summary);
+        if (metricsData.overview) setOverview(metricsData.overview);
+        if (onDataLoadRef.current) {
+          onDataLoadRef.current({
+            summary: metricsData.summary || defaultTodaySummary,
+            overview: metricsData.overview || defaultTodayOverview,
+            total: typeof metricsData.total === "number" ? metricsData.total : (metricsData.meta?.total || 0),
+            eligibleBrushSyncOrders: [],
+            isLoading: false,
+          });
+        }
+      }
+    } catch {
+      // 忽略指标静默更新失败
+    }
+  }, [debouncedQuery, onClearProfitUpdating, patchOrder, platform, shop, status, todayDate, userId]);
+
+  const lastHandledRefreshRef = useRef<number>(0);
+  useEffect(() => {
+    if (targetRefreshOrder && targetRefreshOrder.timestamp > lastHandledRefreshRef.current) {
+      lastHandledRefreshRef.current = targetRefreshOrder.timestamp;
+      void refreshSingleOrder(targetRefreshOrder.id);
+    }
+  }, [targetRefreshOrder, refreshSingleOrder]);
 
   // 3. 卡片操作与事件回调
   const toggleExpanded = (orderId: string) => {
