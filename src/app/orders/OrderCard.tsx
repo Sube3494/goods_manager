@@ -810,14 +810,16 @@ function resolveCancelReasonFromDetails(cancelDetails: unknown) {
     .join("：");
 }
 
-function getCancelReason(order: Pick<AutoPickOrder, "cancelReason" | "rawPayload">) {
+function getCancelReason(order: Pick<AutoPickOrder, "cancelReason" | "rawPayload"> & { cancelDetails?: unknown }) {
   const direct = String(order.cancelReason || "").trim();
   if (direct) return direct;
-  const rawPayload = order.rawPayload && typeof order.rawPayload === "object" && !Array.isArray(order.rawPayload)
-    ? order.rawPayload as Record<string, unknown>
-    : null;
+  if (order.cancelDetails) {
+    const fromDetails = resolveCancelReasonFromDetails(order.cancelDetails);
+    if (fromDetails) return fromDetails;
+  }
+  const rawPayload = readRecord(order.rawPayload);
   if (!rawPayload) return "";
-  return String(rawPayload.cancelReason || rawPayload.cancel_reason || "").trim()
+  return String(rawPayload.cancelReason || rawPayload.cancel_reason || rawPayload.cancel_note || rawPayload.cancelNote || rawPayload.reject_reason || rawPayload.rejectReason || "").trim()
     || resolveCancelReasonFromDetails(rawPayload.cancelDetails || rawPayload.cancel_details);
 }
 
@@ -1366,10 +1368,11 @@ export function PromotionMetricCard({
 }
 
 
-export function StatusBadge({ order }: { order: Pick<AutoPickOrder, "isPickup" | "status" | "platform" | "isPickCompleted" | "cancelReason" | "rawPayload"> }) {
+export function StatusBadge({ order }: { order: Pick<AutoPickOrder, "isPickup" | "status" | "platform" | "isPickCompleted" | "cancelReason" | "rawPayload"> & { cancelDetails?: unknown } }) {
   const display = getDisplayStatus(order);
   const tone = getStatusTone(display);
-  const cancelReason = display === "已取消" ? getCancelReason(order) : "";
+  const isCancelled = display === "已取消" || isCancelledStatus(order.status);
+  const cancelReason = isCancelled ? getCancelReason(order) : "";
   return (
     <span className="group/status relative inline-flex">
       <span
@@ -1380,7 +1383,7 @@ export function StatusBadge({ order }: { order: Pick<AutoPickOrder, "isPickup" |
         {display}
       </span>
       {cancelReason ? (
-        <span className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 hidden w-[min(19rem,calc(100vw-2rem))] -translate-x-1/2 opacity-0 transition-all duration-200 group-hover/status:block group-hover/status:opacity-100">
+        <span className="pointer-events-none absolute bottom-full left-1/2 z-40 mb-2 w-72 max-w-[calc(100vw-2rem)] -translate-x-1/2 scale-95 opacity-0 transition-all duration-200 ease-out group-hover/status:pointer-events-auto group-hover/status:scale-100 group-hover/status:opacity-100">
           <span className="block rounded-xl border border-slate-200/90 bg-white/98 p-3 text-left shadow-[0_16px_40px_rgba(15,23,42,0.18)] dark:border-white/12 dark:bg-[#171b22]/96 dark:shadow-[0_18px_44px_rgba(0,0,0,0.38)]">
             <span className="absolute left-1/2 top-full h-2.5 w-2.5 -translate-x-1/2 -translate-y-1.5 rotate-45 border-r border-b border-slate-200/90 bg-white dark:border-white/12 dark:bg-[#171b22]" />
             <span className="flex items-center gap-2 border-b border-slate-200/80 pb-2 dark:border-white/8">

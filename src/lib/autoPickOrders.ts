@@ -2375,6 +2375,18 @@ async function fetchMaiyatianCancelDetailByCookie(cookie: string, orderId: strin
   return [];
 }
 
+export function readCancelReasonFromRawPayload(rawPayload: unknown): string | null {
+  if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) return null;
+  const record = rawPayload as Record<string, unknown>;
+  const direct = String(record.cancelReason || record.cancel_reason || "").trim();
+  if (direct) return direct;
+  return resolveMaiyatianCancelReason(
+    Array.isArray(record.cancelDetails || record.cancel_details)
+      ? (record.cancelDetails || record.cancel_details) as Array<Record<string, unknown>>
+      : null
+  ) || null;
+}
+
 function resolveMaiyatianCancelReason(cancelDetails: Array<Record<string, unknown>> | undefined | null) {
   if (!Array.isArray(cancelDetails) || cancelDetails.length === 0) return "";
   const effectiveCancel = [...cancelDetails]
@@ -2648,6 +2660,8 @@ async function enrichMaiyatianOrderByCookie(cookie: string, order: AutoPickInbou
     ...((order.rawPayload && typeof order.rawPayload === "object" && !Array.isArray(order.rawPayload))
       ? order.rawPayload as Record<string, unknown>
       : {}),
+    ...(Array.isArray(cancelDetails) && cancelDetails.length > 0 ? { cancelDetails } : {}),
+    ...(order.cancelReason ? { cancelReason: order.cancelReason } : {}),
   };
 
   return order;
@@ -4028,9 +4042,26 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
       ? normalized.rawPayload as Record<string, unknown>
       : normalized as unknown as Record<string, unknown>;
     const customerType = readCustomerTypeFromRawPayload(normalizedRawPayload) || null;
+    const existingRawRecord = existing?.rawPayload && typeof existing.rawPayload === "object" && !Array.isArray(existing.rawPayload)
+      ? existing.rawPayload as Record<string, unknown>
+      : null;
+    const nextCancelReason = normalized.cancelReason
+      || (normalizedRawPayload.cancelReason as string)
+      || (normalizedRawPayload.cancel_reason as string)
+      || (existingRawRecord ? readCancelReasonFromRawPayload(existingRawRecord) : null)
+      || undefined;
+    const nextCancelDetails = normalized.cancelDetails
+      || normalizedRawPayload.cancelDetails
+      || normalizedRawPayload.cancel_details
+      || existingRawRecord?.cancelDetails
+      || existingRawRecord?.cancel_details
+      || undefined;
+
     const nextRawPayload = mergeAutoPickSystemMeta(
       {
         ...normalizedRawPayload,
+        cancelReason: nextCancelReason,
+        cancelDetails: nextCancelDetails,
         customerType,
       },
       existing?.rawPayload
@@ -4391,9 +4422,9 @@ export async function enrichAutoPickInboundOrderIfNeeded(
     }
 
     const currentStatusDisplay = getBaseAutoPickStatusDisplay(current.status);
+    const isCancelled = currentStatusDisplay === "已取消" || isAutoPickOrderCancelledStatus(current.status);
     const canEnrich =
       options?.force || (
-        currentStatusDisplay !== "已取消" &&
         currentStatusDisplay !== "已删除" &&
         currentStatusDisplay !== "同步中"
       );
@@ -4448,14 +4479,23 @@ export async function enrichAutoPickInboundOrderIfNeeded(
     const hasCurrentMeituanSkuId = hasMeituanOriginalSkuIdInItems(current.items as Array<Record<string, unknown>>);
     const hasExistingMeituanSkuId = hasMeituanOriginalSkuIdInItems(existing?.items);
 
+    const hasCancelReason = Boolean(
+      current.cancelReason
+      || readCancelReasonFromRawPayload(current.rawPayload)
+      || readCancelReasonFromRawPayload(existing?.rawPayload)
+    );
+
     const shouldEnrichOrderDetail =
       !existing
-      || !existing.customerRemark
-      || !hasCustomerName
-      || !hasEncryptedCustomerPhone
-      || !hasMaskedCustomerPhone
-      || (isAccepted && !hasRiderPhone)
-      || (isMeituanOrder && !hasCurrentMeituanSkuId && !hasExistingMeituanSkuId);
+      || (isCancelled && !hasCancelReason)
+      || (!isCancelled && (
+        !existing.customerRemark
+        || !hasCustomerName
+        || !hasEncryptedCustomerPhone
+        || !hasMaskedCustomerPhone
+        || (isAccepted && !hasRiderPhone)
+        || (isMeituanOrder && !hasCurrentMeituanSkuId && !hasExistingMeituanSkuId)
+      ));
 
     if (shouldEnrichOrderDetail) {
       console.log(`[AutoEnrich] Synchronously enriching order ${current.orderNo} (status: ${current.status})`);

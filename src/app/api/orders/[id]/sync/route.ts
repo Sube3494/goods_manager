@@ -11,6 +11,7 @@ import {
   readCustomerPhoneExtensionFromRawPayload,
   readCustomerPhoneFromRawPayload,
   readCustomerTypeFromRawPayload,
+  readCancelReasonFromRawPayload,
   readRiderPhoneFromDelivery,
   readRiderPhoneFromRawPayload,
   readShopNameFromRawPayload,
@@ -248,6 +249,7 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
         customerMaskedPhone: readCustomerMaskedPhoneFromRawPayload(refreshedOrder.rawPayload),
         customerPhoneExtension: readCustomerPhoneExtensionFromRawPayload(refreshedOrder.rawPayload),
         customerType,
+        cancelReason: readCancelReasonFromRawPayload(refreshedOrder.rawPayload) || normalized?.cancelReason || null,
         delivery: syncedDelivery,
       };
 
