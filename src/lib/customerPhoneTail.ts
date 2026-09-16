@@ -1,14 +1,76 @@
-import { readCustomerMaskedPhoneFromRawPayload } from "@/lib/autoPickOrders";
-
 /**
- * 从订单及其原始报文中提取顾客脱敏真实手机号中的 4 位真实尾号
- * 例如从 "182****1789" 中提取 "1789"
- * 
- * 严格规则：
- * 1. 虚拟隐私号（例如 "15534074635_3686"）带有下划线分机号，3686 为临时分机号，绝非真实尾号，必须排除。
- * 2. 真实尾号只从脱敏手机号（如 182****1789、手机尾号1789）中提取末尾 4 位数字。
+ * 顾客真实脱敏手机号与 4 位尾号纯工具库
+ * 必须保持 100% 零服务端/零 Node.js 依赖，确保在 Next.js Client Component 中安全打包
  */
 
+function readTrimmedCandidateValue(candidates: unknown[]): string | null {
+  for (const candidate of candidates) {
+    const value = String(candidate || "").trim();
+    if (value && value !== "-" && value !== "undefined" && value !== "null") {
+      return value;
+    }
+  }
+  return null;
+}
+
+/**
+ * 深度解析 rawPayload 获取顾客脱敏手机号（如 182****1789）
+ * 穿透 root / userInfo / extend / order / data 等各层级
+ */
+function readDeepCustomerMaskedPhone(rawPayload: unknown): string | null {
+  if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
+    return null;
+  }
+
+  const root = rawPayload as Record<string, unknown>;
+  const userInfo = root.userInfo && typeof root.userInfo === "object" && !Array.isArray(root.userInfo)
+    ? root.userInfo as Record<string, unknown>
+    : null;
+
+  const directValue = readTrimmedCandidateValue([
+    root.customerMaskedPhone,
+    root.secret_phone,
+    root.secretPhone,
+    userInfo?.secret_phone,
+    userInfo?.secretPhone,
+    userInfo?.customerMaskedPhone,
+  ]);
+  if (directValue) {
+    return directValue;
+  }
+
+  const nestedCandidates = [
+    root.data,
+    root.extend,
+    root.order,
+    root.orderInfo,
+    root.order_info,
+    root.extra,
+    root.payload,
+  ];
+
+  for (const candidate of nestedCandidates) {
+    if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
+      continue;
+    }
+    const nested = candidate as Record<string, unknown>;
+    const nestedValue = readTrimmedCandidateValue([
+      nested.customerMaskedPhone,
+      nested.secret_phone,
+      nested.secretPhone,
+    ]);
+    if (nestedValue) {
+      return nestedValue;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * 从订单或其原始报文中提取脱敏真实手机号末尾的 4 位纯数字尾号
+ * 例如从 "182****1789" 中提取 "1789"
+ */
 export function extractCustomerPhoneTail(source: unknown): string | null {
   if (!source) return null;
 
@@ -25,7 +87,7 @@ export function extractCustomerPhoneTail(source: unknown): string | null {
     }
   }
 
-  // 1. 优先使用传入的已解析 directMaskedPhone
+  // 1. 优先使用已存在的直接脱敏号码
   if (directMaskedPhone && !directMaskedPhone.includes("_") && !directMaskedPhone.includes("#")) {
     const match = directMaskedPhone.match(/(\d{4})$/);
     if (match && match[1]) {
@@ -33,38 +95,12 @@ export function extractCustomerPhoneTail(source: unknown): string | null {
     }
   }
 
-  // 2. 深度利用系统全面的 readCustomerMaskedPhoneFromRawPayload（穿透 root / data / extend / order / orderInfo 等）
-  const systemMaskedPhone = readCustomerMaskedPhoneFromRawPayload(rawPayload);
-  if (systemMaskedPhone) {
-    const trimmed = systemMaskedPhone.trim();
-    if (!trimmed.includes("_") && !trimmed.includes("#")) {
-      const match = trimmed.match(/(\d{4})$/);
-      if (match && match[1]) {
-        return match[1];
-      }
-    }
-  }
-
-  // 3. 兜底扫描 rawPayload 内部对象
-  if (rawPayload && typeof rawPayload === "object" && !Array.isArray(rawPayload)) {
-    const root = rawPayload as Record<string, unknown>;
-    const userInfo = (root.userInfo && typeof root.userInfo === "object") ? root.userInfo as Record<string, unknown> : null;
-    const candidates = [
-      root.secret_phone,
-      root.secretPhone,
-      root.customerMaskedPhone,
-      userInfo?.secret_phone,
-      userInfo?.secretPhone,
-    ];
-
-    for (const c of candidates) {
-      if (typeof c !== "string") continue;
-      const trimmed = c.trim();
-      if (!trimmed || trimmed.includes("_") || trimmed.includes("#")) continue;
-      const match = trimmed.match(/(\d{4})$/);
-      if (match && match[1]) {
-        return match[1];
-      }
+  // 2. 深度穿透解析 rawPayload
+  const deepMasked = readDeepCustomerMaskedPhone(rawPayload);
+  if (deepMasked && !deepMasked.includes("_") && !deepMasked.includes("#")) {
+    const match = deepMasked.match(/(\d{4})$/);
+    if (match && match[1]) {
+      return match[1];
     }
   }
 
@@ -94,9 +130,9 @@ export function getCustomerMaskedPhoneDisplay(source: unknown): string | null {
     return directMaskedPhone;
   }
 
-  const systemMasked = readCustomerMaskedPhoneFromRawPayload(rawPayload);
-  if (systemMasked && !systemMasked.includes("_") && !systemMasked.includes("#") && /\d{4}$/.test(systemMasked)) {
-    return systemMasked;
+  const deepMasked = readDeepCustomerMaskedPhone(rawPayload);
+  if (deepMasked && !deepMasked.includes("_") && !deepMasked.includes("#") && /\d{4}$/.test(deepMasked)) {
+    return deepMasked;
   }
 
   return null;
