@@ -7,7 +7,6 @@ import {
   X,
   History,
   Phone,
-  Search,
   ShoppingBag,
   Clock,
   MapPin,
@@ -78,7 +77,6 @@ export function CustomerHistoryModal({
   maskedPhone: initialMaskedPhone,
 }: CustomerHistoryModalProps) {
   const [phoneTail, setPhoneTail] = useState(initialPhoneTail);
-  const [inputTail, setInputTail] = useState(initialPhoneTail);
   const [data, setData] = useState<CustomerHistoryData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -86,7 +84,6 @@ export function CustomerHistoryModal({
   useEffect(() => {
     if (isOpen) {
       setPhoneTail(initialPhoneTail);
-      setInputTail(initialPhoneTail);
     }
   }, [isOpen, initialPhoneTail]);
 
@@ -134,16 +131,6 @@ export function CustomerHistoryModal({
       document.body.style.overflow = originalOverflow;
     };
   }, [isOpen, onClose]);
-
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    const clean = inputTail.trim();
-    if (/^\d{4}$/.test(clean)) {
-      setPhoneTail(clean);
-    } else {
-      setError("请输入4位纯数字手机尾号");
-    }
-  };
 
   if (typeof window === "undefined" || !isOpen) return null;
 
@@ -198,34 +185,14 @@ export function CustomerHistoryModal({
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              {/* 尾号快捷搜索框 */}
-              <form onSubmit={handleSearch} className="hidden sm:flex items-center gap-1.5">
-                <input
-                  type="text"
-                  maxLength={4}
-                  value={inputTail}
-                  onChange={(e) => setInputTail(e.target.value.replace(/\D/g, ""))}
-                  placeholder="尾号4位"
-                  className="h-8 w-24 rounded-xl border border-border/70 bg-background/80 px-2.5 text-xs font-mono text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
-                />
-                <button
-                  type="submit"
-                  title="按尾号搜索"
-                  className="inline-flex h-8 items-center justify-center rounded-xl border border-border/70 bg-background/80 px-2.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                >
-                  <Search size={13} />
-                </button>
-              </form>
-
-              <button
-                type="button"
-                onClick={onClose}
-                className="rounded-full p-2 text-muted-foreground hover:bg-black/5 dark:hover:bg-white/10 hover:text-foreground transition-all active:scale-90"
-              >
-                <X size={18} />
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              title="关闭 (Esc)"
+              className="rounded-full p-2 text-muted-foreground hover:bg-black/5 dark:hover:bg-white/10 hover:text-foreground transition-all active:scale-90"
+            >
+              <X size={18} />
+            </button>
           </div>
 
           {/* 统计概览条 */}
