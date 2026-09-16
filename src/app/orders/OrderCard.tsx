@@ -2723,6 +2723,7 @@ export const OrderCard = memo(function OrderCard({
           phoneTail={customerPhoneTail}
           currentOrderNo={order.orderNo}
           shopId={order.shopId || undefined}
+          shopName={order.matchedShopName || undefined}
           maskedPhone={customerMaskedPhone !== "-" ? customerMaskedPhone : undefined}
         />
       ) : null}

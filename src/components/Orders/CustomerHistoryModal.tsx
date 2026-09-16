@@ -64,6 +64,7 @@ interface CustomerHistoryModalProps {
   phoneTail: string;
   currentOrderNo?: string;
   shopId?: string;
+  shopName?: string;
   maskedPhone?: string | null;
 }
 
@@ -73,6 +74,7 @@ export function CustomerHistoryModal({
   phoneTail: initialPhoneTail,
   currentOrderNo,
   shopId,
+  shopName,
   maskedPhone: initialMaskedPhone,
 }: CustomerHistoryModalProps) {
   const [phoneTail, setPhoneTail] = useState(initialPhoneTail);
@@ -97,6 +99,7 @@ export function CustomerHistoryModal({
         phoneTail: tail,
         ...(currentOrderNo ? { currentOrderNo } : {}),
         ...(shopId ? { shopId } : {}),
+        ...(shopName ? { shopName } : {}),
       });
       const res = await fetch(`/api/orders/customer-history?${query.toString()}`);
       const json = await res.json();
@@ -109,7 +112,7 @@ export function CustomerHistoryModal({
     } finally {
       setLoading(false);
     }
-  }, [currentOrderNo, shopId]);
+  }, [currentOrderNo, shopId, shopName]);
 
   useEffect(() => {
     if (isOpen && phoneTail) {

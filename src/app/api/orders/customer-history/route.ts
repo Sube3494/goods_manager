@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
 import { extractCustomerPhoneTail, getCustomerMaskedPhoneDisplay } from "@/lib/customerPhoneTail";
 import { getBaseAutoPickStatusDisplay } from "@/lib/autoPickOrderStatus";
+import { resolveAutoPickMatchedShopName } from "@/lib/autoPickOrders";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +16,7 @@ export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const rawTail = String(searchParams.get("phoneTail") || "").trim();
   const currentOrderNo = String(searchParams.get("currentOrderNo") || "").trim();
+  const rawShopName = String(searchParams.get("shopName") || "").trim();
   const rawShopId = String(searchParams.get("shopId") || "").trim();
 
   // 必须只搜索尾号（4位数字）
@@ -25,26 +27,32 @@ export async function GET(request: NextRequest) {
   const phoneTail = tailMatch[1];
 
   try {
-    // 若未直接传入 shopId 但提供了当前订单号，先查询当前订单获取其 shopId
-    let effectiveShopId = rawShopId || null;
-    if (!effectiveShopId && currentOrderNo) {
+    // 获取当前商户用户的权限配置（用于精准匹配门店名称）
+    const userRecord = await prisma.user.findUnique({
+      where: { id: session.id },
+      select: { permissions: true },
+    });
+    const userPermissions = userRecord?.permissions;
+
+    // 若未直接传入 shopName 但提供了当前订单号，先查询当前订单获取其门店名称
+    let targetShopName = rawShopName || null;
+    if (!targetShopName && currentOrderNo) {
       const currentOrder = await prisma.autoPickOrder.findFirst({
         where: {
           orderNo: currentOrderNo,
           userId: session.id,
         },
-        select: { shopId: true },
+        select: { shopId: true, rawPayload: true },
       });
-      if (currentOrder?.shopId) {
-        effectiveShopId = currentOrder.shopId;
+      if (currentOrder) {
+        targetShopName = resolveAutoPickMatchedShopName(currentOrder, userPermissions) || null;
       }
     }
 
-    // 严格限定在当前账号、当前店铺的所有订单（绝不跨账号、绝不跨店铺）
+    // 严格限定在当前用户账号（绝不跨商户账号），读取所有历史订单
     const allOrders = await prisma.autoPickOrder.findMany({
       where: {
         userId: session.id,
-        ...(effectiveShopId ? { shopId: effectiveShopId } : {}),
       },
       include: {
         items: true,
@@ -54,10 +62,29 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    // 严格按真实尾号过滤
+    // 过滤同门店与同真实尾号
     const matchedOrders = allOrders.filter((order) => {
+      // 1. 真实尾号严格匹配
       const tail = extractCustomerPhoneTail(order);
-      return tail === phoneTail;
+      if (tail !== phoneTail) {
+        return false;
+      }
+
+      // 2. 门店归属过滤（同商户同门店）：
+      // 如果指定了门店名称（例如“南山店”），判定候选订单是否也属于该门店
+      if (targetShopName && targetShopName !== "未绑定店铺" && targetShopName !== "未绑定门店") {
+        const orderShopName = resolveAutoPickMatchedShopName(order, userPermissions);
+        // 如果候选订单有匹配的门店名称，要求与目标门店一致
+        if (orderShopName && orderShopName !== targetShopName) {
+          // 容错：如果两者的 shopId 一致，仍视为同店
+          const isSameShopId = rawShopId && order.shopId && rawShopId === order.shopId;
+          if (!isSameShopId) {
+            return false;
+          }
+        }
+      }
+
+      return true;
     });
 
     // 统计数据
