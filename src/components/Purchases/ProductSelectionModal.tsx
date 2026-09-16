@@ -160,7 +160,7 @@ export function ProductSelectionModal({
   const queryRef = useRef(query);
   queryRef.current = query;
   const [searchQuery, setSearchQuery] = useState(initialSearchQuery || "");
-  const debouncedSearch = useDebounce(searchQuery, 500);
+  const debouncedSearch = useDebounce(searchQuery, searchQuery ? 300 : 0);
 
   useEffect(() => {
     if (initialSearchQuery !== undefined) {
@@ -280,6 +280,13 @@ export function ProductSelectionModal({
   }, []);
 
 
+  const externalSignature = useMemo(() => {
+    if (!Array.isArray(selectedIds)) return "";
+    return selectedIds.map((id) => String(id).trim()).filter(Boolean).sort().join("+");
+  }, [selectedIds]);
+
+  const lastExternalSignatureRef = useRef<string | null>(null);
+
   // 初始化重置逻辑
   useEffect(() => {
     if (isOpen) {
@@ -299,6 +306,9 @@ export function ProductSelectionModal({
       setIsSearching(false);
       resultsVersion.current += 1;
       lastLoadedSignatureRef.current = "";
+      lastExternalSignatureRef.current = Array.isArray(selectedIds)
+        ? selectedIds.map((id) => String(id).trim()).filter(Boolean).sort().join("+")
+        : "";
 
       // singleSelect 模式（如"修改商品匹配"）下，已选商品应以勾选态显示而非被过滤掉
       setShowUnselectedOnly(!disableAlreadySelected ? false : !singleSelect);
@@ -310,6 +320,7 @@ export function ProductSelectionModal({
     } else {
       setIsInitialized(false);
       setShowInitialSkeleton(false);
+      lastExternalSignatureRef.current = null;
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]); 
@@ -318,19 +329,43 @@ export function ProductSelectionModal({
     setLocalVisibleCount(50);
   }, [debouncedSearch, selectedCategoryName, showUnselectedOnly]);
 
-  // 当外部 selectedIds 变化（例如在弹窗内切换了正在匹配的订单项）时，同步更新内部选中的 tempSelectedIds 与 selectedProducts
+  // 当外部 selectedIds 真正发生变化（例如在弹窗内切换了正在匹配的订单项）时，才同步更新内部选中的 tempSelectedIds 与 selectedProducts
   useEffect(() => {
     if (!isOpen) return;
-    if (!disableAlreadySelected && Array.isArray(selectedIds)) {
-      setTempSelectedIds(selectedIds);
-      if (selectedIds.length === 0) {
-        setSelectedProducts([]);
-      } else if (products.length > 0) {
-        const matchingProducts = products.filter((p) => selectedIds.includes(getSelectionKey(p)));
-        setSelectedProducts(matchingProducts);
+    if (lastExternalSignatureRef.current === null) {
+      lastExternalSignatureRef.current = externalSignature;
+      return;
+    }
+    // 只有当外部选中的商品 ID 组合真正发生变动时才重置内部选择（避免父组件重渲染导致临时选择被冲掉）
+    if (lastExternalSignatureRef.current !== externalSignature) {
+      lastExternalSignatureRef.current = externalSignature;
+      if (!disableAlreadySelected && Array.isArray(selectedIds)) {
+        setTempSelectedIds(selectedIds);
+        if (selectedIds.length === 0) {
+          setSelectedProducts([]);
+        } else {
+          const matchingProducts = products.filter((p) => selectedIds.includes(getSelectionKey(p)));
+          setSelectedProducts(matchingProducts);
+        }
       }
     }
-  }, [disableAlreadySelected, getSelectionKey, isOpen, products, selectedIds]);
+  }, [disableAlreadySelected, externalSignature, getSelectionKey, isOpen, products, selectedIds]);
+
+  // 当 products 列表加载完成或更新时，增量补充 tempSelectedIds 对应但 selectedProducts 中尚未包含的 Product 对象
+  useEffect(() => {
+    if (!isOpen || products.length === 0 || tempSelectedIds.length === 0) return;
+
+    setSelectedProducts((prev) => {
+      const existingKeys = new Set(prev.map((p) => getSelectionKey(p)));
+      const newlyFound = products.filter((p) => {
+        const key = getSelectionKey(p);
+        return tempSelectedIds.includes(key) && !existingKeys.has(key);
+      });
+
+      if (newlyFound.length === 0) return prev;
+      return [...prev, ...newlyFound];
+    });
+  }, [getSelectionKey, isOpen, products, tempSelectedIds]);
 
   useEffect(() => {
     if (!usesPrefetchedData) return;
@@ -499,8 +534,50 @@ export function ProductSelectionModal({
   const displayCategoryName = selectedCategoryName;
 
   const filteredProducts = useMemo(() => {
-    return filterVisibleProducts(Array.isArray(products) ? products : [], displayCategoryName);
-  }, [filterVisibleProducts, products, displayCategoryName]);
+    const rawList = filterVisibleProducts(Array.isArray(products) ? products : [], displayCategoryName);
+
+    // 搜索模式下保持原生搜索结果，避免搜索结果里强行塞入不匹配的商品
+    if (debouncedSearch.trim()) {
+      return rawList;
+    }
+
+    // 未搜索模式下：将已勾选的商品置顶显示，避免用户搜索选中后清空搜索时，因分页或排序找不到刚才选中的商品
+    const selectedKeySet = new Set(tempSelectedIds);
+    if (selectedKeySet.size === 0) {
+      return rawList;
+    }
+
+    const selectedInList: Product[] = [];
+    const unselectedInList: Product[] = [];
+    const seenKeys = new Set<string>();
+
+    // 优先把 selectedProducts 中记录的已选商品加入置顶队列（防止由于列表分页尚未完全拉取而缺失对象）
+    for (const p of selectedProducts) {
+      const key = getSelectionKey(p);
+      if (selectedKeySet.has(key) && !seenKeys.has(key)) {
+        selectedInList.push(p);
+        seenKeys.add(key);
+      }
+    }
+
+    // 再遍历当前店铺的 rawList
+    for (const p of rawList) {
+      const key = getSelectionKey(p);
+      if (selectedKeySet.has(key)) {
+        if (!seenKeys.has(key)) {
+          selectedInList.push(p);
+          seenKeys.add(key);
+        }
+      } else {
+        if (!seenKeys.has(key)) {
+          unselectedInList.push(p);
+          seenKeys.add(key);
+        }
+      }
+    }
+
+    return [...selectedInList, ...unselectedInList];
+  }, [debouncedSearch, displayCategoryName, filterVisibleProducts, getSelectionKey, products, selectedProducts, tempSelectedIds]);
 
   const hasMoreLocal = filteredProducts.length > localVisibleCount;
 
