@@ -7549,7 +7549,7 @@ export async function createOutboundFromAutoPickOrder(
   };
 }
 
-async function updateAutoPickOrderAutoOutboundState(
+export async function updateAutoPickOrderAutoOutboundState(
   userId: string,
   orderId: string,
   nextState: NonNullable<AutoPickSystemMeta["autoOutbound"]>

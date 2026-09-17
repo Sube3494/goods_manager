@@ -18,6 +18,8 @@ import {
   readRiderPhoneFromDelivery,
   readRiderPhoneFromRawPayload,
   resolveAutoPickMatchedShopName,
+  createOutboundFromAutoPickOrder,
+  updateAutoPickOrderAutoOutboundState,
   syncAutoOutboundFromCompletedAutoPickOrder,
   syncBrushOrderFromCompletedAutoPickOrder,
 } from "@/lib/autoPickOrders";
@@ -272,12 +274,60 @@ export async function PATCH(
     const hasOfflineItems = offlineEdit && Array.isArray(offlineEdit.items);
     const offlineItems = hasOfflineItems ? (offlineEdit.items as Array<any>) : null;
 
-    await prisma.$transaction(async (tx) => {
-      if (offlineItems !== null) {
-        // 1. 先清理或回滚原有关联出库单
-        const existingOutbounds = await tx.outboundOrder.findMany({
+    const extractOrderItemKey = (item: {
+      productId?: string | null;
+      shopProductId?: string | null;
+      sourceProductId?: string | null;
+      rawPayload?: unknown;
+    }) => {
+      const rawRecord = item.rawPayload && typeof item.rawPayload === "object" && !Array.isArray(item.rawPayload)
+        ? (item.rawPayload as Record<string, any>)
+        : {};
+      const manual = rawRecord.manualMatchedProduct && typeof rawRecord.manualMatchedProduct === "object"
+        ? (rawRecord.manualMatchedProduct as Record<string, any>)
+        : null;
+      const auto = rawRecord.autoMatchedProduct && typeof rawRecord.autoMatchedProduct === "object"
+        ? (rawRecord.autoMatchedProduct as Record<string, any>)
+        : null;
+
+      const resolvedProductId = String(
+        item.productId || item.sourceProductId || manual?.id || auto?.id || ""
+      ).trim();
+      const resolvedShopProductId = String(
+        item.shopProductId || manual?.shopProductId || auto?.shopProductId || ""
+      ).trim();
+
+      return `${resolvedShopProductId}::${resolvedProductId}`;
+    };
+
+    let isOfflineItemsChanged = false;
+    const returnedOutboundIds: string[] = [];
+
+    if (offlineItems !== null) {
+      const existingItemMap = new Map<string, number>();
+      for (const item of order.items) {
+        const key = extractOrderItemKey(item);
+        if (key !== "::") {
+          existingItemMap.set(key, (existingItemMap.get(key) || 0) + Math.max(1, Number(item.quantity) || 1));
+        }
+      }
+      const incomingItemMap = new Map<string, number>();
+      for (const item of offlineItems) {
+        const key = extractOrderItemKey(item);
+        if (key !== "::") {
+          incomingItemMap.set(key, (incomingItemMap.get(key) || 0) + Math.max(1, Number(item.quantity) || 1));
+        }
+      }
+
+      isOfflineItemsChanged = existingItemMap.size !== incomingItemMap.size ||
+        Array.from(existingItemMap.entries()).some(([key, qty]) => incomingItemMap.get(key) !== qty);
+
+      // 如果商品或数量发生了变动，必须先通过退库回滚原有关联出库单，将扣减的库存如实归还
+      if (isOfflineItemsChanged) {
+        const existingOutbounds = await prisma.outboundOrder.findMany({
           where: {
             userId: user.id,
+            status: { not: "Returned" },
             note: {
               contains: `平台单号: ${order.orderNo}`,
               mode: "insensitive",
@@ -292,15 +342,16 @@ export async function PATCH(
           return match[1].toLowerCase() === order.orderNo.toLowerCase();
         });
 
-        if (filteredOutbounds.length > 0) {
-          await tx.outboundOrder.deleteMany({
-            where: {
-              id: { in: filteredOutbounds.map((o: any) => o.id) },
-            },
-          });
+        for (const outbound of filteredOutbounds) {
+          await returnOutboundOrderById(user.id, outbound.id, "修改线下订单商品明细，自动回滚旧出库");
+          returnedOutboundIds.push(outbound.id);
         }
+      }
+    }
 
-        // 2. 同步 items：删除已移除的 item，更新已有的，创建新加的
+    await prisma.$transaction(async (tx) => {
+      if (offlineItems !== null) {
+        // 同步 items：删除已移除的 item，更新已有的，创建新加的
         const incomingItemIds = new Set(
           offlineItems.map((item) => String(item.id || "").trim()).filter(Boolean)
         );
@@ -475,7 +526,72 @@ export async function PATCH(
       });
     });
 
-    if (hasAmountEdit || offlineEdit) {
+    if (offlineEdit) {
+      // 仅在商品明细（商品种类或数量）确实变动时才重新生成出库单；
+      // 若未改动商品，原出库单完好保留，无需重新出库，也不扣减或改变库存。
+      if (isOfflineItemsChanged) {
+        const attemptedAt = new Date().toISOString();
+        const preferredShop = targetShopName || (rawPayload?.systemMeta?.resolvedShop?.name as string) || undefined;
+        const outboundResult = await createOutboundFromAutoPickOrder(user.id, order.id, {
+          requireCompleted: false,
+          preferredMappedShopName: preferredShop,
+        }).catch((err) => {
+          console.error("Failed to auto-create outbound after offline order edit:", err);
+          return { ok: false, reason: "error", error: err instanceof Error ? err.message : "自动出库失败" } as const;
+        });
+
+        if (outboundResult.ok) {
+          await updateAutoPickOrderAutoOutboundState(user.id, order.id, {
+            status: "success",
+            attemptedAt,
+            resolvedAt: new Date().toISOString(),
+            outboundOrderId: outboundResult.outboundOrderId,
+          }).catch(() => null);
+
+          // 重新出库成功，清理已回滚的旧出库单，保持出库列表干净
+          if (returnedOutboundIds.length > 0) {
+            await prisma.outboundOrderItem.deleteMany({
+              where: { outboundOrderId: { in: returnedOutboundIds } },
+            }).catch(() => null);
+            await prisma.outboundOrder.deleteMany({
+              where: { id: { in: returnedOutboundIds } },
+            }).catch(() => null);
+          }
+        } else if (outboundResult.reason === "no-items" || outboundResult.reason === "delivery-fee-only") {
+          await updateAutoPickOrderAutoOutboundState(user.id, order.id, {
+            status: "success",
+            attemptedAt,
+            resolvedAt: new Date().toISOString(),
+          }).catch(() => null);
+
+          if (returnedOutboundIds.length > 0) {
+            await prisma.outboundOrderItem.deleteMany({
+              where: { outboundOrderId: { in: returnedOutboundIds } },
+            }).catch(() => null);
+            await prisma.outboundOrder.deleteMany({
+              where: { id: { in: returnedOutboundIds } },
+            }).catch(() => null);
+          }
+        } else if (outboundResult.reason === "insufficient-stock") {
+          const summary = Array.isArray(outboundResult.insufficientItems)
+            ? outboundResult.insufficientItems
+                .map((item) => `${item.name} 缺 ${item.missingQuantity} 件`)
+                .join("；")
+            : "";
+          await updateAutoPickOrderAutoOutboundState(user.id, order.id, {
+            status: "failed",
+            attemptedAt,
+            error: summary ? `库存不足，请先创建采购单：${summary}` : "库存不足，请先创建采购单",
+          }).catch(() => null);
+        } else {
+          await updateAutoPickOrderAutoOutboundState(user.id, order.id, {
+            status: "failed",
+            attemptedAt,
+            error: (outboundResult as any).error || `自动生成出库单失败（${outboundResult.reason}）`,
+          }).catch(() => null);
+        }
+      }
+    } else if (hasAmountEdit) {
       await syncAutoOutboundFromCompletedAutoPickOrder(user.id, order.id).catch((error) => {
         console.error("Failed to auto-create outbound after order edit:", error);
       });
