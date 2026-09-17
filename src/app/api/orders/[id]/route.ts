@@ -13,6 +13,7 @@ import {
   readCustomerPhoneFromRawPayload,
   readCustomerPhoneExtensionFromRawPayload,
   readCustomerRemarkFromRawPayload,
+  readAdminRemarkFromRawPayload,
   readCustomerTypeFromRawPayload,
   readCancelReasonFromRawPayload,
   readRiderPhoneFromDelivery,
@@ -77,6 +78,7 @@ export async function GET(
         customerPhoneExtension: readCustomerPhoneExtensionFromRawPayload(order.rawPayload),
         customerType,
         customerRemark: order.customerRemark || readCustomerRemarkFromRawPayload(order.rawPayload),
+        adminRemark: readAdminRemarkFromRawPayload(order.rawPayload),
         cancelReason: readCancelReasonFromRawPayload(order.rawPayload),
         detailLoaded: true,
         detailLoading: false,
@@ -109,8 +111,9 @@ export async function PATCH(
     const hasOfflineEdit = body.offlineEdit && typeof body.offlineEdit === "object";
     const hasAmountEdit = hasExpectedIncome;
     const hasShopEdit = body.shopId !== undefined;
+    const hasAdminRemarkEdit = body.adminRemark !== undefined;
 
-    if (!hasBrushToggle && !hasAmountEdit && !hasOfflineEdit && !hasShopEdit) {
+    if (!hasBrushToggle && !hasAmountEdit && !hasOfflineEdit && !hasShopEdit && !hasAdminRemarkEdit) {
       return NextResponse.json({ error: "参数错误" }, { status: 400 });
     }
 
@@ -520,6 +523,11 @@ export async function PATCH(
                     },
                   }
                 : {}),
+              ...(hasAdminRemarkEdit
+                ? {
+                    adminRemark: String(body.adminRemark || "").trim() || null,
+                  }
+                : {}),
             },
           } as Prisma.InputJsonValue,
         },
@@ -632,6 +640,7 @@ export async function PATCH(
       actualPaid,
       expectedIncome,
       platformCommission,
+      ...(hasAdminRemarkEdit ? { adminRemark: String(body.adminRemark || "").trim() || null } : {}),
       ...(hasShopEdit ? { shopId: targetShopId, matchedShopName: targetShopName } : {}),
     });
   } catch (error) {

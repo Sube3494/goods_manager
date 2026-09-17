@@ -244,6 +244,7 @@ export interface AutoPickOrder {
   customerPhoneExtension?: string | null;
   customerType?: "new" | "returning" | null;
   customerRemark?: string | null;
+  adminRemark?: string | null;
   items: AutoPickOrderItem[];
   autoCompleteAt?: string | null;
   completedAt?: string | null;

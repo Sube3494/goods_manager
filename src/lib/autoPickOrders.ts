@@ -550,6 +550,27 @@ export function readCustomerRemarkFromRawPayload(rawPayload: unknown): string | 
   return null;
 }
 
+export function readAdminRemarkFromRawPayload(rawPayload: unknown): string | null {
+  if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
+    return null;
+  }
+  const root = rawPayload as Record<string, unknown>;
+  const systemMeta = root.systemMeta && typeof root.systemMeta === "object" && !Array.isArray(root.systemMeta)
+    ? (root.systemMeta as Record<string, unknown>)
+    : null;
+
+  const candidate = systemMeta?.adminRemark ?? root.adminRemark;
+  if (candidate === null || candidate === undefined) {
+    return null;
+  }
+  if (typeof candidate === "object") {
+    const text = (candidate as Record<string, unknown>).text;
+    return typeof text === "string" ? text.trim() || null : null;
+  }
+  const str = String(candidate).trim();
+  return str || null;
+}
+
 function readTrimmedCandidateValue(candidates: unknown[]) {
   for (const candidate of candidates) {
     const value = String(candidate || "").trim();

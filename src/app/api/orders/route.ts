@@ -14,6 +14,7 @@ import {
   readCustomerPhoneFromRawPayload,
   readCustomerPhoneExtensionFromRawPayload,
   readCustomerRemarkFromRawPayload,
+  readAdminRemarkFromRawPayload,
   readCustomerTypeFromRawPayload,
   readDeliveryFeeFromValue,
   readRiderPhoneFromDelivery,
@@ -2250,6 +2251,7 @@ export async function GET(request: NextRequest) {
         customerPhoneExtension: readCustomerPhoneExtensionFromRawPayload(order.rawPayload),
         customerType,
         customerRemark: order.customerRemark || readCustomerRemarkFromRawPayload(order.rawPayload),
+        adminRemark: readAdminRemarkFromRawPayload(order.rawPayload),
         delivery: order.delivery && typeof order.delivery === "object"
           ? {
               ...(order.delivery as Record<string, unknown>),

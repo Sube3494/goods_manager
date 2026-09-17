@@ -9,6 +9,7 @@ import {
   ChevronDown,
   ChevronUp,
   Clock3,
+  FileText,
   Loader2,
   MapPin,
   Navigation,
@@ -1522,6 +1523,89 @@ function OrderAmountEditModal({
   );
 }
 
+function OrderAdminRemarkModal({
+  order,
+  initialRemark,
+  onClose,
+  onSave,
+}: {
+  order: AutoPickOrder;
+  initialRemark?: string | null;
+  onClose: () => void;
+  onSave: (remark: string) => Promise<boolean>;
+}) {
+  const [remark, setRemark] = useState(() => String(initialRemark ?? order.adminRemark ?? ""));
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    const ok = await onSave(remark.trim());
+    setIsSaving(false);
+    if (ok) {
+      onClose();
+    }
+  };
+
+  return createPortal(
+    <div className="fixed inset-0 z-100000 flex items-center justify-center px-4">
+      <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm" onClick={() => { if (!isSaving) onClose(); }} />
+      <div className="relative w-full max-w-md rounded-[28px] border border-black/8 bg-white/96 shadow-[0_24px_64px_rgba(15,23,42,0.20)] dark:border-white/10 dark:bg-[#0d1420]/98 overflow-hidden">
+        <div className="flex items-start justify-between gap-3 px-6 pb-4 pt-6 border-b border-black/6 dark:border-white/6">
+          <div>
+            <h3 className="text-xl font-semibold tracking-tight text-foreground">订单内部备注</h3>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">此备注仅管理员内部可见，顾客端不会展示。</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isSaving}
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-black/8 bg-white/80 text-muted-foreground transition-all hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-white/4 cursor-pointer"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="space-y-4 px-6 py-5">
+          <label className="block">
+            <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
+              <span>备注内容</span>
+              <span className="font-mono text-[10px] text-muted-foreground/80">{remark.length}/300</span>
+            </div>
+            <textarea
+              value={remark}
+              onChange={(e) => setRemark(e.target.value.slice(0, 300))}
+              placeholder="请输入管理员备忘、处理记录或特殊沟通事项..."
+              rows={4}
+              className="mt-2 w-full rounded-2xl border border-black/8 bg-white/88 p-3 text-sm text-foreground outline-none transition focus:border-primary/45 focus:ring-2 focus:ring-primary/10 dark:border-white/10 dark:bg-white/5 resize-none placeholder-muted-foreground/45"
+            />
+          </label>
+
+          <div className="flex gap-3 pt-1">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isSaving}
+              className="inline-flex h-11 flex-1 items-center justify-center rounded-2xl border border-black/8 bg-white/85 px-4 text-sm font-bold text-foreground transition-all hover:bg-white disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-white/5 cursor-pointer"
+            >
+              取消
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleSave()}
+              disabled={isSaving}
+              className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-2xl bg-foreground px-4 text-sm font-bold text-background transition-all hover:opacity-92 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-black cursor-pointer"
+            >
+              {isSaving ? <Loader2 size={15} className="animate-spin" /> : null}
+              保存备注
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 interface EditableOfflineOrderItem {
   id?: string;
   productId?: string;
@@ -2226,6 +2310,7 @@ export const OrderCard = memo(function OrderCard({
   onOpenMatchEditor: (order: AutoPickOrder, item: AutoPickOrderItem, options?: { autoOutbound?: boolean }) => void;
   onRefresh?: () => void;
 }) {
+  const { showToast } = useToast();
   const [isProfitTooltipOpen, setIsProfitTooltipOpen] = useState(false);
   const [isProfitTooltipHovering, setIsProfitTooltipHovering] = useState(false);
   const [isUpdatingBrush, setIsUpdatingBrush] = useState(false);
@@ -2276,7 +2361,37 @@ export const OrderCard = memo(function OrderCard({
   const [isSavingCommission, setIsSavingCommission] = useState(false);
   const [isShopEditorOpen, setIsShopEditorOpen] = useState(false);
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
-  const { showToast } = useToast();
+  const [isAdminRemarkModalOpen, setIsAdminRemarkModalOpen] = useState(false);
+  const [localAdminRemark, setLocalAdminRemark] = useState<string | null>(() => order.adminRemark ?? null);
+
+  useEffect(() => {
+    setLocalAdminRemark(order.adminRemark ?? null);
+  }, [order.adminRemark]);
+
+  const handleSaveAdminRemark = useCallback(async (nextRemark: string) => {
+    try {
+      const res = await fetch(`/api/orders/${order.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          adminRemark: nextRemark,
+        }),
+      });
+      if (res.ok) {
+        showToast(nextRemark ? "订单备注已保存" : "订单备注已清除", "success");
+        setLocalAdminRemark(nextRemark || null);
+        onRefresh?.();
+        return true;
+      }
+      const data = await res.json().catch(() => ({}));
+      showToast(data.error || "保存订单备注失败", "error");
+      return false;
+    } catch (err) {
+      console.error("保存订单备注失败", err);
+      showToast("网络请求失败，请稍后重试", "error");
+      return false;
+    }
+  }, [order.id, showToast, onRefresh]);
   const profitTooltipHoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const clearProfitTooltipHoverTimeout = useCallback(() => {
@@ -3714,6 +3829,51 @@ export const OrderCard = memo(function OrderCard({
                 ) : null}
               </section>
 
+              <section className="rounded-[20px] border border-black/6 bg-white/80 p-3.5 dark:border-white/8 dark:bg-white/4 sm:rounded-3xl sm:p-4">
+                <div className="mb-2.5 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <FileText size={13} className="text-muted-foreground" />
+                    <h3 className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">订单备注</h3>
+                  </div>
+                  {!readOnly ? (
+                    <button
+                      type="button"
+                      onClick={() => setIsAdminRemarkModalOpen(true)}
+                      className="inline-flex items-center gap-1 text-[11px] font-medium text-sky-600 hover:text-sky-700 dark:text-sky-400 dark:hover:text-sky-300 transition-colors cursor-pointer"
+                      title="编辑管理员内部备忘"
+                    >
+                      <Pencil size={11} />
+                      <span>{localAdminRemark ? "修改" : "添加备注"}</span>
+                    </button>
+                  ) : null}
+                </div>
+                {localAdminRemark ? (
+                  <div
+                    onClick={() => !readOnly && setIsAdminRemarkModalOpen(true)}
+                    className={cn(
+                      "rounded-2xl border border-black/6 bg-black/2 p-3 text-xs leading-relaxed text-foreground dark:border-white/8 dark:bg-white/3 break-all whitespace-pre-wrap transition-colors",
+                      !readOnly ? "cursor-pointer hover:border-black/12 hover:bg-black/4 dark:hover:border-white/14 dark:hover:bg-white/5" : ""
+                    )}
+                    title={!readOnly ? "点击快速修改备注" : undefined}
+                  >
+                    {localAdminRemark}
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={readOnly}
+                    onClick={() => setIsAdminRemarkModalOpen(true)}
+                    className={cn(
+                      "w-full rounded-2xl border border-dashed border-black/12 bg-black/1 py-4 px-3 text-center text-xs text-muted-foreground/80 dark:border-white/12 dark:bg-white/2 transition-colors flex flex-col items-center justify-center gap-1",
+                      !readOnly ? "cursor-pointer hover:border-primary/40 hover:bg-primary/5 hover:text-primary" : "cursor-default opacity-60"
+                    )}
+                  >
+                    <span>暂无管理员备注</span>
+                    {!readOnly ? <span className="text-[10px] text-muted-foreground/60">+ 点击添加管理备忘</span> : null}
+                  </button>
+                )}
+              </section>
+
             </div>
           </div>
         </div>
@@ -3739,6 +3899,14 @@ export const OrderCard = memo(function OrderCard({
             }
           }}
           onSave={handleSaveOfflineOrder}
+        />
+      ) : null}
+      {isAdminRemarkModalOpen ? (
+        <OrderAdminRemarkModal
+          order={order}
+          initialRemark={localAdminRemark}
+          onClose={() => setIsAdminRemarkModalOpen(false)}
+          onSave={handleSaveAdminRemark}
         />
       ) : null}
       <ConfirmModal
