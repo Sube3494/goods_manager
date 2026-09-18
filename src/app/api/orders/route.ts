@@ -1490,6 +1490,7 @@ export async function GET(request: NextRequest) {
         unitCost: number;
         totalCost: number;
         shopProductId: string | null;
+        productId: string | null;
       }>;
     }>();
     const purchaseOrderItemIds = Array.from(new Set(
@@ -2111,8 +2112,15 @@ export async function GET(request: NextRequest) {
         return ids.flatMap((id) => id.split(/[+＋]/)).map((s) => s.trim()).filter(Boolean);
       }))
     ));
+    const outboundMatchedShopProductIds = Array.from(new Set(
+      responseOrders.flatMap((order) => (
+        outboundByOrderNo.get(order.orderNo)?.breakdown
+          .map((item) => String(item.shopProductId || "").trim())
+          .filter(Boolean) || []
+      ))
+    ));
 
-    const shopProducts = (productSkuCandidates.length > 0 || manualMatchedProductIds.length > 0)
+    const shopProducts = (productSkuCandidates.length > 0 || manualMatchedProductIds.length > 0 || outboundMatchedShopProductIds.length > 0)
       ? await prisma.shopProduct.findMany({
             where: {
               shop: { userId: targetUserId },
@@ -2131,6 +2139,9 @@ export async function GET(request: NextRequest) {
                 ...(manualMatchedProductIds.length > 0 ? [
                   { id: { in: manualMatchedProductIds } },
                   { productId: { in: manualMatchedProductIds } },
+                ] : []),
+                ...(outboundMatchedShopProductIds.length > 0 ? [
+                  { id: { in: outboundMatchedShopProductIds } },
                 ] : []),
               ],
             },
@@ -2397,7 +2408,7 @@ export async function GET(request: NextRequest) {
         firstMissingCostShopProductId: outboundMeta?.firstMissingCostShopProductId || null,
         firstMissingCostPurchaseOrderId: outboundMeta?.firstMissingCostPurchaseOrderId || null,
         firstMissingCostPurchaseOrderItemId: outboundMeta?.firstMissingCostPurchaseOrderItemId || null,
-        items: order.items.map((item) => {
+        items: order.items.map((item, itemIndex) => {
           const manualMatchedProduct = readManualMatchedProduct(item.rawPayload);
           const isCompositeSku = /[+＋]/.test(String(item.productNo || ""));
           const strictPlatformProductId = isCompositeSku ? null : readStrictPlatformProductId(order.platform, item.rawPayload, item.platformSkuId);
@@ -2439,13 +2450,22 @@ export async function GET(request: NextRequest) {
             .filter((product): product is typeof mappedShopProducts[number] => Boolean(product)) : [];
           const hasStrictMatchForAllSegments = shouldTrySkuFallback && normalizedSkuCandidates.length > 0
             && normalizedSkuCandidates.every((candidate) => Boolean(resolveStrictSkuMatch(candidate)));
+          const outboundBreakdown = outboundMeta?.breakdown || [];
+          const outboundItem = outboundBreakdown.length === order.items.length
+            ? outboundBreakdown[itemIndex]
+            : (outboundBreakdown.length === 1 && order.items.length === 1 ? outboundBreakdown[0] : null);
+          const outboundMatchedProduct = outboundItem?.shopProductId
+            ? mappedShopProducts.find((product) => product.id === outboundItem.shopProductId) || null
+            : null;
           const matchedProduct = manualMatchedProduct
             ? { ...manualMatchedProduct, isManual: true, matchMethod: "manual" as const }
             : platformStrictMatch
             ? { ...platformStrictMatch, isManual: false, matchMethod: "id" as const }
             : (hasStrictMatchForAllSegments && fallbackStrictMatches[0]
               ? { ...fallbackStrictMatches[0], isManual: false, matchMethod: "sku" as const }
-              : null);
+              : outboundMatchedProduct
+                ? { ...outboundMatchedProduct, isManual: false, matchMethod: "outbound" as const }
+                : null);
           if (matchedProduct) {
             const foundShopProduct = mappedShopProducts.find((p) =>
               (matchedProduct.shopProductId && p.id === matchedProduct.shopProductId)
