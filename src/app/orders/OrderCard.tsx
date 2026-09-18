@@ -2993,7 +2993,7 @@ export const OrderCard = memo(function OrderCard({
                       <span className="truncate font-semibold">{toCurrency(refundAmount)}</span>
                     </span>
                   ) : null}
-                  {(hasPureProfit || (completed && order.productCostStatus === "pending-backfill")) ? (
+                  {!isProfitUpdating && (hasPureProfit || (completed && order.productCostStatus === "pending-backfill")) ? (
                     <div
                       ref={profitTooltipRef}
                       className="group/profit relative"
@@ -3006,7 +3006,7 @@ export const OrderCard = memo(function OrderCard({
                           onClick={handleProfitTooltipTriggerClick}
                           aria-expanded={isProfitTooltipVisible}
                           className={cn(
-                            "inline-flex h-7 min-w-0 items-center gap-1 rounded-full border px-2 text-[11px] font-medium leading-none transition-all hover:-translate-y-px active:translate-y-0 sm:h-8 sm:gap-1.5 sm:px-2.5 sm:text-[13px]",
+                            "animate-in fade-in zoom-in-95 motion-reduce:animate-none inline-flex h-7 min-w-0 items-center gap-1 rounded-full border px-2 text-[11px] font-medium leading-none transition-all duration-300 hover:-translate-y-px active:translate-y-0 sm:h-8 sm:gap-1.5 sm:px-2.5 sm:text-[13px]",
                             pureProfit >= 0
                               ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 hover:border-emerald-500/35 hover:bg-emerald-500/14 dark:text-emerald-300"
                               : "border-rose-500/20 bg-rose-500/10 text-rose-700 hover:border-rose-500/35 hover:bg-rose-500/14 dark:text-rose-300"
@@ -3167,9 +3167,13 @@ export const OrderCard = memo(function OrderCard({
                     </div>
                   ) : null}
                   {isProfitUpdating ? (
-                    <span className="inline-flex h-7 min-w-0 items-center gap-1 rounded-full border border-sky-500/20 bg-sky-500/10 px-2 text-[11px] font-medium leading-none text-sky-700 dark:text-sky-300 sm:h-8 sm:gap-1.5 sm:px-2.5 sm:text-[13px]">
+                    <span
+                      role="status"
+                      aria-live="polite"
+                      className="animate-in fade-in motion-reduce:animate-none inline-flex h-7 min-w-[7.25rem] items-center justify-center gap-1 rounded-full border border-sky-500/20 bg-sky-500/10 px-2 text-[11px] font-medium leading-none text-sky-700 duration-200 dark:text-sky-300 sm:h-8 sm:gap-1.5 sm:px-2.5 sm:text-[13px]"
+                    >
                       <Loader2 size={11} className="animate-spin sm:h-3 sm:w-3" />
-                      <span className="truncate">更新利润中...</span>
+                      <span className="truncate">正在计算利润...</span>
                     </span>
                   ) : null}
                 </div>

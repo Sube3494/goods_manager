@@ -557,13 +557,20 @@ export function TodayOrdersView({
 
   const refreshSingleOrder = useCallback(async (orderId: string) => {
     try {
-      const response = await fetch(`/api/orders/${orderId}`, { cache: "no-store" });
+      const params = new URLSearchParams({
+        ids: orderId,
+        page: "1",
+        pageSize: "1",
+      });
+      if (userId) params.set("userId", userId);
+      const response = await fetch(`/api/orders?${params.toString()}`, { cache: "no-store" });
       const data = await response.json().catch(() => ({}));
-      if (response.ok && data?.order) {
+      const refreshedOrder = Array.isArray(data?.items) ? data.items[0] : null;
+      if (response.ok && refreshedOrder) {
         patchOrder(orderId, (order) => ({
           ...order,
-          ...data.order,
-          delivery: data.order.delivery ?? order.delivery,
+          ...refreshedOrder,
+          delivery: refreshedOrder.delivery ?? order.delivery,
           detailLoaded: true,
           detailLoading: false,
         }));
