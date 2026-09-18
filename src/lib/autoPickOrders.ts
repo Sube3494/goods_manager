@@ -468,7 +468,7 @@ function getAutoPickCookieListenerState() {
   return scoped.autoPickCookieListenerState;
 }
 
-function readAutoPickSystemMeta(rawPayload: unknown): AutoPickSystemMeta | null {
+export function readAutoPickSystemMeta(rawPayload: unknown): AutoPickSystemMeta | null {
   if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
     return null;
   }
@@ -7308,7 +7308,7 @@ export async function createOutboundFromAutoPickOrder(
     return { ok: false, skipped: true, reason: "order-not-completed" as const };
   }
 
-  const existingOutbound = await prisma.outboundOrder.findFirst({
+  const existingOutboundCandidates = await prisma.outboundOrder.findMany({
     where: {
       userId,
       status: {
@@ -7321,6 +7321,7 @@ export async function createOutboundFromAutoPickOrder(
     },
     select: {
       id: true,
+      note: true,
       items: {
         select: {
           id: true,
@@ -7333,6 +7334,11 @@ export async function createOutboundFromAutoPickOrder(
     orderBy: {
       createdAt: "desc",
     },
+  });
+  const normalizedOrderNo = order.orderNo.trim().toLowerCase();
+  const existingOutbound = existingOutboundCandidates.find((outbound) => {
+    const match = outbound.note?.match(/平台单号:\s*([^\s|]+)/);
+    return String(match?.[1] || "").trim().toLowerCase() === normalizedOrderNo;
   });
 
   const hasOrderFulfillmentItems = hasAutoPickFulfillmentItems(order.items);
@@ -7380,7 +7386,7 @@ export async function createOutboundFromAutoPickOrder(
       if (quantityChanged) {
         await returnOutboundOrderById(userId, existingOutbound.id, "订单商品匹配数量变更，自动重建出库单");
       } else {
-      return { ok: true, duplicated: true, outboundOrderId: existingOutbound.id };
+        return { ok: true, duplicated: true, outboundOrderId: existingOutbound.id };
       }
     }
   }

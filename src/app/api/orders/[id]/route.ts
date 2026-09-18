@@ -18,6 +18,7 @@ import {
   readCancelReasonFromRawPayload,
   readRiderPhoneFromDelivery,
   readRiderPhoneFromRawPayload,
+  readAutoPickSystemMeta,
   resolveAutoPickMatchedShopName,
   createOutboundFromAutoPickOrder,
   updateAutoPickOrderAutoOutboundState,
@@ -55,6 +56,17 @@ export async function GET(
     if (!order) {
       return NextResponse.json({ error: "订单不存在" }, { status: 404 });
     }
+    const autoOutboundMeta = readAutoPickSystemMeta(order.rawPayload)?.autoOutbound;
+    const outboundOrderId = String(autoOutboundMeta?.outboundOrderId || "").trim() || null;
+    const activeOutbound = outboundOrderId
+      ? await prisma.outboundOrder.findFirst({
+          where: {
+            id: outboundOrderId,
+            status: { not: "Returned" },
+          },
+          select: { id: true },
+        })
+      : null;
     const normalized = normalizeAutoPickOrderPayload(order.rawPayload);
     const customerType = readCustomerTypeFromRawPayload(order.rawPayload)
       || normalized?.customerType
@@ -80,6 +92,12 @@ export async function GET(
         customerRemark: order.customerRemark || readCustomerRemarkFromRawPayload(order.rawPayload),
         adminRemark: readAdminRemarkFromRawPayload(order.rawPayload),
         cancelReason: readCancelReasonFromRawPayload(order.rawPayload),
+        autoOutboundStatus: autoOutboundMeta?.status || null,
+        autoOutboundError: autoOutboundMeta?.error || null,
+        autoOutboundAttemptedAt: autoOutboundMeta?.attemptedAt || null,
+        autoOutboundResolvedAt: autoOutboundMeta?.resolvedAt || null,
+        hasOutbound: Boolean(activeOutbound),
+        outboundOrderId: activeOutbound?.id || null,
         detailLoaded: true,
         detailLoading: false,
       },

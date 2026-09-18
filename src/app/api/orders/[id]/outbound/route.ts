@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthorizedUserAny } from "@/lib/auth";
-import { createOutboundFromAutoPickOrder } from "@/lib/autoPickOrders";
+import { createOutboundFromAutoPickOrder, updateAutoPickOrderAutoOutboundState } from "@/lib/autoPickOrders";
 import { getOutboundOrderItemSchemaErrorMessage } from "@/lib/prismaSchemaCompat";
 
 export const dynamic = "force-dynamic";
@@ -20,12 +20,18 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
     });
 
     if (result.ok) {
-      if (result.duplicated) {
-        return NextResponse.json({ error: "该订单已生成出库单", outboundOrderId: result.outboundOrderId }, { status: 409 });
-      }
+      const attemptedAt = new Date().toISOString();
+      await updateAutoPickOrderAutoOutboundState(session.id, id, {
+        status: "success",
+        attemptedAt,
+        resolvedAt: attemptedAt,
+        error: undefined,
+        outboundOrderId: result.outboundOrderId,
+      });
 
       return NextResponse.json({
         ok: true,
+        duplicated: result.duplicated === true,
         outboundOrderId: result.outboundOrderId,
       });
     }
