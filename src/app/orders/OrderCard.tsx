@@ -3156,7 +3156,7 @@ export const OrderCard = memo(function OrderCard({
                                           <div className="mt-0.5 flex flex-wrap gap-x-1 text-[11px] text-slate-500 dark:text-white/45">
                                             <span>x{item.quantity} · {toCurrency(item.unitCost)}/件</span>
                                             {costComposition ? (
-                                              <span>（{toCurrency(costComposition.baseUnitCost)} + {toCurrency(costComposition.additionalFee)}费用）</span>
+                                              <span>（{toCurrency(costComposition.baseUnitCost)}进价 + {toCurrency(costComposition.additionalFee)}采购附加费）</span>
                                             ) : null}
                                           </div>
                                         </div>
