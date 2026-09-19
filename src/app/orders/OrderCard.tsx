@@ -196,10 +196,13 @@ function getProductCostComposition(item: NonNullable<AutoPickOrder["productCostB
   );
   let quantity = 0;
   let baseTotal = 0;
+  const feeLabels = new Set<string>();
   for (const batch of batches) {
     const baseUnitCost = baseCostByBatchId.get(batch.purchaseOrderItemId);
+    const availableBatch = availableBatches.find((candidate) => candidate.purchaseOrderItemId === batch.purchaseOrderItemId);
     const batchQuantity = Math.max(0, Number(batch.quantity || 0));
     if (baseUnitCost === undefined || batchQuantity <= 0) return null;
+    if (availableBatch?.feeLabel) feeLabels.add(availableBatch.feeLabel);
     quantity += batchQuantity;
     baseTotal += baseUnitCost * batchQuantity;
   }
@@ -208,7 +211,8 @@ function getProductCostComposition(item: NonNullable<AutoPickOrder["productCostB
   const baseUnitCost = Math.round((baseTotal / quantity) * 100);
   const additionalFee = Math.round(Number(item.unitCost || 0) - baseUnitCost);
   if (additionalFee <= 0) return null;
-  return { baseUnitCost, additionalFee };
+  const feeLabel = feeLabels.size === 1 ? Array.from(feeLabels)[0] : "费用分摊";
+  return { baseUnitCost, additionalFee, feeLabel };
 }
 
 function getDisplayText(value: string | null | undefined) {
@@ -3156,7 +3160,7 @@ export const OrderCard = memo(function OrderCard({
                                           <div className="mt-0.5 flex flex-wrap gap-x-1 text-[11px] text-slate-500 dark:text-white/45">
                                             <span>x{item.quantity} · {toCurrency(item.unitCost)}/件</span>
                                             {costComposition ? (
-                                              <span>（{toCurrency(costComposition.baseUnitCost)}进价 + {toCurrency(costComposition.additionalFee)}采购附加费）</span>
+                                              <span>（{toCurrency(costComposition.baseUnitCost)}进价 + {toCurrency(costComposition.additionalFee)}{costComposition.feeLabel}）</span>
                                             ) : null}
                                           </div>
                                         </div>

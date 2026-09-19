@@ -298,6 +298,7 @@ export interface AutoPickOrder {
       remainingQuantity: number;
       costPrice: number;
       date: string | null;
+      feeLabel?: string;
     }>;
   }> | null;
   pureProfit?: number | null;

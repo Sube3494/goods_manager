@@ -1546,6 +1546,8 @@ export async function GET(request: NextRequest) {
             purchaseOrder: {
               select: {
                 date: true,
+                shippingFees: true,
+                extraFees: true,
               },
             },
           },
@@ -1564,6 +1566,7 @@ export async function GET(request: NextRequest) {
       remainingQuantity: number;
       costPrice: number;
       date: string | null;
+      feeLabel?: string;
     }>>();
 
     const availableBatchesByShopProduct = new Map<string, Array<{
@@ -1573,6 +1576,7 @@ export async function GET(request: NextRequest) {
       remainingQuantity: number;
       costPrice: number;
       date: string | null;
+      feeLabel?: string;
     }>>();
 
     availablePurchaseItems.forEach((poi) => {
@@ -1583,6 +1587,13 @@ export async function GET(request: NextRequest) {
         remainingQuantity: poi.remainingQuantity || 0,
         costPrice: poi.costPrice,
         date: poi.purchaseOrder?.date ? poi.purchaseOrder.date.toISOString() : null,
+        feeLabel: poi.purchaseOrderId.startsWith("PO-TR-")
+          ? "调拨运费"
+          : Number(poi.purchaseOrder?.shippingFees || 0) > 0 && Number(poi.purchaseOrder?.extraFees || 0) > 0
+            ? "采购运费及额外费用"
+            : Number(poi.purchaseOrder?.extraFees || 0) > 0
+              ? "采购额外费用"
+              : "采购运费",
       };
 
       if (poi.shopProductId) {

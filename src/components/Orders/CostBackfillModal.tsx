@@ -30,6 +30,7 @@ type OutboundBreakdownItem = {
     remainingQuantity: number;
     costPrice: number;
     date: string | null;
+    feeLabel?: string;
   }>;
 };
 
