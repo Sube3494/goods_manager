@@ -691,6 +691,10 @@ export function AllOrdersView({
         } else {
           void fetchOrders({ silent: true });
         }
+
+        if (action === "sync") {
+          await fetchOrders({ silent: true, force: true, refreshMetrics: true });
+        }
       }
     } catch (error) {
       showToast(error instanceof Error ? error.message : "操作失败", "error");
