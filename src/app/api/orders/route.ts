@@ -705,6 +705,12 @@ function readRefundAmountFromRawPayload(rawPayload: unknown) {
   return Number(record.refundAmount || record.refund_amount || 0) || 0;
 }
 
+function isFullyRefundedOrder(actualPaid: unknown, refundAmount: unknown) {
+  const paid = Math.max(0, Number(actualPaid || 0));
+  const refunded = Math.max(0, Number(refundAmount || 0));
+  return paid > 0 && refunded >= paid;
+}
+
 function resolveCancelReasonFromDetails(cancelDetails: unknown) {
   if (!Array.isArray(cancelDetails) || cancelDetails.length === 0) return null;
   const records = cancelDetails.filter((item): item is Record<string, unknown> => (
@@ -1898,6 +1904,7 @@ export async function GET(request: NextRequest) {
           if (!cancelled && !deleted) {
             const isBrush = readMainSystemSelfDeliveryFlag(order.rawPayload);
             const refundAmount = Math.max(outboundMeta?.refundAmount || 0, readRefundAmountFromRawPayload(order.rawPayload));
+            const fullyRefunded = isFullyRefundedOrder(actualPaid, refundAmount);
             const adjustedMetrics = resolveRefundAdjustedIncomeMetrics({
               expectedIncome: metrics.expectedIncome,
               platformCommission: metrics.platformCommission,
@@ -1913,13 +1920,19 @@ export async function GET(request: NextRequest) {
               acc.brushPaidAmount += Number(actualPaid || 0);
               shopProfitForReceived.brushReceivedAmount = (shopProfitForReceived.brushReceivedAmount || 0) + expected;
               shopProfitForReceived.brushPaidAmount = (shopProfitForReceived.brushPaidAmount || 0) + Number(actualPaid || 0);
-              shopProfitForReceived.brushOrderCount = (shopProfitForReceived.brushOrderCount || 0) + 1;
+              if (!fullyRefunded) {
+                shopProfitForReceived.brushOrderCount = (shopProfitForReceived.brushOrderCount || 0) + 1;
+              }
             } else {
               acc.realReceivedAmount += expected;
               acc.realPaidAmount += Number(actualPaid || 0);
-              acc.validOrderCount += 1;
+              if (!fullyRefunded) {
+                acc.validOrderCount += 1;
+              }
               shopProfitForReceived.realReceivedAmount = (shopProfitForReceived.realReceivedAmount || 0) + expected;
-              shopProfitForReceived.realOrderCount = (shopProfitForReceived.realOrderCount || 0) + 1;
+              if (!fullyRefunded) {
+                shopProfitForReceived.realOrderCount = (shopProfitForReceived.realOrderCount || 0) + 1;
+              }
             }
             acc.platformCommission += adjustedMetrics.platformCommission;
 
@@ -2051,7 +2064,11 @@ export async function GET(request: NextRequest) {
     if (includeMetrics) {
       for (const order of metricOrders) {
         const platform = normalizeOrderPlatformForSummary(order.platform);
-        const cancelled = isAutoPickOrderCancelledStatus(order.status) || isAutoPickOrderDeletedStatus(order.status);
+        const outboundMeta = outboundByOrderNo.get(order.orderNo) || null;
+        const refundAmount = Math.max(outboundMeta?.refundAmount || 0, readRefundAmountFromRawPayload(order.rawPayload));
+        const cancelled = isAutoPickOrderCancelledStatus(order.status)
+          || isAutoPickOrderDeletedStatus(order.status)
+          || isFullyRefundedOrder(order.actualPaid, refundAmount);
         if (cancelled) {
           cancelledPlatformCounts[platform] = (cancelledPlatformCounts[platform] || 0) + 1;
         } else {
