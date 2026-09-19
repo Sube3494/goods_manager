@@ -186,6 +186,31 @@ export function toCurrency(value: number | null | undefined) {
   return `¥${amount.toFixed(2)}`;
 }
 
+function getProductCostComposition(item: NonNullable<AutoPickOrder["productCostBreakdown"]>[number]) {
+  const batches = Array.isArray(item.batches) ? item.batches : [];
+  const availableBatches = Array.isArray(item.availableBatches) ? item.availableBatches : [];
+  if (batches.length === 0 || availableBatches.length === 0) return null;
+
+  const baseCostByBatchId = new Map(
+    availableBatches.map((batch) => [batch.purchaseOrderItemId, Number(batch.costPrice || 0)] as const)
+  );
+  let quantity = 0;
+  let baseTotal = 0;
+  for (const batch of batches) {
+    const baseUnitCost = baseCostByBatchId.get(batch.purchaseOrderItemId);
+    const batchQuantity = Math.max(0, Number(batch.quantity || 0));
+    if (baseUnitCost === undefined || batchQuantity <= 0) return null;
+    quantity += batchQuantity;
+    baseTotal += baseUnitCost * batchQuantity;
+  }
+  if (quantity <= 0) return null;
+
+  const baseUnitCost = Math.round((baseTotal / quantity) * 100);
+  const additionalFee = Math.round(Number(item.unitCost || 0) - baseUnitCost);
+  if (additionalFee <= 0) return null;
+  return { baseUnitCost, additionalFee };
+}
+
 function getDisplayText(value: string | null | undefined) {
   const text = String(value || "").trim();
   return text || "-";
@@ -3120,21 +3145,27 @@ export const OrderCard = memo(function OrderCard({
                                   货品成本明细
                                 </div>
                                 <div className="mt-2 space-y-2">
-                                  {productCostBreakdown.map((item, index) => (
-                                    <div key={`${item.name}-${index}`} className="flex items-start justify-between gap-3 text-[12px]">
-                                      <div className="min-w-0">
-                                        <div className="truncate font-medium text-slate-900 dark:text-white">
-                                          {item.name}
+                                  {productCostBreakdown.map((item, index) => {
+                                    const costComposition = getProductCostComposition(item);
+                                    return (
+                                      <div key={`${item.name}-${index}`} className="flex items-start justify-between gap-3 text-[12px]">
+                                        <div className="min-w-0">
+                                          <div className="truncate font-medium text-slate-900 dark:text-white">
+                                            {item.name}
+                                          </div>
+                                          <div className="mt-0.5 flex flex-wrap gap-x-1 text-[11px] text-slate-500 dark:text-white/45">
+                                            <span>x{item.quantity} · {toCurrency(item.unitCost)}/件</span>
+                                            {costComposition ? (
+                                              <span>（{toCurrency(costComposition.baseUnitCost)} + {toCurrency(costComposition.additionalFee)}费用）</span>
+                                            ) : null}
+                                          </div>
                                         </div>
-                                        <div className="mt-0.5 text-[11px] text-slate-500 dark:text-white/45">
-                                          x{item.quantity} · {toCurrency(item.unitCost)}/件
+                                        <div className="shrink-0 font-semibold text-slate-900 dark:text-white">
+                                          {toCurrency(item.totalCost)}
                                         </div>
                                       </div>
-                                      <div className="shrink-0 font-semibold text-slate-900 dark:text-white">
-                                        {toCurrency(item.totalCost)}
-                                      </div>
-                                    </div>
-                                  ))}
+                                    );
+                                  })}
                                 </div>
                               </div>
                             ) : null}
