@@ -289,7 +289,7 @@ function MappingSelect({
           data-mapping-select-menu="true"
           onMouseDown={(event) => event.stopPropagation()}
           onClick={(event) => event.stopPropagation()}
-          className="fixed z-[100200] overflow-hidden rounded-xl border border-black/8 bg-white/95 shadow-[0_18px_40px_rgba(15,23,42,0.16)] backdrop-blur dark:border-white/10 dark:bg-[#111827]/96"
+          className="fixed z-100200 overflow-hidden rounded-xl border border-black/8 bg-white/95 shadow-[0_18px_40px_rgba(15,23,42,0.16)] backdrop-blur dark:border-white/10 dark:bg-[#111827]/96"
           style={{ top: menuRect.top, left: menuRect.left, width: menuRect.width }}
         >
           <div className="custom-scrollbar max-h-64 overflow-y-auto p-1.5">
@@ -579,7 +579,7 @@ function IntegrationModal({
   }, [callbackOrderUrl]);
 
   return (
-    <div className="fixed inset-0 z-[100000] flex items-center justify-center p-3 sm:p-5">
+    <div className="fixed inset-0 z-100000 flex items-center justify-center p-3 sm:p-5">
       <div
         className="absolute inset-0 bg-slate-950/42 backdrop-blur-sm"
         onMouseDown={(event) => {
@@ -590,7 +590,7 @@ function IntegrationModal({
       />
       <div
         ref={modalRef}
-        className="relative flex max-h-[calc(100vh-1.5rem)] w-full max-w-4xl flex-col overflow-hidden rounded-[24px] border border-black/8 bg-white/95 shadow-[0_30px_80px_rgba(15,23,42,0.22)] dark:border-white/10 dark:bg-[#0b111e]/98 sm:rounded-4xl"
+        className="relative flex max-h-[calc(100vh-1.5rem)] w-full max-w-4xl flex-col overflow-hidden rounded-3xl border border-black/8 bg-white/95 shadow-[0_30px_80px_rgba(15,23,42,0.22)] dark:border-white/10 dark:bg-[#0b111e]/98 sm:rounded-4xl"
       >
         <button
           type="button"
@@ -721,7 +721,7 @@ function IntegrationModal({
                           "overflow-hidden rounded-2xl border transition-all duration-200",
                           isEnabled
                             ? "border-black/8 bg-white/85 shadow-[0_1px_3px_rgba(0,0,0,0.03)] dark:border-white/10 dark:bg-[#111827]"
-                            : "border-dashed border-black/8 bg-black/[0.02] opacity-60 dark:border-white/6 dark:bg-white/[0.02]"
+                            : "border-dashed border-black/8 bg-black/2 opacity-60 dark:border-white/6 dark:bg-white/2"
                         )}
                       >
                         {/* 顶部主信息栏 */}
@@ -744,7 +744,7 @@ function IntegrationModal({
                                   value={acc.name}
                                   onChange={(e) => handleUpdateAccount(index, { name: e.target.value })}
                                   placeholder={`账号${String.fromCharCode(65 + (index % 26))}`}
-                                  className="w-full max-w-[170px] truncate bg-transparent px-1 py-0.5 text-sm font-bold text-foreground outline-none transition-colors hover:bg-black/5 focus:bg-black/5 focus:ring-1 focus:ring-primary/25 dark:hover:bg-white/5 dark:focus:bg-white/5 rounded-md -ml-1"
+                                  className="w-full max-w-42.5 truncate bg-transparent px-1 py-0.5 text-sm font-bold text-foreground outline-none transition-colors hover:bg-black/5 focus:bg-black/5 focus:ring-1 focus:ring-primary/25 dark:hover:bg-white/5 dark:focus:bg-white/5 rounded-md -ml-1"
                                   title="点击可修改账号备注"
                                 />
                               </div>
@@ -805,7 +805,7 @@ function IntegrationModal({
                         </div>
 
                         {/* 底部操作分栏：编辑与测试等宽排布 */}
-                        <div className="grid grid-cols-2 gap-2 border-t border-black/5 bg-black/[0.015] px-3.5 py-2 dark:border-white/5 dark:bg-white/[0.015]">
+                        <div className="grid grid-cols-2 gap-2 border-t border-black/5 bg-black/1.5 px-3.5 py-2 dark:border-white/5 dark:bg-white/1.5">
                           <button
                             type="button"
                             onClick={() => toggleAccountEditor(acc.id, hasAccCookie)}
@@ -841,7 +841,7 @@ function IntegrationModal({
 
                         {/* 展开的 Cookie 输入框 */}
                         {isExpanded && (
-                          <div className="border-t border-black/5 bg-black/[0.02] p-3 dark:border-white/5 dark:bg-white/[0.02] animate-in fade-in duration-150">
+                          <div className="border-t border-black/5 bg-black/2 p-3 dark:border-white/5 dark:bg-white/2 animate-in fade-in duration-150">
                             <textarea
                               value={acc.cookie}
                               onChange={(event) => handleUpdateAccount(index, { cookie: event.target.value })}
@@ -1012,7 +1012,7 @@ function IntegrationModal({
                       </div>
 
                       {mapped?.localShopName && !isMappingInvalid ? (
-                        <div className="mt-3 rounded-xl border border-black/6 bg-black/[0.018] p-2.5 dark:border-white/8 dark:bg-white/[0.025]">
+                        <div className="mt-3 rounded-xl border border-black/6 bg-black/[0.018] p-2.5 dark:border-white/8 dark:bg-white/2.5">
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <div className="min-w-0">
                               <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">自配时间</div>
@@ -3055,7 +3055,7 @@ export default function OrdersPage() {
                     >
                       <div className="flex items-center justify-end gap-1.5 text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
                         <span className="leading-none">商家实收</span>
-                        <span className="relative flex h-1.5 w-1.5 shrink-0 items-center justify-center -translate-y-[1px]">
+                        <span className="relative flex h-1.5 w-1.5 shrink-0 items-center justify-center -translate-y-px">
                           <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60 duration-1000" />
                           <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.7)] transition-transform duration-200 group-hover/income:scale-125" />
                         </span>
@@ -3068,7 +3068,7 @@ export default function OrdersPage() {
                       <div
                         onClick={(e) => e.stopPropagation()}
                         className={cn(
-                          "hidden sm:block absolute right-0 top-full z-50 mt-2 w-[360px] transition-all duration-200 ease-out",
+                          "hidden sm:block absolute right-0 top-full z-50 mt-2 w-90 transition-all duration-200 ease-out",
                           isIncomeDetailsOpen
                             ? "pointer-events-auto opacity-100 translate-y-0 scale-100"
                             : "pointer-events-none opacity-0 translate-y-1 scale-95 group-hover/income:pointer-events-auto group-hover/income:opacity-100 group-hover/income:translate-y-0 group-hover/income:scale-100"
@@ -3087,7 +3087,7 @@ export default function OrdersPage() {
                           </div>
 
                           {/* 分店铺列表区域 */}
-                          <div className="flex flex-col gap-1.5 max-h-[230px] overflow-y-auto pr-1">
+                          <div className="flex max-h-57.5 flex-col gap-1.5 overflow-y-auto pr-1">
                             {shopReceivedEntries.length > 0 ? (
                               shopReceivedEntries.map((shop, idx) => {
                                 const displayShopName = shop.name === "未匹配店铺" ? shop.name : simplifyShopName(shop.name) || shop.name;
@@ -3098,7 +3098,7 @@ export default function OrdersPage() {
                                 return (
                                   <div
                                     key={shop.key || idx}
-                                    className="flex items-center justify-between gap-3 rounded-xl bg-black/[0.025] border border-black/4 px-3 py-2 text-xs dark:bg-white/[0.035] dark:border-white/6 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors"
+                                    className="flex items-center justify-between gap-3 rounded-xl bg-black/2.5 border border-black/4 px-3 py-2 text-xs dark:bg-white/[0.035] dark:border-white/6 hover:bg-black/4 dark:hover:bg-white/6 transition-colors"
                                   >
                                     <div className="min-w-0 flex-1">
                                       <div className="flex items-center gap-1.5">
@@ -3196,7 +3196,7 @@ export default function OrdersPage() {
                       {/* 移动端：真正的全屏居中弹窗（Portal 挂载，带遮罩与右上角关闭按钮） */}
                       {typeof document !== "undefined" && isIncomeDetailsOpen && createPortal(
                         <div
-                          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 sm:hidden animate-in fade-in duration-200"
+                          className="fixed inset-0 z-100 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 sm:hidden animate-in fade-in duration-200"
                           onClick={(e) => {
                             e.stopPropagation();
                             setIsIncomeDetailsOpen(false);
@@ -3205,7 +3205,7 @@ export default function OrdersPage() {
                           <div
                             ref={incomeModalRef}
                             onClick={(e) => e.stopPropagation()}
-                            className="relative flex w-full max-w-[340px] max-h-[85vh] flex-col rounded-3xl border border-black/10 bg-white text-left shadow-2xl backdrop-blur-xl dark:border-white/15 dark:bg-[#0c1220] animate-in zoom-in-95 duration-200 overflow-hidden"
+                            className="relative flex w-full max-w-85 max-h-[85vh] flex-col rounded-3xl border border-black/10 bg-white text-left shadow-2xl backdrop-blur-xl dark:border-white/15 dark:bg-[#0c1220] animate-in zoom-in-95 duration-200 overflow-hidden"
                           >
                             {/* 弹窗顶部栏：标题 + 右上角关闭按钮 */}
                             <div className="flex items-center justify-between border-b border-black/6 px-4 py-3 dark:border-white/8">
@@ -3243,7 +3243,7 @@ export default function OrdersPage() {
                                   return (
                                     <div
                                       key={shop.key || idx}
-                                      className="flex items-center justify-between gap-3 rounded-2xl bg-black/[0.025] border border-black/4 px-3 py-2 text-xs dark:bg-white/[0.035] dark:border-white/6"
+                                      className="flex items-center justify-between gap-3 rounded-2xl bg-black/2.5 border border-black/4 px-3 py-2 text-xs dark:bg-white/[0.035] dark:border-white/6"
                                     >
                                       <div className="min-w-0 flex-1">
                                         <div className="flex items-center gap-1.5">
@@ -3295,7 +3295,7 @@ export default function OrdersPage() {
                             </div>
 
                             {/* 弹窗底部汇总 */}
-                            <div className="border-t border-black/6 bg-black/[0.015] p-3.5 dark:border-white/8 dark:bg-white/[0.02] flex flex-col gap-2.5">
+                            <div className="border-t border-black/6 bg-black/1.5 p-3.5 dark:border-white/8 dark:bg-white/2 flex flex-col gap-2.5">
                               <div className="flex items-baseline justify-between px-0.5">
                                 <span className="text-xs font-semibold text-foreground dark:text-white">实收总计</span>
                                 <span className="text-base font-black text-emerald-600 dark:text-emerald-400 tabular-nums">
@@ -3362,7 +3362,7 @@ export default function OrdersPage() {
                               .map(([platform, count]) => {
                                 const meta = getPlatformBadgeMeta(platform);
                                 return (
-                                  <div key={platform} className="inline-flex items-center gap-1 rounded-lg bg-black/[0.03] dark:bg-white/[0.05] border border-black/4 dark:border-white/6 px-2 py-0.5 text-[11px] text-foreground/90 dark:text-white/90">
+                                  <div key={platform} className="inline-flex items-center gap-1 rounded-lg bg-black/3 dark:bg-white/5 border border-black/4 dark:border-white/6 px-2 py-0.5 text-[11px] text-foreground/90 dark:text-white/90">
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
                                     <img src={meta.iconSrc} alt={meta.iconAlt} className="h-3.5 w-3.5 object-contain shrink-0" onError={(e) => { e.currentTarget.style.display = "none"; }} />
                                     <span className="font-medium">{platform}</span>
@@ -3424,7 +3424,7 @@ export default function OrdersPage() {
                               .map(([platform, count]) => {
                                 const meta = getPlatformBadgeMeta(platform);
                                 return (
-                                  <div key={platform} className="inline-flex items-center gap-1 rounded-lg bg-black/[0.03] dark:bg-white/[0.05] border border-black/4 dark:border-white/6 px-2 py-0.5 text-[11px] text-foreground/90 dark:text-white/90">
+                                  <div key={platform} className="inline-flex items-center gap-1 rounded-lg bg-black/3 dark:bg-white/5 border border-black/4 dark:border-white/6 px-2 py-0.5 text-[11px] text-foreground/90 dark:text-white/90">
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
                                     <img src={meta.iconSrc} alt={meta.iconAlt} className="h-3.5 w-3.5 object-contain shrink-0" onError={(e) => { e.currentTarget.style.display = "none"; }} />
                                     <span className="font-medium">{platform}</span>
@@ -3486,7 +3486,7 @@ export default function OrdersPage() {
                               .map(([platform, count]) => {
                                 const meta = getPlatformBadgeMeta(platform);
                                 return (
-                                  <div key={platform} className="inline-flex items-center gap-1 rounded-lg bg-black/[0.03] dark:bg-white/[0.05] border border-black/4 dark:border-white/6 px-2 py-0.5 text-[11px] text-foreground/90 dark:text-white/90">
+                                  <div key={platform} className="inline-flex items-center gap-1 rounded-lg bg-black/3 dark:bg-white/5 border border-black/4 dark:border-white/6 px-2 py-0.5 text-[11px] text-foreground/90 dark:text-white/90">
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
                                     <img src={meta.iconSrc} alt={meta.iconAlt} className="h-3.5 w-3.5 object-contain shrink-0" onError={(e) => { e.currentTarget.style.display = "none"; }} />
                                     <span className="font-medium">{platform}</span>
@@ -3691,7 +3691,7 @@ export default function OrdersPage() {
 
       {isShopProfitOpen
         ? createPortal(
-            <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/45 p-2 backdrop-blur-sm sm:p-4" onMouseDown={() => setIsShopProfitOpen(false)}>
+            <div className="fixed inset-0 z-80 flex items-center justify-center bg-black/45 p-2 backdrop-blur-sm sm:p-4" onMouseDown={() => setIsShopProfitOpen(false)}>
               <div
                 className="flex max-h-[94vh] w-full max-w-6xl flex-col overflow-hidden rounded-[18px] border border-black/10 bg-white text-slate-950 shadow-2xl dark:border-white/10 dark:bg-[#111827] dark:text-white sm:max-h-[88vh] sm:rounded-[20px]"
                 onMouseDown={(event) => event.stopPropagation()}
@@ -3736,7 +3736,7 @@ export default function OrdersPage() {
                   {shopProfitEntries.length > 0 ? (
                     <div className="overflow-hidden rounded-xl border border-black/8 bg-slate-50/80 text-sm dark:border-white/10 dark:bg-white/[0.035]">
                       <div className="overflow-x-auto">
-                        <div className="hidden min-w-[1040px] grid-cols-[2.75rem_6.5rem_4.25rem_6.75rem_5.75rem_5.75rem_5.75rem_repeat(5,5.75rem)] border-b border-black/6 bg-slate-100/80 px-3 py-2 text-[11px] font-bold text-muted-foreground dark:border-white/8 dark:bg-white/5 xl:grid">
+                        <div className="hidden min-w-260 grid-cols-[2.75rem_6.5rem_4.25rem_6.75rem_5.75rem_5.75rem_5.75rem_repeat(5,5.75rem)] border-b border-black/6 bg-slate-100/80 px-3 py-2 text-[11px] font-bold text-muted-foreground dark:border-white/8 dark:bg-white/5 xl:grid">
                           <div className="text-center">#</div>
                           <div className="text-center">店铺</div>
                           <div className="text-center">订单</div>
@@ -3763,7 +3763,7 @@ export default function OrdersPage() {
                         const averageProfit = shop.count > 0 ? shop.amount / shop.count : 0;
 
                         return (
-                          <div key={shop.key} className="border-b border-black/6 px-3 py-2.5 last:border-b-0 dark:border-white/8 xl:grid xl:min-w-[1040px] xl:grid-cols-[2.75rem_6.5rem_4.25rem_6.75rem_5.75rem_5.75rem_5.75rem_repeat(5,5.75rem)] xl:items-center xl:px-3 xl:py-2">
+                          <div key={shop.key} className="border-b border-black/6 px-3 py-2.5 last:border-b-0 dark:border-white/8 xl:grid xl:min-w-260 xl:grid-cols-[2.75rem_6.5rem_4.25rem_6.75rem_5.75rem_5.75rem_5.75rem_repeat(5,5.75rem)] xl:items-center xl:px-3 xl:py-2">
                             <div className="hidden text-center text-xs font-black tabular-nums text-muted-foreground xl:block">
                               #{index + 1}
                             </div>
@@ -3994,7 +3994,7 @@ export default function OrdersPage() {
         title={matchEditorTarget?.shopName ? `修改商品匹配 · ${matchEditorTarget.shopName}` : "修改商品匹配"}
         headerBanner={
           matchEditorTarget ? (
-            <div className="rounded-2xl border border-black/8 dark:border-white/10 bg-slate-500/5 dark:bg-white/[0.03] p-2.5 sm:p-3 space-y-2 text-left shrink-0 shadow-xs backdrop-blur-md">
+            <div className="rounded-2xl border border-black/8 dark:border-white/10 bg-slate-500/5 dark:bg-white/3 p-2.5 sm:p-3 space-y-2 text-left shrink-0 shadow-xs backdrop-blur-md">
               {matchEditorTarget.order?.items && matchEditorTarget.order.items.length > 1 && (() => {
                 const items = matchEditorTarget.order.items;
                 const currentIndex = items.findIndex((it) => String(it.id || "") === matchEditorTarget.itemId);
@@ -4005,7 +4005,7 @@ export default function OrdersPage() {
                   <div className="flex items-center justify-between gap-1.5 p-1 rounded-full bg-zinc-100 dark:bg-white/10 border border-border/50 shrink-0 h-9 box-border">
                     {/* Tab 区域：完全复刻系统内置的 rounded-full 胶囊药丸风格（与下方的列表/大图控件一致） */}
                     <div
-                      className="flex items-center gap-1 overflow-x-auto no-scrollbar flex-nowrap flex-1 h-full items-center"
+                      className="flex items-center gap-1 overflow-x-auto no-scrollbar flex-nowrap flex-1 h-full"
                       onWheel={(e) => {
                         if (e.deltaY !== 0) {
                           e.currentTarget.scrollLeft += e.deltaY;
@@ -4047,7 +4047,7 @@ export default function OrdersPage() {
                     </div>
 
                     {/* PC 端快捷翻页按钮：同样采用 rounded-full 风格 */}
-                    <div className="flex items-center gap-0.5 shrink-0 pl-1 pr-0.5 border-l border-border/40 text-muted-foreground h-full items-center">
+                    <div className="flex items-center gap-0.5 shrink-0 pl-1 pr-0.5 border-l border-border/40 text-muted-foreground h-full">
                       <button
                         type="button"
                         onClick={() => hasPrev && openMatchEditor(matchEditorTarget.order!, items[currentIndex - 1], { autoOutbound: matchEditorTarget.autoOutbound })}
@@ -4105,7 +4105,7 @@ export default function OrdersPage() {
                   {/* 编码信息：固定高度 h-5，无货号时保留占位防塌陷 */}
                   <div className="h-5 flex items-center gap-2 text-xs text-muted-foreground overflow-hidden">
                     {matchEditorTarget.sku && !/^\d{7,}$/.test(String(matchEditorTarget.sku).trim()) ? (
-                      <span className="inline-flex items-center gap-1.5 rounded-lg bg-black/[0.04] dark:bg-white/[0.06] border border-black/6 dark:border-white/8 px-2 py-0.5 font-mono text-[11px] shrink-0">
+                      <span className="inline-flex items-center gap-1.5 rounded-lg bg-black/4 dark:bg-white/6 border border-black/6 dark:border-white/8 px-2 py-0.5 font-mono text-[11px] shrink-0">
                         <span className="text-[10px] text-muted-foreground font-sans">货号</span>
                         <span className="font-bold text-foreground">{matchEditorTarget.sku}</span>
                       </span>
