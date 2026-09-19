@@ -1040,7 +1040,6 @@ export async function GET(request: NextRequest) {
         const isOffline = order.platform === "线下交易" || String(order.platform || "").toLowerCase() === "other";
         const hasRealizedDeliveryCost = !isOffline
           && deliveryFee > 0
-          && hasOutbound
           && !isRefundableMeituanDelivery(order.platform, order.delivery);
         if (hasRealizedDeliveryCost) {
           if (point) {
