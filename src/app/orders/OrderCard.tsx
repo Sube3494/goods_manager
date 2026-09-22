@@ -42,6 +42,7 @@ import {
   readDeliveryFeeFromValue,
 } from "@/lib/autoPickOrderStatus";
 import { formatLocalDate, formatLocalDateTime } from "@/lib/dateUtils";
+import { cleanCustomerRemark } from "@/lib/customerRemark";
 
 const OrderRouteModal = dynamic(() => import("@/components/Orders/OrderRouteModal").then((module) => module.OrderRouteModal), { ssr: false });
 const CustomerHistoryModal = dynamic(() => import("@/components/Orders/CustomerHistoryModal").then((module) => module.CustomerHistoryModal), { ssr: false });
@@ -2580,6 +2581,7 @@ export const OrderCard = memo(function OrderCard({
   const visibleItems = getVisibleOrderItems(order.items);
   const unmatchedPlaceholderItem = (order.items || []).find(isUnmatchedOrIgnoredItem);
   const itemCount = getItemCount(visibleItems);
+  const usefulCustomerRemark = cleanCustomerRemark(order.customerRemark);
   const completed = isCompletedStatus(order.status);
   const cancelled = isCancelledStatus(order.status);
   const cancelReason = cancelled ? getCancelReason(order) : "";
@@ -3442,6 +3444,23 @@ export const OrderCard = memo(function OrderCard({
 
       <div className="px-3.5 py-3 sm:px-5 sm:py-4">
         <div className="grid gap-3">
+          {usefulCustomerRemark ? (
+            <div
+              className="flex items-start gap-2.5 rounded-[18px] border border-amber-500/20 bg-amber-500/10 px-3 py-2.5 text-amber-950 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-100 sm:rounded-2xl sm:px-3.5 sm:py-3"
+              role="note"
+              aria-label="顾客备注"
+            >
+              <FileText size={15} className="mt-0.5 shrink-0 text-amber-600 dark:text-amber-300" />
+              <div className="min-w-0">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-700/80 dark:text-amber-300/80">
+                  顾客备注
+                </div>
+                <p className="mt-0.5 whitespace-pre-wrap break-words text-xs font-semibold leading-5 sm:text-[13px]">
+                  {usefulCustomerRemark}
+                </p>
+              </div>
+            </div>
+          ) : null}
           {visibleItems.length > 0 ? (
             <div className="rounded-[18px] border border-black/6 bg-black/2 p-2.5 dark:border-white/8 dark:bg-white/3 sm:rounded-3xl sm:p-4">
               <div className="flex items-center justify-between gap-3">
@@ -3748,7 +3767,7 @@ export const OrderCard = memo(function OrderCard({
                   />
                   <DetailBlock
                     label="顾客备注"
-                    value={order.customerRemark || "-"}
+                    value={usefulCustomerRemark || "-"}
                     className="sm:col-span-2"
                   />
                   <DetailStat

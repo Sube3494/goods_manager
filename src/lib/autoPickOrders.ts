@@ -1,6 +1,7 @@
 import prisma from "@/lib/prisma";
 import { assertMaiyatianCookieResponse } from "@/lib/maiyatianCookieResponse";
 import { formatLocalDate, parseAsShanghaiTime } from "@/lib/dateUtils";
+import { cleanCustomerRemark, firstMeaningfulCustomerRemark } from "@/lib/customerRemark";
 import {
   getBaseAutoPickStatusDisplay,
   hasAutoPickCompletionProof,
@@ -507,18 +508,16 @@ export function readCustomerRemarkFromRawPayload(rawPayload: unknown): string | 
   }
 
   const readRemarkFromRecord = (record: Record<string, unknown>) => {
-    const value = String(
-      record.customerRemark
-      || record.user_remark
-      || record.userRemark
-      || record.buyer_remark
-      || record.buyerRemark
-      || record.remark
-      || record.memo
-      || record.note
-      || ""
-    ).trim();
-    return value || null;
+    return firstMeaningfulCustomerRemark(
+      record.customerRemark,
+      record.user_remark,
+      record.userRemark,
+      record.buyer_remark,
+      record.buyerRemark,
+      record.remark,
+      record.memo,
+      record.note,
+    );
   };
 
   const root = rawPayload as Record<string, unknown>;
@@ -2553,17 +2552,16 @@ async function enrichMaiyatianOrderByCookie(cookie: string, order: AutoPickInbou
     order.delivery = deliveryInfo;
   }
 
-  const customerRemark = detailData ? String(
-    detailData.customerRemark
-    || detailData.user_remark
-    || detailData.userRemark
-    || detailData.buyer_remark
-    || detailData.buyerRemark
-    || detailData.remark
-    || detailData.memo
-    || detailData.note
-    || ""
-  ).trim() : "";
+  const customerRemark = detailData ? firstMeaningfulCustomerRemark(
+    detailData.customerRemark,
+    detailData.user_remark,
+    detailData.userRemark,
+    detailData.buyer_remark,
+    detailData.buyerRemark,
+    detailData.remark,
+    detailData.memo,
+    detailData.note,
+  ) : null;
   if (customerRemark) {
     order.customerRemark = customerRemark;
   }
@@ -2582,7 +2580,8 @@ async function enrichMaiyatianOrderByCookie(cookie: string, order: AutoPickInbou
 
   const detailRemark = detailDataObj?.user_remark || detailDataObj?.remark || detailDataObj?.buyer_remark || detailDataObj?.memo;
   if (detailRemark) {
-    order.customerRemark = String(detailRemark).trim();
+    const cleanedDetailRemark = cleanCustomerRemark(detailRemark);
+    if (cleanedDetailRemark) order.customerRemark = cleanedDetailRemark;
   }
 
   const detailOrderTime = String(detailData.order_time || "").trim();
@@ -3562,17 +3561,16 @@ export function normalizeAutoPickOrderPayload(payload: unknown): AutoPickInbound
 
   const normalized: AutoPickInboundOrder = {
     id: String(input.id || "").trim(),
-    customerRemark: String(
-      input.customerRemark
-      || input.user_remark
-      || input.userRemark
-      || input.buyer_remark
-      || input.buyerRemark
-      || input.remark
-      || input.memo
-      || input.note
-      || ""
-    ).trim() || undefined,
+    customerRemark: firstMeaningfulCustomerRemark(
+      input.customerRemark,
+      input.user_remark,
+      input.userRemark,
+      input.buyer_remark,
+      input.buyerRemark,
+      input.remark,
+      input.memo,
+      input.note,
+    ) || undefined,
     user_remark: input.user_remark !== undefined ? String(input.user_remark).trim() : undefined,
     userRemark: input.userRemark !== undefined ? String(input.userRemark).trim() : undefined,
     buyer_remark: input.buyer_remark !== undefined ? String(input.buyer_remark).trim() : undefined,
@@ -4271,7 +4269,10 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
       rawPayload: asPrismaJsonValue(nextRawPayloadWithResolvedShop),
       // 备注：优先使用平台同步回来的值；如果平台没有返回（null/空），则保留数据库中已有的备注，
       // 避免一键同步时把用户手动添加/平台历史备注覆盖为空。
-      customerRemark: normalized.customerRemark || existing?.customerRemark || readCustomerRemarkFromRawPayload(existing?.rawPayload) || null,
+      customerRemark: normalized.customerRemark
+        || cleanCustomerRemark(existing?.customerRemark)
+        || readCustomerRemarkFromRawPayload(existing?.rawPayload)
+        || null,
       lastSyncedAt: new Date(),
     } satisfies Prisma.AutoPickOrderUncheckedUpdateInput;
 
