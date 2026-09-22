@@ -1,5 +1,5 @@
 const EMPTY_CARD_CONTENT = /^(?:不需要|无需|不要|无)(?:贺卡|卡片)$/i;
-const DEFAULT_SHORTAGE_INSTRUCTION = /^(?:如遇)?缺货时?(?:请)?(?:及时)?(?:电话|致电)(?:与我|和我)?沟通(?:联系)?[。.!！]?$/i;
+const DEFAULT_SHORTAGE_INSTRUCTION = /^(?:如遇)?缺货时?(?:请)?(?:及时)?(?:电话|致电)(?:与我|和我)?(?:沟通|联系)[。.!！]?$/i;
 const JD_ORDER_MARKER = /【\s*JD\d{10,}\s*】/gi;
 
 function decodeHtmlEntities(value: string) {
@@ -10,6 +10,14 @@ function decodeHtmlEntities(value: string) {
     .replace(/&amp;?/gi, "&")
     .replace(/&lt;?/gi, "<")
     .replace(/&gt;?/gi, ">");
+}
+
+function isDefaultShortageInstruction(value: string) {
+  const unwrapped = value
+    .trim()
+    .replace(/^[\s(（[【]+|[\s)）\]】]+$/g, "")
+    .trim();
+  return DEFAULT_SHORTAGE_INSTRUCTION.test(unwrapped);
 }
 
 /** Removes marketplace wrappers/default choices, retaining actionable text. */
@@ -37,7 +45,7 @@ export function cleanCustomerRemark(value: unknown): string | null {
 
       if (!content) return " ";
       if (label === "卡片内容" && EMPTY_CARD_CONTENT.test(content)) return " ";
-      if (label === "如遇缺货" && DEFAULT_SHORTAGE_INSTRUCTION.test(content)) return " ";
+      if (label === "如遇缺货" && isDefaultShortageInstruction(content)) return " ";
       return `${content} `;
     },
   );
@@ -48,7 +56,7 @@ export function cleanCustomerRemark(value: unknown): string | null {
     .replace(/\s*\n\s*/g, "\n")
     .trim();
 
-  if (DEFAULT_SHORTAGE_INSTRUCTION.test(remark)) {
+  if (isDefaultShortageInstruction(remark)) {
     return null;
   }
 
