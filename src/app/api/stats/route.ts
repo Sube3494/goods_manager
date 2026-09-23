@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getAuthorizedUser } from "@/lib/auth";
+import { getAuthorizedUserAny } from "@/lib/auth";
 import { hasAdminAccess } from "@/lib/permissions";
 import { FinanceMath } from "@/lib/math";
 import {
@@ -281,7 +281,7 @@ function resolveDashboardIncomeMetrics(
 export async function GET(request: NextRequest) {
   const perf = createRequestPerfTracker(request);
   try {
-    const user = await getAuthorizedUser("dashboard:read");
+    const user = await getAuthorizedUserAny("dashboard:read", "marketing:read");
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -1250,6 +1250,7 @@ export async function GET(request: NextRequest) {
           brushOrderCount: point?.brushOrderCount || 0,
           orderCount,
           cumulativeOrderCount: cumulativeOrders,
+          userPaid: point?.userPaid || 0,
           productCost: point?.productCost || 0,
           brushExpense: point?.brushExpense || 0,
           promotionExpense: point?.promotionExpense || 0,
@@ -1471,6 +1472,169 @@ export async function GET(request: NextRequest) {
       returningCustomerTopProducts: returningTop5,
     };
 
+    const productSalesMap = new Map<string, {
+      productName: string;
+      sku: string | null;
+      image: string | null;
+      quantity: number;
+      orderNos: Set<string>;
+      platformQuantities: Record<string, number>;
+      orders: Map<string, { id: string; orderNo: string; date: string; platform: string; shopName: string; status?: string | null; quantity: number; actualPaid: number }>;
+    }>();
+    const productSalesDailyMap = new Map(dateSeries.map((item) => [item.date, { ...item, quantity: 0 }]));
+
+    const addProductSale = (input: {
+      productName: string;
+      sku?: string | null;
+      image?: string | null;
+      quantity: number;
+      orderNo: string;
+      orderId: string;
+      platform: string;
+      dateKey: string;
+      shopName: string;
+      status?: string | null;
+      actualPaid: number;
+    }) => {
+      const productName = String(input.productName || "").trim();
+      const sku = String(input.sku || "").trim() || null;
+      const quantity = Math.max(1, Number(input.quantity || 1) || 1);
+      if (!productName || productName === "手工配送占位商品" || sku === "__manual_delivery_placeholder__") return;
+      const key = `${sku || ""}::${productName}`;
+      const current = productSalesMap.get(key) || {
+        productName,
+        sku,
+        image: input.image || null,
+        quantity: 0,
+        orderNos: new Set<string>(),
+        platformQuantities: {} as Record<string, number>,
+        orders: new Map(),
+      };
+      if (!current.image && input.image) current.image = input.image;
+      current.quantity += quantity;
+      current.orderNos.add(input.orderNo);
+      current.platformQuantities[input.platform] = (current.platformQuantities[input.platform] || 0) + quantity;
+      const existingOrder = current.orders.get(input.orderNo);
+      current.orders.set(input.orderNo, {
+        id: input.orderId,
+        orderNo: input.orderNo,
+        date: input.dateKey,
+        platform: input.platform,
+        shopName: input.shopName,
+        status: input.status,
+        quantity: (existingOrder?.quantity || 0) + quantity,
+        actualPaid: input.actualPaid,
+      });
+      productSalesMap.set(key, current);
+      const daily = productSalesDailyMap.get(input.dateKey);
+      if (daily) daily.quantity += quantity;
+    };
+
+    filteredAutoPickOrdersInRange.forEach((order) => {
+      if (
+        readMainSystemSelfDeliveryFlag(order.rawPayload)
+        || isAutoPickOrderCancelledStatus(order.status)
+        || isAutoPickOrderDeletedStatus(order.status)
+        || isVoidedOfflineOrder(order)
+      ) return;
+
+      const platform = normalizePlatform(order.platform);
+      const dateKey = resolveAutoPickOrderDateKey(order);
+      const resolvedOrderShopName = resolveAutoPickMatchedShopName(order, permissionsObj) || readShopNameFromRawPayload(order.rawPayload) || "未匹配店铺";
+      const actualPaidYuan = Math.max(0, Number(order.actualPaid || 0) / 100);
+      order.items.forEach((item) => {
+        const payload = item.rawPayload && typeof item.rawPayload === "object" && !Array.isArray(item.rawPayload)
+          ? item.rawPayload as Record<string, unknown>
+          : null;
+        const manualMatched = payload?.manualMatchedProduct && typeof payload.manualMatchedProduct === "object"
+          ? payload.manualMatchedProduct as Record<string, unknown>
+          : null;
+        if (payload?.ignoreOutbound === true || payload?.isManualIgnored === true || manualMatched?.id === "__ignored__") return;
+        const isPlaceholder = String(item.productNo || "").trim() === "__manual_delivery_placeholder__"
+          || payload?.isManualDeliveryPlaceholder === true
+          || String(item.productName || "").trim() === "手工配送占位商品";
+        if (isPlaceholder && !manualMatched) return;
+        const image = String(item.thumb || manualMatched?.image || payload?.imageUrl || payload?.picture || payload?.picUrl || payload?.image || "").trim() || null;
+        const bundles = Array.isArray(manualMatched?.bundleItems) ? manualMatched.bundleItems as Array<Record<string, unknown>> : [];
+        if (bundles.length > 0) {
+          bundles.forEach((bundle) => addProductSale({
+            productName: String(bundle.name || "未命名商品"),
+            sku: String(bundle.sku || "") || null,
+            image: String(bundle.image || image || "") || null,
+            quantity: Math.max(1, Number(item.quantity || 1)) * Math.max(1, Number(bundle.quantity || 1)),
+            orderNo: order.orderNo,
+            orderId: order.id,
+            platform,
+            dateKey,
+            shopName: resolvedOrderShopName,
+            status: order.status,
+            actualPaid: actualPaidYuan,
+          }));
+          return;
+        }
+        addProductSale({
+          productName: String(manualMatched?.name || item.productName || "未命名商品"),
+          sku: String(manualMatched?.sku || item.productNo || "") || null,
+          image,
+          quantity: item.quantity,
+          orderNo: order.orderNo,
+          orderId: order.id,
+          platform,
+          dateKey,
+          shopName: resolvedOrderShopName,
+          status: order.status,
+          actualPaid: actualPaidYuan,
+        });
+      });
+    });
+
+    const productSalesItems = Array.from(productSalesMap.values())
+      .map((item) => {
+        const stockRows = shopProductRows.filter((product) => (
+          (item.sku && product.sku && item.sku === product.sku)
+          || product.productName === item.productName
+        ));
+        return {
+          productName: item.productName,
+          sku: item.sku,
+          image: item.image ? storage.resolveUrl(item.image) : null,
+          quantity: item.quantity,
+          orderCount: item.orderNos.size,
+          stock: stockRows.length > 0
+            ? stockRows.reduce((sum, product) => sum + Number(product.stock || 0), 0)
+            : null,
+          platformQuantities: item.platformQuantities,
+          orders: Array.from(item.orders.values()).sort((a, b) => b.date.localeCompare(a.date)),
+        };
+      })
+      .sort((a, b) => b.quantity - a.quantity || b.orderCount - a.orderCount);
+    const productSalesMissingImages = productSalesItems.filter((item) => !item.image);
+    if (productSalesMissingImages.length > 0) {
+      const missingSkus = productSalesMissingImages.map((item) => item.sku).filter(Boolean) as string[];
+      const missingNames = productSalesMissingImages.map((item) => item.productName).filter(Boolean);
+      const productImages = await prisma.product.findMany({
+        where: {
+          userId: targetUserId,
+          OR: [
+            ...(missingSkus.length > 0 ? [{ sku: { in: missingSkus } }] : []),
+            ...(missingNames.length > 0 ? [{ name: { in: missingNames } }] : []),
+          ],
+          image: { not: null },
+        },
+        select: { sku: true, name: true, image: true },
+      });
+      productSalesMissingImages.forEach((item) => {
+        const matched = productImages.find((product) => (item.sku && product.sku === item.sku) || product.name === item.productName);
+        if (matched?.image) item.image = storage.resolveUrl(matched.image);
+      });
+    }
+    const productSales = {
+      totalQuantity: productSalesItems.reduce((sum, item) => sum + item.quantity, 0),
+      productCount: productSalesItems.length,
+      items: productSalesItems,
+      daily: Array.from(productSalesDailyMap.values()),
+    };
+
     const shopBreakdownMap = new Map<string, { shopId: string; shopName: string; skuCount: number; stock: number; lowStockCount: number; value: number }>();
     shopProductRows.forEach((item) => {
       const current = shopBreakdownMap.get(item.shopId) || {
@@ -1586,6 +1750,7 @@ export async function GET(request: NextRequest) {
         grandTotal: platformMatrixColumns.reduce((sum, item) => sum + item.totalCount, 0),
       },
       customerAnalysis,
+      productSales,
       businessTrend,
       platformBusinessTrend,
       shopBreakdown,

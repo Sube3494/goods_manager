@@ -11,6 +11,7 @@ interface PaginationProps {
   onPageChange: (page: number) => void;
   onPageSizeChange: (size: number) => void;
   pageSizeOptions?: number[];
+  className?: string;
 }
 
 export function Pagination({
@@ -21,9 +22,10 @@ export function Pagination({
   onPageChange,
   onPageSizeChange,
   pageSizeOptions = [10, 20, 50, 100],
+  className,
 }: PaginationProps) {
   return (
-    <div className="mt-5 rounded-[22px] border border-border bg-white/80 px-3.5 py-3 shadow-sm backdrop-blur-sm transition-all animate-in fade-in slide-in-from-bottom-2 duration-300 dark:bg-white/[0.04] sm:px-5 sm:py-4">
+    <div className={cn("mt-5 rounded-[22px] border border-border bg-white/80 px-3.5 py-3 shadow-sm backdrop-blur-sm transition-all animate-in fade-in slide-in-from-bottom-2 duration-300 dark:bg-white/[0.04] sm:px-5 sm:py-4", className)}>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">

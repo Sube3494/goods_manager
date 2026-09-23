@@ -2,6 +2,7 @@ import { JWTPayload } from "jose";
 
 export type Permission = 
   | "dashboard:read"
+  | "marketing:read"
   | "product:read" | "product:create" | "product:update" | "product:delete" | "product:import" | "product:export" | "shop_product:manage"
   | "category:manage" | "category:create" | "category:update" | "category:delete"
   | "supplier:manage" | "supplier:create" | "supplier:update" | "supplier:delete"
@@ -54,6 +55,7 @@ export const PERMISSION_TREE = [
     label: "概述看板",
     children: [
       { key: "dashboard:read", label: "查看概述" },
+      { key: "marketing:read", label: "查看营销分析" },
     ]
   },
   {
@@ -257,6 +259,13 @@ export const PAGE_PERMISSION_TREE: PagePermissionGroup[] = [
         label: "概览",
         description: "仓储总览与快捷入口",
         accessKey: "dashboard:read",
+        actions: [],
+      },
+      {
+        key: "marketing_analysis",
+        label: "营销分析",
+        description: "查看商品销量、关联订单与渠道经营数据",
+        accessKey: "marketing:read",
         actions: [],
       },
       {
@@ -719,6 +728,7 @@ type RouteAccessRule = {
 
 const DEFAULT_ROUTE_RULES: RouteAccessRule[] = [
   { href: "/", permission: "dashboard:read" },
+  { href: "/marketing-analysis", permission: "marketing:read" },
   { href: "/goods", superAdminOnly: true, permission: "product:read" },
   { href: "/shop-goods", permission: "product:read" },
   { href: "/categories", permission: "category:manage" },

@@ -1,4 +1,4 @@
-import { LayoutDashboard, Package, Settings, PlusCircle, Layers, Truck, ShoppingCart, Camera, Users, CreditCard, ArrowUpRight, ShieldAlert, LucideIcon, Store, PanelsTopLeft, Navigation2, Clock, WalletCards, KeyRound } from "lucide-react";
+import { LayoutDashboard, Package, Settings, PlusCircle, Layers, Truck, ShoppingCart, Camera, Users, CreditCard, ArrowUpRight, ShieldAlert, LucideIcon, Store, PanelsTopLeft, Navigation2, Clock, WalletCards, KeyRound, ChartNoAxesCombined } from "lucide-react";
 import { AdminCapability, Permission, hasAdminAccess } from "./permissions";
 
 export interface NavItem {
@@ -16,6 +16,7 @@ export interface NavItem {
 
 export const navItems: NavItem[] = [
   { name: "概览", href: "/", icon: LayoutDashboard, adminOnly: true, permission: "dashboard:read", description: "仓储总览与快捷入口", section: "workspace" },
+  { name: "营销分析", href: "/marketing-analysis", icon: ChartNoAxesCombined, adminOnly: true, permission: "marketing:read", description: "渠道、店铺与客户营销洞察", section: "workspace" },
   { name: "商品管理", href: "/goods", icon: Package, adminOnly: true, superAdminOnly: true, permission: "product:read", description: "商品档案与库存查询", section: "workspace" },
   { name: "店铺商品", href: "/shop-goods", icon: Store, adminOnly: true, permission: "product:read", description: "按店铺管理经营商品清单", section: "workspace" },
   { name: "保质期管理", href: "/shelf-life", icon: Clock, adminOnly: true, permission: "shelf_life:read", description: "批次台账与临期预警", section: "workspace" },

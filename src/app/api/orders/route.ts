@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getAuthorizedUser } from "@/lib/auth";
+import { getAuthorizedUser, getAuthorizedUserAny } from "@/lib/auth";
 import { hasAdminAccess, hasPermission } from "@/lib/permissions";
 import {
   backfillJdSkuIdForManualMatchedShopProducts,
@@ -1049,9 +1049,26 @@ function roundCurrency(value: number) {
 
 export async function GET(request: NextRequest) {
   const perf = createRequestPerfTracker(request);
-  const session = await getAuthorizedUser("order:manage");
+  const searchParams = request.nextUrl.searchParams;
+  const isMarketingLookup = searchParams.get("_marketing") === "1";
+  const session = isMarketingLookup
+    ? await getAuthorizedUserAny("order:manage", "marketing:read")
+    : await getAuthorizedUser("order:manage");
   if (!session) {
     return NextResponse.json({ error: "Permission denied" }, { status: 403 });
+  }
+
+  const requestedOrderIds = Array.from(new Set(
+    String(searchParams.get("ids") || "")
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean)
+  )).slice(0, 100);
+  if (isMarketingLookup && (
+    searchParams.get("_lite") !== "1"
+    || requestedOrderIds.length === 0
+  )) {
+    return NextResponse.json({ error: "Marketing order lookup must be read-only and ID-scoped" }, { status: 403 });
   }
 
   try {
@@ -1059,18 +1076,11 @@ export async function GET(request: NextRequest) {
     void processDueAutoCompleteJobs(5).catch(() => {});
 
     const storage = await getStorageStrategy();
-    const searchParams = request.nextUrl.searchParams;
     const liteMode = searchParams.get("_lite") === "1";
     const includeMetrics = !liteMode && searchParams.get("_metrics") === "1";
     const page = Math.max(1, Number(searchParams.get("page") || 1));
     const pageSize = Math.min(10000, Math.max(1, Number(searchParams.get("pageSize") || 20)));
     const query = String(searchParams.get("query") || "").trim();
-    const requestedOrderIds = Array.from(new Set(
-      String(searchParams.get("ids") || "")
-        .split(",")
-        .map((item) => item.trim())
-        .filter(Boolean)
-    )).slice(0, 100);
     const platform = String(searchParams.get("platform") || "").trim();
     const status = String(searchParams.get("status") || "").trim();
     const productCostStatusFilter = status === "pending-outbound" || status === "pending-backfill"

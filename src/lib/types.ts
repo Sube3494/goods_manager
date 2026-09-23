@@ -623,6 +623,36 @@ export interface StatsData {
   businessTrend?: DashboardBusinessTrendPoint[];
   platformBusinessTrend?: Record<string, DashboardBusinessTrendPoint[]>;
   customerAnalysis?: DashboardCustomerAnalysis;
+  productSales?: DashboardProductSales;
+}
+
+export interface DashboardProductSalesItem {
+  productName: string;
+  sku?: string | null;
+  image?: string | null;
+  quantity: number;
+  orderCount: number;
+  stock: number | null;
+  platformQuantities: Record<string, number>;
+  orders: DashboardProductSalesOrder[];
+}
+
+export interface DashboardProductSalesOrder {
+  id: string;
+  orderNo: string;
+  date: string;
+  platform: string;
+  shopName: string;
+  status?: string | null;
+  quantity: number;
+  actualPaid: number;
+}
+
+export interface DashboardProductSales {
+  totalQuantity: number;
+  productCount: number;
+  items: DashboardProductSalesItem[];
+  daily: Array<{ date: string; label: string; quantity: number }>;
 }
 
 export interface DashboardTrendPoint {
@@ -669,6 +699,7 @@ export interface DashboardPlatformMatrix {
 export interface DashboardBusinessTrendPoint {
   date: string;
   label: string;
+  userPaid?: number;
   netProfit: number;
   pureProfit?: number;
   platformPureProfit?: Record<string, number>;
