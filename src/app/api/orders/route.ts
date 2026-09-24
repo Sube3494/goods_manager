@@ -2194,9 +2194,11 @@ export async function GET(request: NextRequest) {
               sourceProductId: true,
               productName: true,
               productImage: true,
+              costPrice: true,
               product: {
                 select: {
                   image: true,
+                  costPrice: true,
                 },
               },
               shop: {
@@ -2221,6 +2223,7 @@ export async function GET(request: NextRequest) {
         taobaoSkuId: item.taobaoSkuId,
         doudianSkuId: item.doudianSkuId,
         image: rawImage ? storage.resolveUrl(rawImage) : null,
+        costPrice: Number(item.costPrice || item.product?.costPrice || 0) || null,
         sourceType: "shopProduct" as const,
         productId: item.productId || item.sourceProductId || null,
         shopProductId: item.id,
@@ -2513,6 +2516,7 @@ export async function GET(request: NextRequest) {
             );
             const fallbackImg = foundShopProduct?.image || null;
             matchedProduct.image = matchedProduct.image ? storage.resolveUrl(matchedProduct.image) : fallbackImg;
+            Object.assign(matchedProduct, { costPrice: foundShopProduct?.costPrice || null });
             if (!manualMatchedProduct && !isCompositeSku && isMeituanPlatform(order.platform) && strictPlatformProductId && foundShopProduct?.id) {
               autoMatchedMeituanBackfills.push({
                 shopProductId: foundShopProduct.id,
@@ -2578,6 +2582,7 @@ export async function GET(request: NextRequest) {
                   ) || "-",
                   image: bResolvedImg,
                   quantity: bQty,
+                  costPrice: foundBShopProduct?.costPrice || null,
                   sourceId: bSourceId || undefined,
                 };
               })
@@ -2597,6 +2602,7 @@ export async function GET(request: NextRequest) {
                   ) || candidate,
                   image: segmentMatchedProduct?.image || (item.thumb ? storage.resolveUrl(item.thumb) : null),
                   quantity: segQty,
+                  costPrice: segmentMatchedProduct?.costPrice || null,
                   sourceId: segSourceId || undefined,
                 };
               })

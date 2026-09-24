@@ -770,6 +770,7 @@ export function getOrderItemDisplay(item: AutoPickOrderItem, platform?: string |
     sku: matchedProduct?.sku || (isManualDeliveryPlaceholder && !realResolvedName ? "不加则只记配送费" : item.productNo) || "-",
     image: matchedProduct?.image || item.thumb || rawThumbCandidate,
     quantity: Math.max(1, Number((matchedProduct as any)?.quantity || item.quantity || 1) || 1),
+    costPrice: matchedProduct?.costPrice || null,
     sourceId: isManualDeliveryPlaceholder && !realResolvedName ? undefined : sourceId || undefined,
     optionalMatch: isManualDeliveryPlaceholder && !realResolvedName,
   };
@@ -785,6 +786,7 @@ export function getExpandedOrderItemDisplays(item: AutoPickOrderItem, platform?:
       sku: displayItem.sku || matchedProduct?.sku || item.productNo || "-",
       image: displayItem.image || item.thumb || null,
       quantity: displayItem.quantity,
+      costPrice: displayItem.costPrice || null,
       sourceId: (displayItem as any).sourceId || undefined,
     }));
   }
@@ -2037,7 +2039,7 @@ export function ProductStripItem({
   isTaobaoOrder = false,
   isDoudianOrder = false,
 }: {
-  display: { name: string; sku: string; image: string | null; quantity: number; sourceId?: string; optionalMatch?: boolean };
+  display: { name: string; sku: string; image: string | null; quantity: number; costPrice?: number | null; sourceId?: string; optionalMatch?: boolean };
   onEditMatch?: () => void;
   showEditMatch?: boolean;
   matchedProduct?: AutoPickOrderItem['matchedProduct'];
@@ -2146,6 +2148,11 @@ export function ProductStripItem({
               <span className="shrink-0">{display.sku}</span>
             ) : null}
             <span className="shrink-0">x{display.quantity}</span>
+            {typeof display.costPrice === "number" && Number.isFinite(display.costPrice) && display.costPrice > 0 ? (
+              <span className="shrink-0 text-emerald-600 dark:text-emerald-400">
+                成本 ¥{display.costPrice.toFixed(2)}
+              </span>
+            ) : null}
             {showMatchStatus ? (
               <span className={cn(
                 "inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[10px] font-medium leading-none whitespace-nowrap sm:text-[11px]",

@@ -173,6 +173,7 @@ export interface AutoPickOrderItem {
     sku?: string | null;
     image?: string | null;
     quantity: number;
+    costPrice?: number | null;
     sourceId?: string;
   }>;
   matchedProduct?: {
@@ -183,6 +184,7 @@ export interface AutoPickOrderItem {
     sourceType: "product" | "shopProduct";
     shopProductId?: string | null;
     productId?: string | null;
+    costPrice?: number | null;
     shopName?: string | null;
     isManual?: boolean;
     matchMethod?: "id" | "sku" | "manual";
