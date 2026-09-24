@@ -68,6 +68,7 @@ import { simplifyShopName } from "@/lib/shopIdentity";
 type OrderAction = "self-delivery" | "complete-delivery" | "pickup-complete" | "sync" | "outbound";
 type OrdersTab = "today" | "appointments" | "all";
 type PurchaseDraftPayload = PurchaseOrder & { sourceOrderId?: string };
+const SHOW_APPOINTMENT_TAB = false;
 const SHOP_PROFIT_PLATFORMS = ["美团", "京东", "淘宝", "抖店", "线下交易"] as const;
 const UNMATCHED_SHOP_FILTER = "__unmatched__";
 const SHOP_PROFIT_PLATFORM_ICONS: Record<(typeof SHOP_PROFIT_PLATFORMS)[number], string> = {
@@ -1890,7 +1891,7 @@ export default function OrdersPage() {
   useEffect(() => {
     if (tabParam === "all") {
       setActiveTab("all");
-    } else if (tabParam === "appointments") {
+    } else if (SHOW_APPOINTMENT_TAB && tabParam === "appointments") {
       setActiveTab("appointments");
     } else if (tabParam === "today") {
       setActiveTab("today");
@@ -3050,8 +3051,8 @@ export default function OrdersPage() {
               {/* 平移滑动的高亮胶囊背景滑块 */}
               <div
                 className={cn(
-                  "absolute top-1 bottom-1 left-1 w-[calc((100%_-_8px)/3)] rounded-full bg-foreground dark:bg-white shadow-xs transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] pointer-events-none",
-                  activeTab === "appointments" ? "translate-x-full" : activeTab === "all" ? "translate-x-[200%]" : "translate-x-0"
+                  "absolute top-1 bottom-1 left-1 w-[calc(50%-4px)] rounded-full bg-foreground dark:bg-white shadow-xs transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] pointer-events-none",
+                  activeTab === "all" ? "translate-x-full" : "translate-x-0"
                 )}
               />
 
@@ -3067,18 +3068,20 @@ export default function OrdersPage() {
               >
                 今日推单
               </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab("appointments")}
-                className={cn(
-                  "relative z-10 flex-1 rounded-full px-3 py-2 text-sm font-medium transition-colors duration-200 sm:min-w-35 cursor-pointer text-center select-none",
-                  activeTab === "appointments"
-                    ? "text-background dark:text-black font-semibold"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                预约单
-              </button>
+              {SHOW_APPOINTMENT_TAB ? (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("appointments")}
+                  className={cn(
+                    "relative z-10 flex-1 rounded-full px-3 py-2 text-sm font-medium transition-colors duration-200 sm:min-w-35 cursor-pointer text-center select-none",
+                    activeTab === "appointments"
+                      ? "text-background dark:text-black font-semibold"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  预约单
+                </button>
+              ) : null}
               <button
                 type="button"
                 onClick={() => setActiveTab("all")}
@@ -3724,7 +3727,7 @@ export default function OrdersPage() {
             onShopChange={setCurrentSelectedShop}
           />
         </div>
-        {appointmentOrdersMounted && (
+        {SHOW_APPOINTMENT_TAB && appointmentOrdersMounted && (
           <div className={activeTab === "appointments" ? "block" : "hidden"}>
             <AllOrdersView
               key="appointment-orders"
