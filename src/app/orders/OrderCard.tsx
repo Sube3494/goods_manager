@@ -1080,9 +1080,34 @@ export function formatCompactDateTime(value: string | null | undefined) {
   return match?.[1] || text;
 }
 
-export function getFilterDateValue(value: string | null | undefined) {
+export function getFilterDateValue(value: string | null | undefined, referenceDate?: string | Date | null) {
   const text = String(value || "").trim();
   if (!text) return "";
+
+  // 麦芽田预约时间常见格式为 MM-DD HH:mm。直接交给 Date 解析会被部分
+  // 浏览器当作 2001 年，预约单因此会被错误归入“已逾期”。
+  const shortDateMatch = text.match(/^(\d{2})[-/](\d{2})(?:\s|$)/);
+  if (shortDateMatch) {
+    const reference = referenceDate ? new Date(referenceDate) : new Date();
+    const safeReference = Number.isNaN(reference.getTime()) ? new Date() : reference;
+    const referenceDateText = formatLocalDate(safeReference);
+    let year = Number(referenceDateText.slice(0, 4));
+    const month = shortDateMatch[1];
+    const day = shortDateMatch[2];
+    let candidate = new Date(`${year}-${month}-${day}T00:00:00+08:00`);
+    const halfYearMs = 183 * 24 * 60 * 60 * 1000;
+
+    // 预约通常与下单时间相邻；用最近年份兼容 12 月下单、次年 1 月送达。
+    if (candidate.getTime() < safeReference.getTime() - halfYearMs) {
+      year += 1;
+      candidate = new Date(`${year}-${month}-${day}T00:00:00+08:00`);
+    } else if (candidate.getTime() > safeReference.getTime() + halfYearMs) {
+      year -= 1;
+      candidate = new Date(`${year}-${month}-${day}T00:00:00+08:00`);
+    }
+
+    return Number.isNaN(candidate.getTime()) ? "" : `${year}-${month}-${day}`;
+  }
 
   const date = new Date(text);
   if (!Number.isNaN(date.getTime())) {

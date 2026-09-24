@@ -783,7 +783,10 @@ export function AllOrdersView({
     ];
 
     for (const order of filteredOrders) {
-      const appointmentDate = getFilterDateValue(order.deliveryDeadline || order.deliveryTimeRange);
+      const appointmentDate = getFilterDateValue(
+        order.deliveryDeadline || order.deliveryTimeRange,
+        order.orderTime || order.createdAt,
+      );
       const group = !appointmentDate
         ? groups[4]
         : appointmentDate < todayDate
