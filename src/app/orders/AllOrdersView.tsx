@@ -9,12 +9,19 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { AutoPickOrder, AutoPickOrderItem, PurchaseOrder, PurchaseStatus } from "@/lib/types";
 import { formatLocalDate } from "@/lib/dateUtils";
 import { isShopNameMatch } from "@/lib/shopIdentity";
-import { AUTO_PICK_EXTRA_STATUS_FILTERS, getAutoPickStatusFilterLabel } from "@/lib/autoPickOrderStatus";
+import {
+  AUTO_PICK_EXTRA_STATUS_FILTERS,
+  getAutoPickStatusFilterLabel,
+  isAutoPickOrderCancelledStatus,
+  isAutoPickOrderCompletedStatus,
+  isAutoPickOrderDeletedStatus,
+} from "@/lib/autoPickOrderStatus";
 import {
   OrderCard,
   OrderCardErrorBoundary,
   isBrushSyncEligibleOrder,
   getOrderActionErrorMessage,
+  getFilterDateValue,
 } from "./OrderCard";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -139,6 +146,7 @@ interface AllOrdersViewProps {
   readOnly?: boolean;
   canExpandDetails?: boolean;
   canViewProductCosts?: boolean;
+  mode?: "all" | "appointments";
 }
 
 const ALL_ORDERS_BATCH_SIZE = 30;
@@ -159,6 +167,7 @@ export function AllOrdersView({
   readOnly = false,
   canExpandDetails = true,
   canViewProductCosts = true,
+  mode = "all",
 }: AllOrdersViewProps) {
   const { showToast } = useToast();
   const [orders, setOrders] = useState<AutoPickOrder[]>([]);
@@ -292,6 +301,7 @@ export function AllOrdersView({
       if (endDate) params.set("endDate", endDate);
       if (shop !== "all") params.set("shop", shop);
       if (userId) params.set("userId", userId);
+      if (mode === "appointments") params.set("subscription", "pending");
       if (!silent || options?.refreshMetrics) {
         params.set("_metrics", "1");
       }
@@ -356,7 +366,7 @@ export function AllOrdersView({
         setIsLoadingMore(false);
       }
     }
-  }, [platform, debouncedQuery, startDate, endDate, status, shop, showToast, userId]);
+  }, [platform, debouncedQuery, startDate, endDate, status, shop, showToast, userId, mode]);
 
   // 外部刷新信号监听
   useEffect(() => {
@@ -503,6 +513,7 @@ export function AllOrdersView({
       if (endDate) params.set("endDate", endDate);
       if (shop !== "all") params.set("shop", shop);
       if (userId) params.set("userId", userId);
+      if (mode === "appointments") params.set("subscription", "pending");
 
       const metricsRes = await fetch(`/api/orders?${params.toString()}`, { cache: "no-store" });
       const metricsData = await metricsRes.json().catch(() => ({}));
@@ -513,7 +524,7 @@ export function AllOrdersView({
     } catch {
       // 忽略指标静默更新失败
     }
-  }, [debouncedQuery, endDate, onClearProfitUpdating, patchOrder, platform, shop, startDate, status, userId]);
+  }, [debouncedQuery, endDate, mode, onClearProfitUpdating, patchOrder, platform, shop, startDate, status, userId]);
 
   const lastHandledRefreshRef = useRef<number>(0);
   useEffect(() => {
@@ -701,12 +712,15 @@ export function AllOrdersView({
           await fetchOrders({ silent: true, force: true, refreshMetrics: true });
         }
       }
+      if (mode === "appointments" && (action === "complete-delivery" || action === "pickup-complete")) {
+        await fetchOrders({ silent: true, force: true, refreshMetrics: true });
+      }
     } catch (error) {
       showToast(error instanceof Error ? error.message : "操作失败", "error");
     } finally {
       setActingId("");
     }
-  }, [fetchOrders, localShops, onOpenPurchaseDraft, patchOrder, showToast]);
+  }, [fetchOrders, localShops, mode, onOpenPurchaseDraft, patchOrder, showToast]);
 
   // 数据统计与过滤处理
   const shopOptions = useMemo(() => {
@@ -746,8 +760,44 @@ export function AllOrdersView({
 
   // 筛选和统计都交给后端；前端只展示当前页。
   const filteredOrders = useMemo(() => {
-    return orders;
-  }, [orders]);
+    if (mode !== "appointments") return orders;
+    return orders.filter((order) => (
+      order.isSubscribe
+      && !isAutoPickOrderCompletedStatus(order.status)
+      && !isAutoPickOrderCancelledStatus(order.status)
+      && !isAutoPickOrderDeletedStatus(order.status)
+    ));
+  }, [mode, orders]);
+
+  const appointmentGroups = useMemo(() => {
+    if (mode !== "appointments") return [];
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowDate = formatLocalDate(tomorrow);
+    const groups = [
+      { key: "overdue", label: "已逾期", orders: [] as AutoPickOrder[] },
+      { key: "today", label: "今日预约", orders: [] as AutoPickOrder[] },
+      { key: "tomorrow", label: "明日预约", orders: [] as AutoPickOrder[] },
+      { key: "later", label: "更晚预约", orders: [] as AutoPickOrder[] },
+      { key: "unknown", label: "预约时间待同步", orders: [] as AutoPickOrder[] },
+    ];
+
+    for (const order of filteredOrders) {
+      const appointmentDate = getFilterDateValue(order.deliveryDeadline || order.deliveryTimeRange);
+      const group = !appointmentDate
+        ? groups[4]
+        : appointmentDate < todayDate
+          ? groups[0]
+          : appointmentDate === todayDate
+            ? groups[1]
+            : appointmentDate === tomorrowDate
+              ? groups[2]
+              : groups[3];
+      group.orders.push(order);
+    }
+
+    return groups.filter((group) => group.orders.length > 0);
+  }, [filteredOrders, mode, todayDate]);
 
   const orderOverviewCounts = useMemo(() => {
     return {
@@ -781,7 +831,7 @@ export function AllOrdersView({
     });
   }, [displayedSummary, orderOverviewCounts, meta.total, eligibleBrushSyncOrders, isLoading, onDataLoad, startDate, todayDate]);
 
-  const hasActiveFilters = Boolean(query.trim() || platform !== "all" || shop !== "all" || status !== "all" || startDate || endDate);
+  const hasActiveFilters = Boolean(query.trim() || platform !== "all" || shop !== "all" || status !== "all" || (mode === "all" && (startDate || endDate)));
 
   const resetFilters = () => {
     setQuery("");
@@ -830,7 +880,7 @@ export function AllOrdersView({
             </div>
 
             {/* 第二组：平台、状态、开始日期、结束日期（移动端2列对称，桌面端单行展开） */}
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:flex lg:items-center shrink-0">
+            <div className={mode === "appointments" ? "grid grid-cols-2 gap-2 lg:flex lg:items-center shrink-0" : "grid grid-cols-2 gap-2 sm:grid-cols-4 lg:flex lg:items-center shrink-0"}>
               <CustomSelect
                 value={platform}
                 onChange={setPlatform}
@@ -849,23 +899,27 @@ export function AllOrdersView({
                 className="h-11 w-full lg:w-[124px]"
                 triggerClassName="h-full rounded-full border border-black/8 bg-white px-3.5 text-sm shadow-none dark:border-white/10 dark:bg-white/3 whitespace-nowrap text-center justify-center"
               />
-              <DatePicker
-                value={startDate}
-                onChange={setStartDate}
-                placeholder="开始日期"
-                maxDate={endDate || todayDate}
-                className="h-11 w-full lg:w-[134px]"
-                triggerClassName="h-full rounded-full border border-black/8 bg-white px-3.5 text-sm shadow-none dark:border-white/10 dark:bg-white/3 whitespace-nowrap text-center justify-center"
-              />
-              <DatePicker
-                value={endDate}
-                onChange={setEndDate}
-                placeholder="结束日期"
-                minDate={startDate || undefined}
-                maxDate={todayDate}
-                className="h-11 w-full lg:w-[134px]"
-                triggerClassName="h-full rounded-full border border-black/8 bg-white px-3.5 text-sm shadow-none dark:border-white/10 dark:bg-white/3 whitespace-nowrap text-center justify-center"
-              />
+              {mode === "all" ? (
+                <>
+                  <DatePicker
+                    value={startDate}
+                    onChange={setStartDate}
+                    placeholder="开始日期"
+                    maxDate={endDate || todayDate}
+                    className="h-11 w-full lg:w-[134px]"
+                    triggerClassName="h-full rounded-full border border-black/8 bg-white px-3.5 text-sm shadow-none dark:border-white/10 dark:bg-white/3 whitespace-nowrap text-center justify-center"
+                  />
+                  <DatePicker
+                    value={endDate}
+                    onChange={setEndDate}
+                    placeholder="结束日期"
+                    minDate={startDate || undefined}
+                    maxDate={todayDate}
+                    className="h-11 w-full lg:w-[134px]"
+                    triggerClassName="h-full rounded-full border border-black/8 bg-white px-3.5 text-sm shadow-none dark:border-white/10 dark:bg-white/3 whitespace-nowrap text-center justify-center"
+                  />
+                </>
+              ) : null}
             </div>
           </div>
         </div>
@@ -894,8 +948,8 @@ export function AllOrdersView({
             >
               <EmptyState
                 icon={<Package2 size={56} strokeWidth={1.5} className="text-muted-foreground/25" />}
-                title="当前没有匹配订单"
-                description="可以换个筛选条件试试。"
+                title={mode === "appointments" ? "当前没有待处理预约单" : "当前没有匹配订单"}
+                description={mode === "appointments" ? "新的预约单会集中显示在这里。" : "可以换个筛选条件试试。"}
               />
             </motion.div>
           ) : (
@@ -908,23 +962,46 @@ export function AllOrdersView({
               className="space-y-4"
             >
               <div className="grid gap-4">
-                {filteredOrders.map((order) => (
-                  <OrderCardErrorBoundary key={order.id} orderNo={order.orderNo || order.id}>
-                    <OrderCard
-                      order={order}
-                      expanded={expandedIds.includes(order.id)}
-                      actingId={actingId}
-                      onToggleExpanded={toggleExpanded}
-                      onRunAction={runAction}
-                      onOpenCostBackfill={onOpenCostBackfill}
-                      onOpenMatchEditor={onOpenMatchEditor}
-                      onRefresh={handleRefreshOrder}
-                      isProfitUpdating={profitUpdatingOrderIds.includes(order.id)}
-                      readOnly={readOnly}
-                      canExpandDetails={canExpandDetails}
-                      canViewProductCosts={canViewProductCosts}
-                    />
-                  </OrderCardErrorBoundary>
+                {(mode === "appointments" ? appointmentGroups : [{ key: "all", label: "", orders: filteredOrders }]).map((group) => (
+                  <section key={group.key} className="grid gap-2.5">
+                    {group.label ? (
+                      <div className="flex items-center gap-2.5 px-0.5" role="heading" aria-level={2}>
+                        <div className={group.key === "overdue"
+                          ? "inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full border border-rose-500/15 bg-rose-500/8 px-2.5 text-xs font-semibold text-rose-600 dark:text-rose-300"
+                          : "inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full border border-black/7 bg-black/3 px-2.5 text-xs font-semibold text-foreground/75 dark:border-white/8 dark:bg-white/5 dark:text-white/75"
+                        }>
+                          <span>{group.label}</span>
+                          <span className={group.key === "overdue"
+                            ? "flex min-w-4.5 items-center justify-center rounded-full bg-rose-500/12 px-1 text-[10px] tabular-nums text-rose-600 dark:text-rose-200"
+                            : "flex min-w-4.5 items-center justify-center rounded-full bg-black/5 px-1 text-[10px] tabular-nums text-muted-foreground dark:bg-white/8"
+                          }>
+                            {group.orders.length}
+                          </span>
+                        </div>
+                        <div className={group.key === "overdue" ? "h-px flex-1 bg-rose-500/12" : "h-px flex-1 bg-black/6 dark:bg-white/8"} />
+                      </div>
+                    ) : null}
+                    <div className="grid gap-4">
+                      {group.orders.map((order) => (
+                        <OrderCardErrorBoundary key={order.id} orderNo={order.orderNo || order.id}>
+                          <OrderCard
+                            order={order}
+                            expanded={expandedIds.includes(order.id)}
+                            actingId={actingId}
+                            onToggleExpanded={toggleExpanded}
+                            onRunAction={runAction}
+                            onOpenCostBackfill={onOpenCostBackfill}
+                            onOpenMatchEditor={onOpenMatchEditor}
+                            onRefresh={handleRefreshOrder}
+                            isProfitUpdating={profitUpdatingOrderIds.includes(order.id)}
+                            readOnly={readOnly}
+                            canExpandDetails={canExpandDetails}
+                            canViewProductCosts={canViewProductCosts}
+                          />
+                        </OrderCardErrorBoundary>
+                      ))}
+                    </div>
+                  </section>
                 ))}
               </div>
             </motion.div>
@@ -950,7 +1027,7 @@ export function AllOrdersView({
                 </div>
               </div>
             ) : (
-              <div className="text-sm text-muted-foreground">全部订单已加载完成</div>
+              <div className="text-sm text-muted-foreground">{mode === "appointments" ? "预约单已全部加载" : "全部订单已加载完成"}</div>
             )}
           </div>
         ) : null}

@@ -1083,6 +1083,7 @@ export async function GET(request: NextRequest) {
     const query = String(searchParams.get("query") || "").trim();
     const platform = String(searchParams.get("platform") || "").trim();
     const status = String(searchParams.get("status") || "").trim();
+    const subscriptionScope = String(searchParams.get("subscription") || "").trim();
     const productCostStatusFilter = status === "pending-outbound" || status === "pending-backfill"
       ? status
       : "";
@@ -1129,6 +1130,32 @@ export async function GET(request: NextRequest) {
       shopWhereFilter = { OR: shopClauses };
     }
 
+    const subscriptionWhere: Prisma.AutoPickOrderWhereInput | undefined = subscriptionScope === "pending"
+      ? {
+          AND: [
+            {
+              OR: [
+                { rawPayload: { path: ["is_subscribe"], equals: true } },
+                { rawPayload: { path: ["is_subscribe"], equals: 1 } },
+                { rawPayload: { path: ["is_subscribe"], equals: "1" } },
+                { rawPayload: { path: ["isSubscribe"], equals: true } },
+                { rawPayload: { path: ["isSubscribe"], equals: 1 } },
+                { rawPayload: { path: ["isSubscribe"], equals: "1" } },
+              ],
+            },
+            {
+              NOT: {
+                OR: [
+                  buildStatusWhere("已完成"),
+                  buildStatusWhere("已取消"),
+                  buildStatusWhere("已删除"),
+                ].filter((item): item is Prisma.AutoPickOrderWhereInput => Boolean(item)),
+              },
+            },
+          ],
+        }
+      : undefined;
+
     const baseWhereWithoutShop: Prisma.AutoPickOrderWhereInput = {
       userId: targetUserId,
       ...(requestedOrderIds.length > 0 ? { id: { in: requestedOrderIds } } : {}),
@@ -1170,8 +1197,10 @@ export async function GET(request: NextRequest) {
       } : {}),
     };
     const baseWhere: Prisma.AutoPickOrderWhereInput = shopWhereFilter
-      ? { AND: [baseWhereWithoutShop, shopWhereFilter] }
-      : baseWhereWithoutShop;
+      ? { AND: [baseWhereWithoutShop, shopWhereFilter, ...(subscriptionWhere ? [subscriptionWhere] : [])] }
+      : subscriptionWhere
+        ? { AND: [baseWhereWithoutShop, subscriptionWhere] }
+        : baseWhereWithoutShop;
 
     const platformWhere: Prisma.AutoPickOrderWhereInput | undefined = platform
       ? platform === "线下交易" || platform.toLowerCase() === "other"
@@ -1197,7 +1226,10 @@ export async function GET(request: NextRequest) {
     const cancelledWhere = buildStatusWhere("已取消");
     const deletedWhere = buildStatusWhere("已删除");
 
-    const shopOptionsConditions: Prisma.AutoPickOrderWhereInput[] = [baseWhereWithoutShop];
+    const shopOptionsConditions: Prisma.AutoPickOrderWhereInput[] = [
+      baseWhereWithoutShop,
+      ...(subscriptionWhere ? [subscriptionWhere] : []),
+    ];
     if (platformWhere) shopOptionsConditions.push(platformWhere);
     if (statusWhere) shopOptionsConditions.push(statusWhere);
     const shopOptionsWhere: Prisma.AutoPickOrderWhereInput = shopOptionsConditions.length === 1 ? shopOptionsConditions[0] : { AND: shopOptionsConditions };
@@ -1264,10 +1296,15 @@ export async function GET(request: NextRequest) {
             },
           },
         },
-        orderBy: [
-          { orderTime: "desc" },
-          { createdAt: "desc" },
-        ],
+        orderBy: subscriptionScope === "pending"
+          ? [
+              { deliveryDeadline: "asc" },
+              { orderTime: "asc" },
+            ]
+          : [
+              { orderTime: "desc" },
+              { createdAt: "desc" },
+            ],
         skip: productCostStatusFilter ? 0 : (page - 1) * pageSize,
         take: productCostStatusFilter ? 10000 : pageSize,
       }),

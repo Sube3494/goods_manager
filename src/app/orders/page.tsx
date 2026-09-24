@@ -66,7 +66,7 @@ import { ORDER_SHORTAGE_PURCHASE_NOTE_KEYWORD } from "@/lib/purchaseOrderTypes";
 import { simplifyShopName } from "@/lib/shopIdentity";
 
 type OrderAction = "self-delivery" | "complete-delivery" | "pickup-complete" | "sync" | "outbound";
-type OrdersTab = "today" | "all";
+type OrdersTab = "today" | "appointments" | "all";
 type PurchaseDraftPayload = PurchaseOrder & { sourceOrderId?: string };
 const SHOP_PROFIT_PLATFORMS = ["美团", "京东", "淘宝", "抖店", "线下交易"] as const;
 const UNMATCHED_SHOP_FILTER = "__unmatched__";
@@ -1890,6 +1890,8 @@ export default function OrdersPage() {
   useEffect(() => {
     if (tabParam === "all") {
       setActiveTab("all");
+    } else if (tabParam === "appointments") {
+      setActiveTab("appointments");
     } else if (tabParam === "today") {
       setActiveTab("today");
     }
@@ -1940,6 +1942,34 @@ export default function OrdersPage() {
     isLoading: boolean;
   }>>({
     today: {
+      summary: {
+        receivedAmount: 0,
+        platformCommission: 0,
+        validOrderCount: 0,
+        itemCount: 0,
+        totalDeliveryFee: 0,
+        platformReceived: {},
+        platformDelivery: {},
+        pureProfit: 0,
+        platformProfit: {},
+        shopProfit: {},
+      },
+      overview: {
+        totalCount: 0,
+        trueOrderCount: 0,
+        brushCount: 0,
+        cancelledCount: 0,
+        platformBreakdown: {
+          truePlatformCounts: {},
+          brushPlatformCounts: {},
+          cancelledPlatformCounts: {},
+        },
+      },
+      total: 0,
+      eligibleBrushSyncOrders: [],
+      isLoading: false,
+    },
+    appointments: {
       summary: {
         receivedAmount: 0,
         platformCommission: 0,
@@ -2024,6 +2054,7 @@ export default function OrdersPage() {
   }, [activeSummary.shopProfit]);
 
   const [allOrdersMounted, setAllOrdersMounted] = useState(false);
+  const [appointmentOrdersMounted, setAppointmentOrdersMounted] = useState(false);
   const [isIncomeDetailsOpen, setIsIncomeDetailsOpen] = useState(false);
   const incomeContainerRef = useRef<HTMLDivElement>(null);
   const incomeModalRef = useRef<HTMLDivElement>(null);
@@ -2057,7 +2088,10 @@ export default function OrdersPage() {
     if (activeTab === "all" && !allOrdersMounted) {
       setAllOrdersMounted(true);
     }
-  }, [activeTab, allOrdersMounted]);
+    if (activeTab === "appointments" && !appointmentOrdersMounted) {
+      setAppointmentOrdersMounted(true);
+    }
+  }, [activeTab, allOrdersMounted, appointmentOrdersMounted]);
 
   // 推广费相关
   const [promotionAmount, setPromotionAmount] = useState(0);
@@ -2200,12 +2234,16 @@ export default function OrdersPage() {
     }
   }, []);
 
-  const handleTodayDataLoad = useCallback((data: any) => {
+  const handleTodayDataLoad = useCallback((data: Parameters<typeof handleDataLoad>[1]) => {
     handleDataLoad("today", data);
   }, [handleDataLoad]);
 
-  const handleAllDataLoad = useCallback((data: any) => {
+  const handleAllDataLoad = useCallback((data: Parameters<typeof handleDataLoad>[1]) => {
     handleDataLoad("all", data);
+  }, [handleDataLoad]);
+
+  const handleAppointmentDataLoad = useCallback((data: Parameters<typeof handleDataLoad>[1]) => {
+    handleDataLoad("appointments", data);
   }, [handleDataLoad]);
 
   const fetchPromotionExpense = useCallback(async () => {
@@ -2934,7 +2972,11 @@ export default function OrdersPage() {
               <div className="min-w-0">
                 <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">订单管理</h1>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  {activeTab === "today" ? "聚焦今天待处理订单" : "按时间和状态回看订单"}
+                  {activeTab === "today"
+                    ? "聚焦今天待处理订单"
+                    : activeTab === "appointments"
+                      ? "集中处理尚未完成的预约订单"
+                      : "按时间和状态回看订单"}
                 </p>
               </div>
 
@@ -3008,8 +3050,8 @@ export default function OrdersPage() {
               {/* 平移滑动的高亮胶囊背景滑块 */}
               <div
                 className={cn(
-                  "absolute top-1 bottom-1 left-1 w-[calc(50%-4px)] rounded-full bg-foreground dark:bg-white shadow-xs transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] pointer-events-none",
-                  activeTab === "all" ? "translate-x-full" : "translate-x-0"
+                  "absolute top-1 bottom-1 left-1 w-[calc((100%_-_8px)/3)] rounded-full bg-foreground dark:bg-white shadow-xs transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] pointer-events-none",
+                  activeTab === "appointments" ? "translate-x-full" : activeTab === "all" ? "translate-x-[200%]" : "translate-x-0"
                 )}
               />
 
@@ -3027,9 +3069,21 @@ export default function OrdersPage() {
               </button>
               <button
                 type="button"
+                onClick={() => setActiveTab("appointments")}
+                className={cn(
+                  "relative z-10 flex-1 rounded-full px-3 py-2 text-sm font-medium transition-colors duration-200 sm:min-w-35 cursor-pointer text-center select-none",
+                  activeTab === "appointments"
+                    ? "text-background dark:text-black font-semibold"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                预约单
+              </button>
+              <button
+                type="button"
                 onClick={() => setActiveTab("all")}
                 className={cn(
-                  "relative z-10 flex-1 rounded-full px-5 py-2 text-sm font-medium transition-colors duration-200 sm:min-w-35 cursor-pointer text-center select-none",
+                  "relative z-10 flex-1 rounded-full px-3 py-2 text-sm font-medium transition-colors duration-200 sm:min-w-35 cursor-pointer text-center select-none",
                   activeTab === "all"
                     ? "text-background dark:text-black font-semibold"
                     : "text-muted-foreground hover:text-foreground"
@@ -3670,6 +3724,24 @@ export default function OrdersPage() {
             onShopChange={setCurrentSelectedShop}
           />
         </div>
+        {appointmentOrdersMounted && (
+          <div className={activeTab === "appointments" ? "block" : "hidden"}>
+            <AllOrdersView
+              mode="appointments"
+              refreshTrigger={refreshTrigger}
+              targetRefreshOrder={targetRefreshOrder}
+              onClearProfitUpdating={clearProfitUpdating}
+              onOpenCostBackfill={setBackfillTarget}
+              onOpenMatchEditor={openMatchEditor}
+              onOpenPurchaseDraft={setPurchaseDraft}
+              profitUpdatingOrderIds={profitUpdatingOrderIds}
+              onDataLoad={handleAppointmentDataLoad}
+              localShops={localShops}
+              shopFilterSignal={shopFilterSignal}
+              onShopChange={setCurrentSelectedShop}
+            />
+          </div>
+        )}
         {allOrdersMounted && (
           <div className={activeTab === "all" ? "block" : "hidden"}>
             <AllOrdersView
