@@ -5,6 +5,9 @@ import { hasAdminAccess } from "@/lib/permissions";
 import { FinanceMath } from "@/lib/math";
 import {
   normalizeAutoPickIntegrationConfig,
+  normalizeAutoPickSkuForMatch,
+  readAutoPickPlatformProductIdForMatch,
+  doesShopProductMatchAutoPickStableKey,
   readCustomerTypeFromRawPayload,
   readDeliveryFeeFromValue,
   resolveAutoPickMatchedShopName,
@@ -455,8 +458,14 @@ export async function GET(request: NextRequest) {
           stock: true,
           costPrice: true,
           sku: true,
+          jdSkuId: true,
+          meituanSkuId: true,
+          taobaoSkuId: true,
+          doudianSkuId: true,
           productName: true,
+          productImage: true,
           sourceProductId: true,
+          product: { select: { image: true } },
           shop: { select: { id: true, name: true } },
         },
       }),
@@ -598,6 +607,7 @@ export async function GET(request: NextRequest) {
             select: {
               quantity: true,
               productNo: true,
+              platformSkuId: true,
               productName: true,
               thumb: true,
               rawPayload: true,
@@ -1554,7 +1564,25 @@ export async function GET(request: NextRequest) {
           || payload?.isManualDeliveryPlaceholder === true
           || String(item.productName || "").trim() === "手工配送占位商品";
         if (isPlaceholder && !manualMatched) return;
-        const image = String(item.thumb || manualMatched?.image || payload?.imageUrl || payload?.picture || payload?.picUrl || payload?.image || "").trim() || null;
+        const platformProductId = normalizeAutoPickSkuForMatch(item.platformSkuId)
+          || readAutoPickPlatformProductIdForMatch(order.platform, item.rawPayload, item.productNo);
+        const autoMatched = !manualMatched && platformProductId
+          ? shopProductRows.find((product) => (
+              isShopNameMatch(product.shop?.name, resolvedOrderShopName)
+              && doesShopProductMatchAutoPickStableKey(order.platform, product, platformProductId)
+            )) || null
+          : null;
+        const image = String(
+          item.thumb
+          || manualMatched?.image
+          || autoMatched?.productImage
+          || autoMatched?.product?.image
+          || payload?.imageUrl
+          || payload?.picture
+          || payload?.picUrl
+          || payload?.image
+          || ""
+        ).trim() || null;
         const bundles = Array.isArray(manualMatched?.bundleItems) ? manualMatched.bundleItems as Array<Record<string, unknown>> : [];
         if (bundles.length > 0) {
           bundles.forEach((bundle) => addProductSale({
@@ -1575,8 +1603,8 @@ export async function GET(request: NextRequest) {
           return;
         }
         addProductSale({
-          productName: String(manualMatched?.name || item.productName || "未命名商品"),
-          sku: String(manualMatched?.sku || item.productNo || "") || null,
+          productName: String(manualMatched?.name || autoMatched?.productName || item.productName || "未命名商品"),
+          sku: String(manualMatched?.sku || autoMatched?.sku || item.productNo || "") || null,
           image,
           quantity: item.quantity,
           orderNo: order.orderNo,

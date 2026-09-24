@@ -5222,7 +5222,7 @@ function toNormalizedText(value: string | null | undefined) {
     .toLowerCase();
 }
 
-function normalizeAutoPickSkuForMatch(value: string | null | undefined) {
+export function normalizeAutoPickSkuForMatch(value: string | null | undefined) {
   const raw = String(value || "").trim().toUpperCase();
   if (!raw) {
     return "";
@@ -5297,7 +5297,7 @@ function readAutoPickGoodsExtraRecord(rawPayload: unknown) {
     : {};
 }
 
-function readAutoPickPlatformProductIdForMatch(
+export function readAutoPickPlatformProductIdForMatch(
   platform: string | null | undefined,
   rawPayload: unknown,
   productNo?: string | null,
@@ -5587,7 +5587,7 @@ function normalizeShopProductSkuForPlatformMatch(
   return normalizeAutoPickSkuForMatch(item.sku || item.jdSkuId);
 }
 
-function doesShopProductMatchAutoPickStableKey(
+export function doesShopProductMatchAutoPickStableKey(
   platform: string | null | undefined,
   item: { sku?: string | null; jdSkuId?: string | null; meituanSkuId?: string | null; taobaoSkuId?: string | null; doudianSkuId?: string | null },
   key: string
