@@ -47,6 +47,7 @@ interface UserOrdersModalProps {
   userName?: string | null;
   userEmail?: string | null;
   roleName?: string | null;
+  canViewFinancials?: boolean;
 }
 
 const money = (val: number | undefined | null) => {
@@ -708,12 +709,19 @@ export function UserOrdersModal({
   userName,
   userEmail,
   roleName,
+  canViewFinancials = false,
 }: UserOrdersModalProps) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [isSpinning, setIsSpinning] = useState(false);
   const [activeTab, setActiveTab] = useState<"today-orders" | "all-orders" | "profit-trend">("today-orders");
   const [allOrdersMounted, setAllOrdersMounted] = useState(false);
+
+  useEffect(() => {
+    if (!canViewFinancials && activeTab === "profit-trend") {
+      setActiveTab("today-orders");
+    }
+  }, [activeTab, canViewFinancials]);
 
   const todayDate = useMemo(() => format(new Date(), "yyyy-MM-dd"), []);
   const [promotionAmount, setPromotionAmount] = useState(0);
@@ -1019,7 +1027,10 @@ export function UserOrdersModal({
               {/* 核心 Tab 切换与桌面端操作按钮组 */}
               <div className="flex items-center gap-2 w-full sm:w-auto shrink-0 justify-between sm:justify-end">
                 {/* 视图 Tab 切换：移动端全宽等分三列，桌面端行内胶囊 */}
-                <div className="grid grid-cols-3 w-full sm:w-auto sm:flex sm:items-center rounded-xl border border-black/8 bg-black/3 p-1 dark:border-white/10 dark:bg-white/4 gap-1">
+                <div className={cn(
+                  "grid w-full sm:w-auto sm:flex sm:items-center rounded-xl border border-black/8 bg-black/3 p-1 dark:border-white/10 dark:bg-white/4 gap-1",
+                  canViewFinancials ? "grid-cols-3" : "grid-cols-2"
+                )}>
                   <button
                     type="button"
                     onClick={() => setActiveTab("today-orders")}
@@ -1048,7 +1059,7 @@ export function UserOrdersModal({
                     <span className="truncate">全部订单</span>
                   </button>
 
-                  <button
+                  {canViewFinancials && <button
                     type="button"
                     onClick={() => setActiveTab("profit-trend")}
                     className={cn(
@@ -1060,7 +1071,7 @@ export function UserOrdersModal({
                   >
                     <TrendingUp size={13} className="shrink-0" />
                     <span className="truncate">利润曲线</span>
-                  </button>
+                  </button>}
                 </div>
 
                 {/* 桌面端独立操作按钮（刷新 + 全屏 + 关闭） */}
@@ -1094,7 +1105,7 @@ export function UserOrdersModal({
 
             {/* 弹窗内容区 */}
             <div className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-3 sm:space-y-6 overscroll-contain">
-              {activeTab === "profit-trend" ? (
+              {canViewFinancials && activeTab === "profit-trend" ? (
                 userId ? (
                   <UserProfitTrendView
                     userId={userId}
@@ -1581,7 +1592,7 @@ export function UserOrdersModal({
                     </div>
 
                     {/* 2. 平台纯利润分布卡片 */}
-                    <div
+                    {canViewFinancials && <div
                       role="button"
                       tabIndex={0}
                       ref={profitContainerRef}
@@ -1844,7 +1855,7 @@ export function UserOrdersModal({
                         </div>,
                         document.body
                       )}
-                    </div>
+                    </div>}
 
                     {/* 3. 最右侧：总配送费与推广费垂直组合列（严格对齐 orders/page.tsx，填满第4列，杜绝突出折行） */}
                     <div className={cn(
@@ -1933,6 +1944,7 @@ export function UserOrdersModal({
                       onDataLoad={handleTodayDataLoad}
                       localShops={localShops}
                       readOnly={true}
+                      canExpandDetails={canViewFinancials}
                     />
                   </div>
 
@@ -1947,6 +1959,7 @@ export function UserOrdersModal({
                         onDataLoad={handleAllDataLoad}
                         localShops={localShops}
                         readOnly={true}
+                        canExpandDetails={canViewFinancials}
                       />
                     </div>
                   )}

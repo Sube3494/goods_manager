@@ -117,6 +117,7 @@ interface TodayOrdersViewProps {
   shopFilterSignal?: { value: string; nonce: number } | null;
   onShopChange?: (shop: string) => void;
   readOnly?: boolean;
+  canExpandDetails?: boolean;
 }
 
 const TODAY_TAB_PAGE_SIZE = 40;
@@ -194,6 +195,7 @@ export function TodayOrdersView({
   shopFilterSignal,
   onShopChange,
   readOnly = false,
+  canExpandDetails = true,
 }: TodayOrdersViewProps) {
   const { showToast } = useToast();
   const todayDate = useMemo(() => formatLocalDate(new Date()), []);
@@ -626,6 +628,7 @@ export function TodayOrdersView({
 
   // 3. 卡片操作与事件回调
   const toggleExpanded = (orderId: string) => {
+    if (!canExpandDetails) return;
     let shouldLoadDetail = false;
     setExpandedIds((current) => {
       if (current.includes(orderId)) {
@@ -1018,6 +1021,7 @@ export function TodayOrdersView({
                         onRefresh={handleRefreshOrder}
                         isProfitUpdating={profitUpdatingOrderIds.includes(order.id)}
                         readOnly={readOnly}
+                        canExpandDetails={canExpandDetails}
                       />
                     </OrderCardErrorBoundary>
                   ))}
@@ -1055,6 +1059,7 @@ export function TodayOrdersView({
                             onRefresh={handleRefreshOrder}
                             isProfitUpdating={profitUpdatingOrderIds.includes(order.id)}
                             readOnly={readOnly}
+                            canExpandDetails={canExpandDetails}
                           />
                         </OrderCardErrorBoundary>
                       ))}
@@ -1094,6 +1099,7 @@ export function TodayOrdersView({
                             onRefresh={handleRefreshOrder}
                             isProfitUpdating={profitUpdatingOrderIds.includes(order.id)}
                             readOnly={readOnly}
+                            canExpandDetails={canExpandDetails}
                           />
                         </OrderCardErrorBoundary>
                       ))}

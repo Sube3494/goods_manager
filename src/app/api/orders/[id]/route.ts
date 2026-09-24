@@ -4,7 +4,6 @@ import { getAuthorizedUser, getAuthorizedUserAny } from "@/lib/auth";
 import { Prisma } from "../../../../../prisma/generated-client";
 import { returnOutboundOrderById } from "@/lib/outboundReturns";
 import { cancelAutoCompleteJob } from "@/lib/autoPickAutoComplete";
-import { hasAdminAccess } from "@/lib/permissions";
 import {
   getAutoPickIntegrationConfigByUserId,
   normalizeAutoPickOrderPayload,
@@ -40,7 +39,7 @@ export async function GET(
     const order = await prisma.autoPickOrder.findFirst({
       where: {
         id,
-        ...(hasAdminAccess(user, "members:orders") ? {} : { userId: user.id }),
+        ...(user.role === "SUPER_ADMIN" ? {} : { userId: user.id }),
       },
       select: {
         id: true,

@@ -290,6 +290,12 @@ export async function GET(request: NextRequest) {
     const canManageMembers = hasAdminAccess(user, "members:orders") || hasAdminAccess(user, "members:manage") || user.role === "SUPER_ADMIN";
     const targetUserId = (canManageMembers && requestedUserId) ? requestedUserId : user.id;
 
+    // 利润、成本等经营财务数据仅允许本人或超级管理员查看。
+    // 普通管理角色可以查看成员订单，但不能借助 userId 读取他人的利润看板。
+    if (targetUserId !== user.id && user.role !== "SUPER_ADMIN") {
+      return NextResponse.json({ error: "无权查看其他用户的利润与成本数据" }, { status: 403 });
+    }
+
     const targetUserRecord = targetUserId === user.id
       ? user
       : await prisma.user.findUnique({

@@ -2331,6 +2331,7 @@ export const OrderCard = memo(function OrderCard({
   expanded,
   actingId,
   readOnly = false,
+  canExpandDetails = true,
   isProfitUpdating = false,
   onToggleExpanded,
   onRunAction,
@@ -2342,6 +2343,7 @@ export const OrderCard = memo(function OrderCard({
   expanded: boolean;
   actingId: string;
   readOnly?: boolean;
+  canExpandDetails?: boolean;
   isProfitUpdating?: boolean;
   onToggleExpanded: (id: string) => void;
   onRunAction: (orderId: string, action: OrderAction) => void;
@@ -3592,13 +3594,13 @@ export const OrderCard = memo(function OrderCard({
           </div>
 
           <div className="flex flex-wrap items-center justify-end gap-1.5 sm:gap-2 shrink-0 ml-auto">
-            <ActionButton
+            {canExpandDetails ? <ActionButton
               label={expanded ? "收起详情" : "展开详情"}
               icon={expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
               onClick={() => onToggleExpanded(order.id)}
               mobileIconOnly={!displayAsOfflineOrder}
               title={expanded ? "收起详情" : "展开详情"}
-            />
+            /> : null}
             {displayAsOfflineOrder && !deleted && !readOnly ? (
               <ActionButton
                 label={isSavingOfflineEdit ? "保存中" : "修改"}
@@ -3652,7 +3654,7 @@ export const OrderCard = memo(function OrderCard({
         </div>
       </div>
 
-      {expanded ? (
+      {canExpandDetails && expanded ? (
         <div className="border-t border-black/6 bg-zinc-50/60 px-3.5 py-4 dark:border-white/6 dark:bg-white/2.5 sm:px-5 sm:py-5">
           {order.detailLoading && !order.detailLoaded ? (
             <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-black/8 bg-white/85 px-3 py-1.5 text-xs font-medium text-muted-foreground dark:border-white/10 dark:bg-white/5">

@@ -137,6 +137,7 @@ interface AllOrdersViewProps {
   shopFilterSignal?: { value: string; nonce: number } | null;
   onShopChange?: (shop: string) => void;
   readOnly?: boolean;
+  canExpandDetails?: boolean;
 }
 
 const ALL_ORDERS_BATCH_SIZE = 30;
@@ -155,6 +156,7 @@ export function AllOrdersView({
   shopFilterSignal,
   onShopChange,
   readOnly = false,
+  canExpandDetails = true,
 }: AllOrdersViewProps) {
   const { showToast } = useToast();
   const [orders, setOrders] = useState<AutoPickOrder[]>([]);
@@ -521,6 +523,7 @@ export function AllOrdersView({
 
   // 卡片操作与事件回调
   const toggleExpanded = useCallback((orderId: string) => {
+    if (!canExpandDetails) return;
     let shouldLoadDetail = false;
     setExpandedIds((current) => {
       if (current.includes(orderId)) {
@@ -532,7 +535,7 @@ export function AllOrdersView({
     if (shouldLoadDetail) {
       void ensureOrderDetail(orderId);
     }
-  }, [ensureOrderDetail]);
+  }, [canExpandDetails, ensureOrderDetail]);
 
   const handleRefreshOrder = useCallback(() => {
     void fetchOrders({ silent: true, force: true, refreshMetrics: true });
@@ -916,6 +919,7 @@ export function AllOrdersView({
                       onRefresh={handleRefreshOrder}
                       isProfitUpdating={profitUpdatingOrderIds.includes(order.id)}
                       readOnly={readOnly}
+                      canExpandDetails={canExpandDetails}
                     />
                   </OrderCardErrorBoundary>
                 ))}

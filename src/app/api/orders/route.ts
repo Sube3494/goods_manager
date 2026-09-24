@@ -1100,6 +1100,7 @@ export async function GET(request: NextRequest) {
       || String(session.roleProfile?.name || "").includes("管理")
       || hasPermission(session, "order:manage");
     const targetUserId = (canManageMembers && requestedUserId) ? requestedUserId : session.id;
+    const canViewSensitiveFinancials = targetUserId === session.id || session.role === "SUPER_ADMIN";
 
     const shopFilter = String(searchParams.get("shop") || "").trim();
     let shopWhereFilter: Prisma.AutoPickOrderWhereInput | undefined = undefined;
@@ -2717,8 +2718,69 @@ export async function GET(request: NextRequest) {
     perf.lap("response-build");
     perf.log("GET /api/orders", { page, pageSize, count: responseOrders.length, total: responseTotal });
 
+    const sensitiveFinancialKeys = new Set([
+      "costPrice",
+      "unitCost",
+      "totalCost",
+      "productCost",
+      "productCostBreakdown",
+      "pureProfit",
+      "shopProfit",
+      "platformProfit",
+      "costSnapshot",
+    ]);
+    const redactSensitiveFinancialFields = (value: unknown): unknown => {
+      if (Array.isArray(value)) {
+        return value.map(redactSensitiveFinancialFields);
+      }
+      if (!value || typeof value !== "object") {
+        return value;
+      }
+      return Object.fromEntries(
+        Object.entries(value as Record<string, unknown>)
+          .filter(([key]) => !sensitiveFinancialKeys.has(key))
+          .map(([key, nestedValue]) => [key, redactSensitiveFinancialFields(nestedValue)])
+      );
+    };
+
+    const responseItems = canViewSensitiveFinancials
+      ? enrichedOrders
+      : enrichedOrders.map((order) => ({
+          ...order,
+          rawPayload: redactSensitiveFinancialFields(order.rawPayload),
+          productCost: null,
+          productCostBreakdown: [],
+          outboundReturnDetails: [],
+          pureProfit: null,
+          missingCostItemCount: 0,
+          firstMissingCostShopProductId: null,
+          firstMissingCostPurchaseOrderId: null,
+          firstMissingCostPurchaseOrderItemId: null,
+          items: order.items.map((item) => ({
+            ...item,
+            rawPayload: redactSensitiveFinancialFields(item.rawPayload),
+            matchedProduct: item.matchedProduct
+              ? redactSensitiveFinancialFields(item.matchedProduct)
+              : item.matchedProduct,
+            displayItems: item.displayItems?.map((displayItem) => ({
+              ...displayItem,
+              costPrice: null,
+              costSource: undefined,
+            })),
+          })),
+        }));
+
+    const responseSummary = canViewSensitiveFinancials
+      ? summary
+      : {
+          ...summary,
+          pureProfit: 0,
+          platformProfit: {},
+          shopProfit: {},
+        };
+
     return NextResponse.json({
-      items: enrichedOrders,
+      items: responseItems,
       meta: {
         total: responseTotal,
         page,
@@ -2732,7 +2794,7 @@ export async function GET(request: NextRequest) {
           shops: shopFilterOptions,
         },
         ...(includeMetrics ? {
-          summary,
+          summary: responseSummary,
           overview,
         } : {}),
       }),
