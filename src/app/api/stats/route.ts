@@ -15,7 +15,7 @@ import {
   readShopNameFromRawPayload,
   readShopAddressFromRawPayload,
 } from "@/lib/shopCommission";
-import { isAutoPickOrderCancelledStatus, isAutoPickOrderDeletedStatus } from "@/lib/autoPickOrderStatus";
+import { isAutoPickOrderCancelledStatus, isAutoPickOrderDeletedStatus, readMainSystemSelfDeliveryFlag } from "@/lib/autoPickOrderStatus";
 import { createRequestPerfTracker } from "@/lib/perf";
 import { getStorageStrategy } from "@/lib/storage";
 import { formatLocalDate, parseAsShanghaiTime } from "@/lib/dateUtils";
@@ -74,15 +74,6 @@ function readAutoPickSystemMeta(rawPayload: unknown) {
     return null;
   }
   return candidate as Record<string, unknown>;
-}
-
-function readMainSystemSelfDeliveryFlag(rawPayload: unknown) {
-  const systemMeta = readAutoPickSystemMeta(rawPayload);
-  const marker = systemMeta?.mainSystemSelfDelivery;
-  if (!marker || typeof marker !== "object" || Array.isArray(marker)) {
-    return false;
-  }
-  return Boolean((marker as Record<string, unknown>).triggered);
 }
 
 function readManualAmountOverride(rawPayload: unknown) {
@@ -888,7 +879,7 @@ export async function GET(request: NextRequest) {
         const expectedIncomeYuan = adjustedMetrics.expectedIncome;
         const incomeYuan = (manualAmountOverride || isOffline) ? expectedIncomeYuan : adjustedPaidYuan;
 
-        const isBrush = readMainSystemSelfDeliveryFlag(order.rawPayload);
+        const isBrush = readMainSystemSelfDeliveryFlag(order.rawPayload, order.delivery);
         const matchedShopName = resolveExistingMatchedShopName(order) || "未匹配店铺";
         const orderSystemMeta = readAutoPickSystemMeta(order.rawPayload);
         const manualBrushCommission = typeof orderSystemMeta?.manualBrushCommission === "number" && orderSystemMeta.manualBrushCommission >= 0
@@ -997,7 +988,7 @@ export async function GET(request: NextRequest) {
       const platform = normalizePlatform(order.platform);
       const platformPoint = platformTrendMaps.get(platform)?.get(key);
       const current = platformBuckets.get(platform) || { trueOrderCount: 0, brushOrderCount: 0 };
-      const isBrush = readMainSystemSelfDeliveryFlag(order.rawPayload);
+      const isBrush = readMainSystemSelfDeliveryFlag(order.rawPayload, order.delivery);
       const isOther = isAutoPickOrderCancelledStatus(order.status)
         || isAutoPickOrderDeletedStatus(order.status)
         || isVoidedOfflineOrder(order);
@@ -1315,7 +1306,7 @@ export async function GET(request: NextRequest) {
     let returningCustomerTotalQuantity = 0;
 
     filteredAutoPickOrdersInRange.forEach((order) => {
-      const isBrush = readMainSystemSelfDeliveryFlag(order.rawPayload);
+      const isBrush = readMainSystemSelfDeliveryFlag(order.rawPayload, order.delivery);
       const isOffline = isVoidedOfflineOrder(order)
         || String(order.platform || "").trim() === "线下交易"
         || String(order.platform || "").includes("线下")
@@ -1541,7 +1532,7 @@ export async function GET(request: NextRequest) {
 
     filteredAutoPickOrdersInRange.forEach((order) => {
       if (
-        readMainSystemSelfDeliveryFlag(order.rawPayload)
+        readMainSystemSelfDeliveryFlag(order.rawPayload, order.delivery)
         || isAutoPickOrderCancelledStatus(order.status)
         || isAutoPickOrderDeletedStatus(order.status)
         || isVoidedOfflineOrder(order)
