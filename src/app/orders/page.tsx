@@ -3727,6 +3727,7 @@ export default function OrdersPage() {
         {appointmentOrdersMounted && (
           <div className={activeTab === "appointments" ? "block" : "hidden"}>
             <AllOrdersView
+              key="appointment-orders"
               mode="appointments"
               refreshTrigger={refreshTrigger}
               targetRefreshOrder={targetRefreshOrder}
@@ -3745,6 +3746,7 @@ export default function OrdersPage() {
         {allOrdersMounted && (
           <div className={activeTab === "all" ? "block" : "hidden"}>
             <AllOrdersView
+              key="all-orders"
               refreshTrigger={refreshTrigger}
               targetRefreshOrder={targetRefreshOrder}
               onClearProfitUpdating={clearProfitUpdating}

@@ -762,8 +762,7 @@ export function AllOrdersView({
   const filteredOrders = useMemo(() => {
     if (mode !== "appointments") return orders;
     return orders.filter((order) => (
-      order.isSubscribe
-      && !isAutoPickOrderCompletedStatus(order.status)
+      !isAutoPickOrderCompletedStatus(order.status)
       && !isAutoPickOrderCancelledStatus(order.status)
       && !isAutoPickOrderDeletedStatus(order.status)
     ));
