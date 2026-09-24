@@ -349,7 +349,10 @@ export default function MarketingAnalysisPage() {
     )
       .then((groups) => {
         if (!cancelled) {
-          setRelatedOrders(groups.flat().sort((a, b) => new Date(b.orderTime).getTime() - new Date(a.orderTime).getTime()));
+          const uniqueOrders = Array.from(new Map(
+            groups.flat().map((order) => [String(order.orderNo || order.sourceId || order.id), order])
+          ).values());
+          setRelatedOrders(uniqueOrders.sort((a, b) => new Date(b.orderTime).getTime() - new Date(a.orderTime).getTime()));
         }
       })
       .catch((error) => {
@@ -1021,6 +1024,7 @@ export default function MarketingAnalysisPage() {
                                 expanded={expandedRelatedOrderIds.includes(order.id)}
                                 actingId=""
                                 readOnly
+                                showFullOrderNo
                                 onToggleExpanded={(orderId) =>
                                   setExpandedRelatedOrderIds((current) =>
                                     current.includes(orderId) ? current.filter((id) => id !== orderId) : [...current, orderId]

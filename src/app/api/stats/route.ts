@@ -5,9 +5,6 @@ import { hasAdminAccess } from "@/lib/permissions";
 import { FinanceMath } from "@/lib/math";
 import {
   normalizeAutoPickIntegrationConfig,
-  normalizeAutoPickSkuForMatch,
-  readAutoPickPlatformProductIdForMatch,
-  doesShopProductMatchAutoPickStableKey,
   readCustomerTypeFromRawPayload,
   readDeliveryFeeFromValue,
   resolveAutoPickMatchedShopName,
@@ -23,11 +20,12 @@ import { createRequestPerfTracker } from "@/lib/perf";
 import { getStorageStrategy } from "@/lib/storage";
 import { formatLocalDate, parseAsShanghaiTime } from "@/lib/dateUtils";
 import { isPrismaMissingColumnError } from "@/lib/prismaSchemaCompat";
-import { getOutboundReturnTotals, parseOutboundReturnMeta } from "@/lib/outboundReturnMeta";
+import { getOutboundReturnTotals, getOutboundReturnedQuantityMap, parseOutboundReturnMeta } from "@/lib/outboundReturnMeta";
 import { getDailyFixedOperatingCost, getDailyUtilityCost, normalizeMonthKey } from "@/lib/operatingCosts";
 import { AUTO_INBOUND_NOTE_KEYWORD, AUTO_INBOUND_TYPE, ORDER_SHORTAGE_PURCHASE_NOTE_KEYWORD } from "@/lib/purchaseOrderTypes";
 import { isAddressDisabled } from "@/lib/addressBook";
 import { normalizeShopNameKey, isShopNameMatch, stripShopSuffix } from "@/lib/shopIdentity";
+import { parseOutboundNote } from "@/lib/utils";
 
 const SHANGHAI_DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -167,16 +165,27 @@ function hasAutoPickFulfillmentItems(items?: Array<{
 const DASHBOARD_PLATFORMS = ["美团", "京东", "淘宝", "抖店", "线下交易"] as const;
 
 type OutboundCostLookupRow = {
+  id: string;
+  type: string;
+  date: Date;
   note: string | null;
   status?: string | null;
   items: Array<{
+    id: string;
     quantity: number;
     costSnapshot?: unknown;
     shopProduct: {
       costPrice: number;
+      productName?: string | null;
+      sku?: string | null;
+      productImage?: string | null;
+      shop?: { name: string } | null;
     } | null;
     product: {
       costPrice: number;
+      name?: string | null;
+      sku?: string | null;
+      image?: string | null;
     } | null;
   }>;
 };
@@ -541,16 +550,26 @@ export async function GET(request: NextRequest) {
         },
         select: {
           id: true,
+          type: true,
           date: true,
           note: true,
           status: true,
           items: {
             select: {
+              id: true,
               quantity: true,
               price: true,
               costSnapshot: true,
-              shopProduct: { select: { costPrice: true } },
-              product: { select: { costPrice: true } },
+              shopProduct: {
+                select: {
+                  costPrice: true,
+                  productName: true,
+                  sku: true,
+                  productImage: true,
+                  shop: { select: { name: true } },
+                },
+              },
+              product: { select: { costPrice: true, name: true, sku: true, image: true } },
             },
           },
         },
@@ -1535,79 +1554,40 @@ export async function GET(request: NextRequest) {
       if (daily) daily.quantity += quantity;
     };
 
-    filteredAutoPickOrdersInRange.forEach((order) => {
-      if (
-        readMainSystemSelfDeliveryFlag(order.rawPayload, order.delivery)
-        || isAutoPickOrderCancelledStatus(order.status)
-        || isAutoPickOrderDeletedStatus(order.status)
-        || isVoidedOfflineOrder(order)
-      ) return;
+    const salesOrderByOrderNo = new Map(
+      filteredAutoPickOrdersInRange.map((order) => [String(order.orderNo || "").trim(), order])
+    );
+    outboundOrdersInRange.forEach((outbound) => {
+      const noteMeta = parseOutboundNote(outbound.note);
+      const platformOrderNo = extractOrderNoFromNote(outbound.note);
+      const salesOrder = platformOrderNo ? salesOrderByOrderNo.get(platformOrderNo) || null : null;
+      const returnedQuantityMap = getOutboundReturnedQuantityMap(parseOutboundReturnMeta(outbound.note).returns);
+      const platform = normalizePlatform(salesOrder?.platform || noteMeta.platform || outbound.type);
+      const dateKey = formatDateKey(outbound.date);
+      const resolvedOrderShopName = String(
+        outbound.items.find((item) => item.shopProduct?.shop?.name)?.shopProduct?.shop?.name
+        || (salesOrder ? resolveAutoPickMatchedShopName(salesOrder, permissionsObj) : null)
+        || noteMeta.shopName
+        || "未匹配店铺"
+      ).trim();
+      const actualPaidYuan = Math.max(0, Number(salesOrder?.actualPaid || 0) / 100);
 
-      const platform = normalizePlatform(order.platform);
-      const dateKey = resolveAutoPickOrderDateKey(order);
-      const resolvedOrderShopName = resolveAutoPickMatchedShopName(order, permissionsObj) || readShopNameFromRawPayload(order.rawPayload) || "未匹配店铺";
-      const actualPaidYuan = Math.max(0, Number(order.actualPaid || 0) / 100);
-      order.items.forEach((item) => {
-        const payload = item.rawPayload && typeof item.rawPayload === "object" && !Array.isArray(item.rawPayload)
-          ? item.rawPayload as Record<string, unknown>
-          : null;
-        const manualMatched = payload?.manualMatchedProduct && typeof payload.manualMatchedProduct === "object"
-          ? payload.manualMatchedProduct as Record<string, unknown>
-          : null;
-        if (payload?.ignoreOutbound === true || payload?.isManualIgnored === true || manualMatched?.id === "__ignored__") return;
-        const isPlaceholder = String(item.productNo || "").trim() === "__manual_delivery_placeholder__"
-          || payload?.isManualDeliveryPlaceholder === true
-          || String(item.productName || "").trim() === "手工配送占位商品";
-        if (isPlaceholder && !manualMatched) return;
-        const platformProductId = normalizeAutoPickSkuForMatch(item.platformSkuId)
-          || readAutoPickPlatformProductIdForMatch(order.platform, item.rawPayload, item.productNo);
-        const autoMatched = !manualMatched && platformProductId
-          ? shopProductRows.find((product) => (
-              isShopNameMatch(product.shop?.name, resolvedOrderShopName)
-              && doesShopProductMatchAutoPickStableKey(order.platform, product, platformProductId)
-            )) || null
-          : null;
-        const image = String(
-          item.thumb
-          || manualMatched?.image
-          || autoMatched?.productImage
-          || autoMatched?.product?.image
-          || payload?.imageUrl
-          || payload?.picture
-          || payload?.picUrl
-          || payload?.image
-          || ""
-        ).trim() || null;
-        const bundles = Array.isArray(manualMatched?.bundleItems) ? manualMatched.bundleItems as Array<Record<string, unknown>> : [];
-        if (bundles.length > 0) {
-          bundles.forEach((bundle) => addProductSale({
-            productName: String(bundle.name || "未命名商品"),
-            sku: String(bundle.sku || "") || null,
-            image: String(bundle.image || image || "") || null,
-            // Manual bundle quantities are already the final resolved outbound
-            // quantities for this order item; do not multiply by the parent total.
-            quantity: Math.max(1, Number(bundle.quantity || 1)),
-            orderNo: order.orderNo,
-            orderId: order.id,
-            platform,
-            dateKey,
-            shopName: resolvedOrderShopName,
-            status: order.status,
-            actualPaid: actualPaidYuan,
-          }));
-          return;
-        }
+      outbound.items.forEach((item) => {
+        const netQuantity = Math.max(0, Number(item.quantity || 0) - Number(returnedQuantityMap.get(item.id) || 0));
+        if (netQuantity <= 0) return;
+        const productName = String(item.shopProduct?.productName || item.product?.name || "").trim();
+        if (!productName || productName === "手工配送占位商品") return;
         addProductSale({
-          productName: String(manualMatched?.name || autoMatched?.productName || item.productName || "未命名商品"),
-          sku: String(manualMatched?.sku || autoMatched?.sku || item.productNo || "") || null,
-          image,
-          quantity: item.quantity,
-          orderNo: order.orderNo,
-          orderId: order.id,
+          productName,
+          sku: String(item.shopProduct?.sku || item.product?.sku || "").trim() || null,
+          image: String(item.shopProduct?.productImage || item.product?.image || "").trim() || null,
+          quantity: netQuantity,
+          orderNo: platformOrderNo || `outbound:${outbound.id}`,
+          orderId: salesOrder?.id || "",
           platform,
           dateKey,
           shopName: resolvedOrderShopName,
-          status: order.status,
+          status: salesOrder?.status || outbound.status,
           actualPaid: actualPaidYuan,
         });
       });

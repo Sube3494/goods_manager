@@ -2333,6 +2333,7 @@ export const OrderCard = memo(function OrderCard({
   readOnly = false,
   canExpandDetails = true,
   canViewProductCosts = true,
+  showFullOrderNo = false,
   isProfitUpdating = false,
   onToggleExpanded,
   onRunAction,
@@ -2346,6 +2347,7 @@ export const OrderCard = memo(function OrderCard({
   readOnly?: boolean;
   canExpandDetails?: boolean;
   canViewProductCosts?: boolean;
+  showFullOrderNo?: boolean;
   isProfitUpdating?: boolean;
   onToggleExpanded: (id: string) => void;
   onRunAction: (orderId: string, action: OrderAction) => void;
@@ -2904,7 +2906,15 @@ export const OrderCard = memo(function OrderCard({
                         unoptimized
                       />
                     </span>
-                    <span className="pr-0.5 text-[12px] font-bold leading-none tracking-tight sm:text-[13px]">#{order.dailyPlatformSequence || 0}</span>
+                    <span
+                      className={cn(
+                        "pr-0.5 text-[12px] font-bold leading-none tracking-tight sm:text-[13px]",
+                        showFullOrderNo && "max-w-52 truncate font-mono text-[11px] sm:text-[12px]"
+                      )}
+                      title={showFullOrderNo ? `平台订单号：${order.orderNo}` : `当日流水号：${order.dailyPlatformSequence || 0}`}
+                    >
+                      {showFullOrderNo ? `单号 ${order.orderNo || order.id}` : `#${order.dailyPlatformSequence || 0}`}
+                    </span>
                   </span>
                   {readOnly ? (
                     <span
