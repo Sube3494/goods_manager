@@ -2492,6 +2492,24 @@ export async function GET(request: NextRequest) {
           const hasStrictMatchForAllSegments = shouldTrySkuFallback && normalizedSkuCandidates.length > 0
             && normalizedSkuCandidates.every((candidate) => Boolean(resolveStrictSkuMatch(candidate)));
           const outboundBreakdown = outboundMeta?.breakdown || [];
+          const resolveDisplayCost = (
+            shopProductId?: string | null,
+            productId?: string | null,
+            currentCost?: number | null,
+          ) => {
+            const outboundCostItem = outboundBreakdown.find((entry) => (
+              (shopProductId && entry.shopProductId === shopProductId)
+              || (productId && entry.productId === productId)
+            ));
+            const outboundCost = Number(outboundCostItem?.unitCost || 0);
+            if (Number.isFinite(outboundCost) && outboundCost > 0) {
+              return { costPrice: outboundCost, costSource: "outbound" as const };
+            }
+            const fallbackCost = Number(currentCost || 0);
+            return Number.isFinite(fallbackCost) && fallbackCost > 0
+              ? { costPrice: fallbackCost, costSource: "current" as const }
+              : { costPrice: null, costSource: undefined };
+          };
           const outboundItem = outboundBreakdown.length === order.items.length
             ? outboundBreakdown[itemIndex]
             : (outboundBreakdown.length === 1 && order.items.length === 1 ? outboundBreakdown[0] : null);
@@ -2516,7 +2534,11 @@ export async function GET(request: NextRequest) {
             );
             const fallbackImg = foundShopProduct?.image || null;
             matchedProduct.image = matchedProduct.image ? storage.resolveUrl(matchedProduct.image) : fallbackImg;
-            Object.assign(matchedProduct, { costPrice: foundShopProduct?.costPrice || null });
+            Object.assign(matchedProduct, resolveDisplayCost(
+              foundShopProduct?.shopProductId,
+              foundShopProduct?.productId,
+              foundShopProduct?.costPrice,
+            ));
             if (!manualMatchedProduct && !isCompositeSku && isMeituanPlatform(order.platform) && strictPlatformProductId && foundShopProduct?.id) {
               autoMatchedMeituanBackfills.push({
                 shopProductId: foundShopProduct.id,
@@ -2573,6 +2595,11 @@ export async function GET(request: NextRequest) {
                 const bResolvedImg = bItem.image ? storage.resolveUrl(bItem.image) : bFallbackImg;
                 const bSourceId = getProductSourceIdByPlatform(foundBShopProduct, order.platform, parentPlatformSkuId)
                   || getProductSourceIdByPlatform(bItem, order.platform, parentPlatformSkuId);
+                const displayCost = resolveDisplayCost(
+                  foundBShopProduct?.shopProductId,
+                  foundBShopProduct?.productId,
+                  foundBShopProduct?.costPrice,
+                );
                 return {
                   name: bItem.name || item.productName || "未命名商品",
                   sku: (
@@ -2582,7 +2609,7 @@ export async function GET(request: NextRequest) {
                   ) || "-",
                   image: bResolvedImg,
                   quantity: bQty,
-                  costPrice: foundBShopProduct?.costPrice || null,
+                  ...displayCost,
                   sourceId: bSourceId || undefined,
                 };
               })
@@ -2593,6 +2620,11 @@ export async function GET(request: NextRequest) {
                   ? Math.max(1, Math.floor(item.quantity / segmentsFromSku.length))
                   : 1;
                 const segSourceId = getProductSourceIdByPlatform(segmentMatchedProduct, order.platform, parentPlatformSkuId);
+                const displayCost = resolveDisplayCost(
+                  segmentMatchedProduct?.shopProductId,
+                  segmentMatchedProduct?.productId,
+                  segmentMatchedProduct?.costPrice,
+                );
                 return {
                   name: segmentMatchedProduct?.name || item.productName || "未命名商品",
                   sku: (
@@ -2602,7 +2634,7 @@ export async function GET(request: NextRequest) {
                   ) || candidate,
                   image: segmentMatchedProduct?.image || (item.thumb ? storage.resolveUrl(item.thumb) : null),
                   quantity: segQty,
-                  costPrice: segmentMatchedProduct?.costPrice || null,
+                  ...displayCost,
                   sourceId: segSourceId || undefined,
                 };
               })
