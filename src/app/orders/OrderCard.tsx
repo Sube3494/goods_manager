@@ -2332,6 +2332,7 @@ export const OrderCard = memo(function OrderCard({
   actingId,
   readOnly = false,
   canExpandDetails = true,
+  canViewProductCosts = true,
   isProfitUpdating = false,
   onToggleExpanded,
   onRunAction,
@@ -2344,6 +2345,7 @@ export const OrderCard = memo(function OrderCard({
   actingId: string;
   readOnly?: boolean;
   canExpandDetails?: boolean;
+  canViewProductCosts?: boolean;
   isProfitUpdating?: boolean;
   onToggleExpanded: (id: string) => void;
   onRunAction: (orderId: string, action: OrderAction) => void;
@@ -2814,7 +2816,7 @@ export const OrderCard = memo(function OrderCard({
             ...(hasRefundAmount ? [{ label: "减退款", value: toCurrency(refundAmount) }] : []),
             { label: `扣抽出 ${formatPercent(serviceFeeRate)} 后`, value: toCurrency(settlementAfterRate) },
             { label: "减配送费", value: toCurrency(deliveryFee) },
-            { label: "减货品成本", value: toCurrency(productCost), editable: canEditProductCost },
+            ...(canViewProductCosts ? [{ label: "减货品成本", value: toCurrency(productCost), editable: canEditProductCost }] : []),
             ...(hasReturnExtraExpense ? [{ label: "减退货支出", value: toCurrency(returnExtraExpense) }] : []),
           ])
     : productCostStatusText
@@ -2823,7 +2825,7 @@ export const OrderCard = memo(function OrderCard({
           ...(hasRefundAmount ? [{ label: "退款", value: toCurrency(refundAmount) }] : []),
           { label: "抽出率", value: formatPercent(serviceFeeRate) },
           { label: "配送费", value: toCurrency(deliveryFee) },
-          { label: "货品成本", value: productCostStatusText, editable: canEditProductCost },
+          ...(canViewProductCosts ? [{ label: "货品成本", value: productCostStatusText, editable: canEditProductCost }] : []),
           ...(hasReturnExtraExpense ? [{ label: "退货支出", value: toCurrency(returnExtraExpense) }] : []),
         ]
       : [];
@@ -3156,7 +3158,7 @@ export const OrderCard = memo(function OrderCard({
                                 </div>
                               ))}
                             </div>
-                            {hasPureProfit && productCostBreakdown.length > 0 ? (
+                            {canViewProductCosts && hasPureProfit && productCostBreakdown.length > 0 ? (
                               <div className="mt-3 rounded-xl border border-slate-200/80 bg-slate-50/80 p-3 dark:border-white/8 dark:bg-white/4">
                                 <div className="text-[11px] font-semibold tracking-[0.08em] text-slate-500 dark:text-white/45">
                                   货品成本明细

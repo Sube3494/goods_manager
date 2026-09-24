@@ -118,6 +118,7 @@ interface TodayOrdersViewProps {
   onShopChange?: (shop: string) => void;
   readOnly?: boolean;
   canExpandDetails?: boolean;
+  canViewProductCosts?: boolean;
 }
 
 const TODAY_TAB_PAGE_SIZE = 40;
@@ -196,6 +197,7 @@ export function TodayOrdersView({
   onShopChange,
   readOnly = false,
   canExpandDetails = true,
+  canViewProductCosts = true,
 }: TodayOrdersViewProps) {
   const { showToast } = useToast();
   const todayDate = useMemo(() => formatLocalDate(new Date()), []);
@@ -1022,6 +1024,7 @@ export function TodayOrdersView({
                         isProfitUpdating={profitUpdatingOrderIds.includes(order.id)}
                         readOnly={readOnly}
                         canExpandDetails={canExpandDetails}
+                        canViewProductCosts={canViewProductCosts}
                       />
                     </OrderCardErrorBoundary>
                   ))}
@@ -1060,6 +1063,7 @@ export function TodayOrdersView({
                             isProfitUpdating={profitUpdatingOrderIds.includes(order.id)}
                             readOnly={readOnly}
                             canExpandDetails={canExpandDetails}
+                            canViewProductCosts={canViewProductCosts}
                           />
                         </OrderCardErrorBoundary>
                       ))}
@@ -1100,6 +1104,7 @@ export function TodayOrdersView({
                             isProfitUpdating={profitUpdatingOrderIds.includes(order.id)}
                             readOnly={readOnly}
                             canExpandDetails={canExpandDetails}
+                            canViewProductCosts={canViewProductCosts}
                           />
                         </OrderCardErrorBoundary>
                       ))}

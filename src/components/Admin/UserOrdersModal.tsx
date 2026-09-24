@@ -47,7 +47,7 @@ interface UserOrdersModalProps {
   userName?: string | null;
   userEmail?: string | null;
   roleName?: string | null;
-  canViewFinancials?: boolean;
+  canViewProductCosts?: boolean;
 }
 
 const money = (val: number | undefined | null) => {
@@ -709,19 +709,13 @@ export function UserOrdersModal({
   userName,
   userEmail,
   roleName,
-  canViewFinancials = false,
+  canViewProductCosts = false,
 }: UserOrdersModalProps) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [isSpinning, setIsSpinning] = useState(false);
   const [activeTab, setActiveTab] = useState<"today-orders" | "all-orders" | "profit-trend">("today-orders");
   const [allOrdersMounted, setAllOrdersMounted] = useState(false);
-
-  useEffect(() => {
-    if (!canViewFinancials && activeTab === "profit-trend") {
-      setActiveTab("today-orders");
-    }
-  }, [activeTab, canViewFinancials]);
 
   const todayDate = useMemo(() => format(new Date(), "yyyy-MM-dd"), []);
   const [promotionAmount, setPromotionAmount] = useState(0);
@@ -1027,10 +1021,7 @@ export function UserOrdersModal({
               {/* 核心 Tab 切换与桌面端操作按钮组 */}
               <div className="flex items-center gap-2 w-full sm:w-auto shrink-0 justify-between sm:justify-end">
                 {/* 视图 Tab 切换：移动端全宽等分三列，桌面端行内胶囊 */}
-                <div className={cn(
-                  "grid w-full sm:w-auto sm:flex sm:items-center rounded-xl border border-black/8 bg-black/3 p-1 dark:border-white/10 dark:bg-white/4 gap-1",
-                  canViewFinancials ? "grid-cols-3" : "grid-cols-2"
-                )}>
+                <div className="grid grid-cols-3 w-full sm:w-auto sm:flex sm:items-center rounded-xl border border-black/8 bg-black/3 p-1 dark:border-white/10 dark:bg-white/4 gap-1">
                   <button
                     type="button"
                     onClick={() => setActiveTab("today-orders")}
@@ -1059,7 +1050,7 @@ export function UserOrdersModal({
                     <span className="truncate">全部订单</span>
                   </button>
 
-                  {canViewFinancials && <button
+                  <button
                     type="button"
                     onClick={() => setActiveTab("profit-trend")}
                     className={cn(
@@ -1071,7 +1062,7 @@ export function UserOrdersModal({
                   >
                     <TrendingUp size={13} className="shrink-0" />
                     <span className="truncate">利润曲线</span>
-                  </button>}
+                  </button>
                 </div>
 
                 {/* 桌面端独立操作按钮（刷新 + 全屏 + 关闭） */}
@@ -1105,7 +1096,7 @@ export function UserOrdersModal({
 
             {/* 弹窗内容区 */}
             <div className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-3 sm:space-y-6 overscroll-contain">
-              {canViewFinancials && activeTab === "profit-trend" ? (
+              {activeTab === "profit-trend" ? (
                 userId ? (
                   <UserProfitTrendView
                     userId={userId}
@@ -1592,7 +1583,7 @@ export function UserOrdersModal({
                     </div>
 
                     {/* 2. 平台纯利润分布卡片 */}
-                    {canViewFinancials && <div
+                    <div
                       role="button"
                       tabIndex={0}
                       ref={profitContainerRef}
@@ -1719,12 +1710,17 @@ export function UserOrdersModal({
                               {shopProfitEntries.length > 0 ? (
                                 <div className="overflow-hidden rounded-xl border border-black/8 bg-slate-50/80 text-sm dark:border-white/10 dark:bg-white/[0.035]">
                                   <div className="overflow-x-auto">
-                                    <div className="hidden min-w-[1040px] grid-cols-[2.75rem_6.5rem_4.25rem_6.75rem_5.75rem_5.75rem_5.75rem_repeat(5,5.75rem)] border-b border-black/6 bg-slate-100/80 px-3 py-2 text-[11px] font-bold text-muted-foreground dark:border-white/8 dark:bg-white/5 xl:grid">
+                                    <div className={cn(
+                                      "hidden min-w-[1040px] border-b border-black/6 bg-slate-100/80 px-3 py-2 text-[11px] font-bold text-muted-foreground dark:border-white/8 dark:bg-white/5 xl:grid",
+                                      canViewProductCosts
+                                        ? "grid-cols-[2.75rem_6.5rem_4.25rem_6.75rem_5.75rem_5.75rem_5.75rem_repeat(5,5.75rem)]"
+                                        : "grid-cols-[2.75rem_6.5rem_4.25rem_6.75rem_5.75rem_5.75rem_repeat(5,5.75rem)]"
+                                    )}>
                                       <div className="text-center">#</div>
                                       <div className="text-center">店铺</div>
                                       <div className="text-center">订单</div>
                                       <div className="text-center">纯利润</div>
-                                      <div className="text-center">货品</div>
+                                      {canViewProductCosts ? <div className="text-center">货品</div> : null}
                                       <div className="text-center">配送</div>
                                       <div className="text-center">佣金</div>
                                       {SHOP_PROFIT_PLATFORMS.map((platform) => (
@@ -1744,7 +1740,12 @@ export function UserOrdersModal({
                                       const averageProfit = shop.count > 0 ? shop.amount / shop.count : 0;
                                   const displayShopName = shop.name === "未匹配店铺" ? shop.name : simplifyShopName(shop.name) || shop.name;
                                   return (
-                                    <div key={shop.key || idx} className="border-b border-black/6 px-3 py-2.5 last:border-b-0 dark:border-white/8 xl:grid xl:min-w-[1040px] xl:grid-cols-[2.75rem_6.5rem_4.25rem_6.75rem_5.75rem_5.75rem_5.75rem_repeat(5,5.75rem)] xl:items-center xl:px-3 xl:py-2">
+                                    <div key={shop.key || idx} className={cn(
+                                      "border-b border-black/6 px-3 py-2.5 last:border-b-0 dark:border-white/8 xl:grid xl:min-w-[1040px] xl:items-center xl:px-3 xl:py-2",
+                                      canViewProductCosts
+                                        ? "xl:grid-cols-[2.75rem_6.5rem_4.25rem_6.75rem_5.75rem_5.75rem_5.75rem_repeat(5,5.75rem)]"
+                                        : "xl:grid-cols-[2.75rem_6.5rem_4.25rem_6.75rem_5.75rem_5.75rem_repeat(5,5.75rem)]"
+                                    )}>
                                       <div className="hidden text-center text-xs font-black tabular-nums text-muted-foreground xl:block">
                                         #{idx + 1}
                                       </div>
@@ -1771,7 +1772,7 @@ export function UserOrdersModal({
                                       <div className={cn("hidden text-center text-base font-black tabular-nums xl:block", shop.amount < 0 ? "text-rose-500" : "text-emerald-500")}>
                                         {toCurrency(shop.amount)}
                                       </div>
-                                      <div className="hidden text-center font-bold tabular-nums xl:block">{toCurrency(shop.productCost)}</div>
+                                      {canViewProductCosts ? <div className="hidden text-center font-bold tabular-nums xl:block">{toCurrency(shop.productCost)}</div> : null}
                                       <div className="hidden text-center font-bold tabular-nums xl:block">{toCurrency(shop.deliveryFee)}</div>
                                       <div className="hidden text-center font-bold tabular-nums xl:block">{toCurrency(shop.platformCommission)}</div>
                                       {SHOP_PROFIT_PLATFORMS.map((platform) => {
@@ -1797,11 +1798,11 @@ export function UserOrdersModal({
                                         );
                                       })}
 
-                                      <div className="mt-2 grid grid-cols-4 gap-1.5 text-xs xl:hidden">
-                                        <div className="rounded-lg bg-slate-200/50 px-2 py-1.5 dark:bg-white/6">
+                                      <div className={cn("mt-2 grid gap-1.5 text-xs xl:hidden", canViewProductCosts ? "grid-cols-4" : "grid-cols-3")}>
+                                        {canViewProductCosts ? <div className="rounded-lg bg-slate-200/50 px-2 py-1.5 dark:bg-white/6">
                                           <div className="text-muted-foreground">货品</div>
                                           <div className="font-bold tabular-nums">{toCurrency(shop.productCost)}</div>
-                                        </div>
+                                        </div> : null}
                                         <div className="rounded-lg bg-slate-200/50 px-2 py-1.5 dark:bg-white/6">
                                           <div className="text-muted-foreground">配送</div>
                                           <div className="font-bold tabular-nums">{toCurrency(shop.deliveryFee)}</div>
@@ -1855,7 +1856,7 @@ export function UserOrdersModal({
                         </div>,
                         document.body
                       )}
-                    </div>}
+                    </div>
 
                     {/* 3. 最右侧：总配送费与推广费垂直组合列（严格对齐 orders/page.tsx，填满第4列，杜绝突出折行） */}
                     <div className={cn(
@@ -1944,7 +1945,8 @@ export function UserOrdersModal({
                       onDataLoad={handleTodayDataLoad}
                       localShops={localShops}
                       readOnly={true}
-                      canExpandDetails={canViewFinancials}
+                      canExpandDetails={canViewProductCosts}
+                      canViewProductCosts={canViewProductCosts}
                     />
                   </div>
 
@@ -1959,7 +1961,8 @@ export function UserOrdersModal({
                         onDataLoad={handleAllDataLoad}
                         localShops={localShops}
                         readOnly={true}
-                        canExpandDetails={canViewFinancials}
+                        canExpandDetails={canViewProductCosts}
+                        canViewProductCosts={canViewProductCosts}
                       />
                     </div>
                   )}

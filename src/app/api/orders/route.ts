@@ -1100,7 +1100,7 @@ export async function GET(request: NextRequest) {
       || String(session.roleProfile?.name || "").includes("管理")
       || hasPermission(session, "order:manage");
     const targetUserId = (canManageMembers && requestedUserId) ? requestedUserId : session.id;
-    const canViewSensitiveFinancials = targetUserId === session.id || session.role === "SUPER_ADMIN";
+    const canViewProductCosts = targetUserId === session.id || session.role === "SUPER_ADMIN";
 
     const shopFilter = String(searchParams.get("shop") || "").trim();
     let shopWhereFilter: Prisma.AutoPickOrderWhereInput | undefined = undefined;
@@ -2724,9 +2724,6 @@ export async function GET(request: NextRequest) {
       "totalCost",
       "productCost",
       "productCostBreakdown",
-      "pureProfit",
-      "shopProfit",
-      "platformProfit",
       "costSnapshot",
     ]);
     const redactSensitiveFinancialFields = (value: unknown): unknown => {
@@ -2743,7 +2740,7 @@ export async function GET(request: NextRequest) {
       );
     };
 
-    const responseItems = canViewSensitiveFinancials
+    const responseItems = canViewProductCosts
       ? enrichedOrders
       : enrichedOrders.map((order) => ({
           ...order,
@@ -2751,7 +2748,6 @@ export async function GET(request: NextRequest) {
           productCost: null,
           productCostBreakdown: [],
           outboundReturnDetails: [],
-          pureProfit: null,
           missingCostItemCount: 0,
           firstMissingCostShopProductId: null,
           firstMissingCostPurchaseOrderId: null,
@@ -2770,13 +2766,14 @@ export async function GET(request: NextRequest) {
           })),
         }));
 
-    const responseSummary = canViewSensitiveFinancials
+    const responseSummary = !summary || canViewProductCosts
       ? summary
       : {
           ...summary,
-          pureProfit: 0,
-          platformProfit: {},
-          shopProfit: {},
+          shopProfit: Object.fromEntries(Object.entries(summary.shopProfit).map(([key, shop]) => [
+            key,
+            { ...shop, productCost: 0 },
+          ])),
         };
 
     return NextResponse.json({

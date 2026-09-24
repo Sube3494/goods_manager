@@ -138,6 +138,7 @@ interface AllOrdersViewProps {
   onShopChange?: (shop: string) => void;
   readOnly?: boolean;
   canExpandDetails?: boolean;
+  canViewProductCosts?: boolean;
 }
 
 const ALL_ORDERS_BATCH_SIZE = 30;
@@ -157,6 +158,7 @@ export function AllOrdersView({
   onShopChange,
   readOnly = false,
   canExpandDetails = true,
+  canViewProductCosts = true,
 }: AllOrdersViewProps) {
   const { showToast } = useToast();
   const [orders, setOrders] = useState<AutoPickOrder[]>([]);
@@ -920,6 +922,7 @@ export function AllOrdersView({
                       isProfitUpdating={profitUpdatingOrderIds.includes(order.id)}
                       readOnly={readOnly}
                       canExpandDetails={canExpandDetails}
+                      canViewProductCosts={canViewProductCosts}
                     />
                   </OrderCardErrorBoundary>
                 ))}
