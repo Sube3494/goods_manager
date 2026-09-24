@@ -631,6 +631,8 @@ export interface StatsData {
 }
 
 export interface DashboardProductSalesItem {
+  shopProductId?: string | null;
+  shopName: string;
   productName: string;
   sku?: string | null;
   image?: string | null;

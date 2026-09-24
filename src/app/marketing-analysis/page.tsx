@@ -304,7 +304,7 @@ export default function MarketingAnalysisPage() {
     const keyword = productSearch.trim().toLowerCase();
     if (!keyword) return productRows;
     return productRows.filter((item) =>
-      [item.productName, item.sku, ...Object.keys(item.platformQuantities || {})].some((value) =>
+      [item.productName, item.sku, item.shopName, ...Object.keys(item.platformQuantities || {})].some((value) =>
         String(value || "").toLowerCase().includes(keyword)
       )
     );
@@ -584,7 +584,7 @@ export default function MarketingAnalysisPage() {
           {/* 商品销售分析：排行榜 + 专属搜索框 + 关联订单查看 */}
           <Panel
             title="商品销售分析"
-            subtitle={`累计售出 ${integer(productSales?.totalQuantity || 0)} 件 · 覆盖 ${integer(productSales?.productCount || 0)} 款商品 · 按真实出库件数统计`}
+            subtitle={`累计售出 ${integer(productSales?.totalQuantity || 0)} 件 · 覆盖 ${integer(productSales?.productCount || 0)} 个门店商品 · 按真实销售出库统计`}
             action={
               <div className="relative w-full sm:w-84 md:w-96">
                 <Search size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground/75" />
@@ -627,7 +627,7 @@ export default function MarketingAnalysisPage() {
                           const index = (productPage - 1) * productPageSize + visibleIndex;
                           return (
                             <tr
-                              key={`${item.sku || ""}-${item.productName}`}
+                              key={item.shopProductId || `${item.shopName}-${item.sku || ""}-${item.productName}`}
                               tabIndex={0}
                               role="button"
                               onClick={() => setSelectedProduct(item)}
@@ -685,6 +685,9 @@ export default function MarketingAnalysisPage() {
                                       ) : (
                                         <span className="text-[10px] text-muted-foreground/60">未绑定货号</span>
                                       )}
+                                      <span className="inline-flex items-center rounded-md border border-sky-500/15 bg-sky-500/8 px-1.5 py-0.2 text-[10px] font-medium text-sky-700 dark:text-sky-300">
+                                        {item.shopName}
+                                      </span>
                                     </div>
                                   </div>
                                 </div>
@@ -971,6 +974,9 @@ export default function MarketingAnalysisPage() {
                                 {selectedProduct.sku}
                               </span>
                             ) : null}
+                            <span className="inline-flex items-center rounded-md border border-sky-500/15 bg-sky-500/8 px-1.5 py-0.2 text-[10px] font-medium text-sky-700 dark:text-sky-300">
+                              {selectedProduct.shopName}
+                            </span>
                             <span>·</span>
                             <span>{selectedProduct.orders.length} 笔关联订单</span>
                             <span>·</span>

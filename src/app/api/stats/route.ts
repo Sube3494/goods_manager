@@ -175,6 +175,8 @@ type OutboundCostLookupRow = {
     quantity: number;
     costSnapshot?: unknown;
     shopProduct: {
+      id: string;
+      productId?: string | null;
       costPrice: number;
       productName?: string | null;
       sku?: string | null;
@@ -182,6 +184,7 @@ type OutboundCostLookupRow = {
       shop?: { name: string } | null;
     } | null;
     product: {
+      id: string;
       costPrice: number;
       name?: string | null;
       sku?: string | null;
@@ -562,6 +565,8 @@ export async function GET(request: NextRequest) {
               costSnapshot: true,
               shopProduct: {
                 select: {
+                  id: true,
+                  productId: true,
                   costPrice: true,
                   productName: true,
                   sku: true,
@@ -569,7 +574,7 @@ export async function GET(request: NextRequest) {
                   shop: { select: { name: true } },
                 },
               },
-              product: { select: { costPrice: true, name: true, sku: true, image: true } },
+              product: { select: { id: true, costPrice: true, name: true, sku: true, image: true } },
             },
           },
         },
@@ -1497,6 +1502,9 @@ export async function GET(request: NextRequest) {
     };
 
     const productSalesMap = new Map<string, {
+      shopProductId: string | null;
+      productId: string | null;
+      shopName: string;
       productName: string;
       sku: string | null;
       image: string | null;
@@ -1509,6 +1517,8 @@ export async function GET(request: NextRequest) {
 
     const addProductSale = (input: {
       productName: string;
+      shopProductId?: string | null;
+      productId?: string | null;
       sku?: string | null;
       image?: string | null;
       quantity: number;
@@ -1521,11 +1531,19 @@ export async function GET(request: NextRequest) {
       actualPaid: number;
     }) => {
       const productName = String(input.productName || "").trim();
+      const shopProductId = String(input.shopProductId || "").trim() || null;
+      const productId = String(input.productId || "").trim() || null;
+      const shopName = String(input.shopName || "").trim() || "未匹配店铺";
       const sku = String(input.sku || "").trim() || null;
       const quantity = Math.max(1, Number(input.quantity || 1) || 1);
       if (!productName || productName === "手工配送占位商品" || sku === "__manual_delivery_placeholder__") return;
-      const key = `${sku || ""}::${productName}`;
+      const key = shopProductId
+        ? `shop-product:${shopProductId}`
+        : `fallback:${shopName}::${sku || ""}::${productName}`;
       const current = productSalesMap.get(key) || {
+        shopProductId,
+        productId,
+        shopName,
         productName,
         sku,
         image: input.image || null,
@@ -1558,6 +1576,7 @@ export async function GET(request: NextRequest) {
       filteredAutoPickOrdersInRange.map((order) => [String(order.orderNo || "").trim(), order])
     );
     outboundOrdersInRange.forEach((outbound) => {
+      if (outbound.type !== "Sale") return;
       const noteMeta = parseOutboundNote(outbound.note);
       const platformOrderNo = extractOrderNoFromNote(outbound.note);
       const salesOrder = platformOrderNo ? salesOrderByOrderNo.get(platformOrderNo) || null : null;
@@ -1578,6 +1597,8 @@ export async function GET(request: NextRequest) {
         const productName = String(item.shopProduct?.productName || item.product?.name || "").trim();
         if (!productName || productName === "手工配送占位商品") return;
         addProductSale({
+          shopProductId: item.shopProduct?.id || null,
+          productId: item.product?.id || item.shopProduct?.productId || null,
           productName,
           sku: String(item.shopProduct?.sku || item.product?.sku || "").trim() || null,
           image: String(item.shopProduct?.productImage || item.product?.image || "").trim() || null,
@@ -1595,19 +1616,22 @@ export async function GET(request: NextRequest) {
 
     const productSalesItems = Array.from(productSalesMap.values())
       .map((item) => {
-        const stockRows = shopProductRows.filter((product) => (
-          (item.sku && product.sku && item.sku === product.sku)
-          || product.productName === item.productName
-        ));
+        const stockRow = item.shopProductId
+          ? shopProductRows.find((product) => product.id === item.shopProductId) || null
+          : shopProductRows.find((product) => (
+              isShopNameMatch(product.shop?.name, item.shopName)
+              && ((item.sku && product.sku && item.sku === product.sku) || product.productName === item.productName)
+            )) || null;
         return {
+          shopProductId: item.shopProductId,
+          productId: item.productId,
+          shopName: item.shopName,
           productName: item.productName,
           sku: item.sku,
           image: item.image ? storage.resolveUrl(item.image) : null,
           quantity: item.quantity,
           orderCount: item.orderNos.size,
-          stock: stockRows.length > 0
-            ? stockRows.reduce((sum, product) => sum + Number(product.stock || 0), 0)
-            : null,
+          stock: stockRow ? Number(stockRow.stock || 0) : null,
           platformQuantities: item.platformQuantities,
           orders: Array.from(item.orders.values()).sort((a, b) => b.date.localeCompare(a.date)),
         };
@@ -1615,21 +1639,17 @@ export async function GET(request: NextRequest) {
       .sort((a, b) => b.quantity - a.quantity || b.orderCount - a.orderCount);
     const productSalesMissingImages = productSalesItems.filter((item) => !item.image);
     if (productSalesMissingImages.length > 0) {
-      const missingSkus = productSalesMissingImages.map((item) => item.sku).filter(Boolean) as string[];
-      const missingNames = productSalesMissingImages.map((item) => item.productName).filter(Boolean);
+      const missingProductIds = productSalesMissingImages.map((item) => item.productId).filter(Boolean) as string[];
       const productImages = await prisma.product.findMany({
         where: {
           userId: targetUserId,
-          OR: [
-            ...(missingSkus.length > 0 ? [{ sku: { in: missingSkus } }] : []),
-            ...(missingNames.length > 0 ? [{ name: { in: missingNames } }] : []),
-          ],
+          id: { in: missingProductIds },
           image: { not: null },
         },
-        select: { sku: true, name: true, image: true },
+        select: { id: true, image: true },
       });
       productSalesMissingImages.forEach((item) => {
-        const matched = productImages.find((product) => (item.sku && product.sku === item.sku) || product.name === item.productName);
+        const matched = productImages.find((product) => product.id === item.productId);
         if (matched?.image) item.image = storage.resolveUrl(matched.image);
       });
     }
