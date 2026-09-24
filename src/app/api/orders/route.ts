@@ -2501,9 +2501,9 @@ export async function GET(request: NextRequest) {
               (shopProductId && entry.shopProductId === shopProductId)
               || (productId && entry.productId === productId)
             ));
-            const outboundCost = Number(outboundCostItem?.unitCost || 0);
-            if (Number.isFinite(outboundCost) && outboundCost > 0) {
-              return { costPrice: outboundCost, costSource: "outbound" as const };
+            const outboundCostCents = Number(outboundCostItem?.unitCost || 0);
+            if (Number.isFinite(outboundCostCents) && outboundCostCents > 0) {
+              return { costPrice: roundCurrency(outboundCostCents / 100), costSource: "outbound" as const };
             }
             const fallbackCost = Number(currentCost || 0);
             return Number.isFinite(fallbackCost) && fallbackCost > 0
