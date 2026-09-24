@@ -1373,7 +1373,6 @@ export async function GET(request: NextRequest) {
             : null;
 
           if (bundleItems && bundleItems.length > 0) {
-            const orderItemQty = Math.max(1, Number(item.quantity || 1) || 1);
             bundleItems.forEach((b) => {
               const bName = String(b?.name || "").trim() || "未命名商品";
               const bSku = String(b?.sku || "").trim() || null;
@@ -1388,7 +1387,11 @@ export async function GET(request: NextRequest) {
                 orderNos: new Set<string>(),
               };
               if (!current.image && bImg) current.image = bImg;
-              current.quantity += bQty * orderItemQty;
+              // bundleItems.quantity is the resolved outbound quantity for this order
+              // item (the same value shown in the order detail and used for outbound).
+              // Multiplying it by the placeholder item's aggregate quantity inflates
+              // a 3/3/1 bundle into 21/21/7.
+              current.quantity += bQty;
               current.orderNos.add(order.orderNo);
               returningProductMap.set(bKey, current);
             });
@@ -1561,7 +1564,9 @@ export async function GET(request: NextRequest) {
             productName: String(bundle.name || "未命名商品"),
             sku: String(bundle.sku || "") || null,
             image: String(bundle.image || image || "") || null,
-            quantity: Math.max(1, Number(item.quantity || 1)) * Math.max(1, Number(bundle.quantity || 1)),
+            // Manual bundle quantities are already the final resolved outbound
+            // quantities for this order item; do not multiply by the parent total.
+            quantity: Math.max(1, Number(bundle.quantity || 1)),
             orderNo: order.orderNo,
             orderId: order.id,
             platform,
