@@ -102,12 +102,11 @@ export default function ShelfLifeDashboard() {
   }, []);
 
   // 获取台账明细
-  const fetchBatches = useCallback(async (isFirstPage = true) => {
+  const fetchBatches = useCallback(async (page = 1) => {
     try {
       setIsLoadingBatches(true);
-      const targetPage = isFirstPage ? 1 : currentPage + 1;
       const queryParams = new URLSearchParams({
-        page: targetPage.toString(),
+        page: page.toString(),
         pageSize: "15",
         status: selectedStatus,
         shopId: selectedShop,
@@ -117,13 +116,13 @@ export default function ShelfLifeDashboard() {
       const res = await fetch(`/api/shelf-life/batches?${queryParams.toString()}`);
       if (res.ok) {
         const data = await res.json();
-        if (isFirstPage) {
+        if (page === 1) {
           setBatches(data.items);
         } else {
           setBatches(prev => [...prev, ...data.items]);
         }
         setTotalBatches(data.total);
-        setCurrentPage(targetPage);
+        setCurrentPage(page);
         setHasMore(data.hasMore);
       }
     } catch (err) {
@@ -131,7 +130,7 @@ export default function ShelfLifeDashboard() {
     } finally {
       setIsLoadingBatches(false);
     }
-  }, [selectedStatus, selectedShop, searchQuery, currentPage]);
+  }, [selectedStatus, selectedShop, searchQuery]);
 
   // 获取店铺列表
   const fetchShops = useCallback(async () => {
@@ -158,7 +157,7 @@ export default function ShelfLifeDashboard() {
 
   // 当台账筛选条件变化时，重新获取台账数据
   useEffect(() => {
-    void fetchBatches(true);
+    void fetchBatches(1);
   }, [selectedStatus, selectedShop, searchQuery, fetchBatches]);
 
   // 手动调整剩余库存/核销批次
@@ -188,7 +187,7 @@ export default function ShelfLifeDashboard() {
       
       // 刷新数据
       void fetchStats();
-      void fetchBatches(true);
+      void fetchBatches(1);
     } catch (err) {
       console.error("Failed to adjust batch:", err);
       showToast("请求失败，请稍后重试", "error");
@@ -687,7 +686,7 @@ export default function ShelfLifeDashboard() {
                   
                   {hasMore && (
                     <button 
-                      onClick={() => void fetchBatches(false)}
+                      onClick={() => void fetchBatches(currentPage + 1)}
                       disabled={isLoadingBatches}
                       className="w-full h-11 flex items-center justify-center gap-2 border border-dashed border-black/10 dark:border-white/10 hover:border-primary/30 rounded-full hover:bg-black/5 dark:hover:bg-white/5 text-xs text-muted-foreground hover:text-foreground transition-all active:scale-98 disabled:opacity-50"
                     >
