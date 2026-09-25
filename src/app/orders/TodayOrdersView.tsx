@@ -1081,7 +1081,7 @@ export function TodayOrdersView({
                   >
                     <div>
                       <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">今日已取消</div>
-                      <div className="mt-1 text-lg font-bold text-foreground">{todayCancelledOrders.length} 单</div>
+                      <div className="mt-1 text-lg font-bold text-foreground">{overview.cancelledCount} 单</div>
                     </div>
                     <div className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-black/8 bg-black/2 transition-colors hover:bg-black/3 dark:border-white/10 dark:bg-white/3">
                       {showCancelledToday ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
