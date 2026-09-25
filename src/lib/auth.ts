@@ -160,7 +160,14 @@ async function upsertUserDeviceSession(userId: string, sessionId: string, now: D
 
 async function getMaxLoginDevicesLimit() {
   try {
-    const settings = await getCachedSettings();
+    // This value gates a login immediately after an administrator changes it.
+    // Reading through the general settings cache can enforce the previous limit
+    // for up to a minute (and independently on every server instance).
+    const prisma = await getPrismaClient();
+    const settings = await prisma.systemSetting.findUnique({
+      where: { id: "system" },
+      select: { maxLoginDevices: true },
+    });
     const rawValue = Number(settings?.maxLoginDevices ?? 2);
     return Number.isFinite(rawValue) && rawValue >= 1 ? Math.floor(rawValue) : 2;
   } catch {
