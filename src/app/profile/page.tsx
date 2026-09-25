@@ -30,6 +30,7 @@ import { User as UserType, AddressItem } from "@/lib/types";
 import { hasPermission, SessionUser } from "@/lib/permissions";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
+import { DeviceSessionManager } from "@/components/Profile/DeviceSessionManager";
 
 export default function ProfilePage() {
   const { user, isLoading: isUserLoading } = useUser();
@@ -635,6 +636,8 @@ export default function ProfilePage() {
                     </div>
                   </div>
                 </div>
+
+                <DeviceSessionManager />
               </div>
 
             </div>

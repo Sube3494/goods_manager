@@ -72,6 +72,35 @@ type ClientDeviceInfo = {
   ipAddress: string | null;
 };
 
+function normalizeClientHint(value: string | null) {
+  const normalized = String(value || "").trim().replace(/^"|"$/g, "").trim();
+  return normalized && normalized !== "Unknown" ? normalized.slice(0, 120) : null;
+}
+
+function detectDeviceModel(userAgent: string, clientHintModel: string | null) {
+  const hintedModel = normalizeClientHint(clientHintModel);
+  if (hintedModel) return hintedModel;
+
+  // Android user agents commonly expose the model between the Android version
+  // and the Build marker. Other platforms intentionally remain generic.
+  const androidMatch = userAgent.match(/Android[^;)]*;\s*(?:[a-z]{2}[-_]\w+;\s*)?([^;)]+?)(?:\s+Build\/[A-Z0-9._-]+|[;)])/i);
+  const model = androidMatch?.[1]?.trim();
+  return model && !/^(wv|mobile)$/i.test(model) ? model.slice(0, 120) : null;
+}
+
+function getForwardedClientIp(headerStore: Awaited<ReturnType<typeof headers>>) {
+  const directCandidates = [
+    headerStore.get("cf-connecting-ip"),
+    headerStore.get("true-client-ip"),
+    headerStore.get("x-vercel-forwarded-for"),
+    headerStore.get("x-real-ip"),
+  ];
+  const forwardedFor = headerStore.get("x-forwarded-for")?.split(",")[0]?.trim();
+  const rawIp = directCandidates.find((value) => String(value || "").trim()) || forwardedFor || "";
+  const normalized = String(rawIp).trim().replace(/^::ffff:/i, "");
+  return normalized || null;
+}
+
 export async function encrypt(payload: JWTPayload) {
   return await new SignJWT(payload)
     .setProtectedHeader({ alg: "HS256" })
@@ -117,13 +146,12 @@ async function getClientDeviceInfo(): Promise<ClientDeviceInfo> {
   const browser = detectBrowser(userAgent);
   const os = detectOs(userAgent);
   const deviceType = detectDeviceType(userAgent);
-  const forwardedFor = String(headerStore.get("x-forwarded-for") || "").split(",")[0]?.trim() || "";
-  const realIp = String(headerStore.get("x-real-ip") || "").trim();
-  const ipAddress = forwardedFor || realIp || null;
+  const deviceModel = detectDeviceModel(userAgent, headerStore.get("sec-ch-ua-model"));
+  const ipAddress = getForwardedClientIp(headerStore);
 
   return {
     deviceType,
-    deviceLabel: `${os} ${browser}`,
+    deviceLabel: deviceModel ? `${deviceModel} · ${os} · ${browser}` : `${os} · ${browser}`,
     browser,
     os,
     ipAddress,

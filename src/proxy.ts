@@ -14,6 +14,9 @@ export async function proxy(request: NextRequest) {
   // Update session expiration if session exists
   const sessionResponse = await updateSession(request);
   const response = sessionResponse || NextResponse.next();
+  // Ask supported browsers for a best-effort hardware model on subsequent
+  // requests. Unsupported or privacy-restricted browsers simply omit it.
+  response.headers.set("Accept-CH", "Sec-CH-UA-Model, Sec-CH-UA-Platform, Sec-CH-UA-Platform-Version");
 
   const path = request.nextUrl.pathname;
   const isPublicApiKeyWebhook =
