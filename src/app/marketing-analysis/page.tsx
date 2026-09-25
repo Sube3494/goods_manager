@@ -395,7 +395,7 @@ export default function MarketingAnalysisPage() {
     <div className="relative min-w-0 space-y-5 px-1 pb-10 sm:space-y-6">
       {/* 顶部全局控制栏：标题 + 数据同步指示 + 快捷周期 + 日期范围 + 店铺筛选 + 刷新 */}
       <div className="rounded-[24px] sm:rounded-[28px] border border-black/8 bg-white/75 p-3.5 sm:p-5 shadow-xs backdrop-blur-sm dark:border-white/10 dark:bg-white/4">
-        <div className="flex flex-col gap-3.5 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-col gap-3.5 2xl:flex-row 2xl:items-center 2xl:justify-between">
           {/* 第一行：标题 + 图标 + 更新状态指示 + 移动端专属快捷刷新按钮 */}
           <div className="flex items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-2.5 sm:gap-3">
@@ -422,7 +422,7 @@ export default function MarketingAnalysisPage() {
             <button
               onClick={() => loadData(false)}
               disabled={loading}
-              className="lg:hidden flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-black/8 bg-white/80 text-foreground shadow-2xs transition-all hover:bg-black/4 active:scale-95 disabled:opacity-60 dark:border-white/10 dark:bg-white/5"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-black/8 bg-white/80 text-foreground shadow-2xs transition-all hover:bg-black/4 active:scale-95 disabled:opacity-60 dark:border-white/10 dark:bg-white/5 2xl:hidden"
               title="刷新数据"
             >
               <RefreshCw size={14} className={loading ? "animate-spin text-primary" : ""} />
@@ -430,7 +430,7 @@ export default function MarketingAnalysisPage() {
           </div>
 
           {/* 全局筛选工具条：移动端流式规整排列，桌面端水平展开 */}
-          <div className="flex flex-col gap-2.5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2">
+          <div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-[auto_9.5rem_minmax(17rem,1fr)] sm:items-center 2xl:flex 2xl:shrink-0">
             {/* 快捷周期切换胶囊：移动端全宽 3 等分 */}
             <div className="grid grid-cols-3 sm:flex h-9 items-center rounded-full border border-black/8 bg-white/80 p-0.5 shadow-2xs dark:border-white/10 dark:bg-white/5" aria-label="快捷周期">
               {[
@@ -455,7 +455,7 @@ export default function MarketingAnalysisPage() {
             </div>
 
             {/* 移动端两列并排：店铺筛选 + 日期范围 */}
-            <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:gap-2">
+            <div className="grid min-w-0 grid-cols-1 gap-2 sm:contents">
               {/* 店铺筛选下拉框 */}
               <div className="relative min-w-0">
                 <Store size={13} className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-muted-foreground" />
@@ -463,7 +463,7 @@ export default function MarketingAnalysisPage() {
                   value={shopName}
                   onChange={setShopName}
                   options={[{ value: "", label: "全部店铺" }, ...shops.map((shop) => ({ value: shop.name, label: shop.name }))]}
-                  className="h-9 w-full sm:w-38"
+                  className="h-9 w-full"
                   triggerClassName="h-9 rounded-full border-black/8 bg-white/80 pl-8 pr-3 text-xs shadow-2xs dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8"
                 />
               </div>
@@ -507,7 +507,7 @@ export default function MarketingAnalysisPage() {
             <button
               onClick={() => loadData(false)}
               disabled={loading}
-              className="hidden lg:inline-flex h-9 items-center justify-center gap-1.5 rounded-full border border-black/8 bg-white/80 px-4 text-xs font-bold text-foreground shadow-2xs transition-all duration-150 hover:bg-black/4 active:scale-95 disabled:opacity-60 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8"
+              className="hidden h-9 items-center justify-center gap-1.5 rounded-full border border-black/8 bg-white/80 px-4 text-xs font-bold text-foreground shadow-2xs transition-all duration-150 hover:bg-black/4 active:scale-95 disabled:opacity-60 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8 2xl:inline-flex"
             >
               <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
               <span>刷新</span>
