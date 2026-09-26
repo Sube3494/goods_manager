@@ -584,6 +584,31 @@ export function hasAutoOutboundFailure(order: Pick<AutoPickOrder, "autoOutboundS
   return String(order.autoOutboundStatus || "").trim().toLowerCase() === "failed";
 }
 
+export function shouldShowAutoOutboundRecovery(order: Pick<AutoPickOrder, "autoOutboundStatus" | "hasOutbound" | "actualPaid" | "expectedIncome" | "delivery" | "status">) {
+  return hasAutoOutboundFailure(order)
+    && getBaseAutoPickStatusDisplay(order.status) !== "已删除"
+    && !isCancelledStatus(order.status);
+}
+
+export function getAutoOutboundRecoveryTargetItem(order: Pick<AutoPickOrder, "items" | "autoOutboundError">) {
+  const errorText = order.autoOutboundError || "";
+  const unmatchedItems = (order.items || []).filter((item) => {
+    const rawPayload = item.rawPayload && typeof item.rawPayload === "object" && !Array.isArray(item.rawPayload)
+      ? item.rawPayload as Record<string, unknown>
+      : {};
+    const isIgnored = rawPayload.ignoreOutbound === true
+      || rawPayload.isManualIgnored === true
+      || (item.matchedProduct as (AutoPickOrderItem["matchedProduct"] & { ignoreOutbound?: boolean }))?.ignoreOutbound === true;
+    return !isIgnored && !item.matchedProduct;
+  });
+
+  return unmatchedItems.find((item) => (
+    Boolean(item.productNo && errorText.includes(item.productNo))
+    || Boolean(item.platformSkuId && errorText.includes(item.platformSkuId))
+    || Boolean(item.productName && errorText.includes(item.productName))
+  )) || unmatchedItems[0] || null;
+}
+
 export function isPureManualOfflineOrder(order: { platform?: string | null; orderNo?: string | null; sourceId?: string | null; rawPayload?: unknown }) {
   const rawPayload = order.rawPayload && typeof order.rawPayload === "object" && !Array.isArray(order.rawPayload)
     ? order.rawPayload as Record<string, unknown>
@@ -2318,6 +2343,49 @@ export function ActionButton({
   );
 }
 
+export function AutoCompleteStatusBadge({
+  order,
+  pickup,
+  compact = false,
+  className,
+}: {
+  order: Pick<AutoPickOrder, "status" | "isMainSystemSelfDelivery" | "autoCompleteAt" | "autoCompleteJobStatus">;
+  pickup: boolean;
+  compact?: boolean;
+  className?: string;
+}) {
+  const terminal = isTerminalStatus(order.status);
+  const abnormal = isAbnormalStatus(order.status);
+  const autoCompleteFailed = hasAutoCompleteFailure(order);
+
+  if (!pickup && !terminal && !abnormal && Boolean(order.isMainSystemSelfDelivery) && order.autoCompleteAt) {
+    return (
+      <span className={cn("inline-flex h-7 min-w-0 items-center gap-1.5 rounded-full border border-amber-500/15 bg-amber-500/10 px-2 text-[11px] font-medium leading-none text-amber-700 dark:text-amber-400 sm:h-8 sm:px-2.5 sm:text-[13px]", className)}>
+        <TimerReset size={12} />
+        {compact ? (
+          <span className="truncate">{`自动完成 ${formatCompactDateTime(order.autoCompleteAt)}`}</span>
+        ) : (
+          <>
+            <span className="truncate sm:hidden">{`自动完成 ${formatCompactDateTime(order.autoCompleteAt)}`}</span>
+            <span className="hidden sm:inline">{`预计自动完成 ${formatLocalDateTime(order.autoCompleteAt)}`}</span>
+          </>
+        )}
+      </span>
+    );
+  }
+
+  if (autoCompleteFailed && Boolean(order.isMainSystemSelfDelivery)) {
+    return (
+      <span className={cn("inline-flex h-7 items-center gap-1.5 rounded-full border border-rose-500/15 bg-rose-500/10 px-2 text-[11px] font-medium leading-none text-rose-700 dark:text-rose-400 sm:h-8 sm:px-2.5 sm:text-[13px]", className)}>
+        <X size={12} />
+        自动完成失败
+      </span>
+    );
+  }
+
+  return null;
+}
+
 export class OrderCardErrorBoundary extends Component<{ children: React.ReactNode; orderNo: string }, { hasError: boolean; error: Error | null }> {
   constructor(props: { children: React.ReactNode; orderNo: string }) {
     super(props);
@@ -2861,7 +2929,6 @@ export const OrderCard = memo(function OrderCard({
   const autoCompleteFailed = hasAutoCompleteFailure(order);
   const autoOutboundFailed = hasAutoOutboundFailure(order);
   const compactCompletedAt = formatCompactDateTime(order.completedAt);
-  const compactAutoCompleteAt = formatCompactDateTime(order.autoCompleteAt);
   const compactDeadlineDisplay = formatCompactDateTime(deadlineDisplay);
   const isProfitTooltipVisible = isProfitTooltipOpen || isProfitTooltipHovering;
   const closeProfitTooltip = useCallback(() => {
@@ -2975,7 +3042,7 @@ export const OrderCard = memo(function OrderCard({
                       刷单
                     </span>
                   ) : null}
-                  {autoOutboundFailed && !deleted && !cancelled ? (
+                  {shouldShowAutoOutboundRecovery(order) ? (
                     readOnly ? (
                       <span
                         title={order.autoOutboundError || "自动出库失败"}
@@ -2993,30 +3060,8 @@ export const OrderCard = memo(function OrderCard({
                             // 清除当前焦点，避免悬浮层在弹窗打开时产生残留闪烁
                             (e.currentTarget as HTMLElement)?.blur();
 
-                            const errorText = order.autoOutboundError || "";
-
-                            // 查找所有未匹配且未显式忽略的商品
-                            const unmatchedItems = (order.items || []).filter((it) => {
-                              const rawPayload = it.rawPayload && typeof it.rawPayload === "object" && !Array.isArray(it.rawPayload)
-                                ? it.rawPayload as Record<string, unknown>
-                                : {};
-                              const isIgnored = rawPayload.ignoreOutbound === true
-                                || rawPayload.isManualIgnored === true
-                                || (it.matchedProduct as any)?.ignoreOutbound === true;
-                              if (isIgnored) return false;
-                              return !it.matchedProduct;
-                            });
-
-                            // 只有在【确实存在未匹配商品】时，才拦截并拉起改匹配弹窗
-                            if (unmatchedItems.length > 0) {
-                              // 优先匹配报错信息中提及的具体商品，否则取第一个未匹配商品
-                              const targetItem = unmatchedItems.find((it) => {
-                                if (it.productNo && errorText.includes(it.productNo)) return true;
-                                if (it.platformSkuId && errorText.includes(it.platformSkuId)) return true;
-                                if (it.productName && errorText.includes(it.productName)) return true;
-                                return false;
-                              }) || unmatchedItems[0];
-
+                            const targetItem = getAutoOutboundRecoveryTargetItem(order);
+                            if (targetItem) {
                               onOpenMatchEditor(order, targetItem, { autoOutbound: true });
                               return;
                             }
@@ -3582,19 +3627,7 @@ export const OrderCard = memo(function OrderCard({
                 订单已删除
               </span>
             ) : null}
-            {!pickup && !terminal && !abnormal && Boolean(order.isMainSystemSelfDelivery) && order.autoCompleteAt ? (
-              <span className="inline-flex h-7 sm:h-8 min-w-0 items-center gap-1.5 rounded-full border border-amber-500/15 bg-amber-500/10 px-2 text-[11px] font-medium leading-none text-amber-700 dark:text-amber-400 sm:gap-1.5 sm:px-2.5 sm:text-[13px]">
-                <TimerReset size={12} />
-                <span className="truncate sm:hidden">{`自动完成 ${compactAutoCompleteAt}`}</span>
-                <span className="hidden sm:inline">{`预计自动完成 ${formatLocalDateTime(order.autoCompleteAt)}`}</span>
-              </span>
-            ) : null}
-            {autoCompleteFailed && Boolean(order.isMainSystemSelfDelivery) ? (
-              <span className="inline-flex h-7 sm:h-8 items-center gap-1.5 rounded-full border border-rose-500/15 bg-rose-500/10 px-2 text-[11px] font-medium leading-none text-rose-700 dark:text-rose-400 sm:gap-1.5 sm:px-2.5 sm:text-[13px]">
-                <X size={12} />
-                自动完成失败
-              </span>
-            ) : null}
+            <AutoCompleteStatusBadge order={order} pickup={pickup} />
             {deadlineDisplay !== "-" ? (
               <span className="ml-auto inline-flex h-7 sm:h-8 min-w-0 items-center justify-end gap-1.5 rounded-full border border-black/8 bg-white/85 px-2 text-[11px] font-medium leading-none text-muted-foreground dark:border-white/10 dark:bg-white/4 sm:ml-0 sm:justify-start sm:gap-1.5 sm:px-2.5 sm:text-[13px]">
                 <Clock3 size={12} />

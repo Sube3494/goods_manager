@@ -1,31 +1,57 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowUp, Package2, Search, X, ChevronUp, ChevronDown, Loader2 } from "lucide-react";
+import Image from "next/image";
+import dynamic from "next/dynamic";
+import { createPortal } from "react-dom";
+import { ArrowUp, Package2, Search, X, ChevronUp, ChevronDown, Loader2, LayoutGrid, List, RefreshCw, Clock3, MapPin, Truck, CheckCheck, TriangleAlert } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { AutoPickOrder, AutoPickOrderItem, PurchaseOrder, PurchaseStatus } from "@/lib/types";
 import { formatLocalDate } from "@/lib/dateUtils";
 import { isShopNameMatch } from "@/lib/shopIdentity";
-import { AUTO_PICK_EXTRA_STATUS_FILTERS, getBaseAutoPickStatusDisplay, getAutoPickStatusFilterLabel } from "@/lib/autoPickOrderStatus";
+import { extractCustomerPhoneTail } from "@/lib/customerPhoneTail";
+import {
+  AUTO_PICK_EXTRA_STATUS_FILTERS,
+  getBaseAutoPickStatusDisplay,
+  getAutoPickStatusFilterLabel,
+  isAutoPickOrderDeliveringStatus,
+  isAutoPickOrderRiderAssigned,
+  isAutoPickPickupOrder,
+} from "@/lib/autoPickOrderStatus";
 import {
   OrderCard,
   OrderCardErrorBoundary,
+  ActionButton,
+  AutoCompleteStatusBadge,
+  ProductStripItem,
   isCompletedStatus,
   isCancelledStatus,
   isBrushSyncEligibleOrder,
-  getOrderActionErrorMessage
+  getOrderActionErrorMessage,
+  getExpandedOrderItemDisplays,
+  getDeliveryFee,
+  getDeadlineDisplay,
+  getOrderTypeLabel,
+  getPlatformBadgeMeta,
+  getProductCostStatusText,
+  getAutoOutboundRecoveryTargetItem,
+  shouldShowAutoOutboundRecovery,
+  toCurrency,
 } from "./OrderCard";
 import { motion, AnimatePresence } from "framer-motion";
 
-function OrderListSkeleton({ count = 3 }: { count?: number }) {
+const CompactOrderRouteModal = dynamic(() => import("@/components/Orders/OrderRouteModal").then((module) => module.OrderRouteModal), { ssr: false });
+const CompactCustomerHistoryModal = dynamic(() => import("@/components/Orders/CustomerHistoryModal").then((module) => module.CustomerHistoryModal), { ssr: false });
+
+function OrderListSkeleton({ count = 3, cardMode = false }: { count?: number; cardMode?: boolean }) {
   return (
-    <div className="grid gap-4 animate-pulse">
+    <div className={cardMode ? "animate-pulse columns-1 gap-4 sm:columns-2 xl:columns-3" : "grid gap-4 animate-pulse"}>
       {Array.from({ length: count }).map((_, index) => (
         <div 
           key={index} 
-          className="rounded-[28px] border border-black/8 bg-white/70 dark:border-white/10 dark:bg-white/4 p-5 sm:p-6 space-y-4 shadow-sm"
+          className={`space-y-4 rounded-[28px] border border-black/8 bg-white/70 p-5 shadow-sm dark:border-white/10 dark:bg-white/4 sm:p-6 ${cardMode ? "mb-4 break-inside-avoid" : ""}`}
         >
           {/* Header row */}
           <div className="flex items-center justify-between gap-3">
@@ -66,7 +92,232 @@ function OrderListSkeleton({ count = 3 }: { count?: number }) {
   );
 }
 
+function formatCompactTime(value?: string | null) {
+  if (!value) return "-";
+  const matched = String(value).match(/(?:T|\s)(\d{2}:\d{2})/);
+  return matched?.[1] || String(value).replace("T", " ").slice(-5);
+}
+
+function CompactTodayOrderCard({
+  order,
+  actingId,
+  readOnly,
+  canExpandDetails,
+  onExpand,
+  onRunAction,
+  onOpenMatchEditor,
+}: {
+  order: AutoPickOrder;
+  actingId: string;
+  readOnly: boolean;
+  canExpandDetails: boolean;
+  onExpand: () => void;
+  onRunAction: (action: OrderAction) => void;
+  onOpenMatchEditor: (item: AutoPickOrderItem, options?: { autoOutbound?: boolean }) => void;
+}) {
+  const [routeOpen, setRouteOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const compactProductRows = order.items.flatMap((item, itemIndex) => (
+    getExpandedOrderItemDisplays(item, order.platform).map((display, displayIndex) => ({
+      key: `${item.id || item.productNo || itemIndex}-${display.sourceId || display.sku || displayIndex}`,
+      item,
+      display,
+      displayIndex,
+    }))
+  ));
+  const platformBadge = getPlatformBadgeMeta(order.platform, order.rawPayload);
+  const statusLabel = getBaseAutoPickStatusDisplay(order.status) || "待处理";
+  const cancelled = isCancelledStatus(order.status) || statusLabel === "已删除";
+  const completed = isCompletedStatus(order.status);
+  const deleted = statusLabel === "已删除";
+  const terminal = cancelled || completed || deleted;
+  const pickup = Boolean(order.isPickup) || isAutoPickPickupOrder(order.rawPayload, order.userAddress, order.shopAddress);
+  const delivering = isAutoPickOrderDeliveringStatus(order.status);
+  const riderAssigned = isAutoPickOrderRiderAssigned(order);
+  const displayAsOfflineOrder = order.platform === "线下交易" || String(order.platform || "").toLowerCase() === "other";
+  const showPlatformActions = !displayAsOfflineOrder && !readOnly;
+  const cannotSelfDeliver = Boolean(actingId) || terminal || delivering || pickup || riderAssigned;
+  const showAutoOutboundRecovery = shouldShowAutoOutboundRecovery(order);
+  const returned = Boolean(order.outboundReturnDetails?.some((entry) => entry.items?.some((item) => Number(item.quantity || 0) > 0)));
+  const syncing = actingId === `${order.id}:sync`;
+  const shopName = order.matchedShopName || order.rawShopName || order.shopId || "未匹配店铺";
+  const deadlineDisplay = getDeadlineDisplay(order);
+  const deliveryFee = getDeliveryFee(order.delivery, order);
+  const customerPhoneTail = extractCustomerPhoneTail(order);
+  const customerType = order.customerType;
+  const orderTypeLabel = getOrderTypeLabel(order);
+  const showBrushMarker = !pickup && !displayAsOfflineOrder && Boolean(order.isMainSystemSelfDelivery);
+  const hasPureProfit = typeof order.pureProfit === "number" && Number.isFinite(order.pureProfit);
+  const canShowPureProfit = Boolean(order.hasOutbound) && hasPureProfit;
+  const pureProfitDisplay = hasPureProfit ? toCurrency(Number(order.pureProfit)) : (getProductCostStatusText(order) || "-");
+
+  const statusClassName = cancelled
+    ? "border-slate-500/15 bg-slate-500/10 text-slate-600 dark:text-slate-300"
+    : completed
+      ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+      : "border-sky-500/20 bg-sky-500/10 text-sky-700 dark:text-sky-300";
+
+  const handleAutoOutboundRecovery = () => {
+    const targetItem = getAutoOutboundRecoveryTargetItem(order);
+    if (targetItem) {
+      onOpenMatchEditor(targetItem, { autoOutbound: true });
+      return;
+    }
+    onRunAction("outbound");
+  };
+
+  return (
+    <>
+      {routeOpen ? <CompactOrderRouteModal order={order} onClose={() => setRouteOpen(false)} /> : null}
+      {historyOpen && customerPhoneTail ? (
+        <CompactCustomerHistoryModal
+          isOpen={historyOpen}
+          onClose={() => setHistoryOpen(false)}
+          phoneTail={customerPhoneTail}
+          currentOrderNo={order.orderNo}
+        />
+      ) : null}
+      <article className="group flex min-h-[286px] flex-col overflow-hidden rounded-[24px] border border-black/8 bg-white/82 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-black/12 hover:shadow-lg dark:border-white/10 dark:bg-white/4 dark:hover:border-white/16">
+        <div className="flex flex-1 flex-col p-4 text-left">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-black/8 bg-white dark:border-white/10 dark:bg-white/8">
+              <Image src={platformBadge.iconSrc} alt={platformBadge.iconAlt} width={20} height={20} className="h-5 w-5 object-contain" />
+            </span>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-base font-black text-foreground">#{order.dailyPlatformSequence || "-"}</span>
+                <span title={shopName} className="inline-flex h-6 min-w-0 max-w-32 items-center rounded-full border border-black/8 bg-black/3 px-2 text-[11px] font-semibold text-muted-foreground dark:border-white/10 dark:bg-white/5"><span className="truncate">{shopName}</span></span>
+                {orderTypeLabel ? <span className="inline-flex h-6 shrink-0 items-center rounded-full border border-violet-500/20 bg-violet-500/10 px-2 text-[11px] font-semibold leading-none text-violet-700 dark:text-violet-300">{orderTypeLabel}</span> : null}
+                {showBrushMarker ? <span className="inline-flex h-6 shrink-0 items-center rounded-full border border-rose-500/20 bg-rose-500/10 px-2 text-[11px] font-semibold leading-none text-rose-700 dark:text-rose-300">刷单</span> : null}
+              </div>
+              <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
+                <span>{formatCompactTime(order.orderTime)} · {order.distanceKm != null ? `${order.distanceKm.toFixed(2)} km` : "距离待同步"}</span>
+                {customerType === "new" ? (
+                  <span title="门店新客" className="rounded-full border border-orange-500/25 bg-orange-500/10 px-1.5 py-0.5 text-[9.5px] leading-none text-orange-600 dark:text-orange-400">新客</span>
+                ) : customerType === "returning" ? (
+                  <button
+                    type="button"
+                    onClick={() => customerPhoneTail && setHistoryOpen(true)}
+                    disabled={!customerPhoneTail}
+                    title={customerPhoneTail ? `查看此老客历史订单（尾号 ${customerPhoneTail}）` : "老客"}
+                    className="rounded-full border border-slate-400/20 bg-slate-500/8 px-1.5 py-0.5 text-[9.5px] leading-none text-slate-500 transition hover:bg-slate-500/15 disabled:cursor-default dark:text-slate-300"
+                  >老客</button>
+                ) : null}
+                {pickup && !displayAsOfflineOrder ? <span className="rounded-full border border-sky-500/20 bg-sky-500/10 px-1.5 py-0.5 text-[9.5px] leading-none text-sky-700 dark:text-sky-300">到店自取</span> : null}
+              </div>
+            </div>
+          </div>
+          <div className="flex max-w-[58%] shrink-0 flex-wrap items-center justify-end gap-1.5">
+            {returned ? <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-1 text-[10px] font-semibold text-amber-700 dark:text-amber-300">已退</span> : null}
+            {showAutoOutboundRecovery ? (
+              readOnly ? (
+                <span title={order.autoOutboundError || "自动出库失败"} className="inline-flex items-center gap-1 rounded-full border border-rose-500/25 bg-rose-500/10 px-2.5 py-1 text-[10px] font-semibold text-rose-700 dark:text-rose-300">
+                  <TriangleAlert size={11} />出库
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleAutoOutboundRecovery}
+                  disabled={actingId === `${order.id}:outbound`}
+                  title={order.autoOutboundError || "自动出库失败，点击处理"}
+                  className="inline-flex items-center gap-1 rounded-full border border-rose-500/25 bg-rose-500/10 px-2.5 py-1 text-[10px] font-semibold text-rose-700 transition hover:border-rose-500/40 hover:bg-rose-500/15 disabled:cursor-not-allowed disabled:opacity-60 dark:text-rose-300"
+                >
+                  {actingId === `${order.id}:outbound` ? <Loader2 size={11} className="animate-spin" /> : <TriangleAlert size={11} />}
+                  {actingId === `${order.id}:outbound` ? "处理中" : "出库"}
+                </button>
+              )
+            ) : order.hasOutbound ? (
+              <span className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold tabular-nums ${canShowPureProfit ? (Number(order.pureProfit) >= 0 ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "border-rose-500/20 bg-rose-500/10 text-rose-700 dark:text-rose-300") : "border-slate-500/15 bg-slate-500/8 text-muted-foreground"}`}>
+                利润 {pureProfitDisplay}
+              </span>
+            ) : null}
+            <span className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${statusClassName}`}>{statusLabel}</span>
+          </div>
+        </div>
+
+        <div className="mt-3.5 space-y-2">
+          {compactProductRows.length > 0 ? compactProductRows.map(({ key, item, display, displayIndex }) => (
+            <ProductStripItem
+              key={key}
+              display={display}
+              showEditMatch={displayIndex === 0 && !deleted && !readOnly}
+              onEditMatch={() => onOpenMatchEditor(item)}
+              matchedProduct={item.matchedProduct}
+              showMatchStatus={displayIndex === 0}
+            />
+          )) : (
+            <div className="flex min-w-0 items-center gap-3 rounded-2xl border border-black/6 bg-black/[0.025] p-2.5 dark:border-white/8 dark:bg-white/[0.035]">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[13px] border border-black/6 bg-white text-muted-foreground/35 dark:border-white/8 dark:bg-white/6"><Package2 size={19} /></div>
+              <div className="text-[13px] font-semibold text-foreground">纯配送订单</div>
+            </div>
+          )}
+        </div>
+
+        <div className={`mt-3 grid items-center divide-x divide-black/6 rounded-xl border border-black/6 bg-black/[0.018] px-1 py-2.5 text-[11px] dark:divide-white/8 dark:border-white/8 dark:bg-white/[0.025] ${Number(order.refundAmount || 0) > 0 ? "grid-cols-4" : "grid-cols-3"}`}>
+          <div className="flex min-w-0 items-center gap-1.5 px-2"><span className="shrink-0 text-muted-foreground">实付</span><span className="truncate font-bold tabular-nums text-foreground">{toCurrency(order.actualPaid)}</span></div>
+          <div className="flex min-w-0 items-center justify-center gap-1.5 px-2"><span className="shrink-0 text-muted-foreground">到手</span><span className="truncate font-bold tabular-nums text-foreground">{toCurrency(order.expectedIncome)}</span></div>
+          {Number(order.refundAmount || 0) > 0 ? (
+            <div className="flex min-w-0 items-center justify-center gap-1.5 px-2"><span className="shrink-0 text-muted-foreground">退款</span><span className="truncate font-bold tabular-nums text-rose-600 dark:text-rose-400">{toCurrency(order.refundAmount)}</span></div>
+          ) : null}
+          <div className="flex min-w-0 items-center justify-end gap-1.5 px-2"><span className="shrink-0 text-muted-foreground">配送费</span><span className="truncate font-bold tabular-nums text-foreground">{Number.isFinite(deliveryFee) ? toCurrency(deliveryFee) : "-"}</span></div>
+        </div>
+
+        <AutoCompleteStatusBadge order={order} pickup={pickup} compact className="mt-2.5 max-w-full self-start" />
+
+        <div className="mt-auto flex min-w-0 items-center gap-3 pt-3 text-[11px] font-medium text-muted-foreground">
+          <span className={`flex items-center gap-1.5 ${order.isSubscribe ? "shrink-0" : "min-w-0"}`} title={deadlineDisplay !== "-" ? deadlineDisplay : undefined}>
+            <Clock3 size={12} className="shrink-0" />
+            <span className={order.isSubscribe ? "whitespace-nowrap" : "truncate"}>
+              {deadlineDisplay !== "-" ? `${pickup ? "取货" : order.isSubscribe ? "预约" : "最晚"} ${deadlineDisplay}` : "时效待同步"}
+            </span>
+          </span>
+          <button type="button" onClick={() => setRouteOpen(true)} title="查看配送地图" className="ml-auto flex min-w-0 cursor-pointer items-center gap-1.5 rounded-md px-1 py-0.5 transition hover:bg-primary/6 hover:text-primary focus-visible:outline-2 focus-visible:outline-primary"><MapPin size={12} className="shrink-0" /><span className="max-w-32 truncate">{order.userAddress || "地址待同步"}</span></button>
+        </div>
+        </div>
+
+        {!readOnly || canExpandDetails ? (
+          <div className="border-t border-black/6 bg-black/[0.012] px-4 py-2.5 dark:border-white/8 dark:bg-white/[0.018]">
+            <div className="flex flex-nowrap items-center justify-end gap-1.5">
+            {showPlatformActions && !deleted && !order.isSubscribe ? (
+              <ActionButton
+                label="自配"
+                icon={actingId === `${order.id}:self-delivery` ? <Loader2 size={12} className="animate-spin" /> : <Truck size={12} />}
+                onClick={() => onRunAction("self-delivery")}
+                disabled={cannotSelfDeliver}
+                title={riderAssigned ? "骑手已接单，不能发起自配" : terminal ? "订单已结束，不能发起自配" : undefined}
+              />
+            ) : null}
+            {showPlatformActions ? (
+              <ActionButton
+                label={pickup ? "完成取货" : "完成配送"}
+                variant="primary"
+                icon={actingId === `${order.id}:${pickup ? "pickup-complete" : "complete-delivery"}` ? <Loader2 size={12} className="animate-spin" /> : <CheckCheck size={12} />}
+                onClick={() => onRunAction(pickup ? "pickup-complete" : "complete-delivery")}
+                disabled={Boolean(actingId) || terminal || (!pickup && (!delivering || !order.isMainSystemSelfDelivery))}
+                title={terminal ? "订单已结束，不能重复完成" : !pickup && !order.isMainSystemSelfDelivery ? "平台骑手配送不能在主系统完成" : undefined}
+              />
+            ) : null}
+            {!readOnly ? (
+              <ActionButton
+                label={syncing ? "同步中" : "同步"}
+                icon={<RefreshCw size={12} className={syncing ? "animate-spin" : ""} />}
+                onClick={() => onRunAction("sync")}
+                disabled={syncing || deleted}
+                title={deleted ? "订单已删除，不能同步" : "从平台重新同步最新订单状态"}
+              />
+            ) : null}
+            {canExpandDetails ? <button type="button" onClick={onExpand} className="inline-flex h-8 shrink-0 items-center justify-center whitespace-nowrap rounded-full bg-foreground px-3 text-[11px] font-semibold text-background shadow-xs transition hover:opacity-85">查看详情</button> : null}
+            </div>
+          </div>
+        ) : null}
+      </article>
+    </>
+  );
+}
+
 type OrderAction = "self-delivery" | "complete-delivery" | "pickup-complete" | "sync" | "outbound" | "sync-brush";
+type TodayOrderLayout = "cards" | "list";
 type PurchaseDraftPayload = PurchaseOrder & { sourceOrderId?: string };
 type ShopProfitInfo = {
   id: string | null;
@@ -224,6 +475,23 @@ export function TodayOrdersView({
   const [platform, setPlatform] = useState("all");
   const [shop, setShop] = useState("all");
   const [status, setStatus] = useState("all");
+  const [layoutMode, setLayoutMode] = useState<TodayOrderLayout>("list");
+  const [isMobileViewport, setIsMobileViewport] = useState(false);
+
+  useEffect(() => {
+    const savedLayout = window.localStorage.getItem("today-orders-layout");
+    if (savedLayout === "cards" || savedLayout === "list") {
+      setLayoutMode(savedLayout);
+    }
+  }, []);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(max-width: 639px)");
+    const updateViewport = () => setIsMobileViewport(mediaQuery.matches);
+    updateViewport();
+    mediaQuery.addEventListener("change", updateViewport);
+    return () => mediaQuery.removeEventListener("change", updateViewport);
+  }, []);
 
   useEffect(() => {
     onShopChange?.(shop);
@@ -231,6 +499,7 @@ export function TodayOrdersView({
   
   const [actingId, setActingId] = useState("");
   const [expandedIds, setExpandedIds] = useState<string[]>([]);
+  const [detailOrderId, setDetailOrderId] = useState<string | null>(null);
   const [showCompletedToday, setShowCompletedToday] = useState(true);
   const [showCancelledToday, setShowCancelledToday] = useState(false);
   
@@ -909,6 +1178,78 @@ export function TodayOrdersView({
     setStatus("all");
   };
 
+  const changeLayoutMode = (nextLayout: TodayOrderLayout) => {
+    setLayoutMode(nextLayout);
+    setDetailOrderId(null);
+    window.localStorage.setItem("today-orders-layout", nextLayout);
+  };
+
+  const detailOrder = useMemo(
+    () => orders.find((order) => order.id === detailOrderId) || null,
+    [detailOrderId, orders]
+  );
+
+  useEffect(() => {
+    if (!detailOrderId) return;
+    const previousOverflow = document.body.style.overflow;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setDetailOrderId(null);
+    };
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [detailOrderId]);
+
+  useEffect(() => {
+    if (isMobileViewport) setDetailOrderId(null);
+  }, [isMobileViewport]);
+
+  const effectiveLayoutMode: TodayOrderLayout = isMobileViewport ? "list" : layoutMode;
+
+  const renderOrderCollection = (groupOrders: AutoPickOrder[]) => (
+    <div className={effectiveLayoutMode === "cards" ? "columns-1 gap-4 sm:columns-2 xl:columns-3" : "grid gap-4"}>
+      {groupOrders.map((order) => {
+        const expanded = expandedIds.includes(order.id);
+        const showCompactCard = effectiveLayoutMode === "cards";
+        return (
+          <div key={order.id} className={showCompactCard ? "mb-4 min-w-0 break-inside-avoid" : "min-w-0"}>
+            <OrderCardErrorBoundary orderNo={order.orderNo || order.id}>
+              {showCompactCard ? (
+                <CompactTodayOrderCard
+                  order={order}
+                  actingId={actingId}
+                  readOnly={readOnly}
+                  canExpandDetails={canExpandDetails}
+                  onExpand={() => setDetailOrderId(order.id)}
+                  onRunAction={(action) => runAction(order.id, action)}
+                  onOpenMatchEditor={(item, options) => onOpenMatchEditor(order, item, options)}
+                />
+              ) : (
+                <OrderCard
+                  order={order}
+                  expanded={expanded}
+                  actingId={actingId}
+                  onToggleExpanded={toggleExpanded}
+                  onRunAction={runAction}
+                  onOpenCostBackfill={onOpenCostBackfill}
+                  onOpenMatchEditor={onOpenMatchEditor}
+                  onRefresh={handleRefreshOrder}
+                  isProfitUpdating={profitUpdatingOrderIds.includes(order.id)}
+                  readOnly={readOnly}
+                  canExpandDetails={canExpandDetails}
+                  canViewProductCosts={canViewProductCosts}
+                />
+              )}
+            </OrderCardErrorBoundary>
+          </div>
+        );
+      })}
+    </div>
+  );
+
   return (
     <div className="space-y-6">
       {/* 筛选栏 */}
@@ -969,6 +1310,28 @@ export function TodayOrdersView({
               />
             </div>
           </div>
+
+          <div className="hidden items-center justify-between gap-3 border-t border-black/6 pt-3 dark:border-white/8 sm:flex">
+            <span className="text-xs font-medium text-muted-foreground">{filteredOrders.length} 张订单</span>
+            <div className="inline-flex rounded-full border border-black/8 bg-white p-1 shadow-xs dark:border-white/10 dark:bg-white/4" role="group" aria-label="订单布局">
+              <button
+                type="button"
+                onClick={() => changeLayoutMode("cards")}
+                aria-pressed={layoutMode === "cards"}
+                className={`inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-xs font-semibold transition ${layoutMode === "cards" ? "bg-foreground text-background shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                <LayoutGrid size={13} />卡片
+              </button>
+              <button
+                type="button"
+                onClick={() => changeLayoutMode("list")}
+                aria-pressed={layoutMode === "list"}
+                className={`inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-xs font-semibold transition ${layoutMode === "list" ? "bg-foreground text-background shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                <List size={13} />列表
+              </button>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -983,7 +1346,7 @@ export function TodayOrdersView({
               exit={{ opacity: 0 }}
               transition={{ duration: 0.15 }}
             >
-              <OrderListSkeleton count={4} />
+              <OrderListSkeleton count={4} cardMode={effectiveLayoutMode === "cards"} />
             </motion.div>
           ) : todayPendingOrders.length === 0 && todayCompletedOrders.length === 0 && todayCancelledOrders.length === 0 ? (
             <motion.div
@@ -1009,26 +1372,7 @@ export function TodayOrdersView({
               className="space-y-4"
             >
               {todayPendingOrders.length > 0 && (
-                <div className="grid gap-4">
-                  {todayPendingOrders.map((order) => (
-                    <OrderCardErrorBoundary key={order.id} orderNo={order.orderNo || order.id}>
-                      <OrderCard
-                        order={order}
-                        expanded={expandedIds.includes(order.id)}
-                        actingId={actingId}
-                        onToggleExpanded={toggleExpanded}
-                        onRunAction={runAction}
-                        onOpenCostBackfill={onOpenCostBackfill}
-                        onOpenMatchEditor={onOpenMatchEditor}
-                        onRefresh={handleRefreshOrder}
-                        isProfitUpdating={profitUpdatingOrderIds.includes(order.id)}
-                        readOnly={readOnly}
-                        canExpandDetails={canExpandDetails}
-                        canViewProductCosts={canViewProductCosts}
-                      />
-                    </OrderCardErrorBoundary>
-                  ))}
-                </div>
+                renderOrderCollection(todayPendingOrders)
               )}
 
               {todayCompletedOrders.length > 0 && (
@@ -1048,26 +1392,7 @@ export function TodayOrdersView({
                   </button>
 
                   {showCompletedToday && (
-                    <div className="grid gap-4 animate-in fade-in duration-200">
-                      {todayCompletedOrders.map((order) => (
-                        <OrderCardErrorBoundary key={order.id} orderNo={order.orderNo || order.id}>
-                          <OrderCard
-                            order={order}
-                            expanded={expandedIds.includes(order.id)}
-                            actingId={actingId}
-                            onToggleExpanded={toggleExpanded}
-                            onRunAction={runAction}
-                            onOpenCostBackfill={onOpenCostBackfill}
-                            onOpenMatchEditor={onOpenMatchEditor}
-                            onRefresh={handleRefreshOrder}
-                            isProfitUpdating={profitUpdatingOrderIds.includes(order.id)}
-                            readOnly={readOnly}
-                            canExpandDetails={canExpandDetails}
-                            canViewProductCosts={canViewProductCosts}
-                          />
-                        </OrderCardErrorBoundary>
-                      ))}
-                    </div>
+                    <div className="animate-in fade-in duration-200">{renderOrderCollection(todayCompletedOrders)}</div>
                   )}
                 </section>
               )}
@@ -1089,26 +1414,7 @@ export function TodayOrdersView({
                   </button>
 
                   {showCancelledToday && (
-                    <div className="grid gap-4 animate-in fade-in duration-200">
-                      {todayCancelledOrders.map((order) => (
-                        <OrderCardErrorBoundary key={order.id} orderNo={order.orderNo || order.id}>
-                          <OrderCard
-                            order={order}
-                            expanded={expandedIds.includes(order.id)}
-                            actingId={actingId}
-                            onToggleExpanded={toggleExpanded}
-                            onRunAction={runAction}
-                            onOpenCostBackfill={onOpenCostBackfill}
-                            onOpenMatchEditor={onOpenMatchEditor}
-                            onRefresh={handleRefreshOrder}
-                            isProfitUpdating={profitUpdatingOrderIds.includes(order.id)}
-                            readOnly={readOnly}
-                            canExpandDetails={canExpandDetails}
-                            canViewProductCosts={canViewProductCosts}
-                          />
-                        </OrderCardErrorBoundary>
-                      ))}
-                    </div>
+                    <div className="animate-in fade-in duration-200">{renderOrderCollection(todayCancelledOrders)}</div>
                   )}
                 </section>
               )}
@@ -1139,6 +1445,54 @@ export function TodayOrdersView({
           )}
         </AnimatePresence>
       </main>
+
+      {effectiveLayoutMode === "cards" && detailOrder && typeof document !== "undefined" ? createPortal(
+        <div
+          className="fixed inset-0 z-[150000] flex items-center justify-center bg-slate-950/72 p-3 backdrop-blur-sm sm:p-6"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`订单 #${detailOrder.dailyPlatformSequence || detailOrder.orderNo} 详情`}
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setDetailOrderId(null);
+          }}
+        >
+          <div className="flex max-h-[84dvh] w-full max-w-[1040px] flex-col overflow-hidden rounded-[26px] border border-white/12 bg-background shadow-2xl">
+            <div className="flex shrink-0 items-center justify-between border-b border-black/8 bg-background/96 px-4 py-3 backdrop-blur dark:border-white/10 sm:px-5">
+              <div className="min-w-0">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">订单详情</div>
+                <div className="mt-0.5 truncate text-sm font-bold text-foreground">#{detailOrder.dailyPlatformSequence || "-"} · {detailOrder.matchedShopName || detailOrder.rawShopName || detailOrder.shopId || "未匹配店铺"}</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDetailOrderId(null)}
+                className="ml-3 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-black/8 bg-black/3 text-muted-foreground transition hover:bg-black/7 hover:text-foreground dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10"
+                aria-label="关闭订单详情"
+              >
+                <X size={17} />
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-5">
+              <OrderCardErrorBoundary orderNo={detailOrder.orderNo || detailOrder.id}>
+                <OrderCard
+                  order={detailOrder}
+                  expanded
+                  actingId={actingId}
+                  onToggleExpanded={() => setDetailOrderId(null)}
+                  onRunAction={runAction}
+                  onOpenCostBackfill={onOpenCostBackfill}
+                  onOpenMatchEditor={onOpenMatchEditor}
+                  onRefresh={handleRefreshOrder}
+                  isProfitUpdating={profitUpdatingOrderIds.includes(detailOrder.id)}
+                  readOnly={readOnly}
+                  canExpandDetails={canExpandDetails}
+                  canViewProductCosts={canViewProductCosts}
+                />
+              </OrderCardErrorBoundary>
+            </div>
+          </div>
+        </div>,
+        document.body
+      ) : null}
 
       {showScrollTop ? (
         <button
