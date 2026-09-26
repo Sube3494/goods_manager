@@ -16,8 +16,7 @@ function readEffectiveConfirmedRefunds(rawPayload: unknown) {
     const status = String(item.status ?? "").trim();
     const title = String(item.title || "").trim();
     return status === "1"
-      && /确认退款|同意退款|退款成功|退款完成|已退款/.test(title)
-      && !/取消|拒绝|驳回/.test(title);
+      && !/取消退款申请|撤销退款|拒绝|驳回/.test(title);
   });
 }
 
@@ -26,8 +25,8 @@ export function hasEffectiveConfirmedRefund(rawPayload: unknown) {
 }
 
 export function readConfirmedRefundAmountFromRawPayload(rawPayload: unknown) {
-  return readEffectiveConfirmedRefunds(rawPayload).reduce((sum, item) => (
-    sum + Math.round(Math.max(0, Number(item.total_price || 0) || 0) * 100)
+  return readEffectiveConfirmedRefunds(rawPayload).reduce((maxAmount, item) => (
+    Math.max(maxAmount, Math.round(Math.max(0, Number(item.total_price || 0) || 0) * 100))
   ), 0);
 }
 

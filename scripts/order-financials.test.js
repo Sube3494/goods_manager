@@ -119,6 +119,26 @@ assert.equal(
   resolveOrderRefundAmount({
     rawPayload: {
       cancelDetails: [
+        {
+          source_cancel_id: "returned-refund",
+          status: 1,
+          title: "退货已同意",
+          reason: "计划有变，我不想要了",
+          total_price: 0,
+        },
+      ],
+    },
+    actualPaid: 17510,
+    hasReturnedGoods: true,
+  }),
+  17510,
+  "麦芽田退货已同意且商品已退时应按实付金额展示",
+);
+
+assert.equal(
+  resolveOrderRefundAmount({
+    rawPayload: {
+      cancelDetails: [
         { source_cancel_id: "merchant-cancel", status: 1, title: "商户取消", total_price: 0 },
       ],
     },
@@ -127,6 +147,26 @@ assert.equal(
   }),
   0,
   "普通商户取消不能显示退款金额",
+);
+
+assert.equal(
+  resolveOrderRefundAmount({
+    rawPayload: {
+      cancelDetails: [
+        {
+          source_cancel_id: "",
+          status: 1,
+          title: "商户取消",
+          reason: "已协商",
+          total_price: 0,
+        },
+      ],
+    },
+    actualPaid: 12410,
+    hasReturnedGoods: true,
+  }),
+  12410,
+  "商户取消已生效且商品已退时应按实付金额展示",
 );
 
 assert.equal(
