@@ -191,83 +191,78 @@ function CompactTodayOrderCard({
       ) : null}
       <article className="group flex min-h-[268px] flex-col overflow-hidden rounded-[24px] border border-black/8 bg-white/82 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-black/12 hover:shadow-lg dark:border-white/10 dark:bg-white/4 dark:hover:border-white/16">
         <div className="flex flex-1 flex-col p-4 text-left">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex min-w-0 flex-1 items-center gap-2.5">
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-black/8 bg-white dark:border-white/10 dark:bg-white/8">
-              <Image src={platformBadge.iconSrc} alt={platformBadge.iconAlt} width={20} height={20} className="h-5 w-5 object-contain" />
-            </span>
-            <div className="min-w-0">
-              <div className="flex min-w-0 items-center gap-1.5 overflow-hidden">
-                <span className="shrink-0 text-base font-black text-foreground">#{order.dailyPlatformSequence || "-"}</span>
-                <span title={shopName} className="inline-flex h-5 min-w-0 max-w-24 items-center rounded-full border border-black/8 bg-black/3 px-1.5 text-[10px] font-semibold text-muted-foreground dark:border-white/10 dark:bg-white/5"><span className="truncate">{shopName}</span></span>
-                {orderTypeLabel ? <span className="inline-flex h-5 shrink-0 items-center rounded-full border border-violet-500/20 bg-violet-500/10 px-1.5 text-[10px] font-semibold leading-none text-violet-700 dark:text-violet-300">{orderTypeLabel}</span> : null}
-                {showBrushMarker ? <span className="inline-flex h-5 shrink-0 items-center rounded-full border border-rose-500/20 bg-rose-500/10 px-1.5 text-[10px] font-semibold leading-none text-rose-700 dark:text-rose-300">刷单</span> : null}
-              </div>
-              <div className="mt-1 flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
-                <span>{formatCompactTime(order.orderTime)}</span>
-                <button
-                  type="button"
-                  disabled={pickup}
-                  onClick={() => setRouteOpen(true)}
-                  title="查看配送地图"
-                  aria-label="查看配送地图"
-                  className="inline-flex items-center gap-1 rounded transition enabled:cursor-pointer enabled:hover:text-primary disabled:cursor-default focus-visible:outline-2 focus-visible:outline-primary"
-                >
-                  <MapPin size={10} className="shrink-0" />
-                  <span>{pickup ? "-" : (order.distanceKm != null ? `${order.distanceKm.toFixed(2)} km` : "距离待同步")}</span>
-                </button>
-                {customerType === "new" ? (
-                  <span title="门店新客" className="rounded-full border border-orange-500/25 bg-orange-500/10 px-1.5 py-0.5 text-[9.5px] leading-none text-orange-600 dark:text-orange-400">新客</span>
-                ) : customerType === "returning" ? (
+        <div className="space-y-2">
+          {/* 第一行：平台图标 + 序号 + 店铺 + 业务标签  ===  右侧：出库/状态/利润胶囊 */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-black/8 bg-white dark:border-white/10 dark:bg-white/8">
+                <Image src={platformBadge.iconSrc} alt={platformBadge.iconAlt} width={18} height={18} className="h-4.5 w-4.5 object-contain" />
+              </span>
+              <span className="shrink-0 text-base font-black text-foreground">#{order.dailyPlatformSequence || "-"}</span>
+              <span title={shopName} className="inline-flex h-5 min-w-0 max-w-24 items-center rounded-full border border-black/8 bg-black/3 px-1.5 text-[10px] font-semibold text-muted-foreground dark:border-white/10 dark:bg-white/5">
+                <span className="truncate">{shopName}</span>
+              </span>
+              {orderTypeLabel ? <span className="inline-flex h-5 shrink-0 items-center rounded-full border border-violet-500/20 bg-violet-500/10 px-1.5 text-[10px] font-semibold leading-none text-violet-700 dark:text-violet-300">{orderTypeLabel}</span> : null}
+              {showBrushMarker ? <span className="inline-flex h-5 shrink-0 items-center rounded-full border border-rose-500/20 bg-rose-500/10 px-1.5 text-[10px] font-semibold leading-none text-rose-700 dark:text-rose-300">刷单</span> : null}
+            </div>
+            <div className="flex shrink-0 items-center gap-1.5">
+              {returned ? <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-1 text-[10px] font-semibold text-amber-700 dark:text-amber-300">已退</span> : null}
+              {showAutoOutboundRecovery ? (
+                readOnly ? (
+                  <span title={order.autoOutboundError || "自动出库失败"} className="inline-flex items-center gap-1 rounded-full border border-rose-500/25 bg-rose-500/10 px-2.5 py-1 text-[10px] font-semibold text-rose-700 dark:text-rose-300">
+                    <TriangleAlert size={11} />出库
+                  </span>
+                ) : (
                   <button
                     type="button"
-                    onClick={() => customerPhoneTail && setHistoryOpen(true)}
-                    disabled={!customerPhoneTail}
-                    title={customerPhoneTail ? `查看此老客历史订单（尾号 ${customerPhoneTail}）` : "老客"}
-                    className="rounded-full border border-slate-400/20 bg-slate-500/8 px-1.5 py-0.5 text-[9.5px] leading-none text-slate-500 transition hover:bg-slate-500/15 disabled:cursor-default dark:text-slate-300"
-                  >老客</button>
-                ) : null}
-                {pickup && !displayAsOfflineOrder ? <span className="rounded-full border border-sky-500/20 bg-sky-500/10 px-1.5 py-0.5 text-[9.5px] leading-none text-sky-700 dark:text-sky-300">到店自取</span> : null}
-              </div>
-            </div>
-          </div>
-          <div className="flex shrink-0 items-center gap-1.5">
-
-            {returned ? <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-1 text-[10px] font-semibold text-amber-700 dark:text-amber-300">已退</span> : null}
-            {showAutoOutboundRecovery ? (
-              readOnly ? (
-                <span title={order.autoOutboundError || "自动出库失败"} className="inline-flex items-center gap-1 rounded-full border border-rose-500/25 bg-rose-500/10 px-2.5 py-1 text-[10px] font-semibold text-rose-700 dark:text-rose-300">
-                  <TriangleAlert size={11} />出库
+                    onClick={handleAutoOutboundRecovery}
+                    disabled={actingId === `${order.id}:outbound`}
+                    title={order.autoOutboundError || "自动出库失败，点击处理"}
+                    className="inline-flex items-center gap-1 rounded-full border border-rose-500/25 bg-rose-500/10 px-2.5 py-1 text-[10px] font-semibold text-rose-700 transition hover:border-rose-500/40 hover:bg-rose-500/15 disabled:cursor-not-allowed disabled:opacity-60 dark:text-rose-300"
+                  >
+                    {actingId === `${order.id}:outbound` ? <Loader2 size={11} className="animate-spin" /> : <TriangleAlert size={11} />}
+                    {actingId === `${order.id}:outbound` ? "处理中" : "出库"}
+                  </button>
+                )
+              ) : null}
+              {canShowPureProfit ? (
+                <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs tabular-nums ${Number(order.pureProfit) >= 0 ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "border-rose-500/20 bg-rose-500/10 text-rose-700 dark:text-rose-300"}`}>
+                  <span className="text-[11px] font-medium opacity-80">利润</span>
+                  <span className="text-xs font-bold sm:text-[13px]">{pureProfitDisplay}</span>
                 </span>
               ) : (
-                <button
-                  type="button"
-                  onClick={handleAutoOutboundRecovery}
-                  disabled={actingId === `${order.id}:outbound`}
-                  title={order.autoOutboundError || "自动出库失败，点击处理"}
-                  className="inline-flex items-center gap-1 rounded-full border border-rose-500/25 bg-rose-500/10 px-2.5 py-1 text-[10px] font-semibold text-rose-700 transition hover:border-rose-500/40 hover:bg-rose-500/15 disabled:cursor-not-allowed disabled:opacity-60 dark:text-rose-300"
-                >
-                  {actingId === `${order.id}:outbound` ? <Loader2 size={11} className="animate-spin" /> : <TriangleAlert size={11} />}
-                  {actingId === `${order.id}:outbound` ? "处理中" : "出库"}
-                </button>
-              )
+                <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${statusClassName}`}>{statusLabel}</span>
+              )}
+            </div>
+          </div>
 
-              ) : null}
-            {canShowPureProfit ? (
-              <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs tabular-nums ${Number(order.pureProfit) >= 0 ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "border-rose-500/20 bg-rose-500/10 text-rose-700 dark:text-rose-300"}`}>
-                <span className="text-[11px] font-medium opacity-80">利润</span>
-                <span className="text-xs font-bold sm:text-[13px]">{pureProfitDisplay}</span>
-              </span>
-            ) : (
-              <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${statusClassName}`}>{statusLabel}</span>
-            )}
-
-
-
-
-
-
-
+          {/* 第二行（独立排布，占满整行宽度）：时间 · 距离 · 客人类型 · 取货方式 */}
+          <div className="flex items-center gap-2 text-[11px] font-medium text-muted-foreground">
+            <span className="shrink-0 whitespace-nowrap">{formatCompactTime(order.orderTime)}</span>
+            <span className="h-2 w-px shrink-0 bg-black/10 dark:bg-white/10" />
+            <button
+              type="button"
+              disabled={pickup}
+              onClick={() => setRouteOpen(true)}
+              title="查看配送地图"
+              aria-label="查看配送地图"
+              className="inline-flex shrink-0 items-center gap-1 rounded whitespace-nowrap transition enabled:cursor-pointer enabled:hover:text-primary disabled:cursor-default focus-visible:outline-2 focus-visible:outline-primary"
+            >
+              <MapPin size={11} className="shrink-0" />
+              <span>{pickup ? "-" : (order.distanceKm != null ? `${order.distanceKm.toFixed(2)} km` : "距离待同步")}</span>
+            </button>
+            {customerType === "new" ? (
+              <span title="门店新客" className="shrink-0 whitespace-nowrap rounded-full border border-orange-500/25 bg-orange-500/10 px-1.5 py-0.5 text-[9.5px] font-medium leading-none text-orange-600 dark:text-orange-400">新客</span>
+            ) : customerType === "returning" ? (
+              <button
+                type="button"
+                onClick={() => customerPhoneTail && setHistoryOpen(true)}
+                disabled={!customerPhoneTail}
+                title={customerPhoneTail ? `查看此老客历史订单（尾号 ${customerPhoneTail}）` : "老客"}
+                className="shrink-0 whitespace-nowrap rounded-full border border-slate-400/20 bg-slate-500/8 px-1.5 py-0.5 text-[9.5px] font-medium leading-none text-slate-500 transition hover:bg-slate-500/15 disabled:cursor-default dark:text-slate-300"
+              >老客</button>
+            ) : null}
+            {pickup && !displayAsOfflineOrder ? <span className="shrink-0 whitespace-nowrap rounded-full border border-sky-500/20 bg-sky-500/10 px-1.5 py-0.5 text-[9.5px] font-medium leading-none text-sky-700 dark:text-sky-300">到店自取</span> : null}
           </div>
         </div>
 
