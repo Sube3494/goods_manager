@@ -6020,6 +6020,12 @@ export async function refreshAutoPickOrderFromPlugin(
   const fallbackPlatform = String(lookup.platform || "").trim();
   const fallbackOrderNo = String(lookup.orderNo || "").trim();
   const canTrustLookupPlatform = Boolean(fallbackPlatform && fallbackPlatform !== "未知");
+  const enrichAndUpsert = async (order: AutoPickInboundOrder) => {
+    await enrichMaiyatianOrderByCookie(cookie, order).catch((error) => {
+      console.warn(`[OrderSync] Failed to enrich refund details for ${order.orderNo}:`, error);
+    });
+    return upsertAutoPickOrder(userId, order);
+  };
 
   const sourceId = String(lookup.id || "").trim();
   if (sourceId) {
@@ -6091,7 +6097,7 @@ export async function refreshAutoPickOrderFromPlugin(
             isDeleted: true,
           } as unknown as Awaited<ReturnType<typeof upsertAutoPickOrder>>;
         }
-        return await upsertAutoPickOrder(userId, normalizedDetailOrder);
+        return await enrichAndUpsert(normalizedDetailOrder);
       }
     }
   }
@@ -6137,7 +6143,7 @@ export async function refreshAutoPickOrderFromPlugin(
       } as unknown as Awaited<ReturnType<typeof upsertAutoPickOrder>>;
     }
 
-    return await upsertAutoPickOrder(userId, normalizedFallbackMatched);
+    return await enrichAndUpsert(normalizedFallbackMatched);
   }
 
   if (isAutoPickOrderDeletedStatus(matched.status)) {
@@ -6154,7 +6160,7 @@ export async function refreshAutoPickOrderFromPlugin(
     } as unknown as Awaited<ReturnType<typeof upsertAutoPickOrder>>;
   }
 
-  return await upsertAutoPickOrder(userId, matched);
+  return await enrichAndUpsert(matched);
 }
 
 async function findAutoPickOrderFromActiveStatusLists(
