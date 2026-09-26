@@ -2082,6 +2082,7 @@ export function ProductStripItem({
   display,
   onEditMatch,
   showEditMatch = false,
+  compact = false,
   matchedProduct,
   showMatchStatus = false,
   returnedQuantity = 0,
@@ -2094,6 +2095,7 @@ export function ProductStripItem({
   display: { name: string; sku: string; image: string | null; quantity: number; costPrice?: number | null; costSource?: "outbound" | "current"; sourceId?: string; optionalMatch?: boolean };
   onEditMatch?: () => void;
   showEditMatch?: boolean;
+  compact?: boolean;
   matchedProduct?: AutoPickOrderItem['matchedProduct'];
   showMatchStatus?: boolean;
   returnedQuantity?: number;
@@ -2166,13 +2168,21 @@ export function ProductStripItem({
 
   return (
     <>
-      <div className="flex items-center gap-2.5 rounded-2xl border border-black/6 bg-white/70 px-2.5 py-2 dark:border-white/8 dark:bg-white/4 sm:gap-3 sm:rounded-[18px] sm:px-3 sm:py-2.5">
-        <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-white dark:bg-white/6 sm:h-11 sm:w-11 sm:rounded-xl">
+      <div className={cn(
+        "flex items-center border border-black/6 bg-white/70 dark:border-white/8 dark:bg-white/4",
+        compact
+          ? "gap-2 rounded-xl px-2 py-1.5"
+          : "gap-2.5 rounded-2xl px-2.5 py-2 sm:gap-3 sm:rounded-[18px] sm:px-3 sm:py-2.5"
+      )}>
+        <div className={cn(
+          "shrink-0 overflow-hidden bg-white dark:bg-white/6",
+          compact ? "h-9 w-9 rounded-lg" : "h-10 w-10 rounded-lg sm:h-11 sm:w-11 sm:rounded-xl"
+        )}>
           {display.image && !imgError ? (
             <button
               type="button"
               onClick={() => setIsPreviewOpen(true)}
-              className="group h-full w-full cursor-zoom-in overflow-hidden rounded-lg outline-none ring-0 transition-transform active:scale-95 sm:rounded-xl"
+              className={cn("group h-full w-full cursor-zoom-in overflow-hidden rounded-lg outline-none ring-0 transition-transform active:scale-95", !compact && "sm:rounded-xl")}
               title="查看大图"
             >
               <Image
@@ -2192,10 +2202,16 @@ export function ProductStripItem({
           )}
         </div>
         <div className="min-w-0 flex-1">
-          <div className="line-clamp-2 wrap-break-word text-[13px] font-medium leading-4.5 text-foreground sm:text-sm sm:leading-5 sm:line-clamp-1">
+          <div className={cn(
+            "wrap-break-word font-medium text-foreground",
+            compact ? "line-clamp-1 text-xs leading-4" : "line-clamp-2 text-[13px] leading-4.5 sm:line-clamp-1 sm:text-sm sm:leading-5"
+          )}>
             {display.name}
           </div>
-          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-medium text-muted-foreground sm:mt-1 sm:gap-x-2.5">
+          <div className={cn(
+            "mt-0.5 flex flex-wrap items-center font-medium text-muted-foreground",
+            compact ? "gap-x-1.5 gap-y-0.5 text-[10px]" : "gap-x-2 gap-y-1 text-[11px] sm:mt-1 sm:gap-x-2.5"
+          )}>
             {shouldShowItemSku ? (
               <span className="shrink-0">{display.sku}</span>
             ) : null}
@@ -2207,7 +2223,8 @@ export function ProductStripItem({
             ) : null}
             {showMatchStatus ? (
               <span className={cn(
-                "inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[10px] font-medium leading-none whitespace-nowrap sm:text-[11px]",
+                "inline-flex shrink-0 items-center rounded-full py-0.5 text-[10px] font-medium leading-none whitespace-nowrap",
+                compact ? "px-1.5" : "px-2 sm:text-[11px]",
                 matchMeta.className
               )}>
                 {matchMeta.text}
@@ -2265,9 +2282,16 @@ export function ProductStripItem({
           <button
             type="button"
             onClick={onEditMatch}
-            className="inline-flex h-7 sm:h-8 shrink-0 items-center justify-center rounded-full border border-black/8 bg-white/85 px-2 text-[11px] font-medium text-foreground transition-all hover:border-black/12 hover:bg-zinc-100 dark:border-white/10 dark:bg-white/6 dark:text-white dark:hover:border-white/20 dark:hover:bg-white/14 sm:px-2.5 sm:text-[13px] cursor-pointer"
+            title="改匹配"
+            aria-label="改匹配"
+            className={cn(
+              "inline-flex shrink-0 cursor-pointer items-center justify-center rounded-full font-medium transition-all",
+              compact
+                ? "h-7 w-7 border border-transparent bg-black/[0.025] p-0 text-muted-foreground hover:bg-black/[0.06] hover:text-foreground dark:bg-white/[0.035] dark:hover:bg-white/[0.08]"
+                : "h-7 border border-black/8 bg-white/85 px-2 text-[11px] text-foreground hover:border-black/12 hover:bg-zinc-100 dark:border-white/10 dark:bg-white/6 dark:text-white dark:hover:border-white/20 dark:hover:bg-white/14 sm:h-8 sm:px-2.5 sm:text-[13px]"
+            )}
           >
-            改匹配
+            {compact ? <Pencil size={12} /> : "改匹配"}
           </button>
         ) : null}
       </div>
@@ -2314,6 +2338,7 @@ export function ActionButton({
   variant = "default",
   title,
   mobileIconOnly = false,
+  iconOnly = false,
 }: {
   label: string;
   icon: React.ReactNode;
@@ -2322,23 +2347,28 @@ export function ActionButton({
   variant?: "default" | "primary";
   title?: string;
   mobileIconOnly?: boolean;
+  iconOnly?: boolean;
 }) {
   return (
     <button
       type="button"
-      title={title}
+      title={title || label}
+      aria-label={label}
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "inline-flex h-7 sm:h-8 items-center justify-center gap-1.5 rounded-full px-2.5 sm:px-3.5 text-[11px] sm:text-[13px] font-medium transition-all disabled:cursor-not-allowed disabled:opacity-50 whitespace-nowrap cursor-pointer",
-        mobileIconOnly && "aspect-square px-0 sm:aspect-auto sm:px-3.5",
-        variant === "primary"
-          ? "bg-foreground text-background hover:opacity-90 dark:bg-white dark:text-black shadow-xs"
-          : "border border-black/8 bg-white/85 text-foreground hover:bg-white dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8 shadow-xs"
+        "inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-full text-[11px] font-medium transition-all disabled:cursor-not-allowed disabled:opacity-40 sm:text-[13px]",
+        iconOnly
+          ? "h-7 w-7 cursor-pointer border border-transparent bg-black/[0.025] p-0 text-muted-foreground hover:bg-black/[0.06] hover:text-foreground dark:bg-white/[0.035] dark:hover:bg-white/[0.08]"
+          : "h-7 cursor-pointer px-2.5 sm:h-8 sm:px-3.5",
+        !iconOnly && mobileIconOnly && "aspect-square px-0 sm:aspect-auto sm:px-3.5",
+        !iconOnly && (variant === "primary"
+          ? "bg-foreground text-background shadow-xs hover:opacity-90 dark:bg-white dark:text-black"
+          : "border border-black/8 bg-white/85 text-foreground shadow-xs hover:bg-white dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8")
       )}
     >
       {icon}
-      <span className={cn(mobileIconOnly ? "sr-only sm:not-sr-only sm:inline" : "")}>{label}</span>
+      <span className={cn(iconOnly ? "sr-only" : mobileIconOnly ? "sr-only sm:not-sr-only sm:inline" : "")}>{label}</span>
     </button>
   );
 }

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import dynamic from "next/dynamic";
 import { createPortal } from "react-dom";
-import { ArrowUp, Package2, Search, X, ChevronUp, ChevronDown, Loader2, LayoutGrid, List, RefreshCw, Clock3, MapPin, Truck, CheckCheck, TriangleAlert } from "lucide-react";
+import { ArrowUp, Package2, Search, X, ChevronUp, ChevronDown, Loader2, LayoutGrid, List, RefreshCw, Clock3, MapPin, Truck, CheckCheck, TriangleAlert, Eye } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -177,21 +177,21 @@ function CompactTodayOrderCard({
           currentOrderNo={order.orderNo}
         />
       ) : null}
-      <article className="group flex min-h-[286px] flex-col overflow-hidden rounded-[24px] border border-black/8 bg-white/82 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-black/12 hover:shadow-lg dark:border-white/10 dark:bg-white/4 dark:hover:border-white/16">
+      <article className="group flex min-h-[268px] flex-col overflow-hidden rounded-[24px] border border-black/8 bg-white/82 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-black/12 hover:shadow-lg dark:border-white/10 dark:bg-white/4 dark:hover:border-white/16">
         <div className="flex flex-1 flex-col p-4 text-left">
         <div className="flex items-start justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-2">
+          <div className="flex min-w-0 flex-1 items-center gap-2.5">
             <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-black/8 bg-white dark:border-white/10 dark:bg-white/8">
               <Image src={platformBadge.iconSrc} alt={platformBadge.iconAlt} width={20} height={20} className="h-5 w-5 object-contain" />
             </span>
             <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="text-base font-black text-foreground">#{order.dailyPlatformSequence || "-"}</span>
-                <span title={shopName} className="inline-flex h-6 min-w-0 max-w-32 items-center rounded-full border border-black/8 bg-black/3 px-2 text-[11px] font-semibold text-muted-foreground dark:border-white/10 dark:bg-white/5"><span className="truncate">{shopName}</span></span>
-                {orderTypeLabel ? <span className="inline-flex h-6 shrink-0 items-center rounded-full border border-violet-500/20 bg-violet-500/10 px-2 text-[11px] font-semibold leading-none text-violet-700 dark:text-violet-300">{orderTypeLabel}</span> : null}
-                {showBrushMarker ? <span className="inline-flex h-6 shrink-0 items-center rounded-full border border-rose-500/20 bg-rose-500/10 px-2 text-[11px] font-semibold leading-none text-rose-700 dark:text-rose-300">刷单</span> : null}
+              <div className="flex min-w-0 items-center gap-1.5 overflow-hidden">
+                <span className="shrink-0 text-base font-black text-foreground">#{order.dailyPlatformSequence || "-"}</span>
+                <span title={shopName} className="inline-flex h-5 min-w-0 max-w-24 items-center rounded-full border border-black/8 bg-black/3 px-1.5 text-[10px] font-semibold text-muted-foreground dark:border-white/10 dark:bg-white/5"><span className="truncate">{shopName}</span></span>
+                {orderTypeLabel ? <span className="inline-flex h-5 shrink-0 items-center rounded-full border border-violet-500/20 bg-violet-500/10 px-1.5 text-[10px] font-semibold leading-none text-violet-700 dark:text-violet-300">{orderTypeLabel}</span> : null}
+                {showBrushMarker ? <span className="inline-flex h-5 shrink-0 items-center rounded-full border border-rose-500/20 bg-rose-500/10 px-1.5 text-[10px] font-semibold leading-none text-rose-700 dark:text-rose-300">刷单</span> : null}
               </div>
-              <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
+              <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
                 <span>{formatCompactTime(order.orderTime)} · {order.distanceKm != null ? `${order.distanceKm.toFixed(2)} km` : "距离待同步"}</span>
                 {customerType === "new" ? (
                   <span title="门店新客" className="rounded-full border border-orange-500/25 bg-orange-500/10 px-1.5 py-0.5 text-[9.5px] leading-none text-orange-600 dark:text-orange-400">新客</span>
@@ -236,20 +236,21 @@ function CompactTodayOrderCard({
           </div>
         </div>
 
-        <div className="mt-3.5 space-y-2">
+        <div className="mt-2.5 space-y-1.5">
           {compactProductRows.length > 0 ? compactProductRows.map(({ key, item, display, displayIndex }) => (
             <ProductStripItem
               key={key}
               display={display}
+              compact
               showEditMatch={displayIndex === 0 && !deleted && !readOnly}
               onEditMatch={() => onOpenMatchEditor(item)}
               matchedProduct={item.matchedProduct}
               showMatchStatus={displayIndex === 0}
             />
           )) : (
-            <div className="flex min-w-0 items-center gap-3 rounded-2xl border border-black/6 bg-black/[0.025] p-2.5 dark:border-white/8 dark:bg-white/[0.035]">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[13px] border border-black/6 bg-white text-muted-foreground/35 dark:border-white/8 dark:bg-white/6"><Package2 size={19} /></div>
-              <div className="text-[13px] font-semibold text-foreground">纯配送订单</div>
+            <div className="flex min-w-0 items-center gap-2 rounded-xl border border-black/6 bg-black/[0.025] px-2 py-1.5 dark:border-white/8 dark:bg-white/[0.035]">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-black/6 bg-white text-muted-foreground/35 dark:border-white/8 dark:bg-white/6"><Package2 size={16} /></div>
+              <div className="text-xs font-semibold text-foreground">纯配送订单</div>
             </div>
           )}
         </div>
@@ -277,7 +278,7 @@ function CompactTodayOrderCard({
         </div>
 
         {!readOnly || canExpandDetails ? (
-          <div className="border-t border-black/6 bg-black/[0.012] px-4 py-2.5 dark:border-white/8 dark:bg-white/[0.018]">
+          <div className="border-t border-black/6 bg-black/[0.012] px-4 py-2 dark:border-white/8 dark:bg-white/[0.018]">
             <div className="flex flex-nowrap items-center justify-end gap-1.5">
             {showPlatformActions && !deleted && !order.isSubscribe ? (
               <ActionButton
@@ -286,6 +287,7 @@ function CompactTodayOrderCard({
                 onClick={() => onRunAction("self-delivery")}
                 disabled={cannotSelfDeliver}
                 title={riderAssigned ? "骑手已接单，不能发起自配" : terminal ? "订单已结束，不能发起自配" : undefined}
+                iconOnly
               />
             ) : null}
             {showPlatformActions ? (
@@ -296,6 +298,7 @@ function CompactTodayOrderCard({
                 onClick={() => onRunAction(pickup ? "pickup-complete" : "complete-delivery")}
                 disabled={Boolean(actingId) || terminal || (!pickup && (!delivering || !order.isMainSystemSelfDelivery))}
                 title={terminal ? "订单已结束，不能重复完成" : !pickup && !order.isMainSystemSelfDelivery ? "平台骑手配送不能在主系统完成" : undefined}
+                iconOnly
               />
             ) : null}
             {!readOnly ? (
@@ -305,9 +308,10 @@ function CompactTodayOrderCard({
                 onClick={() => onRunAction("sync")}
                 disabled={syncing || deleted}
                 title={deleted ? "订单已删除，不能同步" : "从平台重新同步最新订单状态"}
+                iconOnly
               />
             ) : null}
-            {canExpandDetails ? <button type="button" onClick={onExpand} className="inline-flex h-8 shrink-0 items-center justify-center whitespace-nowrap rounded-full bg-foreground px-3 text-[11px] font-semibold text-background shadow-xs transition hover:opacity-85">查看详情</button> : null}
+            {canExpandDetails ? <button type="button" onClick={onExpand} title="查看详情" aria-label="查看详情" className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-transparent bg-black/[0.025] text-muted-foreground transition hover:bg-black/[0.06] hover:text-foreground dark:bg-white/[0.035] dark:hover:bg-white/[0.08]"><Eye size={12} /></button> : null}
             </div>
           </div>
         ) : null}
