@@ -247,11 +247,12 @@ function CompactTodayOrderCard({
                 </button>
               )
             ) : order.hasOutbound ? (
-              <span className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold tabular-nums ${canShowPureProfit ? (Number(order.pureProfit) >= 0 ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "border-rose-500/20 bg-rose-500/10 text-rose-700 dark:text-rose-300") : "border-slate-500/15 bg-slate-500/8 text-muted-foreground"}`}>
-                利润 {pureProfitDisplay}
+              <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs tabular-nums ${canShowPureProfit ? (Number(order.pureProfit) >= 0 ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "border-rose-500/20 bg-rose-500/10 text-rose-700 dark:text-rose-300") : "border-slate-500/15 bg-slate-500/8 text-muted-foreground"}`}>
+                <span className="text-[11px] font-medium opacity-80">利润</span>
+                <span className="text-xs font-bold sm:text-[13px]">{pureProfitDisplay}</span>
               </span>
             ) : null}
-            <span className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${statusClassName}`}>{statusLabel}</span>
+            <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${statusClassName}`}>{statusLabel}</span>
           </div>
         </div>
 
@@ -1412,28 +1413,11 @@ export function TodayOrdersView({
                   <button
                     type="button"
                     onClick={() => setShowBrushToday((current) => !current)}
-                    className="flex w-full items-center justify-between rounded-[20px] border border-rose-500/20 bg-rose-50/40 hover:bg-rose-50/70 px-5 py-4 text-left transition-all dark:border-rose-500/20 dark:bg-rose-950/20 dark:hover:bg-rose-950/30 shadow-xs"
+                    className="flex w-full items-center justify-between rounded-[20px] border border-black/8 bg-white/76 px-5 py-4 text-left transition-all hover:bg-black/3 dark:border-white/10 dark:bg-white/5 shadow-xs"
                   >
-                    <div className="flex items-center gap-3.5">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-rose-500/10 text-rose-600 dark:bg-rose-500/20 dark:text-rose-400">
-                        <Truck size={18} />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-rose-700 dark:text-rose-400">今日刷单</span>
-                          <span className="inline-flex items-center rounded-full bg-rose-500/10 px-2 py-0.5 text-[10px] font-semibold text-rose-700 dark:bg-rose-500/20 dark:text-rose-300">
-                            已独立折叠
-                          </span>
-                        </div>
-                        <div className="mt-0.5 text-lg font-bold text-foreground">
-                          {todayBrushOrders.length} 单
-                          {overview.brushCount > todayBrushOrders.length && (
-                            <span className="ml-1.5 text-xs font-normal text-muted-foreground">
-                              (总共 {overview.brushCount} 单)
-                            </span>
-                          )}
-                        </div>
-                      </div>
+                    <div>
+                      <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">今日刷单</div>
+                      <div className="mt-1 text-lg font-bold text-foreground">{todayBrushOrders.length} 单</div>
                     </div>
                     <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-black/8 bg-black/2 transition-colors hover:bg-black/3 dark:border-white/10 dark:bg-white/3">
                       {showBrushToday ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
