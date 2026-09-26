@@ -199,7 +199,7 @@ function CompactTodayOrderCard({
                 {orderTypeLabel ? <span className="inline-flex h-5 shrink-0 items-center rounded-full border border-violet-500/20 bg-violet-500/10 px-1.5 text-[10px] font-semibold leading-none text-violet-700 dark:text-violet-300">{orderTypeLabel}</span> : null}
                 {showBrushMarker ? <span className="inline-flex h-5 shrink-0 items-center rounded-full border border-rose-500/20 bg-rose-500/10 px-1.5 text-[10px] font-semibold leading-none text-rose-700 dark:text-rose-300">刷单</span> : null}
               </div>
-              <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
+              <div className="mt-1 flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
                 <span>{formatCompactTime(order.orderTime)}</span>
                 <button
                   type="button"
@@ -227,7 +227,8 @@ function CompactTodayOrderCard({
               </div>
             </div>
           </div>
-          <div className="flex max-w-[58%] shrink-0 flex-wrap items-center justify-end gap-1.5">
+          <div className="flex shrink-0 flex-col items-end gap-1">
+            <div className="flex items-center gap-1.5">
             {returned ? <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-1 text-[10px] font-semibold text-amber-700 dark:text-amber-300">已退</span> : null}
             {showAutoOutboundRecovery ? (
               readOnly ? (
@@ -246,13 +247,17 @@ function CompactTodayOrderCard({
                   {actingId === `${order.id}:outbound` ? "处理中" : "出库"}
                 </button>
               )
-            ) : order.hasOutbound ? (
-              <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs tabular-nums ${canShowPureProfit ? (Number(order.pureProfit) >= 0 ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "border-rose-500/20 bg-rose-500/10 text-rose-700 dark:text-rose-300") : "border-slate-500/15 bg-slate-500/8 text-muted-foreground"}`}>
+
+              ) : null}
+              <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold ${statusClassName}`}>{statusLabel}</span>
+            </div>
+            {order.hasOutbound ? (
+              <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs tabular-nums ${canShowPureProfit ? (Number(order.pureProfit) >= 0 ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "border-rose-500/20 bg-rose-500/10 text-rose-700 dark:text-rose-300") : "border-slate-500/15 bg-slate-500/8 text-muted-foreground"}`}>
                 <span className="text-[11px] font-medium opacity-80">利润</span>
                 <span className="text-xs font-bold sm:text-[13px]">{pureProfitDisplay}</span>
               </span>
             ) : null}
-            <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${statusClassName}`}>{statusLabel}</span>
+
           </div>
         </div>
 
@@ -1408,27 +1413,8 @@ export function TodayOrdersView({
                 renderOrderCollection(todayPendingOrders)
               )}
 
-              {todayBrushOrders.length > 0 && (
-                <section className="flex flex-col gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setShowBrushToday((current) => !current)}
-                    className="flex w-full items-center justify-between rounded-[20px] border border-black/8 bg-white/76 px-5 py-4 text-left transition-all hover:bg-black/3 dark:border-white/10 dark:bg-white/5 shadow-xs"
-                  >
-                    <div>
-                      <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">今日刷单</div>
-                      <div className="mt-1 text-lg font-bold text-foreground">{todayBrushOrders.length} 单</div>
-                    </div>
-                    <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-black/8 bg-black/2 transition-colors hover:bg-black/3 dark:border-white/10 dark:bg-white/3">
-                      {showBrushToday ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                    </div>
-                  </button>
 
-                  {showBrushToday && (
-                    <div className="animate-in fade-in duration-200">{renderOrderCollection(todayBrushOrders)}</div>
-                  )}
-                </section>
-              )}
+
 
               {todayCompletedOrders.length > 0 && (
                 <section className="flex flex-col gap-3">
@@ -1470,6 +1456,28 @@ export function TodayOrdersView({
 
                   {showCancelledToday && (
                     <div className="animate-in fade-in duration-200">{renderOrderCollection(todayCancelledOrders)}</div>
+                  )}
+                </section>
+              )}
+
+              {todayBrushOrders.length > 0 && (
+                <section className="flex flex-col gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowBrushToday((current) => !current)}
+                    className="flex w-full items-center justify-between rounded-[20px] border border-black/8 bg-white/76 px-5 py-4 text-left transition-all hover:bg-black/3 dark:border-white/10 dark:bg-white/5 shadow-xs"
+                  >
+                    <div>
+                      <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">今日刷单</div>
+                      <div className="mt-1 text-lg font-bold text-foreground">{todayBrushOrders.length} 单</div>
+                    </div>
+                    <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-black/8 bg-black/2 transition-colors hover:bg-black/3 dark:border-white/10 dark:bg-white/3">
+                      {showBrushToday ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                    </div>
+                  </button>
+
+                  {showBrushToday && (
+                    <div className="animate-in fade-in duration-200">{renderOrderCollection(todayBrushOrders)}</div>
                   )}
                 </section>
               )}
