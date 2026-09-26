@@ -136,7 +136,7 @@ export function CustomerHistoryModal({
 
   return createPortal(
     <AnimatePresence>
-      <div className="fixed inset-0 z-110000 flex items-center justify-center p-3 sm:p-5">
+      <div className="fixed inset-0 z-[160000] flex items-center justify-center p-3 sm:p-5">
         {/* 背景遮罩 */}
         <motion.div
           initial={{ opacity: 0 }}

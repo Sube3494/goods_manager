@@ -1521,7 +1521,7 @@ export function TodayOrdersView({
 
       {effectiveLayoutMode === "cards" && detailOrder && typeof document !== "undefined" ? createPortal(
         <div
-          className="fixed inset-0 z-[150000] flex items-center justify-center bg-slate-950/72 p-3 backdrop-blur-sm sm:p-6"
+          className="fixed inset-0 z-[80000] flex items-center justify-center bg-slate-950/72 p-3 backdrop-blur-sm sm:p-6"
           role="dialog"
           aria-modal="true"
           aria-label={`订单 #${detailOrder.dailyPlatformSequence || detailOrder.orderNo} 详情`}

@@ -727,7 +727,7 @@ export function OrderRouteModal({ order, onClose }: { order: AutoPickOrder; onCl
   }, [effectiveTrail, riderAssigned, effectiveShopAddress, displayShopName, derivedCity, order.longitude, order.latitude, order.userAddress, attempt, customerCoord, phaseInfo.phase, primaryDistanceValue, shopToCustomerDistance, effectiveShopCoord, isDark]);
 
   return createPortal(
-    <div className="fixed inset-0 z-[120000] flex items-center justify-center p-3 sm:p-4">
+    <div className="fixed inset-0 z-[160000] flex items-center justify-center p-3 sm:p-4">
       {/* 遮罩层 */}
       <div
         className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity animate-in fade-in duration-200"
