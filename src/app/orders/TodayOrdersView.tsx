@@ -192,7 +192,18 @@ function CompactTodayOrderCard({
                 {showBrushMarker ? <span className="inline-flex h-5 shrink-0 items-center rounded-full border border-rose-500/20 bg-rose-500/10 px-1.5 text-[10px] font-semibold leading-none text-rose-700 dark:text-rose-300">刷单</span> : null}
               </div>
               <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
-                <span>{formatCompactTime(order.orderTime)} · {order.distanceKm != null ? `${order.distanceKm.toFixed(2)} km` : "距离待同步"}</span>
+                <span>{formatCompactTime(order.orderTime)}</span>
+                <button
+                  type="button"
+                  disabled={pickup}
+                  onClick={() => setRouteOpen(true)}
+                  title="查看配送地图"
+                  aria-label="查看配送地图"
+                  className="inline-flex items-center gap-1 rounded transition enabled:cursor-pointer enabled:hover:text-primary disabled:cursor-default focus-visible:outline-2 focus-visible:outline-primary"
+                >
+                  <MapPin size={10} className="shrink-0" />
+                  <span>{pickup ? "-" : (order.distanceKm != null ? `${order.distanceKm.toFixed(2)} km` : "距离待同步")}</span>
+                </button>
                 {customerType === "new" ? (
                   <span title="门店新客" className="rounded-full border border-orange-500/25 bg-orange-500/10 px-1.5 py-0.5 text-[9.5px] leading-none text-orange-600 dark:text-orange-400">新客</span>
                 ) : customerType === "returning" ? (
@@ -273,7 +284,7 @@ function CompactTodayOrderCard({
               {deadlineDisplay !== "-" ? `${pickup ? "取货" : order.isSubscribe ? "预约" : "最晚"} ${deadlineDisplay}` : "时效待同步"}
             </span>
           </span>
-          <button type="button" onClick={() => setRouteOpen(true)} title="查看配送地图" className="ml-auto flex min-w-0 cursor-pointer items-center gap-1.5 rounded-md px-1 py-0.5 transition hover:bg-primary/6 hover:text-primary focus-visible:outline-2 focus-visible:outline-primary"><MapPin size={12} className="shrink-0" /><span className="max-w-32 truncate">{order.userAddress || "地址待同步"}</span></button>
+          <span className="ml-auto min-w-0 max-w-32 truncate text-right" title={order.userAddress || "地址待同步"}>{order.userAddress || "地址待同步"}</span>
         </div>
         </div>
 
