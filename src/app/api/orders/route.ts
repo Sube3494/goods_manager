@@ -2378,7 +2378,14 @@ export async function GET(request: NextRequest) {
       const autoOutboundMeta = readAutoOutboundMeta(order.rawPayload);
       const outboundMeta = outboundByOrderNo.get(order.orderNo) || null;
       const hiddenDeletedOfflineIncome = order.isDeleted && order.platform === "线下交易";
-      const refundAmount = Math.max(outboundMeta?.refundAmount || 0, readRefundAmountFromRawPayload(order.rawPayload));
+      const cancelled = isAutoPickOrderCancelledStatus(order.status);
+      const deleted = isAutoPickOrderDeletedStatus(order.status);
+      const recordedRefundAmount = Math.max(outboundMeta?.refundAmount || 0, readRefundAmountFromRawPayload(order.rawPayload));
+      // 历史取消单可能没有落库退款金额；平台已明确取消时按实付金额兜底为全额退款，
+      // 避免继续把原预计收入计入利润。明确记录的退款金额仍优先保留。
+      const refundAmount = cancelled
+        ? Math.max(recordedRefundAmount, Math.max(0, Number(order.actualPaid || 0)))
+        : recordedRefundAmount;
       const returnExtraExpense = outboundMeta?.extraExpense || 0;
       const adjustedMetrics = resolveRefundAdjustedIncomeMetrics({
         expectedIncome: order.expectedIncome,
@@ -2396,7 +2403,7 @@ export async function GET(request: NextRequest) {
       const deliveryFee = readDeliveryFee(order.delivery, order.rawPayload ?? order.isMainSystemSelfDelivery);
       const hasOutbound = Boolean(outboundMeta);
       const hasFulfillmentItems = hasAutoPickFulfillmentItems(order.items);
-      const cancelledDeliveryLoss = (isAutoPickOrderCancelledStatus(order.status) || isAutoPickOrderDeletedStatus(order.status))
+      const cancelledDeliveryLoss = (cancelled || deleted)
         && hasRealizedCancelledDeliveryCost({
           deliveryFee,
           platform: order.platform,
@@ -2437,8 +2444,8 @@ export async function GET(request: NextRequest) {
 
       const pureProfit = hiddenDeletedOfflineIncome
         ? null
-        : cancelledDeliveryLoss
-        ? -deliveryFee
+        : (cancelled || deleted)
+        ? -(cancelledDeliveryLoss ? deliveryFee : 0) - returnExtraExpense
         : manualDeliveryLoss
         ? -deliveryFee
         : order.isMainSystemSelfDelivery
