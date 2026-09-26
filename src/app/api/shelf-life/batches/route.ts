@@ -27,26 +27,29 @@ export async function GET(request: NextRequest) {
     const criticalThreshold = addDays(today, 15);
     const warningThreshold = addDays(today, 45);
 
+    const isSuperAdmin = user.role === "SUPER_ADMIN";
+
+    // 用户数据隔离范围：超级管理员看全部，普通用户看自身创建批次、名下商品或名下店铺批次
+    const userScope = isSuperAdmin
+      ? {}
+      : {
+          OR: [
+            { userId: user.id },
+            { product: { userId: user.id } },
+            { shopProduct: { shop: { userId: user.id } } },
+          ],
+        };
+
     // 构建查询条件
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const where: Record<string, any> = {
       remainingStock: { gt: 0 },
-      product: {
-        userId: user.id
-      },
-      shopProduct: {
-        shop: {
-          addressBookId: { not: null }
-        }
-      }
+      ...userScope,
     };
 
     if (shopId !== "all") {
       where.shopProduct = {
         shopId,
-        shop: {
-          addressBookId: { not: null }
-        }
       };
     }
 
@@ -90,7 +93,8 @@ export async function GET(request: NextRequest) {
             select: {
               name: true,
               image: true,
-              sku: true
+              sku: true,
+              shelfLifeDays: true,
             }
           },
           shopProduct: {
@@ -160,8 +164,8 @@ export async function GET(request: NextRequest) {
         productName: batch.shopProduct?.productName || batch.product?.name || "未命名商品",
         productImage,
         sku: batch.shopProductId ? (batch.shopProduct?.sku || null) : (batch.product?.sku || null),
-        shopName: batch.shopProduct?.shop?.name || "未知店铺",
-        shelfLifeDays: batch.shopProduct?.shelfLifeDays || null,
+        shopName: batch.shopProduct?.shop?.name || (batch.shopProductId ? "未知店铺" : "总部门店/通用"),
+        shelfLifeDays: batch.shopProduct?.shelfLifeDays || batch.product?.shelfLifeDays || null,
         remainingDays: diffDays,
         status: batchStatus,
         remark: batch.remark || ""
@@ -205,6 +209,7 @@ export async function POST(request: NextRequest) {
         where: { id: purchaseOrderItemId },
         include: {
           shopProduct: true,
+          product: true,
           purchaseOrder: true
         }
       });
@@ -213,15 +218,30 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "找不到指定的到货记录" }, { status: 404 });
       }
 
-      if (!orderItem.shopProduct) {
-        return NextResponse.json({ error: "该到货记录未关联店铺商品" }, { status: 400 });
+      // 获取保质期天数：优先请求体指定 -> shopProduct -> product
+      const passedShelfLifeDays = body?.shelfLifeDays ? Number(body.shelfLifeDays) : null;
+      const shelfLifeDays = (passedShelfLifeDays && passedShelfLifeDays > 0)
+        ? passedShelfLifeDays
+        : (orderItem.shopProduct?.shelfLifeDays || orderItem.product?.shelfLifeDays || null);
+
+      if (!shelfLifeDays || shelfLifeDays <= 0) {
+        return NextResponse.json({ error: "该商品未设置保质期天数，请先录入商品保质期时长" }, { status: 400 });
       }
 
-      if (!orderItem.shopProduct.isShelfLife || !orderItem.shopProduct.shelfLifeDays) {
-        return NextResponse.json({ error: "该商品未启用保质期管理" }, { status: 400 });
+      // 如果商品尚未启用保质期标记，自动同步开启
+      if (orderItem.shopProduct && (!orderItem.shopProduct.isShelfLife || !orderItem.shopProduct.shelfLifeDays)) {
+        await prisma.shopProduct.update({
+          where: { id: orderItem.shopProduct.id },
+          data: { isShelfLife: true, shelfLifeDays }
+        }).catch(() => null);
+      }
+      if (orderItem.product && (!orderItem.product.isShelfLife || !orderItem.product.shelfLifeDays)) {
+        await prisma.product.update({
+          where: { id: orderItem.product.id },
+          data: { isShelfLife: true, shelfLifeDays }
+        }).catch(() => null);
       }
 
-      const shelfLifeDays = orderItem.shopProduct.shelfLifeDays;
       const expirationDate = addDays(productionDate, shelfLifeDays);
 
       // 检查该采购明细是否已经录入过保质期
@@ -238,16 +258,17 @@ export async function POST(request: NextRequest) {
             productionDate,
             expirationDate,
             remark,
-            remainingStock: orderItem.remainingQuantity !== null ? orderItem.remainingQuantity : orderItem.quantity
+            remainingStock: orderItem.remainingQuantity !== null ? orderItem.remainingQuantity : orderItem.quantity,
+            userId: existingBatch.userId || user.id
           }
         });
       } else {
         // 创建新批次
         savedBatch = await prisma.productBatch.create({
           data: {
-            productId: orderItem.productId || "",
-            shopProductId: orderItem.shopProductId,
-            batchNo: orderItem.purchaseOrder.id, // 默认以完整采购单ID作为批次号
+            productId: orderItem.productId || orderItem.shopProduct?.productId || String(body?.productId || "").trim(),
+            shopProductId: orderItem.shopProductId || null,
+            batchNo: orderItem.purchaseOrder?.id || `BATCH-${Date.now()}`,
             productionDate,
             expirationDate,
             quantity: orderItem.quantity,

@@ -35,6 +35,7 @@ export class InventoryService {
         OR: [
           { userId },
           { product: { userId } },
+          { shopProduct: { shop: { userId } } },
         ],
         purchaseOrderItemId: { not: null },
       },
@@ -54,16 +55,25 @@ export class InventoryService {
     });
 
     for (const batch of batches) {
-      const isReceived = batch.purchaseOrderItem?.purchaseOrder?.status === "Received";
-      const expectedRemaining = isReceived
-        ? Math.max(0, Number(batch.purchaseOrderItem?.remainingQuantity ?? batch.purchaseOrderItem?.quantity ?? 0) || 0)
-        : 0;
-
-      if (batch.remainingStock !== expectedRemaining) {
-        await tx.productBatch.update({
-          where: { id: batch.id },
-          data: { remainingStock: expectedRemaining },
-        });
+      const poStatus = batch.purchaseOrderItem?.purchaseOrder?.status;
+      if (poStatus === "Received") {
+        const expectedRemaining = Math.max(
+          0,
+          Number(batch.purchaseOrderItem?.remainingQuantity ?? batch.purchaseOrderItem?.quantity ?? 0) || 0
+        );
+        if (batch.remainingStock !== expectedRemaining) {
+          await tx.productBatch.update({
+            where: { id: batch.id },
+            data: { remainingStock: expectedRemaining },
+          });
+        }
+      } else if (poStatus === "Cancelled") {
+        if (batch.remainingStock !== 0) {
+          await tx.productBatch.update({
+            where: { id: batch.id },
+            data: { remainingStock: 0 },
+          });
+        }
       }
     }
   }

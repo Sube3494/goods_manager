@@ -15,18 +15,22 @@ export async function GET() {
     const today = startOfDay(now);
     await prisma.$transaction((tx) => InventoryService.reconcileShelfLifeBatchesForUser(tx, user.id));
 
-    // 获取该用户所有开启了保质期的批次，且仅限制在个人中心地址库店铺
+    const isSuperAdmin = user.role === "SUPER_ADMIN";
+    const userScope = isSuperAdmin
+      ? {}
+      : {
+          OR: [
+            { userId: user.id },
+            { product: { userId: user.id } },
+            { shopProduct: { shop: { userId: user.id } } },
+          ],
+        };
+
+    // 获取所有开启了保质期的批次
     const allBatches = await prisma.productBatch.findMany({
       where: {
         remainingStock: { gt: 0 },
-        product: {
-          userId: user.id
-        },
-        shopProduct: {
-          shop: {
-            addressBookId: { not: null }
-          }
-        }
+        ...userScope,
       },
       include: {
         product: {

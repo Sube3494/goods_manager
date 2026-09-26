@@ -182,10 +182,20 @@ export async function GET(request: Request) {
     }
     const where: Prisma.PurchaseOrderWhereInput = andWhere.length > 0 ? { AND: andWhere } : {};
 
+    const userScopeWhere: Prisma.PurchaseOrderWhereInput = session.role === "SUPER_ADMIN"
+      ? {}
+      : {
+          OR: [
+            { userId: session.id },
+            { items: { some: { product: { userId: session.id } } } },
+            { items: { some: { shopProduct: { shop: { userId: session.id } } } } },
+          ],
+        };
+
     const statsAndWhere = andWhere.filter((clause) => !("status" in clause));
     const unscopedStatusWhere: Prisma.PurchaseOrderWhereInput = statsAndWhere.length > 0
-      ? { AND: statsAndWhere, userId: session.id }
-      : { userId: session.id };
+      ? { AND: [...statsAndWhere, userScopeWhere] }
+      : userScopeWhere;
 
     const receivedStatsWhere: Prisma.PurchaseOrderWhereInput = {
       AND: [unscopedStatusWhere, { status: "Received" }],
@@ -198,7 +208,7 @@ export async function GET(request: Request) {
       prisma.purchaseOrder.findMany({
         where: {
           ...where,
-          userId: session.id
+          ...userScopeWhere,
         },
         include: {
           items: {
@@ -206,6 +216,20 @@ export async function GET(request: Request) {
               product: true,
               shopProduct: true,
               supplier: true,
+              batches: {
+                select: {
+                  id: true,
+                  batchNo: true,
+                  productionDate: true,
+                  expirationDate: true,
+                  remainingStock: true,
+                  quantity: true,
+                  remark: true,
+                },
+                orderBy: {
+                  createdAt: 'desc',
+                },
+              },
             }
           }
         },
@@ -218,7 +242,7 @@ export async function GET(request: Request) {
       prisma.purchaseOrder.count({
         where: {
           ...where,
-          userId: session.id
+          ...userScopeWhere,
         }
       }),
       prisma.purchaseOrder.aggregate({

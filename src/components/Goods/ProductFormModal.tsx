@@ -1952,7 +1952,9 @@ export function ProductFormModal({
                                                                             headers: { "Content-Type": "application/json" },
                                                                             body: JSON.stringify({
                                                                                 purchaseOrderItemId: itemId,
-                                                                                productionDate: newVal
+                                                                                productionDate: newVal,
+                                                                                shelfLifeDays: formData.isShelfLife && formData.shelfLifeDays ? Number(formData.shelfLifeDays) : (initialData?.shelfLifeDays ? Number(initialData.shelfLifeDays) : undefined),
+                                                                                productId: initialData?.id
                                                                             })
                                                                         });
                                                                         const resData = await res.json().catch(() => null);
