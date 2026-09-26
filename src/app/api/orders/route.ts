@@ -704,8 +704,8 @@ function resolveRefundAdjustedIncomeMetrics(options: {
   };
 }
 
-function readRefundAmountFromRawPayload(rawPayload: unknown) {
-  return readConfirmedRefundAmountFromRawPayload(rawPayload);
+function readRefundAmountFromRawPayload(rawPayload: unknown, fullRefundFallback?: unknown) {
+  return readConfirmedRefundAmountFromRawPayload(rawPayload, fullRefundFallback);
 }
 
 function isFullyRefundedOrder(actualPaid: unknown, refundAmount: unknown) {
@@ -1955,7 +1955,7 @@ export async function GET(request: NextRequest) {
           }
           if (!cancelled && !deleted) {
             const isBrush = readMainSystemSelfDeliveryFlag(order.rawPayload);
-            const refundAmount = Math.max(outboundMeta?.refundAmount || 0, readRefundAmountFromRawPayload(order.rawPayload));
+            const refundAmount = Math.max(outboundMeta?.refundAmount || 0, readRefundAmountFromRawPayload(order.rawPayload, actualPaid));
             const fullyRefunded = isFullyRefundedOrder(actualPaid, refundAmount);
             const adjustedMetrics = resolveRefundAdjustedIncomeMetrics({
               expectedIncome: metrics.expectedIncome,
@@ -2117,7 +2117,7 @@ export async function GET(request: NextRequest) {
       for (const order of metricOrders) {
         const platform = normalizeOrderPlatformForSummary(order.platform);
         const outboundMeta = outboundByOrderNo.get(order.orderNo) || null;
-        const refundAmount = Math.max(outboundMeta?.refundAmount || 0, readRefundAmountFromRawPayload(order.rawPayload));
+        const refundAmount = Math.max(outboundMeta?.refundAmount || 0, readRefundAmountFromRawPayload(order.rawPayload, order.actualPaid));
         const cancelled = isAutoPickOrderCancelledStatus(order.status)
           || isAutoPickOrderDeletedStatus(order.status)
           || isFullyRefundedOrder(order.actualPaid, refundAmount);
@@ -2385,7 +2385,7 @@ export async function GET(request: NextRequest) {
       const cancelled = isAutoPickOrderCancelledStatus(order.status);
       const deleted = isAutoPickOrderDeletedStatus(order.status);
       // 退款金额只采用平台确认生效或退货记录中明确登记的值；取消不等于已退款。
-      const refundAmount = Math.max(outboundMeta?.refundAmount || 0, readRefundAmountFromRawPayload(order.rawPayload));
+      const refundAmount = Math.max(outboundMeta?.refundAmount || 0, readRefundAmountFromRawPayload(order.rawPayload, order.actualPaid));
       const returnExtraExpense = outboundMeta?.extraExpense || 0;
       const adjustedMetrics = resolveRefundAdjustedIncomeMetrics({
         expectedIncome: order.expectedIncome,

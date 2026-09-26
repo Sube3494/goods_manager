@@ -1,16 +1,33 @@
-export function readConfirmedRefundAmountFromRawPayload(rawPayload: unknown) {
+export function readConfirmedRefundAmountFromRawPayload(rawPayload: unknown, fullRefundFallback?: unknown) {
   if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) return 0;
   const record = rawPayload as Record<string, unknown>;
   const directAmount = Math.max(0, Number(record.refundAmount || record.refund_amount || 0) || 0);
   const cancelDetails = Array.isArray(record.cancelDetails || record.cancel_details)
     ? (record.cancelDetails || record.cancel_details) as Array<Record<string, unknown>>
     : [];
-  const confirmedCancel = cancelDetails
-    .filter((item) => String(item.status ?? "").trim() === "1")
-    .pop();
-  const confirmedAmountYuan = Math.max(0, Number(confirmedCancel?.total_price || 0) || 0);
+  if (cancelDetails.length === 0) return directAmount;
 
-  return Math.max(directAmount, Math.round(confirmedAmountYuan * 100));
+  const latestByRefundRequest = new Map<string, Record<string, unknown>>();
+  cancelDetails.forEach((item, index) => {
+    const requestId = String(item.source_cancel_id || item.sourceCancelId || "").trim();
+    latestByRefundRequest.set(requestId || `record:${index}`, item);
+  });
+  const effectiveConfirmedRefunds = [...latestByRefundRequest.values()].filter((item) => {
+    const status = String(item.status ?? "").trim();
+    const title = String(item.title || "").trim();
+    return status === "1"
+      && (!title || /确认退款|同意退款|退款成功|退款完成|已退款/.test(title))
+      && !/取消|拒绝|驳回/.test(title);
+  });
+
+  if (effectiveConfirmedRefunds.length === 0) return 0;
+
+  const confirmedAmount = effectiveConfirmedRefunds.reduce((sum, item) => (
+    sum + Math.round(Math.max(0, Number(item.total_price || 0) || 0) * 100)
+  ), 0);
+  const fallbackAmount = Math.max(0, Number(fullRefundFallback || 0) || 0);
+
+  return Math.max(directAmount, confirmedAmount, confirmedAmount === 0 ? fallbackAmount : 0);
 }
 
 export function hasExplicitDeliveryPickupProof(delivery: unknown, _rawPayload?: unknown) {

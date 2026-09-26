@@ -52,6 +52,29 @@ assert.equal(
 );
 
 assert.equal(
+  readConfirmedRefundAmountFromRawPayload({
+    cancelDetails: [
+      { source_cancel_id: "auto-refund", status: 0, title: "发起退款", total_price: 0 },
+      { source_cancel_id: "auto-refund", status: 1, title: "确认退款", total_price: 0 },
+      { source_cancel_id: "", status: 1, title: "用户取消", total_price: 0 },
+    ],
+  }, 17510),
+  17510,
+  "系统自动确认退款但金额为零时应按订单实付金额展示",
+);
+
+assert.equal(
+  readConfirmedRefundAmountFromRawPayload({
+    cancelDetails: [
+      { source_cancel_id: "cancelled-refund", status: 1, title: "确认退款", total_price: 103 },
+      { source_cancel_id: "cancelled-refund", status: 3, title: "取消退款申请", total_price: 103 },
+    ],
+  }, 10300),
+  0,
+  "确认后又取消的退款申请不能显示为已退款",
+);
+
+assert.equal(
   resolveCancelledOrderPureProfit(0, 0),
   null,
   "取消且没有实际损失时不应显示零利润",
