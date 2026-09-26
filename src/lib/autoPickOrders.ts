@@ -2311,8 +2311,12 @@ async function fetchMaiyatianJson<T>(pathname: string, cookie: string, init?: Re
   }
 }
 
+function isMaiyatianSuccess(response: { errno?: number } | null | undefined) {
+  return response?.errno === 1 || response?.errno === 0;
+}
+
 function assertMaiyatianSuccess(response: { errno?: number; message?: string }, fallback: string) {
-  if (response.errno === 1 || response.errno === 0) {
+  if (isMaiyatianSuccess(response)) {
     return;
   }
   throw new Error(String(response.message || fallback).trim() || fallback);
@@ -2386,8 +2390,11 @@ async function fetchMaiyatianCancelDetailByCookie(cookie: string, orderId: strin
   const response = await fetchMaiyatianJson<{ errno?: number; message?: string; data?: Array<Record<string, unknown>> }>(
     `${MAIYATIAN_CANCEL_DETAIL_PATH}${encodeURIComponent(orderId)}`,
     cookie,
-  ).catch(() => null);
-  if (response && response.errno === 1 && Array.isArray(response.data)) {
+  ).catch((error) => {
+    console.warn(`[MaiyatianCancelDetail] Failed to fetch refund details for order ${orderId}:`, error);
+    return null;
+  });
+  if (isMaiyatianSuccess(response) && Array.isArray(response?.data)) {
     return response.data;
   }
   return [];
