@@ -194,7 +194,7 @@ function CompactTodayOrderCard({
           currentOrderNo={order.orderNo}
         />
       ) : null}
-      <article className="group flex min-h-[268px] flex-col overflow-hidden rounded-[24px] border border-black/8 bg-white/82 shadow-sm transition-all duration-200 hover:border-black/16 hover:shadow-md hover:bg-white/95 dark:border-white/10 dark:bg-white/4 dark:hover:border-white/20 dark:hover:bg-white/6">
+      <article className="group relative flex min-h-[268px] flex-col rounded-[24px] border border-black/8 bg-white/82 shadow-sm transition-all duration-200 hover:border-black/16 hover:shadow-md hover:bg-white/95 dark:border-white/10 dark:bg-white/4 dark:hover:border-white/20 dark:hover:bg-white/6">
         <div className="flex flex-1 flex-col p-4 text-left">
         <div className="space-y-2">
           {/* 第一行：平台图标 + 序号 + 店铺 + 业务标签  ===  右侧：出库/状态/利润胶囊 */}
@@ -242,8 +242,9 @@ function CompactTodayOrderCard({
                     {statusLabel}
                   </span>
                   {cancelReason ? (
-                    <span className="pointer-events-none absolute bottom-full right-0 z-50 mb-2 w-64 max-w-[calc(100vw-2rem)] scale-95 opacity-0 transition-all duration-200 ease-out group-hover/status:pointer-events-auto group-hover/status:scale-100 group-hover/status:opacity-100">
-                      <span className="block rounded-xl border border-slate-200/90 bg-white/98 p-3 text-left shadow-[0_16px_40px_rgba(15,23,42,0.18)] dark:border-white/12 dark:bg-[#171b22]/96 dark:shadow-[0_18px_44px_rgba(0,0,0,0.38)]">
+                    <span className="pointer-events-none absolute top-full right-0 z-50 mt-2 w-64 max-w-[calc(100vw-2rem)] scale-95 opacity-0 transition-all duration-200 ease-out group-hover/status:pointer-events-auto group-hover/status:scale-100 group-hover/status:opacity-100">
+                      <span className="relative block rounded-xl border border-slate-200/90 bg-white/98 p-3 text-left shadow-[0_16px_40px_rgba(15,23,42,0.18)] dark:border-white/12 dark:bg-[#171b22]/98 dark:shadow-[0_18px_44px_rgba(0,0,0,0.38)] backdrop-blur-md">
+                        <span className="absolute right-4 bottom-full h-2 w-2 translate-y-[5px] rotate-45 border-l border-t border-slate-200/90 bg-white dark:border-white/12 dark:bg-[#171b22]" />
                         <span className="flex items-center gap-1.5 border-b border-slate-200/80 pb-1.5 dark:border-white/8 text-[11px] font-semibold text-foreground">
                           <span className="h-1.5 w-1.5 rounded-full bg-slate-500 shrink-0" />
                           <span>取消原因</span>
@@ -331,7 +332,7 @@ function CompactTodayOrderCard({
         </div>
 
         {!readOnly || canExpandDetails ? (
-          <div className="border-t border-black/6 bg-black/[0.012] px-4 py-2 dark:border-white/8 dark:bg-white/[0.018]">
+          <div className="rounded-b-[24px] border-t border-black/6 bg-black/[0.012] px-4 py-2 dark:border-white/8 dark:bg-white/[0.018]">
             <div className="flex flex-nowrap items-center justify-end gap-1.5">
             {showPlatformActions && !deleted && !order.isSubscribe ? (
               <ActionButton
