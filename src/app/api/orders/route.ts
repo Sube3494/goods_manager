@@ -40,6 +40,11 @@ import {
   parseOutboundReturnMeta,
 } from "@/lib/outboundReturnMeta";
 import { isAddressDisabled } from "@/lib/addressBook";
+import {
+  hasExplicitDeliveryPickupProof,
+  readConfirmedRefundAmountFromRawPayload,
+  resolveCancelledOrderPureProfit,
+} from "@/lib/orderFinancials";
 
 export const dynamic = "force-dynamic";
 
@@ -700,9 +705,7 @@ function resolveRefundAdjustedIncomeMetrics(options: {
 }
 
 function readRefundAmountFromRawPayload(rawPayload: unknown) {
-  if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) return 0;
-  const record = rawPayload as Record<string, unknown>;
-  return Number(record.refundAmount || record.refund_amount || 0) || 0;
+  return readConfirmedRefundAmountFromRawPayload(rawPayload);
 }
 
 function isFullyRefundedOrder(actualPaid: unknown, refundAmount: unknown) {
@@ -974,35 +977,18 @@ function isRefundableMeituanDelivery(delivery: unknown) {
   return haystack.includes("美团") || haystack.includes("meituan");
 }
 
-function hasDeliveryPickupProof(delivery: unknown) {
-  const deliveryObj = delivery && typeof delivery === "object" && !Array.isArray(delivery)
-    ? delivery as Record<string, unknown>
-    : {};
-  const pickupTime = String(
-    deliveryObj.pickupTime
-    || deliveryObj.pickup_time
-    || deliveryObj.pickerTime
-    || deliveryObj.picker_time
-    || ""
-  ).trim();
-  const track = String(deliveryObj.track || "").trim();
-
-  return Boolean(pickupTime && pickupTime !== "0")
-    || /已取货|已取餐|取货完成|取餐完成|配送中|派送中/.test(track);
-}
-
 function hasRealizedCancelledDeliveryCost(input: {
   deliveryFee: number;
   platform?: unknown;
   delivery?: unknown;
-  hasOutbound?: boolean;
+  rawPayload?: unknown;
 }) {
   const isOffline = String(input.platform || "").trim() === "线下交易" || String(input.platform || "").toLowerCase() === "other";
   if (isOffline) {
     return false;
   }
   return input.deliveryFee > 0
-    && (Boolean(input.hasOutbound) || hasDeliveryPickupProof(input.delivery))
+    && hasExplicitDeliveryPickupProof(input.delivery, input.rawPayload)
     && !isRefundableMeituanDelivery(input.delivery);
 }
 
@@ -1825,6 +1811,7 @@ export async function GET(request: NextRequest) {
       actualPaid: number;
       expectedIncome: number | null;
       delivery: unknown;
+      rawPayload: unknown;
       orderNo: string;
       items: Array<{ productName?: string | null; productNo?: string | null; rawPayload?: unknown }>;
     }) => {
@@ -1836,7 +1823,7 @@ export async function GET(request: NextRequest) {
           deliveryFee,
           platform: order.platform,
           delivery: order.delivery,
-          hasOutbound,
+          rawPayload: order.rawPayload,
         });
       const manualDeliveryLoss = isOfflineManualDeliveryLossOrder({
         platform: order.platform,
@@ -1952,7 +1939,7 @@ export async function GET(request: NextRequest) {
             deliveryFee,
             platform: order.platform,
             delivery: order.delivery,
-            hasOutbound: Boolean(outboundMeta),
+            rawPayload: order.rawPayload,
           })) {
             acc.totalDeliveryFee += deliveryFee;
             acc.platformDelivery[platform] = (acc.platformDelivery[platform] || 0) + deliveryFee;
@@ -2423,7 +2410,7 @@ export async function GET(request: NextRequest) {
           deliveryFee,
           platform: order.platform,
           delivery: order.delivery,
-          hasOutbound,
+          rawPayload: order.rawPayload,
         });
       const manualDeliveryLoss = isOfflineManualDeliveryLossOrder({
         platform: order.platform,
@@ -2456,11 +2443,15 @@ export async function GET(request: NextRequest) {
             rawPayload: order.rawPayload,
           });
       const orderBrushCommission = Math.round(orderBrushCommissionYuan * 100);
+      const cancelledPureProfit = resolveCancelledOrderPureProfit(
+        cancelledDeliveryLoss ? deliveryFee : 0,
+        returnExtraExpense,
+      );
 
       const pureProfit = hiddenDeletedOfflineIncome
         ? null
         : (cancelled || deleted)
-        ? -(cancelledDeliveryLoss ? deliveryFee : 0) - returnExtraExpense
+        ? cancelledPureProfit
         : manualDeliveryLoss
         ? -deliveryFee
         : order.isMainSystemSelfDelivery

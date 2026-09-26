@@ -2132,7 +2132,6 @@ function parseDeliveryInfoFromDetail(detail: MaiyatianOrderDetailResponse["data"
     deliveryRecord?.pickupTime,
     deliveryRecord?.pick_time,
     deliveryRecord?.pickTime,
-    detail?.delivery_time,
   ];
   const normalPickupCandidates = [
     deliveryRecord?.pickup_time,
@@ -2147,7 +2146,6 @@ function parseDeliveryInfoFromDetail(detail: MaiyatianOrderDetailResponse["data"
     firstGoodsWithTime?.pickupTime,
     firstGoodsWithTime?.picker_time,
     firstGoodsWithTime?.pickerTime,
-    detail?.delivery_time,
   ];
   const rawPickupTime = pickFirstValidTimeValue(...(isJdLike ? jdLikePickupCandidates : normalPickupCandidates));
   const pickupTime = typeof rawPickupTime === "string" && rawPickupTime.includes("-")
@@ -3698,7 +3696,6 @@ export function normalizeAutoPickOrderPayload(payload: unknown): AutoPickInbound
             deliveryRecord?.pickupTime,
             deliveryRecord?.pick_time,
             deliveryRecord?.pickTime,
-            input.delivery_time,
           )
         : pickFirstValidTimeValue(
             deliveryRecord?.pickup_time,
@@ -3709,7 +3706,6 @@ export function normalizeAutoPickOrderPayload(payload: unknown): AutoPickInbound
             input.pickupTime,
             input.picker_time,
             input.pickerTime,
-            input.delivery_time,
           );
       const rawFinishedTime = deliveryRecord?.finished_time
         ?? deliveryRecord?.finishedTime
