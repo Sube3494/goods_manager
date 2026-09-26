@@ -527,6 +527,13 @@ export function isBrushSyncEligibleOrder(order: Pick<AutoPickOrder, "status" | "
 }
 
 export function getStatusTone(display: string) {
+  if (display === "异常") {
+    return {
+      badge: "border-rose-500/25 bg-rose-500/10 text-rose-700 dark:text-rose-400",
+      dot: "bg-rose-500",
+      soft: "bg-rose-500/8 text-rose-700 dark:text-rose-300",
+    };
+  }
 
   if (display === "已取消") {
     return {

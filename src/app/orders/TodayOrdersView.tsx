@@ -16,6 +16,7 @@ import {
   AUTO_PICK_EXTRA_STATUS_FILTERS,
   getBaseAutoPickStatusDisplay,
   getAutoPickStatusFilterLabel,
+  isAutoPickOrderAbnormalStatus,
   isAutoPickOrderDeliveringStatus,
   isAutoPickOrderRiderAssigned,
   isAutoPickPickupOrder,
@@ -135,6 +136,7 @@ function CompactTodayOrderCard({
   ));
   const platformBadge = getPlatformBadgeMeta(order.platform, order.rawPayload);
   const statusLabel = getBaseAutoPickStatusDisplay(order.status) || "待处理";
+  const abnormal = isAutoPickOrderAbnormalStatus(order.status) || statusLabel === "异常";
   const cancelled = isCancelledStatus(order.status) || statusLabel === "已删除";
   const completed = isCompletedStatus(order.status);
   const deleted = statusLabel === "已删除";
@@ -159,7 +161,9 @@ function CompactTodayOrderCard({
   const canShowPureProfit = Boolean(order.hasOutbound) && hasPureProfit;
   const pureProfitDisplay = hasPureProfit ? toCurrency(Number(order.pureProfit)) : (getProductCostStatusText(order) || "-");
 
-  const statusClassName = cancelled
+  const statusClassName = abnormal
+    ? "border-rose-500/25 bg-rose-500/10 text-rose-700 dark:text-rose-400"
+    : cancelled
     ? "border-slate-500/15 bg-slate-500/10 text-slate-600 dark:text-slate-300"
     : completed
       ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
