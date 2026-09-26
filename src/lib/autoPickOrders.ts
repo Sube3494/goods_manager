@@ -2618,6 +2618,32 @@ async function enrichMaiyatianOrderByCookie(cookie: string, order: AutoPickInbou
     const effectiveCancel = cancelDetails.filter((item) => String(item.status ?? "").trim() === "1").pop();
     const refundAmountYuan = Number(effectiveCancel?.total_price || 0) || 0;
 
+    if (!effectiveCancel && isAutoPickOrderCancelledStatus(detailStatus)) {
+      // 美团在用户仅发起取消/售后申请时，也可能提前设置 is_cancel 或取消类 tips。
+      // 退款明细尚未确认生效时忽略这类申请态标记，继续按真实履约状态展示。
+      const detailWithoutPendingCancel = {
+        ...(detailDataObj || {}),
+        is_cancel: 0,
+        isCancel: 0,
+        tips: /取消|退款|售后/.test(String(detailDataObj?.tips || "")) ? "" : detailDataObj?.tips,
+      };
+      const nonCancelDetailStatus = resolveMaiyatianOrderStatus(detailWithoutPendingCancel);
+      const deliveryTrack = String(order.delivery?.track || "").trim();
+      const hasCompletedDelivery = /配送完成|已送达|用户已收货/.test(deliveryTrack)
+        || Boolean(order.completedAt)
+        || Boolean(detailDataObj?.finished_time);
+
+      if (!isAutoPickOrderCancelledStatus(nonCancelDetailStatus) && nonCancelDetailStatus) {
+        detailStatus = nonCancelDetailStatus;
+      } else if (hasCompletedDelivery) {
+        detailStatus = "已完成";
+      } else if (/配送中|派送中|已取货/.test(deliveryTrack)) {
+        detailStatus = "配送中";
+      } else {
+        detailStatus = "待配送";
+      }
+    }
+
     let returnedCount = 0;
     if (effectiveCancel?.goods_format && typeof effectiveCancel.goods_format === "string") {
       try {
@@ -6009,7 +6035,10 @@ export async function refreshAutoPickOrderFromPlugin(
         orderNo: String(detailOrder.orderNo || "").trim() || fallbackOrderNo,
       });
       if (normalizedDetailOrder) {
+        // 美团详情会在用户仅发起取消/售后申请时提前返回取消态；
+        // 取消态也必须和订单列表复核，避免申请态覆盖列表中的真实完成状态。
         const shouldReconcileWithActiveList = isAutoPickOrderAbnormalStatus(normalizedDetailOrder.status)
+          || isAutoPickOrderCancelledStatus(normalizedDetailOrder.status)
           || !String(normalizedDetailOrder.deliveryId || "").trim();
         if (shouldReconcileWithActiveList) {
           const fallbackLookup = {
