@@ -9,7 +9,7 @@ import { useToast } from "@/components/ui/Toast";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { AutoPickOrder, AutoPickOrderItem, PurchaseOrder, PurchaseStatus } from "@/lib/types";
-import { formatLocalDate } from "@/lib/dateUtils";
+import { formatLocalDate, formatLocalDateTime } from "@/lib/dateUtils";
 import { isShopNameMatch } from "@/lib/shopIdentity";
 import { extractCustomerPhoneTail } from "@/lib/customerPhoneTail";
 import {
@@ -92,10 +92,18 @@ function OrderListSkeleton({ count = 3, cardMode = false }: { count?: number; ca
   );
 }
 
+export function isTodayBrushOrder(order: AutoPickOrder): boolean {
+  const pickup = Boolean(order.isPickup) || isAutoPickPickupOrder(order.rawPayload, order.userAddress, order.shopAddress);
+  const displayAsOfflineOrder = order.platform === "线下交易" || String(order.platform || "").toLowerCase() === "other";
+  return !pickup && !displayAsOfflineOrder && Boolean(order.isMainSystemSelfDelivery);
+}
+
 function formatCompactTime(value?: string | null) {
   if (!value) return "-";
-  const matched = String(value).match(/(?:T|\s)(\d{2}:\d{2})/);
-  return matched?.[1] || String(value).replace("T", " ").slice(-5);
+  const formatted = formatLocalDateTime(value);
+  if (!formatted || formatted === "无效日期") return "-";
+  const parts = formatted.split(" ");
+  return parts[1] || formatted.slice(-5);
 }
 
 function CompactTodayOrderCard({
@@ -146,7 +154,7 @@ function CompactTodayOrderCard({
   const customerPhoneTail = extractCustomerPhoneTail(order);
   const customerType = order.customerType;
   const orderTypeLabel = getOrderTypeLabel(order);
-  const showBrushMarker = !pickup && !displayAsOfflineOrder && Boolean(order.isMainSystemSelfDelivery);
+  const showBrushMarker = isTodayBrushOrder(order);
   const hasPureProfit = typeof order.pureProfit === "number" && Number.isFinite(order.pureProfit);
   const canShowPureProfit = Boolean(order.hasOutbound) && hasPureProfit;
   const pureProfitDisplay = hasPureProfit ? toCurrency(Number(order.pureProfit)) : (getProductCostStatusText(order) || "-");
@@ -515,6 +523,7 @@ export function TodayOrdersView({
   const [actingId, setActingId] = useState("");
   const [expandedIds, setExpandedIds] = useState<string[]>([]);
   const [detailOrderId, setDetailOrderId] = useState<string | null>(null);
+  const [showBrushToday, setShowBrushToday] = useState(false);
   const [showCompletedToday, setShowCompletedToday] = useState(true);
   const [showCancelledToday, setShowCancelledToday] = useState(false);
   
@@ -1136,7 +1145,7 @@ export function TodayOrdersView({
   }, [orders]);
 
   const todayCompletedOrders = useMemo(() => {
-    return filteredOrders.filter((order) => isCompletedStatus(order.status));
+    return filteredOrders.filter((order) => isCompletedStatus(order.status) && !isTodayBrushOrder(order));
   }, [filteredOrders]);
 
   const todayCancelledOrders = useMemo(() => {
@@ -1146,10 +1155,18 @@ export function TodayOrdersView({
     });
   }, [filteredOrders]);
 
+  const todayBrushOrders = useMemo(() => {
+    return filteredOrders.filter((order) => {
+      const displayStatus = getBaseAutoPickStatusDisplay(order.status);
+      const isCancelled = isCancelledStatus(order.status) || displayStatus === "已删除";
+      return !isCancelled && isTodayBrushOrder(order);
+    });
+  }, [filteredOrders]);
+
   const todayPendingOrders = useMemo(() => {
     return filteredOrders.filter((order) => {
       const displayStatus = getBaseAutoPickStatusDisplay(order.status);
-      return !isCompletedStatus(order.status) && !isCancelledStatus(order.status) && displayStatus !== "已删除";
+      return !isCompletedStatus(order.status) && !isCancelledStatus(order.status) && displayStatus !== "已删除" && !isTodayBrushOrder(order);
     });
   }, [filteredOrders]);
 
@@ -1363,7 +1380,7 @@ export function TodayOrdersView({
             >
               <OrderListSkeleton count={4} cardMode={effectiveLayoutMode === "cards"} />
             </motion.div>
-          ) : todayPendingOrders.length === 0 && todayCompletedOrders.length === 0 && todayCancelledOrders.length === 0 ? (
+          ) : todayPendingOrders.length === 0 && todayBrushOrders.length === 0 && todayCompletedOrders.length === 0 && todayCancelledOrders.length === 0 ? (
             <motion.div
               key="today-orders-empty"
               initial={{ opacity: 0 }}
@@ -1388,6 +1405,45 @@ export function TodayOrdersView({
             >
               {todayPendingOrders.length > 0 && (
                 renderOrderCollection(todayPendingOrders)
+              )}
+
+              {todayBrushOrders.length > 0 && (
+                <section className="flex flex-col gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowBrushToday((current) => !current)}
+                    className="flex w-full items-center justify-between rounded-[20px] border border-rose-500/20 bg-rose-50/40 hover:bg-rose-50/70 px-5 py-4 text-left transition-all dark:border-rose-500/20 dark:bg-rose-950/20 dark:hover:bg-rose-950/30 shadow-xs"
+                  >
+                    <div className="flex items-center gap-3.5">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-rose-500/10 text-rose-600 dark:bg-rose-500/20 dark:text-rose-400">
+                        <Truck size={18} />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-rose-700 dark:text-rose-400">今日刷单</span>
+                          <span className="inline-flex items-center rounded-full bg-rose-500/10 px-2 py-0.5 text-[10px] font-semibold text-rose-700 dark:bg-rose-500/20 dark:text-rose-300">
+                            已独立折叠
+                          </span>
+                        </div>
+                        <div className="mt-0.5 text-lg font-bold text-foreground">
+                          {todayBrushOrders.length} 单
+                          {overview.brushCount > todayBrushOrders.length && (
+                            <span className="ml-1.5 text-xs font-normal text-muted-foreground">
+                              (总共 {overview.brushCount} 单)
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-black/8 bg-black/2 transition-colors hover:bg-black/3 dark:border-white/10 dark:bg-white/3">
+                      {showBrushToday ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                    </div>
+                  </button>
+
+                  {showBrushToday && (
+                    <div className="animate-in fade-in duration-200">{renderOrderCollection(todayBrushOrders)}</div>
+                  )}
+                </section>
               )}
 
               {todayCompletedOrders.length > 0 && (
