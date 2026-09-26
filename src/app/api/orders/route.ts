@@ -42,8 +42,8 @@ import {
 import { isAddressDisabled } from "@/lib/addressBook";
 import {
   hasExplicitDeliveryPickupProof,
-  readConfirmedRefundAmountFromRawPayload,
   resolveCancelledOrderPureProfit,
+  resolveOrderRefundAmount,
 } from "@/lib/orderFinancials";
 
 export const dynamic = "force-dynamic";
@@ -704,8 +704,24 @@ function resolveRefundAdjustedIncomeMetrics(options: {
   };
 }
 
-function readRefundAmountFromRawPayload(rawPayload: unknown, fullRefundFallback?: unknown) {
-  return readConfirmedRefundAmountFromRawPayload(rawPayload, fullRefundFallback);
+function readRefundAmountFromRawPayload(
+  rawPayload: unknown,
+  actualPaid: unknown,
+  outboundMeta?: {
+    refundAmount?: unknown;
+    returnDetails?: Array<{ items?: Array<{ quantity?: number }> }>;
+  } | null,
+) {
+  const hasReturnedGoods = Boolean(outboundMeta?.returnDetails?.some((entry) => (
+    entry.items?.some((item) => Number(item.quantity || 0) > 0)
+  )));
+
+  return resolveOrderRefundAmount({
+    rawPayload,
+    actualPaid,
+    recordedRefundAmount: outboundMeta?.refundAmount,
+    hasReturnedGoods,
+  });
 }
 
 function isFullyRefundedOrder(actualPaid: unknown, refundAmount: unknown) {
@@ -1955,7 +1971,7 @@ export async function GET(request: NextRequest) {
           }
           if (!cancelled && !deleted) {
             const isBrush = readMainSystemSelfDeliveryFlag(order.rawPayload);
-            const refundAmount = Math.max(outboundMeta?.refundAmount || 0, readRefundAmountFromRawPayload(order.rawPayload, actualPaid));
+            const refundAmount = readRefundAmountFromRawPayload(order.rawPayload, actualPaid, outboundMeta);
             const fullyRefunded = isFullyRefundedOrder(actualPaid, refundAmount);
             const adjustedMetrics = resolveRefundAdjustedIncomeMetrics({
               expectedIncome: metrics.expectedIncome,
@@ -2117,7 +2133,7 @@ export async function GET(request: NextRequest) {
       for (const order of metricOrders) {
         const platform = normalizeOrderPlatformForSummary(order.platform);
         const outboundMeta = outboundByOrderNo.get(order.orderNo) || null;
-        const refundAmount = Math.max(outboundMeta?.refundAmount || 0, readRefundAmountFromRawPayload(order.rawPayload, order.actualPaid));
+        const refundAmount = readRefundAmountFromRawPayload(order.rawPayload, order.actualPaid, outboundMeta);
         const cancelled = isAutoPickOrderCancelledStatus(order.status)
           || isAutoPickOrderDeletedStatus(order.status)
           || isFullyRefundedOrder(order.actualPaid, refundAmount);
@@ -2385,7 +2401,7 @@ export async function GET(request: NextRequest) {
       const cancelled = isAutoPickOrderCancelledStatus(order.status);
       const deleted = isAutoPickOrderDeletedStatus(order.status);
       // 退款金额只采用平台确认生效或退货记录中明确登记的值；取消不等于已退款。
-      const refundAmount = Math.max(outboundMeta?.refundAmount || 0, readRefundAmountFromRawPayload(order.rawPayload, order.actualPaid));
+      const refundAmount = readRefundAmountFromRawPayload(order.rawPayload, order.actualPaid, outboundMeta);
       const returnExtraExpense = outboundMeta?.extraExpense || 0;
       const adjustedMetrics = resolveRefundAdjustedIncomeMetrics({
         expectedIncome: order.expectedIncome,

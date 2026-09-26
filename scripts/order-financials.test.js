@@ -3,6 +3,7 @@ import {
   hasExplicitDeliveryPickupProof,
   readConfirmedRefundAmountFromRawPayload,
   resolveCancelledOrderPureProfit,
+  resolveOrderRefundAmount,
 } from "../src/lib/orderFinancials.ts";
 
 assert.equal(
@@ -45,22 +46,87 @@ assert.equal(
 
 assert.equal(
   readConfirmedRefundAmountFromRawPayload({
-    cancelDetails: [{ status: 0, total_price: "129.10" }, { status: 1, total_price: "129.10" }],
+    cancelDetails: [
+      { status: 0, title: "发起退款", total_price: "129.10" },
+      { status: 1, title: "确认退款", total_price: "129.10" },
+    ],
   }),
   12910,
   "确认退款应按分返回退款金额",
 );
 
 assert.equal(
-  readConfirmedRefundAmountFromRawPayload({
-    cancelDetails: [
-      { source_cancel_id: "auto-refund", status: 0, title: "发起退款", total_price: 0 },
-      { source_cancel_id: "auto-refund", status: 1, title: "确认退款", total_price: 0 },
-      { source_cancel_id: "", status: 1, title: "用户取消", total_price: 0 },
-    ],
-  }, 17510),
+  resolveOrderRefundAmount({
+    rawPayload: {
+      cancelDetails: [
+        { status: 1, title: "确认退款", total_price: "129.10" },
+      ],
+    },
+    actualPaid: 17510,
+    hasReturnedGoods: false,
+  }),
+  0,
+  "平台金额为正但商品未退时也不能显示退款",
+);
+
+assert.equal(
+  resolveOrderRefundAmount({
+    rawPayload: {
+      cancelDetails: [
+        { status: 1, title: "确认退款", total_price: "129.10" },
+      ],
+    },
+    actualPaid: 17510,
+    hasReturnedGoods: true,
+  }),
+  12910,
+  "商品已退时应优先采用平台返回的正数退款金额",
+);
+
+assert.equal(
+  resolveOrderRefundAmount({
+    rawPayload: {
+      cancelDetails: [
+        { source_cancel_id: "auto-refund", status: 0, title: "发起退款", total_price: 0 },
+        { source_cancel_id: "auto-refund", status: 1, title: "确认退款", total_price: 0 },
+        { source_cancel_id: "", status: 1, title: "用户取消", total_price: 0 },
+      ],
+    },
+    actualPaid: 17510,
+    hasReturnedGoods: false,
+  }),
+  0,
+  "未出库取消即使确认退款也不能按实付金额展示",
+);
+
+assert.equal(
+  resolveOrderRefundAmount({
+    rawPayload: {
+      cancelDetails: [
+        { source_cancel_id: "auto-refund", status: 0, title: "发起退款", total_price: 0 },
+        { source_cancel_id: "auto-refund", status: 1, title: "确认退款", total_price: 0 },
+        { source_cancel_id: "", status: 1, title: "用户取消", total_price: 0 },
+      ],
+    },
+    actualPaid: 17510,
+    hasReturnedGoods: true,
+  }),
   17510,
-  "系统自动确认退款但金额为零时应按订单实付金额展示",
+  "确认退款且商品已退时应按实付金额展示",
+);
+
+assert.equal(
+  resolveOrderRefundAmount({
+    rawPayload: {
+      cancelDetails: [
+        { source_cancel_id: "merchant-cancel", status: 1, title: "商户取消", total_price: 0 },
+      ],
+    },
+    actualPaid: 12410,
+    hasReturnedGoods: false,
+  }),
+  0,
+  "普通商户取消不能显示退款金额",
 );
 
 assert.equal(
@@ -69,7 +135,7 @@ assert.equal(
       { source_cancel_id: "cancelled-refund", status: 1, title: "确认退款", total_price: 103 },
       { source_cancel_id: "cancelled-refund", status: 3, title: "取消退款申请", total_price: 103 },
     ],
-  }, 10300),
+  }),
   0,
   "确认后又取消的退款申请不能显示为已退款",
 );
