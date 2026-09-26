@@ -974,6 +974,23 @@ function isRefundableMeituanDelivery(delivery: unknown) {
   return haystack.includes("美团") || haystack.includes("meituan");
 }
 
+function hasDeliveryPickupProof(delivery: unknown) {
+  const deliveryObj = delivery && typeof delivery === "object" && !Array.isArray(delivery)
+    ? delivery as Record<string, unknown>
+    : {};
+  const pickupTime = String(
+    deliveryObj.pickupTime
+    || deliveryObj.pickup_time
+    || deliveryObj.pickerTime
+    || deliveryObj.picker_time
+    || ""
+  ).trim();
+  const track = String(deliveryObj.track || "").trim();
+
+  return Boolean(pickupTime && pickupTime !== "0")
+    || /已取货|已取餐|取货完成|取餐完成|配送中|派送中/.test(track);
+}
+
 function hasRealizedCancelledDeliveryCost(input: {
   deliveryFee: number;
   platform?: unknown;
@@ -985,7 +1002,7 @@ function hasRealizedCancelledDeliveryCost(input: {
     return false;
   }
   return input.deliveryFee > 0
-    && Boolean(input.hasOutbound)
+    && (Boolean(input.hasOutbound) || hasDeliveryPickupProof(input.delivery))
     && !isRefundableMeituanDelivery(input.delivery);
 }
 
@@ -2380,12 +2397,8 @@ export async function GET(request: NextRequest) {
       const hiddenDeletedOfflineIncome = order.isDeleted && order.platform === "线下交易";
       const cancelled = isAutoPickOrderCancelledStatus(order.status);
       const deleted = isAutoPickOrderDeletedStatus(order.status);
-      const recordedRefundAmount = Math.max(outboundMeta?.refundAmount || 0, readRefundAmountFromRawPayload(order.rawPayload));
-      // 历史取消单可能没有落库退款金额；平台已明确取消时按实付金额兜底为全额退款，
-      // 避免继续把原预计收入计入利润。明确记录的退款金额仍优先保留。
-      const refundAmount = cancelled
-        ? Math.max(recordedRefundAmount, Math.max(0, Number(order.actualPaid || 0)))
-        : recordedRefundAmount;
+      // 退款金额只采用平台确认生效或退货记录中明确登记的值；取消不等于已退款。
+      const refundAmount = Math.max(outboundMeta?.refundAmount || 0, readRefundAmountFromRawPayload(order.rawPayload));
       const returnExtraExpense = outboundMeta?.extraExpense || 0;
       const adjustedMetrics = resolveRefundAdjustedIncomeMetrics({
         expectedIncome: order.expectedIncome,
@@ -2395,6 +2408,8 @@ export async function GET(request: NextRequest) {
       });
       const safeExpectedIncome = hiddenDeletedOfflineIncome
         ? null
+        : cancelled
+        ? 0
         : (typeof adjustedMetrics.expectedIncome === "number" ? adjustedMetrics.expectedIncome : null);
       const serviceFeeRate = order.platform === "线下交易"
         ? 0
