@@ -13,33 +13,17 @@ export function readConfirmedRefundAmountFromRawPayload(rawPayload: unknown) {
   return Math.max(directAmount, Math.round(confirmedAmountYuan * 100));
 }
 
-export function hasExplicitDeliveryPickupProof(delivery: unknown, rawPayload?: unknown) {
+export function hasExplicitDeliveryPickupProof(delivery: unknown, _rawPayload?: unknown) {
   const deliveryObj = delivery && typeof delivery === "object" && !Array.isArray(delivery)
     ? delivery as Record<string, unknown>
     : {};
-  const rawObj = rawPayload && typeof rawPayload === "object" && !Array.isArray(rawPayload)
-    ? rawPayload as Record<string, unknown>
-    : {};
-  const rawDelivery = rawObj.delivery && typeof rawObj.delivery === "object" && !Array.isArray(rawObj.delivery)
-    ? rawObj.delivery as Record<string, unknown>
-    : {};
-  const pickupTime = [
-    rawObj.pickup_time,
-    rawObj.pickupTime,
-    rawObj.picker_time,
-    rawObj.pickerTime,
-    rawDelivery.pickup_time,
-    rawDelivery.pickupTime,
-    rawDelivery.picker_time,
-    rawDelivery.pickerTime,
-    rawDelivery.pick_time,
-    rawDelivery.pickTime,
-  ].map((value) => String(value || "").trim()).find((value) => value && value !== "0");
   const track = String(deliveryObj.track || "").trim();
   const completedTime = String(deliveryObj.completedTime || deliveryObj.completed_time || "").trim();
 
-  return Boolean(pickupTime || completedTime)
-    || /已取货|已取餐|取货完成|取餐完成|已送达|配送完成/.test(track);
+  // 麦芽田的 pickup_time/“取餐时间”是计划时间，并不代表骑手已经取货。
+  // 只认履约轨迹已经进入取货后的阶段，或存在明确完成时间。
+  return Boolean(completedTime)
+    || /已取货|已取餐|取货完成|取餐完成|配送中|派送中|已送达|配送完成/.test(track);
 }
 
 export function resolveCancelledOrderPureProfit(deliveryFeeLoss: unknown, returnExtraExpense: unknown) {
