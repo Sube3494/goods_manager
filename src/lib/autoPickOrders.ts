@@ -2615,8 +2615,7 @@ async function enrichMaiyatianOrderByCookie(cookie: string, order: AutoPickInbou
   if (Array.isArray(cancelDetails) && cancelDetails.length > 0) {
     // 麦芽田 /cancel/detail 返回的是同一笔退款的生命周期流转记录（如“发起退款” status:0 与“确认退款” status:1 为同一笔退款）
     // 优先读取已确认/生效的退款流水记录，防止重复求和导致退款金额翻倍
-    const confirmedCancel = cancelDetails.filter((item) => String(item.status || "").trim() === "1").pop();
-    const effectiveCancel = confirmedCancel || cancelDetails[cancelDetails.length - 1] || cancelDetails[0];
+    const effectiveCancel = cancelDetails.filter((item) => String(item.status ?? "").trim() === "1").pop();
     const refundAmountYuan = Number(effectiveCancel?.total_price || 0) || 0;
 
     let returnedCount = 0;
@@ -2661,6 +2660,11 @@ async function enrichMaiyatianOrderByCookie(cookie: string, order: AutoPickInbou
     if (refundAmountYuan > 0) {
       order.refundAmount = Math.round(refundAmountYuan * 100);
       orderObj.refundAmount = Math.round(refundAmountYuan * 100);
+    } else {
+      // status 非 1 的记录只是退款申请、处理中或已驳回，不能计作实际退款。
+      // 同步时同时清掉旧版本误写入的金额，使误取消订单可以恢复真实状态。
+      delete order.refundAmount;
+      delete orderObj.refundAmount;
     }
   }
 
