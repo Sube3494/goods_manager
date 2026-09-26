@@ -879,7 +879,7 @@ function resolveCancelReasonFromDetails(cancelDetails: unknown) {
     .join("：");
 }
 
-function getCancelReason(order: Pick<AutoPickOrder, "cancelReason" | "rawPayload"> & { cancelDetails?: unknown }) {
+export function getCancelReason(order: Pick<AutoPickOrder, "cancelReason" | "rawPayload"> & { cancelDetails?: unknown }) {
   const direct = String(order.cancelReason || "").trim();
   if (direct) return direct;
   if (order.cancelDetails) {

@@ -29,6 +29,7 @@ import {
   ProductStripItem,
   isCompletedStatus,
   isCancelledStatus,
+  getCancelReason,
   isBrushSyncEligibleOrder,
   getOrderActionErrorMessage,
   getExpandedOrderItemDisplays,
@@ -48,11 +49,11 @@ const CompactCustomerHistoryModal = dynamic(() => import("@/components/Orders/Cu
 
 function OrderListSkeleton({ count = 3, cardMode = false }: { count?: number; cardMode?: boolean }) {
   return (
-    <div className={cardMode ? "animate-pulse columns-1 gap-4 sm:columns-2 xl:columns-3" : "grid gap-4 animate-pulse"}>
+    <div className={cardMode ? "grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 items-start animate-pulse" : "grid gap-4 animate-pulse"}>
       {Array.from({ length: count }).map((_, index) => (
         <div 
           key={index} 
-          className={`space-y-4 rounded-[28px] border border-black/8 bg-white/70 p-5 shadow-sm dark:border-white/10 dark:bg-white/4 sm:p-6 ${cardMode ? "mb-4 break-inside-avoid" : ""}`}
+          className="space-y-4 rounded-[28px] border border-black/8 bg-white/70 p-5 shadow-sm dark:border-white/10 dark:bg-white/4 sm:p-6 min-w-0"
         >
           {/* Header row */}
           <div className="flex items-center justify-between gap-3">
@@ -135,9 +136,12 @@ function CompactTodayOrderCard({
     }))
   ));
   const platformBadge = getPlatformBadgeMeta(order.platform, order.rawPayload);
-  const statusLabel = getBaseAutoPickStatusDisplay(order.status) || "待处理";
+  const returned = Boolean(order.outboundReturnDetails?.some((entry) => entry.items?.some((item) => Number(item.quantity || 0) > 0)));
+  const baseStatusLabel = getBaseAutoPickStatusDisplay(order.status) || "待处理";
+  const statusLabel = returned ? "已退" : baseStatusLabel;
   const abnormal = isAutoPickOrderAbnormalStatus(order.status) || statusLabel === "异常";
   const cancelled = isCancelledStatus(order.status) || statusLabel === "已删除";
+  const cancelReason = cancelled ? getCancelReason(order) : "";
   const completed = isCompletedStatus(order.status);
   const deleted = statusLabel === "已删除";
   const terminal = cancelled || completed || deleted;
@@ -148,7 +152,6 @@ function CompactTodayOrderCard({
   const showPlatformActions = !displayAsOfflineOrder && !readOnly;
   const cannotSelfDeliver = Boolean(actingId) || terminal || delivering || pickup || riderAssigned;
   const showAutoOutboundRecovery = shouldShowAutoOutboundRecovery(order);
-  const returned = Boolean(order.outboundReturnDetails?.some((entry) => entry.items?.some((item) => Number(item.quantity || 0) > 0)));
   const syncing = actingId === `${order.id}:sync`;
   const shopName = order.matchedShopName || order.rawShopName || order.shopId || "未匹配店铺";
   const deadlineDisplay = getDeadlineDisplay(order);
@@ -163,11 +166,13 @@ function CompactTodayOrderCard({
 
   const statusClassName = abnormal
     ? "border-rose-500/25 bg-rose-500/10 text-rose-700 dark:text-rose-400"
-    : cancelled
-    ? "border-slate-500/15 bg-slate-500/10 text-slate-600 dark:text-slate-300"
-    : completed
-      ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-      : "border-sky-500/20 bg-sky-500/10 text-sky-700 dark:text-sky-300";
+    : returned
+      ? "border-amber-500/25 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+      : cancelled
+        ? "border-slate-500/15 bg-slate-500/10 text-slate-600 dark:text-slate-300"
+        : completed
+          ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+          : "border-sky-500/20 bg-sky-500/10 text-sky-700 dark:text-sky-300";
 
   const handleAutoOutboundRecovery = () => {
     const targetItem = getAutoOutboundRecoveryTargetItem(order);
@@ -189,7 +194,7 @@ function CompactTodayOrderCard({
           currentOrderNo={order.orderNo}
         />
       ) : null}
-      <article className="group flex min-h-[268px] flex-col overflow-hidden rounded-[24px] border border-black/8 bg-white/82 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-black/12 hover:shadow-lg dark:border-white/10 dark:bg-white/4 dark:hover:border-white/16">
+      <article className="group flex min-h-[268px] flex-col overflow-hidden rounded-[24px] border border-black/8 bg-white/82 shadow-sm transition-all duration-200 hover:border-black/16 hover:shadow-md hover:bg-white/95 dark:border-white/10 dark:bg-white/4 dark:hover:border-white/20 dark:hover:bg-white/6">
         <div className="flex flex-1 flex-col p-4 text-left">
         <div className="space-y-2">
           {/* 第一行：平台图标 + 序号 + 店铺 + 业务标签  ===  右侧：出库/状态/利润胶囊 */}
@@ -205,12 +210,11 @@ function CompactTodayOrderCard({
               {orderTypeLabel ? <span className="inline-flex h-5 shrink-0 items-center rounded-full border border-violet-500/20 bg-violet-500/10 px-1.5 text-[10px] font-semibold leading-none text-violet-700 dark:text-violet-300">{orderTypeLabel}</span> : null}
               {showBrushMarker ? <span className="inline-flex h-5 shrink-0 items-center rounded-full border border-rose-500/20 bg-rose-500/10 px-1.5 text-[10px] font-semibold leading-none text-rose-700 dark:text-rose-300">刷单</span> : null}
             </div>
-            <div className="flex shrink-0 items-center gap-1.5">
-              {returned ? <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-1 text-[10px] font-semibold text-amber-700 dark:text-amber-300">已退</span> : null}
+            <div className="flex shrink-0 items-center">
               {showAutoOutboundRecovery ? (
                 readOnly ? (
-                  <span title={order.autoOutboundError || "自动出库失败"} className="inline-flex items-center gap-1 rounded-full border border-rose-500/25 bg-rose-500/10 px-2.5 py-1 text-[10px] font-semibold text-rose-700 dark:text-rose-300">
-                    <TriangleAlert size={11} />出库
+                  <span title={order.autoOutboundError || "自动出库失败"} className="inline-flex items-center gap-1 rounded-full border border-rose-500/25 bg-rose-500/10 px-2.5 py-1 text-xs font-semibold text-rose-700 dark:text-rose-300">
+                    <TriangleAlert size={12} />出库
                   </span>
                 ) : (
                   <button
@@ -218,20 +222,39 @@ function CompactTodayOrderCard({
                     onClick={handleAutoOutboundRecovery}
                     disabled={actingId === `${order.id}:outbound`}
                     title={order.autoOutboundError || "自动出库失败，点击处理"}
-                    className="inline-flex items-center gap-1 rounded-full border border-rose-500/25 bg-rose-500/10 px-2.5 py-1 text-[10px] font-semibold text-rose-700 transition hover:border-rose-500/40 hover:bg-rose-500/15 disabled:cursor-not-allowed disabled:opacity-60 dark:text-rose-300"
+                    className="inline-flex items-center gap-1 rounded-full border border-rose-500/25 bg-rose-500/10 px-2.5 py-1 text-xs font-semibold text-rose-700 transition hover:border-rose-500/40 hover:bg-rose-500/15 disabled:cursor-not-allowed disabled:opacity-60 dark:text-rose-300 cursor-pointer"
                   >
-                    {actingId === `${order.id}:outbound` ? <Loader2 size={11} className="animate-spin" /> : <TriangleAlert size={11} />}
+                    {actingId === `${order.id}:outbound` ? <Loader2 size={12} className="animate-spin" /> : <TriangleAlert size={12} />}
                     {actingId === `${order.id}:outbound` ? "处理中" : "出库"}
                   </button>
                 )
-              ) : null}
-              {canShowPureProfit ? (
+              ) : canShowPureProfit ? (
                 <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs tabular-nums ${Number(order.pureProfit) >= 0 ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "border-rose-500/20 bg-rose-500/10 text-rose-700 dark:text-rose-300"}`}>
                   <span className="text-[11px] font-medium opacity-80">利润</span>
                   <span className="text-xs font-bold sm:text-[13px]">{pureProfitDisplay}</span>
                 </span>
               ) : (
-                <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${statusClassName}`}>{statusLabel}</span>
+                <span className="group/status relative inline-flex">
+                  <span
+                    title={cancelReason || undefined}
+                    className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${statusClassName}`}
+                  >
+                    {statusLabel}
+                  </span>
+                  {cancelReason ? (
+                    <span className="pointer-events-none absolute bottom-full right-0 z-50 mb-2 w-64 max-w-[calc(100vw-2rem)] scale-95 opacity-0 transition-all duration-200 ease-out group-hover/status:pointer-events-auto group-hover/status:scale-100 group-hover/status:opacity-100">
+                      <span className="block rounded-xl border border-slate-200/90 bg-white/98 p-3 text-left shadow-[0_16px_40px_rgba(15,23,42,0.18)] dark:border-white/12 dark:bg-[#171b22]/96 dark:shadow-[0_18px_44px_rgba(0,0,0,0.38)]">
+                        <span className="flex items-center gap-1.5 border-b border-slate-200/80 pb-1.5 dark:border-white/8 text-[11px] font-semibold text-foreground">
+                          <span className="h-1.5 w-1.5 rounded-full bg-slate-500 shrink-0" />
+                          <span>取消原因</span>
+                        </span>
+                        <span className="mt-1.5 block whitespace-normal break-words text-[11.5px] font-medium leading-relaxed text-muted-foreground">
+                          {cancelReason}
+                        </span>
+                      </span>
+                    </span>
+                  ) : null}
+                </span>
               )}
             </div>
           </div>
@@ -1253,12 +1276,12 @@ export function TodayOrdersView({
   const effectiveLayoutMode: TodayOrderLayout = isMobileViewport ? "list" : layoutMode;
 
   const renderOrderCollection = (groupOrders: AutoPickOrder[]) => (
-    <div className={effectiveLayoutMode === "cards" ? "columns-1 gap-4 sm:columns-2 xl:columns-3" : "grid gap-4"}>
+    <div className={effectiveLayoutMode === "cards" ? "grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 items-start" : "grid gap-4"}>
       {groupOrders.map((order) => {
         const expanded = expandedIds.includes(order.id);
         const showCompactCard = effectiveLayoutMode === "cards";
         return (
-          <div key={order.id} className={showCompactCard ? "mb-4 min-w-0 break-inside-avoid" : "min-w-0"}>
+          <div key={order.id} className="min-w-0">
             <OrderCardErrorBoundary orderNo={order.orderNo || order.id}>
               {showCompactCard ? (
                 <CompactTodayOrderCard
