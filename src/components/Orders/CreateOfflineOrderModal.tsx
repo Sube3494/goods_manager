@@ -41,9 +41,6 @@ export function CreateOfflineOrderModal({ shopOptions, onClose, onSuccess }: Cre
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isProductPickerOpen, setIsProductPickerOpen] = useState(false);
-  const [isShopSelectOpen, setIsShopSelectOpen] = useState(false);
-  
-  const modalRef = useRef<HTMLDivElement>(null);
 
   const formattedShopOptions = useMemo(() => {
     return shopOptions.map((shop) => ({
@@ -58,16 +55,16 @@ export function CreateOfflineOrderModal({ shopOptions, onClose, onSuccess }: Cre
     }
   }, [shopOptions]);
 
+  // 监听 ESC 键关闭弹窗（当商品挑选子弹窗未打开时）
   useEffect(() => {
-    const handleMouseDown = (event: MouseEvent) => {
-      if (isProductPickerOpen || isShopSelectOpen) return;
-      if (modalRef.current && !modalRef.current.contains(event.target as Node)) {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !isProductPickerOpen) {
         onClose();
       }
     };
-    document.addEventListener("mousedown", handleMouseDown);
-    return () => document.removeEventListener("mousedown", handleMouseDown);
-  }, [onClose, isProductPickerOpen, isShopSelectOpen]);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose, isProductPickerOpen]);
 
   const handleSelectProducts = (selectedProducts: any[]) => {
     if (!selectedProducts || selectedProducts.length === 0) return;
@@ -223,7 +220,12 @@ export function CreateOfflineOrderModal({ shopOptions, onClose, onSuccess }: Cre
   const labelTextClass = "text-xs font-black text-muted-foreground/90 dark:text-white/70 flex items-center gap-1.5 select-none";
 
   return createPortal(
-    <div className="fixed inset-0 z-100000 flex items-center justify-center p-4">
+    <div 
+      className="fixed inset-0 z-100000 flex items-center justify-center p-4"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
       {/* 遮罩背景：完全一致的背景色与磨砂度 */}
       <motion.div
         initial={{ opacity: 0 }}
@@ -235,7 +237,6 @@ export function CreateOfflineOrderModal({ shopOptions, onClose, onSuccess }: Cre
 
       {/* Modal 容器卡片：高贵深蓝底色 `#0b111e`/98 彻底融于系统背景 */}
       <motion.div
-        ref={modalRef}
         initial={{ opacity: 0, scale: 0.96, y: 15 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.96, y: 15 }}
@@ -288,7 +289,6 @@ export function CreateOfflineOrderModal({ shopOptions, onClose, onSuccess }: Cre
                         showToast("已切换归属店铺，为了保证出库库存精确，已清空商品列表", "warning");
                       }
                     }}
-                    onOpenChange={setIsShopSelectOpen}
                     options={formattedShopOptions}
                     placeholder="请选择归属店铺"
                     className="w-full h-11"

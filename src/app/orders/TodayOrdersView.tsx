@@ -227,8 +227,8 @@ function CompactTodayOrderCard({
               </div>
             </div>
           </div>
-          <div className="flex shrink-0 flex-col items-end gap-1">
-            <div className="flex items-center gap-1.5">
+          <div className="flex shrink-0 items-center gap-1.5">
+
             {returned ? <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-1 text-[10px] font-semibold text-amber-700 dark:text-amber-300">已退</span> : null}
             {showAutoOutboundRecovery ? (
               readOnly ? (
@@ -249,14 +249,20 @@ function CompactTodayOrderCard({
               )
 
               ) : null}
-              <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold ${statusClassName}`}>{statusLabel}</span>
-            </div>
-            {order.hasOutbound ? (
-              <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs tabular-nums ${canShowPureProfit ? (Number(order.pureProfit) >= 0 ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "border-rose-500/20 bg-rose-500/10 text-rose-700 dark:text-rose-300") : "border-slate-500/15 bg-slate-500/8 text-muted-foreground"}`}>
+            {canShowPureProfit ? (
+              <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs tabular-nums ${Number(order.pureProfit) >= 0 ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "border-rose-500/20 bg-rose-500/10 text-rose-700 dark:text-rose-300"}`}>
                 <span className="text-[11px] font-medium opacity-80">利润</span>
                 <span className="text-xs font-bold sm:text-[13px]">{pureProfitDisplay}</span>
               </span>
-            ) : null}
+            ) : (
+              <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${statusClassName}`}>{statusLabel}</span>
+            )}
+
+
+
+
+
+
 
           </div>
         </div>
