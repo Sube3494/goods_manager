@@ -1002,9 +1002,16 @@ export function TodayOrdersView({
       if (!response.ok) {
         if (response.status === 409 && data.reason === "insufficient-stock" && Array.isArray(data.insufficientItems)) {
           if (onOpenPurchaseDraft) {
+            const uncoveredItems = data.insufficientItems.filter((item: { missingQuantity: number; uncoveredMissingQuantity?: number }) => (
+              Number(item.uncoveredMissingQuantity ?? item.missingQuantity) > 0
+            ));
+            if (uncoveredItems.length === 0) {
+              showToast("已有待入库采购覆盖本次缺口，请先将现有采购单确认入库", "warning");
+              return;
+            }
             const today = new Date();
-            const draftShopId = data.insufficientItems[0]?.mappedShopId || "";
-            const draftShopName = data.insufficientItems[0]?.mappedShopName || "";
+            const draftShopId = uncoveredItems[0]?.mappedShopId || "";
+            const draftShopName = uncoveredItems[0]?.mappedShopName || "";
             const matchedShop = draftShopId
               ? localShops.find((shop) => shop.id === draftShopId)
               : draftShopName
@@ -1015,7 +1022,7 @@ export function TodayOrdersView({
               status: "Confirmed" as PurchaseStatus,
               type: "Purchase",
               date: today.toLocaleString('sv-SE').slice(0, 16).replace('T', ' '),
-              items: data.insufficientItems.map((item: { productId?: string; shopProductId?: string; name?: string; image?: string | null; missingQuantity: number; mappedShopId?: string; mappedShopName?: string }) => ({
+              items: uncoveredItems.map((item: { productId?: string; shopProductId?: string; name?: string; image?: string | null; missingQuantity: number; uncoveredMissingQuantity?: number; mappedShopId?: string; mappedShopName?: string }) => ({
                 productId: item.productId || null,
                 shopProductId: item.shopProductId || null,
                 product: {
@@ -1027,7 +1034,7 @@ export function TodayOrdersView({
                 },
                 image: item.image || null,
                 supplierId: null,
-                quantity: item.missingQuantity,
+                quantity: Number(item.uncoveredMissingQuantity ?? item.missingQuantity),
                 costPrice: 0,
               })),
               shippingFees: 0,
@@ -1039,7 +1046,7 @@ export function TodayOrdersView({
               sourceOrderId: orderId,
             };
             onOpenPurchaseDraft(draft);
-            showToast("库存不足，已为您生成采购草稿单，请输入成本并确认入库", "warning");
+            showToast("库存不足，已扣除在途采购并按剩余缺口生成采购草稿", "warning");
             return;
           }
         }

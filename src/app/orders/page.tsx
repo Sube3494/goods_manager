@@ -2754,9 +2754,17 @@ export default function OrdersPage() {
           if (outboundRes.ok) {
             showToast("商品匹配已更新，并已成功完成出库！", "success");
           } else if (outboundRes.status === 409 && outboundData.reason === "insufficient-stock" && Array.isArray(outboundData.insufficientItems)) {
+            const uncoveredItems = outboundData.insufficientItems.filter((item: any) => (
+              Number(item.uncoveredMissingQuantity ?? item.missingQuantity) > 0
+            ));
+            if (uncoveredItems.length === 0) {
+              showToast("商品匹配已更新；已有待入库采购覆盖本次缺口，请先确认入库", "warning");
+              triggerParentRefresh();
+              return;
+            }
             const today = new Date();
-            const draftShopId = outboundData.insufficientItems[0]?.mappedShopId || "";
-            const draftShopName = outboundData.insufficientItems[0]?.mappedShopName || "";
+            const draftShopId = uncoveredItems[0]?.mappedShopId || "";
+            const draftShopName = uncoveredItems[0]?.mappedShopName || "";
             const matchedShop = draftShopId
               ? localShops.find((shop) => shop.id === draftShopId)
               : draftShopName
@@ -2767,7 +2775,7 @@ export default function OrdersPage() {
               status: "Confirmed" as PurchaseStatus,
               type: "Purchase",
               date: today.toLocaleString("sv-SE").slice(0, 16).replace("T", " "),
-              items: outboundData.insufficientItems.map((item: any) => ({
+              items: uncoveredItems.map((item: any) => ({
                 productId: item.productId || null,
                 shopProductId: item.shopProductId || null,
                 product: {
@@ -2779,7 +2787,7 @@ export default function OrdersPage() {
                 },
                 image: item.image || null,
                 supplierId: null,
-                quantity: item.missingQuantity,
+                quantity: Number(item.uncoveredMissingQuantity ?? item.missingQuantity),
                 costPrice: 0,
               })),
               shippingFees: 0,
@@ -2791,7 +2799,7 @@ export default function OrdersPage() {
               sourceOrderId: matchEditorTarget.orderId,
             };
             setPurchaseDraft(draft);
-            showToast("商品匹配已更新，但库存不足，已为您生成采购草稿单", "warning");
+            showToast("商品匹配已更新；已扣除在途采购并按剩余缺口生成采购草稿", "warning");
           } else {
             const errMsg = outboundData.error || "";
             showToast(errMsg ? `商品匹配已更新，出库提示：${errMsg}` : "商品匹配已更新", "success");

@@ -6895,6 +6895,9 @@ type InsufficientAutoPickStockItem = {
   quantity: number;
   availableQuantity: number;
   missingQuantity: number;
+  pendingPurchaseQuantity: number;
+  uncoveredMissingQuantity: number;
+  pendingPurchaseOrderIds: string[];
   mappedShopId: string | null;
   mappedShopName: string | null;
   systemStock?: number;
@@ -7461,7 +7464,7 @@ export async function createOutboundFromAutoPickOrder(
     const insufficientItems: InsufficientAutoPickStockItem[] = [];
     for (const item of resolved.items) {
       if (item.shopProductId) {
-        const [aggregateResult, shopProduct] = await Promise.all([
+        const [aggregateResult, pendingAggregate, pendingOrders, shopProduct] = await Promise.all([
           tx.purchaseOrderItem.aggregate({
             where: {
               shopProductId: item.shopProductId,
@@ -7472,6 +7475,27 @@ export async function createOutboundFromAutoPickOrder(
               },
             },
             _sum: { remainingQuantity: true },
+          }),
+          tx.purchaseOrderItem.aggregate({
+            where: {
+              shopProductId: item.shopProductId,
+              purchaseOrder: {
+                userId,
+                status: { in: ["Draft", "Confirmed", "Ordered", "Shipped"] },
+              },
+            },
+            _sum: { quantity: true },
+          }),
+          tx.purchaseOrderItem.findMany({
+            where: {
+              shopProductId: item.shopProductId,
+              purchaseOrder: {
+                userId,
+                status: { in: ["Draft", "Confirmed", "Ordered", "Shipped"] },
+              },
+            },
+            select: { purchaseOrderId: true },
+            distinct: ["purchaseOrderId"],
           }),
           tx.shopProduct.findUnique({
             where: { id: item.shopProductId },
@@ -7487,6 +7511,8 @@ export async function createOutboundFromAutoPickOrder(
         const currentBatchStock = aggregateResult._sum.remainingQuantity || 0;
         const currentSystemStock = shopProduct?.stock || 0;
         if (currentBatchStock < item.quantity) {
+          const missingQuantity = item.quantity - currentBatchStock;
+          const pendingPurchaseQuantity = Number(pendingAggregate._sum.quantity || 0);
           insufficientItems.push({
             productId: item.productId,
             shopProductId: item.shopProductId,
@@ -7498,14 +7524,17 @@ export async function createOutboundFromAutoPickOrder(
                 : (shopProduct?.product?.image ? storage.resolveUrl(shopProduct.product.image) : null)),
             quantity: item.quantity,
             availableQuantity: currentBatchStock,
-            missingQuantity: item.quantity - currentBatchStock,
+            missingQuantity,
+            pendingPurchaseQuantity,
+            uncoveredMissingQuantity: Math.max(0, missingQuantity - pendingPurchaseQuantity),
+            pendingPurchaseOrderIds: pendingOrders.map((entry) => entry.purchaseOrderId),
             mappedShopId: shopProduct?.shop?.id || resolved.mappedShopId || null,
             mappedShopName: shopProduct?.shop?.name || resolved.mappedShopName || null,
             systemStock: currentSystemStock,
           });
         }
       } else if (item.productId) {
-        const [aggregateResult, product] = await Promise.all([
+        const [aggregateResult, pendingAggregate, pendingOrders, product] = await Promise.all([
           tx.purchaseOrderItem.aggregate({
             where: {
               productId: item.productId,
@@ -7517,6 +7546,27 @@ export async function createOutboundFromAutoPickOrder(
             },
             _sum: { remainingQuantity: true },
           }),
+          tx.purchaseOrderItem.aggregate({
+            where: {
+              productId: item.productId,
+              purchaseOrder: {
+                userId,
+                status: { in: ["Draft", "Confirmed", "Ordered", "Shipped"] },
+              },
+            },
+            _sum: { quantity: true },
+          }),
+          tx.purchaseOrderItem.findMany({
+            where: {
+              productId: item.productId,
+              purchaseOrder: {
+                userId,
+                status: { in: ["Draft", "Confirmed", "Ordered", "Shipped"] },
+              },
+            },
+            select: { purchaseOrderId: true },
+            distinct: ["purchaseOrderId"],
+          }),
           tx.product.findUnique({
             where: { id: item.productId },
             select: { name: true, stock: true, image: true },
@@ -7525,6 +7575,8 @@ export async function createOutboundFromAutoPickOrder(
         const currentBatchStock = aggregateResult._sum.remainingQuantity || 0;
         const currentSystemStock = product?.stock || 0;
         if (currentBatchStock < item.quantity) {
+          const missingQuantity = item.quantity - currentBatchStock;
+          const pendingPurchaseQuantity = Number(pendingAggregate._sum.quantity || 0);
           insufficientItems.push({
             productId: item.productId,
             shopProductId: null,
@@ -7532,7 +7584,10 @@ export async function createOutboundFromAutoPickOrder(
             image: product?.image ? storage.resolveUrl(product.image) : null,
             quantity: item.quantity,
             availableQuantity: currentBatchStock,
-            missingQuantity: item.quantity - currentBatchStock,
+            missingQuantity,
+            pendingPurchaseQuantity,
+            uncoveredMissingQuantity: Math.max(0, missingQuantity - pendingPurchaseQuantity),
+            pendingPurchaseOrderIds: pendingOrders.map((entry) => entry.purchaseOrderId),
             mappedShopId: resolved.mappedShopId || null,
             mappedShopName: resolved.mappedShopName || null,
             systemStock: currentSystemStock,
