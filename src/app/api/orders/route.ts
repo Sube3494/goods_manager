@@ -2481,9 +2481,7 @@ export async function GET(request: NextRequest) {
             ...(order.delivery as Record<string, unknown>),
             sendFee: (hiddenDeletedOfflineIncome || isSelfDeliveryOrCancelledDelivery(order.delivery, order.isMainSystemSelfDelivery))
               ? 0
-              : ((order.delivery as Record<string, unknown>).sendFee != null
-                  ? Number((order.delivery as Record<string, unknown>).sendFee)
-                  : undefined),
+              : (deliveryFee > 0 ? deliveryFee : undefined),
           }
         : order.delivery;
 

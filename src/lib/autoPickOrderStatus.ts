@@ -506,24 +506,12 @@ export function readDeliveryFeeFromValue(delivery: unknown, rawPayloadOrFlag?: u
     ? rawObj.fee as Record<string, unknown>
     : null;
 
-  // 1. 优先提取基础配送费（支持麦芽田各类即时跑腿运力字段及不同挂载层级）
+  // 平台的 send_fee / delivery_fee 是最终配送支出，premium_fee、tip 等字段只是
+  // 费用构成，不能在最终费用上再次累加。原始载荷优先于数据库中旧的标准化值，
+  // 这样历史上曾错误保存为 send_fee + premium_fee 的订单也能在读取时自动纠正。
   const candidates = [
-    deliveryObj?.sendFee,
-    deliveryObj?.send_fee,
-    deliveryObj?.delivery_fee,
-    deliveryObj?.deliveryFee,
-    deliveryObj?.carrier_fee,
-    deliveryObj?.carrierFee,
-    deliveryObj?.actual_fee,
-    deliveryObj?.actualFee,
-    deliveryObj?.pay_fee,
-    deliveryObj?.payFee,
-    deliveryObj?.total_fee,
-    deliveryObj?.fee,
-    deliveryObj?.money,
-    deliveryObj?.price,
-    rawDelivery?.sendFee,
     rawDelivery?.send_fee,
+    rawDelivery?.sendFee,
     rawDelivery?.delivery_fee,
     rawDelivery?.deliveryFee,
     rawDelivery?.carrier_fee,
@@ -547,25 +535,36 @@ export function readDeliveryFeeFromValue(delivery: unknown, rawPayloadOrFlag?: u
     rawFeeObj?.send_fee,
     rawFeeObj?.sendFee,
     rawFeeObj?.shipping_fee,
+    deliveryObj?.send_fee,
+    deliveryObj?.delivery_fee,
+    deliveryObj?.sendFee,
+    deliveryObj?.deliveryFee,
+    deliveryObj?.carrier_fee,
+    deliveryObj?.carrierFee,
+    deliveryObj?.actual_fee,
+    deliveryObj?.actualFee,
+    deliveryObj?.pay_fee,
+    deliveryObj?.payFee,
+    deliveryObj?.total_fee,
+    deliveryObj?.fee,
+    deliveryObj?.money,
+    deliveryObj?.price,
   ];
 
-  let baseFee = 0;
   for (const candidate of candidates) {
     const parsed = parseDeliveryFeeToCents(candidate);
     if (parsed > 0) {
-      baseFee = parsed;
-      break;
+      return parsed;
     }
   }
 
-  // 2. 累加骑手小费/加价（tip）与动态溢价（premium_fee）
+  // 极少数载荷没有最终费用字段时，才用独立费用构成兜底。
   const tip = parseDeliveryFeeToCents(deliveryObj?.tip ?? rawDelivery?.tip ?? rawObj?.tip);
   const premiumFee = parseDeliveryFeeToCents(
     deliveryObj?.premium_fee ?? deliveryObj?.premiumFee ?? rawDelivery?.premium_fee ?? rawDelivery?.premiumFee
   );
 
-  const totalFee = baseFee + tip + premiumFee;
-  return totalFee > 0 ? totalFee : 0;
+  return tip + premiumFee;
 }
 
 export function readMainSystemSelfDeliveryFlag(rawPayload: unknown, delivery?: unknown): boolean {
