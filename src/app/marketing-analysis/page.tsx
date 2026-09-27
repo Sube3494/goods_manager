@@ -1030,7 +1030,6 @@ export default function MarketingAnalysisPage() {
                                 expanded={expandedRelatedOrderIds.includes(order.id)}
                                 actingId=""
                                 readOnly
-                                showFullOrderNo
                                 onToggleExpanded={(orderId) =>
                                   setExpandedRelatedOrderIds((current) =>
                                     current.includes(orderId) ? current.filter((id) => id !== orderId) : [...current, orderId]
