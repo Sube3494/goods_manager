@@ -16,7 +16,6 @@ import {
   AUTO_PICK_EXTRA_STATUS_FILTERS,
   getBaseAutoPickStatusDisplay,
   getAutoPickStatusFilterLabel,
-  isAutoPickOrderAbnormalStatus,
   isAutoPickOrderDeliveringStatus,
   isAutoPickOrderRiderAssigned,
   isAutoPickPickupOrder,
@@ -38,6 +37,7 @@ import {
   getOrderTypeLabel,
   getPlatformBadgeMeta,
   getProductCostStatusText,
+  getStatusTone,
   getAutoOutboundRecoveryTargetItem,
   shouldShowAutoOutboundRecovery,
   toCurrency,
@@ -139,7 +139,6 @@ function CompactTodayOrderCard({
   const returned = Boolean(order.outboundReturnDetails?.some((entry) => entry.items?.some((item) => Number(item.quantity || 0) > 0)));
   const baseStatusLabel = getBaseAutoPickStatusDisplay(order.status) || "待处理";
   const statusLabel = returned ? "已退" : baseStatusLabel;
-  const abnormal = isAutoPickOrderAbnormalStatus(order.status) || statusLabel === "异常";
   const cancelled = isCancelledStatus(order.status) || statusLabel === "已删除";
   const cancelReason = cancelled ? getCancelReason(order) : "";
   const completed = isCompletedStatus(order.status);
@@ -164,15 +163,7 @@ function CompactTodayOrderCard({
   const canShowPureProfit = Boolean(order.hasOutbound) && hasPureProfit;
   const pureProfitDisplay = hasPureProfit ? toCurrency(Number(order.pureProfit)) : (getProductCostStatusText(order) || "-");
 
-  const statusClassName = abnormal
-    ? "border-rose-500/25 bg-rose-500/10 text-rose-700 dark:text-rose-400"
-    : returned
-      ? "border-amber-500/25 bg-amber-500/10 text-amber-700 dark:text-amber-300"
-      : cancelled
-        ? "border-slate-500/15 bg-slate-500/10 text-slate-600 dark:text-slate-300"
-        : completed
-          ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-          : "border-sky-500/20 bg-sky-500/10 text-sky-700 dark:text-sky-300";
+  const statusClassName = getStatusTone(statusLabel).badge;
 
   const handleAutoOutboundRecovery = () => {
     const targetItem = getAutoOutboundRecoveryTargetItem(order);
