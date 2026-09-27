@@ -67,7 +67,7 @@ import { simplifyShopName } from "@/lib/shopIdentity";
 
 type OrderAction = "self-delivery" | "complete-delivery" | "pickup-complete" | "sync" | "outbound";
 type OrdersTab = "today" | "appointments" | "all";
-type PurchaseDraftPayload = PurchaseOrder & { sourceOrderId?: string };
+type PurchaseDraftPayload = PurchaseOrder & { sourceOrderId?: string; isExistingPurchase?: boolean };
 const SHOW_APPOINTMENT_TAB = false;
 const SHOP_PROFIT_PLATFORMS = ["美团", "京东", "淘宝", "抖店", "线下交易"] as const;
 const UNMATCHED_SHOP_FILTER = "__unmatched__";
@@ -2758,7 +2758,25 @@ export default function OrdersPage() {
               Number(item.uncoveredMissingQuantity ?? item.missingQuantity) > 0
             ));
             if (uncoveredItems.length === 0) {
-              showToast("商品匹配已更新；已有待入库采购覆盖本次缺口，请先确认入库", "warning");
+              const pendingPurchaseOrderId = outboundData.insufficientItems
+                .flatMap((item: { pendingPurchaseOrderIds?: string[] }) => item.pendingPurchaseOrderIds || [])
+                .find(Boolean);
+              if (pendingPurchaseOrderId) {
+                const purchaseResponse = await fetch(`/api/purchases?orderId=${encodeURIComponent(pendingPurchaseOrderId)}&pageSize=1`);
+                const purchasePayload = await purchaseResponse.json().catch(() => ({}));
+                const pendingPurchase = Array.isArray(purchasePayload?.items) ? purchasePayload.items[0] : null;
+                if (purchaseResponse.ok && pendingPurchase) {
+                  setPurchaseDraft({
+                    ...pendingPurchase,
+                    sourceOrderId: matchEditorTarget.orderId,
+                    isExistingPurchase: true,
+                  });
+                  showToast("商品匹配已更新，并已打开覆盖缺口的待入库采购单", "warning");
+                  triggerParentRefresh();
+                  return;
+                }
+              }
+              showToast("商品匹配已更新；已有待入库采购覆盖缺口，但采购单读取失败", "warning");
               triggerParentRefresh();
               return;
             }
@@ -2902,12 +2920,13 @@ export default function OrdersPage() {
   }, []);
 
   const savePurchaseDraft = useCallback(async (data: PurchaseDraftPayload) => {
+    const isExistingPurchase = data.isExistingPurchase === true;
     const existingNote = String(data.note || "").trim();
-    const taggedNote = existingNote.includes(ORDER_SHORTAGE_PURCHASE_NOTE_KEYWORD)
+    const taggedNote = isExistingPurchase || existingNote.includes(ORDER_SHORTAGE_PURCHASE_NOTE_KEYWORD)
       ? existingNote
       : [ORDER_SHORTAGE_PURCHASE_NOTE_KEYWORD, existingNote].filter(Boolean).join(" | ");
-    const response = await fetch("/api/purchases", {
-      method: "POST",
+    const response = await fetch(isExistingPurchase ? `/api/purchases/${encodeURIComponent(data.id)}` : "/api/purchases", {
+      method: isExistingPurchase ? "PUT" : "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...data,
@@ -2917,7 +2936,7 @@ export default function OrdersPage() {
     });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) {
-      throw new Error(payload?.error || "创建采购单失败");
+      throw new Error(payload?.error || (isExistingPurchase ? "采购单入库失败" : "创建采购单失败"));
     }
 
     const sourceOrderId = String(data.sourceOrderId || "").trim();
@@ -2938,13 +2957,13 @@ export default function OrdersPage() {
           const outboundMessage = getOrderActionErrorMessage(
             outboundPayload?.error || outboundPayload?.message || "自动出库失败"
           );
-          showToast(`采购单已创建并入库，请手动重试出库：${outboundMessage}`, "warning");
+          showToast(`${isExistingPurchase ? "采购单已入库" : "采购单已创建并入库"}，请手动重试出库：${outboundMessage}`, "warning");
           setPurchaseDraft(null);
           triggerParentRefresh();
           return;
         }
 
-        showToast("采购单已创建入库，并已自动出库", "success");
+        showToast(`${isExistingPurchase ? "现有采购单已入库" : "采购单已创建入库"}，并已自动出库`, "success");
         setPurchaseDraft(null);
         triggerSingleOrderRefresh(sourceOrderId);
         return;
@@ -2956,7 +2975,7 @@ export default function OrdersPage() {
       }
     }
 
-    showToast("采购单已创建并入库", "success");
+    showToast(isExistingPurchase ? "现有采购单已确认入库" : "采购单已创建并入库", "success");
     setPurchaseDraft(null);
     triggerParentRefresh();
   }, [clearProfitUpdating, markProfitUpdating, showToast, triggerParentRefresh, triggerSingleOrderRefresh]);

@@ -73,7 +73,7 @@ function OrderListSkeleton({ count = 3 }: { count?: number }) {
 }
 
 type OrderAction = "self-delivery" | "complete-delivery" | "pickup-complete" | "sync" | "outbound" | "sync-brush";
-type PurchaseDraftPayload = PurchaseOrder & { sourceOrderId?: string };
+type PurchaseDraftPayload = PurchaseOrder & { sourceOrderId?: string; isExistingPurchase?: boolean };
 type ShopProfitInfo = {
   id: string | null;
   name: string;
@@ -575,7 +575,24 @@ export function AllOrdersView({
               Number(item.uncoveredMissingQuantity ?? item.missingQuantity) > 0
             ));
             if (uncoveredItems.length === 0) {
-              showToast("已有待入库采购覆盖本次缺口，请先将现有采购单确认入库", "warning");
+              const pendingPurchaseOrderId = data.insufficientItems
+                .flatMap((item: { pendingPurchaseOrderIds?: string[] }) => item.pendingPurchaseOrderIds || [])
+                .find(Boolean);
+              if (pendingPurchaseOrderId) {
+                const purchaseResponse = await fetch(`/api/purchases?orderId=${encodeURIComponent(pendingPurchaseOrderId)}&pageSize=1`);
+                const purchasePayload = await purchaseResponse.json().catch(() => ({}));
+                const pendingPurchase = Array.isArray(purchasePayload?.items) ? purchasePayload.items[0] : null;
+                if (purchaseResponse.ok && pendingPurchase) {
+                  onOpenPurchaseDraft({
+                    ...pendingPurchase,
+                    sourceOrderId: orderId,
+                    isExistingPurchase: true,
+                  });
+                  showToast("已打开覆盖本次缺口的待入库采购单", "warning");
+                  return;
+                }
+              }
+              showToast("已有待入库采购覆盖本次缺口，但采购单读取失败，请前往采购管理确认入库", "warning");
               return;
             }
             const today = new Date();

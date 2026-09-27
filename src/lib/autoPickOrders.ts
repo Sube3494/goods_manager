@@ -7496,6 +7496,7 @@ export async function createOutboundFromAutoPickOrder(
             },
             select: { purchaseOrderId: true },
             distinct: ["purchaseOrderId"],
+            orderBy: { purchaseOrder: { date: "asc" } },
           }),
           tx.shopProduct.findUnique({
             where: { id: item.shopProductId },
@@ -7566,6 +7567,7 @@ export async function createOutboundFromAutoPickOrder(
             },
             select: { purchaseOrderId: true },
             distinct: ["purchaseOrderId"],
+            orderBy: { purchaseOrder: { date: "asc" } },
           }),
           tx.product.findUnique({
             where: { id: item.productId },
