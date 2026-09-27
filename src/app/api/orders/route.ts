@@ -2290,6 +2290,66 @@ export async function GET(request: NextRequest) {
       };
     });
 
+    const displayPurchaseItems = mappedShopProducts.length > 0
+      ? await prisma.purchaseOrderItem.findMany({
+          where: {
+            purchaseOrder: {
+              userId: targetUserId,
+              status: "Received",
+            },
+            costPrice: { gt: 0 },
+            OR: [
+              { shopProductId: { in: mappedShopProducts.map((item) => item.shopProductId) } },
+              {
+                productId: {
+                  in: mappedShopProducts
+                    .map((item) => item.productId)
+                    .filter((id): id is string => Boolean(id)),
+                },
+              },
+            ],
+          },
+          select: {
+            productId: true,
+            shopProductId: true,
+            remainingQuantity: true,
+            costPrice: true,
+            purchaseOrder: {
+              select: { date: true },
+            },
+          },
+          orderBy: {
+            purchaseOrder: { date: "asc" },
+          },
+        })
+      : [];
+
+    type DisplayPurchaseCost = (typeof displayPurchaseItems)[number];
+    const displayPurchaseCostsByShopProduct = new Map<string, DisplayPurchaseCost[]>();
+    const displayPurchaseCostsByProduct = new Map<string, DisplayPurchaseCost[]>();
+    displayPurchaseItems.forEach((item) => {
+      if (item.shopProductId) {
+        const entries = displayPurchaseCostsByShopProduct.get(item.shopProductId) || [];
+        entries.push(item);
+        displayPurchaseCostsByShopProduct.set(item.shopProductId, entries);
+      }
+      if (item.productId) {
+        const entries = displayPurchaseCostsByProduct.get(item.productId) || [];
+        entries.push(item);
+        displayPurchaseCostsByProduct.set(item.productId, entries);
+      }
+    });
+
+    const resolvePurchaseDisplayCost = (shopProductId?: string | null, productId?: string | null) => {
+      const candidates = (shopProductId ? displayPurchaseCostsByShopProduct.get(shopProductId) : null)
+        || (productId ? displayPurchaseCostsByProduct.get(productId) : null)
+        || [];
+      const availableBatch = candidates.find((item) => Number(item.remainingQuantity || 0) > 0);
+      const latestReceivedBatch = [...candidates].reverse().find((item) => Number(item.costPrice || 0) > 0);
+      const purchaseCost = Number((availableBatch || latestReceivedBatch)?.costPrice || 0);
+      return Number.isFinite(purchaseCost) && purchaseCost > 0 ? purchaseCost : null;
+    };
+
 
 
     const autoMatchedMeituanBackfills: Array<{ shopProductId: string; meituanSkuId: string }> = [];
@@ -2560,7 +2620,6 @@ export async function GET(request: NextRequest) {
           const resolveDisplayCost = (
             shopProductId?: string | null,
             productId?: string | null,
-            currentCost?: number | null,
           ) => {
             const outboundCostItem = outboundBreakdown.find((entry) => (
               (shopProductId && entry.shopProductId === shopProductId)
@@ -2570,9 +2629,9 @@ export async function GET(request: NextRequest) {
             if (Number.isFinite(outboundCostCents) && outboundCostCents > 0) {
               return { costPrice: roundCurrency(outboundCostCents / 100), costSource: "outbound" as const };
             }
-            const fallbackCost = Number(currentCost || 0);
-            return Number.isFinite(fallbackCost) && fallbackCost > 0
-              ? { costPrice: fallbackCost, costSource: "current" as const }
+            const purchaseCost = resolvePurchaseDisplayCost(shopProductId, productId);
+            return purchaseCost
+              ? { costPrice: purchaseCost, costSource: "current" as const }
               : { costPrice: null, costSource: undefined };
           };
           const outboundItem = outboundBreakdown.length === order.items.length
@@ -2602,7 +2661,6 @@ export async function GET(request: NextRequest) {
             Object.assign(matchedProduct, resolveDisplayCost(
               foundShopProduct?.shopProductId,
               foundShopProduct?.productId,
-              foundShopProduct?.costPrice,
             ));
             if (!manualMatchedProduct && !isCompositeSku && isMeituanPlatform(order.platform) && strictPlatformProductId && foundShopProduct?.id) {
               autoMatchedMeituanBackfills.push({
@@ -2663,7 +2721,6 @@ export async function GET(request: NextRequest) {
                 const displayCost = resolveDisplayCost(
                   foundBShopProduct?.shopProductId,
                   foundBShopProduct?.productId,
-                  foundBShopProduct?.costPrice,
                 );
                 return {
                   name: bItem.name || item.productName || "未命名商品",
@@ -2688,7 +2745,6 @@ export async function GET(request: NextRequest) {
                 const displayCost = resolveDisplayCost(
                   segmentMatchedProduct?.shopProductId,
                   segmentMatchedProduct?.productId,
-                  segmentMatchedProduct?.costPrice,
                 );
                 return {
                   name: segmentMatchedProduct?.name || item.productName || "未命名商品",
