@@ -162,7 +162,9 @@ function CompactTodayOrderCard({
   const orderTypeLabel = getOrderTypeLabel(order);
   const showBrushMarker = isTodayBrushOrder(order);
   const hasPureProfit = typeof order.pureProfit === "number" && Number.isFinite(order.pureProfit);
-  const canShowPureProfit = Boolean(order.hasOutbound) && hasPureProfit;
+  const canShowPureProfit = hasPureProfit && (
+    Boolean(order.hasOutbound) || (showBrushMarker && completed)
+  );
   const pureProfitDisplay = hasPureProfit ? toCurrency(Number(order.pureProfit)) : (getProductCostStatusText(order) || "-");
 
   const statusClassName = getStatusTone(statusLabel).badge;
