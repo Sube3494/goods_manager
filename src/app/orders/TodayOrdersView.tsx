@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import dynamic from "next/dynamic";
 import { createPortal } from "react-dom";
-import { ArrowUp, Package2, Search, X, ChevronUp, ChevronDown, Loader2, LayoutGrid, List, RefreshCw, Clock3, MapPin, Truck, CheckCheck, TriangleAlert, Eye } from "lucide-react";
+import { ArrowUp, Package2, Search, X, ChevronUp, ChevronDown, Loader2, LayoutGrid, List, RefreshCw, Clock3, MapPin, Truck, CheckCheck, TriangleAlert, Eye, FileText } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -12,6 +12,7 @@ import { AutoPickOrder, AutoPickOrderItem, PurchaseOrder, PurchaseStatus } from 
 import { formatLocalDate, formatLocalDateTime } from "@/lib/dateUtils";
 import { isShopNameMatch } from "@/lib/shopIdentity";
 import { extractCustomerPhoneTail } from "@/lib/customerPhoneTail";
+import { cleanCustomerRemark } from "@/lib/customerRemark";
 import {
   AUTO_PICK_EXTRA_STATUS_FILTERS,
   getBaseAutoPickStatusDisplay,
@@ -157,6 +158,7 @@ function CompactTodayOrderCard({
   const deliveryFee = getDeliveryFee(order.delivery, order);
   const customerPhoneTail = extractCustomerPhoneTail(order);
   const customerType = order.customerType;
+  const usefulCustomerRemark = cleanCustomerRemark(order.customerRemark);
   const orderTypeLabel = getOrderTypeLabel(order);
   const showBrushMarker = isTodayBrushOrder(order);
   const hasPureProfit = typeof order.pureProfit === "number" && Number.isFinite(order.pureProfit);
@@ -299,6 +301,20 @@ function CompactTodayOrderCard({
             </div>
           )}
         </div>
+
+        {usefulCustomerRemark ? (
+          <div
+            className="mt-2.5 flex items-start gap-2 rounded-xl border border-amber-500/20 bg-amber-500/10 px-2.5 py-2 text-amber-950 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-100"
+            role="note"
+            aria-label="顾客备注"
+            title={usefulCustomerRemark}
+          >
+            <FileText size={13} className="mt-0.5 shrink-0 text-amber-600 dark:text-amber-300" />
+            <p className="line-clamp-2 whitespace-pre-wrap break-words text-[11px] font-semibold leading-4">
+              {usefulCustomerRemark}
+            </p>
+          </div>
+        ) : null}
 
         <div className={`mt-3 grid items-center divide-x divide-black/6 rounded-xl border border-black/6 bg-black/[0.018] px-1 py-2.5 text-[11px] dark:divide-white/8 dark:border-white/8 dark:bg-white/[0.025] ${Number(order.refundAmount || 0) > 0 ? "grid-cols-4" : "grid-cols-3"}`}>
           <div className="flex min-w-0 items-center gap-1.5 px-2"><span className="shrink-0 text-muted-foreground">实付</span><span className="truncate font-bold tabular-nums text-foreground">{toCurrency(order.actualPaid)}</span></div>
