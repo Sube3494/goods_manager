@@ -182,15 +182,9 @@ export async function GET(request: Request) {
     }
     const where: Prisma.PurchaseOrderWhereInput = andWhere.length > 0 ? { AND: andWhere } : {};
 
-    const userScopeWhere: Prisma.PurchaseOrderWhereInput = session.role === "SUPER_ADMIN"
-      ? {}
-      : {
-          OR: [
-            { userId: session.id },
-            { items: { some: { product: { userId: session.id } } } },
-            { items: { some: { shopProduct: { shop: { userId: session.id } } } } },
-          ],
-        };
+    // 采购单是用户级业务数据。即使商品曾被共享、迁移或重复关联，也不能据此
+    // 推断采购单的访问权；超级管理员在日常采购页也只查看自己的数据。
+    const userScopeWhere: Prisma.PurchaseOrderWhereInput = { userId: session.id };
 
     const statsAndWhere = andWhere.filter((clause) => !("status" in clause));
     const unscopedStatusWhere: Prisma.PurchaseOrderWhereInput = statsAndWhere.length > 0

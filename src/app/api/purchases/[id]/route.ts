@@ -8,6 +8,8 @@ import { Prisma } from "../../../../../prisma/generated-client";
 import { allocateShippingToPurchaseItems, calculatePurchaseOrderTotalAmount } from "@/lib/purchaseCosting";
 import { parseAsShanghaiTime } from "@/lib/dateUtils";
 import { resolvePurchaseOrderResponse } from "../route";
+import { getFreshSession } from "@/lib/auth";
+import { hasPermission, SessionUser } from "@/lib/permissions";
 
 function calculateRevertedCostPrice(currentStock: number, currentCost: number, revertQty: number, revertCost: number) {
   const nextStock = currentStock - revertQty;
@@ -151,6 +153,14 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await getFreshSession() as SessionUser | null;
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    if (!hasPermission(session, "purchase:update")) {
+      return NextResponse.json({ error: "Permission denied" }, { status: 403 });
+    }
+
     const { id } = await params;
     const body = await request.json();
     const { 
@@ -170,8 +180,8 @@ export async function PUT(
     } = body;
 
     const purchase = await prisma.$transaction(async (tx) => {
-      const existingPurchase = await tx.purchaseOrder.findUnique({
-        where: { id },
+      const existingPurchase = await tx.purchaseOrder.findFirst({
+        where: { id, userId: session.id },
         include: {
           items: true,
         },
@@ -565,11 +575,19 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await getFreshSession() as SessionUser | null;
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    if (!hasPermission(session, "purchase:delete")) {
+      return NextResponse.json({ error: "Permission denied" }, { status: 403 });
+    }
+
     const { id } = await params;
 
     await prisma.$transaction(async (tx) => {
-      const existingPurchase = await tx.purchaseOrder.findUnique({
-        where: { id },
+      const existingPurchase = await tx.purchaseOrder.findFirst({
+        where: { id, userId: session.id },
         include: { items: true },
       });
 
