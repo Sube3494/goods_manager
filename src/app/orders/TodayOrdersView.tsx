@@ -325,8 +325,6 @@ function CompactTodayOrderCard({
           <div className="flex min-w-0 items-center justify-end gap-1.5 px-2"><span className="shrink-0 text-muted-foreground">配送费</span><span className="truncate font-bold tabular-nums text-foreground">{Number.isFinite(deliveryFee) ? toCurrency(deliveryFee) : "-"}</span></div>
         </div>
 
-        <AutoCompleteStatusBadge order={order} pickup={pickup} compact className="mt-2.5 max-w-full self-start" />
-
         <div className="mt-auto flex min-w-0 items-center gap-3 pt-3 text-[11px] font-medium text-muted-foreground">
           <span className={`flex items-center gap-1.5 ${order.isSubscribe ? "shrink-0" : "min-w-0"}`} title={deadlineDisplay !== "-" ? deadlineDisplay : undefined}>
             <Clock3 size={12} className="shrink-0" />
@@ -341,6 +339,12 @@ function CompactTodayOrderCard({
         {!readOnly || canExpandDetails ? (
           <div className="rounded-b-[24px] border-t border-black/6 bg-black/[0.012] px-4 py-2 dark:border-white/8 dark:bg-white/[0.018]">
             <div className="flex flex-nowrap items-center justify-end gap-1.5">
+            <AutoCompleteStatusBadge
+              order={order}
+              pickup={pickup}
+              compact
+              className="mr-auto h-6 max-w-[calc(100%_-_8.75rem)] gap-1 px-2 text-[10px] sm:h-6 sm:px-2 sm:text-[10px]"
+            />
             {showPlatformActions && !deleted && !order.isSubscribe ? (
               <ActionButton
                 label="自配"
