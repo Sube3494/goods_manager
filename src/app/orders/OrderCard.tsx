@@ -2227,7 +2227,19 @@ export function ProductStripItem({
             "break-all wrap-break-word font-medium text-foreground",
             compact ? "line-clamp-1 text-xs leading-4" : "line-clamp-2 text-[13px] leading-4.5 sm:line-clamp-1 sm:text-sm sm:leading-5"
           )}>
-            {display.name}
+            {bundleComponentCount !== undefined && bundleComponentCount > 0 && onToggleBundleExpand ? (
+              <button
+                type="button"
+                onClick={onToggleBundleExpand}
+                className="inline-flex sm:hidden mr-1.5 align-middle items-center gap-0.5 rounded-full border border-black/8 bg-black/[0.04] active:bg-black/[0.08] dark:border-white/10 dark:bg-white/8 dark:active:bg-white/14 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground transition-colors cursor-pointer"
+                title={isBundleExpanded ? "收起配件" : "展开配件"}
+              >
+                <Layers size={10} className="opacity-70" />
+                <span>{bundleComponentCount}件</span>
+                {isBundleExpanded ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+              </button>
+            ) : null}
+            <span>{display.name}</span>
           </div>
           <div className={cn(
             "mt-0.5 flex flex-wrap items-center font-medium text-muted-foreground",
@@ -2302,12 +2314,12 @@ export function ProductStripItem({
           <button
             type="button"
             onClick={onToggleBundleExpand}
-            className="inline-flex items-center gap-0.5 sm:gap-1 rounded-full border border-black/8 bg-black/[0.03] hover:bg-black/[0.06] dark:border-white/10 dark:bg-white/6 dark:hover:bg-white/10 px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-[11px] font-medium text-muted-foreground hover:text-foreground dark:text-zinc-300 transition-colors cursor-pointer"
+            className="hidden sm:inline-flex items-center gap-1 rounded-full border border-black/8 bg-black/[0.03] hover:bg-black/[0.06] dark:border-white/10 dark:bg-white/6 dark:hover:bg-white/10 px-2 py-0.5 text-[11px] font-medium text-muted-foreground hover:text-foreground dark:text-zinc-300 transition-colors cursor-pointer"
             title={isBundleExpanded ? "收起配件" : "展开配件"}
           >
-            <Layers size={10} className="opacity-70 sm:w-[11px] sm:h-[11px]" />
-            <span>{bundleComponentCount}件<span className="hidden sm:inline">配件</span></span>
-            {isBundleExpanded ? <ChevronUp size={10} className="sm:w-[11px] sm:h-[11px]" /> : <ChevronDown size={10} className="sm:w-[11px] sm:h-[11px]" />}
+            <Layers size={11} className="opacity-70" />
+            <span>{bundleComponentCount}件配件</span>
+            {isBundleExpanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
           </button>
         ) : null}
 
