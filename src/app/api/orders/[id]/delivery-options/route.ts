@@ -13,6 +13,27 @@ import {
 
 export const dynamic = "force-dynamic";
 
+type DeliveryCategory = "direct" | "shared" | "standard";
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+function normalizeMaiyitianOption(value: unknown) {
+  const option = asRecord(value) || {};
+  const category = String(option.category || "").trim();
+  return {
+    ...option,
+    provider: "maiyitian" as const,
+    servicePkg: String(option.servicePkg ?? option.service_pkg ?? "").trim(),
+    category: (["direct", "shared", "standard"] as DeliveryCategory[]).includes(category as DeliveryCategory)
+      ? category as DeliveryCategory
+      : "standard",
+  };
+}
+
 export async function GET(_: NextRequest, context: { params: Promise<{ id: string }> }) {
   const session = await getAuthorizedUser("order:manage");
   if (!session) return NextResponse.json({ error: "Permission denied" }, { status: 403 });
@@ -62,14 +83,11 @@ export async function GET(_: NextRequest, context: { params: Promise<{ id: strin
 
     const maiyitianData = maiyitianResult.status === "fulfilled" ? maiyitianResult.value.data : {};
     const maiyitianOptions = Array.isArray(maiyitianData?.options)
-      ? maiyitianData.options.map((option: unknown) => ({
-          ...(option && typeof option === "object" ? option as Record<string, unknown> : {}),
-          provider: "maiyitian",
-        }))
+      ? maiyitianData.options.map(normalizeMaiyitianOption)
       : [];
     const options = [
       ...maiyitianOptions,
-      ...(shansongResult.status === "fulfilled" ? [shansongResult.value] : []),
+      ...(shansongResult.status === "fulfilled" ? [{ ...shansongResult.value, category: "direct" as const }] : []),
     ];
     const providerErrors = {
       maiyitian: maiyitianResult.status === "rejected"

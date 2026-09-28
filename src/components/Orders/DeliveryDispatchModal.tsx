@@ -31,6 +31,7 @@ export type DeliveryQuoteOption = {
   logisticTag: string;
   name: string;
   servicePkg?: string;
+  category?: "direct" | "shared" | "standard";
   amount: number;
   distance?: number;
   estimatedDeliveryTime?: number;
@@ -45,10 +46,7 @@ function getOptionKey(option: DeliveryQuoteOption) {
 }
 
 function getOptionCategory(option: DeliveryQuoteOption): Exclude<DeliveryCategory, "all"> | "standard" {
-  const servicePkg = String(option.servicePkg || "").trim().toLowerCase();
-  if (servicePkg.includes("pinsong") || servicePkg.includes("拼")) return "shared";
-  if (servicePkg.includes("direct") || servicePkg.includes("专")) return "direct";
-  return "standard";
+  return option.category || "standard";
 }
 
 interface BrandTheme {
