@@ -2244,7 +2244,7 @@ export async function GET(request: NextRequest) {
       ))
     ));
 
-    const shopProducts = (productSkuCandidates.length > 0 || manualMatchedProductIds.length > 0 || outboundMatchedShopProductIds.length > 0)
+    let shopProducts = (productSkuCandidates.length > 0 || manualMatchedProductIds.length > 0 || outboundMatchedShopProductIds.length > 0)
       ? await prisma.shopProduct.findMany({
             where: {
               shop: { userId: targetUserId },
@@ -2280,9 +2280,13 @@ export async function GET(request: NextRequest) {
               sourceProductId: true,
               productName: true,
               productImage: true,
+              isBundle: true,
+              bundleItems: true,
               product: {
                 select: {
                   image: true,
+                  isBundle: true,
+                  bundleItems: true,
                 },
               },
               shop: {
@@ -2294,6 +2298,62 @@ export async function GET(request: NextRequest) {
             },
           })
       : [];
+
+    // 自动补查组合商品的子配件到 shopProducts，确保计算成本时能精准匹配到各配件
+    if (shopProducts.length > 0) {
+      const missingSubItemIds = new Set<string>();
+      for (const sp of shopProducts) {
+        const rawBundle = sp.bundleItems || sp.product?.bundleItems;
+        if (Array.isArray(rawBundle)) {
+          for (const b of rawBundle as any[]) {
+            const id = String(b.shopProductId || b.id || b.productId || "").trim();
+            if (id && !shopProducts.some((p) => p.id === id || p.productId === id || p.sourceProductId === id)) {
+              missingSubItemIds.add(id);
+            }
+          }
+        }
+      }
+      if (missingSubItemIds.size > 0) {
+        const subShopProducts = await prisma.shopProduct.findMany({
+          where: {
+            shop: { userId: targetUserId },
+            OR: [
+              { id: { in: Array.from(missingSubItemIds) } },
+              { productId: { in: Array.from(missingSubItemIds) } },
+              { sourceProductId: { in: Array.from(missingSubItemIds) } },
+            ],
+          },
+          select: {
+            id: true,
+            sku: true,
+            jdSkuId: true,
+            meituanSkuId: true,
+            taobaoSkuId: true,
+            doudianSkuId: true,
+            productId: true,
+            sourceProductId: true,
+            productName: true,
+            productImage: true,
+            isBundle: true,
+            bundleItems: true,
+            product: {
+              select: {
+                image: true,
+                isBundle: true,
+                bundleItems: true,
+              },
+            },
+            shop: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        });
+        shopProducts = [...shopProducts, ...subShopProducts];
+      }
+    }
     perf.lap("shop-product-lookup");
 
     const mappedShopProducts = shopProducts.map((item) => {
@@ -2313,6 +2373,8 @@ export async function GET(request: NextRequest) {
         shopProductId: item.id,
         shopId: item.shop?.id || null,
         shopName: item.shop?.name || null,
+        isBundle: item.isBundle ?? item.product?.isBundle ?? false,
+        bundleItems: item.bundleItems ?? item.product?.bundleItems ?? null,
       };
     });
 
@@ -2731,17 +2793,38 @@ export async function GET(request: NextRequest) {
             return val;
           };
 
-          const bundleItems = manualMatchedProduct?.bundleItems;
-          const displayItems = (manualMatchedProduct && bundleItems && Array.isArray(bundleItems))
+          const activeMatched = matchedProduct || manualMatchedProduct;
+          const targetShopProduct = activeMatched
+            ? mappedShopProducts.find((p) =>
+                (activeMatched.shopProductId && p.id === activeMatched.shopProductId)
+                || (activeMatched.id && p.id === activeMatched.id)
+                || (activeMatched.productId && p.productId === activeMatched.productId)
+                || (activeMatched.sku && p.sku === activeMatched.sku)
+              ) || null
+            : null;
+          const rawBundleItems = manualMatchedProduct?.bundleItems
+            || (activeMatched as any)?.bundleItems
+            || (targetShopProduct as any)?.bundleItems;
+          const isBundleProduct = Boolean(
+            (activeMatched as any)?.isBundle
+            || (targetShopProduct as any)?.isBundle
+            || (Array.isArray(rawBundleItems) && rawBundleItems.length > 0)
+          );
+          const bundleItems = isBundleProduct && Array.isArray(rawBundleItems) && rawBundleItems.length > 0
+            ? rawBundleItems
+            : null;
+          if (matchedProduct && bundleItems) {
+            (matchedProduct as any).isBundle = true;
+            (matchedProduct as any).bundleItems = bundleItems;
+          }
+          const displayItems = bundleItems
             ? bundleItems.map((bItem: any) => {
-                const bQty = typeof bItem.quantity === "number" && bItem.quantity > 0
-                  ? bItem.quantity
-                  : (item.quantity > 1 && item.quantity % bundleItems.length === 0
-                    ? Math.max(1, Math.floor(item.quantity / bundleItems.length))
-                    : 1);
+                const perPackQty = typeof bItem.quantity === "number" && bItem.quantity > 0 ? bItem.quantity : 1;
+                const bQty = perPackQty * Math.max(1, Number(item.quantity || 1) || 1);
                 const foundBShopProduct = mappedShopProducts.find((p) =>
                   (bItem.shopProductId && p.id === bItem.shopProductId)
-                  || (bItem.id && p.id === bItem.id)
+                  || (bItem.id && (p.id === bItem.id || p.productId === bItem.id))
+                  || (bItem.productId && (p.productId === bItem.productId || p.id === bItem.productId))
                   || (bItem.sku && p.sku === bItem.sku)
                 );
                 const bFallbackImg = foundBShopProduct?.image || null;

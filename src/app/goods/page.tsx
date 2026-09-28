@@ -1331,7 +1331,6 @@ export default function GoodsPage() {
               product={{ ...product, stock: product.assignedShopIds?.length || 0 }} 
               onEdit={canUpdate ? handleEdit : undefined} 
               onDelete={canDelete ? handleDelete : undefined} 
-              onPurchase={canPurchase ? handleStartPurchase : undefined}
               lowStockThreshold={0}
               isSelected={selectedIds.includes(product.id)}
               anySelected={selectedIds.length > 0}
@@ -1411,16 +1410,7 @@ export default function GoodsPage() {
         showMeituanSkuField={true}
       />
 
-      {purchaseDraft ? (
-        <PurchaseOrderModal
-          isOpen={Boolean(purchaseDraft)}
-          onClose={() => setPurchaseDraft(null)}
-          onSubmit={handleSavePurchase}
-          initialData={purchaseDraft}
-          defaultType="Purchase"
-        />
-      ) : null}
-
+      
       <BatchEditModal 
         isOpen={isBatchEditOpen}
         onClose={() => setIsBatchEditOpen(false)}

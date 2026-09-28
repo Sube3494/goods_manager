@@ -440,6 +440,8 @@ export async function PUT(request: Request) {
           remark: remark !== undefined ? remark : undefined,
           isShelfLife: isShelfLife ?? undefined,
           shelfLifeDays: shelfLifeDays !== undefined ? (Number.isFinite(shelfLifeDays) ? shelfLifeDays : null) : undefined,
+          isBundle: body.isBundle !== undefined ? Boolean(body.isBundle) : undefined,
+          bundleItems: body.bundleItems !== undefined ? (Array.isArray(body.bundleItems) ? body.bundleItems : (body.isBundle ? [] : Prisma.JsonNull)) : undefined,
         },
       });
 

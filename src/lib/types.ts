@@ -92,6 +92,18 @@ export interface Product {
   isShelfLife?: boolean;
   shelfLifeDays?: number | null;
   libraryId?: string | null;
+  isBundle?: boolean;
+  bundleItems?: BundleSubItem[];
+}
+
+export interface BundleSubItem {
+  id: string;
+  name: string;
+  sku?: string | null;
+  image?: string | null;
+  quantity: number;
+  shopProductId?: string;
+  productId?: string;
 }
 
 export interface Shop {
@@ -138,6 +150,8 @@ export interface ShopCatalogItem {
   shopName?: string | null;
   isPublic?: boolean;
   isDiscontinued?: boolean;
+  isBundle?: boolean;
+  bundleItems?: BundleSubItem[];
   remark?: string | null;
   specs?: Record<string, string> | null;
   isShelfLife?: boolean;

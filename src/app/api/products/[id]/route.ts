@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "../../../../../prisma/generated-client";
 import prisma from "@/lib/prisma";
 import { getLightSession } from "@/lib/auth";
 import { getStorageStrategy } from "@/lib/storage";
@@ -178,9 +179,21 @@ export async function PUT(
           isPublic,
           remark: remark !== undefined ? remark : undefined,
           isShelfLife: isShelfLife !== undefined ? Boolean(isShelfLife) : undefined,
-          shelfLifeDays: isShelfLife === false ? null : (shelfLifeDays !== undefined ? (Number(shelfLifeDays) || null) : undefined)
+          shelfLifeDays: isShelfLife === false ? null : (shelfLifeDays !== undefined ? (Number(shelfLifeDays) || null) : undefined),
+          isBundle: body.isBundle !== undefined ? Boolean(body.isBundle) : undefined,
+          bundleItems: body.bundleItems !== undefined ? (Array.isArray(body.bundleItems) ? body.bundleItems : (body.isBundle ? [] : Prisma.JsonNull)) : undefined
         }
       });
+
+      if (body.isBundle !== undefined || body.bundleItems !== undefined) {
+        await tx.shopProduct.updateMany({
+          where: { productId: id },
+          data: {
+            ...(body.isBundle !== undefined ? { isBundle: Boolean(body.isBundle) } : {}),
+            ...(body.bundleItems !== undefined ? { bundleItems: Array.isArray(body.bundleItems) ? body.bundleItems : (body.isBundle ? [] : Prisma.JsonNull) } : {}),
+          },
+        });
+      }
 
       if (image !== undefined) {
         await tx.shopProduct.updateMany({

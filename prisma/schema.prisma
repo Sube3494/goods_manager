@@ -44,6 +44,8 @@ model Product {
   isShelfLife     Boolean             @default(false)
   shelfLifeDays   Int?
   remark          String?
+  isBundle        Boolean             @default(false)
+  bundleItems     Json?
   userId          String?
   sourceProductId String?
   libraryId       String?
@@ -655,6 +657,8 @@ model ShopProduct {
   sortNumber      Int?
   sortGroupName   String?
   sortCategoryName String?
+  isBundle        Boolean  @default(false)
+  bundleItems     Json?
   batches         ProductBatch[]
 
   shop      Shop    @relation(fields: [shopId], references: [id], onDelete: Cascade)

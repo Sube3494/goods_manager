@@ -54,6 +54,10 @@ function getOptionTransport(option: DeliveryQuoteOption): Exclude<DeliveryTransp
   return option.transport || "rider";
 }
 
+function getOptionBrandKey(option: DeliveryQuoteOption) {
+  return getBrandTheme(option).shortName.toLocaleLowerCase("zh-CN");
+}
+
 interface BrandTheme {
   shortName: string;
   badgeBg: string;
@@ -221,13 +225,40 @@ export function DeliveryDispatchModal({
     return counts;
   }, { all: 0, rider: 0, car: 0, freight: 0 }), [category, options]);
 
-  const displayedOptions = useMemo(() => options
-    .filter((option) => category === "all" || getOptionCategory(option) === category)
-    .filter((option) => transport === "all" || getOptionTransport(option) === transport)
-    .toSorted((a, b) => {
+  const displayedOptions = useMemo(() => {
+    const filteredOptions = options
+      .filter((option) => category === "all" || getOptionCategory(option) === category)
+      .filter((option) => transport === "all" || getOptionTransport(option) === transport);
+    const compareAmount = (a: DeliveryQuoteOption, b: DeliveryQuoteOption) => {
       const amountDiff = Number(a.amount || 0) - Number(b.amount || 0);
       return (priceSort === "asc" ? amountDiff : -amountDiff) || a.name.localeCompare(b.name, "zh-CN");
-    }), [category, options, priceSort, transport]);
+    };
+
+    if (category !== "all") return filteredOptions.toSorted(compareAmount);
+
+    const brandPrices = new Map<string, number>();
+    for (const option of filteredOptions) {
+      const brandKey = getOptionBrandKey(option);
+      const amount = Number(option.amount || 0);
+      const current = brandPrices.get(brandKey);
+      brandPrices.set(
+        brandKey,
+        current === undefined
+          ? amount
+          : priceSort === "asc" ? Math.min(current, amount) : Math.max(current, amount),
+      );
+    }
+
+    return filteredOptions.toSorted((a, b) => {
+      const brandA = getOptionBrandKey(a);
+      const brandB = getOptionBrandKey(b);
+      if (brandA === brandB) return compareAmount(a, b);
+
+      const brandPriceDiff = (brandPrices.get(brandA) || 0) - (brandPrices.get(brandB) || 0);
+      return (priceSort === "asc" ? brandPriceDiff : -brandPriceDiff)
+        || brandA.localeCompare(brandB, "zh-CN");
+    });
+  }, [category, options, priceSort, transport]);
 
   // 计算已选运力的金额区间
   const priceRange = useMemo(() => {

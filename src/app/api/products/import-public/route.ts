@@ -161,6 +161,8 @@ export async function POST(request: Request) {
         specs: sourceProduct.specs ?? undefined,
         pinyin: ProductService.generatePinyinSearchText(sourceProduct.name),
         remark: sourceProduct.remark,
+        isBundle: sourceProduct.isBundle ?? false,
+        bundleItems: sourceProduct.bundleItems ?? undefined,
         userId: user.id,
         sourceProductId: sourceProduct.id,
         gallery: sourceProduct.gallery.length

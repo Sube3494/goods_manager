@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
-import { X, Check, CheckCircle, Package, Tag, Truck, FileText, Camera, Plus, ChevronLeft, ChevronRight, ChevronDown, Eye, Crown, Activity, RotateCw, Trash2, Calendar, Pencil, ArrowUpRight } from "lucide-react";
+import { Boxes, Layers, Search, X, Check, CheckCircle, Package, Tag, Truck, FileText, Camera, Plus, Minus, ChevronLeft, ChevronRight, ChevronDown, Eye, Crown, Activity, RotateCw, Trash2, Calendar, Pencil, ArrowUpRight } from "lucide-react";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { Switch } from "@/components/ui/Switch";
 import { DatePicker } from "@/components/ui/DatePicker";
@@ -274,6 +274,67 @@ export function ProductFormModal({
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   
+  const [isBundle, setIsBundle] = useState<boolean>(
+    Boolean((initialData as any)?.isBundle || (Array.isArray((initialData as any)?.bundleItems) && (initialData as any).bundleItems.length > 0))
+  );
+  const [bundleItems, setBundleItems] = useState<Array<{
+    id: string;
+    name: string;
+    sku?: string | null;
+    image?: string | null;
+    quantity: number;
+    shopProductId?: string;
+    productId?: string;
+  }>>(Array.isArray((initialData as any)?.bundleItems) ? (initialData as any).bundleItems : []);
+  const [isBundlePickerOpen, setIsBundlePickerOpen] = useState(false);
+  const [bundleSearchText, setBundleSearchText] = useState("");
+  const [bundleCandidates, setBundleCandidates] = useState<any[]>([]);
+  const [isLoadingBundleCandidates, setIsLoadingBundleCandidates] = useState(false);
+
+  const searchBundleCandidates = async (query: string) => {
+    setIsLoadingBundleCandidates(true);
+    try {
+      const endpoint = (initialData as any)?.shopId 
+        ? `/api/shop-products?shopId=${(initialData as any).shopId}&search=${encodeURIComponent(query)}&pageSize=20`
+        : `/api/products?search=${encodeURIComponent(query)}&pageSize=20`;
+      const res = await fetch(endpoint);
+      const data = await res.json().catch(() => ({}));
+      const items = Array.isArray(data.items) ? data.items : [];
+      setBundleCandidates(items.filter((item: any) => item.id !== initialData?.id));
+    } catch {
+      setBundleCandidates([]);
+    } finally {
+      setIsLoadingBundleCandidates(false);
+    }
+  };
+
+  const handleAddBundleItem = (candidate: any) => {
+    const candidateId = candidate.id;
+    if (bundleItems.some((item) => item.id === candidateId || (item.shopProductId && item.shopProductId === candidateId))) {
+      showToast("该子配件已在清单中", "info");
+      return;
+    }
+    const newItem = {
+      id: candidateId,
+      name: candidate.name || candidate.productName || "未命名商品",
+      sku: candidate.sku || null,
+      image: candidate.image || null,
+      quantity: 1,
+      shopProductId: candidate.sourceType === "shopProduct" ? candidate.id : (candidate.shopProductId || undefined),
+      productId: candidate.productId || (candidate.sourceType === "product" ? candidate.id : undefined),
+    };
+    setBundleItems((prev) => [...prev, newItem]);
+    showToast(`已添加子配件：${newItem.name}`, "success");
+  };
+
+  const handleRemoveBundleItem = (index: number) => {
+    setBundleItems((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleUpdateBundleItemQty = (index: number, qty: number) => {
+    setBundleItems((prev) => prev.map((item, i) => i === index ? { ...item, quantity: Math.max(1, qty) } : item));
+  };
+
   const [inboundHistory, setInboundHistory] = useState<PurchaseOrder[]>([]);
   const [isLoadingBatches, setIsLoadingBatches] = useState(false);
   const reorderTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -1668,8 +1729,8 @@ export function ProductFormModal({
                         </div>
                     )}
 
-                    {/* Shelf Life / 保质期管理 - 始终显示 */}
-                    <div className="grid grid-cols-2 gap-4">
+                    {/* Shelf Life / 保质期管理 - 始终单行双列显示 */}
+                    <div className="grid grid-cols-2 gap-3 sm:gap-4">
                         {/* 是否为保质期商品 */}
                         <div className="space-y-2">
                             <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
@@ -1677,25 +1738,27 @@ export function ProductFormModal({
                                 是否为保质期商品
                             </label>
                             <div className={cn(
-                                "rounded-full border px-4 h-[46px] flex items-center justify-between transition-all duration-300",
+                                "rounded-full border px-3.5 sm:px-4 h-[44px] sm:h-[46px] flex items-center justify-between transition-all duration-300",
                                 formData.isShelfLife
                                     ? "bg-emerald-500/5 border-emerald-500/25 dark:border-emerald-500/20"
                                     : "bg-white/5 dark:bg-white/5 border-border dark:border-white/10"
                             )}>
                                 <span className={cn(
-                                    "text-sm font-medium",
+                                    "text-xs sm:text-sm font-semibold whitespace-nowrap",
                                     formData.isShelfLife ? "text-emerald-400" : "text-muted-foreground"
                                 )}>
-                                    {formData.isShelfLife ? "是 (需录入保质期)" : "否 (无需录入保质期)"}
+                                    {formData.isShelfLife ? "是" : "否"}
                                 </span>
-                                <Switch
-                                    checked={formData.isShelfLife}
-                                    onChange={(checked) => {
-                                        setFormData(prev => ({ ...prev, isShelfLife: checked }));
-                                        if (checked && !shelfLifeVal) handleShelfLifeChange("6", "月");
-                                        if (!checked) setFormData(prev => ({ ...prev, shelfLifeDays: "" }));
-                                    }}
-                                />
+                                <div className="shrink-0 ml-2">
+                                    <Switch
+                                        checked={formData.isShelfLife}
+                                        onChange={(checked) => {
+                                            setFormData(prev => ({ ...prev, isShelfLife: checked }));
+                                            if (checked && !shelfLifeVal) handleShelfLifeChange("6", "月");
+                                            if (!checked) setFormData(prev => ({ ...prev, shelfLifeDays: "" }));
+                                        }}
+                                    />
+                                </div>
                             </div>
                         </div>
 
@@ -1735,6 +1798,220 @@ export function ProductFormModal({
                                 </p>
                             )}
                         </div>
+                    </div>
+
+
+                    {/* 组合商品 / 配货清单（BOM）设置 */}
+                    <div className="rounded-2xl border border-border bg-white dark:border-white/10 dark:bg-white/5 p-4 space-y-4 shadow-sm">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-500 dark:bg-emerald-500/20">
+                            <Boxes size={18} />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-sm font-semibold text-foreground leading-none">
+                              组合商品 / 配件清单
+                            </div>
+                            <p className="mt-1.5 text-xs text-muted-foreground">
+                              附带礼盒配件时开启，自动拆单扣库存
+                            </p>
+                          </div>
+                        </div>
+                        <div className="shrink-0">
+                          <Switch
+                            checked={isBundle}
+                            onChange={(val) => {
+                              setIsBundle(val);
+                              if (val && bundleCandidates.length === 0) {
+                                searchBundleCandidates("");
+                              }
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      {isBundle && (
+                        <div className="space-y-3 pt-2 border-t border-border dark:border-white/10">
+                          {/* 子物料清单列表 */}
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between text-xs text-muted-foreground font-medium px-1">
+                              <span>已配置配件 ({bundleItems.length})</span>
+                              <span>每套配比</span>
+                            </div>
+
+                            {bundleItems.length === 0 ? (
+                              <div className="rounded-xl border border-dashed border-border dark:border-white/10 py-6 text-center text-xs text-muted-foreground">
+                                暂无子配件，请点击下方按钮添加（如：打火机裸机、礼盒、礼袋、配件包）
+                              </div>
+                            ) : (
+                              <div className="space-y-2">
+                                {bundleItems.map((item, index) => (
+                                  <div
+                                    key={item.id + "-" + index}
+                                    className="flex items-center justify-between gap-2.5 rounded-xl border border-border/70 dark:border-white/10 bg-muted/20 hover:bg-muted/30 transition-all p-2 sm:p-2.5"
+                                  >
+                                    {/* 商品基础信息（图片 + 名称 + SKU） */}
+                                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                      {item.image ? (
+                                        <img
+                                          src={item.image}
+                                          alt={item.name}
+                                          className="h-9 w-9 shrink-0 rounded-lg object-cover border border-border/60 shadow-2xs"
+                                        />
+                                      ) : (
+                                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                                          <Package size={16} />
+                                        </div>
+                                      )}
+                                      <div className="min-w-0 flex-1">
+                                        <div className="text-xs font-semibold text-foreground truncate" title={item.name}>
+                                          {item.name}
+                                        </div>
+                                        <div className="text-[10px] font-mono text-muted-foreground truncate mt-0.5">
+                                          SKU: {item.sku || "无编码"}
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    {/* 右侧超紧凑步进器 + 删除 */}
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                      <div className="inline-flex items-center rounded-lg border border-border/80 bg-white dark:border-white/10 dark:bg-white/10 p-0.5 shadow-2xs">
+                                        <button
+                                          type="button"
+                                          onClick={() => handleUpdateBundleItemQty(index, Math.max(1, (item.quantity || 1) - 1))}
+                                          className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-black/5 dark:hover:bg-white/10 hover:text-foreground active:scale-90 transition-all cursor-pointer"
+                                          title="减少"
+                                        >
+                                          <Minus size={12} />
+                                        </button>
+                                        <input
+                                          type="number"
+                                          min="1"
+                                          value={item.quantity || 1}
+                                          onChange={(e) => handleUpdateBundleItemQty(index, parseInt(e.target.value, 10) || 1)}
+                                          className="h-6 w-8 text-center text-xs font-bold text-foreground outline-none bg-transparent"
+                                        />
+                                        <button
+                                          type="button"
+                                          onClick={() => handleUpdateBundleItemQty(index, (item.quantity || 1) + 1)}
+                                          className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-black/5 dark:hover:bg-white/10 hover:text-foreground active:scale-90 transition-all cursor-pointer"
+                                          title="增加"
+                                        >
+                                          <Plus size={12} />
+                                        </button>
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleRemoveBundleItem(index)}
+                                        className="p-1.5 text-muted-foreground hover:text-rose-500 rounded-lg transition-colors hover:bg-rose-500/10 active:scale-90 cursor-pointer"
+                                        title="移除此配件"
+                                      >
+                                        <Trash2 size={15} />
+                                      </button>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* 添加子配件按钮与搜索浮窗 */}
+                          {!isBundlePickerOpen ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsBundlePickerOpen(true);
+                                searchBundleCandidates(bundleSearchText);
+                              }}
+                              className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-border dark:border-white/10 bg-white/5 hover:bg-white/10 py-2.5 text-xs font-medium text-foreground/80 hover:text-foreground transition-all"
+                            >
+                              <Plus size={15} /> 添加子配件 / 礼盒 / 物料
+                            </button>
+                          ) : (
+                            <div className="rounded-xl border border-border dark:border-white/10 bg-black/10 dark:bg-black/20 p-3 space-y-3">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-medium text-foreground flex items-center gap-1.5">
+                                  <Search size={14} /> 搜索并添加子配件
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => setIsBundlePickerOpen(false)}
+                                  className="text-xs text-muted-foreground hover:text-foreground"
+                                >
+                                  收起
+                                </button>
+                              </div>
+
+                              <div className="flex gap-2">
+                                <input
+                                  type="text"
+                                  value={bundleSearchText}
+                                  onChange={(e) => {
+                                    setBundleSearchText(e.target.value);
+                                    searchBundleCandidates(e.target.value);
+                                  }}
+                                  placeholder="输入商品名或 SKU 搜索（如：礼盒、礼袋、火石）"
+                                  className="h-8 flex-1 rounded-lg border border-border bg-white px-3 text-xs outline-none dark:border-white/10 dark:bg-white/10 focus:ring-1 focus:ring-primary/20"
+                                />
+                              </div>
+
+                              <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1 custom-scrollbar">
+                                {isLoadingBundleCandidates ? (
+                                  <div className="py-4 text-center text-xs text-muted-foreground">搜索中...</div>
+                                ) : bundleCandidates.length === 0 ? (
+                                  <div className="py-4 text-center text-xs text-muted-foreground">未找到相关商品</div>
+                                ) : (
+                                  bundleCandidates.map((candidate) => {
+                                    const isAdded = bundleItems.some(
+                                      (it) => it.id === candidate.id || (it.shopProductId && it.shopProductId === candidate.id)
+                                    );
+                                    return (
+                                      <div
+                                        key={candidate.id}
+                                        className="flex items-center justify-between gap-2.5 rounded-lg bg-white/70 dark:bg-white/5 p-2 text-xs border border-border/50 hover:border-emerald-500/30 transition-all"
+                                      >
+                                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                          {candidate.image ? (
+                                            <img
+                                              src={candidate.image}
+                                              alt={candidate.name}
+                                              className="h-8 w-8 shrink-0 rounded-md object-cover border border-border/50"
+                                            />
+                                          ) : (
+                                            <div className="h-8 w-8 shrink-0 rounded-md bg-muted flex items-center justify-center text-muted-foreground">
+                                              <Package size={14} />
+                                            </div>
+                                          )}
+                                          <div className="min-w-0 flex-1">
+                                            <div className="font-medium text-foreground truncate">{candidate.name || candidate.productName}</div>
+                                            <div className="font-mono text-[10px] text-muted-foreground mt-0.5">
+                                              {candidate.sku ? `SKU: ${candidate.sku}` : "无SKU"} · 库存: {candidate.stock ?? 0}
+                                            </div>
+                                          </div>
+                                        </div>
+
+                                        <button
+                                          type="button"
+                                          disabled={isAdded}
+                                          onClick={() => handleAddBundleItem(candidate)}
+                                          className={cn(
+                                            "shrink-0 rounded-md px-2.5 py-1 text-[11px] font-bold transition-colors",
+                                            isAdded
+                                              ? "bg-muted text-muted-foreground cursor-not-allowed"
+                                              : "bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500 hover:text-white border border-emerald-500/30 shadow-sm"
+                                          )}
+                                        >
+                                          {isAdded ? "已添加" : "+ 添加"}
+                                        </button>
+                                      </div>
+                                    );
+                                  })
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     {/* Inbound History */}

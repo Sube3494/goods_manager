@@ -328,6 +328,8 @@ export async function POST(
             remark: sourceProduct.remark,
             isShelfLife: sourceProduct.isShelfLife,
             shelfLifeDays: sourceProduct.shelfLifeDays,
+            isBundle: sourceProduct.isBundle ?? false,
+            bundleItems: sourceProduct.bundleItems ?? undefined,
           },
         });
       }

@@ -2140,6 +2140,8 @@ export default function ShopGoodsPage() {
           specs: formData.specs || {},
           isShelfLife: formData.isShelfLife,
           shelfLifeDays: formData.isShelfLife ? (Number(formData.shelfLifeDays) || null) : null,
+          isBundle: formData.isBundle,
+          bundleItems: formData.bundleItems,
         }),
       });
       const responseData = await res.json().catch(() => null);
