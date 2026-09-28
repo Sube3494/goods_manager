@@ -1567,7 +1567,7 @@ export function ProductFormModal({
           >
             <div className="flex items-center justify-between border-b border-white/10 p-8 shrink-0">
               <h2 className="text-2xl font-bold text-foreground">{title || (initialData ? "编辑商品" : "新增商品")}</h2>
-              <button onClick={onClose} className="rounded-full p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors">
+              <button type="button" onClick={onClose} className="rounded-full p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors">
                 <X size={24} />
               </button>
             </div>
@@ -2253,26 +2253,46 @@ export function ProductFormModal({
                                                                                 setEditingCostValue(sanitized);
                                                                             }
                                                                         }}
+                                                                        onKeyDown={(e) => {
+                                                                            if (e.key === 'Enter') {
+                                                                                e.preventDefault();
+                                                                                e.stopPropagation();
+                                                                                handleSaveCost(itemId, order.id);
+                                                                            } else if (e.key === 'Escape') {
+                                                                                e.preventDefault();
+                                                                                e.stopPropagation();
+                                                                                setEditingItemId(null);
+                                                                                setEditingCostValue("");
+                                                                            }
+                                                                        }}
                                                                         className="w-16 h-6 px-1.5 text-[10px] text-right rounded border border-border dark:border-white/10 bg-white/5 text-foreground focus:outline-none focus:border-primary font-mono"
                                                                         placeholder="0.00"
                                                                         disabled={isSavingCost}
                                                                         autoFocus
                                                                     />
                                                                     <button 
-                                                                        onClick={() => handleSaveCost(itemId, order.id)}
+                                                                        type="button"
+                                                                        onClick={(e) => {
+                                                                            e.preventDefault();
+                                                                            e.stopPropagation();
+                                                                            handleSaveCost(itemId, order.id);
+                                                                        }}
                                                                         disabled={isSavingCost}
-                                                                        className="p-0.5 text-green-500 hover:bg-green-500/10 rounded transition-colors disabled:opacity-50 inline-flex items-center justify-center"
+                                                                        className="p-0.5 text-green-500 hover:bg-green-500/10 rounded transition-colors disabled:opacity-50 inline-flex items-center justify-center cursor-pointer"
                                                                         title="保存"
                                                                     >
                                                                         <Check size={12} />
                                                                     </button>
                                                                     <button 
-                                                                        onClick={() => {
+                                                                        type="button"
+                                                                        onClick={(e) => {
+                                                                            e.preventDefault();
+                                                                            e.stopPropagation();
                                                                             setEditingItemId(null);
                                                                             setEditingCostValue("");
                                                                         }}
                                                                         disabled={isSavingCost}
-                                                                        className="p-0.5 text-red-500 hover:bg-red-500/10 rounded transition-colors disabled:opacity-50 inline-flex items-center justify-center"
+                                                                        className="p-0.5 text-red-500 hover:bg-red-500/10 rounded transition-colors disabled:opacity-50 inline-flex items-center justify-center cursor-pointer"
                                                                         title="取消"
                                                                     >
                                                                         <X size={12} />
@@ -2284,11 +2304,14 @@ export function ProductFormModal({
                                                                         <>
                                                                             <span className="text-[9px] text-orange-500 font-medium bg-orange-500/10 px-1 py-0.2 rounded">无进价</span>
                                                                             <button 
-                                                                                onClick={() => {
+                                                                                type="button"
+                                                                                onClick={(e) => {
+                                                                                    e.preventDefault();
+                                                                                    e.stopPropagation();
                                                                                     setEditingItemId(itemId);
                                                                                     setEditingCostValue("");
                                                                                 }}
-                                                                                className="text-[10px] text-primary hover:underline font-medium flex items-center gap-0.5"
+                                                                                className="text-[10px] text-primary hover:underline font-medium flex items-center gap-0.5 cursor-pointer"
                                                                             >
                                                                                 补录
                                                                             </button>
@@ -2302,11 +2325,14 @@ export function ProductFormModal({
                                                                                 </span>
                                                                             )}
                                                                             <button 
-                                                                                onClick={() => {
+                                                                                type="button"
+                                                                                onClick={(e) => {
+                                                                                    e.preventDefault();
+                                                                                    e.stopPropagation();
                                                                                     setEditingItemId(itemId);
                                                                                     setEditingCostValue(String(item.costPrice));
                                                                                 }}
-                                                                                className="text-muted-foreground hover:text-primary transition-colors inline-flex items-center"
+                                                                                className="text-muted-foreground hover:text-primary transition-colors inline-flex items-center cursor-pointer p-0.5 rounded hover:bg-white/10"
                                                                                 title="修改价格"
                                                                             >
                                                                                 <Pencil size={10} />
