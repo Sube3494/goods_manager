@@ -125,10 +125,11 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
     }
 
+    const isSuperAdmin = user.role === "SUPER_ADMIN";
     const result = await prisma.product.updateMany({
       where: {
         id: { in: ids.map(String) },
-        userId: user.id,
+        ...(isSuperAdmin ? {} : { OR: [{ userId: user.id }, { isPublic: true }] }),
       },
       data: updateData,
     });

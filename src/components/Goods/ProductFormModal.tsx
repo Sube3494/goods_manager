@@ -737,6 +737,8 @@ export function ProductFormModal({
         const _parsed = parseShelfLife(initialData.shelfLifeDays !== null && initialData.shelfLifeDays !== undefined ? String(initialData.shelfLifeDays) : "");
         setShelfLifeVal(_parsed.value);
         setShelfLifeUnit(_parsed.unit);
+        setIsBundle(Boolean((initialData as any)?.isBundle || (Array.isArray((initialData as any)?.bundleItems) && (initialData as any).bundleItems.length > 0)));
+        setBundleItems(Array.isArray((initialData as any)?.bundleItems) ? (initialData as any).bundleItems : []);
         if (initialData.id && !hideGallerySection) {
           fetchGallery(initialData.id, initialData.image || "");
         }
@@ -762,6 +764,8 @@ export function ProductFormModal({
         });
         setShelfLifeVal("");
         setShelfLifeUnit("天");
+        setIsBundle(false);
+        setBundleItems([]);
       }
     }
   }, [hideGallerySection, isOpen, initialData]);
@@ -1244,6 +1248,8 @@ export function ProductFormModal({
       specs: Object.keys(cleanedSpecs).length > 0 ? cleanedSpecs : undefined,
       isShelfLife: formData.isShelfLife,
       shelfLifeDays: shelfLifeDaysVal,
+      isBundle,
+      bundleItems: isBundle ? bundleItems : [],
       id: initialData?.id
     }, galleryImages);
   };

@@ -395,7 +395,7 @@ export async function PUT(request: Request) {
     }
 
     const existing = await prisma.product.findFirst({
-      where: { id, userId: user.id }
+      where: user.role === 'SUPER_ADMIN' ? { id } : { id, OR: [{ userId: user.id }, { isPublic: true }] }
     });
 
     if (!existing) {
@@ -444,6 +444,16 @@ export async function PUT(request: Request) {
           bundleItems: body.bundleItems !== undefined ? (Array.isArray(body.bundleItems) ? body.bundleItems : (body.isBundle ? [] : Prisma.JsonNull)) : undefined,
         },
       });
+
+      if (body.isBundle !== undefined || body.bundleItems !== undefined) {
+        await tx.shopProduct.updateMany({
+          where: { productId: id },
+          data: {
+            ...(body.isBundle !== undefined ? { isBundle: Boolean(body.isBundle) } : {}),
+            ...(body.bundleItems !== undefined ? { bundleItems: Array.isArray(body.bundleItems) ? body.bundleItems : (body.isBundle ? [] : Prisma.JsonNull) } : {}),
+          },
+        });
+      }
 
       if (image !== undefined) {
         // 同步更新继承该主库商品的所有店铺商品，确保主库换图时店铺即刻同步最新图，且不会残留旧图死链
@@ -503,7 +513,7 @@ export async function DELETE(request: Request) {
 
     // Security check: Global access
     const product = await prisma.product.findFirst({
-      where: { id, userId: user.id }
+      where: user.role === 'SUPER_ADMIN' ? { id } : { id, OR: [{ userId: user.id }, { isPublic: true }] }
     });
 
     if (!product) {
