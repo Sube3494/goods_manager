@@ -108,7 +108,11 @@ export class ProductService {
       if (!isSuperAdmin) {
         if (userId) {
           andConditions.push({
-            library: { authorizedUsers: { some: { id: userId } } }
+            OR: [
+              { libraryId: null },
+              { library: { isPublic: true } },
+              { library: { authorizedUsers: { some: { id: userId } } } }
+            ]
           });
         } else {
           // 未登录：只能看到公开库或无库商品

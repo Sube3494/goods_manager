@@ -290,27 +290,109 @@ export function ProductFormModal({
   const [bundleSearchText, setBundleSearchText] = useState("");
   const [bundleCandidates, setBundleCandidates] = useState<any[]>([]);
   const [isLoadingBundleCandidates, setIsLoadingBundleCandidates] = useState(false);
+  const bundleSearchVersionRef = useRef(0);
+  const bundleSearchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const searchBundleCandidates = async (query: string) => {
-    setIsLoadingBundleCandidates(true);
-    try {
-      const endpoint = (initialData as any)?.shopId 
-        ? `/api/shop-products?shopId=${(initialData as any).shopId}&search=${encodeURIComponent(query)}&pageSize=20`
-        : `/api/products?search=${encodeURIComponent(query)}&pageSize=20`;
-      const res = await fetch(endpoint);
-      const data = await res.json().catch(() => ({}));
-      const items = Array.isArray(data.items) ? data.items : [];
-      setBundleCandidates(items.filter((item: any) => item.id !== initialData?.id));
-    } catch {
-      setBundleCandidates([]);
-    } finally {
-      setIsLoadingBundleCandidates(false);
+  const searchBundleCandidates = (query: string, immediate: boolean = false) => {
+    if (bundleSearchTimeoutRef.current) clearTimeout(bundleSearchTimeoutRef.current);
+
+    const execute = async () => {
+      const version = ++bundleSearchVersionRef.current;
+      setIsLoadingBundleCandidates(true);
+      const trimmed = query.trim();
+
+      try {
+        const productUrl = `/api/products?search=${encodeURIComponent(trimmed)}&includePublic=true&includeShopOnly=true&pageSize=30`;
+        const shopId = (initialData as any)?.shopId;
+        const shopProductUrl = shopId
+          ? `/api/shop-products?shopId=${shopId}&search=${encodeURIComponent(trimmed)}&pageSize=30`
+          : null;
+
+        const [pRes, spRes] = await Promise.all([
+          fetch(productUrl),
+          shopProductUrl ? fetch(shopProductUrl) : Promise.resolve(null),
+        ]);
+
+        if (version !== bundleSearchVersionRef.current) return;
+
+        const pData = await pRes.json().catch(() => ({}));
+        const spData = spRes ? await spRes.json().catch(() => ({})) : null;
+
+        const pItems = Array.isArray(pData.items) ? pData.items : [];
+        const spItems = spData && Array.isArray(spData.items) ? spData.items : [];
+
+        // 合并去重：店铺已有商品优先，主库公共物料全量补充
+        const seen = new Set<string>();
+        const merged: any[] = [];
+
+        for (const item of spItems) {
+          const key = item.productId || item.id;
+          seen.add(key);
+          merged.push({
+            ...item,
+            id: item.id,
+            shopProductId: item.id,
+            productId: item.productId || item.id,
+            name: item.productName || item.name,
+            image: item.productImage || item.image,
+            sku: item.sku || null,
+            sourceType: "shopProduct",
+          });
+        }
+
+        for (const item of pItems) {
+          if (!seen.has(item.id)) {
+            seen.add(item.id);
+            merged.push({
+              ...item,
+              id: item.id,
+              productId: item.id,
+              name: item.name,
+              image: item.image,
+              sku: item.sku || null,
+              sourceType: "product",
+            });
+          }
+        }
+
+        // 排除当前被编辑的商品自身，避免循环组合
+        const filtered = merged.filter((item) => {
+          if (item.id === initialData?.id) return false;
+          if (initialData?.productId && (item.productId === initialData.productId || item.id === initialData.productId)) return false;
+          if ((initialData as any)?.shopProductId && (item.shopProductId === (initialData as any).shopProductId || item.id === (initialData as any).shopProductId)) return false;
+          return true;
+        });
+
+        setBundleCandidates(filtered);
+      } catch {
+        if (version === bundleSearchVersionRef.current) {
+          setBundleCandidates([]);
+        }
+      } finally {
+        if (version === bundleSearchVersionRef.current) {
+          setIsLoadingBundleCandidates(false);
+        }
+      }
+    };
+
+    if (immediate) {
+      execute();
+    } else {
+      bundleSearchTimeoutRef.current = setTimeout(execute, 200);
     }
   };
 
   const handleAddBundleItem = (candidate: any) => {
     const candidateId = candidate.id;
-    if (bundleItems.some((item) => item.id === candidateId || (item.shopProductId && item.shopProductId === candidateId))) {
+    if (
+      bundleItems.some(
+        (item) =>
+          item.id === candidateId ||
+          (item.shopProductId && item.shopProductId === candidateId) ||
+          (candidate.shopProductId && item.shopProductId === candidate.shopProductId) ||
+          (candidate.productId && item.productId === candidate.productId)
+      )
+    ) {
       showToast("该子配件已在清单中", "info");
       return;
     }
@@ -318,7 +400,7 @@ export function ProductFormModal({
       id: candidateId,
       name: candidate.name || candidate.productName || "未命名商品",
       sku: candidate.sku || null,
-      image: candidate.image || null,
+      image: candidate.image || candidate.productImage || null,
       quantity: 1,
       shopProductId: candidate.sourceType === "shopProduct" ? candidate.id : (candidate.shopProductId || undefined),
       productId: candidate.productId || (candidate.sourceType === "product" ? candidate.id : undefined),
@@ -1927,9 +2009,9 @@ export function ProductFormModal({
                               type="button"
                               onClick={() => {
                                 setIsBundlePickerOpen(true);
-                                searchBundleCandidates(bundleSearchText);
+                                searchBundleCandidates(bundleSearchText, true);
                               }}
-                              className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-border dark:border-white/10 bg-white/5 hover:bg-white/10 py-2.5 text-xs font-medium text-foreground/80 hover:text-foreground transition-all"
+                              className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-border dark:border-white/10 bg-white/5 hover:bg-white/10 py-2.5 text-xs font-medium text-foreground/80 hover:text-foreground transition-all cursor-pointer"
                             >
                               <Plus size={15} /> 添加子配件 / 礼盒 / 物料
                             </button>
@@ -1942,7 +2024,7 @@ export function ProductFormModal({
                                 <button
                                   type="button"
                                   onClick={() => setIsBundlePickerOpen(false)}
-                                  className="text-xs text-muted-foreground hover:text-foreground"
+                                  className="text-xs text-muted-foreground hover:text-foreground cursor-pointer"
                                 >
                                   收起
                                 </button>
@@ -1969,7 +2051,11 @@ export function ProductFormModal({
                                 ) : (
                                   bundleCandidates.map((candidate) => {
                                     const isAdded = bundleItems.some(
-                                      (it) => it.id === candidate.id || (it.shopProductId && it.shopProductId === candidate.id)
+                                      (it) =>
+                                        it.id === candidate.id ||
+                                        (it.shopProductId && it.shopProductId === candidate.id) ||
+                                        (candidate.shopProductId && it.shopProductId === candidate.shopProductId) ||
+                                        (candidate.productId && it.productId === candidate.productId)
                                     );
                                     return (
                                       <div
@@ -1989,7 +2075,12 @@ export function ProductFormModal({
                                             </div>
                                           )}
                                           <div className="min-w-0 flex-1">
-                                            <div className="font-medium text-foreground truncate">{candidate.name || candidate.productName}</div>
+                                            <div className="flex items-center gap-1.5">
+                                              <span className="font-medium text-foreground truncate">{candidate.name || candidate.productName}</span>
+                                              {candidate.sourceType === "product" && (
+                                                <span className="shrink-0 px-1 py-0.2 text-[9px] rounded bg-blue-500/10 text-blue-500 font-normal">物料库</span>
+                                              )}
+                                            </div>
                                             <div className="font-mono text-[10px] text-muted-foreground mt-0.5">
                                               {candidate.sku ? `SKU: ${candidate.sku}` : "无SKU"} · 库存: {candidate.stock ?? 0}
                                             </div>
@@ -2001,7 +2092,7 @@ export function ProductFormModal({
                                           disabled={isAdded}
                                           onClick={() => handleAddBundleItem(candidate)}
                                           className={cn(
-                                            "shrink-0 rounded-md px-2.5 py-1 text-[11px] font-bold transition-colors",
+                                            "shrink-0 rounded-md px-2.5 py-1 text-[11px] font-bold transition-colors cursor-pointer",
                                             isAdded
                                               ? "bg-muted text-muted-foreground cursor-not-allowed"
                                               : "bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500 hover:text-white border border-emerald-500/30 shadow-sm"

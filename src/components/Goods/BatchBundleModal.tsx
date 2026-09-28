@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { X, Boxes, Search, Plus, Minus, Trash2, CheckCircle, Package, AlertCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { createPortal } from "react-dom";
@@ -37,22 +37,85 @@ const BatchBundleForm = ({
   const [candidates, setCandidates] = useState<any[]>([]);
   const [isLoadingCandidates, setIsLoadingCandidates] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const searchVersionRef = useRef(0);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // 搜索配件候选列表
-  const handleSearchCandidates = async (query: string) => {
-    setIsLoadingCandidates(true);
-    try {
-      const endpoint = shopId
-        ? `/api/shop-products?shopId=${shopId}&search=${encodeURIComponent(query)}&pageSize=20`
-        : `/api/products?search=${encodeURIComponent(query)}&pageSize=20`;
-      const res = await fetch(endpoint);
-      const data = await res.json().catch(() => ({}));
-      const items = Array.isArray(data.items) ? data.items : [];
-      setCandidates(items);
-    } catch {
-      setCandidates([]);
-    } finally {
-      setIsLoadingCandidates(false);
+  // 搜索配件候选列表（支持主物料库及店铺商品聚合搜索，全量覆盖）
+  const handleSearchCandidates = (query: string, immediate: boolean = false) => {
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+
+    const execute = async () => {
+      const version = ++searchVersionRef.current;
+      setIsLoadingCandidates(true);
+      const trimmed = query.trim();
+
+      try {
+        const productUrl = `/api/products?search=${encodeURIComponent(trimmed)}&includePublic=true&includeShopOnly=true&pageSize=30`;
+        const shopProductUrl = shopId
+          ? `/api/shop-products?shopId=${shopId}&search=${encodeURIComponent(trimmed)}&pageSize=30`
+          : null;
+
+        const [pRes, spRes] = await Promise.all([
+          fetch(productUrl),
+          shopProductUrl ? fetch(shopProductUrl) : Promise.resolve(null),
+        ]);
+
+        if (version !== searchVersionRef.current) return;
+
+        const pData = await pRes.json().catch(() => ({}));
+        const spData = spRes ? await spRes.json().catch(() => ({})) : null;
+
+        const pItems = Array.isArray(pData.items) ? pData.items : [];
+        const spItems = spData && Array.isArray(spData.items) ? spData.items : [];
+
+        // 合并去重：店铺已有商品优先，主库公共物料全面补充
+        const seen = new Set<string>();
+        const merged: any[] = [];
+
+        for (const item of spItems) {
+          const key = item.productId || item.id;
+          seen.add(key);
+          merged.push({
+            ...item,
+            id: item.id,
+            shopProductId: item.id,
+            productId: item.productId || item.id,
+            name: item.productName || item.name,
+            image: item.productImage || item.image,
+            sku: item.sku || null,
+          });
+        }
+
+        for (const item of pItems) {
+          if (!seen.has(item.id)) {
+            seen.add(item.id);
+            merged.push({
+              ...item,
+              id: item.id,
+              productId: item.id,
+              name: item.name,
+              image: item.image,
+              sku: item.sku || null,
+            });
+          }
+        }
+
+        setCandidates(merged);
+      } catch {
+        if (version === searchVersionRef.current) {
+          setCandidates([]);
+        }
+      } finally {
+        if (version === searchVersionRef.current) {
+          setIsLoadingCandidates(false);
+        }
+      }
+    };
+
+    if (immediate) {
+      execute();
+    } else {
+      searchTimeoutRef.current = setTimeout(execute, 200);
     }
   };
 
