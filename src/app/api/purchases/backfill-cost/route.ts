@@ -5,6 +5,7 @@ import { hasPermission, SessionUser } from "@/lib/permissions";
 import { FinanceMath } from "@/lib/math";
 import { Prisma } from "../../../../../prisma/generated-client";
 import { calculatePurchaseOrderTotalAmount } from "@/lib/purchaseCosting";
+import { InventoryService } from "@/services/inventoryService";
 
 type ParsedOutboundSnapshotBatch = {
   purchaseOrderItemId: string;
@@ -99,6 +100,39 @@ async function syncOutboundCostSnapshotsForPurchaseItems(
   if (costPriceByPurchaseOrderItemId.size <= 0) {
     return;
   }
+
+  // 1. 查询相关的采购批次明细、采购单及同单下的所有明细（用于精确分摊运费和附加费）
+  const allItemIds = Array.from(costPriceByPurchaseOrderItemId.keys());
+  const purchaseItems = await tx.purchaseOrderItem.findMany({
+    where: { id: { in: allItemIds } },
+    include: {
+      purchaseOrder: {
+        select: {
+          shippingFees: true,
+          extraFees: true,
+          items: {
+            select: {
+              id: true,
+              quantity: true,
+              costPrice: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  // 2. 基于权威算法计算每个采购批次包含运费/附加费平摊后的综合实际出库成本
+  const actualUnitCostMap = new Map<string, number>();
+  for (const item of purchaseItems) {
+    const unitCost = InventoryService.resolveBatchUnitCost({
+      quantity: item.quantity,
+      costPrice: item.costPrice,
+      purchaseOrder: item.purchaseOrder,
+    });
+    actualUnitCostMap.set(item.id, Number(unitCost.toFixed(4)));
+  }
+
   const outboundItems = await tx.outboundOrderItem.findMany({
     where: purchaseOrderUserId
       ? {
@@ -117,7 +151,7 @@ async function syncOutboundCostSnapshotsForPurchaseItems(
     if (!snapshot || snapshot.batches.length <= 0) {
       continue;
     }
-    const nextSnapshot = rebuildOutboundCostSnapshot(snapshot, costPriceByPurchaseOrderItemId);
+    const nextSnapshot = rebuildOutboundCostSnapshot(snapshot, actualUnitCostMap);
     if (!nextSnapshot) {
       continue;
     }
@@ -324,6 +358,7 @@ export async function POST(request: Request) {
                   quantity: item.quantity || 0,
                   costPrice: item.costPrice || 0,
                 })),
+                shippingFees: order.shippingFees || 0,
                 extraFees: order.extraFees || 0,
                 discountAmount: order.discountAmount || 0,
               }),

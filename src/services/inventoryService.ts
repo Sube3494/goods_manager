@@ -117,7 +117,7 @@ export class InventoryService {
     }
   }
 
-  private static resolveBatchUnitCost(batch: {
+  public static resolveBatchUnitCost(batch: {
     quantity: number;
     costPrice: Prisma.Decimal | number | null;
     purchaseOrder?: {

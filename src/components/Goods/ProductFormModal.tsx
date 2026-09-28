@@ -2316,39 +2316,91 @@ export function ProductFormModal({
                                                                                 补录
                                                                             </button>
                                                                         </>
-                                                                    ) : (
-                                                                        <>
-                                                                            <span>单价: ￥{item.costPrice} | 小计: ￥{(item.costPrice * item.quantity).toFixed(2).replace(/\.00$/, '')}</span>
-                                                                            {order.totalAmount !== undefined && order.totalAmount !== null && Math.abs(order.totalAmount - (item.costPrice * item.quantity)) > 0.01 && (
-                                                                                <span className="text-[10px] text-muted-foreground/80 font-normal">
-                                                                                    (整单实付: ￥{Number(order.totalAmount).toFixed(2).replace(/\.00$/, '')})
-                                                                                </span>
-                                                                            )}
-                                                                            <button 
-                                                                                type="button"
-                                                                                onClick={(e) => {
-                                                                                    e.preventDefault();
-                                                                                    e.stopPropagation();
-                                                                                    setEditingItemId(itemId);
-                                                                                    setEditingCostValue(String(item.costPrice));
-                                                                                }}
-                                                                                className="text-muted-foreground hover:text-primary transition-colors inline-flex items-center cursor-pointer p-0.5 rounded hover:bg-white/10"
-                                                                                title="修改价格"
-                                                                            >
-                                                                                <Pencil size={10} />
-                                                                            </button>
-                                                                        </>
-                                                                    )}
+                                                                    ) : (() => {
+                                                                        const itemQty = Math.max(0, Number(item.quantity || 0));
+                                                                        const totalAdditionalFees = Number(order.shippingFees || 0) + Number(order.extraFees || 0);
+                                                                        let allocatedUnitCost = item.costPrice;
+                                                                        if (totalAdditionalFees > 0 && Array.isArray(order.items)) {
+                                                                            const totalItemValue = order.items.reduce((sum, it) => sum + (Number(it.costPrice || 0) * Number(it.quantity || 0)), 0);
+                                                                            const totalQuantity = order.items.reduce((sum, it) => sum + Number(it.quantity || 0), 0);
+                                                                            if (totalItemValue > 0 && itemQty > 0) {
+                                                                                const itemValue = Number(item.costPrice || 0) * itemQty;
+                                                                                const allocatedFee = totalAdditionalFees * (itemValue / totalItemValue);
+                                                                                allocatedUnitCost = Number(item.costPrice || 0) + (allocatedFee / itemQty);
+                                                                            } else if (totalQuantity > 0) {
+                                                                                allocatedUnitCost = Number(item.costPrice || 0) + (totalAdditionalFees / totalQuantity);
+                                                                            }
+                                                                        }
+                                                                        const hasShippingDiff = allocatedUnitCost > item.costPrice && Math.abs(allocatedUnitCost - item.costPrice) >= 0.001;
+
+                                                                        return (
+                                                                            <>
+                                                                                <span>进价: ￥{item.costPrice}</span>
+                                                                                {hasShippingDiff && (
+                                                                                    <span className="text-amber-500 dark:text-amber-400 font-medium" title={`包含整单运费/附加费平摊(+￥${(allocatedUnitCost - item.costPrice).toFixed(2)}/件)`}>
+                                                                                        (实摊成本: ￥{allocatedUnitCost.toFixed(2).replace(/\.00$/, '')})
+                                                                                    </span>
+                                                                                )}
+                                                                                <span> | 小计: ￥{(item.costPrice * item.quantity).toFixed(2).replace(/\.00$/, '')}</span>
+                                                                                {order.totalAmount !== undefined && order.totalAmount !== null && Math.abs(order.totalAmount - (item.costPrice * item.quantity)) > 0.01 && (
+                                                                                    <span className="text-[10px] text-muted-foreground/80 font-normal">
+                                                                                        (整单实付: ￥{Number(order.totalAmount).toFixed(2).replace(/\.00$/, '')})
+                                                                                    </span>
+                                                                                )}
+                                                                                <button 
+                                                                                    type="button"
+                                                                                    onClick={(e) => {
+                                                                                        e.preventDefault();
+                                                                                        e.stopPropagation();
+                                                                                        setEditingItemId(itemId);
+                                                                                        setEditingCostValue(String(item.costPrice));
+                                                                                    }}
+                                                                                    className="text-muted-foreground hover:text-primary transition-colors inline-flex items-center cursor-pointer p-0.5 rounded hover:bg-white/10"
+                                                                                    title="修改价格"
+                                                                                >
+                                                                                    <Pencil size={10} />
+                                                                                </button>
+                                                                            </>
+                                                                        );
+                                                                    })()}
                                                                 </div>
                                                             )
                                                         ) : (
-                                                            <div className="text-[10px] text-muted-foreground">
-                                                                单价: ￥{item.costPrice} | 小计: ￥{(item.costPrice * item.quantity).toFixed(2).replace(/\.00$/, '')}
-                                                                {order.totalAmount !== undefined && order.totalAmount !== null && Math.abs(order.totalAmount - (item.costPrice * item.quantity)) > 0.01 && (
-                                                                    <span className="text-[10px] text-muted-foreground/80 font-normal ml-1">
-                                                                        (整单实付: ￥{Number(order.totalAmount).toFixed(2).replace(/\.00$/, '')})
-                                                                    </span>
-                                                                )}
+                                                            <div className="text-[10px] text-muted-foreground flex items-center justify-end gap-1 mt-0.5 flex-wrap">
+                                                                {(() => {
+                                                                    const itemQty = Math.max(0, Number(item.quantity || 0));
+                                                                    const totalAdditionalFees = Number(order.shippingFees || 0) + Number(order.extraFees || 0);
+                                                                    let allocatedUnitCost = item.costPrice;
+                                                                    if (totalAdditionalFees > 0 && Array.isArray(order.items)) {
+                                                                        const totalItemValue = order.items.reduce((sum, it) => sum + (Number(it.costPrice || 0) * Number(it.quantity || 0)), 0);
+                                                                        const totalQuantity = order.items.reduce((sum, it) => sum + Number(it.quantity || 0), 0);
+                                                                        if (totalItemValue > 0 && itemQty > 0) {
+                                                                            const itemValue = Number(item.costPrice || 0) * itemQty;
+                                                                            const allocatedFee = totalAdditionalFees * (itemValue / totalItemValue);
+                                                                            allocatedUnitCost = Number(item.costPrice || 0) + (allocatedFee / itemQty);
+                                                                        } else if (totalQuantity > 0) {
+                                                                            allocatedUnitCost = Number(item.costPrice || 0) + (totalAdditionalFees / totalQuantity);
+                                                                        }
+                                                                    }
+                                                                    const hasShippingDiff = allocatedUnitCost > item.costPrice && Math.abs(allocatedUnitCost - item.costPrice) >= 0.001;
+
+                                                                    return (
+                                                                        <>
+                                                                            <span>进价: ￥{item.costPrice}</span>
+                                                                            {hasShippingDiff && (
+                                                                                <span className="text-amber-500 dark:text-amber-400 font-medium" title={`包含整单运费/附加费平摊(+￥${(allocatedUnitCost - item.costPrice).toFixed(2)}/件)`}>
+                                                                                    (实摊成本: ￥{allocatedUnitCost.toFixed(2).replace(/\.00$/, '')})
+                                                                                </span>
+                                                                            )}
+                                                                            <span> | 小计: ￥{(item.costPrice * item.quantity).toFixed(2).replace(/\.00$/, '')}</span>
+                                                                            {order.totalAmount !== undefined && order.totalAmount !== null && Math.abs(order.totalAmount - (item.costPrice * item.quantity)) > 0.01 && (
+                                                                                <span className="text-[10px] text-muted-foreground/80 font-normal ml-1">
+                                                                                    (整单实付: ￥{Number(order.totalAmount).toFixed(2).replace(/\.00$/, '')})
+                                                                                </span>
+                                                                            )}
+                                                                        </>
+                                                                    );
+                                                                })()}
                                                             </div>
                                                         )}
                                                     </div>
