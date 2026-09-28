@@ -7078,7 +7078,18 @@ async function resolveOutboundItemsForAutoPickOrder(
     const currentShopId = target.shopId || fullShopProduct?.shop?.id || internalShop?.id || null;
 
     if (isBundle && bundleItems && bundleItems.length > 0) {
-      const subPrice = FinanceMath.divide(itemPriceShare, bundleItems.length);
+      const totalCount = 1 + bundleItems.length;
+      const subPrice = FinanceMath.divide(itemPriceShare, totalCount);
+
+      // 1. 保留本体商品自身（扣除本体自身出库与库存）
+      resolvedItems.push({
+        productId: String(target.productId || target.sourceProductId || fullShopProduct?.productId || fullShopProduct?.sourceProductId || "").trim() || null,
+        shopProductId: target.id || null,
+        quantity: Math.max(1, Math.trunc(Number(quantity) || 1)),
+        price: subPrice,
+      });
+
+      // 2. 依次推入附带的各个配件（扣除配件出库与库存）
       for (const b of bundleItems) {
         let bShopProductId: string | null = null;
         let bProductId: string | null = b.productId || null;
@@ -7152,44 +7163,6 @@ async function resolveOutboundItemsForAutoPickOrder(
 
     // 1. 手动匹配处理
     if (manualMatchedProduct?.id) {
-      if ((manualMatchedProduct as any).bundleItems && Array.isArray((manualMatchedProduct as any).bundleItems)) {
-        const bundleItems = (manualMatchedProduct as any).bundleItems;
-        for (const bundleItem of bundleItems) {
-          const matchedShopProduct = await tx.shopProduct.findFirst({
-            where: {
-              id: bundleItem.shopProductId || bundleItem.id,
-              shop: { userId },
-            },
-            select: {
-              id: true,
-              productId: true,
-              sourceProductId: true,
-            },
-          });
-
-          const resolvedSubProductId = String(
-            matchedShopProduct?.productId
-            || matchedShopProduct?.sourceProductId
-            || bundleItem.id
-            || ""
-          ).trim() || null;
-
-          const bundleItemQty = typeof bundleItem.quantity === "number" && bundleItem.quantity > 0
-            ? bundleItem.quantity
-            : (item.quantity > 1 && item.quantity % bundleItems.length === 0
-              ? Math.max(1, Math.floor(item.quantity / bundleItems.length))
-              : Math.max(1, Number(item.quantity || 1) || 1));
-
-          resolvedItems.push({
-            productId: resolvedSubProductId,
-            shopProductId: bundleItem.shopProductId || bundleItem.id,
-            quantity: bundleItemQty,
-            price: FinanceMath.divide(priceShare, bundleItems.length),
-          });
-        }
-        continue;
-      }
-
       const storedManualShopProductId = String(manualMatchedProduct.shopProductId || "").trim() || null;
       let manualShopProductId: string | null = storedManualShopProductId;
       let manualResolvedProductId: string | null =
@@ -7249,6 +7222,14 @@ async function resolveOutboundItemsForAutoPickOrder(
           productId: manualResolvedProductId,
           sourceProductId: null,
           isBundle: manualIsBundle,
+          bundleItems: manualBundleItems,
+        }, manualQuantity > 1 ? Math.max(1, manualQuantity) : orderItemQuantity, priceShare);
+      } else if (manualIsBundle && manualBundleItems && manualBundleItems.length > 0) {
+        expandAndPushOutboundItem({
+          id: manualMatchedProduct.id,
+          productId: manualResolvedProductId,
+          sourceProductId: null,
+          isBundle: true,
           bundleItems: manualBundleItems,
         }, manualQuantity > 1 ? Math.max(1, manualQuantity) : orderItemQuantity, priceShare);
       } else {

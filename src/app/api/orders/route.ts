@@ -2817,7 +2817,7 @@ export async function GET(request: NextRequest) {
             (matchedProduct as any).isBundle = true;
             (matchedProduct as any).bundleItems = bundleItems;
           }
-          const displayItems = bundleItems
+          const bundleDisplayItems = bundleItems
             ? bundleItems.map((bItem: any) => {
                 const perPackQty = typeof bItem.quantity === "number" && bItem.quantity > 0 ? bItem.quantity : 1;
                 const bQty = perPackQty * Math.max(1, Number(item.quantity || 1) || 1);
@@ -2836,7 +2836,7 @@ export async function GET(request: NextRequest) {
                   foundBShopProduct?.productId,
                 );
                 return {
-                  name: bItem.name || item.productName || "未命名商品",
+                  name: bItem.name || "未命名配件",
                   sku: (
                     isJDPlatform(order.platform)
                       ? (bItem.jdSkuId || bItem.sku)
@@ -2848,6 +2848,28 @@ export async function GET(request: NextRequest) {
                   sourceId: bSourceId || undefined,
                 };
               })
+            : null;
+
+          const mainDisplayItem = bundleItems ? {
+            name: matchedProduct?.name || targetShopProduct?.name || item.productName || "未命名商品",
+            sku: (
+              isJDPlatform(order.platform)
+                ? (targetShopProduct?.jdSkuId || matchedProduct?.sku)
+                : (matchedProduct?.sku || targetShopProduct?.sku)
+            ) || item.productNo || "-",
+            image: matchedProduct?.image
+              ? storage.resolveUrl(matchedProduct.image)
+              : (targetShopProduct?.image ? storage.resolveUrl(targetShopProduct.image) : (item.thumb ? storage.resolveUrl(item.thumb) : null)),
+            quantity: Math.max(1, Number(item.quantity || 1) || 1),
+            ...resolveDisplayCost(
+              targetShopProduct?.shopProductId || (matchedProduct as any)?.shopProductId,
+              targetShopProduct?.productId || (matchedProduct as any)?.productId,
+            ),
+            sourceId: getProductSourceIdByPlatform(targetShopProduct, order.platform, parentPlatformSkuId),
+          } : null;
+
+          const displayItems = bundleDisplayItems && mainDisplayItem
+            ? [mainDisplayItem, ...bundleDisplayItems]
             : hasStrictMatchForAllSegmentsFromSku
             ? segmentsFromSku.map((candidate) => {
                 const segmentMatchedProduct = resolveStrictSkuMatch(candidate);
