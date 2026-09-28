@@ -348,7 +348,7 @@ function CompactTodayOrderCard({
               compact
               className="mr-auto h-6 max-w-[calc(100%_-_8.75rem)] gap-1 px-2 text-[10px] sm:h-6 sm:px-2 sm:text-[10px]"
             />
-            {showPlatformActions && !deleted && !order.isSubscribe ? (
+            {showPlatformActions && !deleted ? (
               <ActionButton
                 label="叫配送"
                 icon={<Navigation size={12} />}

@@ -3706,7 +3706,7 @@ export const OrderCard = memo(function OrderCard({
             ) : null}
             {showPlatformActions && !readOnly && (
               <>
-                {!deleted && !order.isSubscribe ? (
+                {!deleted ? (
                   <ActionButton
                     label="叫配送"
                     title="选择第三方运力并呼叫配送"
