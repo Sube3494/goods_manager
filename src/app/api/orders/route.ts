@@ -1598,6 +1598,7 @@ export async function GET(request: NextRequest) {
         totalCost: number;
         shopProductId: string | null;
         productId: string | null;
+        image?: string | null;
       }>;
     }>();
     const purchaseOrderItemIds = Array.from(new Set(
@@ -2725,9 +2726,27 @@ export async function GET(request: NextRequest) {
               ? { costPrice: purchaseCost, costSource: "current" as const }
               : { costPrice: null, costSource: undefined };
           };
-          const outboundItem = outboundBreakdown.length === order.items.length
+          const isSingleOrderItem = order.items.length === 1;
+          let outboundItem = outboundBreakdown.length === order.items.length
             ? outboundBreakdown[itemIndex]
-            : (outboundBreakdown.length === 1 && order.items.length === 1 ? outboundBreakdown[0] : null);
+            : (isSingleOrderItem && outboundBreakdown.length > 0 ? outboundBreakdown[0] : null);
+
+          if (!outboundItem && outboundBreakdown.length > 0) {
+            const candidateIds = [
+              manualMatchedProduct?.id,
+              manualMatchedProduct?.shopProductId,
+              platformStrictMatch?.id,
+              platformStrictMatch?.shopProductId,
+              fallbackStrictMatches[0]?.id,
+              fallbackStrictMatches[0]?.shopProductId,
+            ].filter(Boolean);
+            if (candidateIds.length > 0) {
+              outboundItem = outboundBreakdown.find((entry) =>
+                (entry.shopProductId && candidateIds.includes(entry.shopProductId))
+                || (entry.productId && candidateIds.includes(entry.productId))
+              ) || null;
+            }
+          }
           const outboundMatchedProduct = outboundItem?.shopProductId
             ? mappedShopProducts.find((product) => product.id === outboundItem.shopProductId) || null
             : null;
@@ -2850,8 +2869,39 @@ export async function GET(request: NextRequest) {
               })
             : null;
 
-          const mainDisplayItem = bundleItems ? {
-            name: matchedProduct?.name || targetShopProduct?.name || item.productName || "未命名商品",
+          const outboundFallbackBundleItems = (!bundleItems && isSingleOrderItem && outboundBreakdown.length > 1)
+            ? outboundBreakdown.slice(1).map((bOutbound) => {
+                const foundBShopProduct = mappedShopProducts.find((p) =>
+                  (bOutbound.shopProductId && p.id === bOutbound.shopProductId)
+                  || (bOutbound.productId && (p.productId === bOutbound.productId || p.id === bOutbound.productId))
+                );
+                const bFallbackImg = foundBShopProduct?.image || null;
+                const bResolvedImg = bOutbound.image ? storage.resolveUrl(bOutbound.image) : bFallbackImg;
+                const bSourceId = getProductSourceIdByPlatform(foundBShopProduct, order.platform, parentPlatformSkuId);
+                const outboundCostCents = Number(bOutbound.unitCost || 0);
+                const displayCost = Number.isFinite(outboundCostCents) && outboundCostCents > 0
+                  ? { costPrice: roundCurrency(outboundCostCents / 100), costSource: "outbound" as const }
+                  : resolveDisplayCost(bOutbound.shopProductId, bOutbound.productId, bOutbound);
+                return {
+                  name: bOutbound.name || foundBShopProduct?.name || "未命名配件",
+                  sku: (
+                    isJDPlatform(order.platform)
+                      ? (foundBShopProduct?.jdSkuId || foundBShopProduct?.sku)
+                      : (foundBShopProduct?.sku || foundBShopProduct?.jdSkuId)
+                  ) || "-",
+                  image: bResolvedImg,
+                  quantity: bOutbound.quantity || 1,
+                  ...displayCost,
+                  sourceId: bSourceId || undefined,
+                };
+              })
+            : null;
+
+          const effectiveBundleDisplayItems = bundleDisplayItems || outboundFallbackBundleItems;
+          const hasEffectiveBundle = Boolean(effectiveBundleDisplayItems && effectiveBundleDisplayItems.length > 0);
+
+          const mainDisplayItem = hasEffectiveBundle ? {
+            name: matchedProduct?.name || targetShopProduct?.name || outboundItem?.name || item.productName || "未命名商品",
             sku: (
               isJDPlatform(order.platform)
                 ? (targetShopProduct?.jdSkuId || matchedProduct?.sku)
@@ -2859,17 +2909,20 @@ export async function GET(request: NextRequest) {
             ) || item.productNo || "-",
             image: matchedProduct?.image
               ? storage.resolveUrl(matchedProduct.image)
-              : (targetShopProduct?.image ? storage.resolveUrl(targetShopProduct.image) : (item.thumb ? storage.resolveUrl(item.thumb) : null)),
+              : (targetShopProduct?.image
+                ? storage.resolveUrl(targetShopProduct.image)
+                : (outboundItem?.image ? storage.resolveUrl(outboundItem.image) : (item.thumb ? storage.resolveUrl(item.thumb) : null))),
             quantity: Math.max(1, Number(item.quantity || 1) || 1),
             ...resolveDisplayCost(
-              targetShopProduct?.shopProductId || (matchedProduct as any)?.shopProductId,
-              targetShopProduct?.productId || (matchedProduct as any)?.productId,
+              targetShopProduct?.shopProductId || (matchedProduct as any)?.shopProductId || outboundItem?.shopProductId,
+              targetShopProduct?.productId || (matchedProduct as any)?.productId || outboundItem?.productId,
+              outboundItem,
             ),
             sourceId: getProductSourceIdByPlatform(targetShopProduct, order.platform, parentPlatformSkuId),
           } : null;
 
-          const displayItems = bundleDisplayItems && mainDisplayItem
-            ? [mainDisplayItem, ...bundleDisplayItems]
+          const displayItems = effectiveBundleDisplayItems && mainDisplayItem
+            ? [mainDisplayItem, ...effectiveBundleDisplayItems]
             : hasStrictMatchForAllSegmentsFromSku
             ? segmentsFromSku.map((candidate) => {
                 const segmentMatchedProduct = resolveStrictSkuMatch(candidate);
