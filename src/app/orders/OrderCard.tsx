@@ -2610,6 +2610,378 @@ export class OrderCardErrorBoundary extends Component<{ children: React.ReactNod
   }
 }
 
+export interface OrderProfitBadgeProps {
+  order: AutoPickOrder;
+  readOnly?: boolean;
+  canViewProductCosts?: boolean;
+  isProfitUpdating?: boolean;
+  compact?: boolean;
+  align?: "center" | "right";
+  onOpenCostBackfill?: (order: AutoPickOrder) => void;
+  onEditCommission?: () => void;
+}
+
+export const OrderProfitBadge = memo(function OrderProfitBadge({
+  order,
+  readOnly = false,
+  canViewProductCosts = true,
+  isProfitUpdating = false,
+  compact = false,
+  align = "center",
+  onOpenCostBackfill,
+  onEditCommission,
+}: OrderProfitBadgeProps) {
+  const [isProfitTooltipOpen, setIsProfitTooltipOpen] = useState(false);
+  const [isProfitTooltipHovering, setIsProfitTooltipHovering] = useState(false);
+  const profitTooltipRef = useRef<HTMLDivElement>(null);
+  const profitTooltipHoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearProfitTooltipHoverTimeout = useCallback(() => {
+    if (profitTooltipHoverTimeoutRef.current) {
+      clearTimeout(profitTooltipHoverTimeoutRef.current);
+      profitTooltipHoverTimeoutRef.current = null;
+    }
+  }, []);
+
+  const openProfitTooltipHover = useCallback(() => {
+    clearProfitTooltipHoverTimeout();
+    setIsProfitTooltipHovering(true);
+  }, [clearProfitTooltipHoverTimeout]);
+
+  const closeProfitTooltipHover = useCallback(() => {
+    clearProfitTooltipHoverTimeout();
+    profitTooltipHoverTimeoutRef.current = setTimeout(() => {
+      setIsProfitTooltipHovering(false);
+      profitTooltipHoverTimeoutRef.current = null;
+    }, 180);
+  }, [clearProfitTooltipHoverTimeout]);
+
+  const closeProfitTooltip = useCallback(() => {
+    clearProfitTooltipHoverTimeout();
+    setIsProfitTooltipHovering(false);
+    setIsProfitTooltipOpen(false);
+  }, [clearProfitTooltipHoverTimeout]);
+
+  const handleProfitTooltipTriggerClick = useCallback((event: React.MouseEvent) => {
+    event.stopPropagation();
+    clearProfitTooltipHoverTimeout();
+    setIsProfitTooltipOpen((current) => {
+      if (current) {
+        setIsProfitTooltipHovering(false);
+      }
+      return !current;
+    });
+  }, [clearProfitTooltipHoverTimeout]);
+
+  useEffect(() => {
+    if (!isProfitTooltipOpen) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!profitTooltipRef.current?.contains(event.target as Node)) {
+        closeProfitTooltip();
+      }
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [closeProfitTooltip, isProfitTooltipOpen]);
+
+  useEffect(() => {
+    return () => {
+      clearProfitTooltipHoverTimeout();
+    };
+  }, [clearProfitTooltipHoverTimeout]);
+
+  const isProfitTooltipVisible = isProfitTooltipOpen || isProfitTooltipHovering;
+
+  const isPureOffline = isPureManualOfflineOrder(order);
+  const displayAsOfflineOrder = isPureOffline;
+  const deliveryFee = getDeliveryFee(order.delivery, order);
+  const hasDeliveryAddress = Boolean(String(order.userAddress || "").trim());
+  const pickup = Boolean(order.isPickup) || (displayAsOfflineOrder && deliveryFee <= 0 && !hasDeliveryAddress);
+  const showManualDeliveryMarker = displayAsOfflineOrder && !pickup;
+
+  const effectiveRawExpectedIncome = order.expectedIncome;
+  const expectedIncome = getExpectedIncome(effectiveRawExpectedIncome, order.actualPaid, order.platformCommission, order.platform);
+  const serviceFeeRate = Number(order.serviceFeeRate || 0);
+  const productCost = Number(order.productCost || 0);
+  const productCostBreakdown = Array.isArray(order.productCostBreakdown) ? order.productCostBreakdown : [];
+  const canEditProductCost = !readOnly && order.productCostStatus === "ready" && productCostBreakdown.length > 0 && Boolean(onOpenCostBackfill);
+  const settlementAfterRate = Math.round(expectedIncome * (1 - serviceFeeRate));
+  const hasPureProfit = typeof order.pureProfit === "number" && Number.isFinite(order.pureProfit);
+  const pureProfit = hasPureProfit ? Number(order.pureProfit) : 0;
+  const productCostStatusText = getProductCostStatusText(order);
+  const refundAmount = Math.max(0, Number(order.refundAmount || 0));
+  const hasRefundAmount = refundAmount > 0;
+  const returnExtraExpense = Math.max(0, Number(order.returnExtraExpense || 0));
+  const hasReturnExtraExpense = returnExtraExpense > 0;
+
+  if (isProfitUpdating) {
+    return null;
+  }
+
+  if (!hasPureProfit && !productCostStatusText) {
+    return null;
+  }
+
+  const pureProfitTooltipRows: Array<{ label: string; value: string; editable?: boolean; onEdit?: () => void }> = hasPureProfit
+    ? (showManualDeliveryMarker
+      ? [
+          { label: "订单收入", value: toCurrency(expectedIncome) },
+          { label: "扣配送费", value: toCurrency(-deliveryFee) },
+        ]
+      : order.isMainSystemSelfDelivery
+      ? [
+          { label: "扣平台佣金", value: toCurrency(order.platformCommission) },
+          {
+            label: "扣刷单佣金",
+            value: toCurrency(- (typeof order.brushCommission === "number" ? Math.round(order.brushCommission * 100) : -pureProfit - Number(order.platformCommission || 0))),
+            editable: !readOnly && Boolean(onEditCommission),
+            onEdit: readOnly || !onEditCommission ? undefined : () => {
+              closeProfitTooltip();
+              onEditCommission();
+            },
+          },
+        ]
+        : [
+            { label: "预计到手", value: toCurrency(hasRefundAmount ? expectedIncome + refundAmount : expectedIncome) },
+            ...(hasRefundAmount ? [{ label: "减退款", value: toCurrency(refundAmount) }] : []),
+            { label: `扣抽出 ${formatPercent(serviceFeeRate)} 后`, value: toCurrency(settlementAfterRate) },
+            { label: "减配送费", value: toCurrency(deliveryFee) },
+            ...(canViewProductCosts ? [{ label: "减货品成本", value: toCurrency(productCost), editable: canEditProductCost }] : []),
+            ...(hasReturnExtraExpense ? [{ label: "减退货支出", value: toCurrency(returnExtraExpense) }] : []),
+          ])
+    : productCostStatusText
+      ? [
+          { label: "预计到手", value: toCurrency(hasRefundAmount ? expectedIncome + refundAmount : expectedIncome) },
+          ...(hasRefundAmount ? [{ label: "退款", value: toCurrency(refundAmount) }] : []),
+          { label: "抽出率", value: formatPercent(serviceFeeRate) },
+          { label: "配送费", value: toCurrency(deliveryFee) },
+          ...(canViewProductCosts ? [{ label: "货品成本", value: productCostStatusText, editable: canEditProductCost }] : []),
+          ...(hasReturnExtraExpense ? [{ label: "退货支出", value: toCurrency(returnExtraExpense) }] : []),
+        ]
+      : [];
+
+  return (
+    <div
+      ref={profitTooltipRef}
+      className="group/profit relative inline-flex"
+      onMouseEnter={openProfitTooltipHover}
+      onMouseLeave={closeProfitTooltipHover}
+    >
+      {hasPureProfit ? (
+        compact ? (
+          <button
+            type="button"
+            onClick={handleProfitTooltipTriggerClick}
+            aria-expanded={isProfitTooltipVisible}
+            className={cn(
+              "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs tabular-nums transition-all duration-200 hover:-translate-y-px active:translate-y-0 cursor-pointer",
+              pureProfit >= 0
+                ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 hover:border-emerald-500/35 hover:bg-emerald-500/14 dark:text-emerald-300"
+                : "border-rose-500/20 bg-rose-500/10 text-rose-700 hover:border-rose-500/35 hover:bg-rose-500/14 dark:text-rose-300"
+            )}
+          >
+            <span className="text-[11px] font-medium opacity-80">利润</span>
+            <span className="text-xs font-bold sm:text-[13px]">{toCurrency(pureProfit)}</span>
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={handleProfitTooltipTriggerClick}
+            aria-expanded={isProfitTooltipVisible}
+            className={cn(
+              "animate-in fade-in zoom-in-95 motion-reduce:animate-none inline-flex h-7 min-w-0 items-center gap-1 rounded-full border px-2 text-[11px] font-medium leading-none transition-all duration-300 hover:-translate-y-px active:translate-y-0 sm:h-8 sm:gap-1.5 sm:px-2.5 sm:text-[13px] cursor-pointer",
+              pureProfit >= 0
+                ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 hover:border-emerald-500/35 hover:bg-emerald-500/14 dark:text-emerald-300"
+                : "border-rose-500/20 bg-rose-500/10 text-rose-700 hover:border-rose-500/35 hover:bg-rose-500/14 dark:text-rose-300"
+            )}
+          >
+            <span className="shrink-0">纯利润</span>
+            <span className="truncate font-semibold">{toCurrency(pureProfit)}</span>
+          </button>
+        )
+      ) : readOnly || !onOpenCostBackfill ? (
+        <span
+          className={cn(
+            "inline-flex min-w-0 items-center gap-1 rounded-full border border-orange-500/20 bg-orange-500/10 px-2 text-[11px] font-medium leading-none text-orange-700 dark:text-orange-300",
+            compact ? "px-2.5 py-1 text-xs" : "h-7 sm:h-8 sm:gap-1.5 sm:px-2.5 sm:text-[13px]"
+          )}
+        >
+          <span className="shrink-0">成本</span>
+          <span className="truncate">{productCostStatusText}</span>
+        </span>
+      ) : (
+        <button
+          type="button"
+          onClick={() => onOpenCostBackfill(order)}
+          className={cn(
+            "inline-flex min-w-0 items-center gap-1 rounded-full border border-orange-500/20 bg-orange-500/10 px-2 text-[11px] font-medium leading-none text-orange-700 transition-all hover:border-orange-500/35 hover:bg-orange-500/14 dark:text-orange-300 cursor-pointer",
+            compact ? "px-2.5 py-1 text-xs" : "h-7 sm:h-8 sm:gap-1.5 sm:px-2.5 sm:text-[13px]"
+          )}
+        >
+          <span className="shrink-0">成本</span>
+          <span className="truncate">{productCostStatusText}</span>
+        </button>
+      )}
+
+      {pureProfitTooltipRows.length > 0 ? (
+        <>
+          <div
+            className={cn(
+              "pointer-events-none absolute top-full hidden h-4 w-70 sm:block",
+              align === "right" ? "right-0" : "left-1/2 -translate-x-1/2"
+            )}
+          />
+          {isProfitTooltipOpen ? (
+            <div
+              className="fixed inset-0 z-40 bg-slate-950/42 sm:hidden"
+              onPointerDown={(event) => {
+                event.preventDefault();
+                closeProfitTooltip();
+              }}
+              onClick={closeProfitTooltip}
+            />
+          ) : null}
+          {isProfitTooltipVisible ? (
+            <div
+              className={cn(
+                "fixed left-1/2 top-1/2 z-50 w-[min(320px,calc(100vw-2rem))] max-h-[calc(100vh-2rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border border-slate-200/90 bg-white/98 p-3 text-left shadow-[0_22px_60px_rgba(15,23,42,0.22)] dark:border-white/12 dark:bg-[#171b22]/96 dark:shadow-[0_24px_60px_rgba(0,0,0,0.45)] sm:absolute sm:top-full sm:z-30 sm:mt-3 sm:w-70 sm:max-h-none sm:translate-y-0 sm:overflow-visible",
+                align === "right"
+                  ? "sm:right-0 sm:left-auto sm:translate-x-0"
+                  : "sm:left-1/2 sm:right-auto sm:-translate-x-1/2"
+              )}
+            >
+              <div
+                className={cn(
+                  "hidden absolute top-0 h-3 w-3 -translate-y-1/2 rotate-45 border-l border-t border-slate-200/90 bg-white/98 dark:border-white/12 dark:bg-[#171b22]/96 sm:block",
+                  align === "right" ? "right-6 sm:right-6" : "left-1/2 -translate-x-1/2"
+                )}
+              />
+              <button
+                type="button"
+                onPointerDown={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  closeProfitTooltip();
+                }}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  closeProfitTooltip();
+                }}
+                className="absolute right-3 top-3 inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200/80 bg-white/90 text-slate-500 transition-colors hover:text-slate-900 dark:border-white/10 dark:bg-white/6 dark:text-white/55 dark:hover:text-white sm:hidden"
+                aria-label="关闭利润计算"
+              >
+                <X size={14} />
+              </button>
+              <div className="flex items-start justify-between gap-3 border-b border-slate-200/80 pb-2 pr-10 dark:border-white/8 sm:items-center sm:pr-0">
+                <div className="min-w-0">
+                  <div className="text-[11px] font-semibold tracking-[0.12em] text-slate-500 dark:text-white/45">
+                    利润拆解
+                  </div>
+                  <div className="mt-0.5 text-[13px] font-semibold text-slate-900 dark:text-white">
+                    {hasPureProfit ? "这单的纯利润计算" : "这单的成本状态"}
+                  </div>
+                </div>
+              </div>
+              <div className="mt-3 space-y-2">
+                {pureProfitTooltipRows.map((row, index) => (
+                  <div
+                    key={row.label}
+                    className="flex items-center justify-between gap-4 rounded-xl bg-slate-50 px-3 py-2 text-[12px] leading-5 dark:bg-white/5"
+                  >
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white text-[11px] font-semibold text-slate-500 shadow-sm dark:bg-white/10 dark:text-white/55">
+                        {index + 1}
+                      </span>
+                      <span className="truncate text-slate-600 dark:text-white/68">
+                        {row.label}
+                      </span>
+                    </div>
+                    <span className="flex shrink-0 items-center gap-1.5 font-semibold text-slate-950 dark:text-white">
+                      <span>{row.value}</span>
+                      {row.editable ? (
+                        <button
+                          type="button"
+                          aria-label={row.onEdit ? "修改刷单佣金" : "修改货品成本"}
+                          title={row.onEdit ? "修改刷单佣金" : "修改货品成本"}
+                          onClick={() => {
+                            closeProfitTooltip();
+                            if (row.onEdit) {
+                              row.onEdit();
+                            } else if (onOpenCostBackfill) {
+                              onOpenCostBackfill(order);
+                            }
+                          }}
+                          className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-sky-500/22 bg-sky-500/10 text-sky-700 transition-all hover:border-sky-500/38 hover:bg-sky-500/16 dark:text-sky-300 cursor-pointer"
+                        >
+                          <Pencil size={11} className="shrink-0" />
+                        </button>
+                      ) : null}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              {canViewProductCosts && hasPureProfit && productCostBreakdown.length > 0 ? (
+                <div className="mt-3 rounded-xl border border-slate-200/80 bg-slate-50/80 p-3 dark:border-white/8 dark:bg-white/4">
+                  <div className="text-[11px] font-semibold tracking-[0.08em] text-slate-500 dark:text-white/45">
+                    货品成本明细
+                  </div>
+                  <div className="mt-2 space-y-2">
+                    {productCostBreakdown.map((item, index) => {
+                      const costComposition = getProductCostComposition(item);
+                      return (
+                        <div key={`${item.name}-${index}`} className="flex items-start justify-between gap-3 text-[12px]">
+                          <div className="min-w-0">
+                            <div className="truncate font-medium text-slate-900 dark:text-white">
+                              {item.name}
+                            </div>
+                            <div className="mt-0.5 flex flex-wrap gap-x-1 text-[11px] text-slate-500 dark:text-white/45">
+                              <span>x{item.quantity} · {toCurrency(item.unitCost)}/件</span>
+                              {costComposition ? (
+                                <span>（{toCurrency(costComposition.baseUnitCost)}进价 + {toCurrency(costComposition.additionalFee)}{costComposition.feeLabel}）</span>
+                              ) : null}
+                            </div>
+                          </div>
+                          <div className="shrink-0 font-semibold text-slate-900 dark:text-white">
+                            {toCurrency(item.totalCost)}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
+              <div className={cn(
+                "mt-3 rounded-xl border px-3 py-2.5",
+                hasPureProfit
+                  ? (pureProfit >= 0
+                    ? "border-emerald-500/20 bg-emerald-500/8 dark:border-emerald-500/20 dark:bg-emerald-500/10"
+                    : "border-rose-500/20 bg-rose-500/8 dark:border-rose-500/20 dark:bg-rose-500/10")
+                  : "border-orange-500/20 bg-orange-500/8 dark:border-orange-500/20 dark:bg-orange-500/10"
+              )}>
+                <div className="flex items-center justify-between gap-4 text-[13px]">
+                  <span className="whitespace-nowrap font-semibold text-slate-900 dark:text-white">
+                    {hasPureProfit ? "最终纯利润" : "当前状态"}
+                  </span>
+                  <span className={cn(
+                    "whitespace-nowrap text-[15px] font-bold",
+                    hasPureProfit
+                      ? (pureProfit >= 0 ? "text-emerald-700 dark:text-emerald-300" : "text-rose-700 dark:text-rose-300")
+                      : "text-orange-700 dark:text-orange-300"
+                  )}>
+                    {hasPureProfit ? toCurrency(pureProfit) : productCostStatusText}
+                  </span>
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </>
+      ) : null}
+    </div>
+  );
+});
+
 export const OrderCard = memo(function OrderCard({
   order,
   expanded,
@@ -2640,8 +3012,6 @@ export const OrderCard = memo(function OrderCard({
   onRefresh?: () => void;
 }) {
   const { showToast } = useToast();
-  const [isProfitTooltipOpen, setIsProfitTooltipOpen] = useState(false);
-  const [isProfitTooltipHovering, setIsProfitTooltipHovering] = useState(false);
   const [isUpdatingBrush, setIsUpdatingBrush] = useState(false);
   const [isAmountEditorOpen, setIsAmountEditorOpen] = useState(false);
   const [isSavingAmount, setIsSavingAmount] = useState(false);
@@ -2721,27 +3091,6 @@ export const OrderCard = memo(function OrderCard({
       return false;
     }
   }, [order.id, showToast, onRefresh]);
-  const profitTooltipHoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const clearProfitTooltipHoverTimeout = useCallback(() => {
-    if (profitTooltipHoverTimeoutRef.current) {
-      clearTimeout(profitTooltipHoverTimeoutRef.current);
-      profitTooltipHoverTimeoutRef.current = null;
-    }
-  }, []);
-
-  const openProfitTooltipHover = useCallback(() => {
-    clearProfitTooltipHoverTimeout();
-    setIsProfitTooltipHovering(true);
-  }, [clearProfitTooltipHoverTimeout]);
-
-  const closeProfitTooltipHover = useCallback(() => {
-    clearProfitTooltipHoverTimeout();
-    profitTooltipHoverTimeoutRef.current = setTimeout(() => {
-      setIsProfitTooltipHovering(false);
-      profitTooltipHoverTimeoutRef.current = null;
-    }, 180);
-  }, [clearProfitTooltipHoverTimeout]);
 
   const handleUpdateBrush = useCallback(async (val: boolean) => {
     if (val === order.isMainSystemSelfDelivery) return;
@@ -2875,7 +3224,6 @@ export const OrderCard = memo(function OrderCard({
     }
   }, [order.id, showToast, onRefresh]);
 
-  const profitTooltipRef = useRef<HTMLDivElement | null>(null);
   const legacyManualDeliveryPlaceholderOrder = isLegacyManualDeliveryPlaceholderOrder(order);
   const visibleItems = getVisibleOrderItems(order.items);
   const unmatchedPlaceholderItem = (order.items || []).find(isUnmatchedOrIgnoredItem);
@@ -3068,94 +3416,16 @@ export const OrderCard = memo(function OrderCard({
     }
     return acc;
   }, new Map<string, Array<{ createdAt: string; reason: string; quantity: number; refundAmount?: number; extraExpense?: number }>>());
-  const canEditProductCost = !readOnly && order.productCostStatus === "ready" && productCostBreakdown.length > 0;
-  const settlementAfterRate = Math.round(expectedIncome * (1 - serviceFeeRate));
   const isJdPlatformOrder = isJdOrder(order.platform);
   const isDoudianPlatformOrder = isDoudianOrder(order.platform);
   const isMeituanPlatformOrder = isMeituanOrder(order.platform);
   const canEditExpectedIncome = !readOnly && (isJdPlatformOrder || isDoudianPlatformOrder || legacyManualDeliveryPlaceholderOrder);
-  const pureProfitTooltipRows: Array<{ label: string; value: string; editable?: boolean; onEdit?: () => void }> = hasPureProfit
-    ? (showManualDeliveryMarker
-      ? [
-          { label: "订单收入", value: toCurrency(expectedIncome) },
-          { label: "扣配送费", value: toCurrency(-deliveryFee) },
-        ]
-      : order.isMainSystemSelfDelivery
-      ? [
-          { label: "扣平台佣金", value: toCurrency(order.platformCommission) },
-          {
-            label: "扣刷单佣金",
-            value: toCurrency(- (typeof order.brushCommission === "number" ? Math.round(order.brushCommission * 100) : -pureProfit - Number(order.platformCommission || 0))),
-            editable: !readOnly,
-            onEdit: readOnly ? undefined : () => {
-              const currentVal = typeof order.brushCommission === "number"
-                ? order.brushCommission
-                : (-pureProfit - Number(order.platformCommission || 0)) / 100;
-              setEditCommissionValue(String(currentVal > 0 ? currentVal : ""));
-              setIsProfitTooltipOpen(false);
-              setIsCommissionEditorOpen(true);
-            },
-          },
-        ]
-        : [
-            { label: "预计到手", value: toCurrency(hasRefundAmount ? expectedIncome + refundAmount : expectedIncome) },
-            ...(hasRefundAmount ? [{ label: "减退款", value: toCurrency(refundAmount) }] : []),
-            { label: `扣抽出 ${formatPercent(serviceFeeRate)} 后`, value: toCurrency(settlementAfterRate) },
-            { label: "减配送费", value: toCurrency(deliveryFee) },
-            ...(canViewProductCosts ? [{ label: "减货品成本", value: toCurrency(productCost), editable: canEditProductCost }] : []),
-            ...(hasReturnExtraExpense ? [{ label: "减退货支出", value: toCurrency(returnExtraExpense) }] : []),
-          ])
-    : productCostStatusText
-      ? [
-          { label: "预计到手", value: toCurrency(hasRefundAmount ? expectedIncome + refundAmount : expectedIncome) },
-          ...(hasRefundAmount ? [{ label: "退款", value: toCurrency(refundAmount) }] : []),
-          { label: "抽出率", value: formatPercent(serviceFeeRate) },
-          { label: "配送费", value: toCurrency(deliveryFee) },
-          ...(canViewProductCosts ? [{ label: "货品成本", value: productCostStatusText, editable: canEditProductCost }] : []),
-          ...(hasReturnExtraExpense ? [{ label: "退货支出", value: toCurrency(returnExtraExpense) }] : []),
-        ]
-      : [];
   const sourceLabel = getOrderSourceLabel(order);
   const deadlineDisplay = getDeadlineDisplay(order);
   const autoCompleteFailed = hasAutoCompleteFailure(order);
   const autoOutboundFailed = hasAutoOutboundFailure(order);
   const compactCompletedAt = formatCompactDateTime(order.completedAt);
   const compactDeadlineDisplay = formatCompactDateTime(deadlineDisplay);
-  const isProfitTooltipVisible = isProfitTooltipOpen || isProfitTooltipHovering;
-  const closeProfitTooltip = useCallback(() => {
-    clearProfitTooltipHoverTimeout();
-    setIsProfitTooltipHovering(false);
-    setIsProfitTooltipOpen(false);
-  }, [clearProfitTooltipHoverTimeout]);
-
-  const handleProfitTooltipTriggerClick = useCallback(() => {
-    clearProfitTooltipHoverTimeout();
-    setIsProfitTooltipOpen((current) => {
-      if (current) {
-        setIsProfitTooltipHovering(false);
-      }
-      return !current;
-    });
-  }, [clearProfitTooltipHoverTimeout]);
-
-  useEffect(() => {
-    if (!isProfitTooltipOpen) return;
-
-    const handlePointerDown = (event: PointerEvent) => {
-      if (!profitTooltipRef.current?.contains(event.target as Node)) {
-        closeProfitTooltip();
-      }
-    };
-
-    document.addEventListener("pointerdown", handlePointerDown);
-    return () => document.removeEventListener("pointerdown", handlePointerDown);
-  }, [closeProfitTooltip, isProfitTooltipOpen]);
-
-  useEffect(() => {
-    return () => {
-      clearProfitTooltipHoverTimeout();
-    };
-  }, [clearProfitTooltipHoverTimeout]);
 
   return (
     <>
@@ -3308,185 +3578,20 @@ export const OrderCard = memo(function OrderCard({
                       <span className="truncate font-semibold">{toCurrency(refundAmount)}</span>
                     </span>
                   ) : null}
-                  {!isProfitUpdating && hasPureProfit ? (
-                    <div
-                      ref={profitTooltipRef}
-                      className="group/profit relative"
-                      onMouseEnter={openProfitTooltipHover}
-                      onMouseLeave={closeProfitTooltipHover}
-                    >
-                      {hasPureProfit ? (
-                        <button
-                          type="button"
-                          onClick={handleProfitTooltipTriggerClick}
-                          aria-expanded={isProfitTooltipVisible}
-                          className={cn(
-                            "animate-in fade-in zoom-in-95 motion-reduce:animate-none inline-flex h-7 min-w-0 items-center gap-1 rounded-full border px-2 text-[11px] font-medium leading-none transition-all duration-300 hover:-translate-y-px active:translate-y-0 sm:h-8 sm:gap-1.5 sm:px-2.5 sm:text-[13px]",
-                            pureProfit >= 0
-                              ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 hover:border-emerald-500/35 hover:bg-emerald-500/14 dark:text-emerald-300"
-                              : "border-rose-500/20 bg-rose-500/10 text-rose-700 hover:border-rose-500/35 hover:bg-rose-500/14 dark:text-rose-300"
-                          )}
-                        >
-                          <span className="shrink-0">纯利润</span>
-                          <span className="truncate font-semibold">{toCurrency(pureProfit)}</span>
-                        </button>
-                      ) : readOnly ? (
-                        <span
-                          className="inline-flex h-7 min-w-0 items-center gap-1 rounded-full border border-orange-500/20 bg-orange-500/10 px-2 text-[11px] font-medium leading-none text-orange-700 dark:text-orange-300 sm:h-8 sm:gap-1.5 sm:px-2.5 sm:text-[13px]"
-                        >
-                          <span className="shrink-0">成本</span>
-                          <span className="truncate">{productCostStatusText}</span>
-                        </span>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => onOpenCostBackfill(order)}
-                          className="inline-flex h-7 min-w-0 items-center gap-1 rounded-full border border-orange-500/20 bg-orange-500/10 px-2 text-[11px] font-medium leading-none text-orange-700 transition-all hover:border-orange-500/35 hover:bg-orange-500/14 dark:text-orange-300 sm:h-8 sm:gap-1.5 sm:px-2.5 sm:text-[13px]"
-                        >
-                          <span className="shrink-0">成本</span>
-                          <span className="truncate">{productCostStatusText}</span>
-                        </button>
-                      )}
-                      {pureProfitTooltipRows.length > 0 ? (
-                        <>
-                          <div className="pointer-events-none absolute left-1/2 top-full hidden h-4 w-70 -translate-x-1/2 sm:block" />
-                          {isProfitTooltipOpen ? (
-                            <div
-                              className="fixed inset-0 z-40 bg-slate-950/42 sm:hidden"
-                              onPointerDown={(event) => {
-                                event.preventDefault();
-                                closeProfitTooltip();
-                              }}
-                              onClick={closeProfitTooltip}
-                            />
-                          ) : null}
-                          {isProfitTooltipVisible ? (
-                            <div className={cn(
-                              "fixed left-1/2 top-1/2 z-50 w-[min(320px,calc(100vw-2rem))] max-h-[calc(100vh-2rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border border-slate-200/90 bg-white/98 p-3 text-left shadow-[0_22px_60px_rgba(15,23,42,0.22)] dark:border-white/12 dark:bg-[#171b22]/96 dark:shadow-[0_24px_60px_rgba(0,0,0,0.45)] sm:absolute sm:left-1/2 sm:top-full sm:z-30 sm:mt-3 sm:w-70 sm:max-h-none sm:-translate-x-1/2 sm:translate-y-0 sm:overflow-visible"
-                            )}>
-                            <div className="hidden absolute left-12 top-0 h-3 w-3 -translate-y-1/2 rotate-45 border-l border-t border-slate-200/90 bg-white/98 dark:border-white/12 dark:bg-[#171b22]/96 sm:block sm:left-1/2 sm:-translate-x-1/2" />
-                            <button
-                              type="button"
-                              onPointerDown={(event) => {
-                                event.preventDefault();
-                                event.stopPropagation();
-                                closeProfitTooltip();
-                              }}
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                closeProfitTooltip();
-                              }}
-                              className="absolute right-3 top-3 inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200/80 bg-white/90 text-slate-500 transition-colors hover:text-slate-900 dark:border-white/10 dark:bg-white/6 dark:text-white/55 dark:hover:text-white sm:hidden"
-                              aria-label="关闭利润计算"
-                            >
-                              <X size={14} />
-                            </button>
-                            <div className="flex items-start justify-between gap-3 border-b border-slate-200/80 pb-2 pr-10 dark:border-white/8 sm:items-center sm:pr-0">
-                              <div className="min-w-0">
-                                <div className="text-[11px] font-semibold tracking-[0.12em] text-slate-500 dark:text-white/45">
-                                  利润拆解
-                                </div>
-                                <div className="mt-0.5 text-[13px] font-semibold text-slate-900 dark:text-white">
-                                  {hasPureProfit ? "这单的纯利润计算" : "这单的成本状态"}
-                                </div>
-                              </div>
-                            </div>
-                            <div className="mt-3 space-y-2">
-                              {pureProfitTooltipRows.map((row, index) => (
-                                <div
-                                  key={row.label}
-                                  className="flex items-center justify-between gap-4 rounded-xl bg-slate-50 px-3 py-2 text-[12px] leading-5 dark:bg-white/5"
-                                >
-                                  <div className="flex min-w-0 items-center gap-2">
-                                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white text-[11px] font-semibold text-slate-500 shadow-sm dark:bg-white/10 dark:text-white/55">
-                                      {index + 1}
-                                    </span>
-                                    <span className="truncate text-slate-600 dark:text-white/68">
-                                      {row.label}
-                                    </span>
-                                  </div>
-                                  <span className="flex shrink-0 items-center gap-1.5 font-semibold text-slate-950 dark:text-white">
-                                    <span>{row.value}</span>
-                                    {row.editable ? (
-                                      <button
-                                        type="button"
-                                        aria-label={row.onEdit ? "修改刷单佣金" : "修改货品成本"}
-                                        title={row.onEdit ? "修改刷单佣金" : "修改货品成本"}
-                                        onClick={() => {
-                                          setIsProfitTooltipOpen(false);
-                                          if (row.onEdit) {
-                                            row.onEdit();
-                                          } else {
-                                            onOpenCostBackfill(order);
-                                          }
-                                        }}
-                                        className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-sky-500/22 bg-sky-500/10 text-sky-700 transition-all hover:border-sky-500/38 hover:bg-sky-500/16 dark:text-sky-300"
-                                      >
-                                        <Pencil size={11} className="shrink-0" />
-                                      </button>
-                                    ) : null}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
-                            {canViewProductCosts && hasPureProfit && productCostBreakdown.length > 0 ? (
-                              <div className="mt-3 rounded-xl border border-slate-200/80 bg-slate-50/80 p-3 dark:border-white/8 dark:bg-white/4">
-                                <div className="text-[11px] font-semibold tracking-[0.08em] text-slate-500 dark:text-white/45">
-                                  货品成本明细
-                                </div>
-                                <div className="mt-2 space-y-2">
-                                  {productCostBreakdown.map((item, index) => {
-                                    const costComposition = getProductCostComposition(item);
-                                    return (
-                                      <div key={`${item.name}-${index}`} className="flex items-start justify-between gap-3 text-[12px]">
-                                        <div className="min-w-0">
-                                          <div className="truncate font-medium text-slate-900 dark:text-white">
-                                            {item.name}
-                                          </div>
-                                          <div className="mt-0.5 flex flex-wrap gap-x-1 text-[11px] text-slate-500 dark:text-white/45">
-                                            <span>x{item.quantity} · {toCurrency(item.unitCost)}/件</span>
-                                            {costComposition ? (
-                                              <span>（{toCurrency(costComposition.baseUnitCost)}进价 + {toCurrency(costComposition.additionalFee)}{costComposition.feeLabel}）</span>
-                                            ) : null}
-                                          </div>
-                                        </div>
-                                        <div className="shrink-0 font-semibold text-slate-900 dark:text-white">
-                                          {toCurrency(item.totalCost)}
-                                        </div>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            ) : null}
-                            <div className={cn(
-                              "mt-3 rounded-xl border px-3 py-2.5",
-                              hasPureProfit
-                                ? (pureProfit >= 0
-                                  ? "border-emerald-500/20 bg-emerald-500/8 dark:border-emerald-500/20 dark:bg-emerald-500/10"
-                                  : "border-rose-500/20 bg-rose-500/8 dark:border-rose-500/20 dark:bg-rose-500/10")
-                                : "border-orange-500/20 bg-orange-500/8 dark:border-orange-500/20 dark:bg-orange-500/10"
-                            )}>
-                              <div className="flex items-center justify-between gap-4 text-[13px]">
-                                <span className="whitespace-nowrap font-semibold text-slate-900 dark:text-white">
-                                  {hasPureProfit ? "最终纯利润" : "当前状态"}
-                                </span>
-                                <span className={cn(
-                                  "whitespace-nowrap text-[15px] font-bold",
-                                  hasPureProfit
-                                    ? (pureProfit >= 0 ? "text-emerald-700 dark:text-emerald-300" : "text-rose-700 dark:text-rose-300")
-                                    : "text-orange-700 dark:text-orange-300"
-                                )}>
-                                  {hasPureProfit ? toCurrency(pureProfit) : productCostStatusText}
-                                </span>
-                              </div>
-                            </div>
-                            </div>
-                          ) : null}
-                        </>
-                      ) : null}
-                    </div>
-                  ) : null}
+                  <OrderProfitBadge
+                    order={order}
+                    readOnly={readOnly}
+                    canViewProductCosts={canViewProductCosts}
+                    isProfitUpdating={isProfitUpdating}
+                    onOpenCostBackfill={onOpenCostBackfill}
+                    onEditCommission={readOnly ? undefined : () => {
+                      const currentVal = typeof order.brushCommission === "number"
+                        ? order.brushCommission
+                        : (-pureProfit - Number(order.platformCommission || 0)) / 100;
+                      setEditCommissionValue(String(currentVal > 0 ? currentVal : ""));
+                      setIsCommissionEditorOpen(true);
+                    }}
+                  />
                   {isProfitUpdating ? (
                     <span
                       role="status"

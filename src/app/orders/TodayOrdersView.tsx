@@ -42,6 +42,7 @@ import {
   getAutoOutboundRecoveryTargetItem,
   shouldShowAutoOutboundRecovery,
   toCurrency,
+  OrderProfitBadge,
 } from "./OrderCard";
 import { motion, AnimatePresence } from "framer-motion";
 import { DeliveryDispatchModal } from "@/components/Orders/DeliveryDispatchModal";
@@ -116,17 +117,23 @@ function CompactTodayOrderCard({
   actingId,
   readOnly,
   canExpandDetails,
+  canViewProductCosts = true,
+  isProfitUpdating = false,
   onExpand,
   onRunAction,
   onOpenMatchEditor,
+  onOpenCostBackfill,
 }: {
   order: AutoPickOrder;
   actingId: string;
   readOnly: boolean;
   canExpandDetails: boolean;
+  canViewProductCosts?: boolean;
+  isProfitUpdating?: boolean;
   onExpand: () => void;
   onRunAction: (action: OrderAction) => void;
   onOpenMatchEditor: (item: AutoPickOrderItem, options?: { autoOutbound?: boolean }) => void;
+  onOpenCostBackfill?: (order: AutoPickOrder) => void;
 }) {
   const [routeOpen, setRouteOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -218,10 +225,15 @@ function CompactTodayOrderCard({
                   </button>
                 )
               ) : canShowPureProfit ? (
-                <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs tabular-nums ${Number(order.pureProfit) >= 0 ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "border-rose-500/20 bg-rose-500/10 text-rose-700 dark:text-rose-300"}`}>
-                  <span className="text-[11px] font-medium opacity-80">利润</span>
-                  <span className="text-xs font-bold sm:text-[13px]">{pureProfitDisplay}</span>
-                </span>
+                <OrderProfitBadge
+                  order={order}
+                  compact
+                  align="right"
+                  readOnly={readOnly}
+                  canViewProductCosts={canViewProductCosts}
+                  isProfitUpdating={isProfitUpdating}
+                  onOpenCostBackfill={onOpenCostBackfill}
+                />
               ) : (
                 <span className="group/status relative inline-flex">
                   <span
@@ -1313,9 +1325,12 @@ export function TodayOrdersView({
                   actingId={actingId}
                   readOnly={readOnly}
                   canExpandDetails={canExpandDetails}
+                  canViewProductCosts={canViewProductCosts}
+                  isProfitUpdating={profitUpdatingOrderIds.includes(order.id)}
                   onExpand={() => setDetailOrderId(order.id)}
                   onRunAction={(action) => runAction(order.id, action)}
                   onOpenMatchEditor={(item, options) => onOpenMatchEditor(order, item, options)}
+                  onOpenCostBackfill={onOpenCostBackfill}
                 />
               ) : (
                 <OrderCard
