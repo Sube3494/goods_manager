@@ -2231,11 +2231,19 @@ export function ProductStripItem({
               <button
                 type="button"
                 onClick={onToggleBundleExpand}
-                className="inline-flex mr-1.5 align-middle items-center gap-0.5 sm:gap-1 rounded-full border border-black/8 bg-black/[0.04] hover:bg-black/[0.08] active:bg-black/[0.1] dark:border-white/10 dark:bg-white/8 dark:hover:bg-white/12 dark:active:bg-white/16 px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-[11px] font-medium text-muted-foreground hover:text-foreground dark:text-zinc-300 transition-colors cursor-pointer"
+                className={cn(
+                  "inline-flex mr-1.5 align-middle items-center rounded-full border border-black/8 bg-black/[0.04] hover:bg-black/[0.08] active:bg-black/[0.1] dark:border-white/10 dark:bg-white/8 dark:hover:bg-white/12 dark:active:bg-white/16 font-medium text-muted-foreground hover:text-foreground dark:text-zinc-300 transition-colors cursor-pointer",
+                  compact
+                    ? "gap-0.5 px-1.5 py-0.2 text-[9.5px]"
+                    : "gap-0.5 sm:gap-1 px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-[11px]"
+                )}
                 title={isBundleExpanded ? "收起配件" : "展开配件"}
               >
                 <Layers size={10} className="opacity-70 sm:w-[11px] sm:h-[11px]" />
-                <span>{bundleComponentCount}件<span className="hidden sm:inline">配件</span></span>
+                <span>
+                  {bundleComponentCount}件
+                  {compact ? null : <span className="hidden sm:inline">配件</span>}
+                </span>
                 {isBundleExpanded ? <ChevronUp size={10} className="sm:w-[11px] sm:h-[11px]" /> : <ChevronDown size={10} className="sm:w-[11px] sm:h-[11px]" />}
               </button>
             ) : null}
@@ -2382,6 +2390,7 @@ export function OrderItemBundleGroup({
   returnedItemDetailsMap,
   isJdPlatformOrder,
   isMeituanPlatformOrder,
+  compact = false,
 }: {
   item: AutoPickOrderItem;
   index: number;
@@ -2389,14 +2398,20 @@ export function OrderItemBundleGroup({
   deleted: boolean;
   readOnly: boolean;
   onOpenMatchEditor: (order: AutoPickOrder, item: AutoPickOrderItem) => void;
-  returnedItemQuantityMap: Map<string, number>;
-  returnedItemDetailsMap: Map<string, any[]>;
-  isJdPlatformOrder: boolean;
-  isMeituanPlatformOrder: boolean;
+  returnedItemQuantityMap?: Map<string, number>;
+  returnedItemDetailsMap?: Map<string, any[]>;
+  isJdPlatformOrder?: boolean;
+  isMeituanPlatformOrder?: boolean;
+  compact?: boolean;
 }) {
   const displays = getExpandedOrderItemDisplays(item, order.platform);
   const isBundle = displays.length > 1;
   const [isExpanded, setIsExpanded] = useState(false);
+
+  const returnedQuantity = returnedItemQuantityMap?.get(getReturnedProductKey(item)) || 0;
+  const returnedDetails = returnedItemDetailsMap?.get(getReturnedProductKey(item)) || [];
+  const isJd = isJdPlatformOrder ?? isJdOrder(order.platform);
+  const isMeituan = isMeituanPlatformOrder ?? isMeituanOrder(order.platform);
 
   if (!isBundle) {
     const display = displays[0] || getOrderItemDisplay(item, order.platform);
@@ -2404,14 +2419,15 @@ export function OrderItemBundleGroup({
       <ProductStripItem
         key={`${item.productNo || item.productName}-${index}-${display.sku}-0`}
         display={display}
+        compact={compact}
         showEditMatch={!deleted && !readOnly}
         onEditMatch={() => onOpenMatchEditor(order, item)}
         matchedProduct={item.matchedProduct}
         showMatchStatus={true}
-        returnedQuantity={returnedItemQuantityMap.get(getReturnedProductKey(item)) || 0}
-        returnedDetails={returnedItemDetailsMap.get(getReturnedProductKey(item)) || []}
-        isJdOrder={isJdPlatformOrder}
-        isMeituanOrder={isMeituanPlatformOrder}
+        returnedQuantity={returnedQuantity}
+        returnedDetails={returnedDetails}
+        isJdOrder={isJd}
+        isMeituanOrder={isMeituan}
         isTaobaoOrder={isTaobaoOrder(order.platform)}
         isDoudianOrder={isDoudianOrder(order.platform)}
       />
@@ -2426,6 +2442,7 @@ export function OrderItemBundleGroup({
       {/* 主商品（本体） */}
       <ProductStripItem
         display={mainDisplay}
+        compact={compact}
         isBundleMain={true}
         bundleComponentCount={componentDisplays.length}
         isBundleExpanded={isExpanded}
@@ -2434,17 +2451,21 @@ export function OrderItemBundleGroup({
         onEditMatch={() => onOpenMatchEditor(order, item)}
         matchedProduct={item.matchedProduct}
         showMatchStatus={true}
-        returnedQuantity={returnedItemQuantityMap.get(getReturnedProductKey(item)) || 0}
-        returnedDetails={returnedItemDetailsMap.get(getReturnedProductKey(item)) || []}
-        isJdOrder={isJdPlatformOrder}
-        isMeituanOrder={isMeituanPlatformOrder}
+        returnedQuantity={returnedQuantity}
+        returnedDetails={returnedDetails}
+        isJdOrder={isJd}
+        isMeituanOrder={isMeituan}
         isTaobaoOrder={isTaobaoOrder(order.platform)}
         isDoudianOrder={isDoudianOrder(order.platform)}
       />
 
       {/* 展开时：配件紧随在主商品下方展示，收起时不占用任何多余空间 */}
       {isExpanded ? (
-        <div className="ml-2 sm:ml-4 pl-2 sm:pl-3 border-l-2 border-black/10 dark:border-white/10 space-y-1.5 pt-0.5">
+        <div className={cn(
+          compact
+            ? "ml-1.5 pl-1.5 border-l-2 border-black/10 dark:border-white/10 space-y-1 pt-0.5"
+            : "ml-2 sm:ml-4 pl-2 sm:pl-3 border-l-2 border-black/10 dark:border-white/10 space-y-1.5 pt-0.5"
+        )}>
           {componentDisplays.map((display, cIdx) => (
             <ProductStripItem
               key={`${item.productNo || item.productName}-${index}-${display.sku}-${cIdx + 1}`}
@@ -2456,8 +2477,8 @@ export function OrderItemBundleGroup({
               showMatchStatus={false}
               returnedQuantity={0}
               returnedDetails={[]}
-              isJdOrder={isJdPlatformOrder}
-              isMeituanOrder={isMeituanPlatformOrder}
+              isJdOrder={isJd}
+              isMeituanOrder={isMeituan}
               isTaobaoOrder={isTaobaoOrder(order.platform)}
               isDoudianOrder={isDoudianOrder(order.platform)}
             />

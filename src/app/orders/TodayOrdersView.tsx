@@ -23,6 +23,7 @@ import {
 import {
   OrderCard,
   OrderCardErrorBoundary,
+  OrderItemBundleGroup,
   ActionButton,
   AutoCompleteStatusBadge,
   ProductStripItem,
@@ -129,14 +130,6 @@ function CompactTodayOrderCard({
 }) {
   const [routeOpen, setRouteOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const compactProductRows = order.items.flatMap((item, itemIndex) => (
-    getExpandedOrderItemDisplays(item, order.platform).map((display, displayIndex) => ({
-      key: `${item.id || item.productNo || itemIndex}-${display.sourceId || display.sku || displayIndex}`,
-      item,
-      display,
-      displayIndex,
-    }))
-  ));
   const platformBadge = getPlatformBadgeMeta(order.platform, order.rawPayload);
   const returned = Boolean(order.outboundReturnDetails?.some((entry) => entry.items?.some((item) => Number(item.quantity || 0) > 0)));
   const baseStatusLabel = getBaseAutoPickStatusDisplay(order.status) || "待处理";
@@ -287,15 +280,16 @@ function CompactTodayOrderCard({
         </div>
 
         <div className="mt-2.5 space-y-1.5">
-          {compactProductRows.length > 0 ? compactProductRows.map(({ key, item, display, displayIndex }) => (
-            <ProductStripItem
-              key={key}
-              display={display}
-              compact
-              showEditMatch={displayIndex === 0 && !deleted && !readOnly}
-              onEditMatch={() => onOpenMatchEditor(item)}
-              matchedProduct={item.matchedProduct}
-              showMatchStatus={displayIndex === 0}
+          {order.items.length > 0 ? order.items.map((item, itemIndex) => (
+            <OrderItemBundleGroup
+              key={`${item.id || item.productNo || itemIndex}`}
+              item={item}
+              index={itemIndex}
+              order={order}
+              compact={true}
+              deleted={deleted}
+              readOnly={readOnly}
+              onOpenMatchEditor={(_order, targetItem) => onOpenMatchEditor(targetItem)}
             />
           )) : (
             <div className="flex min-w-0 items-center gap-2 rounded-xl border border-black/6 bg-black/[0.025] px-2 py-1.5 dark:border-white/8 dark:bg-white/[0.035]">
