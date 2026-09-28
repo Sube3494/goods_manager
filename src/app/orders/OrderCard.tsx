@@ -10,6 +10,7 @@ import {
   ChevronUp,
   Clock3,
   FileText,
+  Layers,
   Loader2,
   MapPin,
   Navigation,
@@ -2097,6 +2098,11 @@ export function ProductStripItem({
   isMeituanOrder = false,
   isTaobaoOrder = false,
   isDoudianOrder = false,
+  isBundleMain = false,
+  isBundleComponent = false,
+  bundleComponentCount,
+  isBundleExpanded,
+  onToggleBundleExpand,
 }: {
   display: { name: string; sku: string; image: string | null; quantity: number; costPrice?: number | null; costSource?: "outbound" | "current"; sourceId?: string; optionalMatch?: boolean };
   onEditMatch?: () => void;
@@ -2116,6 +2122,11 @@ export function ProductStripItem({
   isMeituanOrder?: boolean;
   isTaobaoOrder?: boolean;
   isDoudianOrder?: boolean;
+  isBundleMain?: boolean;
+  isBundleComponent?: boolean;
+  bundleComponentCount?: number;
+  isBundleExpanded?: boolean;
+  onToggleBundleExpand?: () => void;
 }) {
   const [imgError, setImgError] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -2175,7 +2186,12 @@ export function ProductStripItem({
   return (
     <>
       <div className={cn(
-        "flex items-center border border-black/6 bg-white/70 dark:border-white/8 dark:bg-white/4",
+        "flex items-center border",
+        isBundleComponent
+          ? "border-black/5 bg-black/[0.015] dark:border-white/6 dark:bg-white/[0.02]"
+          : isBundleMain
+          ? "border-indigo-500/20 bg-indigo-500/[0.03] dark:border-indigo-400/20 dark:bg-indigo-500/[0.05]"
+          : "border-black/6 bg-white/70 dark:border-white/8 dark:bg-white/4",
         compact
           ? "gap-2 rounded-xl px-2 py-1.5"
           : "gap-2.5 rounded-2xl px-2.5 py-2 sm:gap-3 sm:rounded-[18px] sm:px-3 sm:py-2.5"
@@ -2209,10 +2225,20 @@ export function ProductStripItem({
         </div>
         <div className="min-w-0 flex-1">
           <div className={cn(
-            "wrap-break-word font-medium text-foreground",
+            "wrap-break-word font-medium text-foreground flex items-center gap-1.5 flex-wrap",
             compact ? "line-clamp-1 text-xs leading-4" : "line-clamp-2 text-[13px] leading-4.5 sm:line-clamp-1 sm:text-sm sm:leading-5"
           )}>
-            {display.name}
+            {isBundleComponent ? (
+              <span className="shrink-0 px-1.5 py-0.2 rounded bg-amber-500/12 text-amber-700 dark:text-amber-300 text-[10px] font-semibold border border-amber-500/20">
+                配件
+              </span>
+            ) : null}
+            {isBundleMain ? (
+              <span className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full bg-indigo-500/12 text-indigo-700 dark:text-indigo-300 text-[10px] font-semibold border border-indigo-500/20">
+                <Layers size={10} /> 组合商品
+              </span>
+            ) : null}
+            <span className="truncate">{display.name}</span>
           </div>
           <div className={cn(
             "mt-0.5 flex flex-wrap items-center font-medium text-muted-foreground",
@@ -2283,6 +2309,18 @@ export function ProductStripItem({
         </div>
       </div>
       <div className="flex shrink-0 items-center gap-1.5">
+        {bundleComponentCount !== undefined && bundleComponentCount > 0 && onToggleBundleExpand ? (
+          <button
+            type="button"
+            onClick={onToggleBundleExpand}
+            className="inline-flex items-center gap-1 rounded-full border border-indigo-500/20 bg-indigo-500/10 hover:bg-indigo-500/15 px-2 py-0.5 text-[11px] font-medium text-indigo-700 dark:text-indigo-300 transition-colors cursor-pointer"
+            title={isBundleExpanded ? "收起配件明细" : "展开配件明细"}
+          >
+            <Layers size={12} />
+            <span>{bundleComponentCount}件配件</span>
+            {isBundleExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+          </button>
+        ) : null}
 
         {showEditMatch && onEditMatch ? (
           <button
@@ -2335,6 +2373,130 @@ export function ProductStripItem({
     </>
   );
 }
+
+export function OrderItemBundleGroup({
+  item,
+  index,
+  order,
+  deleted,
+  readOnly,
+  onOpenMatchEditor,
+  returnedItemQuantityMap,
+  returnedItemDetailsMap,
+  isJdPlatformOrder,
+  isMeituanPlatformOrder,
+}: {
+  item: AutoPickOrderItem;
+  index: number;
+  order: AutoPickOrder;
+  deleted: boolean;
+  readOnly: boolean;
+  onOpenMatchEditor: (order: AutoPickOrder, item: AutoPickOrderItem) => void;
+  returnedItemQuantityMap: Map<string, number>;
+  returnedItemDetailsMap: Map<string, any[]>;
+  isJdPlatformOrder: boolean;
+  isMeituanPlatformOrder: boolean;
+}) {
+  const displays = getExpandedOrderItemDisplays(item, order.platform);
+  const isBundle = displays.length > 1;
+  const [isExpanded, setIsExpanded] = useState(true);
+
+  if (!isBundle) {
+    const display = displays[0] || getOrderItemDisplay(item, order.platform);
+    return (
+      <ProductStripItem
+        key={`${item.productNo || item.productName}-${index}-${display.sku}-0`}
+        display={display}
+        showEditMatch={!deleted && !readOnly}
+        onEditMatch={() => onOpenMatchEditor(order, item)}
+        matchedProduct={item.matchedProduct}
+        showMatchStatus={true}
+        returnedQuantity={returnedItemQuantityMap.get(getReturnedProductKey(item)) || 0}
+        returnedDetails={returnedItemDetailsMap.get(getReturnedProductKey(item)) || []}
+        isJdOrder={isJdPlatformOrder}
+        isMeituanOrder={isMeituanPlatformOrder}
+        isTaobaoOrder={isTaobaoOrder(order.platform)}
+        isDoudianOrder={isDoudianOrder(order.platform)}
+      />
+    );
+  }
+
+  const mainDisplay = displays[0];
+  const componentDisplays = displays.slice(1);
+
+  return (
+    <div className="rounded-2xl border border-indigo-500/20 bg-indigo-500/[0.02] p-1.5 sm:p-2 space-y-1.5 transition-all">
+      {/* 主商品（本体） */}
+      <ProductStripItem
+        display={mainDisplay}
+        isBundleMain={true}
+        bundleComponentCount={componentDisplays.length}
+        isBundleExpanded={isExpanded}
+        onToggleBundleExpand={() => setIsExpanded(!isExpanded)}
+        showEditMatch={!deleted && !readOnly}
+        onEditMatch={() => onOpenMatchEditor(order, item)}
+        matchedProduct={item.matchedProduct}
+        showMatchStatus={true}
+        returnedQuantity={returnedItemQuantityMap.get(getReturnedProductKey(item)) || 0}
+        returnedDetails={returnedItemDetailsMap.get(getReturnedProductKey(item)) || []}
+        isJdOrder={isJdPlatformOrder}
+        isMeituanOrder={isMeituanPlatformOrder}
+        isTaobaoOrder={isTaobaoOrder(order.platform)}
+        isDoudianOrder={isDoudianOrder(order.platform)}
+      />
+
+      {/* 配件叠在主商品下方 */}
+      {isExpanded ? (
+        <div className="ml-3 sm:ml-4 pl-2.5 sm:pl-3 border-l-2 border-indigo-500/25 dark:border-indigo-400/20 space-y-1.5">
+          <div className="flex items-center justify-between text-[11px] px-1 pt-0.5">
+            <span className="flex items-center gap-1 font-medium text-indigo-700 dark:text-indigo-300">
+              <Layers size={11} /> 组合配件明细 ({componentDisplays.length}件)：
+            </span>
+            <button
+              type="button"
+              onClick={() => setIsExpanded(false)}
+              className="text-[10px] text-muted-foreground hover:text-foreground inline-flex items-center gap-0.5 cursor-pointer"
+            >
+              <span>收起配件</span>
+              <ChevronUp size={11} />
+            </button>
+          </div>
+          {componentDisplays.map((display, cIdx) => (
+            <ProductStripItem
+              key={`${item.productNo || item.productName}-${index}-${display.sku}-${cIdx + 1}`}
+              display={display}
+              compact={true}
+              isBundleComponent={true}
+              showEditMatch={false}
+              matchedProduct={undefined}
+              showMatchStatus={false}
+              returnedQuantity={0}
+              returnedDetails={[]}
+              isJdOrder={isJdPlatformOrder}
+              isMeituanOrder={isMeituanPlatformOrder}
+              isTaobaoOrder={isTaobaoOrder(order.platform)}
+              isDoudianOrder={isDoudianOrder(order.platform)}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="ml-3 sm:ml-4 pl-2.5">
+          <button
+            type="button"
+            onClick={() => setIsExpanded(true)}
+            className="flex items-center gap-1.5 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/15 px-2.5 py-1 text-[11px] font-medium text-indigo-700 dark:text-indigo-300 transition-colors cursor-pointer"
+          >
+            <Layers size={12} className="text-indigo-500" />
+            <span>包含 {componentDisplays.length} 件配件（{componentDisplays.map(c => c.name).join("、")}）</span>
+            <ChevronDown size={12} />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 
 export function ActionButton({
   label,
@@ -3588,24 +3750,21 @@ export const OrderCard = memo(function OrderCard({
               </div>
 
             <div className="mt-2 grid gap-1.5 sm:mt-2.5 sm:gap-2">
-              {visibleItems.flatMap((item, index) =>
-                getExpandedOrderItemDisplays(item, order.platform).map((display, displayIndex) => (
-                  <ProductStripItem
-                    key={`${item.productNo || item.productName}-${index}-${display.sku}-${displayIndex}`}
-                    display={display}
-                    showEditMatch={displayIndex === 0 && !deleted && !readOnly}
-                    onEditMatch={() => onOpenMatchEditor(order, item)}
-                    matchedProduct={item.matchedProduct}
-                    showMatchStatus={displayIndex === 0}
-                    returnedQuantity={returnedItemQuantityMap.get(getReturnedProductKey(item)) || 0}
-                    returnedDetails={returnedItemDetailsMap.get(getReturnedProductKey(item)) || []}
-                    isJdOrder={isJdPlatformOrder}
-                    isMeituanOrder={isMeituanPlatformOrder}
-                    isTaobaoOrder={isTaobaoOrder(order.platform)}
-                    isDoudianOrder={isDoudianOrder(order.platform)}
-                  />
-                ))
-              )}
+              {visibleItems.map((item, index) => (
+                <OrderItemBundleGroup
+                  key={`${item.productNo || item.productName}-${index}`}
+                  item={item}
+                  index={index}
+                  order={order}
+                  deleted={deleted}
+                  readOnly={readOnly}
+                  onOpenMatchEditor={onOpenMatchEditor}
+                  returnedItemQuantityMap={returnedItemQuantityMap}
+                  returnedItemDetailsMap={returnedItemDetailsMap}
+                  isJdPlatformOrder={isJdPlatformOrder}
+                  isMeituanPlatformOrder={isMeituanPlatformOrder}
+                />
+              ))}
             </div>
           </div>
           ) : (
