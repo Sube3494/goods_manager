@@ -251,12 +251,9 @@ export function DeliveryDispatchModal({
       setTransport("all");
       setPriceSort("asc");
 
-      // 默认选中最低价那一家
-      if (nextOptions.length > 0) {
-        const sorted = [...nextOptions].sort((a, b) => Number(a.amount || 0) - Number(b.amount || 0));
-        setSelectedKeys([getOptionKey(sorted[0])]);
-      } else {
-        setSelectedKeys([]);
+      // 每次打开都不预选运力，由用户明确勾选后再发单。
+      setSelectedKeys([]);
+      if (nextOptions.length === 0) {
         setError("当前配送区域暂无可用第三方运力报价");
       }
     } catch (loadError) {

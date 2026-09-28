@@ -252,13 +252,13 @@ export async function getShansongConnectionStatus(userId: string): Promise<Shans
   };
 }
 
-async function postForm<T>(url: string, form: Record<string, string>) {
+async function postForm<T>(url: string, form: Record<string, string>, timeoutMs = 15_000) {
   const response = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
     body: new URLSearchParams(form),
     cache: "no-store",
-    signal: AbortSignal.timeout(15_000),
+    signal: AbortSignal.timeout(timeoutMs),
   });
   const payload = await response.json().catch(() => null) as ShansongApiResponse<T> | null;
   if (!response.ok || !payload || payload.status !== 200) {
@@ -340,7 +340,13 @@ async function getUsableAccessToken(userId: string, boundShopId: string) {
   return stored.accessToken;
 }
 
-async function callShansongApi<T>(userId: string, boundShopId: string, pathname: string, data?: unknown) {
+async function callShansongApi<T>(
+  userId: string,
+  boundShopId: string,
+  pathname: string,
+  data?: unknown,
+  timeoutMs = 15_000,
+) {
   const app = getAppConfig();
   if (!app.configured) throw new Error("服务端尚未配置闪送 appKey/appSecret");
   const accessToken = await getUsableAccessToken(userId, boundShopId);
@@ -355,7 +361,7 @@ async function callShansongApi<T>(userId: string, boundShopId: string, pathname:
   return postForm<T>(`${app.baseUrl}${pathname}`, {
     ...baseParams,
     sign: signParams(app.appSecret, baseParams),
-  });
+  }, timeoutMs);
 }
 
 function readFirstText(record: JsonRecord, keys: string[]) {
@@ -520,7 +526,13 @@ async function buildCalculatePayload(order: ShansongOrder) {
 
 export async function quoteShansongDelivery(order: ShansongOrder): Promise<ShansongQuoteOption> {
   const { boundShopId, payload } = await buildCalculatePayload(order);
-  const quote = await callShansongApi<ShansongCalculateResponse>(order.userId, boundShopId, "/openapi/developer/v5/orderCalculate", payload);
+  const quote = await callShansongApi<ShansongCalculateResponse>(
+    order.userId,
+    boundShopId,
+    "/openapi/developer/v5/orderCalculate",
+    payload,
+    5_000,
+  );
   const orderNumber = String(quote?.orderNumber || "").trim();
   if (!orderNumber) throw new Error("闪送询价成功但未返回闪送订单号");
   const estimateSeconds = Number(quote.estimateReceiveSecond || 0);
