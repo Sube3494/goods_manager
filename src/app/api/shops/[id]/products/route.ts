@@ -995,6 +995,19 @@ export async function PATCH(
       }
     }
 
+    if (typeof body?.isBundle === "boolean") {
+      updateData.isBundle = body.isBundle;
+      if (!body.isBundle && body.bundleItems === undefined) {
+        updateData.bundleItems = Prisma.JsonNull;
+      }
+    }
+    if (typeof body?.bundleItems !== "undefined") {
+      updateData.bundleItems = Array.isArray(body.bundleItems) && body.bundleItems.length > 0 ? body.bundleItems : (body.isBundle ? [] : Prisma.JsonNull);
+      if (Array.isArray(body.bundleItems) && body.bundleItems.length > 0 && typeof body?.isBundle === "undefined") {
+        updateData.isBundle = true;
+      }
+    }
+
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
     }

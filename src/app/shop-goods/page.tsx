@@ -4,12 +4,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { Search, Plus, Store, X, ArrowUp, Trash2, AlertCircle, ListOrdered, Save, Check, Link2, ArrowRightLeft, ChevronUp, ChevronDown } from "lucide-react";
+import { Search, Plus, Store, X, ArrowUp, Trash2, AlertCircle, ListOrdered, Save, Check, Link2, ArrowRightLeft, ChevronUp, ChevronDown, Boxes } from "lucide-react";
 import Link from "next/link";
 import { ImportModal } from "@/components/Goods/ImportModal";
 import { GoodsCard } from "@/components/Goods/GoodsCard";
 import { QuickEditTable } from "@/components/Goods/QuickEditTable";
 import { BatchEditModal } from "@/components/Goods/BatchEditModal";
+import { BatchBundleModal, BundleSubItem } from "@/components/Goods/BatchBundleModal";
 import { GoodsCardSkeleton } from "@/components/Goods/GoodsCardSkeleton";
 import { ProductFormModal } from "@/components/Goods/ProductFormModal";
 import { PurchaseOrderModal } from "@/components/Purchases/PurchaseOrderModal";
@@ -1404,6 +1405,7 @@ export default function ShopGoodsPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [isBatchEditOpen, setIsBatchEditOpen] = useState(false);
+  const [isBatchBundleOpen, setIsBatchBundleOpen] = useState(false);
   const [showScrollTop, setShowScrollTop] = useState(false);
   const editScrollTopRef = useRef<number | null>(null);
   const autoOpenedEditKeyRef = useRef("");
@@ -2250,6 +2252,49 @@ export default function ShopGoodsPage() {
     }
   }, [categories, fetchSelectedItems, selectedIds, showToast]);
 
+  const handleBatchBundleConfirm = useCallback(async ({ isBundle, bundleItems }: { isBundle: boolean; bundleItems: BundleSubItem[] }) => {
+    if (selectedIds.length === 0) return;
+    const selectedItems = (await fetchSelectedItems()).filter((item) => item.shopId);
+    const grouped = selectedItems.reduce<Record<string, string[]>>((acc, item) => {
+      const shopId = item.shopId!;
+      if (!acc[shopId]) acc[shopId] = [];
+      acc[shopId].push(item.id);
+      return acc;
+    }, {});
+
+    try {
+      await Promise.all(Object.entries(grouped).map(async ([shopId, ids]) => {
+        const res = await fetch(`/api/shops/${shopId}/products`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ids, isBundle, bundleItems }),
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok) throw new Error(data?.error || "批量更新失败");
+      }));
+
+      setItems((prev) => prev.map((item) => {
+        if (!selectedIds.includes(item.id)) return item;
+        return {
+          ...item,
+          isBundle,
+          bundleItems: isBundle ? bundleItems : [],
+        };
+      }));
+      setSelectedIds([]);
+      setIsBatchBundleOpen(false);
+      showToast(
+        isBundle
+          ? `成功为 ${selectedItems.length} 个商品配置配件！`
+          : `已清空 ${selectedItems.length} 个商品的配件组合配置！`,
+        "success"
+      );
+    } catch (error) {
+      console.error("Failed to batch update bundle for shop products:", error);
+      showToast(error instanceof Error ? error.message : "批量配置配件请求失败", "error");
+    }
+  }, [fetchSelectedItems, selectedIds, showToast]);
+
   const [exportProgress, setExportProgress] = useState<{ isOpen: boolean; current: number; total: number } | null>(null);
   const exportCancelledRef = useRef(false);
 
@@ -2674,6 +2719,12 @@ export default function ShopGoodsPage() {
                 }];
               })()
             : []),
+          {
+            label: "配配件",
+            icon: <Boxes size={16} />,
+            onClick: () => setIsBatchBundleOpen(true),
+            title: "批量配置发货配件 (BOM)",
+          },
           { label: "删除商品", icon: <Trash2 size={16} />, onClick: handleRemoveSelected, variant: "danger" }
         ]}
       />
@@ -2696,6 +2747,13 @@ export default function ShopGoodsPage() {
       <ProductFormModal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} onSubmit={async (data) => { await handleCreateStandaloneProduct(data); }} title={selectedShop ? `新建 ${selectedShop.name} 商品` : "新建店铺商品"} hideVisibilityControl={true} hideProductionControl={true} hideGallerySection={true} hideSpecsSection={true} disableHistorySection={true} showCoverSection={true} showJdSkuField={true} showMeituanSkuField={true} mainImageUploadEndpoint={selectedShopId ? `/api/shops/${selectedShopId}/products/cover-upload` : undefined} />
       <ProductFormModal isOpen={isEditOpen} onClose={closeEditModal} onSubmit={async (data) => { await handleSaveEdit(data); }} initialData={editingProduct} title="编辑店铺商品" hideVisibilityControl={true} hideProductionControl={true} hideGallerySection={true} hideSpecsSection={true} showCoverSection={true} showJdSkuField={true} showMeituanSkuField={true} mainImageUploadEndpoint={editingShopId ? `/api/shops/${editingShopId}/products/cover-upload` : undefined} onStockChange={handleItemStockChange} />
       <BatchEditModal isOpen={isBatchEditOpen} onClose={() => setIsBatchEditOpen(false)} onConfirm={handleBatchUpdate} categories={categories} suppliers={suppliers} selectedCount={selectedIds.length} hideProductionStatus={true} />
+      <BatchBundleModal
+        isOpen={isBatchBundleOpen}
+        onClose={() => setIsBatchBundleOpen(false)}
+        onConfirm={handleBatchBundleConfirm}
+        selectedCount={selectedIds.length}
+        shopId={selectedShopId}
+      />
       <MeituanMappingModal
         isOpen={isMeituanMappingOpen}
         onClose={() => setIsMeituanMappingOpen(false)}

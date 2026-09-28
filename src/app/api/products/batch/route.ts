@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
 
@@ -79,7 +80,7 @@ export async function PATCH(request: Request) {
     }
 
     const body = await request.json();
-    const { ids, categoryId, supplierId, isDiscontinued, costPrice, isShelfLife, shelfLifeDays } = body || {};
+    const { ids, categoryId, supplierId, isDiscontinued, costPrice, isShelfLife, shelfLifeDays, isBundle, bundleItems } = body || {};
 
     if (!Array.isArray(ids) || ids.length === 0) {
       return NextResponse.json({ error: "No product IDs provided" }, { status: 400 });
@@ -107,6 +108,18 @@ export async function PATCH(request: Request) {
       const num = Number(shelfLifeDays);
       updateData.shelfLifeDays = Number.isFinite(num) && num >= 0 ? Math.floor(num) : 0;
     }
+    if (typeof isBundle === "boolean") {
+      updateData.isBundle = isBundle;
+      if (!isBundle && bundleItems === undefined) {
+        updateData.bundleItems = Prisma.JsonNull;
+      }
+    }
+    if (typeof bundleItems !== "undefined") {
+      updateData.bundleItems = Array.isArray(bundleItems) && bundleItems.length > 0 ? bundleItems : (isBundle ? [] : Prisma.JsonNull);
+      if (Array.isArray(bundleItems) && bundleItems.length > 0 && typeof isBundle === "undefined") {
+        updateData.isBundle = true;
+      }
+    }
 
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
@@ -119,6 +132,18 @@ export async function PATCH(request: Request) {
       },
       data: updateData,
     });
+
+    if (typeof updateData.isBundle !== "undefined" || typeof updateData.bundleItems !== "undefined") {
+      const shopUpdateData: Record<string, unknown> = {};
+      if (typeof updateData.isBundle !== "undefined") shopUpdateData.isBundle = updateData.isBundle;
+      if (typeof updateData.bundleItems !== "undefined") shopUpdateData.bundleItems = updateData.bundleItems;
+      await prisma.shopProduct.updateMany({
+        where: {
+          productId: { in: ids.map(String) },
+        },
+        data: shopUpdateData,
+      });
+    }
 
     return NextResponse.json({
       success: true,

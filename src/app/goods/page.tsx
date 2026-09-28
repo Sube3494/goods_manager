@@ -7,10 +7,11 @@ import { QuickEditTable } from "@/components/Goods/QuickEditTable";
 import { ImportModal } from "@/components/Goods/ImportModal";
 import { ProductFormModal } from "@/components/Goods/ProductFormModal";
 import { PurchaseOrderModal } from "@/components/Purchases/PurchaseOrderModal";
-import { Search, Plus, Download, ArrowUp, X, RotateCcw, Settings, AlertCircle, Zap } from "lucide-react";
+import { Search, Plus, Download, ArrowUp, X, RotateCcw, Settings, AlertCircle, Zap, Boxes } from "lucide-react";
 import { Product, Category, Supplier, GalleryItem, PurchaseOrder } from "@/lib/types";
 import { ManageLibrariesModal } from "@/components/Goods/ManageLibrariesModal";
 import { BatchEditModal } from "@/components/Goods/BatchEditModal";
+import { BatchBundleModal, BundleSubItem } from "@/components/Goods/BatchBundleModal";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { useToast } from "@/components/ui/Toast";
 import { ActionBar } from "@/components/ui/ActionBar";
@@ -159,6 +160,7 @@ export default function GoodsPage() {
   const [selectedStatus, setSelectedStatus] = useState("all");
   const [selectedSupplier, setSelectedSupplier] = useState("all");
   const [isBatchEditOpen, setIsBatchEditOpen] = useState(false);
+  const [isBatchBundleOpen, setIsBatchBundleOpen] = useState(false);
   const [sortBy, setSortBy] = useState<string>("sku-desc");
   const [viewMode, setViewMode] = useState<"card" | "quickEdit">("card");
   const [purchaseDraft, setPurchaseDraft] = useState<PurchaseOrder | null>(null);
@@ -653,6 +655,50 @@ export default function GoodsPage() {
       }
     } catch {
       showToast("批量更新请求失败", "error");
+    }
+  };
+
+  const handleBatchBundleConfirm = async ({ isBundle, bundleItems }: { isBundle: boolean; bundleItems: BundleSubItem[] }) => {
+    if (selectedIds.length === 0) return;
+    try {
+      const count = selectedIds.length;
+      const res = await fetch("/api/products/batch", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ids: selectedIds,
+          isBundle,
+          bundleItems,
+        }),
+      });
+
+      if (res.ok) {
+        showToast(
+          isBundle
+            ? `已成功为 ${count} 件商品统一配置 ${bundleItems.length} 项发货配件！`
+            : `已成功清空 ${count} 件商品的组合配置！`,
+          "success"
+        );
+        setItems((prev) =>
+          prev.map((item) => {
+            if (selectedIds.includes(item.id)) {
+              return {
+                ...item,
+                isBundle,
+                bundleItems: isBundle ? bundleItems : [],
+              };
+            }
+            return item;
+          })
+        );
+        setSelectedIds([]);
+        setIsBatchBundleOpen(false);
+      } else {
+        const data = await res.json().catch(() => null);
+        showToast(data?.error || "批量配置配件失败", "error");
+      }
+    } catch {
+      showToast("批量配置配件请求失败", "error");
     }
   };
 
@@ -1438,6 +1484,21 @@ export default function GoodsPage() {
         label="个商品"
         onDelete={handleBatchDelete}
         onEdit={() => setIsBatchEditOpen(true)}
+        extraActions={[
+          {
+            label: "配配件",
+            icon: <Boxes size={16} />,
+            onClick: () => setIsBatchBundleOpen(true),
+            title: "批量配置发货配件 (BOM)",
+          },
+        ]}
+      />
+
+      <BatchBundleModal
+        isOpen={isBatchBundleOpen}
+        onClose={() => setIsBatchBundleOpen(false)}
+        onConfirm={handleBatchBundleConfirm}
+        selectedCount={selectedIds.length}
       />
 
       <ManageLibrariesModal
