@@ -13,7 +13,8 @@ import {
 
 export const dynamic = "force-dynamic";
 
-type DeliveryCategory = "direct" | "shared" | "standard";
+type DeliveryCategory = "direct" | "shared";
+type DeliveryTransport = "rider" | "car" | "freight";
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -24,13 +25,17 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 function normalizeMaiyitianOption(value: unknown) {
   const option = asRecord(value) || {};
   const category = String(option.category || "").trim();
+  const transport = String(option.transport || "").trim();
   return {
     ...option,
     provider: "maiyitian" as const,
     servicePkg: String(option.servicePkg ?? option.service_pkg ?? "").trim(),
-    category: (["direct", "shared", "standard"] as DeliveryCategory[]).includes(category as DeliveryCategory)
+    category: (["direct", "shared"] as DeliveryCategory[]).includes(category as DeliveryCategory)
       ? category as DeliveryCategory
-      : "standard",
+      : "shared",
+    transport: (["rider", "car", "freight"] as DeliveryTransport[]).includes(transport as DeliveryTransport)
+      ? transport as DeliveryTransport
+      : "rider",
   };
 }
 
@@ -87,7 +92,7 @@ export async function GET(_: NextRequest, context: { params: Promise<{ id: strin
       : [];
     const options = [
       ...maiyitianOptions,
-      ...(shansongResult.status === "fulfilled" ? [{ ...shansongResult.value, category: "direct" as const }] : []),
+      ...(shansongResult.status === "fulfilled" ? [{ ...shansongResult.value, category: "direct" as const, transport: "rider" as const }] : []),
     ];
     const providerErrors = {
       maiyitian: maiyitianResult.status === "rejected"

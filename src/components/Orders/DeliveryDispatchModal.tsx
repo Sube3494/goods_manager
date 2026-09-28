@@ -31,13 +31,15 @@ export type DeliveryQuoteOption = {
   logisticTag: string;
   name: string;
   servicePkg?: string;
-  category?: "direct" | "shared" | "standard";
+  category?: "direct" | "shared";
+  transport?: "rider" | "car" | "freight";
   amount: number;
   distance?: number;
   estimatedDeliveryTime?: number;
 };
 
 type DeliveryCategory = "all" | "direct" | "shared";
+type DeliveryTransport = "all" | "rider" | "car" | "freight";
 type PriceSort = "asc" | "desc";
 type SelectionMode = "single" | "multiple";
 
@@ -45,8 +47,12 @@ function getOptionKey(option: DeliveryQuoteOption) {
   return `${option.provider || "maiyitian"}:${option.logisticId}:${option.logisticTag}:${option.servicePkg || ""}`;
 }
 
-function getOptionCategory(option: DeliveryQuoteOption): Exclude<DeliveryCategory, "all"> | "standard" {
-  return option.category || "standard";
+function getOptionCategory(option: DeliveryQuoteOption): Exclude<DeliveryCategory, "all"> {
+  return option.category || "shared";
+}
+
+function getOptionTransport(option: DeliveryQuoteOption): Exclude<DeliveryTransport, "all"> {
+  return option.transport || "rider";
 }
 
 interface BrandTheme {
@@ -184,6 +190,7 @@ export function DeliveryDispatchModal({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [category, setCategory] = useState<DeliveryCategory>("all");
+  const [transport, setTransport] = useState<DeliveryTransport>("all");
   const [priceSort, setPriceSort] = useState<PriceSort>("asc");
   const [selectionMode, setSelectionMode] = useState<SelectionMode>("single");
 
@@ -197,19 +204,31 @@ export function DeliveryDispatchModal({
     [options, selectedKeys],
   );
 
-  const categoryCounts = useMemo(() => options.reduce((counts, option) => {
+  const categoryCounts = useMemo(() => options
+    .filter((option) => transport === "all" || getOptionTransport(option) === transport)
+    .reduce((counts, option) => {
+    counts.all += 1;
     const optionCategory = getOptionCategory(option);
     if (optionCategory === "direct") counts.direct += 1;
     if (optionCategory === "shared") counts.shared += 1;
     return counts;
-  }, { direct: 0, shared: 0 }), [options]);
+  }, { all: 0, direct: 0, shared: 0 }), [options, transport]);
+
+  const transportCounts = useMemo(() => options
+    .filter((option) => category === "all" || getOptionCategory(option) === category)
+    .reduce((counts, option) => {
+    counts.all += 1;
+    counts[getOptionTransport(option)] += 1;
+    return counts;
+  }, { all: 0, rider: 0, car: 0, freight: 0 }), [category, options]);
 
   const displayedOptions = useMemo(() => options
     .filter((option) => category === "all" || getOptionCategory(option) === category)
+    .filter((option) => transport === "all" || getOptionTransport(option) === transport)
     .toSorted((a, b) => {
       const amountDiff = Number(a.amount || 0) - Number(b.amount || 0);
       return (priceSort === "asc" ? amountDiff : -amountDiff) || a.name.localeCompare(b.name, "zh-CN");
-    }), [category, options, priceSort]);
+    }), [category, options, priceSort, transport]);
 
   // 计算多选模式下的金额区间
   const priceRange = useMemo(() => {
@@ -230,6 +249,7 @@ export function DeliveryDispatchModal({
       const nextOptions = Array.isArray(data.options) ? data.options as DeliveryQuoteOption[] : [];
       setOptions(nextOptions);
       setCategory("all");
+      setTransport("all");
       setPriceSort("asc");
       setSelectionMode("single");
 
@@ -259,6 +279,18 @@ export function DeliveryDispatchModal({
     setCategory(nextCategory);
     const candidates = options
       .filter((option) => nextCategory === "all" || getOptionCategory(option) === nextCategory)
+      .filter((option) => transport === "all" || getOptionTransport(option) === transport)
+      .toSorted((a, b) => Number(a.amount || 0) - Number(b.amount || 0));
+    if (selectionMode === "single" && !candidates.some((option) => selectedKeys.includes(getOptionKey(option)))) {
+      setSelectedKeys(candidates[0] ? [getOptionKey(candidates[0])] : []);
+    }
+  };
+
+  const changeTransport = (nextTransport: DeliveryTransport) => {
+    setTransport(nextTransport);
+    const candidates = options
+      .filter((option) => category === "all" || getOptionCategory(option) === category)
+      .filter((option) => nextTransport === "all" || getOptionTransport(option) === nextTransport)
       .toSorted((a, b) => Number(a.amount || 0) - Number(b.amount || 0));
     if (selectionMode === "single" && !candidates.some((option) => selectedKeys.includes(getOptionKey(option)))) {
       setSelectedKeys(candidates[0] ? [getOptionKey(candidates[0])] : []);
@@ -482,7 +514,7 @@ export function DeliveryDispatchModal({
                 {/* 分类切换 */}
                 <div className="flex items-center gap-1 rounded-xl bg-muted/60 p-0.5 dark:bg-muted/30">
                   {([
-                    ["all", "全部", options.length],
+                    ["all", "全部", categoryCounts.all],
                     ["direct", "专人", categoryCounts.direct],
                     ["shared", "拼单", categoryCounts.shared],
                   ] as const).map(([value, label, count]) => {
@@ -504,6 +536,39 @@ export function DeliveryDispatchModal({
                         <span className={cn(
                           "rounded-full px-1 text-[10px]",
                           category === value ? "bg-muted font-bold text-foreground" : "opacity-60",
+                        )}>
+                          {count}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="flex items-center gap-1 rounded-xl bg-muted/60 p-0.5 dark:bg-muted/30" aria-label="交通工具筛选">
+                  {([
+                    ["all", "全部方式", transportCounts.all],
+                    ["rider", "骑手", transportCounts.rider],
+                    ["car", "汽车", transportCounts.car],
+                    ["freight", "货运", transportCounts.freight],
+                  ] as const).map(([value, label, count]) => {
+                    const isDisabled = value !== "all" && count === 0;
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        disabled={isDisabled}
+                        onClick={() => changeTransport(value)}
+                        className={cn(
+                          "flex h-7 items-center gap-1 rounded-lg px-2 text-[11px] font-medium transition disabled:cursor-not-allowed disabled:opacity-35",
+                          transport === value
+                            ? "bg-background text-foreground shadow-xs ring-1 ring-black/5 dark:bg-background dark:ring-white/10"
+                            : "text-muted-foreground hover:text-foreground",
+                        )}
+                      >
+                        {label}
+                        <span className={cn(
+                          "rounded-full px-1 text-[10px]",
+                          transport === value ? "bg-muted font-bold text-foreground" : "opacity-60",
                         )}>
                           {count}
                         </span>
@@ -554,6 +619,7 @@ export function DeliveryDispatchModal({
                   const key = getOptionKey(option);
                   const active = selectedKeys.includes(key);
                   const optionCategory = getOptionCategory(option);
+                  const optionTransport = getOptionTransport(option);
                   const brand = getBrandTheme(option);
                   const isLowest = minPrice > 0 && Number(option.amount || 0) === minPrice;
                   const estimatedTimeText = formatEstimatedTime(option.estimatedDeliveryTime);
@@ -640,6 +706,9 @@ export function DeliveryDispatchModal({
                               拼单
                             </span>
                           )}
+                          <span className="inline-flex items-center rounded-md bg-violet-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700 dark:bg-violet-500/20 dark:text-violet-300">
+                            {optionTransport === "car" ? "汽车" : optionTransport === "freight" ? "货运" : "骑手"}
+                          </span>
 
                           {/* 最低价超值推荐 */}
                           {isLowest && (
