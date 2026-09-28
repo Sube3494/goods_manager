@@ -177,7 +177,6 @@ type OutboundCostLookupRow = {
     shopProduct: {
       id: string;
       productId?: string | null;
-      costPrice: number;
       productName?: string | null;
       sku?: string | null;
       productImage?: string | null;
@@ -185,7 +184,6 @@ type OutboundCostLookupRow = {
     } | null;
     product: {
       id: string;
-      costPrice: number;
       name?: string | null;
       sku?: string | null;
       image?: string | null;
@@ -567,14 +565,13 @@ export async function GET(request: NextRequest) {
                 select: {
                   id: true,
                   productId: true,
-                  costPrice: true,
                   productName: true,
                   sku: true,
                   productImage: true,
                   shop: { select: { name: true } },
                 },
               },
-              product: { select: { id: true, costPrice: true, name: true, sku: true, image: true } },
+              product: { select: { id: true, name: true, sku: true, image: true } },
             },
           },
         },
@@ -791,10 +788,24 @@ export async function GET(request: NextRequest) {
       const quantity = Number(raw.quantity || 0);
       const totalCost = Number(raw.totalCost || 0);
       const averageUnitCost = Number(raw.averageUnitCost || 0);
+      const batches = Array.isArray(raw.batches)
+        ? raw.batches.flatMap((entry) => {
+            if (!entry || typeof entry !== "object" || Array.isArray(entry)) return [];
+            const batch = entry as Record<string, unknown>;
+            const purchaseOrderItemId = String(batch.purchaseOrderItemId || "").trim();
+            const batchQuantity = Math.max(0, Number(batch.quantity || 0));
+            const unitCost = Number(batch.unitCost || 0);
+            if (!purchaseOrderItemId || batchQuantity <= 0 || !Number.isFinite(unitCost) || unitCost <= 0) {
+              return [];
+            }
+            return [{ purchaseOrderItemId, quantity: batchQuantity, unitCost }];
+          })
+        : [];
       return {
         quantity: Number.isFinite(quantity) ? quantity : 0,
         totalCost: Number.isFinite(totalCost) ? totalCost : 0,
         averageUnitCost: Number.isFinite(averageUnitCost) ? averageUnitCost : 0,
+        batches,
       };
     }
 
@@ -829,16 +840,23 @@ export async function GET(request: NextRequest) {
       const returnTotals = getOutboundReturnTotals(parseOutboundReturnMeta(outbound.note).returns);
       const outboundCost = outbound.items.reduce((sum, item) => {
         const snapshot = parseOutboundCostSnapshot(item.costSnapshot);
-        const unitCost = snapshot
-          ? Number(snapshot.averageUnitCost || 0)
-          : (Number(item.shopProduct?.costPrice || item.product?.costPrice) || 0);
-        const hasCostSnapshot = item.costSnapshot !== null && item.costSnapshot !== undefined;
-        if (!hasCostSnapshot && unitCost <= 0) {
+        const quantity = Math.max(0, Number(item.quantity || 0));
+        const allocatedQuantity = snapshot?.batches.reduce((total, batch) => total + batch.quantity, 0) || 0;
+        const hasCompletePurchaseBatchCost = Boolean(
+          snapshot
+          && quantity > 0
+          && snapshot.batches.length > 0
+          && allocatedQuantity + 1e-6 >= quantity
+        );
+        if (!hasCompletePurchaseBatchCost) {
           missingCostItemCount += 1;
+          return sum;
         }
-        return snapshot
-          ? FinanceMath.add(sum, Number(snapshot.totalCost || 0))
-          : FinanceMath.add(sum, FinanceMath.multiply(unitCost, item.quantity || 0));
+        const purchaseBatchCost = snapshot!.batches.reduce(
+          (total, batch) => FinanceMath.add(total, FinanceMath.multiply(batch.unitCost, batch.quantity)),
+          0
+        );
+        return FinanceMath.add(sum, purchaseBatchCost);
       }, 0);
       const effectiveReturnedCost = isCurrentReturned ? returnTotals.returnedCost : 0;
       outboundMetaByOrderNo.set(orderNo, {

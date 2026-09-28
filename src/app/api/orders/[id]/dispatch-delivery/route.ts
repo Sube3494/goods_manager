@@ -13,6 +13,34 @@ import {
 
 export const dynamic = "force-dynamic";
 
+type DeliverySelection = {
+  logisticId: string;
+  logisticTag: string;
+  servicePkg: string;
+};
+
+function parseDeliverySelections(body: Record<string, unknown>): DeliverySelection[] {
+  const rawSelections = Array.isArray(body.selections) && body.selections.length > 0
+    ? body.selections
+    : [body];
+  const seen = new Set<string>();
+  const selections: DeliverySelection[] = [];
+  for (const rawSelection of rawSelections) {
+    if (!rawSelection || typeof rawSelection !== "object" || Array.isArray(rawSelection)) continue;
+    const selection = rawSelection as Record<string, unknown>;
+    const logisticId = String(selection.logisticId || "").trim();
+    const logisticTag = String(selection.logisticTag || "").trim();
+    const servicePkg = String(selection.servicePkg || "").trim();
+    if (!logisticId || !logisticTag) continue;
+    const key = `${logisticId}:${logisticTag}:${servicePkg}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    selections.push({ logisticId, logisticTag, servicePkg });
+    if (selections.length >= 20) break;
+  }
+  return selections;
+}
+
 export async function POST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   const session = await getAuthorizedUser("order:manage");
   if (!session) return NextResponse.json({ error: "Permission denied" }, { status: 403 });
@@ -20,10 +48,8 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
   try {
     const { id } = await context.params;
     const body = await request.json().catch(() => ({})) as Record<string, unknown>;
-    const logisticId = String(body.logisticId || "").trim();
-    const logisticTag = String(body.logisticTag || "").trim();
-    const servicePkg = String(body.servicePkg || "").trim();
-    if (!logisticId || !logisticTag) {
+    const selections = parseDeliverySelections(body);
+    if (selections.length === 0) {
       return NextResponse.json({ error: "请选择配送服务" }, { status: 400 });
     }
 
@@ -48,16 +74,22 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
 
     const sourceId = String(order.sourceId || "").trim();
     if (!sourceId) return NextResponse.json({ error: "订单缺少麦芽田订单标识，请先同步订单" }, { status: 409 });
-    const result = await callAutoPickCommand(order.userId, "/dispatch-delivery", {
-      platform: resolveAutoPickCommandPlatform(order),
-      dailyPlatformSequence: order.dailyPlatformSequence,
-      orderNo: order.orderNo,
-      sourceId,
-      logisticId,
-      logisticTag,
-      servicePkg,
-    });
-    if (!result.ok) return NextResponse.json(result.data, { status: result.status });
+    // 多选抢单需要同时发起，避免第一条请求改变订单状态后影响后续运力发单。
+    const dispatchResults = await Promise.all(selections.map(async (selection) => {
+      const result = await callAutoPickCommand(order.userId, "/dispatch-delivery", {
+        platform: resolveAutoPickCommandPlatform(order),
+        dailyPlatformSequence: order.dailyPlatformSequence,
+        orderNo: order.orderNo,
+        sourceId,
+        ...selection,
+      });
+      return { selection, ...result };
+    }));
+    const successfulResults = dispatchResults.filter((result) => result.ok);
+    if (successfulResults.length === 0) {
+      const firstFailure = dispatchResults[0];
+      return NextResponse.json(firstFailure?.data || { error: "呼叫配送失败" }, { status: firstFailure?.status || 409 });
+    }
 
     await clearAutoPickOrderMainSystemSelfDelivery(order.userId, order.id, "third-party-delivery-dispatched");
     await cancelAutoCompleteJob(order.id, "third-party-delivery-dispatched");
@@ -74,7 +106,19 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
       where: { id: order.id },
       include: { items: { orderBy: { createdAt: "asc" } } },
     });
-    return NextResponse.json({ ...result.data, order: finalOrder }, { status: result.status });
+    const primaryResult = successfulResults[0];
+    return NextResponse.json({
+      ...primaryResult.data,
+      order: finalOrder,
+      dispatchedCount: successfulResults.length,
+      failedCount: dispatchResults.length - successfulResults.length,
+      dispatchResults: dispatchResults.map((result) => ({
+        ...result.selection,
+        ok: result.ok,
+        status: result.status,
+        error: result.ok ? null : String(result.data?.error || result.data?.message || result.data?.text || "呼叫失败"),
+      })),
+    }, { status: primaryResult.status });
   } catch (error) {
     console.error("Failed to dispatch delivery:", error);
     return NextResponse.json({ error: error instanceof Error ? error.message : "呼叫配送失败" }, { status: 500 });

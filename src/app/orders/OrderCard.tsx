@@ -1152,8 +1152,7 @@ export function getFilterDateValue(value: string | null | undefined, referenceDa
 
 export function getProductCostStatusText(order: Pick<AutoPickOrder, "productCostStatus" | "missingCostItemCount">) {
   if (order.productCostStatus === "pending-backfill") {
-    const count = Math.max(0, Number(order.missingCostItemCount || 0));
-    return count > 0 ? `待回填（${count}项缺成本）` : "待回填";
+    return "";
   }
   if (order.productCostStatus === "pending-outbound") {
     return "待出库";
@@ -2914,7 +2913,7 @@ export const OrderCard = memo(function OrderCard({
     }
     return acc;
   }, new Map<string, Array<{ createdAt: string; reason: string; quantity: number; refundAmount?: number; extraExpense?: number }>>());
-  const canEditProductCost = !readOnly && (order.productCostStatus === "pending-backfill" || productCostBreakdown.length > 0);
+  const canEditProductCost = !readOnly && order.productCostStatus === "ready" && productCostBreakdown.length > 0;
   const settlementAfterRate = Math.round(expectedIncome * (1 - serviceFeeRate));
   const isJdPlatformOrder = isJdOrder(order.platform);
   const isDoudianPlatformOrder = isDoudianOrder(order.platform);
@@ -3154,7 +3153,7 @@ export const OrderCard = memo(function OrderCard({
                       <span className="truncate font-semibold">{toCurrency(refundAmount)}</span>
                     </span>
                   ) : null}
-                  {!isProfitUpdating && (hasPureProfit || (completed && order.productCostStatus === "pending-backfill")) ? (
+                  {!isProfitUpdating && hasPureProfit ? (
                     <div
                       ref={profitTooltipRef}
                       className="group/profit relative"

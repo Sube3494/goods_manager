@@ -1656,8 +1656,17 @@ export function TodayOrdersView({
           orderId={dispatchTarget.id}
           orderNo={dispatchTarget.orderNo}
           onOpenChange={(open) => { if (!open) setDispatchTarget(null); }}
-          onDispatched={() => {
-            showToast("配送单已发出，正在等待骑手接单", "success");
+          onDispatched={(_order, result) => {
+            const dispatchedCount = Math.max(1, Number(result?.dispatchedCount || 1));
+            const failedCount = Math.max(0, Number(result?.failedCount || 0));
+            showToast(
+              failedCount > 0
+                ? `已呼叫 ${dispatchedCount} 家配送，另有 ${failedCount} 家呼叫失败`
+                : dispatchedCount > 1
+                  ? `已同时呼叫 ${dispatchedCount} 家配送，正在等待骑手抢单`
+                  : "配送单已发出，正在等待骑手接单",
+              failedCount > 0 ? "warning" : "success",
+            );
             void refreshSingleOrder(dispatchTarget.id);
           }}
         />

@@ -1059,6 +1059,42 @@ function parseOutboundCostSnapshot(value: unknown): ParsedOutboundCostSnapshot |
   };
 }
 
+function resolvePurchaseBatchSnapshotCost(
+  snapshot: ParsedOutboundCostSnapshot | null,
+  expectedQuantity: number
+) {
+  const quantity = Math.max(0, Number(expectedQuantity || 0));
+  if (!snapshot || quantity <= 0 || snapshot.batches.length === 0) {
+    return null;
+  }
+
+  const allocatedQuantity = snapshot.batches.reduce(
+    (sum, batch) => sum + Math.max(0, Number(batch.quantity || 0)),
+    0
+  );
+  if (allocatedQuantity + 1e-6 < quantity) {
+    return null;
+  }
+
+  const hasInvalidBatchCost = snapshot.batches.some((batch) => (
+    !batch.purchaseOrderItemId
+    || !Number.isFinite(Number(batch.unitCost))
+    || Number(batch.unitCost) <= 0
+  ));
+  if (hasInvalidBatchCost) {
+    return null;
+  }
+
+  const totalCost = snapshot.batches.reduce(
+    (sum, batch) => sum + Number(batch.unitCost) * Number(batch.quantity),
+    0
+  );
+  return {
+    totalCost,
+    averageUnitCost: totalCost / allocatedQuantity,
+  };
+}
+
 function roundCurrency(value: number) {
   if (!Number.isFinite(value)) {
     return 0;
@@ -1481,14 +1517,12 @@ export async function GET(request: NextRequest) {
                 shopProduct: {
                   select: {
                     productName: true,
-                    costPrice: true,
                     productImage: true,
                   },
                 },
                 product: {
                   select: {
                     name: true,
-                    costPrice: true,
                     image: true,
                   },
                 },
@@ -1713,13 +1747,10 @@ export async function GET(request: NextRequest) {
         let firstMissingCostPurchaseOrderItemId: string | null = null;
         const rawBreakdown = outbound.items.map((item) => {
           const snapshot = parseOutboundCostSnapshot(item.costSnapshot);
-          const unitCost = snapshot
-            ? Number(snapshot.averageUnitCost || 0)
-            : (Number(item.shopProduct?.costPrice) || 0);
           const quantity = Math.max(0, Number(item.quantity || 0));
-          const totalCost = snapshot
-            ? Number(snapshot.totalCost || 0)
-            : (Math.round(unitCost * 100) * quantity) / 100;
+          const purchaseBatchCost = resolvePurchaseBatchSnapshotCost(snapshot, quantity);
+          const unitCost = purchaseBatchCost?.averageUnitCost || 0;
+          const totalCost = purchaseBatchCost?.totalCost || 0;
           const shopProductId = String(item.shopProductId || "").trim() || null;
           const productId = String(item.productId || "").trim() || null;
           const rawImage = item.shopProduct?.productImage || item.product?.image || null;
@@ -1738,8 +1769,7 @@ export async function GET(request: NextRequest) {
             || (productId ? availableBatchesByProduct.get(productId) : null)
             || [];
 
-          const hasCostSnapshot = item.costSnapshot !== null && item.costSnapshot !== undefined;
-          const isMissing = hasCostSnapshot ? false : unitCost <= 0;
+          const isMissing = purchaseBatchCost === null;
           if (isMissing) {
             missingCostItemCount += 1;
             if (!firstMissingCostShopProductId) {
@@ -1765,17 +1795,15 @@ export async function GET(request: NextRequest) {
             productId,
             batches,
             availableBatches,
-            hasBackfilled: snapshot !== null,
+            hasBackfilled: purchaseBatchCost !== null,
             image,
           };
         });
         const productCost = outbound.items.reduce((sum, item) => {
           const snapshot = parseOutboundCostSnapshot(item.costSnapshot);
-          const unitCost = snapshot
-            ? Number(snapshot.totalCost || 0)
-            : (Number(item.shopProduct?.costPrice) || 0);
           const quantity = Math.max(0, Number(item.quantity || 0));
-          return sum + (snapshot ? Math.round(unitCost * 100) : Math.round(unitCost * 100) * quantity);
+          const purchaseBatchCost = resolvePurchaseBatchSnapshotCost(snapshot, quantity);
+          return sum + Math.round((purchaseBatchCost?.totalCost || 0) * 100);
         }, 0);
         const rawBreakdownTotal = roundCurrency(
           rawBreakdown.reduce((sum, item) => sum + (Number(item.totalCost || 0) || 0), 0)
@@ -2252,11 +2280,9 @@ export async function GET(request: NextRequest) {
               sourceProductId: true,
               productName: true,
               productImage: true,
-              costPrice: true,
               product: {
                 select: {
                   image: true,
-                  costPrice: true,
                 },
               },
               shop: {
@@ -2281,7 +2307,7 @@ export async function GET(request: NextRequest) {
         taobaoSkuId: item.taobaoSkuId,
         doudianSkuId: item.doudianSkuId,
         image: rawImage ? storage.resolveUrl(rawImage) : null,
-        costPrice: Number(item.costPrice || item.product?.costPrice || 0) || null,
+        costPrice: null,
         sourceType: "shopProduct" as const,
         productId: item.productId || item.sourceProductId || null,
         shopProductId: item.id,
@@ -2345,8 +2371,7 @@ export async function GET(request: NextRequest) {
         || (productId ? displayPurchaseCostsByProduct.get(productId) : null)
         || [];
       const availableBatch = candidates.find((item) => Number(item.remainingQuantity || 0) > 0);
-      const latestReceivedBatch = [...candidates].reverse().find((item) => Number(item.costPrice || 0) > 0);
-      const purchaseCost = Number((availableBatch || latestReceivedBatch)?.costPrice || 0);
+      const purchaseCost = Number(availableBatch?.costPrice || 0);
       return Number.isFinite(purchaseCost) && purchaseCost > 0 ? purchaseCost : null;
     };
 
@@ -2620,14 +2645,18 @@ export async function GET(request: NextRequest) {
           const resolveDisplayCost = (
             shopProductId?: string | null,
             productId?: string | null,
+            fallbackOutboundCostItem?: (typeof outboundBreakdown)[number] | null,
           ) => {
             const outboundCostItem = outboundBreakdown.find((entry) => (
               (shopProductId && entry.shopProductId === shopProductId)
               || (productId && entry.productId === productId)
-            ));
+            )) || fallbackOutboundCostItem;
             const outboundCostCents = Number(outboundCostItem?.unitCost || 0);
             if (Number.isFinite(outboundCostCents) && outboundCostCents > 0) {
               return { costPrice: roundCurrency(outboundCostCents / 100), costSource: "outbound" as const };
+            }
+            if (outboundBreakdown.length > 0) {
+              return { costPrice: null, costSource: undefined };
             }
             const purchaseCost = resolvePurchaseDisplayCost(shopProductId, productId);
             return purchaseCost
@@ -2661,6 +2690,7 @@ export async function GET(request: NextRequest) {
             Object.assign(matchedProduct, resolveDisplayCost(
               foundShopProduct?.shopProductId,
               foundShopProduct?.productId,
+              outboundItem,
             ));
             if (!manualMatchedProduct && !isCompositeSku && isMeituanPlatform(order.platform) && strictPlatformProductId && foundShopProduct?.id) {
               autoMatchedMeituanBackfills.push({
