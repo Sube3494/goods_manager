@@ -2186,7 +2186,7 @@ export function ProductStripItem({
   return (
     <>
       <div className={cn(
-        "flex items-center border",
+        "flex items-center border min-w-0 max-w-full",
         isBundleComponent
           ? "border-black/5 bg-black/[0.015] dark:border-white/6 dark:bg-white/[0.02]"
           : "border-black/6 bg-white/70 dark:border-white/8 dark:bg-white/4",
@@ -2223,10 +2223,10 @@ export function ProductStripItem({
         </div>
         <div className="min-w-0 flex-1">
           <div className={cn(
-            "wrap-break-word font-medium text-foreground flex items-center gap-1.5 flex-wrap",
+            "break-all wrap-break-word font-medium text-foreground",
             compact ? "line-clamp-1 text-xs leading-4" : "line-clamp-2 text-[13px] leading-4.5 sm:line-clamp-1 sm:text-sm sm:leading-5"
           )}>
-            <span className="truncate">{display.name}</span>
+            {display.name}
           </div>
           <div className={cn(
             "mt-0.5 flex flex-wrap items-center font-medium text-muted-foreground",
