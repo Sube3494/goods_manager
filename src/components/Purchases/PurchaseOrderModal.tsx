@@ -257,9 +257,10 @@ const PurchaseItemRow = memo(({
                             <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground font-mono">￥</span>
                             <input 
                                 type="number" 
-                                step="0.01"
+                                step="any"
+                                inputMode="decimal"
                                 value={costPriceInput ?? ""}
-                                onChange={(e) => onCostPriceInputChange?.(itemKey, e.target.value)}
+                                onChange={(e) => onCostPriceInputChange?.(itemKey, e.target.value.replace(/[。．，]/g, '.'))}
                                 onBlur={() => onCostPriceInputBlur?.(itemKey)}
                                 className="w-full h-9 rounded-full bg-white dark:bg-white/5 border border-border/80 dark:border-white/10 pl-6 pr-2 py-1 text-foreground outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all font-mono text-xs font-bold text-center no-spinner shadow-2xs"
                             />
@@ -453,7 +454,7 @@ export function PurchaseOrderModal({
   const [isSavingShelfLife, setIsSavingShelfLife] = useState(false);
 
   const parseDraftNumber = useCallback((value: string) => {
-    const trimmed = value.trim();
+    const trimmed = value.replace(/[。．，]/g, ".").trim();
     if (trimmed === "") return null;
     const numeric = Number(trimmed);
     return Number.isFinite(numeric) ? numeric : null;

@@ -253,6 +253,7 @@ export default function CostBackfillModal({
   }, [order.productCostBreakdown, loadingHistory, refPrices]);
 
   const handleInputChange = (purchaseOrderItemId: string, val: string) => {
+    val = val.replace(/[。．，]/g, '.');
     // 仅允许数字和小数点
     if (val !== "" && !/^\d*\.?\d*$/.test(val)) return;
     setCostInputs((prev) => ({ ...prev, [purchaseOrderItemId]: val }));

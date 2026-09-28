@@ -604,8 +604,9 @@ export function ProductFormModal({
   };
 
   const handleSaveCost = async (purchaseOrderItemId: string, orderId: string) => {
-    const costPrice = Number(editingCostValue);
-    if (isNaN(costPrice) || costPrice < 0) {
+    const raw = String(editingCostValue || "").replace(/[。．，]/g, ".").replace(/[^\d.]/g, "").trim();
+    const costPrice = Number(raw);
+    if (!raw || isNaN(costPrice) || costPrice < 0) {
       showToast("请输入合法的进价", "error");
       return;
     }
@@ -1331,7 +1332,7 @@ export function ProductFormModal({
       meituanSkuIds: meituanSkuPreview,
       taobaoSkuId: formData.taobaoSkuId,
       doudianSkuId: formData.doudianSkuId,
-      costPrice: Number(formData.costPrice),
+      costPrice: Math.max(0, Number(String(formData.costPrice || "").replace(/[。．，]/g, ".")) || 0),
       stock: hideStockField ? 0 : Number(formData.stock),
       specs: Object.keys(cleanedSpecs).length > 0 ? cleanedSpecs : undefined,
       isShelfLife: formData.isShelfLife,
@@ -2243,12 +2244,16 @@ export function ProductFormModal({
                                                                 <div className="flex items-center gap-1 mt-0.5 justify-end" onClick={(e) => e.stopPropagation()}>
                                                                     <span className="text-[10px] text-muted-foreground">进价: ￥</span>
                                                                     <input 
-                                                                        type="number"
-                                                                        step="0.01"
-                                                                        min="0"
+                                                                        type="text"
+                                                                        inputMode="decimal"
                                                                         value={editingCostValue}
-                                                                        onChange={(e) => setEditingCostValue(e.target.value)}
-                                                                        className="w-16 h-6 px-1.5 text-[10px] text-right rounded border border-border dark:border-white/10 bg-white/5 text-foreground focus:outline-none focus:border-primary"
+                                                                        onChange={(e) => {
+                                                                            const sanitized = e.target.value.replace(/[。．，]/g, ".");
+                                                                            if (/^\d*\.?\d*$/.test(sanitized)) {
+                                                                                setEditingCostValue(sanitized);
+                                                                            }
+                                                                        }}
+                                                                        className="w-16 h-6 px-1.5 text-[10px] text-right rounded border border-border dark:border-white/10 bg-white/5 text-foreground focus:outline-none focus:border-primary font-mono"
                                                                         placeholder="0.00"
                                                                         disabled={isSavingCost}
                                                                         autoFocus
@@ -2413,10 +2418,10 @@ export function ProductFormModal({
                                 </label>
                                 <input 
                                     type="number" 
-                                    step="0.01"
+                                    step="any"
                                     min="0"
                                     value={formData.costPrice}
-                                    onChange={(e) => setFormData({...formData, costPrice: e.target.value})}
+                                    onChange={(e) => setFormData({...formData, costPrice: e.target.value.replace(/[。．，]/g, '.')})}
                                     className="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all font-medium dark:hover:bg-white/10 no-spinner text-sm"
                                     placeholder="0.00"
                                 />
