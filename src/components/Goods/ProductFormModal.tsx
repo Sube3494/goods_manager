@@ -624,9 +624,15 @@ export function ProductFormModal({
         showToast("进价修改成功！已自动重算采购单总额与销售利润成本快照", "success");
         setInboundHistory(prev => prev.map(order => {
           if (order.id === orderId) {
+            const nextItems = order.items.map(item => item.id === purchaseOrderItemId ? { ...item, costPrice } : item);
+            const itemsSum = nextItems.reduce((sum, it) => sum + (Number(it.costPrice || 0) * Number(it.quantity || 0)), 0);
+            const extraFees = Number(order.extraFees || 0) + Number(order.shippingFees || 0);
+            const discount = Number(order.discountAmount || 0);
+            const nextTotalAmount = itemsSum + extraFees - discount;
             return {
               ...order,
-              items: order.items.map(item => item.id === purchaseOrderItemId ? { ...item, costPrice } : item)
+              totalAmount: nextTotalAmount,
+              items: nextItems
             };
           }
           return order;
@@ -2284,7 +2290,12 @@ export function ProductFormModal({
                                                                         </>
                                                                     ) : (
                                                                         <>
-                                                                            <span>单价: ￥{item.costPrice} | 合计: ￥{(item.costPrice * item.quantity).toFixed(2).replace(/\.00$/, '')}</span>
+                                                                            <span>单价: ￥{item.costPrice} | 小计: ￥{(item.costPrice * item.quantity).toFixed(2).replace(/\.00$/, '')}</span>
+                                                                            {order.totalAmount !== undefined && order.totalAmount !== null && Math.abs(order.totalAmount - (item.costPrice * item.quantity)) > 0.01 && (
+                                                                                <span className="text-[10px] text-muted-foreground/80 font-normal">
+                                                                                    (整单实付: ￥{Number(order.totalAmount).toFixed(2).replace(/\.00$/, '')})
+                                                                                </span>
+                                                                            )}
                                                                             <button 
                                                                                 onClick={() => {
                                                                                     setEditingItemId(itemId);
@@ -2301,7 +2312,12 @@ export function ProductFormModal({
                                                             )
                                                         ) : (
                                                             <div className="text-[10px] text-muted-foreground">
-                                                                单价: ￥{item.costPrice} | 合计: ￥{(item.costPrice * item.quantity).toFixed(2).replace(/\.00$/, '')}
+                                                                单价: ￥{item.costPrice} | 小计: ￥{(item.costPrice * item.quantity).toFixed(2).replace(/\.00$/, '')}
+                                                                {order.totalAmount !== undefined && order.totalAmount !== null && Math.abs(order.totalAmount - (item.costPrice * item.quantity)) > 0.01 && (
+                                                                    <span className="text-[10px] text-muted-foreground/80 font-normal ml-1">
+                                                                        (整单实付: ￥{Number(order.totalAmount).toFixed(2).replace(/\.00$/, '')})
+                                                                    </span>
+                                                                )}
                                                             </div>
                                                         )}
                                                     </div>
