@@ -2186,13 +2186,14 @@ export function ProductStripItem({
   return (
     <>
       <div className={cn(
-        "flex items-center border min-w-0 max-w-full",
+        "flex border min-w-0 max-w-full",
+        compact ? "items-center" : "items-start sm:items-center",
         isBundleComponent
           ? "border-black/5 bg-black/[0.015] dark:border-white/6 dark:bg-white/[0.02]"
           : "border-black/6 bg-white/70 dark:border-white/8 dark:bg-white/4",
         compact
           ? "gap-2 rounded-xl px-2 py-1.5"
-          : "gap-2.5 rounded-2xl px-2.5 py-2 sm:gap-3 sm:rounded-[18px] sm:px-3 sm:py-2.5"
+          : "gap-2 rounded-2xl px-2.5 py-2 sm:gap-3 sm:rounded-[18px] sm:px-3 sm:py-2.5"
       )}>
         <div className={cn(
           "shrink-0 overflow-hidden bg-white dark:bg-white/6",
@@ -2296,17 +2297,17 @@ export function ProductStripItem({
           ) : null}
         </div>
       </div>
-      <div className="flex shrink-0 items-center gap-1.5">
+      <div className="flex shrink-0 items-center gap-1 sm:gap-1.5 self-start sm:self-center mt-0.5 sm:mt-0">
         {bundleComponentCount !== undefined && bundleComponentCount > 0 && onToggleBundleExpand ? (
           <button
             type="button"
             onClick={onToggleBundleExpand}
-            className="inline-flex items-center gap-1 rounded-full border border-black/8 bg-black/[0.03] hover:bg-black/[0.06] dark:border-white/10 dark:bg-white/6 dark:hover:bg-white/10 px-2 py-0.5 text-[11px] font-medium text-muted-foreground hover:text-foreground dark:text-zinc-300 transition-colors cursor-pointer"
+            className="inline-flex items-center gap-0.5 sm:gap-1 rounded-full border border-black/8 bg-black/[0.03] hover:bg-black/[0.06] dark:border-white/10 dark:bg-white/6 dark:hover:bg-white/10 px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-[11px] font-medium text-muted-foreground hover:text-foreground dark:text-zinc-300 transition-colors cursor-pointer"
             title={isBundleExpanded ? "收起配件" : "展开配件"}
           >
-            <Layers size={11} className="opacity-70" />
-            <span>{bundleComponentCount}件配件</span>
-            {isBundleExpanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+            <Layers size={10} className="opacity-70 sm:w-[11px] sm:h-[11px]" />
+            <span>{bundleComponentCount}件<span className="hidden sm:inline">配件</span></span>
+            {isBundleExpanded ? <ChevronUp size={10} className="sm:w-[11px] sm:h-[11px]" /> : <ChevronDown size={10} className="sm:w-[11px] sm:h-[11px]" />}
           </button>
         ) : null}
 
@@ -2320,10 +2321,17 @@ export function ProductStripItem({
               "inline-flex shrink-0 cursor-pointer items-center justify-center rounded-full font-medium transition-all",
               compact
                 ? "h-7 w-7 border border-transparent bg-black/[0.025] p-0 text-muted-foreground hover:bg-black/[0.06] hover:text-foreground dark:bg-white/[0.035] dark:hover:bg-white/[0.08]"
-                : "h-7 border border-black/8 bg-white/85 px-2 text-[11px] text-foreground hover:border-black/12 hover:bg-zinc-100 dark:border-white/10 dark:bg-white/6 dark:text-white dark:hover:border-white/20 dark:hover:bg-white/14 sm:h-8 sm:px-2.5 sm:text-[13px]"
+                : "h-6 w-6 sm:h-8 sm:w-auto border border-black/8 bg-white/85 p-0 sm:px-2.5 text-[11px] sm:text-[13px] text-foreground hover:border-black/12 hover:bg-zinc-100 dark:border-white/10 dark:bg-white/6 dark:text-white dark:hover:border-white/20 dark:hover:bg-white/14"
             )}
           >
-            {compact ? <Pencil size={12} /> : "改匹配"}
+            {compact ? (
+              <Pencil size={12} />
+            ) : (
+              <>
+                <Pencil size={11} className="sm:hidden" />
+                <span className="hidden sm:inline">改匹配</span>
+              </>
+            )}
           </button>
         ) : null}
       </div>
@@ -2436,7 +2444,7 @@ export function OrderItemBundleGroup({
 
       {/* 展开时：配件紧随在主商品下方展示，收起时不占用任何多余空间 */}
       {isExpanded ? (
-        <div className="ml-3 sm:ml-4 pl-2.5 sm:pl-3 border-l-2 border-black/10 dark:border-white/10 space-y-1.5 pt-0.5">
+        <div className="ml-2 sm:ml-4 pl-2 sm:pl-3 border-l-2 border-black/10 dark:border-white/10 space-y-1.5 pt-0.5">
           {componentDisplays.map((display, cIdx) => (
             <ProductStripItem
               key={`${item.productNo || item.productName}-${index}-${display.sku}-${cIdx + 1}`}
