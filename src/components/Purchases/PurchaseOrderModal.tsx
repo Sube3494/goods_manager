@@ -30,6 +30,7 @@ interface PurchaseOrderModalProps {
   readOnly?: boolean;
   costBackfillItemId?: string | null;
   defaultType?: "Purchase" | "Inbound";
+  onCreateNew?: () => void;
 }
 
 const PurchaseItemRow = memo(({ 
@@ -364,6 +365,7 @@ export function PurchaseOrderModal({
   isOpen,
   onClose,
   onSubmit,
+  onCreateNew,
   onExport,
   onOverview,
   initialData,
@@ -1147,6 +1149,18 @@ export function PurchaseOrderModal({
                 )}
               </div>
               <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                {onCreateNew ? (
+                  <button
+                    type="button"
+                    onClick={onCreateNew}
+                    className="inline-flex h-8.5 items-center gap-1.5 rounded-full border border-primary/20 bg-primary/10 px-3.5 text-xs font-bold text-primary transition-all hover:bg-primary/20 active:scale-95"
+                    title="不使用当前在途采购单，按本次缺口新建一张采购单"
+                  >
+                    <Plus size={15} />
+                    <span className="hidden sm:inline">新建采购单</span>
+                    <span className="sm:hidden">新建</span>
+                  </button>
+                ) : null}
                 {initialData && !(initialData as any)?.isDraft && (
                   <div className="flex items-center gap-1.5 sm:gap-2 mr-1 sm:mr-2 border-r border-border/60 dark:border-white/10 pr-2 sm:pr-4">
                     {onOverview && (

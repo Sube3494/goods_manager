@@ -8,9 +8,8 @@ import { ArrowUp, Package2, Search, X, ChevronUp, ChevronDown, Loader2, LayoutGr
 import { useToast } from "@/components/ui/Toast";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { AutoPickOrder, AutoPickOrderItem, PurchaseOrder, PurchaseStatus } from "@/lib/types";
+import { AutoPickOrder, AutoPickOrderItem } from "@/lib/types";
 import { formatLocalDate, formatLocalDateTime } from "@/lib/dateUtils";
-import { isShopNameMatch } from "@/lib/shopIdentity";
 import { extractCustomerPhoneTail } from "@/lib/customerPhoneTail";
 import { cleanCustomerRemark } from "@/lib/customerRemark";
 import {
@@ -45,6 +44,7 @@ import {
 } from "./OrderCard";
 import { motion, AnimatePresence } from "framer-motion";
 import { DeliveryDispatchModal } from "@/components/Orders/DeliveryDispatchModal";
+import { createOrderShortagePurchaseDraft, OrderPurchaseDraft, OrderShortageItem } from "@/lib/orderShortagePurchase";
 
 const CompactOrderRouteModal = dynamic(() => import("@/components/Orders/OrderRouteModal").then((module) => module.OrderRouteModal), { ssr: false });
 const CompactCustomerHistoryModal = dynamic(() => import("@/components/Orders/CustomerHistoryModal").then((module) => module.CustomerHistoryModal), { ssr: false });
@@ -400,7 +400,7 @@ function CompactTodayOrderCard({
 
 type OrderAction = "self-delivery" | "dispatch-delivery" | "complete-delivery" | "pickup-complete" | "sync" | "outbound" | "sync-brush";
 type TodayOrderLayout = "cards" | "list";
-type PurchaseDraftPayload = PurchaseOrder & { sourceOrderId?: string; isExistingPurchase?: boolean };
+type PurchaseDraftPayload = OrderPurchaseDraft;
 type ShopProfitInfo = {
   id: string | null;
   name: string;
@@ -1022,6 +1022,12 @@ export function TodayOrdersView({
               Number(item.uncoveredMissingQuantity ?? item.missingQuantity) > 0
             ));
             if (uncoveredItems.length === 0) {
+              const newPurchaseDraft = createOrderShortagePurchaseDraft(
+                data.insufficientItems as OrderShortageItem[],
+                orderId,
+                localShops,
+                "missing",
+              );
               const pendingPurchaseOrderId = data.insufficientItems
                 .flatMap((item: { pendingPurchaseOrderIds?: string[] }) => item.pendingPurchaseOrderIds || [])
                 .find(Boolean);
@@ -1034,6 +1040,7 @@ export function TodayOrdersView({
                     ...pendingPurchase,
                     sourceOrderId: orderId,
                     isExistingPurchase: true,
+                    newPurchaseDraft,
                   });
                   showToast("已打开覆盖本次缺口的待入库采购单", "warning");
                   return;
@@ -1042,42 +1049,11 @@ export function TodayOrdersView({
               showToast("已有待入库采购覆盖本次缺口，但采购单读取失败，请前往采购管理确认入库", "warning");
               return;
             }
-            const today = new Date();
-            const draftShopId = uncoveredItems[0]?.mappedShopId || "";
-            const draftShopName = uncoveredItems[0]?.mappedShopName || "";
-            const matchedShop = draftShopId
-              ? localShops.find((shop) => shop.id === draftShopId)
-              : draftShopName
-                ? localShops.find((shop) => isShopNameMatch(shop.name, draftShopName))
-                : undefined;
-            const draft = {
-              id: `PO-${today.toISOString().slice(0, 10).replace(/-/g, "")}-${Math.floor(Math.random() * 1000).toString().padStart(3, "0")}`,
-              status: "Confirmed" as PurchaseStatus,
-              type: "Purchase",
-              date: today.toLocaleString('sv-SE').slice(0, 16).replace('T', ' '),
-              items: uncoveredItems.map((item: { productId?: string; shopProductId?: string; name?: string; image?: string | null; missingQuantity: number; uncoveredMissingQuantity?: number; mappedShopId?: string; mappedShopName?: string }) => ({
-                productId: item.productId || null,
-                shopProductId: item.shopProductId || null,
-                product: {
-                  id: item.shopProductId || item.productId,
-                  name: item.name || "未命名商品",
-                  sku: "",
-                  image: item.image || null,
-                  costPrice: 0,
-                },
-                image: item.image || null,
-                supplierId: null,
-                quantity: Number(item.uncoveredMissingQuantity ?? item.missingQuantity),
-                costPrice: 0,
-              })),
-              shippingFees: 0,
-              extraFees: 0,
-              totalAmount: 0,
-              discountAmount: 0,
-              shippingAddress: matchedShop?.address || "",
-              shopName: draftShopName,
-              sourceOrderId: orderId,
-            };
+            const draft = createOrderShortagePurchaseDraft(
+              uncoveredItems as OrderShortageItem[],
+              orderId,
+              localShops,
+            );
             onOpenPurchaseDraft(draft);
             showToast("库存不足，已扣除在途采购并按剩余缺口生成采购草稿", "warning");
             return;

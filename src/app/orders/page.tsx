@@ -58,16 +58,16 @@ import {
   readShopNameFromRawPayload,
   readShopAddressFromRawPayload,
 } from "@/lib/shopCommission";
-import { AutoPickIntegrationConfig, AutoPickMaiyatianShop, AutoPickMaiyatianShopMapping, AutoPickOrder, AutoPickOrderItem, AutoPickSelfDeliveryTimingConfig, MaiyatianCookieAccount, PurchaseOrder, PurchaseOrderItem, PurchaseStatus } from "@/lib/types";
-import { isShopNameMatch } from "@/lib/shopIdentity";
+import { AutoPickIntegrationConfig, AutoPickMaiyatianShop, AutoPickMaiyatianShopMapping, AutoPickOrder, AutoPickOrderItem, AutoPickSelfDeliveryTimingConfig, MaiyatianCookieAccount, PurchaseOrder, PurchaseOrderItem } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { formatLocalDate, formatLocalDateTime } from "@/lib/dateUtils";
 import { ORDER_SHORTAGE_PURCHASE_NOTE_KEYWORD } from "@/lib/purchaseOrderTypes";
 import { simplifyShopName } from "@/lib/shopIdentity";
+import { createOrderShortagePurchaseDraft, OrderPurchaseDraft, OrderShortageItem } from "@/lib/orderShortagePurchase";
 
 type OrderAction = "self-delivery" | "dispatch-delivery" | "complete-delivery" | "pickup-complete" | "sync" | "outbound";
 type OrdersTab = "today" | "appointments" | "all";
-type PurchaseDraftPayload = PurchaseOrder & { sourceOrderId?: string; isExistingPurchase?: boolean };
+type PurchaseDraftPayload = OrderPurchaseDraft;
 const SHOW_APPOINTMENT_TAB = false;
 const SHOP_PROFIT_PLATFORMS = ["美团", "京东", "淘宝", "抖店", "线下交易"] as const;
 const UNMATCHED_SHOP_FILTER = "__unmatched__";
@@ -2758,6 +2758,12 @@ export default function OrdersPage() {
               Number(item.uncoveredMissingQuantity ?? item.missingQuantity) > 0
             ));
             if (uncoveredItems.length === 0) {
+              const newPurchaseDraft = createOrderShortagePurchaseDraft(
+                outboundData.insufficientItems as OrderShortageItem[],
+                matchEditorTarget.orderId,
+                localShops,
+                "missing",
+              );
               const pendingPurchaseOrderId = outboundData.insufficientItems
                 .flatMap((item: { pendingPurchaseOrderIds?: string[] }) => item.pendingPurchaseOrderIds || [])
                 .find(Boolean);
@@ -2770,6 +2776,7 @@ export default function OrdersPage() {
                     ...pendingPurchase,
                     sourceOrderId: matchEditorTarget.orderId,
                     isExistingPurchase: true,
+                    newPurchaseDraft,
                   });
                   showToast("商品匹配已更新，并已打开覆盖缺口的待入库采购单", "warning");
                   triggerParentRefresh();
@@ -2780,42 +2787,11 @@ export default function OrdersPage() {
               triggerParentRefresh();
               return;
             }
-            const today = new Date();
-            const draftShopId = uncoveredItems[0]?.mappedShopId || "";
-            const draftShopName = uncoveredItems[0]?.mappedShopName || "";
-            const matchedShop = draftShopId
-              ? localShops.find((shop) => shop.id === draftShopId)
-              : draftShopName
-                ? localShops.find((shop) => isShopNameMatch(shop.name, draftShopName))
-                : undefined;
-            const draft = {
-              id: `PO-${today.toISOString().slice(0, 10).replace(/-/g, "")}-${Math.floor(Math.random() * 1000).toString().padStart(3, "0")}`,
-              status: "Confirmed" as PurchaseStatus,
-              type: "Purchase",
-              date: today.toLocaleString("sv-SE").slice(0, 16).replace("T", " "),
-              items: uncoveredItems.map((item: any) => ({
-                productId: item.productId || null,
-                shopProductId: item.shopProductId || null,
-                product: {
-                  id: item.shopProductId || item.productId,
-                  name: item.name || "未命名商品",
-                  sku: "",
-                  image: item.image || null,
-                  costPrice: 0,
-                },
-                image: item.image || null,
-                supplierId: null,
-                quantity: Number(item.uncoveredMissingQuantity ?? item.missingQuantity),
-                costPrice: 0,
-              })),
-              shippingFees: 0,
-              extraFees: 0,
-              totalAmount: 0,
-              discountAmount: 0,
-              shippingAddress: matchedShop?.address || "",
-              shopName: draftShopName,
-              sourceOrderId: matchEditorTarget.orderId,
-            };
+            const draft = createOrderShortagePurchaseDraft(
+              uncoveredItems as OrderShortageItem[],
+              matchEditorTarget.orderId,
+              localShops,
+            );
             setPurchaseDraft(draft);
             showToast("商品匹配已更新；已扣除在途采购并按剩余缺口生成采购草稿", "warning");
           } else {
@@ -4036,6 +4012,9 @@ export default function OrdersPage() {
           isOpen={Boolean(purchaseDraft)}
           initialData={purchaseDraft}
           onClose={() => setPurchaseDraft(null)}
+          onCreateNew={purchaseDraft.isExistingPurchase && purchaseDraft.newPurchaseDraft
+            ? () => setPurchaseDraft(purchaseDraft.newPurchaseDraft || null)
+            : undefined}
           onSubmit={async (data) => {
             await savePurchaseDraft(data).catch((error) => {
               console.error("Failed to create purchase draft:", error);
