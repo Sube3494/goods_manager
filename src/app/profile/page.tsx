@@ -18,6 +18,9 @@ import {
   ChevronDown,
   CheckCircle2,
   Power,
+  Truck,
+  Store,
+  Unplug,
 } from "lucide-react";
 import { useUser } from "@/hooks/useUser";
 import { useToast } from "@/components/ui/Toast";
@@ -32,6 +35,28 @@ import { CustomSelect } from "@/components/ui/CustomSelect";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { DeviceSessionManager } from "@/components/Profile/DeviceSessionManager";
 
+type ShansongProfileStatus = {
+  appConfigured: boolean;
+  authorized: boolean;
+  authUrl: string | null;
+  shopId: string | null;
+  expiresAt: string | null;
+  authorizedAt: string | null;
+  boundShopId: string | null;
+  boundShopName: string | null;
+};
+
+type ProfileShop = {
+  id: string;
+  name: string;
+  address?: string | null;
+};
+
+type ProfileLibrary = {
+  id: string;
+  name: string;
+};
+
 export default function ProfilePage() {
   const { user, isLoading: isUserLoading } = useUser();
   const typedUser = user as unknown as UserType;
@@ -39,17 +64,97 @@ export default function ProfilePage() {
   const canUseBrushSimulation = hasPermission(user as SessionUser | null, "brush:simulate");
   const [name, setName] = useState("");
   const [addressList, setAddressList] = useState<AddressItem[]>([]);
-  const [libraries, setLibraries] = useState<any[]>([]);
+  const [libraries, setLibraries] = useState<ProfileLibrary[]>([]);
+  const [shansongStatus, setShansongStatus] = useState<ShansongProfileStatus | null>(null);
+  const [profileShops, setProfileShops] = useState<ProfileShop[]>([]);
+  const [selectedShansongShopId, setSelectedShansongShopId] = useState("");
+  const [isLoadingShansong, setIsLoadingShansong] = useState(true);
+  const [isSavingShansong, setIsSavingShansong] = useState(false);
+  const [isDisconnectingShansong, setIsDisconnectingShansong] = useState(false);
+  const [confirmDisconnectShansong, setConfirmDisconnectShansong] = useState(false);
 
   useEffect(() => {
     fetch("/api/product-libraries")
       .then((res) => (res.ok ? res.json() : []))
       .then((data) => {
         const libs = Array.isArray(data) ? data : (data.libraries || []);
-        setLibraries(libs);
+        setLibraries(Array.isArray(libs) ? libs as ProfileLibrary[] : []);
       })
       .catch((err) => console.error("Failed to load libraries:", err));
   }, []);
+
+  const loadShansongSettings = async () => {
+    setIsLoadingShansong(true);
+    try {
+      const [statusResponse, shopsResponse] = await Promise.all([
+        fetch("/api/integrations/shansong", { cache: "no-store" }),
+        fetch("/api/shops?source=shipping-addresses", { cache: "no-store" }),
+      ]);
+      const statusData = await statusResponse.json().catch(() => ({}));
+      const shopsData = await shopsResponse.json().catch(() => ({}));
+      if (!statusResponse.ok) throw new Error(statusData.error || "读取闪送配置失败");
+      setShansongStatus(statusData as ShansongProfileStatus);
+      setSelectedShansongShopId(String(statusData.boundShopId || ""));
+      setProfileShops(Array.isArray(shopsData.shops) ? shopsData.shops : []);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "读取闪送配置失败", "error");
+    } finally {
+      setIsLoadingShansong(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadShansongSettings();
+    const params = new URLSearchParams(window.location.search);
+    const result = params.get("shansong");
+    if (result === "connected") showToast("闪送商户账号授权成功，请选择并绑定对应门店", "success");
+    if (result === "error") showToast(params.get("message") || "闪送商户账号授权失败", "error");
+    if (result) {
+      params.delete("shansong");
+      params.delete("message");
+      const query = params.toString();
+      window.history.replaceState(null, "", `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const saveShansongBinding = async () => {
+    if (!selectedShansongShopId) {
+      showToast("请选择闪送账号对应的门店", "error");
+      return;
+    }
+    setIsSavingShansong(true);
+    try {
+      const response = await fetch("/api/integrations/shansong", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ shopId: selectedShansongShopId }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "保存闪送门店绑定失败");
+      setShansongStatus((current) => current ? { ...current, ...data } : data as ShansongProfileStatus);
+      showToast(`闪送账号已绑定门店：${data.boundShopName || "已选择门店"}`, "success");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "保存闪送门店绑定失败", "error");
+    } finally {
+      setIsSavingShansong(false);
+    }
+  };
+
+  const disconnectShansong = async () => {
+    setIsDisconnectingShansong(true);
+    try {
+      const response = await fetch("/api/integrations/shansong", { method: "DELETE" });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "取消闪送授权失败");
+      await loadShansongSettings();
+      showToast("闪送商户账号已解除授权", "success");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "取消闪送授权失败", "error");
+    } finally {
+      setIsDisconnectingShansong(false);
+    }
+  };
 
   useEffect(() => {
     if (libraries.length > 0 && addressList.length > 0) {
@@ -438,6 +543,7 @@ export default function ProfilePage() {
                 <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap xl:justify-end">
                   <a href="#profile-core" className="inline-flex h-10 items-center justify-center whitespace-nowrap rounded-2xl border border-border/70 bg-white/82 px-3 text-xs font-black text-muted-foreground transition-all hover:border-primary/30 hover:text-primary dark:bg-white/5">基本资料</a>
                   <a href="#security-center" className="inline-flex h-10 items-center justify-center whitespace-nowrap rounded-2xl border border-border/70 bg-white/82 px-3 text-xs font-black text-muted-foreground transition-all hover:border-primary/30 hover:text-primary dark:bg-white/5">账号安全</a>
+                  <a href="#delivery-integrations" className="inline-flex h-10 items-center justify-center whitespace-nowrap rounded-2xl border border-border/70 bg-white/82 px-3 text-xs font-black text-muted-foreground transition-all hover:border-primary/30 hover:text-primary dark:bg-white/5">配送授权</a>
                   <a href="#address-library" className="inline-flex h-10 items-center justify-center whitespace-nowrap rounded-2xl border border-border/70 bg-white/82 px-3 text-xs font-black text-muted-foreground transition-all hover:border-primary/30 hover:text-primary dark:bg-white/5">地址库</a>
                   <a
                     href="https://cravatar.cn/"
@@ -641,6 +747,119 @@ export default function ProfilePage() {
               </div>
 
             </div>
+        </motion.section>
+
+        <motion.section id="delivery-integrations" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.13 }} className="overflow-hidden rounded-[22px] border border-border/70 bg-white/86 shadow-xl shadow-black/5 backdrop-blur-xl dark:bg-[#0b111e]/80 dark:shadow-black/20 sm:rounded-[24px]">
+          <div className="flex flex-col gap-3 border-b border-border/60 px-3.5 py-3.5 sm:flex-row sm:items-start sm:justify-between sm:px-6 sm:py-4">
+            <div>
+              <div className="text-[11px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">Delivery integration</div>
+              <h3 className="mt-1 text-lg font-black tracking-tight text-foreground">配送账号授权</h3>
+              <p className="mt-1 text-sm text-muted-foreground">管理个人配送平台账号，并明确绑定对应的本系统门店。</p>
+            </div>
+            {shansongStatus ? (
+              <span className={`inline-flex h-8 shrink-0 items-center gap-1.5 self-start rounded-full px-3 text-xs font-black ${
+                shansongStatus.authorized && shansongStatus.boundShopId
+                  ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                  : shansongStatus.authorized
+                    ? "bg-amber-500/10 text-amber-700 dark:text-amber-300"
+                    : "bg-muted text-muted-foreground"
+              }`}>
+                <span className={`h-2 w-2 rounded-full ${shansongStatus.authorized && shansongStatus.boundShopId ? "bg-emerald-500" : shansongStatus.authorized ? "bg-amber-500" : "bg-muted-foreground/50"}`} />
+                {shansongStatus.authorized && shansongStatus.boundShopId ? "已启用" : shansongStatus.authorized ? "待绑定门店" : "未授权"}
+              </span>
+            ) : null}
+          </div>
+
+          <div className="p-3.5 sm:p-6">
+            {isLoadingShansong ? (
+              <div className="flex min-h-40 items-center justify-center gap-2 text-sm text-muted-foreground">
+                <Loader2 size={18} className="animate-spin text-primary" />
+                正在读取闪送配置…
+              </div>
+            ) : (
+              <div className="rounded-[22px] border border-blue-500/15 bg-gradient-to-br from-blue-500/[0.07] to-transparent p-4 shadow-sm sm:p-5">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-sm">
+                      <Truck size={21} />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="text-base font-black text-foreground">闪送个人商户账号</div>
+                        <span className="rounded-md bg-blue-500/10 px-2 py-0.5 text-[10px] font-black text-blue-700 dark:text-blue-300">官方直连</span>
+                      </div>
+                      <p className="mt-1 max-w-2xl text-xs leading-relaxed text-muted-foreground">
+                        麦芽田仅提供订单数据；运力询价和下单直接走你的闪送账号。每个授权账号在本系统中只绑定一家门店。
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex shrink-0 flex-wrap gap-2">
+                    {shansongStatus?.appConfigured && shansongStatus.authUrl ? (
+                      <button
+                        type="button"
+                        onClick={() => { window.location.href = shansongStatus.authUrl!; }}
+                        className="inline-flex h-10 items-center justify-center gap-2 rounded-2xl bg-blue-600 px-4 text-xs font-black text-white shadow-sm transition hover:bg-blue-500"
+                      >
+                        <ExternalLink size={14} />
+                        {shansongStatus.authorized ? "重新授权" : "授权闪送账号"}
+                      </button>
+                    ) : null}
+                    {shansongStatus?.authorized ? (
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDisconnectShansong(true)}
+                        disabled={isDisconnectingShansong}
+                        className="inline-flex h-10 items-center justify-center gap-2 rounded-2xl border border-destructive/20 bg-background/70 px-4 text-xs font-black text-destructive transition hover:bg-destructive/10 disabled:opacity-50"
+                      >
+                        {isDisconnectingShansong ? <Loader2 size={14} className="animate-spin" /> : <Unplug size={14} />}
+                        解除授权
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+
+                {!shansongStatus?.appConfigured ? (
+                  <div className="mt-4 rounded-2xl border border-amber-500/20 bg-amber-500/[0.07] px-4 py-3 text-xs leading-relaxed text-amber-700 dark:text-amber-300">
+                    服务端尚未配置闪送开放平台 appKey、appSecret 和 redirectUrl，配置完成后这里才可发起商户授权。
+                  </div>
+                ) : (
+                  <div className="mt-5 grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+                    <div>
+                      <label className="mb-2 flex items-center gap-2 text-xs font-black uppercase tracking-[0.14em] text-muted-foreground/70">
+                        <Store size={14} className="text-blue-600" />
+                        绑定经营门店
+                      </label>
+                      <CustomSelect
+                        options={profileShops.map((shop) => ({ value: shop.id, label: `${shop.name}${shop.address ? ` · ${shop.address}` : ""}` }))}
+                        value={selectedShansongShopId}
+                        onChange={setSelectedShansongShopId}
+                        placeholder={profileShops.length ? "请选择该闪送账号对应的门店" : "请先在地址库创建门店"}
+                        triggerClassName="h-12 w-full rounded-2xl border border-border bg-white px-4 text-sm font-bold text-foreground dark:bg-white/5 dark:border-white/10"
+                        searchable
+                        searchPlaceholder="搜索门店名称或地址…"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void saveShansongBinding()}
+                      disabled={!selectedShansongShopId || isSavingShansong || selectedShansongShopId === shansongStatus?.boundShopId}
+                      className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl border border-blue-500/20 bg-blue-500/10 px-5 text-sm font-black text-blue-700 transition hover:bg-blue-500/15 disabled:cursor-not-allowed disabled:opacity-40 dark:text-blue-300"
+                    >
+                      {isSavingShansong ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+                      保存门店绑定
+                    </button>
+                  </div>
+                )}
+
+                {shansongStatus?.authorizedAt ? (
+                  <div className="mt-3 text-[11px] text-muted-foreground">
+                    当前授权商户 ID：{shansongStatus.shopId || "未返回"} · 绑定门店：{shansongStatus.boundShopName || "尚未绑定"}
+                  </div>
+                ) : null}
+              </div>
+            )}
+          </div>
         </motion.section>
 
         <motion.section id="address-library" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="overflow-hidden rounded-[22px] border border-border/70 bg-white/86 shadow-xl shadow-black/5 backdrop-blur-xl dark:bg-[#0b111e]/80 dark:shadow-black/20 sm:rounded-[24px]">
@@ -893,6 +1112,20 @@ export default function ProfilePage() {
       </div>
 
 
+      <ConfirmModal
+        isOpen={confirmDisconnectShansong}
+        onClose={() => setConfirmDisconnectShansong(false)}
+        onConfirm={() => {
+          setConfirmDisconnectShansong(false);
+          void disconnectShansong();
+        }}
+        title="解除闪送商户授权"
+        message="解除后，呼叫配送将不再显示个人闪送报价，已产生的闪送订单不会自动取消。"
+        confirmLabel="确认解除"
+        cancelLabel="保留授权"
+        variant="danger"
+      />
+
       {/* 门店收货地址删除二次确认弹窗 */}
       <ConfirmModal
         isOpen={Boolean(pendingDeleteAddress)}
@@ -927,7 +1160,7 @@ export default function ProfilePage() {
             ) : addressCheckResult?.canDelete === false ? (
               <>
                 <p className="text-sm font-medium text-foreground">
-                  门店"<span className="font-bold text-destructive">{pendingDeleteAddress?.label}</span>"存在关联业务数据，无法删除。
+                  门店“<span className="font-bold text-destructive">{pendingDeleteAddress?.label}</span>”存在关联业务数据，无法删除。
                 </p>
                 <div className="rounded-xl border border-amber-200/60 bg-amber-50/60 px-4 py-3 dark:border-amber-900/40 dark:bg-amber-950/20">
                   <p className="text-xs font-bold text-amber-700 dark:text-amber-400 mb-1.5">关联数据</p>
@@ -947,7 +1180,7 @@ export default function ProfilePage() {
             ) : (
               <>
                 <p className="text-sm font-medium text-foreground">
-                  确定要删除门店"<span className="font-bold text-destructive">{pendingDeleteAddress?.label}</span>"的收货地址吗？
+                  确定要删除门店“<span className="font-bold text-destructive">{pendingDeleteAddress?.label}</span>”的收货地址吗？
                 </p>
                 <p className="text-xs text-muted-foreground leading-relaxed border-l-2 border-destructive/30 pl-3">
                   该地址关联系统中的门店简称、采购订单、刷单计划及外卖订单分布，删除后将无法恢复。

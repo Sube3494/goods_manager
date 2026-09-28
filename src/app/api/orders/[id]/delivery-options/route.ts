@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
 import { callAutoPickCommand } from "@/lib/autoPickOrders";
+import { getShansongConnectionStatus, hasActiveShansongDelivery, quoteShansongDelivery } from "@/lib/shansong";
 import {
   isAutoPickOrderCancelledStatus,
   isAutoPickOrderCompletedStatus,
@@ -25,6 +26,7 @@ export async function GET(_: NextRequest, context: { params: Promise<{ id: strin
     );
     const order = await prisma.autoPickOrder.findFirst({
       where: { id, ...(isAdmin ? {} : { userId: session.id }) },
+      include: { items: { orderBy: { createdAt: "asc" } } },
     });
     if (!order) return NextResponse.json({ error: "Order not found" }, { status: 404 });
     if (isAutoPickOrderCompletedStatus(order.status) || isAutoPickOrderCancelledStatus(order.status)) {
@@ -36,11 +38,57 @@ export async function GET(_: NextRequest, context: { params: Promise<{ id: strin
     if (isAutoPickOrderDeliveringStatus(order.status) || isAutoPickOrderRiderAssigned(order)) {
       return NextResponse.json({ error: "订单已有配送任务，不能重复呼叫" }, { status: 409 });
     }
+    if (hasActiveShansongDelivery(order.rawPayload)) {
+      return NextResponse.json({ error: "该订单已有闪送任务，不能重复发单" }, { status: 409 });
+    }
     const sourceId = String(order.sourceId || "").trim();
-    if (!sourceId) return NextResponse.json({ error: "订单缺少麦芽田订单标识，请先同步订单" }, { status: 409 });
+    const shansongStatus = await getShansongConnectionStatus(order.userId).catch(() => ({
+      appConfigured: false,
+      authorized: false,
+      shopId: null,
+      expiresAt: null,
+      authorizedAt: null,
+      boundShopId: null,
+      boundShopName: null,
+    }));
+    const [maiyitianResult, shansongResult] = await Promise.allSettled([
+      sourceId
+        ? callAutoPickCommand(order.userId, "/delivery-options", { sourceId })
+        : Promise.reject(new Error("订单缺少麦芽田订单标识")),
+      shansongStatus.authorized
+        ? quoteShansongDelivery(order)
+        : Promise.reject(new Error(shansongStatus.appConfigured ? "闪送个人账号未授权" : "闪送开放平台应用未配置")),
+    ]);
 
-    const result = await callAutoPickCommand(order.userId, "/delivery-options", { sourceId });
-    return NextResponse.json(result.data, { status: result.status });
+    const maiyitianData = maiyitianResult.status === "fulfilled" ? maiyitianResult.value.data : {};
+    const maiyitianOptions = Array.isArray(maiyitianData?.options)
+      ? maiyitianData.options.map((option: unknown) => ({
+          ...(option && typeof option === "object" ? option as Record<string, unknown> : {}),
+          provider: "maiyitian",
+        }))
+      : [];
+    const options = [
+      ...maiyitianOptions,
+      ...(shansongResult.status === "fulfilled" ? [shansongResult.value] : []),
+    ];
+    const providerErrors = {
+      maiyitian: maiyitianResult.status === "rejected"
+        ? (maiyitianResult.reason instanceof Error ? maiyitianResult.reason.message : "麦芽田询价失败")
+        : (!maiyitianResult.value.ok ? String(maiyitianResult.value.data?.error || maiyitianResult.value.data?.message || "麦芽田询价失败") : null),
+      shansong: shansongResult.status === "rejected"
+        ? (shansongResult.reason instanceof Error ? shansongResult.reason.message : "闪送询价失败")
+        : null,
+    };
+
+    if (options.length === 0 && maiyitianResult.status === "fulfilled" && !maiyitianResult.value.ok && !shansongStatus.authorized) {
+      return NextResponse.json({ options, shansong: shansongStatus, providerErrors }, { status: 200 });
+    }
+    return NextResponse.json({
+      ...(maiyitianData && typeof maiyitianData === "object" ? maiyitianData : {}),
+      options,
+      shansong: shansongStatus,
+      providerErrors,
+    });
   } catch (error) {
     console.error("Failed to load delivery options:", error);
     return NextResponse.json({ error: error instanceof Error ? error.message : "获取配送报价失败" }, { status: 500 });
