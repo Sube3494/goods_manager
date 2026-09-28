@@ -2189,8 +2189,6 @@ export function ProductStripItem({
         "flex items-center border",
         isBundleComponent
           ? "border-black/5 bg-black/[0.015] dark:border-white/6 dark:bg-white/[0.02]"
-          : isBundleMain
-          ? "border-indigo-500/20 bg-indigo-500/[0.03] dark:border-indigo-400/20 dark:bg-indigo-500/[0.05]"
           : "border-black/6 bg-white/70 dark:border-white/8 dark:bg-white/4",
         compact
           ? "gap-2 rounded-xl px-2 py-1.5"
@@ -2229,13 +2227,13 @@ export function ProductStripItem({
             compact ? "line-clamp-1 text-xs leading-4" : "line-clamp-2 text-[13px] leading-4.5 sm:line-clamp-1 sm:text-sm sm:leading-5"
           )}>
             {isBundleComponent ? (
-              <span className="shrink-0 px-1.5 py-0.2 rounded bg-amber-500/12 text-amber-700 dark:text-amber-300 text-[10px] font-semibold border border-amber-500/20">
+              <span className="shrink-0 px-1.5 py-0.2 rounded bg-black/5 text-muted-foreground dark:bg-white/8 dark:text-zinc-300 text-[10px] font-medium border border-black/6 dark:border-white/8">
                 配件
               </span>
             ) : null}
             {isBundleMain ? (
-              <span className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full bg-indigo-500/12 text-indigo-700 dark:text-indigo-300 text-[10px] font-semibold border border-indigo-500/20">
-                <Layers size={10} /> 组合商品
+              <span className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full bg-black/5 text-muted-foreground dark:bg-white/8 dark:text-zinc-300 text-[10px] font-medium border border-black/8 dark:border-white/10">
+                <Layers size={10} /> 组合
               </span>
             ) : null}
             <span className="truncate">{display.name}</span>
@@ -2245,7 +2243,7 @@ export function ProductStripItem({
             compact ? "gap-x-1.5 gap-y-0.5 text-[10px]" : "gap-x-2 gap-y-1 text-[11px] sm:mt-1 sm:gap-x-2.5"
           )}>
             {shouldShowItemSku ? (
-              <span className="shrink-0">{display.sku}</span>
+              <span className="shrink-0 font-mono">{display.sku}</span>
             ) : null}
             <span className="shrink-0">x{display.quantity}</span>
             {typeof display.costPrice === "number" && Number.isFinite(display.costPrice) && display.costPrice > 0 ? (
@@ -2313,12 +2311,12 @@ export function ProductStripItem({
           <button
             type="button"
             onClick={onToggleBundleExpand}
-            className="inline-flex items-center gap-1 rounded-full border border-indigo-500/20 bg-indigo-500/10 hover:bg-indigo-500/15 px-2 py-0.5 text-[11px] font-medium text-indigo-700 dark:text-indigo-300 transition-colors cursor-pointer"
-            title={isBundleExpanded ? "收起配件明细" : "展开配件明细"}
+            className="inline-flex items-center gap-1 rounded-full border border-black/8 bg-black/[0.03] hover:bg-black/[0.06] dark:border-white/10 dark:bg-white/6 dark:hover:bg-white/10 px-2 py-0.5 text-[11px] font-medium text-muted-foreground hover:text-foreground dark:text-zinc-300 transition-colors cursor-pointer"
+            title={isBundleExpanded ? "收起配件" : "展开配件"}
           >
-            <Layers size={12} />
+            <Layers size={11} className="opacity-70" />
             <span>{bundleComponentCount}件配件</span>
-            {isBundleExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+            {isBundleExpanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
           </button>
         ) : null}
 
@@ -2364,6 +2362,7 @@ export function ProductStripItem({
               height={1200}
               className="max-h-[86dvh] w-full rounded-2xl object-contain shadow-2xl"
               unoptimized
+              onError={() => setIsPreviewOpen(false)}
             />
             <div className="mt-3 truncate text-center text-sm font-medium text-white/90">{display.name}</div>
           </div>
@@ -2399,7 +2398,7 @@ export function OrderItemBundleGroup({
 }) {
   const displays = getExpandedOrderItemDisplays(item, order.platform);
   const isBundle = displays.length > 1;
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   if (!isBundle) {
     const display = displays[0] || getOrderItemDisplay(item, order.platform);
@@ -2425,7 +2424,7 @@ export function OrderItemBundleGroup({
   const componentDisplays = displays.slice(1);
 
   return (
-    <div className="rounded-2xl border border-indigo-500/20 bg-indigo-500/[0.02] p-1.5 sm:p-2 space-y-1.5 transition-all">
+    <div className="space-y-1.5">
       {/* 主商品（本体） */}
       <ProductStripItem
         display={mainDisplay}
@@ -2445,22 +2444,9 @@ export function OrderItemBundleGroup({
         isDoudianOrder={isDoudianOrder(order.platform)}
       />
 
-      {/* 配件叠在主商品下方 */}
+      {/* 展开时：配件紧随在主商品下方展示，收起时不占用任何多余空间 */}
       {isExpanded ? (
-        <div className="ml-3 sm:ml-4 pl-2.5 sm:pl-3 border-l-2 border-indigo-500/25 dark:border-indigo-400/20 space-y-1.5">
-          <div className="flex items-center justify-between text-[11px] px-1 pt-0.5">
-            <span className="flex items-center gap-1 font-medium text-indigo-700 dark:text-indigo-300">
-              <Layers size={11} /> 组合配件明细 ({componentDisplays.length}件)：
-            </span>
-            <button
-              type="button"
-              onClick={() => setIsExpanded(false)}
-              className="text-[10px] text-muted-foreground hover:text-foreground inline-flex items-center gap-0.5 cursor-pointer"
-            >
-              <span>收起配件</span>
-              <ChevronUp size={11} />
-            </button>
-          </div>
+        <div className="ml-3 sm:ml-4 pl-2.5 sm:pl-3 border-l-2 border-black/10 dark:border-white/10 space-y-1.5 pt-0.5">
           {componentDisplays.map((display, cIdx) => (
             <ProductStripItem
               key={`${item.productNo || item.productName}-${index}-${display.sku}-${cIdx + 1}`}
@@ -2479,19 +2465,7 @@ export function OrderItemBundleGroup({
             />
           ))}
         </div>
-      ) : (
-        <div className="ml-3 sm:ml-4 pl-2.5">
-          <button
-            type="button"
-            onClick={() => setIsExpanded(true)}
-            className="flex items-center gap-1.5 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/15 px-2.5 py-1 text-[11px] font-medium text-indigo-700 dark:text-indigo-300 transition-colors cursor-pointer"
-          >
-            <Layers size={12} className="text-indigo-500" />
-            <span>包含 {componentDisplays.length} 件配件（{componentDisplays.map(c => c.name).join("、")}）</span>
-            <ChevronDown size={12} />
-          </button>
-        </div>
-      )}
+      ) : null}
     </div>
   );
 }
