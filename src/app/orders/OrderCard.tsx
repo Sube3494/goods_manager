@@ -2226,16 +2226,6 @@ export function ProductStripItem({
             "wrap-break-word font-medium text-foreground flex items-center gap-1.5 flex-wrap",
             compact ? "line-clamp-1 text-xs leading-4" : "line-clamp-2 text-[13px] leading-4.5 sm:line-clamp-1 sm:text-sm sm:leading-5"
           )}>
-            {isBundleComponent ? (
-              <span className="shrink-0 px-1.5 py-0.2 rounded bg-black/5 text-muted-foreground dark:bg-white/8 dark:text-zinc-300 text-[10px] font-medium border border-black/6 dark:border-white/8">
-                配件
-              </span>
-            ) : null}
-            {isBundleMain ? (
-              <span className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full bg-black/5 text-muted-foreground dark:bg-white/8 dark:text-zinc-300 text-[10px] font-medium border border-black/8 dark:border-white/10">
-                <Layers size={10} /> 组合
-              </span>
-            ) : null}
             <span className="truncate">{display.name}</span>
           </div>
           <div className={cn(
