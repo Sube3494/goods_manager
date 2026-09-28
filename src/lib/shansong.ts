@@ -4,6 +4,7 @@ import { normalizeAutoPickOrderPayload, resolveAutoPickMatchedShopName } from "@
 import { Prisma } from "../../prisma/generated-client";
 
 const CONFIG_KEY = "shansongIntegration";
+const CONFIGS_KEY = "shansongIntegrations";
 const CIPHER_PREFIX = "enc:v1:";
 const ACCESS_TOKEN_LEEWAY_MS = 5 * 60 * 1000;
 
@@ -27,7 +28,10 @@ export type ShansongConnectionStatus = {
   authorizedAt: string | null;
   boundShopId: string | null;
   boundShopName: string | null;
+  accounts: ShansongAccountStatus[];
 };
+
+export type ShansongAccountStatus = Omit<ShansongConnectionStatus, "appConfigured" | "accounts">;
 
 export type ShansongQuoteOption = {
   provider: "shansong";
@@ -136,6 +140,34 @@ function normalizeStoredConfig(value: unknown): StoredShansongConfig {
   };
 }
 
+function normalizeStoredConfigs(permissions: JsonRecord) {
+  const configs: Record<string, StoredShansongConfig> = {};
+  const rawConfigs = asRecord(permissions[CONFIGS_KEY]);
+  for (const [boundShopId, value] of Object.entries(rawConfigs)) {
+    const normalizedShopId = String(boundShopId || "").trim();
+    if (!normalizedShopId) continue;
+    configs[normalizedShopId] = { ...normalizeStoredConfig(value), boundShopId: normalizedShopId };
+  }
+  // 兼容旧版用户级单账号配置；下次保存或刷新时自动迁移到门店映射。
+  const legacy = normalizeStoredConfig(permissions[CONFIG_KEY]);
+  if (legacy.boundShopId && legacy.accessToken && !configs[legacy.boundShopId]) {
+    configs[legacy.boundShopId] = legacy;
+  }
+  return configs;
+}
+
+function serializeStoredConfig(config: StoredShansongConfig) {
+  return {
+    accessToken: encryptSecret(config.accessToken),
+    refreshToken: encryptSecret(config.refreshToken),
+    expiresAt: config.expiresAt,
+    shopId: config.shopId,
+    isAllStoreAuth: config.isAllStoreAuth,
+    authorizedAt: config.authorizedAt,
+    boundShopId: config.boundShopId,
+  };
+}
+
 async function readUserPermissions(userId: string) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -145,25 +177,28 @@ async function readUserPermissions(userId: string) {
   return asRecord(user.permissions);
 }
 
-async function getStoredConfig(userId: string) {
+async function getStoredConfigs(userId: string) {
   const permissions = await readUserPermissions(userId);
-  return normalizeStoredConfig(permissions[CONFIG_KEY]);
+  return normalizeStoredConfigs(permissions);
 }
 
-async function saveStoredConfig(userId: string, config: StoredShansongConfig) {
+async function getStoredConfig(userId: string, boundShopId: string) {
+  const configs = await getStoredConfigs(userId);
+  return configs[boundShopId] || { ...normalizeStoredConfig(null), boundShopId };
+}
+
+async function saveStoredConfig(userId: string, boundShopId: string, config: StoredShansongConfig) {
   const permissions = await readUserPermissions(userId);
-  const stored = {
-    accessToken: encryptSecret(config.accessToken),
-    refreshToken: encryptSecret(config.refreshToken),
-    expiresAt: config.expiresAt,
-    shopId: config.shopId,
-    isAllStoreAuth: config.isAllStoreAuth,
-    authorizedAt: config.authorizedAt,
-    boundShopId: config.boundShopId,
-  };
+  const configs = normalizeStoredConfigs(permissions);
+  configs[boundShopId] = { ...config, boundShopId };
+  const storedConfigs = Object.fromEntries(
+    Object.entries(configs).map(([shopId, stored]) => [shopId, serializeStoredConfig(stored)]),
+  );
+  const nextPermissions: JsonRecord = { ...permissions, [CONFIGS_KEY]: storedConfigs };
+  delete nextPermissions[CONFIG_KEY];
   await prisma.user.update({
     where: { id: userId },
-    data: { permissions: { ...permissions, [CONFIG_KEY]: stored } as Prisma.InputJsonValue },
+    data: { permissions: nextPermissions as Prisma.InputJsonValue },
   });
 }
 
@@ -186,32 +221,35 @@ export function buildShansongAuthorizationUrl(input: { state: string; redirectUr
 
 export async function getShansongConnectionStatus(userId: string): Promise<ShansongConnectionStatus> {
   const app = getAppConfig();
-  const stored = await getStoredConfig(userId);
-  const boundShop = stored.boundShopId
-    ? await prisma.shop.findFirst({ where: { id: stored.boundShopId, userId }, select: { id: true, name: true } })
-    : null;
+  const configs = await getStoredConfigs(userId);
+  const shops = Object.keys(configs).length
+    ? await prisma.shop.findMany({
+        where: { id: { in: Object.keys(configs) }, userId },
+        select: { id: true, name: true },
+      })
+    : [];
+  const shopNames = new Map(shops.map((shop) => [shop.id, shop.name]));
+  const accounts: ShansongAccountStatus[] = Object.entries(configs)
+    .filter(([boundShopId]) => shopNames.has(boundShopId))
+    .map(([boundShopId, stored]) => ({
+      authorized: Boolean(stored.accessToken && stored.refreshToken),
+      shopId: stored.shopId,
+      expiresAt: stored.expiresAt,
+      authorizedAt: stored.authorizedAt,
+      boundShopId,
+      boundShopName: shopNames.get(boundShopId) || null,
+    }));
+  const primary = accounts.find((account) => account.authorized) || accounts[0] || null;
   return {
     appConfigured: app.configured,
-    authorized: Boolean(stored.accessToken && stored.refreshToken),
-    shopId: stored.shopId,
-    expiresAt: stored.expiresAt,
-    authorizedAt: stored.authorizedAt,
-    boundShopId: boundShop?.id || null,
-    boundShopName: boundShop?.name || null,
+    authorized: accounts.some((account) => account.authorized),
+    shopId: primary?.shopId || null,
+    expiresAt: primary?.expiresAt || null,
+    authorizedAt: primary?.authorizedAt || null,
+    boundShopId: primary?.boundShopId || null,
+    boundShopName: primary?.boundShopName || null,
+    accounts,
   };
-}
-
-export async function bindShansongShop(userId: string, shopId: string) {
-  const normalizedShopId = String(shopId || "").trim();
-  if (!normalizedShopId) throw new Error("请选择闪送账号对应的门店");
-  const shop = await prisma.shop.findFirst({
-    where: { id: normalizedShopId, userId },
-    select: { id: true, name: true },
-  });
-  if (!shop) throw new Error("所选门店不存在或不属于当前账号");
-  const stored = await getStoredConfig(userId);
-  await saveStoredConfig(userId, { ...stored, boundShopId: shop.id });
-  return shop;
 }
 
 async function postForm<T>(url: string, form: Record<string, string>) {
@@ -231,6 +269,7 @@ async function postForm<T>(url: string, form: Record<string, string>) {
 
 export async function exchangeShansongAuthorizationCode(userId: string, input: {
   code: string;
+  boundShopId: string;
   shopId?: string | null;
   isAllStoreAuth?: boolean;
 }) {
@@ -243,15 +282,20 @@ export async function exchangeShansongAuthorizationCode(userId: string, input: {
   const accessToken = String(token?.access_token || "").trim();
   const refreshToken = String(token?.refresh_token || "").trim();
   if (!accessToken || !refreshToken) throw new Error("闪送未返回完整授权令牌");
+  const boundShop = await prisma.shop.findFirst({
+    where: { id: input.boundShopId, userId },
+    select: { id: true },
+  });
+  if (!boundShop) throw new Error("待绑定门店不存在或不属于当前账号");
   const expiresIn = Math.max(0, Number(token.expires_in || 0));
-  await saveStoredConfig(userId, {
+  await saveStoredConfig(userId, boundShop.id, {
     accessToken,
     refreshToken,
     expiresAt: expiresIn > 0 ? new Date(Date.now() + expiresIn * 1000).toISOString() : null,
     shopId: String(input.shopId || "").trim() || null,
     isAllStoreAuth: input.isAllStoreAuth === true,
     authorizedAt: new Date().toISOString(),
-    boundShopId: (await getStoredConfig(userId)).boundShopId,
+    boundShopId: boundShop.id,
   });
 }
 
@@ -263,7 +307,7 @@ function signParams(appSecret: string, params: Record<string, string>) {
   return crypto.createHash("md5").update(source, "utf8").digest("hex").toUpperCase();
 }
 
-async function refreshAccessToken(userId: string, stored: StoredShansongConfig) {
+async function refreshAccessToken(userId: string, boundShopId: string, stored: StoredShansongConfig) {
   const app = getAppConfig();
   if (!app.configured) throw new Error("服务端尚未配置闪送 appKey/appSecret");
   if (!stored.refreshToken) throw new Error("闪送账号尚未授权");
@@ -282,24 +326,24 @@ async function refreshAccessToken(userId: string, stored: StoredShansongConfig) 
     accessToken,
     expiresAt: expiresIn > 0 ? new Date(Date.now() + expiresIn * 1000).toISOString() : null,
   };
-  await saveStoredConfig(userId, next);
+  await saveStoredConfig(userId, boundShopId, next);
   return next;
 }
 
-async function getUsableAccessToken(userId: string) {
-  let stored = await getStoredConfig(userId);
-  if (!stored.accessToken) throw new Error("请先授权闪送个人商户账号");
+async function getUsableAccessToken(userId: string, boundShopId: string) {
+  let stored = await getStoredConfig(userId, boundShopId);
+  if (!stored.accessToken) throw new Error("该门店尚未授权闪送商户账号");
   const expiresAt = stored.expiresAt ? new Date(stored.expiresAt).getTime() : 0;
   if (stored.refreshToken && (!expiresAt || expiresAt <= Date.now() + ACCESS_TOKEN_LEEWAY_MS)) {
-    stored = await refreshAccessToken(userId, stored);
+    stored = await refreshAccessToken(userId, boundShopId, stored);
   }
   return stored.accessToken;
 }
 
-async function callShansongApi<T>(userId: string, pathname: string, data?: unknown) {
+async function callShansongApi<T>(userId: string, boundShopId: string, pathname: string, data?: unknown) {
   const app = getAppConfig();
   if (!app.configured) throw new Error("服务端尚未配置闪送 appKey/appSecret");
-  const accessToken = await getUsableAccessToken(userId);
+  const accessToken = await getUsableAccessToken(userId, boundShopId);
   const timestamp = String(Date.now());
   const dataText = data === undefined ? "" : JSON.stringify(data);
   const baseParams = {
@@ -375,13 +419,12 @@ async function buildCalculatePayload(order: ShansongOrder) {
   if (!user) throw new Error("订单所属用户不存在");
   const permissions = asRecord(user.permissions);
   const matchedShopName = resolveAutoPickMatchedShopName(order, permissions);
-  const shansongConfig = normalizeStoredConfig(permissions[CONFIG_KEY]);
-  if (!shansongConfig.boundShopId) throw new Error("请先在个人中心为闪送账号绑定门店");
-  const shop = await prisma.shop.findFirst({ where: { id: shansongConfig.boundShopId, userId: order.userId } });
-  if (!shop) throw new Error("闪送绑定门店已失效，请前往个人中心重新绑定");
-  if (!matchedShopName || matchedShopName.trim() !== shop.name.trim()) {
-    throw new Error(`该订单不属于闪送绑定门店“${shop.name}”`);
-  }
+  if (!matchedShopName) throw new Error("无法识别订单所属门店，不能选择对应的闪送账号");
+  const shops = await prisma.shop.findMany({ where: { userId: order.userId } });
+  const shop = shops.find((item) => item.name.trim() === matchedShopName.trim());
+  if (!shop) throw new Error(`订单所属门店“${matchedShopName}”未在系统门店中建立`);
+  const shansongConfig = normalizeStoredConfigs(permissions)[shop.id];
+  if (!shansongConfig?.accessToken) throw new Error(`门店“${shop.name}”尚未授权对应的闪送账号`);
   const addresses = Array.isArray(user.shippingAddresses) ? user.shippingAddresses.map(asRecord) : [];
   const addressBook = addresses.find((item) => String(item.id || "") === String(shop?.addressBookId || ""))
     || addresses.find((item) => String(item.label || "").trim() === String(matchedShopName || "").trim())
@@ -439,42 +482,45 @@ async function buildCalculatePayload(order: ShansongOrder) {
     .join("、");
   const remarks = truncate([order.customerRemark, goodsText].filter(Boolean).join("；"), 300);
   return {
-    cityName,
-    appointType: 0,
-    storeName: truncate(shop.name, 20) || undefined,
-    travelWay: 0,
-    deliveryType: 1,
-    pickupPwd: 0,
-    deliveryPwd: 0,
-    lbsType: 1,
-    sender: {
-      fromAddress: truncate(senderAddress, 100),
-      fromAddressDetail: "",
-      fromSenderName: truncate(senderName, 30),
-      fromMobile: senderPhone,
-      fromLatitude: String(senderLat),
-      fromLongitude: String(senderLng),
+    boundShopId: shop.id,
+    payload: {
+      cityName,
+      appointType: 0,
+      storeName: truncate(shop.name, 20) || undefined,
+      travelWay: 0,
+      deliveryType: 1,
+      pickupPwd: 0,
+      deliveryPwd: 0,
+      lbsType: 1,
+      sender: {
+        fromAddress: truncate(senderAddress, 100),
+        fromAddressDetail: "",
+        fromSenderName: truncate(senderName, 30),
+        fromMobile: senderPhone,
+        fromLatitude: String(senderLat),
+        fromLongitude: String(senderLng),
+      },
+      receiverList: [{
+        orderNo: order.id,
+        toAddress: truncate(order.userAddress, 100),
+        toAddressDetail: "",
+        toLatitude: String(receiverLat),
+        toLongitude: String(receiverLng),
+        toReceiverName: truncate(receiverName, 30),
+        toMobile: receiverPhone,
+        goodType: inferGoodType(order.items),
+        weight: 1,
+        remarks,
+        orderingSourceType: 5,
+        orderingSourceNo: truncate(order.orderNo, 16),
+      }],
     },
-    receiverList: [{
-      orderNo: order.id,
-      toAddress: truncate(order.userAddress, 100),
-      toAddressDetail: "",
-      toLatitude: String(receiverLat),
-      toLongitude: String(receiverLng),
-      toReceiverName: truncate(receiverName, 30),
-      toMobile: receiverPhone,
-      goodType: inferGoodType(order.items),
-      weight: 1,
-      remarks,
-      orderingSourceType: 5,
-      orderingSourceNo: truncate(order.orderNo, 16),
-    }],
   };
 }
 
 export async function quoteShansongDelivery(order: ShansongOrder): Promise<ShansongQuoteOption> {
-  const data = await buildCalculatePayload(order);
-  const quote = await callShansongApi<ShansongCalculateResponse>(order.userId, "/openapi/developer/v5/orderCalculate", data);
+  const { boundShopId, payload } = await buildCalculatePayload(order);
+  const quote = await callShansongApi<ShansongCalculateResponse>(order.userId, boundShopId, "/openapi/developer/v5/orderCalculate", payload);
   const orderNumber = String(quote?.orderNumber || "").trim();
   if (!orderNumber) throw new Error("闪送询价成功但未返回闪送订单号");
   const estimateSeconds = Number(quote.estimateReceiveSecond || 0);
@@ -490,13 +536,14 @@ export async function quoteShansongDelivery(order: ShansongOrder): Promise<Shans
   };
 }
 
-export async function placeShansongOrder(userId: string, issOrderNo: string) {
-  return callShansongApi<ShansongCalculateResponse>(userId, "/openapi/developer/v5/orderPlace", { issOrderNo });
+export async function placeShansongOrder(order: ShansongOrder, issOrderNo: string) {
+  const { boundShopId } = await buildCalculatePayload(order);
+  return callShansongApi<ShansongCalculateResponse>(order.userId, boundShopId, "/openapi/developer/v5/orderPlace", { issOrderNo });
 }
 
-export async function cancelShansongAuthorization(userId: string) {
+export async function cancelShansongAuthorization(userId: string, boundShopId: string) {
   const app = getAppConfig();
-  const stored = await getStoredConfig(userId);
+  const stored = await getStoredConfig(userId, boundShopId);
   if (app.configured && stored.accessToken) {
     const data = JSON.stringify({ accessToken: stored.accessToken });
     const timestamp = String(Date.now());
@@ -507,9 +554,15 @@ export async function cancelShansongAuthorization(userId: string) {
     });
   }
   const permissions = await readUserPermissions(userId);
-  delete permissions[CONFIG_KEY];
+  const configs = normalizeStoredConfigs(permissions);
+  delete configs[boundShopId];
+  const storedConfigs = Object.fromEntries(
+    Object.entries(configs).map(([shopId, config]) => [shopId, serializeStoredConfig(config)]),
+  );
+  const nextPermissions: JsonRecord = { ...permissions, [CONFIGS_KEY]: storedConfigs };
+  delete nextPermissions[CONFIG_KEY];
   await prisma.user.update({
     where: { id: userId },
-    data: { permissions: permissions as Prisma.InputJsonValue },
+    data: { permissions: nextPermissions as Prisma.InputJsonValue },
   });
 }

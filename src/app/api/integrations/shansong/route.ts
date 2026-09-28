@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { encrypt, getAuthorizedUser } from "@/lib/auth";
+import prisma from "@/lib/prisma";
 import {
   buildShansongAuthorizationUrl,
-  bindShansongShop,
   cancelShansongAuthorization,
   getShansongConnectionStatus,
   getShansongRedirectUri,
@@ -20,11 +20,17 @@ export async function GET(request: NextRequest) {
     let redirectUri: string | null = null;
     if (status.appConfigured) {
       redirectUri = getShansongRedirectUri(request.nextUrl.origin);
-      const state = await encrypt({
-        purpose: "shansong-merchant-auth",
-        shansongUserId: session.id,
-      });
-      authUrl = buildShansongAuthorizationUrl({ state, redirectUri });
+      const boundShopId = String(request.nextUrl.searchParams.get("shopId") || "").trim();
+      if (boundShopId) {
+        const shop = await prisma.shop.findFirst({ where: { id: boundShopId, userId: session.id }, select: { id: true } });
+        if (!shop) return NextResponse.json({ error: "所选门店不存在或不属于当前账号" }, { status: 404 });
+        const state = await encrypt({
+          purpose: "shansong-merchant-auth",
+          shansongUserId: session.id,
+          shansongBoundShopId: shop.id,
+        });
+        authUrl = buildShansongAuthorizationUrl({ state, redirectUri });
+      }
     }
     return NextResponse.json({ ...status, authUrl, redirectUri });
   } catch (error) {
@@ -34,29 +40,16 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function PATCH(request: NextRequest) {
+export async function DELETE(request: NextRequest) {
   const session = await getAuthorizedUser("order:manage");
   if (!session) return NextResponse.json({ error: "Permission denied" }, { status: 403 });
 
   try {
     const body = await request.json().catch(() => ({})) as Record<string, unknown>;
-    const shop = await bindShansongShop(session.id, String(body.shopId || ""));
-    const status = await getShansongConnectionStatus(session.id);
-    return NextResponse.json({ ...status, boundShopId: shop.id, boundShopName: shop.name });
-  } catch (error) {
-    return NextResponse.json({
-      error: error instanceof Error ? error.message : "保存闪送门店绑定失败",
-    }, { status: 400 });
-  }
-}
-
-export async function DELETE() {
-  const session = await getAuthorizedUser("order:manage");
-  if (!session) return NextResponse.json({ error: "Permission denied" }, { status: 403 });
-
-  try {
-    await cancelShansongAuthorization(session.id);
-    return NextResponse.json({ authorized: false });
+    const boundShopId = String(body.shopId || "").trim();
+    if (!boundShopId) return NextResponse.json({ error: "请选择要解除授权的门店" }, { status: 400 });
+    await cancelShansongAuthorization(session.id, boundShopId);
+    return NextResponse.json({ authorized: false, boundShopId });
   } catch (error) {
     return NextResponse.json({
       error: error instanceof Error ? error.message : "取消闪送授权失败",

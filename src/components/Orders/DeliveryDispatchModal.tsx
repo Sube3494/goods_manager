@@ -41,7 +41,6 @@ export type DeliveryQuoteOption = {
 type DeliveryCategory = "all" | "direct" | "shared";
 type DeliveryTransport = "all" | "rider" | "car" | "freight";
 type PriceSort = "asc" | "desc";
-type SelectionMode = "single" | "multiple";
 
 function getOptionKey(option: DeliveryQuoteOption) {
   return `${option.provider || "maiyitian"}:${option.logisticId}:${option.logisticTag}:${option.servicePkg || ""}`;
@@ -192,7 +191,6 @@ export function DeliveryDispatchModal({
   const [category, setCategory] = useState<DeliveryCategory>("all");
   const [transport, setTransport] = useState<DeliveryTransport>("all");
   const [priceSort, setPriceSort] = useState<PriceSort>("asc");
-  const [selectionMode, setSelectionMode] = useState<SelectionMode>("single");
 
   const minPrice = useMemo(() => {
     if (options.length === 0) return 0;
@@ -203,6 +201,7 @@ export function DeliveryDispatchModal({
     () => options.filter((option) => selectedKeys.includes(getOptionKey(option))),
     [options, selectedKeys],
   );
+  const selectedPersonalShansong = selectedOptions.length === 1 && selectedOptions[0].provider === "shansong";
 
   const categoryCounts = useMemo(() => options
     .filter((option) => transport === "all" || getOptionTransport(option) === transport)
@@ -230,7 +229,7 @@ export function DeliveryDispatchModal({
       return (priceSort === "asc" ? amountDiff : -amountDiff) || a.name.localeCompare(b.name, "zh-CN");
     }), [category, options, priceSort, transport]);
 
-  // 计算多选模式下的金额区间
+  // 计算已选运力的金额区间
   const priceRange = useMemo(() => {
     if (selectedOptions.length === 0) return null;
     const amounts = selectedOptions.map((o) => Number(o.amount || 0) / 100);
@@ -251,7 +250,6 @@ export function DeliveryDispatchModal({
       setCategory("all");
       setTransport("all");
       setPriceSort("asc");
-      setSelectionMode("single");
 
       // 默认选中最低价那一家
       if (nextOptions.length > 0) {
@@ -277,75 +275,50 @@ export function DeliveryDispatchModal({
 
   const changeCategory = (nextCategory: DeliveryCategory) => {
     setCategory(nextCategory);
-    const candidates = options
-      .filter((option) => nextCategory === "all" || getOptionCategory(option) === nextCategory)
-      .filter((option) => transport === "all" || getOptionTransport(option) === transport)
-      .toSorted((a, b) => Number(a.amount || 0) - Number(b.amount || 0));
-    if (selectionMode === "single" && !candidates.some((option) => selectedKeys.includes(getOptionKey(option)))) {
-      setSelectedKeys(candidates[0] ? [getOptionKey(candidates[0])] : []);
-    }
   };
 
   const changeTransport = (nextTransport: DeliveryTransport) => {
     setTransport(nextTransport);
-    const candidates = options
-      .filter((option) => category === "all" || getOptionCategory(option) === category)
-      .filter((option) => nextTransport === "all" || getOptionTransport(option) === nextTransport)
-      .toSorted((a, b) => Number(a.amount || 0) - Number(b.amount || 0));
-    if (selectionMode === "single" && !candidates.some((option) => selectedKeys.includes(getOptionKey(option)))) {
-      setSelectedKeys(candidates[0] ? [getOptionKey(candidates[0])] : []);
-    }
-  };
-
-  const changeSelectionMode = (nextMode: SelectionMode) => {
-    setSelectionMode(nextMode);
-    if (nextMode === "single") {
-      const selectedInView = displayedOptions.find((option) => selectedKeys.includes(getOptionKey(option)));
-      const nextSelected = selectedInView || displayedOptions[0] || options[0];
-      setSelectedKeys(nextSelected ? [getOptionKey(nextSelected)] : []);
-    } else {
-      const selectedMaiyitian = options.filter((option) => option.provider !== "shansong" && selectedKeys.includes(getOptionKey(option)));
-      const fallback = options
-        .filter((option) => option.provider !== "shansong")
-        .toSorted((a, b) => Number(a.amount || 0) - Number(b.amount || 0))[0];
-      setSelectedKeys((selectedMaiyitian.length ? selectedMaiyitian : fallback ? [fallback] : []).map(getOptionKey));
-    }
   };
 
   const toggleOption = (key: string) => {
     const target = options.find((option) => getOptionKey(option) === key);
-    if (target?.provider === "shansong") {
-      setSelectionMode("single");
-      setSelectedKeys([key]);
+    if (!target) return;
+    if (target.provider === "shansong" && !selectedKeys.includes(key) && selectedKeys.length > 0) {
+      setError("个人账号直连闪送只能单独发单；麦芽田聚合送中的闪送不受此限制");
       return;
     }
-    if (selectionMode === "single") {
-      setSelectedKeys([key]);
-      return;
-    }
+    setError("");
     setSelectedKeys((current) => {
-      const withoutShansong = current.filter((selectedKey) => {
+      const selectedPersonalShansong = current.some((selectedKey) => {
         const option = options.find((item) => getOptionKey(item) === selectedKey);
-        return option?.provider !== "shansong";
+        return option?.provider === "shansong";
       });
-      return withoutShansong.includes(key)
-        ? withoutShansong.filter((selectedKey) => selectedKey !== key)
-        : [...withoutShansong, key];
+      if (current.includes(key)) return current.filter((selectedKey) => selectedKey !== key);
+      // 从个人闪送切换到普通运力时自动移除个人闪送，普通运力之间可自由多选。
+      return selectedPersonalShansong ? [key] : [...current, key];
     });
   };
 
-  // 快捷操作：多选全选当前显示
+  // 快捷操作：全选当前显示；个人账号直连闪送必须单独发单，因此不参与批量勾选。
   const selectAllDisplayed = () => {
     const displayedKeys = displayedOptions.filter((option) => option.provider !== "shansong").map(getOptionKey);
+    if (displayedKeys.length === 0) return;
     const allSelected = displayedKeys.every((key) => selectedKeys.includes(key));
     if (allSelected) {
       setSelectedKeys((current) => current.filter((key) => !displayedKeys.includes(key)));
     } else {
-      setSelectedKeys((current) => Array.from(new Set([...current, ...displayedKeys])));
+      setSelectedKeys((current) => {
+        const withoutPersonalShansong = current.filter((selectedKey) => {
+          const option = options.find((item) => getOptionKey(item) === selectedKey);
+          return option?.provider !== "shansong";
+        });
+        return Array.from(new Set([...withoutPersonalShansong, ...displayedKeys]));
+      });
     }
   };
 
-  // 快捷操作：多选推荐最划算前三家
+  // 快捷操作：推荐最划算前三家
   const selectTopThreeCheapest = () => {
     const topThree = [...options]
       .filter((option) => option.provider !== "shansong")
@@ -422,45 +395,6 @@ export function DeliveryDispatchModal({
             </div>
           </div>
 
-          {/* 模式切换胶囊卡片 */}
-          <div className="mt-3.5 flex items-center justify-between gap-2 rounded-xl bg-muted/60 p-1 ring-1 ring-black/[0.04] dark:bg-muted/40 dark:ring-white/[0.05]">
-            <div className="grid flex-1 grid-cols-2 gap-1" role="tablist" aria-label="发单模式">
-              <button
-                type="button"
-                role="tab"
-                aria-selected={selectionMode === "single"}
-                onClick={() => { changeSelectionMode("single"); setError(""); }}
-                className={cn(
-                  "relative flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-semibold transition-all duration-200",
-                  selectionMode === "single"
-                    ? "bg-background text-foreground shadow-sm ring-1 ring-black/5 dark:bg-background dark:ring-white/10"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                <Zap size={13} className={selectionMode === "single" ? "text-amber-500" : ""} />
-                单选发单
-                <span className="text-[10px] font-normal text-muted-foreground">精确指定</span>
-              </button>
-
-              <button
-                type="button"
-                role="tab"
-                aria-selected={selectionMode === "multiple"}
-                onClick={() => { changeSelectionMode("multiple"); setError(""); }}
-                className={cn(
-                  "relative flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-semibold transition-all duration-200",
-                  selectionMode === "multiple"
-                    ? "bg-background text-foreground shadow-sm ring-1 ring-black/5 dark:bg-background dark:ring-white/10"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                <Layers size={13} className={selectionMode === "multiple" ? "text-primary" : ""} />
-                多选抢单
-                <span className="rounded bg-primary/10 px-1 py-0.2 text-[10px] font-bold text-primary">推荐·接单更快</span>
-              </button>
-            </div>
-          </div>
-
           {/* 顶部醒目错误告警横幅（发单失败时立即在此处展示，绝不沉底） */}
           {error && options.length > 0 ? (
             <div className="mt-3 flex items-start justify-between gap-2 rounded-xl border border-destructive/25 bg-destructive/10 p-3 text-xs text-destructive animate-in fade-in duration-200">
@@ -469,7 +403,7 @@ export function DeliveryDispatchModal({
                   <span className="block h-2 w-2 rounded-full bg-destructive animate-ping" />
                 </span>
                 <div className="min-w-0">
-                  <span className="font-bold">发单失败提示：</span>
+                  <span className="font-bold">提示：</span>
                   <span className="break-all">{error}</span>
                 </div>
               </div>
@@ -579,27 +513,26 @@ export function DeliveryDispatchModal({
 
                 {/* 辅助工具：排序与多选快捷键 */}
                 <div className="flex items-center gap-1.5">
-                  {selectionMode === "multiple" ? (
-                    <>
-                      <button
-                        type="button"
-                        onClick={selectTopThreeCheapest}
-                        className="inline-flex h-7 items-center gap-1 rounded-lg border border-black/8 px-2 text-[11px] font-medium text-muted-foreground hover:bg-black/5 hover:text-foreground dark:border-white/10 dark:hover:bg-white/5"
-                        title="快速勾选价格最低的前三家运力"
-                      >
-                        <Sparkles size={11} className="text-amber-500" />
-                        推荐前3
-                      </button>
-                      <button
-                        type="button"
-                        onClick={selectAllDisplayed}
-                        className="inline-flex h-7 items-center gap-1 rounded-lg border border-black/8 px-2 text-[11px] font-medium text-muted-foreground hover:bg-black/5 hover:text-foreground dark:border-white/10 dark:hover:bg-white/5"
-                      >
-                        <CheckCheck size={12} />
-                        {displayedOptions.every((opt) => selectedKeys.includes(getOptionKey(opt))) ? "反选" : "全选"}
-                      </button>
-                    </>
-                  ) : null}
+                  <button
+                    type="button"
+                    onClick={selectTopThreeCheapest}
+                    className="inline-flex h-7 items-center gap-1 rounded-lg border border-black/8 px-2 text-[11px] font-medium text-muted-foreground hover:bg-black/5 hover:text-foreground dark:border-white/10 dark:hover:bg-white/5"
+                    title="快速勾选价格最低的前三家运力"
+                  >
+                    <Sparkles size={11} className="text-amber-500" />
+                    推荐前3
+                  </button>
+                  <button
+                    type="button"
+                    onClick={selectAllDisplayed}
+                    className="inline-flex h-7 items-center gap-1 rounded-lg border border-black/8 px-2 text-[11px] font-medium text-muted-foreground hover:bg-black/5 hover:text-foreground dark:border-white/10 dark:hover:bg-white/5"
+                  >
+                    <CheckCheck size={12} />
+                    {displayedOptions.some((opt) => opt.provider !== "shansong")
+                      && displayedOptions.filter((opt) => opt.provider !== "shansong").every((opt) => selectedKeys.includes(getOptionKey(opt)))
+                      ? "反选"
+                      : "全选"}
+                  </button>
 
                   <button
                     type="button"
@@ -623,6 +556,9 @@ export function DeliveryDispatchModal({
                   const brand = getBrandTheme(option);
                   const isLowest = minPrice > 0 && Number(option.amount || 0) === minPrice;
                   const estimatedTimeText = formatEstimatedTime(option.estimatedDeliveryTime);
+                  const personalShansongBlocked = option.provider === "shansong"
+                    && !active
+                    && selectedOptions.length > 0;
 
                   return (
                     <div
@@ -630,6 +566,8 @@ export function DeliveryDispatchModal({
                       onClick={() => toggleOption(key)}
                       role="checkbox"
                       aria-checked={active}
+                      aria-disabled={personalShansongBlocked}
+                      title={personalShansongBlocked ? "个人账号直连闪送只能单独发单" : undefined}
                       tabIndex={0}
                       onKeyDown={(e) => {
                         if (e.key === " " || e.key === "Enter") {
@@ -642,33 +580,21 @@ export function DeliveryDispatchModal({
                         active
                           ? "border-primary/40 bg-primary/[0.04] shadow-xs ring-1 ring-primary/20 dark:border-primary/50 dark:bg-primary/[0.08]"
                           : "border-black/7 bg-background/60 hover:border-black/15 hover:bg-black/[0.015] dark:border-white/8 dark:bg-card/40 dark:hover:border-white/15 dark:hover:bg-white/[0.025]",
+                        personalShansongBlocked && "opacity-55",
                       )}
                     >
-                      {/* 选择状态指示器 (单选 Radio / 多选 Checkbox) */}
+                      {/* 多选状态指示器 */}
                       <div className="flex shrink-0 items-center justify-center">
-                        {selectionMode === "single" ? (
-                          <div
-                            className={cn(
-                              "flex h-5 w-5 items-center justify-center rounded-full border transition-all",
-                              active
-                                ? "border-primary bg-primary text-primary-foreground shadow-xs"
-                                : "border-black/20 bg-background dark:border-white/20 dark:bg-card",
-                            )}
-                          >
-                            {active && <div className="h-2 w-2 rounded-full bg-white dark:bg-primary-foreground" />}
-                          </div>
-                        ) : (
-                          <div
-                            className={cn(
-                              "flex h-5 w-5 items-center justify-center rounded-md border transition-all",
-                              active
-                                ? "border-primary bg-primary text-primary-foreground shadow-xs"
-                                : "border-black/20 bg-background dark:border-white/20 dark:bg-card",
-                            )}
-                          >
-                            <Check size={13} className={cn("stroke-[2.5]", active ? "block" : "hidden")} />
-                          </div>
-                        )}
+                        <div
+                          className={cn(
+                            "flex h-5 w-5 items-center justify-center rounded-md border transition-all",
+                            active
+                              ? "border-primary bg-primary text-primary-foreground shadow-xs"
+                              : "border-black/20 bg-background dark:border-white/20 dark:bg-card",
+                          )}
+                        >
+                          <Check size={13} className={cn("stroke-[2.5]", active ? "block" : "hidden")} />
+                        </div>
                       </div>
 
                       {/* 品牌 Avatar */}
@@ -791,16 +717,20 @@ export function DeliveryDispatchModal({
               <div className="space-y-0.5 animate-in fade-in duration-150">
                 <div className="flex items-center gap-1.5 text-xs font-semibold text-destructive">
                   <span className="h-1.5 w-1.5 rounded-full bg-destructive" />
-                  发单未成功，请查看上方提示或重试
+                  请查看上方提示后重试
                 </div>
                 <div className="text-[11px] text-muted-foreground truncate max-w-sm" title={error}>
                   {error}
                 </div>
               </div>
-            ) : selectionMode === "multiple" ? (
+            ) : (
               <div className="space-y-0.5">
                 <div className="text-xs font-medium text-foreground">
-                  已选 <span className="font-bold text-primary">{selectedOptions.length}</span> 家运力同时抢单
+                  {selectedPersonalShansong ? (
+                    <>已选 <span className="font-bold text-primary">个人账号直连闪送</span>，将单独发单</>
+                  ) : (
+                    <>已选 <span className="font-bold text-primary">{selectedOptions.length}</span> 家运力同时抢单</>
+                  )}
                 </div>
                 <div className="text-[11px] text-muted-foreground">
                   {priceRange ? (
@@ -817,30 +747,6 @@ export function DeliveryDispatchModal({
                     )
                   ) : (
                     "请至少勾选一家运力"
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-0.5">
-                <div className="text-xs font-medium text-foreground">
-                  {selectedOptions[0] ? (
-                    <>
-                      已选 <span className="font-semibold text-primary">{selectedOptions[0].name}</span>
-                    </>
-                  ) : (
-                    "请选择一家运力发单"
-                  )}
-                </div>
-                <div className="text-[11px] text-muted-foreground">
-                  {selectedOptions[0] ? (
-                    <>
-                      预估运费{" "}
-                      <span className="font-mono font-bold text-rose-600 dark:text-rose-400">
-                        ¥{(Number(selectedOptions[0].amount || 0) / 100).toFixed(2)}
-                      </span>
-                    </>
-                  ) : (
-                    "确认后将向选定平台直接指派"
                   )}
                 </div>
               </div>
@@ -871,23 +777,17 @@ export function DeliveryDispatchModal({
               {submitting ? (
                 <>
                   <Loader2 size={15} className="animate-spin" />
-                  <span>
-                    {selectionMode === "multiple"
-                      ? `正在呼叫 ${selectedOptions.length} 家…`
-                      : "正在指派发单…"}
-                  </span>
+                  <span>{selectedPersonalShansong ? "正在呼叫闪送…" : `正在呼叫 ${selectedOptions.length} 家…`}</span>
                 </>
               ) : (
                 <>
-                  {selectionMode === "multiple" ? <Layers size={14} /> : <Truck size={14} />}
+                  <Layers size={14} />
                   <span>
-                    {selectionMode === "multiple"
-                      ? selectedOptions.length > 0
-                        ? `呼叫 ${selectedOptions.length} 家抢单`
-                        : "请勾选运力"
-                      : selectedOptions[0]
-                        ? `确认叫配送 · ¥${(selectedOptions[0].amount / 100).toFixed(2)}`
-                        : "请选择运力"}
+                    {selectedPersonalShansong
+                      ? "确认呼叫闪送"
+                      : selectedOptions.length > 0
+                      ? `呼叫 ${selectedOptions.length} 家抢单`
+                      : "请勾选运力"}
                   </span>
                 </>
               )}

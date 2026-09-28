@@ -76,6 +76,7 @@ export async function GET(_: NextRequest, context: { params: Promise<{ id: strin
       authorizedAt: null,
       boundShopId: null,
       boundShopName: null,
+      accounts: [],
     }));
     const [maiyitianResult, shansongResult] = await Promise.allSettled([
       sourceId

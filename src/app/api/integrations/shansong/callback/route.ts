@@ -22,9 +22,10 @@ export async function GET(request: NextRequest) {
     const payload = await decrypt(state);
     const issuedAt = Number(payload.iat || 0) * 1000;
     const userId = String(payload.shansongUserId || "").trim();
-    if (payload.purpose !== "shansong-merchant-auth" || !userId) throw new Error("授权状态无效");
+    const boundShopId = String(payload.shansongBoundShopId || "").trim();
+    if (payload.purpose !== "shansong-merchant-auth" || !userId || !boundShopId) throw new Error("授权状态无效");
     if (!issuedAt || Date.now() - issuedAt > 10 * 60 * 1000) throw new Error("授权页面已超时，请重新发起授权");
-    await exchangeShansongAuthorizationCode(userId, { code, shopId, isAllStoreAuth });
+    await exchangeShansongAuthorizationCode(userId, { code, boundShopId, shopId, isAllStoreAuth });
     return redirectWithResult(request, "connected");
   } catch (error) {
     return redirectWithResult(request, "error", error instanceof Error ? error.message : "闪送授权失败");

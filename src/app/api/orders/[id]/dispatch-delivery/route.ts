@@ -69,6 +69,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
     );
     const order = await prisma.autoPickOrder.findFirst({
       where: { id, ...(isAdmin ? {} : { userId: session.id }) },
+      include: { items: { orderBy: { createdAt: "asc" } } },
     });
     if (!order) return NextResponse.json({ error: "Order not found" }, { status: 404 });
     if (isAutoPickOrderCompletedStatus(order.status) || isAutoPickOrderCancelledStatus(order.status)) {
@@ -93,7 +94,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
       if (selection.provider === "shansong") {
         let placed: Record<string, unknown>;
         try {
-          placed = await placeShansongOrder(order.userId, selection.logisticId) as Record<string, unknown>;
+          placed = await placeShansongOrder(order, selection.logisticId) as Record<string, unknown>;
         } catch (error) {
           return {
             selection,

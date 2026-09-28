@@ -35,15 +35,19 @@ import { CustomSelect } from "@/components/ui/CustomSelect";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { DeviceSessionManager } from "@/components/Profile/DeviceSessionManager";
 
-type ShansongProfileStatus = {
-  appConfigured: boolean;
+type ShansongAccountStatus = {
   authorized: boolean;
-  authUrl: string | null;
   shopId: string | null;
   expiresAt: string | null;
   authorizedAt: string | null;
   boundShopId: string | null;
   boundShopName: string | null;
+};
+
+type ShansongProfileStatus = ShansongAccountStatus & {
+  appConfigured: boolean;
+  authUrl: string | null;
+  accounts: ShansongAccountStatus[];
 };
 
 type ProfileShop = {
@@ -69,9 +73,12 @@ export default function ProfilePage() {
   const [profileShops, setProfileShops] = useState<ProfileShop[]>([]);
   const [selectedShansongShopId, setSelectedShansongShopId] = useState("");
   const [isLoadingShansong, setIsLoadingShansong] = useState(true);
-  const [isSavingShansong, setIsSavingShansong] = useState(false);
+  const [isAuthorizingShansong, setIsAuthorizingShansong] = useState(false);
   const [isDisconnectingShansong, setIsDisconnectingShansong] = useState(false);
   const [confirmDisconnectShansong, setConfirmDisconnectShansong] = useState(false);
+  const shansongAccounts = shansongStatus?.accounts || [];
+  const selectedShansongAccount = shansongAccounts.find((account) => account.boundShopId === selectedShansongShopId) || null;
+  const authorizedShansongCount = shansongAccounts.filter((account) => account.authorized).length;
 
   useEffect(() => {
     fetch("/api/product-libraries")
@@ -94,8 +101,13 @@ export default function ProfilePage() {
       const shopsData = await shopsResponse.json().catch(() => ({}));
       if (!statusResponse.ok) throw new Error(statusData.error || "读取闪送配置失败");
       setShansongStatus(statusData as ShansongProfileStatus);
-      setSelectedShansongShopId(String(statusData.boundShopId || ""));
-      setProfileShops(Array.isArray(shopsData.shops) ? shopsData.shops : []);
+      const nextShops = Array.isArray(shopsData.shops) ? shopsData.shops as ProfileShop[] : [];
+      setProfileShops(nextShops);
+      setSelectedShansongShopId((current) => (
+        nextShops.some((shop) => shop.id === current)
+          ? current
+          : String(statusData.boundShopId || nextShops[0]?.id || "")
+      ));
     } catch (error) {
       showToast(error instanceof Error ? error.message : "读取闪送配置失败", "error");
     } finally {
@@ -107,7 +119,7 @@ export default function ProfilePage() {
     void loadShansongSettings();
     const params = new URLSearchParams(window.location.search);
     const result = params.get("shansong");
-    if (result === "connected") showToast("闪送商户账号授权成功，请选择并绑定对应门店", "success");
+    if (result === "connected") showToast("当前门店的闪送商户账号授权成功", "success");
     if (result === "error") showToast(params.get("message") || "闪送商户账号授权失败", "error");
     if (result) {
       params.delete("shansong");
@@ -118,33 +130,35 @@ export default function ProfilePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const saveShansongBinding = async () => {
+  const authorizeShansong = async () => {
     if (!selectedShansongShopId) {
-      showToast("请选择闪送账号对应的门店", "error");
+      showToast("请先选择要授权的门店", "error");
       return;
     }
-    setIsSavingShansong(true);
+    setIsAuthorizingShansong(true);
     try {
-      const response = await fetch("/api/integrations/shansong", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ shopId: selectedShansongShopId }),
-      });
+      const response = await fetch(`/api/integrations/shansong?shopId=${encodeURIComponent(selectedShansongShopId)}`, { cache: "no-store" });
       const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.error || "保存闪送门店绑定失败");
-      setShansongStatus((current) => current ? { ...current, ...data } : data as ShansongProfileStatus);
-      showToast(`闪送账号已绑定门店：${data.boundShopName || "已选择门店"}`, "success");
+      if (!response.ok || !data.authUrl) throw new Error(data.error || "生成闪送授权地址失败");
+      window.location.href = data.authUrl;
     } catch (error) {
-      showToast(error instanceof Error ? error.message : "保存闪送门店绑定失败", "error");
-    } finally {
-      setIsSavingShansong(false);
+      showToast(error instanceof Error ? error.message : "发起闪送授权失败", "error");
+      setIsAuthorizingShansong(false);
     }
   };
 
   const disconnectShansong = async () => {
+    if (!selectedShansongShopId) {
+      showToast("请选择要解除授权的门店", "error");
+      return;
+    }
     setIsDisconnectingShansong(true);
     try {
-      const response = await fetch("/api/integrations/shansong", { method: "DELETE" });
+      const response = await fetch("/api/integrations/shansong", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ shopId: selectedShansongShopId }),
+      });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || "取消闪送授权失败");
       await loadShansongSettings();
@@ -758,14 +772,12 @@ export default function ProfilePage() {
             </div>
             {shansongStatus ? (
               <span className={`inline-flex h-8 shrink-0 items-center gap-1.5 self-start rounded-full px-3 text-xs font-black ${
-                shansongStatus.authorized && shansongStatus.boundShopId
+                authorizedShansongCount > 0
                   ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-                  : shansongStatus.authorized
-                    ? "bg-amber-500/10 text-amber-700 dark:text-amber-300"
-                    : "bg-muted text-muted-foreground"
+                  : "bg-muted text-muted-foreground"
               }`}>
-                <span className={`h-2 w-2 rounded-full ${shansongStatus.authorized && shansongStatus.boundShopId ? "bg-emerald-500" : shansongStatus.authorized ? "bg-amber-500" : "bg-muted-foreground/50"}`} />
-                {shansongStatus.authorized && shansongStatus.boundShopId ? "已启用" : shansongStatus.authorized ? "待绑定门店" : "未授权"}
+                <span className={`h-2 w-2 rounded-full ${authorizedShansongCount > 0 ? "bg-emerald-500" : "bg-muted-foreground/50"}`} />
+                {authorizedShansongCount > 0 ? `已授权 ${authorizedShansongCount} 家门店` : "未授权"}
               </span>
             ) : null}
           </div>
@@ -785,27 +797,28 @@ export default function ProfilePage() {
                     </div>
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <div className="text-base font-black text-foreground">闪送个人商户账号</div>
+                        <div className="text-base font-black text-foreground">闪送门店商户账号</div>
                         <span className="rounded-md bg-blue-500/10 px-2 py-0.5 text-[10px] font-black text-blue-700 dark:text-blue-300">官方直连</span>
                       </div>
                       <p className="mt-1 max-w-2xl text-xs leading-relaxed text-muted-foreground">
-                        麦芽田仅提供订单数据；运力询价和下单直接走你的闪送账号。每个授权账号在本系统中只绑定一家门店。
+                        麦芽田仅提供订单数据；每家本系统门店可分别授权自己的闪送商户账号，询价和下单会自动按订单所属门店选用账号。
                       </p>
                     </div>
                   </div>
 
                   <div className="flex shrink-0 flex-wrap gap-2">
-                    {shansongStatus?.appConfigured && shansongStatus.authUrl ? (
+                    {shansongStatus?.appConfigured && selectedShansongShopId ? (
                       <button
                         type="button"
-                        onClick={() => { window.location.href = shansongStatus.authUrl!; }}
+                        onClick={() => void authorizeShansong()}
+                        disabled={isAuthorizingShansong}
                         className="inline-flex h-10 items-center justify-center gap-2 rounded-2xl bg-blue-600 px-4 text-xs font-black text-white shadow-sm transition hover:bg-blue-500"
                       >
-                        <ExternalLink size={14} />
-                        {shansongStatus.authorized ? "重新授权" : "授权闪送账号"}
+                        {isAuthorizingShansong ? <Loader2 size={14} className="animate-spin" /> : <ExternalLink size={14} />}
+                        {selectedShansongAccount?.authorized ? "重新授权此门店" : "授权此门店闪送"}
                       </button>
                     ) : null}
-                    {shansongStatus?.authorized ? (
+                    {selectedShansongAccount?.authorized ? (
                       <button
                         type="button"
                         onClick={() => setConfirmDisconnectShansong(true)}
@@ -813,7 +826,7 @@ export default function ProfilePage() {
                         className="inline-flex h-10 items-center justify-center gap-2 rounded-2xl border border-destructive/20 bg-background/70 px-4 text-xs font-black text-destructive transition hover:bg-destructive/10 disabled:opacity-50"
                       >
                         {isDisconnectingShansong ? <Loader2 size={14} className="animate-spin" /> : <Unplug size={14} />}
-                        解除授权
+                        解除此门店授权
                       </button>
                     ) : null}
                   </div>
@@ -824,38 +837,31 @@ export default function ProfilePage() {
                     服务端尚未配置闪送开放平台 appKey、appSecret 和 redirectUrl，配置完成后这里才可发起商户授权。
                   </div>
                 ) : (
-                  <div className="mt-5 grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+                  <div className="mt-5 grid gap-3">
                     <div>
                       <label className="mb-2 flex items-center gap-2 text-xs font-black uppercase tracking-[0.14em] text-muted-foreground/70">
                         <Store size={14} className="text-blue-600" />
-                        绑定经营门店
+                        选择要管理授权的门店
                       </label>
                       <CustomSelect
                         options={profileShops.map((shop) => ({ value: shop.id, label: `${shop.name}${shop.address ? ` · ${shop.address}` : ""}` }))}
                         value={selectedShansongShopId}
                         onChange={setSelectedShansongShopId}
-                        placeholder={profileShops.length ? "请选择该闪送账号对应的门店" : "请先在地址库创建门店"}
+                        placeholder={profileShops.length ? "请选择要授权闪送账号的门店" : "请先在地址库创建门店"}
                         triggerClassName="h-12 w-full rounded-2xl border border-border bg-white px-4 text-sm font-bold text-foreground dark:bg-white/5 dark:border-white/10"
                         searchable
                         searchPlaceholder="搜索门店名称或地址…"
                       />
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => void saveShansongBinding()}
-                      disabled={!selectedShansongShopId || isSavingShansong || selectedShansongShopId === shansongStatus?.boundShopId}
-                      className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl border border-blue-500/20 bg-blue-500/10 px-5 text-sm font-black text-blue-700 transition hover:bg-blue-500/15 disabled:cursor-not-allowed disabled:opacity-40 dark:text-blue-300"
-                    >
-                      {isSavingShansong ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
-                      保存门店绑定
-                    </button>
                   </div>
                 )}
 
-                {shansongStatus?.authorizedAt ? (
+                {selectedShansongAccount?.authorizedAt ? (
                   <div className="mt-3 text-[11px] text-muted-foreground">
-                    当前授权商户 ID：{shansongStatus.shopId || "未返回"} · 绑定门店：{shansongStatus.boundShopName || "尚未绑定"}
+                    当前门店：{selectedShansongAccount.boundShopName || "未知门店"} · 闪送商户 ID：{selectedShansongAccount.shopId || "未返回"}
                   </div>
+                ) : selectedShansongShopId ? (
+                  <div className="mt-3 text-[11px] text-muted-foreground">当前门店尚未授权闪送商户账号。</div>
                 ) : null}
               </div>
             )}
@@ -1119,8 +1125,8 @@ export default function ProfilePage() {
           setConfirmDisconnectShansong(false);
           void disconnectShansong();
         }}
-        title="解除闪送商户授权"
-        message="解除后，呼叫配送将不再显示个人闪送报价，已产生的闪送订单不会自动取消。"
+        title="解除当前门店闪送授权"
+        message={`解除后，“${selectedShansongAccount?.boundShopName || "当前门店"}”的订单将不再显示个人闪送报价，其他门店授权不受影响；已产生的闪送订单不会自动取消。`}
         confirmLabel="确认解除"
         cancelLabel="保留授权"
         variant="danger"
