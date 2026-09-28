@@ -26,6 +26,7 @@ import {
 import { cn } from "@/lib/utils";
 
 export type DeliveryQuoteOption = {
+  provider?: "maiyitian" | "shansong";
   logisticId: string;
   logisticTag: string;
   name: string;
@@ -40,7 +41,7 @@ type PriceSort = "asc" | "desc";
 type SelectionMode = "single" | "multiple";
 
 function getOptionKey(option: DeliveryQuoteOption) {
-  return `${option.logisticId}:${option.logisticTag}:${option.servicePkg || ""}`;
+  return `${option.provider || "maiyitian"}:${option.logisticId}:${option.logisticTag}:${option.servicePkg || ""}`;
 }
 
 function getOptionCategory(option: DeliveryQuoteOption): Exclude<DeliveryCategory, "all"> | "standard" {
@@ -143,6 +144,27 @@ function formatEstimatedTime(time?: number) {
     return `约 ${h}:${m} 送达`;
   }
   return `约 ${time} 分钟送达`;
+}
+
+function formatDeliveryError(rawError: unknown): string {
+  if (!rawError) return "呼叫配送失败，请稍后重试";
+  const message = rawError instanceof Error ? rawError.message : String(rawError);
+  if (message.includes("picking-not-completed")) {
+    return "该订单尚未拣货出库，请先完成订单拣货后再呼叫配送";
+  }
+  if (message.includes("delivery-option-not-found")) {
+    return "所选配送运力已在配送平台下线或失效，请点击刷新重新获取报价";
+  }
+  if (message.includes("delivery-quote-failed")) {
+    return "向配送平台获取实时运费报价失败，请检查运力余额或稍后重试";
+  }
+  if (message.includes("missing cookie") || message.includes("missing token") || message.includes("9191")) {
+    return "麦芽田账号登录已过期或未配置 Cookie，请在订单设置中重新授权";
+  }
+  if (message.includes("余额不足") || message.includes("8100")) {
+    return "所选运力平台账户余额不足，请先在麦芽田充值配送余额";
+  }
+  return message;
 }
 
 export function DeliveryDispatchModal({
@@ -251,22 +273,40 @@ export function DeliveryDispatchModal({
       const selectedInView = displayedOptions.find((option) => selectedKeys.includes(getOptionKey(option)));
       const nextSelected = selectedInView || displayedOptions[0] || options[0];
       setSelectedKeys(nextSelected ? [getOptionKey(nextSelected)] : []);
+    } else {
+      const selectedMaiyitian = options.filter((option) => option.provider !== "shansong" && selectedKeys.includes(getOptionKey(option)));
+      const fallback = options
+        .filter((option) => option.provider !== "shansong")
+        .toSorted((a, b) => Number(a.amount || 0) - Number(b.amount || 0))[0];
+      setSelectedKeys((selectedMaiyitian.length ? selectedMaiyitian : fallback ? [fallback] : []).map(getOptionKey));
     }
   };
 
   const toggleOption = (key: string) => {
+    const target = options.find((option) => getOptionKey(option) === key);
+    if (target?.provider === "shansong") {
+      setSelectionMode("single");
+      setSelectedKeys([key]);
+      return;
+    }
     if (selectionMode === "single") {
       setSelectedKeys([key]);
       return;
     }
-    setSelectedKeys((current) => current.includes(key)
-      ? current.filter((selectedKey) => selectedKey !== key)
-      : [...current, key]);
+    setSelectedKeys((current) => {
+      const withoutShansong = current.filter((selectedKey) => {
+        const option = options.find((item) => getOptionKey(item) === selectedKey);
+        return option?.provider !== "shansong";
+      });
+      return withoutShansong.includes(key)
+        ? withoutShansong.filter((selectedKey) => selectedKey !== key)
+        : [...withoutShansong, key];
+    });
   };
 
   // 快捷操作：多选全选当前显示
   const selectAllDisplayed = () => {
-    const displayedKeys = displayedOptions.map(getOptionKey);
+    const displayedKeys = displayedOptions.filter((option) => option.provider !== "shansong").map(getOptionKey);
     const allSelected = displayedKeys.every((key) => selectedKeys.includes(key));
     if (allSelected) {
       setSelectedKeys((current) => current.filter((key) => !displayedKeys.includes(key)));
@@ -278,6 +318,7 @@ export function DeliveryDispatchModal({
   // 快捷操作：多选推荐最划算前三家
   const selectTopThreeCheapest = () => {
     const topThree = [...options]
+      .filter((option) => option.provider !== "shansong")
       .sort((a, b) => Number(a.amount || 0) - Number(b.amount || 0))
       .slice(0, 3)
       .map(getOptionKey);
@@ -297,6 +338,7 @@ export function DeliveryDispatchModal({
           logisticTag: selectedOptions[0].logisticTag,
           servicePkg: selectedOptions[0].servicePkg || "",
           selections: selectedOptions.map((option) => ({
+            provider: option.provider || "maiyitian",
             logisticId: option.logisticId,
             logisticTag: option.logisticTag,
             servicePkg: option.servicePkg || "",
@@ -314,7 +356,8 @@ export function DeliveryDispatchModal({
       });
       onOpenChange(false);
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "呼叫配送失败");
+      console.error("呼叫配送失败:", submitError);
+      setError(formatDeliveryError(submitError));
     } finally {
       setSubmitting(false);
     }
@@ -337,7 +380,7 @@ export function DeliveryDispatchModal({
                   呼叫第三方配送
                   <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-600 ring-1 ring-emerald-500/20 dark:bg-emerald-500/20 dark:text-emerald-400">
                     <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
-                    麦芽田实时比价
+                    麦芽田 + 闪送实时比价
                   </span>
                 </DialogTitle>
                 <DialogDescription className="mt-1 text-xs text-muted-foreground">
@@ -356,7 +399,7 @@ export function DeliveryDispatchModal({
                 type="button"
                 role="tab"
                 aria-selected={selectionMode === "single"}
-                onClick={() => changeSelectionMode("single")}
+                onClick={() => { changeSelectionMode("single"); setError(""); }}
                 className={cn(
                   "relative flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-semibold transition-all duration-200",
                   selectionMode === "single"
@@ -373,7 +416,7 @@ export function DeliveryDispatchModal({
                 type="button"
                 role="tab"
                 aria-selected={selectionMode === "multiple"}
-                onClick={() => changeSelectionMode("multiple")}
+                onClick={() => { changeSelectionMode("multiple"); setError(""); }}
                 className={cn(
                   "relative flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-semibold transition-all duration-200",
                   selectionMode === "multiple"
@@ -387,6 +430,29 @@ export function DeliveryDispatchModal({
               </button>
             </div>
           </div>
+
+          {/* 顶部醒目错误告警横幅（发单失败时立即在此处展示，绝不沉底） */}
+          {error && options.length > 0 ? (
+            <div className="mt-3 flex items-start justify-between gap-2 rounded-xl border border-destructive/25 bg-destructive/10 p-3 text-xs text-destructive animate-in fade-in duration-200">
+              <div className="flex items-start gap-2 min-w-0">
+                <span className="mt-0.5 inline-block shrink-0 rounded-full bg-destructive/20 p-0.5">
+                  <span className="block h-2 w-2 rounded-full bg-destructive animate-ping" />
+                </span>
+                <div className="min-w-0">
+                  <span className="font-bold">发单失败提示：</span>
+                  <span className="break-all">{error}</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setError("")}
+                className="shrink-0 rounded-lg p-1 text-destructive/70 hover:bg-destructive/15 hover:text-destructive"
+                title="关闭提示"
+              >
+                ✕
+              </button>
+            </div>
+          ) : null}
         </DialogHeader>
 
         {/* 筛选与选项列表 */}
@@ -395,7 +461,7 @@ export function DeliveryDispatchModal({
             <div className="space-y-3 py-2">
               <div className="flex items-center justify-center gap-2 py-4 text-xs font-medium text-muted-foreground">
                 <Loader2 size={16} className="animate-spin text-primary" />
-                正在向美团、蜂鸟、顺丰、达达等多家平台实时询价…
+                正在向麦芽田运力与闪送个人账号实时询价…
               </div>
               {[1, 2, 3].map((item) => (
                 <div
@@ -558,6 +624,11 @@ export function DeliveryDispatchModal({
                           <span className="truncate text-sm font-bold text-foreground">
                             {option.name}
                           </span>
+                          {option.provider === "shansong" ? (
+                            <span className="inline-flex items-center rounded-md bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 dark:bg-blue-500/20 dark:text-blue-300">
+                              个人账号直连
+                            </span>
+                          ) : null}
 
                           {/* 专人 / 拼单标签 */}
                           {optionCategory === "direct" && (
@@ -642,19 +713,24 @@ export function DeliveryDispatchModal({
             </div>
           )}
 
-          {error && options.length > 0 ? (
-            <div className="mt-3 flex items-center gap-2 rounded-xl bg-destructive/10 px-3.5 py-2.5 text-xs text-destructive">
-              <span className="font-semibold">提示：</span>
-              <span>{error}</span>
-            </div>
-          ) : null}
+          {/* 底部沉底错误提示已由顶部横幅与底栏统一接管 */}
         </div>
 
         {/* 底部结算与发单栏 */}
         <DialogFooter className="mx-0 mb-0 shrink-0 border-t border-black/8 bg-muted/20 px-6 py-3.5 backdrop-blur-sm sm:flex-row sm:items-center sm:justify-between dark:border-white/10 dark:bg-muted/10">
           {/* 左侧说明与费用概览 */}
           <div className="hidden min-w-0 flex-1 sm:block">
-            {selectionMode === "multiple" ? (
+            {error ? (
+              <div className="space-y-0.5 animate-in fade-in duration-150">
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-destructive">
+                  <span className="h-1.5 w-1.5 rounded-full bg-destructive" />
+                  发单未成功，请查看上方提示或重试
+                </div>
+                <div className="text-[11px] text-muted-foreground truncate max-w-sm" title={error}>
+                  {error}
+                </div>
+              </div>
+            ) : selectionMode === "multiple" ? (
               <div className="space-y-0.5">
                 <div className="text-xs font-medium text-foreground">
                   已选 <span className="font-bold text-primary">{selectedOptions.length}</span> 家运力同时抢单
