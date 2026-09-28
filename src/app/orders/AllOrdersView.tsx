@@ -24,6 +24,7 @@ import {
   getFilterDateValue,
 } from "./OrderCard";
 import { motion, AnimatePresence } from "framer-motion";
+import { DeliveryDispatchModal } from "@/components/Orders/DeliveryDispatchModal";
 
 function OrderListSkeleton({ count = 3 }: { count?: number }) {
   return (
@@ -72,7 +73,7 @@ function OrderListSkeleton({ count = 3 }: { count?: number }) {
   );
 }
 
-type OrderAction = "self-delivery" | "complete-delivery" | "pickup-complete" | "sync" | "outbound" | "sync-brush";
+type OrderAction = "self-delivery" | "dispatch-delivery" | "complete-delivery" | "pickup-complete" | "sync" | "outbound" | "sync-brush";
 type PurchaseDraftPayload = PurchaseOrder & { sourceOrderId?: string; isExistingPurchase?: boolean };
 type ShopProfitInfo = {
   id: string | null;
@@ -244,6 +245,7 @@ export function AllOrdersView({
   const [showScrollTop, setShowScrollTop] = useState(false);
 
   const [actingId, setActingId] = useState("");
+  const [dispatchTarget, setDispatchTarget] = useState<AutoPickOrder | null>(null);
   const [expandedIds, setExpandedIds] = useState<string[]>([]);
   const isFetchingRef = useRef(false);
   const fetchAbortRef = useRef<AbortController | null>(null);
@@ -555,6 +557,10 @@ export function AllOrdersView({
   }, [fetchOrders]);
 
   const runAction = useCallback(async (orderId: string, action: OrderAction) => {
+    if (action === "dispatch-delivery") {
+      setDispatchTarget(orders.find((order) => order.id === orderId) || null);
+      return;
+    }
     setActingId(`${orderId}:${action}`);
     try {
       let requestInit: RequestInit = { method: "POST" };
@@ -744,7 +750,7 @@ export function AllOrdersView({
     } finally {
       setActingId("");
     }
-  }, [fetchOrders, localShops, mode, onOpenPurchaseDraft, patchOrder, showToast]);
+  }, [fetchOrders, localShops, mode, onOpenMatchEditor, onOpenPurchaseDraft, orders, patchOrder, showToast]);
 
   // 数据统计与过滤处理
   const shopOptions = useMemo(() => {
@@ -1069,6 +1075,18 @@ export function AllOrdersView({
         >
           <ArrowUp size={20} className="transition-transform group-hover:-translate-y-1" />
         </button>
+      ) : null}
+      {dispatchTarget ? (
+        <DeliveryDispatchModal
+          open
+          orderId={dispatchTarget.id}
+          orderNo={dispatchTarget.orderNo}
+          onOpenChange={(open) => { if (!open) setDispatchTarget(null); }}
+          onDispatched={() => {
+            showToast("配送单已发出，正在等待骑手接单", "success");
+            void refreshSingleOrder(dispatchTarget.id);
+          }}
+        />
       ) : null}
     </div>
   );

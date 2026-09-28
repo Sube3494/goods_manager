@@ -65,7 +65,7 @@ import { formatLocalDate, formatLocalDateTime } from "@/lib/dateUtils";
 import { ORDER_SHORTAGE_PURCHASE_NOTE_KEYWORD } from "@/lib/purchaseOrderTypes";
 import { simplifyShopName } from "@/lib/shopIdentity";
 
-type OrderAction = "self-delivery" | "complete-delivery" | "pickup-complete" | "sync" | "outbound";
+type OrderAction = "self-delivery" | "dispatch-delivery" | "complete-delivery" | "pickup-complete" | "sync" | "outbound";
 type OrdersTab = "today" | "appointments" | "all";
 type PurchaseDraftPayload = PurchaseOrder & { sourceOrderId?: string; isExistingPurchase?: boolean };
 const SHOW_APPOINTMENT_TAB = false;

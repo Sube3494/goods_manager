@@ -6364,7 +6364,7 @@ export async function backfillPersistedAutoPickOrderFields(
   return { count: updatedCount };
 }
 
-export async function callAutoPickCommand(userId: string, pathname: "/self-delivery" | "/complete-delivery" | "/pickup-complete", payload: Record<string, unknown>) {
+export async function callAutoPickCommand(userId: string, pathname: "/self-delivery" | "/complete-delivery" | "/pickup-complete" | "/delivery-options" | "/dispatch-delivery", payload: Record<string, unknown>) {
   const result = await fetchAutoPickPluginJson<Record<string, unknown>>(userId, pathname, {
     method: "POST",
     body: JSON.stringify(payload),

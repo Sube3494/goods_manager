@@ -29,7 +29,7 @@ import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { ProductSelectionModal } from "@/components/Purchases/ProductSelectionModal";
 import { createPortal } from "react-dom";
 import { AutoPickOrder, AutoPickOrderItem, AutoPickIntegrationConfig, MaiyatianCookieAccount } from "@/lib/types";
-type OrderAction = "self-delivery" | "complete-delivery" | "pickup-complete" | "sync" | "outbound" | "sync-brush";
+type OrderAction = "self-delivery" | "dispatch-delivery" | "complete-delivery" | "pickup-complete" | "sync" | "outbound" | "sync-brush";
 import {
   getBaseAutoPickStatusDisplay,
   isAutoPickOrderAbnormalStatus,
@@ -3545,22 +3545,8 @@ export const OrderCard = memo(function OrderCard({
                         </span>
                       </div>
                       {showPlatformActions && !displayAsOfflineOrder && !deleted && !readOnly && !order.isSubscribe ? (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onRunAction(order.id, "self-delivery");
-                          }}
-                          disabled={cannotSelfDeliver}
-                          title={selfDeliveryTitle}
-                          className="ml-auto inline-flex h-6 shrink-0 items-center gap-1 rounded-full border border-sky-500/20 bg-sky-500/10 px-2 text-[11px] font-semibold text-sky-700 transition-all hover:bg-sky-500/15 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 dark:text-sky-300 sm:hidden"
-                        >
-                          {actingId === `${order.id}:self-delivery` ? (
-                            <Loader2 size={11} className="animate-spin" />
-                          ) : (
-                            <Truck size={11} />
-                          )}
-                          <span>自配</span>
+                        <button type="button" onClick={(e) => { e.stopPropagation(); onRunAction(order.id, "self-delivery"); }} disabled={cannotSelfDeliver} title={selfDeliveryTitle} className="ml-auto inline-flex h-6 shrink-0 items-center gap-1 rounded-full border border-sky-500/20 bg-sky-500/10 px-2 text-[11px] font-semibold text-sky-700 transition-all hover:bg-sky-500/15 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 dark:text-sky-300 sm:hidden">
+                          {actingId === `${order.id}:self-delivery` ? <Loader2 size={11} className="animate-spin" /> : <Truck size={11} />}<span>自配</span>
                         </button>
                       ) : null}
                     </div>
@@ -3687,15 +3673,8 @@ export const OrderCard = memo(function OrderCard({
               </span>
             ) : null}
             {showPlatformActions && !displayAsOfflineOrder && !deleted && !readOnly && !order.isSubscribe ? (
-              <button
-                type="button"
-                onClick={() => onRunAction(order.id, "self-delivery")}
-                disabled={cannotSelfDeliver}
-                title={selfDeliveryTitle}
-                className="hidden h-7 sm:h-8 items-center gap-1.5 rounded-full border border-sky-500/20 bg-sky-500/10 px-2 text-[11px] font-medium leading-none text-sky-700 transition-all hover:bg-sky-500/15 disabled:cursor-not-allowed disabled:opacity-45 dark:text-sky-300 sm:inline-flex sm:px-2.5 sm:text-[13px]"
-              >
-                {actingId === `${order.id}:self-delivery` ? <Loader2 size={12} className="animate-spin" /> : <Truck size={12} />}
-                自配
+              <button type="button" onClick={() => onRunAction(order.id, "self-delivery")} disabled={cannotSelfDeliver} title={selfDeliveryTitle} className="hidden h-7 sm:h-8 items-center gap-1.5 rounded-full border border-sky-500/20 bg-sky-500/10 px-2 text-[11px] font-medium leading-none text-sky-700 transition-all hover:bg-sky-500/15 disabled:cursor-not-allowed disabled:opacity-45 dark:text-sky-300 sm:inline-flex sm:px-2.5 sm:text-[13px]">
+                {actingId === `${order.id}:self-delivery` ? <Loader2 size={12} className="animate-spin" /> : <Truck size={12} />}自配
               </button>
             ) : null}
           </div>
@@ -3728,6 +3707,16 @@ export const OrderCard = memo(function OrderCard({
             ) : null}
             {showPlatformActions && !readOnly && (
               <>
+                {!deleted && !order.isSubscribe ? (
+                  <ActionButton
+                    label="叫配送"
+                    title="选择第三方运力并呼叫配送"
+                    icon={<Navigation size={14} />}
+                    onClick={() => onRunAction(order.id, "dispatch-delivery")}
+                    disabled={cannotSelfDeliver}
+                    mobileIconOnly
+                  />
+                ) : null}
                 <ActionButton
                   label="同步"
                   title={deleted ? "订单已删除，不能同步" : "从平台重新同步最新订单状态"}

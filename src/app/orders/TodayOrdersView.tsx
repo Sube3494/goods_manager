@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import dynamic from "next/dynamic";
 import { createPortal } from "react-dom";
-import { ArrowUp, Package2, Search, X, ChevronUp, ChevronDown, Loader2, LayoutGrid, List, RefreshCw, Clock3, MapPin, Truck, CheckCheck, TriangleAlert, Eye, FileText } from "lucide-react";
+import { ArrowUp, Package2, Search, X, ChevronUp, ChevronDown, Loader2, LayoutGrid, List, RefreshCw, Clock3, MapPin, Truck, CheckCheck, TriangleAlert, Eye, FileText, Navigation } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -44,6 +44,7 @@ import {
   toCurrency,
 } from "./OrderCard";
 import { motion, AnimatePresence } from "framer-motion";
+import { DeliveryDispatchModal } from "@/components/Orders/DeliveryDispatchModal";
 
 const CompactOrderRouteModal = dynamic(() => import("@/components/Orders/OrderRouteModal").then((module) => module.OrderRouteModal), { ssr: false });
 const CompactCustomerHistoryModal = dynamic(() => import("@/components/Orders/CustomerHistoryModal").then((module) => module.CustomerHistoryModal), { ssr: false });
@@ -349,6 +350,16 @@ function CompactTodayOrderCard({
             />
             {showPlatformActions && !deleted && !order.isSubscribe ? (
               <ActionButton
+                label="叫配送"
+                icon={<Navigation size={12} />}
+                onClick={() => onRunAction("dispatch-delivery")}
+                disabled={cannotSelfDeliver}
+                title="选择第三方运力并呼叫配送"
+                iconOnly
+              />
+            ) : null}
+            {showPlatformActions && !deleted && !order.isSubscribe ? (
+              <ActionButton
                 label="自配"
                 icon={actingId === `${order.id}:self-delivery` ? <Loader2 size={12} className="animate-spin" /> : <Truck size={12} />}
                 onClick={() => onRunAction("self-delivery")}
@@ -387,7 +398,7 @@ function CompactTodayOrderCard({
   );
 }
 
-type OrderAction = "self-delivery" | "complete-delivery" | "pickup-complete" | "sync" | "outbound" | "sync-brush";
+type OrderAction = "self-delivery" | "dispatch-delivery" | "complete-delivery" | "pickup-complete" | "sync" | "outbound" | "sync-brush";
 type TodayOrderLayout = "cards" | "list";
 type PurchaseDraftPayload = PurchaseOrder & { sourceOrderId?: string; isExistingPurchase?: boolean };
 type ShopProfitInfo = {
@@ -569,6 +580,7 @@ export function TodayOrdersView({
   }, [shop, onShopChange]);
   
   const [actingId, setActingId] = useState("");
+  const [dispatchTarget, setDispatchTarget] = useState<AutoPickOrder | null>(null);
   const [expandedIds, setExpandedIds] = useState<string[]>([]);
   const [detailOrderId, setDetailOrderId] = useState<string | null>(null);
   const [showBrushToday, setShowBrushToday] = useState(false);
@@ -986,6 +998,10 @@ export function TodayOrdersView({
   };
 
   const runAction = async (orderId: string, action: OrderAction) => {
+    if (action === "dispatch-delivery") {
+      setDispatchTarget(orders.find((order) => order.id === orderId) || null);
+      return;
+    }
     setActingId(`${orderId}:${action}`);
     try {
       let requestInit: RequestInit = { method: "POST" };
@@ -1633,6 +1649,18 @@ export function TodayOrdersView({
         >
           <ArrowUp size={20} className="transition-transform group-hover:-translate-y-1" />
         </button>
+      ) : null}
+      {dispatchTarget ? (
+        <DeliveryDispatchModal
+          open
+          orderId={dispatchTarget.id}
+          orderNo={dispatchTarget.orderNo}
+          onOpenChange={(open) => { if (!open) setDispatchTarget(null); }}
+          onDispatched={() => {
+            showToast("配送单已发出，正在等待骑手接单", "success");
+            void refreshSingleOrder(dispatchTarget.id);
+          }}
+        />
       ) : null}
     </div>
   );
