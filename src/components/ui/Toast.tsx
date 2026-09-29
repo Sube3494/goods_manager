@@ -39,16 +39,21 @@ function Toast({ id, message, type, duration = 3000, onClose }: ToastProps) {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20, scale: 0.9 }}
+      initial={{ opacity: 0, y: -20, scale: 0.95 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
+      exit={{ opacity: 0, y: -10, scale: 0.95, transition: { duration: 0.15 } }}
       layout
-      className="flex w-full min-w-[260px] max-w-[calc(100vw-32px)] items-center gap-3 rounded-xl glass p-3.5 shadow-lg sm:min-w-[300px] sm:max-w-md sm:p-4"
+      className="flex w-full min-w-[240px] max-w-[calc(100vw-32px)] items-center gap-3 rounded-xl glass p-3.5 shadow-xl sm:min-w-[280px] sm:max-w-md sm:p-4 border border-border/50 dark:border-white/10 backdrop-blur-md"
     >
       <div className="shrink-0">{icons[type]}</div>
       <p className="min-w-0 flex-1 text-sm font-medium leading-snug text-foreground break-words">{message}</p>
-      <button onClick={() => onClose(id)} className="shrink-0 text-muted-foreground hover:text-foreground">
-        <X size={16} />
+      <button 
+        type="button"
+        onClick={() => onClose(id)} 
+        className="shrink-0 text-muted-foreground hover:text-foreground transition-colors p-1 rounded-md hover:bg-black/5 dark:hover:bg-white/10 cursor-pointer"
+        title="关闭"
+      >
+        <X size={15} />
       </button>
     </motion.div>
   );
@@ -76,7 +81,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={{ showToast, updateToast, removeToast }}>
       {children}
-      <div className="fixed bottom-5 left-1/2 z-[1000000] flex -translate-x-1/2 flex-col items-center gap-2 pointer-events-none w-full max-w-[calc(100vw-32px)] sm:left-auto sm:right-6 sm:translate-x-0 sm:items-end sm:w-auto">
+      <div className="fixed top-4 sm:top-6 right-4 sm:right-6 z-[1000000] flex flex-col items-end gap-2.5 pointer-events-none w-full max-w-[calc(100vw-32px)] sm:w-auto">
         <AnimatePresence>
           {toasts.map((toast) => (
             <div key={toast.id} className="pointer-events-auto w-full sm:w-auto">
