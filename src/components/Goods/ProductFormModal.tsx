@@ -1749,6 +1749,7 @@ export function ProductFormModal({
                                 placeholder="选择分类"
                                 searchable={true}
                                 searchPlaceholder="搜索分类"
+                                matchTriggerWidth={true}
                                 className="h-[38px]"
                                 triggerClassName="w-full h-[38px] rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-3.5 sm:px-4 text-xs sm:text-sm text-foreground outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all dark:hover:bg-white/10"
                                 onAddNew={() => setIsCategoryModalOpen(true)}
@@ -1766,6 +1767,9 @@ export function ProductFormModal({
                                   onChange={(value) => setFormData({...formData, supplierId: value})}
                                   options={suppliers.map(s => ({ value: s.id, label: s.name }))}
                                   placeholder="选择供应商"
+                                  searchable={true}
+                                  searchPlaceholder="搜索供应商"
+                                  matchTriggerWidth={true}
                                   className="h-[38px]"
                                   triggerClassName="w-full h-[38px] rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-3.5 sm:px-4 text-xs sm:text-sm text-foreground outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all dark:hover:bg-white/10"
                                   onAddNew={() => setIsSupplierModalOpen(true)}

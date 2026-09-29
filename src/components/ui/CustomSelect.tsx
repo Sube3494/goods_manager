@@ -41,7 +41,7 @@ export function CustomSelect({
   searchable,
   searchPlaceholder = "搜索...",
   align,
-  matchTriggerWidth,
+  matchTriggerWidth = true,
 }: CustomSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -200,25 +200,43 @@ export function CustomSelect({
                 }
                 setSearchQuery(e.target.value);
               }}
-              onFocus={() => handleOpenChange(true)}
-              onClick={(e) => e.stopPropagation()}
-              placeholder={searchPlaceholder}
+              onFocus={() => {
+                if (!isOpen) handleOpenChange(true);
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (!isOpen) handleOpenChange(true);
+              }}
+              placeholder={isOpen ? (searchPlaceholder || selectedLabel || "搜索...") : selectedLabel}
               className={cn(
-                "w-full bg-transparent outline-none text-xs font-normal",
+                "w-full bg-transparent outline-none text-xs sm:text-sm font-normal",
                 isCenter && "text-center",
-                !value && !searchQuery && "text-muted-foreground"
+                !value && !searchQuery && "text-muted-foreground placeholder:text-muted-foreground"
               )}
-              readOnly={!isOpen}
             />
           ) : (
             <span className={cn("truncate font-normal", !value && "text-muted-foreground", isCenter && "text-center")}>
               {selectedLabel}
             </span>
           )}
-          <ChevronDown
-            size={12}
-            className={cn("text-muted-foreground transition-transform duration-200 shrink-0", isOpen && "rotate-180")}
-          />
+          {isOpen && searchQuery ? (
+            <span
+              onClick={(e) => {
+                e.stopPropagation();
+                setSearchQuery("");
+                inputRef.current?.focus();
+              }}
+              className="text-muted-foreground hover:text-foreground p-0.5 shrink-0 cursor-pointer text-xs leading-none"
+              title="清空搜索"
+            >
+              ✕
+            </span>
+          ) : (
+            <ChevronDown
+              size={12}
+              className={cn("text-muted-foreground transition-transform duration-200 shrink-0", isOpen && "rotate-180")}
+            />
+          )}
         </div>
       </button>
 
@@ -244,12 +262,12 @@ export function CustomSelect({
               } as React.CSSProperties}
               className="select-dropdown-container rounded-2xl bg-white/95 dark:bg-[#0c1222]/95 backdrop-blur-2xl border border-black/8 dark:border-white/10 shadow-2xl dark:shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] focus:outline-none overflow-hidden"
             >
-              {isSearchable && (
+              {/* 仅在胶囊本身不是搜索输入框(!searchable)但选项极多时，才作为下拉列表备用搜索框；胶囊自身可搜索时坚决不展示，杜绝重复 */}
+              {!searchable && isSearchable && (
                 <div className="p-2 border-b border-border/40 sticky top-0 bg-white/95 dark:bg-[#0c1222]/95 backdrop-blur-md z-10">
                   <div className="relative flex items-center">
                     <Search size={12} className="absolute left-2.5 text-muted-foreground pointer-events-none" />
                     <input
-                      ref={inputRef}
                       type="text"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
@@ -263,7 +281,6 @@ export function CustomSelect({
                         onClick={(e) => {
                           e.stopPropagation();
                           setSearchQuery("");
-                          inputRef.current?.focus();
                         }}
                         className="absolute right-1.5 text-muted-foreground hover:text-foreground text-xs p-0.5"
                       >
