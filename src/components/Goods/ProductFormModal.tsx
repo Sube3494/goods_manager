@@ -1579,37 +1579,40 @@ export function ProductFormModal({
             <form onSubmit={handleSubmit} className="flex flex-col min-h-0 flex-1 overflow-hidden">
                 <div className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 space-y-6 custom-scrollbar">
                     {!hideSkuField && (
-                      <div className="space-y-2">
-                          <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                      <div className="space-y-1.5 sm:space-y-2">
+                          <label className="text-xs sm:text-sm font-medium text-muted-foreground flex items-center gap-2">
                               <FileText size={16} className="text-indigo-500" /> 商品编号 (SKU)
                           </label>
                           <input 
                               type="text" 
                               value={formData.sku}
                               onChange={(e) => setFormData({...formData, sku: e.target.value})}
-                              className="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all font-mono dark:hover:bg-white/10"
+                              className="w-full h-[38px] rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-3.5 sm:px-4 text-xs sm:text-sm text-foreground outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all font-mono dark:hover:bg-white/10"
                               placeholder="例如：SKU-001"
                           />
                       </div>
                     )}
 
                     {showPlatformIdSection && (
-                      <div className="overflow-hidden rounded-[26px] border border-border bg-white/60 dark:bg-white/5 dark:border-white/10">
+                      <div className={cn(
+                        "overflow-hidden border border-border bg-white/60 dark:bg-white/5 dark:border-white/10 transition-all",
+                        isPlatformIdsOpen ? "rounded-2xl" : "rounded-full"
+                      )}>
                         <button
                           type="button"
                           onClick={() => setIsPlatformIdsOpen((value) => !value)}
                           className={cn(
-                            "flex h-[52px] w-full items-center justify-between gap-3 px-4 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary/20",
-                            isPlatformIdsOpen ? "rounded-t-[26px]" : "rounded-[26px]"
+                            "flex h-[38px] w-full items-center justify-between gap-3 px-3.5 sm:px-4 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary/20",
+                            isPlatformIdsOpen ? "rounded-t-2xl" : "rounded-full"
                           )}
                         >
-                          <span className="flex min-w-0 items-center gap-2 text-sm font-medium text-muted-foreground">
-                            <Tag size={16} className="shrink-0 text-amber-500" />
+                          <span className="flex min-w-0 items-center gap-2 text-xs sm:text-sm font-medium text-muted-foreground">
+                            <Tag size={15} className="shrink-0 text-amber-500" />
                             <span className="truncate">平台商品 ID</span>
                           </span>
                           <span className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
                             <span className="font-mono">{platformIdCount} 条</span>
-                            <ChevronDown size={16} className={cn("transition-transform", isPlatformIdsOpen && "rotate-180")} />
+                            <ChevronDown size={15} className={cn("transition-transform", isPlatformIdsOpen && "rotate-180")} />
                           </span>
                         </button>
 
@@ -1624,8 +1627,8 @@ export function ProductFormModal({
                             >
                               <div className="space-y-4 border-t border-border px-4 py-4 dark:border-white/10">
                                 {showJdSkuField && (
-                                  <div className="space-y-2">
-                                      <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                                  <div className="space-y-1.5 sm:space-y-2">
+                                      <label className="text-xs sm:text-sm font-medium text-muted-foreground flex items-center gap-2">
                                           <FileText size={16} className="text-rose-500" /> JD SKU ID
                                       </label>
                                       <input
@@ -1640,7 +1643,7 @@ export function ProductFormModal({
                                               setFormData({ ...formData, jdSkuId: normalizePlatformIdInput(text) });
                                             }
                                           }}
-                                          className="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all font-mono dark:hover:bg-white/10"
+                                          className="w-full h-[38px] rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-3.5 sm:px-4 text-xs sm:text-sm text-foreground outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all font-mono dark:hover:bg-white/10"
                                           placeholder="用逗号分隔多个 JD SKU，例如：123456,234567,345678"
                                       />
                                       <div className="flex items-start justify-between gap-3 text-[11px] text-muted-foreground">
@@ -1651,8 +1654,8 @@ export function ProductFormModal({
                                 )}
 
                                 {showMeituanSkuField && (
-                                  <div className="space-y-2">
-                                      <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                                  <div className="space-y-1.5 sm:space-y-2">
+                                      <label className="text-xs sm:text-sm font-medium text-muted-foreground flex items-center gap-2">
                                           <Tag size={16} className="text-amber-500" /> 美团商品 ID (Meituan SKU ID)
                                       </label>
                                       <input
@@ -1667,7 +1670,7 @@ export function ProductFormModal({
                                               setFormData({ ...formData, meituanSkuId: normalizePlatformIdInput(text) });
                                             }
                                           }}
-                                          className="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all font-mono dark:hover:bg-white/10"
+                                          className="w-full h-[38px] rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-3.5 sm:px-4 text-xs sm:text-sm text-foreground outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all font-mono dark:hover:bg-white/10"
                                           placeholder="用逗号分隔多个美团商品 ID，例如：100234,100235"
                                       />
                                       <div className="flex items-start justify-between gap-3 text-[11px] text-muted-foreground">
@@ -1678,15 +1681,15 @@ export function ProductFormModal({
                                 )}
 
                                 {showMeituanSkuField && (
-                                  <div className="space-y-2">
-                                      <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                                  <div className="space-y-1.5 sm:space-y-2">
+                                      <label className="text-xs sm:text-sm font-medium text-muted-foreground flex items-center gap-2">
                                           <Tag size={16} className="text-orange-500" /> 淘宝商品 ID (Taobao SKU ID)
                                       </label>
                                       <input
                                           type="text"
                                           value={formData.taobaoSkuId}
                                           onChange={(e) => setFormData({ ...formData, taobaoSkuId: e.target.value.trim() })}
-                                          className="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all font-mono dark:hover:bg-white/10"
+                                          className="w-full h-[38px] rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-3.5 sm:px-4 text-xs sm:text-sm text-foreground outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all font-mono dark:hover:bg-white/10"
                                           placeholder="淘宝 sku_id，例如：17709501602235146"
                                       />
                                       <div className="flex items-start justify-between gap-3 text-[11px] text-muted-foreground">
@@ -1697,15 +1700,15 @@ export function ProductFormModal({
                                 )}
 
                                 {showMeituanSkuField && (
-                                  <div className="space-y-2">
-                                      <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                                  <div className="space-y-1.5 sm:space-y-2">
+                                      <label className="text-xs sm:text-sm font-medium text-muted-foreground flex items-center gap-2">
                                           <Tag size={16} className="text-sky-500" /> 抖店 SKU ID (Doudian SKU ID)
                                       </label>
                                       <input
                                           type="text"
                                           value={formData.doudianSkuId}
                                           onChange={(e) => setFormData({ ...formData, doudianSkuId: e.target.value.trim() })}
-                                          className="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all font-mono dark:hover:bg-white/10"
+                                          className="w-full h-[38px] rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-3.5 sm:px-4 text-xs sm:text-sm text-foreground outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all font-mono dark:hover:bg-white/10"
                                           placeholder="抖店 sku_id，例如：3706599584670722"
                                       />
                                       <div className="flex items-start justify-between gap-3 text-[11px] text-muted-foreground">
@@ -1722,8 +1725,8 @@ export function ProductFormModal({
                     )}
 
                     {/* Name */}
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <div className="space-y-1.5 sm:space-y-2">
+                        <label className="text-xs sm:text-sm font-medium text-muted-foreground flex items-center gap-2">
                             <Package size={16} className="text-blue-500" /> 商品名称 <span className="text-red-500">*</span>
                         </label>
                         <input 
@@ -1731,7 +1734,7 @@ export function ProductFormModal({
                             type="text" 
                             value={formData.name}
                             onChange={(e) => setFormData({...formData, name: e.target.value})}
-                            className="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all dark:hover:bg-white/10"
+                            className="w-full h-[38px] rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-3.5 sm:px-4 text-xs sm:text-sm text-foreground outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all dark:hover:bg-white/10"
                             placeholder="例如：高级皮质手袋"
                         />
                     </div>
@@ -1749,7 +1752,8 @@ export function ProductFormModal({
                                 placeholder="选择分类"
                                 searchable={true}
                                 searchPlaceholder="搜索分类"
-                                triggerClassName="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-3.5 sm:px-4 py-2.5 text-xs sm:text-sm text-foreground outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all dark:hover:bg-white/10"
+                                className="h-[38px]"
+                                triggerClassName="w-full h-[38px] rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-3.5 sm:px-4 text-xs sm:text-sm text-foreground outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all dark:hover:bg-white/10"
                                 onAddNew={() => setIsCategoryModalOpen(true)}
                                 addNewLabel="新增分类"
                             />
@@ -1765,7 +1769,8 @@ export function ProductFormModal({
                                   onChange={(value) => setFormData({...formData, supplierId: value})}
                                   options={suppliers.map(s => ({ value: s.id, label: s.name }))}
                                   placeholder="选择供应商"
-                                  triggerClassName="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-3.5 sm:px-4 py-2.5 text-xs sm:text-sm text-foreground outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all dark:hover:bg-white/10"
+                                  className="h-[38px]"
+                                  triggerClassName="w-full h-[38px] rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-3.5 sm:px-4 text-xs sm:text-sm text-foreground outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all dark:hover:bg-white/10"
                                   onAddNew={() => setIsSupplierModalOpen(true)}
                                   addNewLabel="新增供应商"
                               />
@@ -1777,18 +1782,18 @@ export function ProductFormModal({
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             {/* Production Condition Box */}
                             {!hideProductionControl && (
-                              <div className="space-y-2">
-                                  <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                              <div className="space-y-1.5 sm:space-y-2">
+                                  <label className="text-xs sm:text-sm font-medium text-muted-foreground flex items-center gap-2">
                                       <Activity size={16} className="text-violet-500" /> 生产状态
                                   </label>
                                   <div className={cn(
-                                      "w-full rounded-full border px-4 py-2 flex items-center justify-between transition-all duration-300",
+                                      "w-full h-[38px] rounded-full border px-3.5 sm:px-4 flex items-center justify-between transition-all duration-300",
                                       formData.isDiscontinued 
                                           ? "bg-red-500/5 border-red-500/20" 
                                           : "bg-emerald-500/5 border-emerald-500/20"
                                   )}>
                                       <span className={cn(
-                                          "text-xs tracking-wider",
+                                          "text-xs sm:text-sm tracking-wider font-medium",
                                           formData.isDiscontinued ? "text-red-500" : "text-emerald-500"
                                       )}>
                                           {formData.isDiscontinued ? "已停止生产" : "正常供应"}
@@ -1802,18 +1807,18 @@ export function ProductFormModal({
                             )}
 
                             {!hideVisibilityControl && (
-                              <div className="space-y-2">
-                                  <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                              <div className="space-y-1.5 sm:space-y-2">
+                                  <label className="text-xs sm:text-sm font-medium text-muted-foreground flex items-center gap-2">
                                       <Eye size={16} className="text-sky-500" /> 展示权限
                                   </label>
                                   <div className={cn(
-                                      "w-full rounded-full border px-4 py-2 flex items-center justify-between transition-all duration-300",
+                                      "w-full h-[38px] rounded-full border px-3.5 sm:px-4 flex items-center justify-between transition-all duration-300",
                                       formData.isPublic 
                                           ? "bg-emerald-500/5 border-emerald-500/20" 
                                           : "bg-amber-500/5 border-amber-500/10"
                                   )}>
                                       <span className={cn(
-                                          "text-xs tracking-wider",
+                                          "text-xs sm:text-sm tracking-wider font-medium",
                                           formData.isPublic ? "text-emerald-500" : "text-amber-600"
                                       )}>
                                           {formData.isPublic ? "公开可见" : "仅自己可见"}
@@ -1831,13 +1836,13 @@ export function ProductFormModal({
                     {/* Shelf Life / 保质期管理 - 始终单行双列显示 */}
                     <div className="grid grid-cols-2 gap-3 sm:gap-4">
                         {/* 是否为保质期商品 */}
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                        <div className="space-y-1.5 sm:space-y-2">
+                            <label className="text-xs sm:text-sm font-medium text-muted-foreground flex items-center gap-2">
                                 <Activity size={16} className="text-emerald-500" />
                                 是否为保质期商品
                             </label>
                             <div className={cn(
-                                "rounded-full border px-3.5 sm:px-4 h-[44px] sm:h-[46px] flex items-center justify-between transition-all duration-300",
+                                "w-full h-[38px] rounded-full border px-3.5 sm:px-4 flex items-center justify-between transition-all duration-300",
                                 formData.isShelfLife
                                     ? "bg-emerald-500/5 border-emerald-500/25 dark:border-emerald-500/20"
                                     : "bg-white/5 dark:bg-white/5 border-border dark:border-white/10"
@@ -1862,22 +1867,22 @@ export function ProductFormModal({
                         </div>
 
                         {/* 保质期时长 - 始终显示，开关关闭时置灰 */}
-                        <div className={cn("space-y-2 transition-opacity duration-300", !formData.isShelfLife && "opacity-40 pointer-events-none")}>
-                            <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                        <div className={cn("space-y-1.5 sm:space-y-2 transition-opacity duration-300", !formData.isShelfLife && "opacity-40 pointer-events-none")}>
+                            <label className="text-xs sm:text-sm font-medium text-muted-foreground flex items-center gap-2">
                                 <FileText size={16} className="text-emerald-500" />
                                 <span>保质期时长 <span className="text-red-500">*</span></span>
                             </label>
-                            <div className="flex items-center rounded-full border border-border dark:border-white/10 bg-white/5 dark:bg-white/5 px-4 h-[46px] focus-within:ring-2 focus-within:ring-emerald-500/20 focus-within:border-emerald-500/30 transition-all">
+                            <div className="flex items-center w-full h-[38px] rounded-full border border-border dark:border-white/10 bg-white/5 dark:bg-white/5 px-3.5 sm:px-4 focus-within:ring-2 focus-within:ring-emerald-500/20 focus-within:border-emerald-500/30 transition-all">
                                 <input
                                     type="number"
                                     min="1"
                                     value={shelfLifeVal}
                                     onChange={(e) => handleShelfLifeChange(e.target.value, shelfLifeUnit)}
                                     disabled={!formData.isShelfLife}
-                                    className="flex-1 bg-transparent border-none outline-none text-foreground text-sm font-medium no-spinner min-w-0"
+                                    className="flex-1 bg-transparent border-none outline-none text-foreground text-xs sm:text-sm font-medium no-spinner min-w-0"
                                     placeholder="6"
                                 />
-                                <div className="h-4 w-px bg-border dark:bg-white/10 mx-3 shrink-0" />
+                                <div className="h-3.5 w-px bg-border dark:bg-white/10 mx-2 sm:mx-3 shrink-0" />
                                 <CustomSelect
                                     value={shelfLifeUnit}
                                     onChange={(val) => handleShelfLifeChange(shelfLifeVal, val as "天" | "月" | "年")}
@@ -1887,8 +1892,8 @@ export function ProductFormModal({
                                         { value: "年", label: "年" }
                                     ]}
                                     placeholder="单位"
-                                    className="w-[80px] shrink-0 h-full"
-                                    triggerClassName="!bg-transparent !border-0 hover:!bg-transparent dark:hover:!bg-transparent focus:!ring-0 px-3 text-xs font-bold text-foreground h-full flex items-center justify-between cursor-pointer rounded-r-full !shadow-none"
+                                    className="w-[72px] shrink-0 h-full"
+                                    triggerClassName="!bg-transparent !border-0 hover:!bg-transparent dark:hover:!bg-transparent focus:!ring-0 px-1 sm:px-2 text-xs sm:text-sm font-medium text-foreground h-full flex items-center justify-between cursor-pointer rounded-r-full !shadow-none"
                                 />
                             </div>
                             {formData.isShelfLife && shelfLifeVal && !isNaN(parseInt(shelfLifeVal, 10)) && parseInt(shelfLifeVal, 10) > 0 && (
@@ -2471,8 +2476,8 @@ export function ProductFormModal({
                     <div className="space-y-4">
                         <div className={cn("grid gap-4", hideStockField ? "grid-cols-1" : "grid-cols-2")}>
                             {/* Cost Price */}
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                            <div className="space-y-1.5 sm:space-y-2">
+                                <label className="text-xs sm:text-sm font-medium text-muted-foreground flex items-center gap-2">
                                     <Tag size={16} className="rotate-90 text-amber-500" /> 进货单价 (￥)
                                 </label>
                                 <input 
@@ -2481,15 +2486,15 @@ export function ProductFormModal({
                                     min="0"
                                     value={formData.costPrice}
                                     onChange={(e) => setFormData({...formData, costPrice: e.target.value.replace(/[。．，]/g, '.')})}
-                                    className="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all font-medium dark:hover:bg-white/10 no-spinner text-sm"
+                                    className="w-full h-[38px] rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 px-3.5 sm:px-4 text-xs sm:text-sm text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all font-medium dark:hover:bg-white/10 no-spinner"
                                     placeholder="0.00"
                                 />
                             </div>
 
                             {/* Stock - 只读，库存由采购批次自动计算，禁止手动修改 */}
                             {!hideStockField && (
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                            <div className="space-y-1.5 sm:space-y-2">
+                                <label className="text-xs sm:text-sm font-medium text-muted-foreground flex items-center gap-2">
                                     <Package size={16} className="text-blue-500" /> 商品库存
                                 </label>
                                 <input
@@ -2498,7 +2503,7 @@ export function ProductFormModal({
                                     disabled
                                     value={formData.stock ?? 0}
                                     placeholder="由采购批次自动计算"
-                                    className="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 px-4 py-2.5 text-foreground outline-none font-medium no-spinner text-sm opacity-50 cursor-not-allowed"
+                                    className="w-full h-[38px] rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 px-3.5 sm:px-4 text-xs sm:text-sm text-foreground outline-none font-medium no-spinner opacity-50 cursor-not-allowed"
                                 />
                             </div>
                             )}
