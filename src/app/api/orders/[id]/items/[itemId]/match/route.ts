@@ -6,9 +6,11 @@ import { Prisma } from "../../../../../../../../prisma/generated-client";
 import {
   createOutboundFromAutoPickOrder,
   syncAutoOutboundFromCompletedAutoPickOrder,
+  syncDoudianSkuIdForShopProduct,
   syncJdSkuIdForShopProduct,
   syncMeituanSkuIdForShopProduct,
   syncTaobaoSkuIdForShopProduct,
+  unbindDoudianSkuIdForShopProduct,
   unbindJdSkuIdForShopProduct,
   unbindMeituanSkuIdForShopProduct,
   unbindTaobaoSkuIdForShopProduct,
@@ -129,6 +131,18 @@ function readTaobaoSkuId(rawPayload: Record<string, unknown>) {
   ).trim();
 }
 
+function readDoudianSkuId(rawPayload: Record<string, unknown>) {
+  return String(
+    rawPayload.sku_id ||
+      rawPayload.skuId ||
+      rawPayload.source_id ||
+      rawPayload.sourceId ||
+      rawPayload.goods_id ||
+      rawPayload.goodsId ||
+      ""
+  ).trim();
+}
+
 function readOrderItemPlatformSkuId(
   platform: string | null | undefined,
   platformSkuId: string | null | undefined,
@@ -155,6 +169,10 @@ function readOrderItemPlatformSkuId(
     return readTaobaoSkuId(rawPayload) || (fallbackRawPayload ? readTaobaoSkuId(fallbackRawPayload) : "");
   }
 
+  if (isDoudianPlatform(platform)) {
+    return readDoudianSkuId(rawPayload) || (fallbackRawPayload ? readDoudianSkuId(fallbackRawPayload) : "");
+  }
+
   return "";
 }
 
@@ -176,6 +194,11 @@ function isJDPlatform(platform: string | null | undefined) {
 function isTaobaoPlatform(platform: string | null | undefined) {
   const normalized = String(platform || "").trim().toLowerCase();
   return normalized.includes("taobao") || normalized.includes("淘宝") || normalized.includes("天猫");
+}
+
+function isDoudianPlatform(platform: string | null | undefined) {
+  const normalized = String(platform || "").trim().toLowerCase();
+  return normalized.includes("抖店") || normalized.includes("抖音") || normalized === "doudian" || normalized === "douyin";
 }
 
 function readArray(value: unknown) {
@@ -259,11 +282,22 @@ async function syncPlatformIdForMatchedShopProduct(
 ) {
   if (!sourceId || !shopProductId) return;
   if (isMeituanPlatform(platform)) {
-    await syncMeituanSkuIdForShopProduct(tx, userId, shopProductId, sourceId);
+    const result = await syncMeituanSkuIdForShopProduct(tx, userId, shopProductId, sourceId);
+    if (!result.ok) {
+      throw new Error(`美团商品 ID 绑定失败：${result.shopFieldError || result.reason || "未知错误"}`);
+    }
   } else if (isJDPlatform(platform)) {
     await syncJdSkuIdForShopProduct(tx, userId, shopProductId, sourceId);
   } else if (isTaobaoPlatform(platform)) {
-    await syncTaobaoSkuIdForShopProduct(tx, userId, shopProductId, sourceId);
+    const result = await syncTaobaoSkuIdForShopProduct(tx, userId, shopProductId, sourceId);
+    if (!result.ok) {
+      throw new Error(`淘宝商品 ID 绑定失败：${result.shopFieldError || result.reason || "未知错误"}`);
+    }
+  } else if (isDoudianPlatform(platform)) {
+    const result = await syncDoudianSkuIdForShopProduct(tx, userId, shopProductId, sourceId);
+    if (!result.ok) {
+      throw new Error(`抖音商品 ID 绑定失败：${result.shopFieldError || result.reason || "未知错误"}`);
+    }
   }
 }
 
@@ -276,11 +310,19 @@ async function unbindPlatformIdForShopProduct(
 ) {
   if (!sourceId || !shopProductId) return;
   if (isMeituanPlatform(platform)) {
-    await unbindMeituanSkuIdForShopProduct(tx, userId, shopProductId, sourceId);
+    const result = await unbindMeituanSkuIdForShopProduct(tx, userId, shopProductId, sourceId);
+    if (!result.ok) {
+      throw new Error(`美团商品 ID 清理失败：${result.reason || "未知错误"}`);
+    }
   } else if (isJDPlatform(platform)) {
     await unbindJdSkuIdForShopProduct(tx, userId, shopProductId, sourceId);
   } else if (isTaobaoPlatform(platform)) {
     await unbindTaobaoSkuIdForShopProduct(tx, userId, shopProductId, sourceId);
+  } else if (isDoudianPlatform(platform)) {
+    const result = await unbindDoudianSkuIdForShopProduct(tx, userId, shopProductId, sourceId);
+    if (!result.ok) {
+      throw new Error(`抖音商品 ID 清理失败：${result.reason || "未知错误"}`);
+    }
   }
 }
 
@@ -426,7 +468,7 @@ export async function PATCH(
 
       if (currentPlatformSkuId && previousShopProductIds.length > 0) {
         for (const oldShopProductId of previousShopProductIds) {
-          await unbindPlatformIdForShopProduct(prisma, targetUserId, oldShopProductId, orderItem.order.platform, currentPlatformSkuId).catch(() => null);
+          await unbindPlatformIdForShopProduct(prisma, targetUserId, oldShopProductId, orderItem.order.platform, currentPlatformSkuId);
         }
       }
 
@@ -795,7 +837,7 @@ export async function PATCH(
       if (currentPlatformSkuId && previousShopProductIds.length > 0) {
         const unbindOldIds = previousShopProductIds.filter((oldId) => !newShopProductIds.has(oldId));
         for (const oldShopProductId of unbindOldIds) {
-          await unbindPlatformIdForShopProduct(prisma, targetUserId, oldShopProductId, orderItem.order.platform, currentPlatformSkuId).catch(() => null);
+          await unbindPlatformIdForShopProduct(prisma, targetUserId, oldShopProductId, orderItem.order.platform, currentPlatformSkuId);
         }
       }
 
@@ -910,7 +952,7 @@ export async function PATCH(
     if (currentPlatformSkuId && previousShopProductIds.length > 0) {
       const unbindOldIds = previousShopProductIds.filter((oldId) => oldId !== shopProduct.id);
       for (const oldShopProductId of unbindOldIds) {
-        await unbindPlatformIdForShopProduct(prisma, targetUserId, oldShopProductId, orderItem.order.platform, currentPlatformSkuId).catch(() => null);
+        await unbindPlatformIdForShopProduct(prisma, targetUserId, oldShopProductId, orderItem.order.platform, currentPlatformSkuId);
       }
     }
 
@@ -922,7 +964,7 @@ export async function PATCH(
         shopProduct.id,
         orderItem.order.platform,
         currentPlatformSkuId
-      ).catch(() => null);
+      );
     }
 
     await rebuildOutbound();

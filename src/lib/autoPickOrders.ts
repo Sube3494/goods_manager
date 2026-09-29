@@ -5450,7 +5450,7 @@ export async function backfillPlatformIdsForSyncedAutoPickOrder(userId: string, 
     },
   });
   const details: Array<Record<string, unknown>> = [];
-  if (!order || (!isMeituanPlatform(order?.platform) && !isJdPlatform(order?.platform) && !isTaobaoPlatform(order?.platform))) {
+  if (!order || (!isMeituanPlatform(order?.platform) && !isJdPlatform(order?.platform) && !isTaobaoPlatform(order?.platform) && !isDoudianPlatform(order?.platform))) {
     return { count: 0, details };
   }
 
@@ -5487,6 +5487,7 @@ export async function backfillPlatformIdsForSyncedAutoPickOrder(userId: string, 
       jdSkuId: true,
       meituanSkuId: true,
       taobaoSkuId: true,
+      doudianSkuId: true,
     },
   });
   const shopProductMap = new Map(shopProducts.map((item) => [item.id, item]));
@@ -5505,8 +5506,11 @@ export async function backfillPlatformIdsForSyncedAutoPickOrder(userId: string, 
     const platformSkuForBackfill = normalizeAutoPickSkuForMatch(item.platformSkuId) || resolveAutoPickItemPlatformSkuId(order.platform, item.rawPayload);
 
     if (!matchedShopProductId) {
-      const matched = shopProducts.find((product) =>
-        matchKeys.some((key) => doesShopProductMatchAutoPickStableKey(order.platform, product, key))
+      const matchedByPlatformId = platformProductId
+        ? shopProducts.find((product) => doesShopProductMatchAutoPickStableKey(order.platform, product, platformProductId))
+        : null;
+      const matched = matchedByPlatformId || shopProducts.find((product) =>
+        skuFallbacks.some((key) => doesShopProductMatchAutoPickLocalSku(product, key))
       );
       matchedShopProductId = matched?.id || null;
     }
@@ -5596,6 +5600,34 @@ export async function backfillPlatformIdsForSyncedAutoPickOrder(userId: string, 
         });
       }
     }
+
+    if (isDoudianPlatform(order.platform)) {
+      const sourceId = platformSkuForBackfill;
+      if (sourceId) {
+        const result = await syncDoudianSkuIdForShopProduct(prisma, userId, matchedShopProductId, sourceId);
+        details.push({
+          itemId: item.id,
+          productNo: item.productNo,
+          platformSkuId: sourceId,
+          matchKeys,
+          resolvedShopId,
+          matchedShopProductId,
+          result,
+        });
+        if (result.ok) {
+          count += 1;
+        }
+      } else {
+        details.push({
+          itemId: item.id,
+          productNo: item.productNo,
+          matchKeys,
+          resolvedShopId,
+          matchedShopProductId,
+          reason: "missing-platform-sku-id",
+        });
+      }
+    }
   }
 
   return { count, details };
@@ -5632,77 +5664,28 @@ export function doesShopProductMatchAutoPickStableKey(
 
   const platformKeys = isMeituanPlatform(platform)
     ? normalizeMeituanSkuIds(item.meituanSkuId).map((value) => normalizeAutoPickSkuForMatch(value))
-    : [normalizeShopProductSkuForPlatformMatch(platform, item)];
-  const fallbackKeys = [
-    normalizeAutoPickSkuForMatch(item.sku),
-    normalizeAutoPickSkuForMatch(item.jdSkuId),
-    normalizeAutoPickSkuForMatch(item.taobaoSkuId),
-    normalizeAutoPickSkuForMatch(item.doudianSkuId),
-    ...normalizeMeituanSkuIds(item.meituanSkuId).map((value) => normalizeAutoPickSkuForMatch(value)),
-  ].filter(Boolean);
+    : isJdPlatform(platform)
+      ? normalizeJdSkuIds(item.jdSkuId).map((value) => normalizeAutoPickSkuForMatch(value))
+      : [normalizeShopProductSkuForPlatformMatch(platform, item)];
 
-  return platformKeys.includes(normalizedKey) || fallbackKeys.includes(normalizedKey);
+  return platformKeys.includes(normalizedKey);
+}
+
+function doesShopProductMatchAutoPickLocalSku(item: { sku?: string | null }, key: string) {
+  const normalizedKey = normalizeAutoPickSkuForMatch(key);
+  return Boolean(normalizedKey && normalizeAutoPickSkuForMatch(item.sku) === normalizedKey);
 }
 
 async function findExistingShopProductByShopAndSku(
   tx: Prisma.TransactionClient,
   shopId: string,
   sku: string | null | undefined,
-  platform?: string | null
+  platform: string | null | undefined,
+  matchKind: "platform" | "local-sku"
 ) {
   const normalizedSku = normalizeAutoPickSkuForMatch(sku);
   if (!shopId || !normalizedSku) {
     return null;
-  }
-
-  if (isJdPlatform(platform)) {
-    const targetJdSku = String(sku || "").trim();
-    const directJdHit = await tx.shopProduct.findFirst({
-      where: {
-        shopId,
-        OR: [
-          { jdSkuId: targetJdSku },
-          { meituanSkuId: targetJdSku },
-          { product: { jdSkuMappings: { some: { jdSkuId: targetJdSku } } } },
-        ],
-      },
-      select: {
-        id: true,
-        productId: true,
-        sourceProductId: true,
-        sku: true,
-        jdSkuId: true,
-        meituanSkuId: true,
-        productName: true,
-      },
-    });
-    if (directJdHit) {
-      return directJdHit;
-    }
-    return null;
-  }
-
-  const directHit = await tx.shopProduct.findFirst({
-    where: {
-      shopId,
-      OR: [
-        { sku: String(sku || "").trim() },
-        { jdSkuId: String(sku || "").trim() },
-        { meituanSkuId: String(sku || "").trim() },
-      ],
-    },
-    select: {
-      id: true,
-      productId: true,
-      sourceProductId: true,
-      sku: true,
-      jdSkuId: true,
-      meituanSkuId: true,
-      productName: true,
-    },
-  });
-  if (directHit) {
-    return directHit;
   }
 
   const candidates = await tx.shopProduct.findMany({
@@ -5716,11 +5699,15 @@ async function findExistingShopProductByShopAndSku(
       sku: true,
       jdSkuId: true,
       meituanSkuId: true,
+      taobaoSkuId: true,
+      doudianSkuId: true,
       productName: true,
     },
   });
 
-  return candidates.find((item) => doesShopProductMatchAutoPickStableKey(platform, item, normalizedSku)) || null;
+  return candidates.find((item) => matchKind === "platform"
+    ? doesShopProductMatchAutoPickStableKey(platform, item, normalizedSku)
+    : doesShopProductMatchAutoPickLocalSku(item, normalizedSku)) || null;
 }
 
 async function resolveAutoPickInternalShop(
@@ -6609,6 +6596,8 @@ async function resolveBrushOrderItemsForAutoPickOrder(
         sku: true,
         jdSkuId: true,
         meituanSkuId: true,
+        taobaoSkuId: true,
+        doudianSkuId: true,
         isBundle: true,
         bundleItems: true,
         product: {
@@ -6649,16 +6638,20 @@ async function resolveBrushOrderItemsForAutoPickOrder(
     return isShopNameMatch(candidateShopName, mappedShopNameText);
   };
 
-  const shopProductSkuMap = new Map<string, Array<{
+  type AutoPickMatchedShopProduct = {
     id: string;
     productId: string | null;
     sourceProductId: string | null;
     sku: string | null;
     jdSkuId: string | null;
     meituanSkuId: string | null;
+    taobaoSkuId: string | null;
+    doudianSkuId: string | null;
     shopId: string | null;
     shopName: string | null;
-  }>>();
+  };
+  const shopProductPlatformIdMap = new Map<string, AutoPickMatchedShopProduct[]>();
+  const shopProductLocalSkuMap = new Map<string, AutoPickMatchedShopProduct[]>();
   for (const item of shopProducts) {
     const rawBundle = item.bundleItems || item.product?.bundleItems;
     const isBundle = Boolean(item.isBundle || item.product?.isBundle);
@@ -6671,6 +6664,8 @@ async function resolveBrushOrderItemsForAutoPickOrder(
       sku: item.sku || null,
       jdSkuId: item.jdSkuId || null,
       meituanSkuId: item.meituanSkuId || null,
+      taobaoSkuId: item.taobaoSkuId || null,
+      doudianSkuId: item.doudianSkuId || null,
       shopId: item.shop?.id || null,
       shopName: item.shop?.name || null,
       isBundle,
@@ -6679,28 +6674,26 @@ async function resolveBrushOrderItemsForAutoPickOrder(
 
     const platformKeys = isMeituanPlatform(order.platform)
       ? normalizeMeituanSkuIds(item.meituanSkuId).map((value) => normalizeAutoPickSkuForMatch(value))
-      : [normalizeShopProductSkuForPlatformMatch(order.platform, item)];
+      : isJdPlatform(order.platform)
+        ? normalizeJdSkuIds(item.jdSkuId).map((value) => normalizeAutoPickSkuForMatch(value))
+        : [normalizeShopProductSkuForPlatformMatch(order.platform, item)];
 
     for (const key of platformKeys.filter(Boolean)) {
-      const current = shopProductSkuMap.get(key) || [];
+      const current = shopProductPlatformIdMap.get(key) || [];
       if (!current.some((c) => c.id === entry.id)) {
         current.push(entry);
       }
-      shopProductSkuMap.set(key, current);
+      shopProductPlatformIdMap.set(key, current);
     }
 
-    const fallbackKeys = [
-      normalizeAutoPickSkuForMatch(item.sku),
-      normalizeAutoPickSkuForMatch(item.jdSkuId),
-      ...normalizeMeituanSkuIds(item.meituanSkuId).map((value) => normalizeAutoPickSkuForMatch(value)),
-    ].filter(Boolean);
+    const fallbackKeys = [normalizeAutoPickSkuForMatch(item.sku)].filter(Boolean);
 
     for (const fallbackKey of fallbackKeys) {
-      const current = shopProductSkuMap.get(fallbackKey) || [];
+      const current = shopProductLocalSkuMap.get(fallbackKey) || [];
       if (!current.some((c) => c.id === entry.id)) {
         current.push(entry);
       }
-      shopProductSkuMap.set(fallbackKey, current);
+      shopProductLocalSkuMap.set(fallbackKey, current);
     }
   }
 
@@ -6783,7 +6776,7 @@ async function resolveBrushOrderItemsForAutoPickOrder(
 
     // 1. 优先平台规格 ID 匹配 (与订单列表 ID 匹配逻辑完全对齐)
     if (platformProductId) {
-      const allCandidates = shopProductSkuMap.get(platformProductId) || [];
+      const allCandidates = shopProductPlatformIdMap.get(platformProductId) || [];
       const shopCandidates = allCandidates.filter((candidate) => isCandidateInMappedShop(candidate.shopId, candidate.shopName));
       matchedCandidate = shopCandidates.find((c) => Boolean(c.productId || c.sourceProductId)) || null;
 
@@ -6806,6 +6799,13 @@ async function resolveBrushOrderItemsForAutoPickOrder(
 
       if (resolvedProductId) {
         await backfillMeituanIdForAutoPickMatchedShopProduct(prisma, userId, matchedCandidate.id, item.rawPayload, order.platform, item.platformSkuId);
+        if (!isCompositeProductNo && isDoudianPlatform(order.platform)) {
+          const doudianSkuId = normalizeAutoPickSkuForMatch(item.platformSkuId)
+            || resolveAutoPickItemPlatformSkuId(order.platform, item.rawPayload);
+          if (doudianSkuId) {
+            await syncDoudianSkuIdForShopProduct(prisma, userId, matchedCandidate.id, doudianSkuId);
+          }
+        }
 
         const resolvedCandidateShopName = String(matchedCandidate.shopName || "").trim();
         if (resolvedCandidateShopName) {
@@ -6829,7 +6829,7 @@ async function resolveBrushOrderItemsForAutoPickOrder(
       const subResolvedItems: Array<{ productId: string; quantity: number }> = [];
 
       for (const normalizedSku of skuParts) {
-        const allCandidates = shopProductSkuMap.get(normalizedSku) || [];
+        const allCandidates = shopProductLocalSkuMap.get(normalizedSku) || [];
         const shopCandidates = allCandidates.filter((candidate) => isCandidateInMappedShop(candidate.shopId, candidate.shopName));
         let partCandidate = shopCandidates.find((c) => Boolean(c.productId || c.sourceProductId)) || null;
 
@@ -6984,6 +6984,8 @@ async function resolveOutboundItemsForAutoPickOrder(
         sku: true,
         jdSkuId: true,
         meituanSkuId: true,
+        taobaoSkuId: true,
+        doudianSkuId: true,
         isBundle: true,
         bundleItems: true,
         product: {
@@ -7001,16 +7003,20 @@ async function resolveOutboundItemsForAutoPickOrder(
         },
       },
     });
-  const shopProductSkuMap = new Map<string, Array<{
+  type OutboundCandidateShopProduct = {
     id: string;
     productId: string | null;
     sourceProductId: string | null;
     sku: string | null;
     jdSkuId: string | null;
     meituanSkuId: string | null;
+    taobaoSkuId: string | null;
+    doudianSkuId: string | null;
     shopId: string | null;
     shopName: string | null;
-  }>>();
+  };
+  const shopProductPlatformIdMap = new Map<string, OutboundCandidateShopProduct[]>();
+  const shopProductLocalSkuMap = new Map<string, OutboundCandidateShopProduct[]>();
   for (const item of shopProducts) {
     const entry = {
       id: item.id,
@@ -7019,34 +7025,34 @@ async function resolveOutboundItemsForAutoPickOrder(
       sku: item.sku || null,
       jdSkuId: item.jdSkuId || null,
       meituanSkuId: item.meituanSkuId || null,
+      taobaoSkuId: item.taobaoSkuId || null,
+      doudianSkuId: item.doudianSkuId || null,
       shopId: item.shop?.id || null,
       shopName: item.shop?.name || null,
     };
 
     const platformKeys = isMeituanPlatform(order.platform)
       ? normalizeMeituanSkuIds(item.meituanSkuId).map((value) => normalizeAutoPickSkuForMatch(value))
-      : [normalizeShopProductSkuForPlatformMatch(order.platform, item)];
+      : isJdPlatform(order.platform)
+        ? normalizeJdSkuIds(item.jdSkuId).map((value) => normalizeAutoPickSkuForMatch(value))
+        : [normalizeShopProductSkuForPlatformMatch(order.platform, item)];
 
     for (const key of platformKeys.filter(Boolean)) {
-      const current = shopProductSkuMap.get(key) || [];
+      const current = shopProductPlatformIdMap.get(key) || [];
       if (!current.some((c) => c.id === entry.id)) {
         current.push(entry);
       }
-      shopProductSkuMap.set(key, current);
+      shopProductPlatformIdMap.set(key, current);
     }
 
-    const fallbackKeys = [
-      normalizeAutoPickSkuForMatch(item.sku),
-      normalizeAutoPickSkuForMatch(item.jdSkuId),
-      ...normalizeMeituanSkuIds(item.meituanSkuId).map((value) => normalizeAutoPickSkuForMatch(value)),
-    ].filter(Boolean);
+    const fallbackKeys = [normalizeAutoPickSkuForMatch(item.sku)].filter(Boolean);
 
     for (const fallbackKey of fallbackKeys) {
-      const current = shopProductSkuMap.get(fallbackKey) || [];
+      const current = shopProductLocalSkuMap.get(fallbackKey) || [];
       if (!current.some((c) => c.id === entry.id)) {
         current.push(entry);
       }
-      shopProductSkuMap.set(fallbackKey, current);
+      shopProductLocalSkuMap.set(fallbackKey, current);
     }
   }
 
@@ -7268,13 +7274,13 @@ async function resolveOutboundItemsForAutoPickOrder(
     let resolvedShopProduct: OutboundMatchedShopProduct = null;
 
     if (platformProductId) {
-      const skuCandidates = (shopProductSkuMap.get(platformProductId) || []).filter((candidate) =>
+      const skuCandidates = (shopProductPlatformIdMap.get(platformProductId) || []).filter((candidate) =>
         isCandidateInMappedShop(candidate.shopId, candidate.shopName)
       );
       if (skuCandidates.length > 0) {
         resolvedShopProduct = skuCandidates[0];
       } else if (internalShop?.id) {
-        const existingShopProduct = await findExistingShopProductByShopAndSku(tx, internalShop.id, platformProductId, order.platform);
+        const existingShopProduct = await findExistingShopProductByShopAndSku(tx, internalShop.id, platformProductId, order.platform, "platform");
         if (existingShopProduct) {
           resolvedShopProduct = {
             id: existingShopProduct.id,
@@ -7296,7 +7302,14 @@ async function resolveOutboundItemsForAutoPickOrder(
       const rawPayloadRecord = item.rawPayload && typeof item.rawPayload === "object" && !Array.isArray(item.rawPayload)
         ? (item.rawPayload as Record<string, unknown>)
         : {};
-      const targetSourceId = String(item.platformSkuId || item.productNo || rawPayloadRecord.source_id || rawPayloadRecord.sourceId || "").trim();
+      const targetSourceId = String(
+        item.platformSkuId
+        || resolveAutoPickItemPlatformSkuId(order.platform, item.rawPayload)
+        || item.productNo
+        || rawPayloadRecord.source_id
+        || rawPayloadRecord.sourceId
+        || ""
+      ).trim();
       const isJdOrder = order.platform && (
         order.platform.includes("京东") ||
         order.platform.toLowerCase().includes("daojia") ||
@@ -7305,6 +7318,12 @@ async function resolveOutboundItemsForAutoPickOrder(
 
       if (isJdOrder && targetShopProductId && targetSourceId) {
         await syncJdSkuIdForShopProduct(tx, userId, targetShopProductId, targetSourceId);
+      }
+      if (isDoudianPlatform(order.platform) && targetShopProductId && targetSourceId && !isCompositeProductNo) {
+        const result = await syncDoudianSkuIdForShopProduct(tx, userId, targetShopProductId, targetSourceId);
+        if (!result.ok) {
+          throw new Error(`抖音商品 ID 绑定失败：${result.shopFieldError || result.reason || "未知错误"}`);
+        }
       }
       if (!isCompositeProductNo) {
         await backfillMeituanIdForAutoPickMatchedShopProduct(tx, userId, targetShopProductId, item.rawPayload, order.platform, item.platformSkuId);
@@ -7328,7 +7347,7 @@ async function resolveOutboundItemsForAutoPickOrder(
     for (const normalizedSku of skuParts) {
       let subResolvedShopProduct: OutboundMatchedShopProduct = null;
       if (normalizedSku) {
-        const skuCandidates = (shopProductSkuMap.get(normalizedSku) || []).filter((candidate) =>
+        const skuCandidates = (shopProductLocalSkuMap.get(normalizedSku) || []).filter((candidate) =>
           isCandidateInMappedShop(candidate.shopId, candidate.shopName)
         );
         const uniqueCandidateShopIds = Array.from(
@@ -7352,7 +7371,7 @@ async function resolveOutboundItemsForAutoPickOrder(
       }
 
       if (!subResolvedShopProduct && internalShop?.id && normalizedSku) {
-        const existingShopProduct = await findExistingShopProductByShopAndSku(tx, internalShop.id, normalizedSku, order.platform);
+        const existingShopProduct = await findExistingShopProductByShopAndSku(tx, internalShop.id, normalizedSku, order.platform, "local-sku");
         if (existingShopProduct) {
           subResolvedShopProduct = {
             id: existingShopProduct.id,
@@ -7380,7 +7399,14 @@ async function resolveOutboundItemsForAutoPickOrder(
       const rawPayloadRecord = item.rawPayload && typeof item.rawPayload === "object" && !Array.isArray(item.rawPayload)
         ? (item.rawPayload as Record<string, unknown>)
         : {};
-      const targetSourceId = String(item.platformSkuId || item.productNo || rawPayloadRecord.source_id || rawPayloadRecord.sourceId || "").trim();
+      const targetSourceId = String(
+        item.platformSkuId
+        || resolveAutoPickItemPlatformSkuId(order.platform, item.rawPayload)
+        || item.productNo
+        || rawPayloadRecord.source_id
+        || rawPayloadRecord.sourceId
+        || ""
+      ).trim();
       const isJdOrder = order.platform && (
         order.platform.includes("京东") ||
         order.platform.toLowerCase().includes("daojia") ||
@@ -7389,6 +7415,12 @@ async function resolveOutboundItemsForAutoPickOrder(
 
       if (isJdOrder && targetShopProductId && targetSourceId) {
         await syncJdSkuIdForShopProduct(tx, userId, targetShopProductId, targetSourceId);
+      }
+      if (isDoudianPlatform(order.platform) && targetShopProductId && targetSourceId && !isCompositeProductNo) {
+        const result = await syncDoudianSkuIdForShopProduct(tx, userId, targetShopProductId, targetSourceId);
+        if (!result.ok) {
+          throw new Error(`抖音商品 ID 绑定失败：${result.shopFieldError || result.reason || "未知错误"}`);
+        }
       }
       await backfillMeituanIdForAutoPickMatchedShopProduct(tx, userId, targetShopProductId, item.rawPayload, order.platform, item.platformSkuId);
 
@@ -8291,40 +8323,50 @@ export async function syncJdSkuIdForShopProduct(
 
   const shopProduct = await tx.shopProduct.findFirst({
     where: { id: shopProductId, shop: { userId } },
-    select: { id: true, productId: true, jdSkuId: true },
+    select: { id: true, shopId: true, productId: true, jdSkuId: true },
   });
 
   if (!shopProduct) return;
 
-  try {
-    const existingIds = normalizeJdSkuIds(shopProduct.jdSkuId);
-    if (!existingIds.includes(cleanSourceId)) {
-      const nextJdSkuIds = Array.from(new Set([...existingIds, cleanSourceId]));
-      const primaryStr = nextJdSkuIds.join(",");
-
-      await tx.shopProduct.update({
-        where: { id: shopProduct.id },
-        data: { jdSkuId: primaryStr },
-      });
-
-      if (shopProduct.productId) {
-        const existingProductSkus = await tx.productJdSku.findMany({
-          where: { productId: shopProduct.productId },
-          select: { jdSkuId: true },
-        });
-        const productJdSkuIds = Array.from(new Set([
-          ...existingProductSkus.map((i) => i.jdSkuId),
-          ...nextJdSkuIds,
-        ]));
-        await replaceProductJdSkuMappings(tx, shopProduct.productId, userId, productJdSkuIds);
-        await tx.product.update({
-          where: { id: shopProduct.productId },
-          data: { jdSkuId: productJdSkuIds[0] || null },
-        });
-      }
+  const conflictingShopProducts = await tx.shopProduct.findMany({
+    where: {
+      shopId: shopProduct.shopId,
+      id: { not: shopProduct.id },
+      jdSkuId: { not: null },
+    },
+    select: { id: true, jdSkuId: true },
+  });
+  for (const conflictingProduct of conflictingShopProducts) {
+    if (normalizeJdSkuIds(conflictingProduct.jdSkuId).includes(cleanSourceId)) {
+      await unbindJdSkuIdForShopProduct(tx, userId, conflictingProduct.id, cleanSourceId);
     }
-  } catch (error) {
-    console.warn("[syncJdSkuIdForShopProduct] 忽略已存在的 jdSkuId 冲突:", error);
+  }
+
+  const existingIds = normalizeJdSkuIds(shopProduct.jdSkuId);
+  if (!existingIds.includes(cleanSourceId)) {
+    const nextJdSkuIds = Array.from(new Set([...existingIds, cleanSourceId]));
+    const primaryStr = nextJdSkuIds.join(",");
+
+    await tx.shopProduct.update({
+      where: { id: shopProduct.id },
+      data: { jdSkuId: primaryStr },
+    });
+
+    if (shopProduct.productId) {
+      const existingProductSkus = await tx.productJdSku.findMany({
+        where: { productId: shopProduct.productId },
+        select: { jdSkuId: true },
+      });
+      const productJdSkuIds = Array.from(new Set([
+        ...existingProductSkus.map((i) => i.jdSkuId),
+        ...nextJdSkuIds,
+      ]));
+      await replaceProductJdSkuMappings(tx, shopProduct.productId, userId, productJdSkuIds);
+      await tx.product.update({
+        where: { id: shopProduct.productId },
+        data: { jdSkuId: productJdSkuIds[0] || null },
+      });
+    }
   }
 }
 
@@ -8650,6 +8692,74 @@ export async function unbindTaobaoSkuIdForShopProduct(
     },
     data: { taobaoSkuId: null },
   });
+}
+
+export async function syncDoudianSkuIdForShopProduct(
+  tx: Prisma.TransactionClient,
+  userId: string,
+  shopProductId: string,
+  sourceId: string
+) {
+  const cleanSourceId = String(sourceId || "").trim();
+  if (!shopProductId || !cleanSourceId) {
+    return {
+      ok: false,
+      reason: !shopProductId ? "missing-shop-product-id" : "missing-doudian-sku-id",
+      shopFieldError: null,
+    };
+  }
+
+  const shopProduct = await tx.shopProduct.findFirst({
+    where: { id: shopProductId, shop: { userId } },
+    select: { id: true, shopId: true, doudianSkuId: true },
+  });
+  if (!shopProduct) {
+    return { ok: false, reason: "shop-product-not-found", shopFieldError: null };
+  }
+
+  try {
+    await tx.shopProduct.updateMany({
+      where: {
+        shopId: shopProduct.shopId,
+        id: { not: shopProduct.id },
+        doudianSkuId: cleanSourceId,
+      },
+      data: { doudianSkuId: null },
+    });
+    if (shopProduct.doudianSkuId !== cleanSourceId) {
+      await tx.shopProduct.update({
+        where: { id: shopProduct.id },
+        data: { doudianSkuId: cleanSourceId },
+      });
+    }
+    return { ok: true, reason: null, shopFieldError: null };
+  } catch (error) {
+    const shopFieldError = error instanceof Error ? error.message : String(error);
+    console.warn("[syncDoudianSkuIdForShopProduct] 绑定抖店 doudianSkuId 失败:", error);
+    return { ok: false, reason: "shop-field-update-failed", shopFieldError };
+  }
+}
+
+export async function unbindDoudianSkuIdForShopProduct(
+  tx: Prisma.TransactionClient,
+  userId: string,
+  shopProductId: string,
+  sourceId: string
+) {
+  const cleanSourceId = String(sourceId || "").trim();
+  if (!shopProductId || !cleanSourceId) {
+    return { ok: false, reason: "missing-params" };
+  }
+
+  const result = await tx.shopProduct.updateMany({
+    where: {
+      id: shopProductId,
+      doudianSkuId: cleanSourceId,
+      shop: { userId },
+    },
+    data: { doudianSkuId: null },
+  });
+  return { ok: true, removed: result.count > 0 };
 }
 
 export async function backfillJdSkuIdForManualMatchedShopProducts(
