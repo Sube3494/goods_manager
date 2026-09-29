@@ -22,6 +22,7 @@ interface BatchBundleModalProps {
   onConfirm: (data: { isBundle: boolean; bundleItems: BundleSubItem[] }) => Promise<void> | void;
   selectedCount: number;
   shopId?: string;
+  libraryId?: string;
 }
 
 const BatchBundleForm = ({
@@ -29,6 +30,7 @@ const BatchBundleForm = ({
   onConfirm,
   selectedCount,
   shopId,
+  libraryId,
 }: Omit<BatchBundleModalProps, "isOpen">) => {
   const [actionType, setActionType] = useState<"configure" | "clear">("configure");
   const [bundleItems, setBundleItems] = useState<BundleSubItem[]>([]);
@@ -40,7 +42,7 @@ const BatchBundleForm = ({
   const searchVersionRef = useRef(0);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // 搜索配件候选列表（支持主物料库及店铺商品聚合搜索，全量覆盖）
+  // 搜索配件候选列表（支持主库及店铺商品聚合搜索）
   const handleSearchCandidates = (query: string, immediate: boolean = false) => {
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
 
@@ -50,7 +52,8 @@ const BatchBundleForm = ({
       const trimmed = query.trim();
 
       try {
-        const productUrl = `/api/products?search=${encodeURIComponent(trimmed)}&includePublic=true&includeShopOnly=true&pageSize=30`;
+        const libraryQuery = libraryId ? `&libraryId=${encodeURIComponent(libraryId)}` : "";
+        const productUrl = `/api/products?search=${encodeURIComponent(trimmed)}&includePublic=true&includeShopOnly=true&pageSize=30${libraryQuery}`;
         const shopProductUrl = shopId
           ? `/api/shop-products?shopId=${shopId}&search=${encodeURIComponent(trimmed)}&pageSize=30`
           : null;
@@ -350,7 +353,7 @@ const BatchBundleForm = ({
                 <div className="rounded-2xl border border-border/80 dark:border-white/10 bg-muted/30 p-3.5 space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                      <Search size={14} className="text-emerald-500" /> 搜索物料库
+                      <Search size={14} className="text-emerald-500" /> 搜索并添加子配件
                     </span>
                     <button
                       type="button"
@@ -474,6 +477,7 @@ export const BatchBundleModal = ({
   onConfirm,
   selectedCount,
   shopId,
+  libraryId,
 }: BatchBundleModalProps) => {
   useEffect(() => {
     if (isOpen) {
@@ -503,6 +507,7 @@ export const BatchBundleModal = ({
             onConfirm={onConfirm}
             selectedCount={selectedCount}
             shopId={shopId}
+            libraryId={libraryId}
           />
         </div>
       )}

@@ -2746,8 +2746,8 @@ export default function ShopGoodsPage() {
         defaultLibraryId={selectedShop?.libraryId || (activeLibraryId !== "all" ? activeLibraryId : undefined)}
       />
       <ImportModal isOpen={isImportOpen} onClose={() => setIsImportOpen(false)} onImport={handleImport} title={selectedShop ? `导入到 ${selectedShop.name}` : "导入店铺商品"} description="导入结果只会落到当前选中的目标店铺。已存在的店铺商品会更新，未存在的会按公开商品匹配后加入该店铺。" templateFileName="店铺商品导入模板.xlsx" templateData={[{ "*商品名称": "示例商品", "SKU/店内码": "SHOP-001", "JD SKU ID": "100234,100235 (选填)", "美团商品 ID": "MT-001,MT-002 (选填)", "*分类": "默认分类", 供应商: "默认供应商", 进货单价: 19.9, 主图: "https://example.com/cover.jpg", 备注: "店铺自定义备注" }]} />
-      <ProductFormModal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} onSubmit={async (data) => { await handleCreateStandaloneProduct(data); }} title={selectedShop ? `新建 ${selectedShop.name} 商品` : "新建店铺商品"} hideVisibilityControl={true} hideProductionControl={true} hideGallerySection={true} hideSpecsSection={true} disableHistorySection={true} showCoverSection={true} showJdSkuField={true} showMeituanSkuField={true} mainImageUploadEndpoint={selectedShopId ? `/api/shops/${selectedShopId}/products/cover-upload` : undefined} />
-      <ProductFormModal key={editingProduct?.id || 'shop-edit'} isOpen={isEditOpen} onClose={closeEditModal} onSubmit={async (data) => { await handleSaveEdit(data); }} initialData={editingProduct} title="编辑店铺商品" hideVisibilityControl={true} hideProductionControl={true} hideGallerySection={true} hideSpecsSection={true} showCoverSection={true} showJdSkuField={true} showMeituanSkuField={true} mainImageUploadEndpoint={editingShopId ? `/api/shops/${editingShopId}/products/cover-upload` : undefined} onStockChange={handleItemStockChange} />
+      <ProductFormModal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} onSubmit={async (data) => { await handleCreateStandaloneProduct(data); }} title={selectedShop ? `新建 ${selectedShop.name} 商品` : "新建店铺商品"} hideVisibilityControl={true} hideProductionControl={true} hideGallerySection={true} hideSpecsSection={true} disableHistorySection={true} showCoverSection={true} showJdSkuField={true} showMeituanSkuField={true} mainImageUploadEndpoint={selectedShopId ? `/api/shops/${selectedShopId}/products/cover-upload` : undefined} defaultLibraryId={selectedShop?.libraryId || (activeLibraryId !== "all" ? activeLibraryId : undefined)} />
+      <ProductFormModal key={editingProduct?.id || 'shop-edit'} isOpen={isEditOpen} onClose={closeEditModal} onSubmit={async (data) => { await handleSaveEdit(data); }} initialData={editingProduct} title="编辑店铺商品" hideVisibilityControl={true} hideProductionControl={true} hideGallerySection={true} hideSpecsSection={true} showCoverSection={true} showJdSkuField={true} showMeituanSkuField={true} mainImageUploadEndpoint={editingShopId ? `/api/shops/${editingShopId}/products/cover-upload` : undefined} onStockChange={handleItemStockChange} defaultLibraryId={selectedShop?.libraryId || (activeLibraryId !== "all" ? activeLibraryId : undefined)} />
       <BatchEditModal isOpen={isBatchEditOpen} onClose={() => setIsBatchEditOpen(false)} onConfirm={handleBatchUpdate} categories={categories} suppliers={suppliers} selectedCount={selectedIds.length} hideProductionStatus={true} />
       <BatchBundleModal
         isOpen={isBatchBundleOpen}
@@ -2755,6 +2755,7 @@ export default function ShopGoodsPage() {
         onConfirm={handleBatchBundleConfirm}
         selectedCount={selectedIds.length}
         shopId={selectedShopId}
+        libraryId={selectedShop?.libraryId || (activeLibraryId !== "all" ? activeLibraryId : undefined)}
       />
       <MeituanMappingModal
         isOpen={isMeituanMappingOpen}

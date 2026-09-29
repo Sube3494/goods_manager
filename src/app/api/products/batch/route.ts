@@ -80,7 +80,7 @@ export async function PATCH(request: Request) {
     }
 
     const body = await request.json();
-    const { ids, categoryId, supplierId, isDiscontinued, costPrice, isShelfLife, shelfLifeDays, isBundle, bundleItems } = body || {};
+    const { ids, categoryId, supplierId, isDiscontinued, costPrice, isShelfLife, shelfLifeDays, isBundle, bundleItems, isPublic } = body || {};
 
     if (!Array.isArray(ids) || ids.length === 0) {
       return NextResponse.json({ error: "No product IDs provided" }, { status: 400 });
@@ -88,6 +88,9 @@ export async function PATCH(request: Request) {
 
     const updateData: Record<string, unknown> = {};
 
+    if (typeof isPublic === "boolean") {
+      updateData.isPublic = isPublic;
+    }
     if (typeof categoryId !== "undefined") {
       updateData.categoryId = categoryId ? String(categoryId) : null;
     }

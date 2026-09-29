@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { X, Tag, Truck, CheckCircle, Activity, FileText, Settings, Layers, CalendarClock } from "lucide-react";
+import { X, Tag, Truck, CheckCircle, Activity, FileText, Settings, Layers, CalendarClock, Eye } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { createPortal } from "react-dom";
 import { Category, Supplier } from "@/lib/types";
@@ -25,6 +25,7 @@ interface BatchEditModalProps {
   suppliers: Supplier[];
   selectedCount: number;
   hideProductionStatus?: boolean;
+  hideVisibilityControl?: boolean;
 }
 
 // 极其精美且带平滑过渡的 Switch 开关组件 (完全对齐系统原生翠绿高亮)
@@ -59,10 +60,12 @@ const BatchEditForm = ({
   suppliers, 
   selectedCount,
   hideProductionStatus = false,
+  hideVisibilityControl = false,
 }: Omit<BatchEditModalProps, "isOpen">) => {
   const [categoryId, setCategoryId] = useState<string>("keep");
   const [supplierId, setSupplierId] = useState<string>("keep");
   const [productionStatus, setProductionStatus] = useState<string>("keep");
+  const [visibility, setVisibility] = useState<string>("keep");
   const [costPrice, setCostPrice] = useState<string>("");
   const [stock, setStock] = useState<string>("");
   
@@ -95,6 +98,7 @@ const BatchEditForm = ({
     if (categoryId !== "keep") data.categoryId = categoryId;
     if (supplierId !== "keep") data.supplierId = supplierId;
     if (!hideProductionStatus && productionStatus !== "keep") data.isDiscontinued = productionStatus === "discontinued";
+    if (!hideVisibilityControl && visibility !== "keep") data.isPublic = visibility === "public";
     if (costPrice.trim() !== "") data.costPrice = parseFloat(costPrice);
     if (stock.trim() !== "") data.stock = parseInt(stock, 10);
     
@@ -238,6 +242,25 @@ const BatchEditForm = ({
                 className="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 h-11 px-4 text-foreground outline-none ring-1 ring-transparent focus:ring-primary/20 focus:border-primary/20 focus:shadow-[0_0_14px_rgba(var(--primary-rgb),0.12)] transition-all font-bold font-number text-xs"
               />
             </div>
+
+            {/* Visibility Select */}
+            {!hideVisibilityControl && (
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-muted-foreground/80 flex items-center gap-1.5 px-1 uppercase tracking-wider">
+                  <Eye size={13} className="text-sky-500" /> 展示权限
+                </label>
+                <CustomSelect
+                  value={visibility}
+                  onChange={setVisibility}
+                  options={[
+                    { value: "keep", label: "保持原权限" },
+                    { value: "public", label: "公开可见" },
+                    { value: "private", label: "仅自己可见" }
+                  ]}
+                  triggerClassName="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 h-11 px-4 text-xs dark:hover:bg-white/10"
+                />
+              </div>
+            )}
           </div>
         </div>
 
@@ -372,6 +395,7 @@ export const BatchEditModal = ({
   suppliers, 
   selectedCount,
   hideProductionStatus = false,
+  hideVisibilityControl = false,
 }: BatchEditModalProps) => {
   useEffect(() => {
     if (isOpen) {
@@ -399,6 +423,7 @@ export const BatchEditModal = ({
             suppliers={suppliers}
             selectedCount={selectedCount}
             hideProductionStatus={hideProductionStatus}
+            hideVisibilityControl={hideVisibilityControl}
           />
         </div>
       )}

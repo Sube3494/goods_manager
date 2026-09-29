@@ -200,6 +200,7 @@ interface ProductFormModalProps {
   showJdSkuField?: boolean;
   showMeituanSkuField?: boolean;
   onStockChange?: (productId: string, newStock: number) => void;
+  defaultLibraryId?: string;
 }
 
 import { createPortal } from "react-dom";
@@ -228,6 +229,7 @@ export function ProductFormModal({
   showJdSkuField = false,
   showMeituanSkuField = false,
   onStockChange,
+  defaultLibraryId,
 }: ProductFormModalProps) {
   const { user } = useUser();
   const [formData, setFormData] = useState({
@@ -302,7 +304,9 @@ export function ProductFormModal({
       const trimmed = query.trim();
 
       try {
-        const productUrl = `/api/products?search=${encodeURIComponent(trimmed)}&includePublic=true&includeShopOnly=true&pageSize=30`;
+        const effectiveLibraryId = (initialData as any)?.libraryId || defaultLibraryId || undefined;
+        const libraryQuery = effectiveLibraryId ? `&libraryId=${encodeURIComponent(effectiveLibraryId)}` : "";
+        const productUrl = `/api/products?search=${encodeURIComponent(trimmed)}&includePublic=true&includeShopOnly=true&pageSize=30${libraryQuery}`;
         const shopId = (initialData as any)?.shopId;
         const shopProductUrl = shopId
           ? `/api/shop-products?shopId=${shopId}&search=${encodeURIComponent(trimmed)}&pageSize=30`
@@ -2084,8 +2088,8 @@ export function ProductFormModal({
                                           <div className="min-w-0 flex-1">
                                             <div className="flex items-center gap-1.5">
                                               <span className="font-medium text-foreground truncate">{candidate.name || candidate.productName}</span>
-                                              {candidate.sourceType === "product" && (
-                                                <span className="shrink-0 px-1 py-0.2 text-[9px] rounded bg-blue-500/10 text-blue-500 font-normal">物料库</span>
+                                              {candidate.sourceType === "product" && Boolean((initialData as any)?.shopId) && (
+                                                <span className="shrink-0 px-1 py-0.2 text-[9px] rounded bg-blue-500/10 text-blue-500 font-normal">主库</span>
                                               )}
                                             </div>
                                             <div className="font-mono text-[10px] text-muted-foreground mt-0.5">

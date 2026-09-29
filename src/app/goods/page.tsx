@@ -1450,6 +1450,7 @@ export default function GoodsPage() {
         onClose={() => setIsNewProductOpen(false)}
         onSubmit={handleSaveItem}
         initialData={editingProduct}
+        defaultLibraryId={activeLibraryId}
         disableHistorySection={true}
         hideStockField={true}
         showJdSkuField={true}
@@ -1499,6 +1500,7 @@ export default function GoodsPage() {
         onClose={() => setIsBatchBundleOpen(false)}
         onConfirm={handleBatchBundleConfirm}
         selectedCount={selectedIds.length}
+        libraryId={activeLibraryId}
       />
 
       <ManageLibrariesModal

@@ -978,6 +978,10 @@ export async function PATCH(
       updateData.supplierId = body.supplierId.trim() || null;
     }
 
+    if (typeof body?.isPublic === "boolean") {
+      updateData.isPublic = body.isPublic;
+    }
+
     if (body?.costPrice !== undefined) {
       const costPrice = Number(body.costPrice);
       updateData.costPrice = Number.isFinite(costPrice) ? costPrice : 0;
