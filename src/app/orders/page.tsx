@@ -19,6 +19,7 @@ import {
   Loader2,
   MapPin,
   Package2,
+  Layers,
   RefreshCw,
   Search,
   Settings2,
@@ -4132,18 +4133,51 @@ export default function OrdersPage() {
           matchEditorTarget ? (
             <div className="rounded-2xl border border-black/8 dark:border-white/10 bg-slate-500/5 dark:bg-white/3 p-2.5 sm:p-3 space-y-2 text-left shrink-0 shadow-xs backdrop-blur-md">
               {matchEditorTarget.componentIndex !== undefined ? (
-                <div className="flex flex-wrap items-center justify-between gap-2 p-1 text-xs">
-                  <div className="flex items-center gap-1.5 font-medium text-foreground">
-                    <span className="inline-flex items-center rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:text-amber-300">
-                      更换配件
+                /* 配件更换专用卡片：聚焦展示待替换的原配件信息，避免误导 */
+                <div className="flex items-center gap-3.5 sm:gap-4 h-16 shrink-0">
+                  {/* 左侧原配件缩略图 */}
+                  <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-amber-500/25 bg-amber-500/8 dark:bg-white/5 flex items-center justify-center shadow-xs">
+                    {matchEditorTarget.componentDisplay?.image ? (
+                      <Image
+                        src={matchEditorTarget.componentDisplay.image}
+                        alt={matchEditorTarget.componentDisplay.name || "原配件"}
+                        width={64}
+                        height={64}
+                        className="h-full w-full object-cover"
+                        unoptimized
+                      />
+                    ) : (
+                      <Layers className="text-amber-600/50 dark:text-amber-400/50" size={24} />
+                    )}
+                    <span className="absolute bottom-1 right-1 rounded-md bg-black/70 px-1.5 py-0.2 font-mono text-[10px] font-bold text-white/90 shadow-xs backdrop-blur-md">
+                      x{matchEditorTarget.componentDisplay?.quantity || 1}
                     </span>
-                    <span>正在为【{matchEditorTarget.itemName}】更换配件</span>
                   </div>
-                  <div className="text-[11px] text-muted-foreground">
-                    原配件：<span className="font-semibold text-foreground">{matchEditorTarget.componentDisplay?.name || "未知"}</span>
+
+                  {/* 右侧原配件信息 */}
+                  <div className="min-w-0 flex-1 flex flex-col justify-center gap-1.5 h-full">
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex shrink-0 items-center rounded-full bg-amber-500/15 px-2 py-0.5 text-[10.5px] font-semibold text-amber-700 dark:text-amber-300">
+                        待替换原配件
+                      </span>
+                      <h3
+                        className="text-xs sm:text-[13.5px] font-bold text-foreground leading-snug truncate text-left"
+                        title={matchEditorTarget.componentDisplay?.name}
+                      >
+                        {matchEditorTarget.componentDisplay?.name || "未命名配件"}
+                      </h3>
+                    </div>
+
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground overflow-hidden">
+                      <span className="text-[11px] truncate text-muted-foreground/80">
+                        所属主商品：{matchEditorTarget.itemName}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              ) : null}
+              ) : (
+                /* 普通主商品匹配原有视图 */
+                <>
               {matchEditorTarget.order?.items && matchEditorTarget.order.items.length > 1 && (() => {
                 const items = matchEditorTarget.order.items;
                 const currentIndex = items.findIndex((it) => String(it.id || "") === matchEditorTarget.itemId);
@@ -4264,6 +4298,8 @@ export default function OrdersPage() {
                   </div>
                 </div>
               </div>
+                </>
+              )}
             </div>
           ) : null
         }
