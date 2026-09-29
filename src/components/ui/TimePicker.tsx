@@ -171,7 +171,7 @@ export function TimePicker({
                   overflowY: "auto",
                   pointerEvents: "auto",
                 }}
-                className="z-[1000001] w-[148px] rounded-2xl bg-white/95 dark:bg-[#0c1222]/95 backdrop-blur-2xl border border-black/8 dark:border-white/10 shadow-2xl dark:shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)]"
+                className="z-[1000001] w-[148px] rounded-2xl bg-white/80 dark:bg-zinc-900/75 backdrop-blur-xl border border-black/10 dark:border-white/15 shadow-2xl dark:shadow-[0_25px_50px_-12px_rgba(0,0,0,0.6)]"
               >
                 {/* 标题栏 */}
                 <div className="flex items-center justify-between px-3 py-2 border-b border-border/40 dark:border-white/5">

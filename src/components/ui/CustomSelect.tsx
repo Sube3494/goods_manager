@@ -135,9 +135,9 @@ export function CustomSelect({
         const safeLeft = Math.max(8, Math.min(preferredLeft, window.innerWidth - targetWidth - 12));
 
         setDropdownPosition({
-          top: showAbove ? rect.top - 8 : rect.bottom + 8,
+          top: showAbove ? rect.top - 4 : rect.bottom + 4,
           left: safeLeft,
-          width: rect.width,
+          width: targetWidth,
           showAbove,
           isReady: true
         });
@@ -181,7 +181,7 @@ export function CustomSelect({
           "flex w-full h-full items-center bg-white dark:bg-white/5 border border-border dark:border-white/10 px-2.5 text-xs transition-all outline-none ring-offset-background text-foreground",
           isCenter ? "justify-center text-center" : "justify-between text-left",
           !triggerClassName?.includes("rounded-") && "rounded-lg",
-          isOpen ? "ring-2 ring-primary/20 border-primary/20 bg-background dark:bg-zinc-900" : "hover:bg-muted/5 dark:hover:bg-white/10",
+          isOpen ? "ring-2 ring-primary/20 border-primary/30" : "hover:bg-muted/5 dark:hover:bg-white/10",
           triggerClassName
         )}
       >
@@ -260,11 +260,11 @@ export function CustomSelect({
                 translateY: dropdownPosition.showAbove ? '-100%' : '0%',
                 willChange: 'transform, opacity'
               } as React.CSSProperties}
-              className="select-dropdown-container rounded-2xl bg-white/95 dark:bg-[#0c1222]/95 backdrop-blur-2xl border border-black/8 dark:border-white/10 shadow-2xl dark:shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] focus:outline-none overflow-hidden"
+              className="select-dropdown-container rounded-2xl bg-white dark:bg-[#1e2432] border border-border dark:border-white/10 shadow-2xl focus:outline-none overflow-hidden"
             >
               {/* 仅在胶囊本身不是搜索输入框(!searchable)但选项极多时，才作为下拉列表备用搜索框；胶囊自身可搜索时坚决不展示，杜绝重复 */}
               {!searchable && isSearchable && (
-                <div className="p-2 border-b border-border/40 sticky top-0 bg-white/95 dark:bg-[#0c1222]/95 backdrop-blur-md z-10">
+                <div className="p-2 border-b border-border/40 sticky top-0 bg-white dark:bg-[#1e2432] z-10">
                   <div className="relative flex items-center">
                     <Search size={12} className="absolute left-2.5 text-muted-foreground pointer-events-none" />
                     <input

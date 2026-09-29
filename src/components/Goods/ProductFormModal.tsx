@@ -1897,11 +1897,6 @@ export function ProductFormModal({
                                     triggerClassName="!bg-transparent !border-0 hover:!bg-transparent dark:hover:!bg-transparent focus:!ring-0 px-1 sm:px-2 text-xs sm:text-sm font-medium text-foreground h-full flex items-center justify-between cursor-pointer rounded-r-full !shadow-none"
                                 />
                             </div>
-                            {formData.isShelfLife && shelfLifeVal && !isNaN(parseInt(shelfLifeVal, 10)) && parseInt(shelfLifeVal, 10) > 0 && (
-                                <p className="text-[11px] text-amber-500/80 font-medium pl-0.5">
-                                    💡 系统将智能折合为 <strong className="text-amber-500">{shelfLifeUnit === "年" ? parseInt(shelfLifeVal, 10) * 365 : shelfLifeUnit === "月" ? parseInt(shelfLifeVal, 10) * 30 : parseInt(shelfLifeVal, 10)}</strong> 天进行到期预警监控
-                                </p>
-                            )}
                         </div>
                     </div>
 
