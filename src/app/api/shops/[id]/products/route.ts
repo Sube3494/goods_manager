@@ -92,12 +92,18 @@ async function getOwnedShop(shopId: string, userId: string, isAdmin: boolean) {
 
 async function ensureUserCategories(userId: string | null | undefined, names: string[]) {
   if (!userId || names.length === 0) {
-    return new Map<string, string>();
+    return {
+      categoryMap: new Map<string, string>(),
+      createdNames: [] as string[],
+    };
   }
 
   const normalizedNames = Array.from(new Set(names.map((name) => name.trim()).filter(Boolean)));
   if (normalizedNames.length === 0) {
-    return new Map<string, string>();
+    return {
+      categoryMap: new Map<string, string>(),
+      createdNames: [] as string[],
+    };
   }
 
   const existing = await prisma.category.findMany({
@@ -108,27 +114,42 @@ async function ensureUserCategories(userId: string | null | undefined, names: st
     select: { id: true, name: true },
   });
 
-  const categoryMap = new Map(existing.map((category) => [category.name, category.id]));
+  const categoryMap = new Map(existing.map((category) => [category.name.trim(), category.id]));
   const missingNames = normalizedNames.filter((name) => !categoryMap.has(name));
+  const createdNames: string[] = [];
 
   if (missingNames.length > 0) {
-    await prisma.category.createMany({
-      data: missingNames.map((name) => ({ userId, name })),
-      skipDuplicates: true,
-    });
-
-    const refreshed = await prisma.category.findMany({
-      where: {
-        userId,
-        name: { in: normalizedNames },
-      },
-      select: { id: true, name: true },
-    });
-
-    return new Map(refreshed.map((category) => [category.name, category.id]));
+    for (const name of missingNames) {
+      try {
+        const created = await prisma.category.upsert({
+          where: {
+            name_userId: {
+              name,
+              userId,
+            },
+          },
+          update: {},
+          create: {
+            name,
+            userId,
+          },
+          select: { id: true, name: true },
+        });
+        categoryMap.set(created.name.trim(), created.id);
+        createdNames.push(created.name.trim());
+      } catch {
+        const found = await prisma.category.findFirst({
+          where: { userId, name },
+          select: { id: true, name: true },
+        });
+        if (found) {
+          categoryMap.set(found.name.trim(), found.id);
+        }
+      }
+    }
   }
 
-  return categoryMap;
+  return { categoryMap, createdNames };
 }
 
 async function ensureUserSuppliers(userId: string | null | undefined, names: string[]) {
@@ -844,13 +865,41 @@ export async function POST(
       existingAssignments.flatMap((item) => [item.productId, item.sourceProductId]).filter((value): value is string => Boolean(value))
     );
 
-    const categoryMap = await ensureUserCategories(
-      shop.userId,
-      products.map((product) => product.category?.name || "").filter(Boolean)
+    const targetUserId = shop.userId || user.id;
+
+    // 收集商品分类名称，若 category 对象为空但 categoryId 存在，做一次兜底查询
+    const missingCatIds = products
+      .filter((p) => !p.category?.name && p.categoryId)
+      .map((p) => p.categoryId);
+    let fallbackCategoryMap = new Map<string, string>();
+    if (missingCatIds.length > 0) {
+      const fallbackList = await prisma.category.findMany({
+        where: { id: { in: missingCatIds } },
+        select: { id: true, name: true },
+      });
+      fallbackCategoryMap = new Map(fallbackList.map((c) => [c.id, c.name.trim()]));
+    }
+
+    const categoryNamesToEnsure = Array.from(
+      new Set(
+        products
+          .map((product) => (product.category?.name || (product.categoryId ? fallbackCategoryMap.get(product.categoryId) : "") || "").trim())
+          .filter(Boolean)
+      )
     );
 
+    const { categoryMap, createdNames } = await ensureUserCategories(
+      targetUserId,
+      categoryNamesToEnsure
+    );
+
+    // 如果当前操作用户与店铺所有者不同，也同步为当前用户确保这些分类存在，防止前端分类筛选查不到
+    if (user.id && user.id !== targetUserId && categoryNamesToEnsure.length > 0) {
+      await ensureUserCategories(user.id, categoryNamesToEnsure);
+    }
+
     const supplierMap = await ensureUserSuppliers(
-      shop.userId,
+      targetUserId,
       products.map((product) => product.supplier?.name || "").filter(Boolean)
     );
 
@@ -898,41 +947,48 @@ export async function POST(
     const skippedCount = skippedAssignmentCount;
 
     const result = await prisma.shopProduct.createMany({
-      data: productsToCreate.map((product) => ({
-        shopId,
-        productId: product.id,
-        sourceProductId: product.id,
-        sku: product.sku,
-        jdSkuId: null,
-        meituanSkuId: null,
-        taobaoSkuId: null,
-        doudianSkuId: null,
-        productName: product.name,
-        pinyin: generatePinyinSearchText(product.name),
-        productImage: null,
-        categoryId: categoryMap.get(product.category?.name || "") || null,
-        categoryName: product.category?.name || null,
-        supplierId: product.supplier?.name ? (supplierMap.get(product.supplier.name) || null) : null,
-        costPrice: typeof product.costPrice === "number" && Number.isFinite(product.costPrice) ? product.costPrice : 0,
-        stock: 0,
-        isPublic: product.isPublic,
-        isDiscontinued: product.isDiscontinued,
-        isShelfLife: product.isShelfLife ?? false,
-        shelfLifeDays: product.shelfLifeDays ?? null,
-        remark: product.remark,
-        specs: product.specs ?? Prisma.JsonNull,
-      })),
+      data: productsToCreate.map((product) => {
+        const rawCategoryName = (product.category?.name || (product.categoryId ? fallbackCategoryMap.get(product.categoryId) : "") || "").trim();
+        const targetCategoryId = rawCategoryName ? (categoryMap.get(rawCategoryName) || null) : null;
+        const targetCategoryName = rawCategoryName || null;
+
+        return {
+          shopId,
+          productId: product.id,
+          sourceProductId: product.id,
+          sku: product.sku,
+          jdSkuId: null,
+          meituanSkuId: null,
+          taobaoSkuId: null,
+          doudianSkuId: null,
+          productName: product.name,
+          pinyin: generatePinyinSearchText(product.name),
+          productImage: null,
+          categoryId: targetCategoryId,
+          categoryName: targetCategoryName,
+          supplierId: product.supplier?.name ? (supplierMap.get(product.supplier.name.trim()) || null) : null,
+          costPrice: typeof product.costPrice === "number" && Number.isFinite(product.costPrice) ? product.costPrice : 0,
+          stock: 0,
+          isPublic: product.isPublic,
+          isDiscontinued: product.isDiscontinued,
+          isShelfLife: product.isShelfLife ?? false,
+          shelfLifeDays: product.shelfLifeDays ?? null,
+          remark: product.remark,
+          specs: product.specs ?? Prisma.JsonNull,
+        };
+      }),
       skipDuplicates: true,
     });
+
+    const createdCatMessage = createdNames.length > 0 ? `，并自动为店铺创建分类「${createdNames.join("、")}」` : "";
 
     return NextResponse.json({
       success: true,
       count: result.count,
       skipped: skippedCount,
+      createdCategories: createdNames,
       message:
-        skippedCount > 0 || copiedWithoutSkuCount > 0
-          ? `成功加入 ${shop.name} ${result.count} 条${skippedCount > 0 ? `，跳过 ${skippedCount} 条已复制商品` : ""}${copiedWithoutSkuCount > 0 ? `${skippedCount > 0 ? "，" : "，"}其中 ${copiedWithoutSkuCount} 条因 SKU 冲突未带编号复制` : ""}`
-          : `成功加入 ${shop.name}`,
+        `成功加入 ${shop.name} ${result.count} 条${createdCatMessage}${skippedCount > 0 ? `，跳过 ${skippedCount} 条已复制商品` : ""}${copiedWithoutSkuCount > 0 ? `，其中 ${copiedWithoutSkuCount} 条因 SKU 冲突未带编号复制` : ""}`,
     });
   } catch (error) {
     console.error("Failed to assign products to shop:", error);

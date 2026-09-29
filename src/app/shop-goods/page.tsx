@@ -1498,28 +1498,30 @@ export default function ShopGoodsPage() {
     void fetchShops();
   }, [requestedShopId, showToast]);
 
+  const fetchCategories = useCallback(async () => {
+    try {
+      const res = await fetch("/api/categories");
+      const data = await res.json().catch(() => []);
+      if (res.ok && Array.isArray(data)) setCategories(data);
+    } catch (error) {
+      console.error("Failed to fetch categories:", error);
+    }
+  }, []);
+
+  const fetchSuppliers = useCallback(async () => {
+    try {
+      const res = await fetch("/api/suppliers");
+      const data = await res.json().catch(() => []);
+      if (res.ok && Array.isArray(data)) setSuppliers(data);
+    } catch (error) {
+      console.error("Failed to fetch suppliers:", error);
+    }
+  }, []);
+
   useEffect(() => {
-    const fetchCategories = async () => {
-      try {
-        const res = await fetch("/api/categories");
-        const data = await res.json().catch(() => []);
-        if (res.ok && Array.isArray(data)) setCategories(data);
-      } catch (error) {
-        console.error("Failed to fetch categories:", error);
-      }
-    };
-    const fetchSuppliers = async () => {
-      try {
-        const res = await fetch("/api/suppliers");
-        const data = await res.json().catch(() => []);
-        if (res.ok && Array.isArray(data)) setSuppliers(data);
-      } catch (error) {
-        console.error("Failed to fetch suppliers:", error);
-      }
-    };
     void fetchCategories();
     void fetchSuppliers();
-  }, []);
+  }, [fetchCategories, fetchSuppliers]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -1743,11 +1745,13 @@ export default function ShopGoodsPage() {
       showToast(data?.message || `已复制到 ${selectedShop.name}`, "success");
       setIsPickerOpen(false);
       void fetchShopProducts(true);
+      void fetchCategories();
+      void fetchSuppliers();
     } catch (error) {
       console.error("Failed to assign products:", error);
       showToast("复制商品失败", "error");
     }
-  }, [fetchShopProducts, selectedShop, showToast]);
+  }, [fetchCategories, fetchShopProducts, fetchSuppliers, selectedShop, showToast]);
 
   const handleCreateStandaloneProduct = useCallback(async (formData: Omit<Product, "id"> & { id?: string }) => {
     if (!selectedShop) {
@@ -2522,6 +2526,8 @@ export default function ShopGoodsPage() {
         return;
       }
       await fetchShopProducts(true);
+      void fetchCategories();
+      void fetchSuppliers();
 
       if (Array.isArray(data?.errors) && data.errors.length > 0) {
         setImportErrors(data.errors);
@@ -2533,7 +2539,7 @@ export default function ShopGoodsPage() {
       console.error("Failed to import shop products:", error);
       showToast("导入失败", "error");
     }
-  }, [fetchShopProducts, selectedShop, showToast]);
+  }, [fetchCategories, fetchShopProducts, fetchSuppliers, selectedShop, showToast]);
 
   return (
     <div className="space-y-8">

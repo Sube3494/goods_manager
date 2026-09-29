@@ -93,6 +93,8 @@ interface ProductSelectionModalProps {
   confirmLabel?: string;
   headerBanner?: React.ReactNode;
   initialSearchQuery?: string;
+  initialCategoryName?: string;
+  preferredCategoryPattern?: RegExp | string;
 }
 
 function ProductSkeleton({ imageOnly = false }: { imageOnly?: boolean }) {
@@ -155,12 +157,15 @@ export function ProductSelectionModal({
   confirmLabel,
   headerBanner,
   initialSearchQuery,
+  initialCategoryName,
+  preferredCategoryPattern,
 }: ProductSelectionModalProps) {
   const [localSingleSelect, setLocalSingleSelect] = useState(Boolean(singleSelect));
   const queryRef = useRef(query);
   queryRef.current = query;
   const [searchQuery, setSearchQuery] = useState(initialSearchQuery || "");
   const debouncedSearch = useDebounce(searchQuery, searchQuery ? 300 : 0);
+  const hasAppliedPreferredCategoryRef = useRef(false);
 
   useEffect(() => {
     if (initialSearchQuery !== undefined) {
@@ -300,6 +305,7 @@ export function ProductSelectionModal({
       setProducts([]);
       setSearchQuery("");
       setSelectedCategoryName("all");
+      hasAppliedPreferredCategoryRef.current = false;
       setHasLoadedResults(false);
       setHasMore(false);
       setIsNextPageLoading(false);
@@ -320,10 +326,64 @@ export function ProductSelectionModal({
     } else {
       setIsInitialized(false);
       setShowInitialSkeleton(false);
+      hasAppliedPreferredCategoryRef.current = false;
       lastExternalSignatureRef.current = null;
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]); 
+
+  // 当分类或商品列表加载完毕时，如配置了 preferredCategoryPattern，自动匹配并切换到相关分类（如礼袋相关）
+  useEffect(() => {
+    if (!isOpen) {
+      hasAppliedPreferredCategoryRef.current = false;
+      return;
+    }
+    if (hasAppliedPreferredCategoryRef.current) return;
+
+    const pattern = typeof preferredCategoryPattern === "string"
+      ? new RegExp(preferredCategoryPattern)
+      : preferredCategoryPattern;
+
+    if (!pattern && !initialCategoryName) return;
+
+    const candidateNames = Array.from(new Set([
+      ...categories.map((c) => c.name),
+      ...products.map((p) => p.category?.name || (p as any).categoryName).filter(Boolean),
+    ])).filter((name): name is string => typeof name === "string" && name.trim().length > 0);
+
+    if (candidateNames.length === 0) return;
+
+    let matched: string | undefined;
+    if (pattern) {
+      matched =
+        candidateNames.find((name) => name.includes("礼袋")) ||
+        candidateNames.find((name) => pattern.test(name));
+    } else if (initialCategoryName) {
+      matched = candidateNames.find((name) => name === initialCategoryName || name.includes(initialCategoryName));
+    }
+
+    if (matched) {
+      setSelectedCategoryName(matched);
+      hasAppliedPreferredCategoryRef.current = true;
+    }
+  }, [categories, initialCategoryName, isOpen, preferredCategoryPattern, products]);
+
+  const allCategoryOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const c of categories) {
+      if (c.name) map.set(c.name, c.name);
+    }
+    for (const p of products) {
+      const pCat = p.category?.name || (p as any).categoryName;
+      if (pCat && typeof pCat === "string" && pCat.trim()) {
+        map.set(pCat.trim(), pCat.trim());
+      }
+    }
+    return [
+      { value: "all", label: "所有分类" },
+      ...Array.from(map.values()).map((name) => ({ value: name, label: name })),
+    ];
+  }, [categories, products]); 
 
   useEffect(() => {
     setLocalVisibleCount(50);
@@ -781,10 +841,7 @@ export function ProductSelectionModal({
                 {shouldShowCategoryFilter && (
                   <div className="w-32 sm:w-40 shrink-0">
                     <CustomSelect
-                      options={[
-                        { value: "all", label: "所有分类" },
-                        ...categories.map(category => ({ value: category.name, label: category.name }))
-                      ]}
+                      options={allCategoryOptions}
                       value={selectedCategoryName}
                       onChange={setSelectedCategoryName}
                       placeholder="筛选分类"
@@ -945,6 +1002,11 @@ export function ProductSelectionModal({
                                       #{productCode}
                                     </span>
                                   )}
+                                  {typeof product.stock === "number" && product.stock > 0 && (
+                                    <span className="shrink-0 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-1.5 py-0.5 text-[9px] sm:text-[10px] font-medium text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-400">
+                                      库存 {product.stock}
+                                    </span>
+                                  )}
                                   {product.category?.name && (
                                     <span className="truncate max-w-full rounded bg-primary/10 px-1.5 py-0.5 text-[9px] sm:text-[10px] font-medium text-primary">
                                       {product.category.name}
@@ -971,6 +1033,11 @@ export function ProductSelectionModal({
                                       {product.category.name}
                                     </span>
                                   )}
+                                  {typeof product.stock === "number" && product.stock > 0 && (
+                                    <span className="shrink-0 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-400">
+                                      库存 {product.stock}
+                                    </span>
+                                  )}
                                   {!minimalView && product.remark && (
                                       <span className="flex min-w-0 items-center gap-1 truncate rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-600 dark:text-amber-500">
                                           <span className="shrink-0 font-bold opacity-70">注:</span>
@@ -982,8 +1049,8 @@ export function ProductSelectionModal({
                                         ￥{product.costPrice}
                                     </span>
                                   )}
-                               </div>
-                            </div>
+                                </div>
+                              </div>
                             )
                           )}
                            {imageOnly && (
@@ -1000,6 +1067,11 @@ export function ProductSelectionModal({
                                 {productCode && (
                                   <span className="inline-flex max-w-full items-center rounded-full bg-black/35 px-2 py-0.5 font-mono text-[10px] font-bold text-white/90">
                                     {`编号 ${productCode}`}
+                                  </span>
+                                )}
+                                {typeof product.stock === "number" && product.stock > 0 && (
+                                  <span className="inline-flex max-w-full items-center rounded-full bg-emerald-600/80 px-2 py-0.5 text-[10px] font-medium text-white">
+                                    {`库存 ${product.stock}`}
                                   </span>
                                 )}
                                 {product.category?.name && (

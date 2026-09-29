@@ -305,6 +305,31 @@ export async function POST(
           ? ((await tx.shopProduct.findFirst({ where: { shopId: targetShopId, doudianSkuId: sourceProduct.doudianSkuId }, select: { id: true } })) ? null : sourceProduct.doudianSkuId)
           : null;
 
+        const targetUserId = targetShop.userId || user.id;
+        let targetCategoryId = sourceProduct.categoryId;
+        const normalizedCategoryName = (sourceProduct.categoryName || "").trim();
+        if (targetUserId && normalizedCategoryName && normalizedCategoryName !== "未分类") {
+          try {
+            const targetCat = await tx.category.upsert({
+              where: {
+                name_userId: {
+                  name: normalizedCategoryName,
+                  userId: targetUserId,
+                },
+              },
+              update: {},
+              create: {
+                name: normalizedCategoryName,
+                userId: targetUserId,
+              },
+              select: { id: true },
+            });
+            targetCategoryId = targetCat.id;
+          } catch {
+            // ignore
+          }
+        }
+
         targetProduct = await tx.shopProduct.create({
           data: {
             shopId: targetShopId,
@@ -318,8 +343,8 @@ export async function POST(
             productName: sourceProduct.productName || "未知商品",
             pinyin: sourceProduct.pinyin,
             productImage: sourceProduct.productImage,
-            categoryId: sourceProduct.categoryId,
-            categoryName: sourceProduct.categoryName || "未分类",
+            categoryId: targetCategoryId,
+            categoryName: normalizedCategoryName || "未分类",
             supplierId: sourceProduct.supplierId,
             costPrice: inboundUnitCost,
             stock: quantity,

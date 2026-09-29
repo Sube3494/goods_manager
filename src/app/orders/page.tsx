@@ -4165,6 +4165,11 @@ export default function OrdersPage() {
         loadAllOnOpen
         showPlatformSelector={false}
         showCategoryFilter={true}
+        preferredCategoryPattern={
+          matchEditorTarget?.isAddingBundleItem || matchEditorTarget?.componentIndex !== undefined
+            ? /礼袋|礼盒|配件|包装/
+            : undefined
+        }
         showPrice={false}
         allowLibrarySwitch={false}
         title={
