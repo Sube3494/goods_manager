@@ -1594,16 +1594,13 @@ export function ProductFormModal({
                     )}
 
                     {showPlatformIdSection && (
-                      <div className={cn(
-                        "overflow-hidden border border-border bg-white/60 dark:bg-white/5 dark:border-white/10 transition-all",
-                        isPlatformIdsOpen ? "rounded-2xl" : "rounded-full"
-                      )}>
+                      <div className="overflow-hidden rounded-[19px] border border-border bg-white/60 dark:bg-white/5 dark:border-white/10">
                         <button
                           type="button"
                           onClick={() => setIsPlatformIdsOpen((value) => !value)}
                           className={cn(
                             "flex h-[38px] w-full items-center justify-between gap-3 px-3.5 sm:px-4 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary/20",
-                            isPlatformIdsOpen ? "rounded-t-2xl" : "rounded-full"
+                            isPlatformIdsOpen ? "rounded-t-[19px]" : "rounded-[19px]"
                           )}
                         >
                           <span className="flex min-w-0 items-center gap-2 text-xs sm:text-sm font-medium text-muted-foreground">
