@@ -506,6 +506,13 @@ export async function PATCH(
         if (matchedCandidate) {
           if (!mainProduct) {
             const rawMainImg = matchedCandidate.productImage || matchedCandidate.product?.image || null;
+            const isPlatformMatched = Boolean(
+              orderItem.platformSkuId && (
+                matchedCandidate.meituanSkuId?.includes(orderItem.platformSkuId)
+                || matchedCandidate.jdSkuId === orderItem.platformSkuId
+                || matchedCandidate.taobaoSkuId === orderItem.platformSkuId
+              )
+            );
             mainProduct = {
               id: matchedCandidate.id,
               productId: matchedCandidate.productId || matchedCandidate.sourceProductId || null,
@@ -515,6 +522,8 @@ export async function PATCH(
               sourceType: "shopProduct",
               shopProductId: matchedCandidate.id,
               shopName: matchedCandidate.shop?.name || null,
+              matchMethod: isPlatformMatched ? "id" : "sku",
+              isManual: false,
             };
           }
           if (existingBundleItems.length === 0) {
@@ -575,9 +584,13 @@ export async function PATCH(
         nextBundleItems.splice(removeComponentIndex, 1);
       }
 
+      const nextIsManual = typeof mainProduct.isManual === "boolean" ? mainProduct.isManual : false;
+      const nextMatchMethod = mainProduct.matchMethod || (nextIsManual ? "manual" : "id");
+
       const updatedMatchedProduct = {
         ...mainProduct,
-        isManual: true,
+        isManual: nextIsManual,
+        matchMethod: nextMatchMethod,
         isBundle: nextBundleItems.length > 0,
         bundleItems: nextBundleItems,
       };
@@ -657,9 +670,13 @@ export async function PATCH(
         nextBundleItems.push(newComponent);
       }
 
+      const nextIsManual = typeof mainProduct.isManual === "boolean" ? mainProduct.isManual : false;
+      const nextMatchMethod = mainProduct.matchMethod || (nextIsManual ? "manual" : "id");
+
       const updatedMatchedProduct = {
         ...mainProduct,
-        isManual: true,
+        isManual: nextIsManual,
+        matchMethod: nextMatchMethod,
         isBundle: true,
         bundleItems: nextBundleItems,
       };
