@@ -260,11 +260,11 @@ export function CustomSelect({
                 translateY: dropdownPosition.showAbove ? '-100%' : '0%',
                 willChange: 'transform, opacity'
               } as React.CSSProperties}
-              className="select-dropdown-container rounded-2xl bg-white dark:bg-[#1e2432] border border-border dark:border-white/10 shadow-2xl focus:outline-none overflow-hidden"
+              className="select-dropdown-container rounded-2xl bg-white/80 dark:bg-zinc-900/75 backdrop-blur-xl border border-black/10 dark:border-white/15 shadow-2xl dark:shadow-[0_25px_50px_-12px_rgba(0,0,0,0.6)] focus:outline-none overflow-hidden"
             >
               {/* 仅在胶囊本身不是搜索输入框(!searchable)但选项极多时，才作为下拉列表备用搜索框；胶囊自身可搜索时坚决不展示，杜绝重复 */}
               {!searchable && isSearchable && (
-                <div className="p-2 border-b border-border/40 sticky top-0 bg-white dark:bg-[#1e2432] z-10">
+                <div className="p-2 border-b border-border/40 sticky top-0 bg-white/80 dark:bg-zinc-900/75 backdrop-blur-md z-10">
                   <div className="relative flex items-center">
                     <Search size={12} className="absolute left-2.5 text-muted-foreground pointer-events-none" />
                     <input

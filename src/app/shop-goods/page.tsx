@@ -2563,9 +2563,8 @@ export default function ShopGoodsPage() {
   return (
     <div className="space-y-4 sm:space-y-8">
       <div className="flex items-center justify-between gap-2 sm:gap-4">
-        <div className="min-w-0 flex items-center gap-2 sm:gap-3 shrink-0">
+        <div className="min-w-0 flex items-center shrink-0">
           <h1 className="text-xl sm:text-4xl font-bold tracking-tight text-foreground truncate">店铺商品</h1>
-          <span className="shrink-0 inline-flex items-center rounded-full border border-primary/20 bg-primary/10 px-2.5 sm:px-4 h-7 sm:h-10 text-xs sm:text-lg font-bold text-primary font-number shadow-sm">{totalResults}</span>
         </div>
         {filteredShops.length > 0 && (
           <div className="flex items-center justify-end gap-1 sm:gap-2 overflow-x-auto no-scrollbar py-0.5 ml-auto">
