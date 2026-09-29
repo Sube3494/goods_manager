@@ -1736,11 +1736,11 @@ export function ProductFormModal({
                         />
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className={cn("grid gap-3 sm:gap-4", hideSupplierField ? "grid-cols-1" : "grid-cols-2")}>
                         {/* Category */}
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                                <Tag size={16} className="text-emerald-500" /> 分类 <span className="text-red-500">*</span>
+                        <div className="space-y-1.5 sm:space-y-2 min-w-0">
+                            <label className="text-xs sm:text-sm font-medium text-muted-foreground flex items-center gap-1.5 sm:gap-2 truncate">
+                                <Tag size={16} className="text-emerald-500 shrink-0" /> 分类 <span className="text-red-500">*</span>
                             </label>
                             <CustomSelect 
                                 value={formData.categoryId}
@@ -1749,23 +1749,23 @@ export function ProductFormModal({
                                 placeholder="选择分类"
                                 searchable={true}
                                 searchPlaceholder="搜索分类"
-                                triggerClassName="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all dark:hover:bg-white/10"
+                                triggerClassName="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-3.5 sm:px-4 py-2.5 text-xs sm:text-sm text-foreground outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all dark:hover:bg-white/10"
                                 onAddNew={() => setIsCategoryModalOpen(true)}
                                 addNewLabel="新增分类"
                             />
                         </div>
 
                         {!hideSupplierField && (
-                          <div className="space-y-2">
-                                  <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                                      <Truck size={16} className="text-amber-500" /> 供应商
-                                  </label>
+                          <div className="space-y-1.5 sm:space-y-2 min-w-0">
+                              <label className="text-xs sm:text-sm font-medium text-muted-foreground flex items-center gap-1.5 sm:gap-2 truncate">
+                                  <Truck size={16} className="text-amber-500 shrink-0" /> 供应商
+                              </label>
                               <CustomSelect 
                                   value={formData.supplierId || ""}
                                   onChange={(value) => setFormData({...formData, supplierId: value})}
                                   options={suppliers.map(s => ({ value: s.id, label: s.name }))}
                                   placeholder="选择供应商"
-                                  triggerClassName="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-4 py-2.5 text-foreground outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all dark:hover:bg-white/10"
+                                  triggerClassName="w-full rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-3.5 sm:px-4 py-2.5 text-xs sm:text-sm text-foreground outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all dark:hover:bg-white/10"
                                   onAddNew={() => setIsSupplierModalOpen(true)}
                                   addNewLabel="新增供应商"
                               />
@@ -2166,248 +2166,225 @@ export function ProductFormModal({
                                             : "";
                                         const dateVal = itemId ? (selectedDates[itemId] !== undefined ? selectedDates[itemId] : existingDate) : existingDate;
 
-                                        return (
-                                            <div key={order.id} className="flex flex-col gap-2 p-3 rounded-xl bg-white dark:bg-white/5 border border-white/5 hover:border-primary/20 transition-colors">
-                                                <div className="flex items-center justify-between w-full">
-                                                    <div className="flex flex-col gap-1">
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="text-[10px] font-mono text-muted-foreground">{new Date(order.date).toLocaleDateString()}</span>
-                                                             <span className={cn(
-                                                                "text-[9px] px-1.5 py-0.5 rounded-md font-medium uppercase",
-                                                                order.status === "Received" ? "bg-green-500/10 text-green-500" : 
-                                                                (order.status === "Ordered" || order.status === "Confirmed" || order.status === "Shipped") ? "bg-blue-500/10 text-blue-500" :
-                                                                "bg-gray-500/10 text-gray-500"
-                                                            )}>
-                                                                {order.status === "Received" ? "已入库" : "待入库"}
-                                                            </span>
-                                                        </div>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setViewingPurchase(order)}
-                                                            className="group inline-flex max-w-full items-center gap-1.5 text-left text-xs font-medium text-foreground transition-colors hover:text-primary"
-                                                            title="查看采购单"
-                                                        >
-                                                            <span className="truncate">单号: {order.id}</span>
-                                                            <Eye size={12} className="shrink-0 text-muted-foreground transition-colors group-hover:text-primary" />
-                                                        </button>
-                                                    </div>
-                                                    <div className="text-right flex flex-col items-end gap-0.5">
-                                                        {(() => {
-                                                            const originalQty = Number(item.quantity || 0);
-                                                            const remainingQty = Number(item.remainingQuantity ?? originalQty);
-                                                            const hasOutbound = remainingQty < originalQty;
+                                        const originalQty = Number(item.quantity || 0);
+                                        const remainingQty = Number(item.remainingQuantity ?? originalQty);
+                                        const hasOutbound = remainingQty < originalQty;
 
-                                                            return (
-                                                                <div className="flex items-center justify-end gap-1.5">
-                                                                    <div className="text-xs font-semibold text-foreground">
-                                                                        x{item.quantity} 
-                                                                        {item.remainingQuantity !== undefined && item.remainingQuantity !== null && order.status === 'Received' && (
-                                                                            <span className="text-[10px] font-normal text-muted-foreground ml-1">
-                                                                                 (余: <span className={cn("font-medium", item.remainingQuantity > 0 ? "text-primary" : "text-muted-foreground")}>{item.remainingQuantity}</span>)
-                                                                            </span>
-                                                                        )}
-                                                                    </div>
-                                                                    {order.status === "Received" && itemId ? (
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => void openBatchTrace(itemId)}
-                                                                            className="inline-flex items-center gap-1 rounded-full border border-sky-500/15 bg-sky-500/10 px-2 py-0.5 text-[10px] font-bold text-sky-600 transition hover:bg-sky-500/15 dark:text-sky-300"
-                                                                            title="查看这批入库货的出库流向"
-                                                                        >
-                                                                            出库
-                                                                            <ArrowUpRight size={10} />
-                                                                        </button>
-                                                                    ) : null}
-                                                                    {itemId ? (
-                                                                        <button
-                                                                            type="button"
-                                                                            disabled={isDeletingBatchId === itemId}
-                                                                            onClick={() => {
-                                                                                setConfirmConfig({
-                                                                                    isOpen: true,
-                                                                                    title: "确认删除入库批次",
-                                                                                    confirmLabel: isDeletingBatchId === itemId ? "删除中..." : "确认删除",
-                                                                                    variant: "danger",
-                                                                                    message: hasOutbound
-                                                                                        ? `该批次入库 ${originalQty} 件，当前剩余 ${remainingQty} 件。若相关出库单已全部退回对冲，将安全删除该批次并扣减剩余 ${remainingQty} 件实际库存；若仍有未退回的出库流向，系统将自动阻止。确认删除吗？`
-                                                                                        : `确定要删除该入库批次（入库 ${originalQty} 件，进价 ¥${item.costPrice}）吗？删除后将同步扣减商品总物理库存。`,
-                                                                                    onConfirm: () => void handleDeleteBatch(itemId, remainingQty),
-                                                                                });
-                                                                            }}
-                                                                            className="inline-flex items-center justify-center p-1 rounded-full transition-all text-muted-foreground hover:text-destructive hover:bg-destructive/10 active:scale-95 cursor-pointer"
-                                                                            title="删除此入库批次"
-                                                                        >
-                                                                            <Trash2 size={12} />
-                                                                        </button>
-                                                                    ) : null}
-                                                                </div>
-                                                            );
-                                                        })()}
-                                                        {order.status === "Received" ? (
-                                                            editingItemId === itemId ? (
-                                                                <div className="flex items-center gap-1 mt-0.5 justify-end" onClick={(e) => e.stopPropagation()}>
-                                                                    <span className="text-[10px] text-muted-foreground">进价: ￥</span>
-                                                                    <input 
-                                                                        type="text"
-                                                                        inputMode="decimal"
-                                                                        value={editingCostValue}
-                                                                        onChange={(e) => {
-                                                                            const sanitized = e.target.value.replace(/[。．，]/g, ".");
-                                                                            if (/^\d*\.?\d*$/.test(sanitized)) {
-                                                                                setEditingCostValue(sanitized);
-                                                                            }
-                                                                        }}
-                                                                        onKeyDown={(e) => {
-                                                                            if (e.key === 'Enter') {
-                                                                                e.preventDefault();
-                                                                                e.stopPropagation();
-                                                                                handleSaveCost(itemId, order.id);
-                                                                            } else if (e.key === 'Escape') {
-                                                                                e.preventDefault();
-                                                                                e.stopPropagation();
-                                                                                setEditingItemId(null);
-                                                                                setEditingCostValue("");
-                                                                            }
-                                                                        }}
-                                                                        className="w-16 h-6 px-1.5 text-[10px] text-right rounded border border-border dark:border-white/10 bg-white/5 text-foreground focus:outline-none focus:border-primary font-mono"
-                                                                        placeholder="0.00"
-                                                                        disabled={isSavingCost}
-                                                                        autoFocus
-                                                                    />
-                                                                    <button 
-                                                                        type="button"
-                                                                        onClick={(e) => {
+                                        const itemQty = Math.max(0, originalQty);
+                                        const totalAdditionalFees = Number(order.shippingFees || 0) + Number(order.extraFees || 0);
+                                        let allocatedUnitCost = item.costPrice;
+                                        if (totalAdditionalFees > 0 && Array.isArray(order.items)) {
+                                            const totalItemValue = order.items.reduce((sum, it) => sum + (Number(it.costPrice || 0) * Number(it.quantity || 0)), 0);
+                                            const totalQuantity = order.items.reduce((sum, it) => sum + Number(it.quantity || 0), 0);
+                                            if (totalItemValue > 0 && itemQty > 0) {
+                                                const itemValue = Number(item.costPrice || 0) * itemQty;
+                                                const allocatedFee = totalAdditionalFees * (itemValue / totalItemValue);
+                                                allocatedUnitCost = Number(item.costPrice || 0) + (allocatedFee / itemQty);
+                                            } else if (totalQuantity > 0) {
+                                                allocatedUnitCost = Number(item.costPrice || 0) + (totalAdditionalFees / totalQuantity);
+                                            }
+                                        }
+                                        const hasShippingDiff = allocatedUnitCost > item.costPrice && Math.abs(allocatedUnitCost - item.costPrice) >= 0.001;
+                                        const itemSubtotal = (item.costPrice * originalQty).toFixed(2).replace(/\.00$/, '');
+                                        const orderTotalNum = Number(order.totalAmount || 0);
+                                        const hasOrderTotalDiff = order.totalAmount !== undefined && order.totalAmount !== null && Math.abs(orderTotalNum - (item.costPrice * originalQty)) > 0.01;
+
+                                        return (
+                                            <div key={order.id} className="flex flex-col gap-2.5 p-3 rounded-xl bg-white dark:bg-white/5 border border-border/40 dark:border-white/5 hover:border-primary/20 transition-colors shadow-xs">
+                                                {/* 顶部状态与批次快捷操作行 */}
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <div className="flex items-center gap-2 min-w-0">
+                                                        <span className="text-[11px] font-mono text-muted-foreground shrink-0">{new Date(order.date).toLocaleDateString()}</span>
+                                                        <span className={cn(
+                                                            "text-[10px] px-1.5 py-0.5 rounded-md font-medium shrink-0",
+                                                            order.status === "Received" ? "bg-green-500/10 text-green-500 dark:bg-green-500/20" : 
+                                                            (order.status === "Ordered" || order.status === "Confirmed" || order.status === "Shipped") ? "bg-blue-500/10 text-blue-500 dark:bg-blue-500/20" :
+                                                            "bg-gray-500/10 text-gray-500 dark:bg-gray-500/20"
+                                                        )}>
+                                                            {order.status === "Received" ? "已入库" : "待入库"}
+                                                        </span>
+                                                    </div>
+
+                                                    <div className="flex items-center gap-1.5 shrink-0">
+                                                        {order.status === "Received" && itemId ? (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => void openBatchTrace(itemId)}
+                                                                className="inline-flex items-center gap-1 rounded-md border border-sky-500/20 bg-sky-500/10 px-2 py-0.5 text-[10px] font-medium text-sky-600 dark:text-sky-400 hover:bg-sky-500/20 transition-colors cursor-pointer"
+                                                                title="查看这批入库货的出库流向"
+                                                            >
+                                                                出库
+                                                                <ArrowUpRight size={11} />
+                                                            </button>
+                                                        ) : null}
+                                                        {itemId ? (
+                                                            <button
+                                                                type="button"
+                                                                disabled={isDeletingBatchId === itemId}
+                                                                onClick={() => {
+                                                                    setConfirmConfig({
+                                                                        isOpen: true,
+                                                                        title: "确认删除入库批次",
+                                                                        confirmLabel: isDeletingBatchId === itemId ? "删除中..." : "确认删除",
+                                                                        variant: "danger",
+                                                                        message: hasOutbound
+                                                                            ? `该批次入库 ${originalQty} 件，当前剩余 ${remainingQty} 件。若相关出库单已全部退回对冲，将安全删除该批次并扣减剩余 ${remainingQty} 件实际库存；若仍有未退回的出库流向，系统将自动阻止。确认删除吗？`
+                                                                            : `确定要删除该入库批次（入库 ${originalQty} 件，进价 ¥${item.costPrice}）吗？删除后将同步扣减商品总物理库存。`,
+                                                                        onConfirm: () => void handleDeleteBatch(itemId, remainingQty),
+                                                                    });
+                                                                }}
+                                                                className="inline-flex items-center justify-center p-1 rounded-md text-muted-foreground/80 hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
+                                                                title="删除此入库批次"
+                                                            >
+                                                                <Trash2 size={13} />
+                                                            </button>
+                                                        ) : null}
+                                                    </div>
+                                                </div>
+
+                                                {/* 单号与数量行 */}
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setViewingPurchase(order)}
+                                                        className="group inline-flex min-w-0 max-w-[65%] items-center gap-1 text-left text-xs font-medium text-foreground transition-colors hover:text-primary"
+                                                        title="查看采购单"
+                                                    >
+                                                        <span className="truncate font-mono">单号: {order.id}</span>
+                                                        <Eye size={12} className="shrink-0 text-muted-foreground/70 transition-colors group-hover:text-primary" />
+                                                    </button>
+                                                    <div className="text-xs font-semibold text-foreground shrink-0">
+                                                        x{item.quantity}
+                                                        {item.remainingQuantity !== undefined && item.remainingQuantity !== null && order.status === 'Received' && (
+                                                            <span className="text-[11px] font-normal text-muted-foreground ml-1.5">
+                                                                (余: <span className={cn("font-medium", item.remainingQuantity > 0 ? "text-primary" : "text-muted-foreground")}>{item.remainingQuantity}</span>)
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                {/* 价格通栏容器：独占全宽，解决移动端狭窄错位挤压问题 */}
+                                                <div className="w-full rounded-lg bg-muted/40 dark:bg-white/[0.03] p-2 text-[11px] text-muted-foreground border border-border/20">
+                                                    {order.status === "Received" && editingItemId === itemId ? (
+                                                        <div className="flex flex-wrap items-center justify-between gap-2" onClick={(e) => e.stopPropagation()}>
+                                                            <div className="flex items-center gap-1.5">
+                                                                <span className="text-xs font-medium text-foreground">进价: ￥</span>
+                                                                <input 
+                                                                    type="text"
+                                                                    inputMode="decimal"
+                                                                    value={editingCostValue}
+                                                                    onChange={(e) => {
+                                                                        const sanitized = e.target.value.replace(/[。．，]/g, ".");
+                                                                        if (/^\d*\.?\d*$/.test(sanitized)) {
+                                                                            setEditingCostValue(sanitized);
+                                                                        }
+                                                                    }}
+                                                                    onKeyDown={(e) => {
+                                                                        if (e.key === 'Enter') {
                                                                             e.preventDefault();
                                                                             e.stopPropagation();
                                                                             handleSaveCost(itemId, order.id);
-                                                                        }}
-                                                                        disabled={isSavingCost}
-                                                                        className="p-0.5 text-green-500 hover:bg-green-500/10 rounded transition-colors disabled:opacity-50 inline-flex items-center justify-center cursor-pointer"
-                                                                        title="保存"
-                                                                    >
-                                                                        <Check size={12} />
-                                                                    </button>
-                                                                    <button 
-                                                                        type="button"
-                                                                        onClick={(e) => {
+                                                                        } else if (e.key === 'Escape') {
                                                                             e.preventDefault();
                                                                             e.stopPropagation();
                                                                             setEditingItemId(null);
                                                                             setEditingCostValue("");
-                                                                        }}
-                                                                        disabled={isSavingCost}
-                                                                        className="p-0.5 text-red-500 hover:bg-red-500/10 rounded transition-colors disabled:opacity-50 inline-flex items-center justify-center cursor-pointer"
-                                                                        title="取消"
-                                                                    >
-                                                                        <X size={12} />
-                                                                    </button>
-                                                                </div>
-                                                            ) : (
-                                                                <div className="text-[10px] text-muted-foreground flex items-center justify-end gap-1.5 mt-0.5">
-                                                                    {item.costPrice === 0 ? (
-                                                                        <>
-                                                                            <span className="text-[9px] text-orange-500 font-medium bg-orange-500/10 px-1 py-0.2 rounded">无进价</span>
+                                                                        }
+                                                                    }}
+                                                                    className="w-20 h-7 px-2 text-xs rounded border border-border bg-background text-foreground focus:outline-none focus:border-primary font-mono"
+                                                                    placeholder="0.00"
+                                                                    disabled={isSavingCost}
+                                                                    autoFocus
+                                                                />
+                                                            </div>
+                                                            <div className="flex items-center gap-1.5 ml-auto">
+                                                                <button 
+                                                                    type="button"
+                                                                    onClick={(e) => {
+                                                                        e.preventDefault();
+                                                                        e.stopPropagation();
+                                                                        handleSaveCost(itemId, order.id);
+                                                                    }}
+                                                                    disabled={isSavingCost}
+                                                                    className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-white bg-green-600 hover:bg-green-700 rounded transition-colors disabled:opacity-50 cursor-pointer shadow-xs"
+                                                                >
+                                                                    <Check size={12} />
+                                                                    保存
+                                                                </button>
+                                                                <button 
+                                                                    type="button"
+                                                                    onClick={(e) => {
+                                                                        e.preventDefault();
+                                                                        e.stopPropagation();
+                                                                        setEditingItemId(null);
+                                                                        setEditingCostValue("");
+                                                                    }}
+                                                                    disabled={isSavingCost}
+                                                                    className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-muted-foreground hover:bg-muted rounded transition-colors disabled:opacity-50 cursor-pointer"
+                                                                >
+                                                                    <X size={12} />
+                                                                    取消
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                                                            {/* 左侧进价与实摊 */}
+                                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                                                {order.status === "Received" && item.costPrice === 0 ? (
+                                                                    <>
+                                                                        <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium bg-amber-500/10 px-1.5 py-0.5 rounded">无进价</span>
+                                                                        <button 
+                                                                            type="button"
+                                                                            onClick={(e) => {
+                                                                                e.preventDefault();
+                                                                                e.stopPropagation();
+                                                                                setEditingItemId(itemId);
+                                                                                setEditingCostValue("");
+                                                                            }}
+                                                                            className="text-xs text-primary hover:underline font-medium inline-flex items-center gap-0.5 cursor-pointer ml-1"
+                                                                        >
+                                                                            补录
+                                                                        </button>
+                                                                    </>
+                                                                ) : (
+                                                                    <>
+                                                                        <span className="text-foreground font-medium">进价: ￥{item.costPrice}</span>
+                                                                        {order.status === "Received" && (
                                                                             <button 
                                                                                 type="button"
                                                                                 onClick={(e) => {
                                                                                     e.preventDefault();
                                                                                     e.stopPropagation();
                                                                                     setEditingItemId(itemId);
-                                                                                    setEditingCostValue("");
+                                                                                    setEditingCostValue(String(item.costPrice));
                                                                                 }}
-                                                                                className="text-[10px] text-primary hover:underline font-medium flex items-center gap-0.5 cursor-pointer"
+                                                                                className="text-muted-foreground hover:text-primary transition-colors inline-flex items-center cursor-pointer p-0.5 rounded hover:bg-black/5 dark:hover:bg-white/10"
+                                                                                title="修改进价"
                                                                             >
-                                                                                补录
+                                                                                <Pencil size={11} />
                                                                             </button>
-                                                                        </>
-                                                                    ) : (() => {
-                                                                        const itemQty = Math.max(0, Number(item.quantity || 0));
-                                                                        const totalAdditionalFees = Number(order.shippingFees || 0) + Number(order.extraFees || 0);
-                                                                        let allocatedUnitCost = item.costPrice;
-                                                                        if (totalAdditionalFees > 0 && Array.isArray(order.items)) {
-                                                                            const totalItemValue = order.items.reduce((sum, it) => sum + (Number(it.costPrice || 0) * Number(it.quantity || 0)), 0);
-                                                                            const totalQuantity = order.items.reduce((sum, it) => sum + Number(it.quantity || 0), 0);
-                                                                            if (totalItemValue > 0 && itemQty > 0) {
-                                                                                const itemValue = Number(item.costPrice || 0) * itemQty;
-                                                                                const allocatedFee = totalAdditionalFees * (itemValue / totalItemValue);
-                                                                                allocatedUnitCost = Number(item.costPrice || 0) + (allocatedFee / itemQty);
-                                                                            } else if (totalQuantity > 0) {
-                                                                                allocatedUnitCost = Number(item.costPrice || 0) + (totalAdditionalFees / totalQuantity);
-                                                                            }
-                                                                        }
-                                                                        const hasShippingDiff = allocatedUnitCost > item.costPrice && Math.abs(allocatedUnitCost - item.costPrice) >= 0.001;
-
-                                                                        return (
-                                                                            <>
-                                                                                <span>进价: ￥{item.costPrice}</span>
-                                                                                {hasShippingDiff && (
-                                                                                    <span className="text-amber-500 dark:text-amber-400 font-medium" title={`包含整单运费/附加费平摊(+￥${(allocatedUnitCost - item.costPrice).toFixed(2)}/件)`}>
-                                                                                        (实摊成本: ￥{allocatedUnitCost.toFixed(2).replace(/\.00$/, '')})
-                                                                                    </span>
-                                                                                )}
-                                                                                <span> | 小计: ￥{(item.costPrice * item.quantity).toFixed(2).replace(/\.00$/, '')}</span>
-                                                                                {order.totalAmount !== undefined && order.totalAmount !== null && Math.abs(order.totalAmount - (item.costPrice * item.quantity)) > 0.01 && (
-                                                                                    <span className="text-[10px] text-muted-foreground/80 font-normal">
-                                                                                        (整单实付: ￥{Number(order.totalAmount).toFixed(2).replace(/\.00$/, '')})
-                                                                                    </span>
-                                                                                )}
-                                                                                <button 
-                                                                                    type="button"
-                                                                                    onClick={(e) => {
-                                                                                        e.preventDefault();
-                                                                                        e.stopPropagation();
-                                                                                        setEditingItemId(itemId);
-                                                                                        setEditingCostValue(String(item.costPrice));
-                                                                                    }}
-                                                                                    className="text-muted-foreground hover:text-primary transition-colors inline-flex items-center cursor-pointer p-0.5 rounded hover:bg-white/10"
-                                                                                    title="修改价格"
-                                                                                >
-                                                                                    <Pencil size={10} />
-                                                                                </button>
-                                                                            </>
-                                                                        );
-                                                                    })()}
-                                                                </div>
-                                                            )
-                                                        ) : (
-                                                            <div className="text-[10px] text-muted-foreground flex items-center justify-end gap-1 mt-0.5 flex-wrap">
-                                                                {(() => {
-                                                                    const itemQty = Math.max(0, Number(item.quantity || 0));
-                                                                    const totalAdditionalFees = Number(order.shippingFees || 0) + Number(order.extraFees || 0);
-                                                                    let allocatedUnitCost = item.costPrice;
-                                                                    if (totalAdditionalFees > 0 && Array.isArray(order.items)) {
-                                                                        const totalItemValue = order.items.reduce((sum, it) => sum + (Number(it.costPrice || 0) * Number(it.quantity || 0)), 0);
-                                                                        const totalQuantity = order.items.reduce((sum, it) => sum + Number(it.quantity || 0), 0);
-                                                                        if (totalItemValue > 0 && itemQty > 0) {
-                                                                            const itemValue = Number(item.costPrice || 0) * itemQty;
-                                                                            const allocatedFee = totalAdditionalFees * (itemValue / totalItemValue);
-                                                                            allocatedUnitCost = Number(item.costPrice || 0) + (allocatedFee / itemQty);
-                                                                        } else if (totalQuantity > 0) {
-                                                                            allocatedUnitCost = Number(item.costPrice || 0) + (totalAdditionalFees / totalQuantity);
-                                                                        }
-                                                                    }
-                                                                    const hasShippingDiff = allocatedUnitCost > item.costPrice && Math.abs(allocatedUnitCost - item.costPrice) >= 0.001;
-
-                                                                    return (
-                                                                        <>
-                                                                            <span>进价: ￥{item.costPrice}</span>
-                                                                            {hasShippingDiff && (
-                                                                                <span className="text-amber-500 dark:text-amber-400 font-medium" title={`包含整单运费/附加费平摊(+￥${(allocatedUnitCost - item.costPrice).toFixed(2)}/件)`}>
-                                                                                    (实摊成本: ￥{allocatedUnitCost.toFixed(2).replace(/\.00$/, '')})
-                                                                                </span>
-                                                                            )}
-                                                                            <span> | 小计: ￥{(item.costPrice * item.quantity).toFixed(2).replace(/\.00$/, '')}</span>
-                                                                            {order.totalAmount !== undefined && order.totalAmount !== null && Math.abs(order.totalAmount - (item.costPrice * item.quantity)) > 0.01 && (
-                                                                                <span className="text-[10px] text-muted-foreground/80 font-normal ml-1">
-                                                                                    (整单实付: ￥{Number(order.totalAmount).toFixed(2).replace(/\.00$/, '')})
-                                                                                </span>
-                                                                            )}
-                                                                        </>
-                                                                    );
-                                                                })()}
+                                                                        )}
+                                                                        {hasShippingDiff && (
+                                                                            <span className="text-amber-600 dark:text-amber-400 font-medium text-[10px]" title={`包含整单运费/附加费平摊(+￥${(allocatedUnitCost - item.costPrice).toFixed(2)}/件)`}>
+                                                                                (实摊: ￥{allocatedUnitCost.toFixed(2).replace(/\.00$/, '')})
+                                                                            </span>
+                                                                        )}
+                                                                    </>
+                                                                )}
                                                             </div>
-                                                        )}
-                                                    </div>
+
+                                                            {/* 右侧小计与整单实付 */}
+                                                            <div className="flex items-center gap-1.5 shrink-0 ml-auto text-[11px]">
+                                                                <span>小计: <span className="font-medium text-foreground">￥{itemSubtotal}</span></span>
+                                                                {hasOrderTotalDiff && (
+                                                                    <span className="text-muted-foreground/80 font-normal">
+                                                                        (整单实付: ￥{orderTotalNum.toFixed(2).replace(/\.00$/, '')})
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </div>
 
                                                 {/* 如果是保质期商品，且已入库，则显示生产日期输入框可以直接补录日期 */}
