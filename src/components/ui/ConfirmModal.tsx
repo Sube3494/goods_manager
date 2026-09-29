@@ -88,7 +88,7 @@ export function ConfirmModal({
       {isOpen && (
         <div
           className={cn(
-            "fixed inset-0 z-100000 flex items-end justify-center p-3 sm:items-center sm:p-6 safe-y safe-x lg:pl-(--sidebar-width) transition-[padding] duration-200",
+            "fixed inset-0 z-100000 flex items-center justify-center p-4 sm:p-6 safe-y safe-x transition-[padding] duration-200",
             className
           )}
           style={{

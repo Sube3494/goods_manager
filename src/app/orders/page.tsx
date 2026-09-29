@@ -2161,6 +2161,7 @@ export default function OrdersPage() {
     componentIndex?: number;
     componentDisplay?: any;
     currentBundleItems?: any[];
+    isAddingBundleItem?: boolean;
   } | null>(null);
 
   const [brushSyncPool, setBrushSyncPool] = useState<AutoPickOrder[]>([]);
@@ -2667,6 +2668,7 @@ export default function OrdersPage() {
     componentIndex?: number;
     componentDisplay?: any;
     currentBundleItems?: any[];
+    isAddingBundleItem?: boolean;
   }) => {
     const resolvedShopName = order.matchedShopName || "";
     const resolvedShop = localShops.find((s) => s.name === resolvedShopName);
@@ -2686,7 +2688,9 @@ export default function OrdersPage() {
       shopName: resolvedShopName,
       shopId: resolvedShopId,
       libraryId: resolvedLibraryId,
-      currentMatchedProductId: options?.componentIndex !== undefined
+      currentMatchedProductId: options?.isAddingBundleItem
+        ? ""
+        : options?.componentIndex !== undefined
         ? (options.componentDisplay?.shopProductId || options.componentDisplay?.id || "")
         : (item.matchedProduct?.shopProductId || item.matchedProduct?.id || ""),
       order,
@@ -2694,6 +2698,7 @@ export default function OrdersPage() {
       componentIndex: options?.componentIndex,
       componentDisplay: options?.componentDisplay,
       currentBundleItems: options?.currentBundleItems,
+      isAddingBundleItem: options?.isAddingBundleItem,
     });
     setIsMatchPickerOpen(true);
   }, [integrationConfig.maiyatianShopMappings, localShops]);
@@ -2707,13 +2712,14 @@ export default function OrdersPage() {
   const saveManualMatch = useCallback(async (
     productId: string,
     items?: Array<{ id: string; quantity: number }>,
-    options?: { clear?: boolean; componentIndex?: number; currentBundleItems?: any[] }
+    options?: { clear?: boolean; componentIndex?: number; currentBundleItems?: any[]; isAddingComponent?: boolean }
   ) => {
     if (!matchEditorTarget?.orderId || !matchEditorTarget.itemId) return;
 
     setIsSavingMatch(true);
     try {
       const isClear = Boolean(options?.clear);
+      const isAddingComponent = Boolean(options?.isAddingComponent || matchEditorTarget.isAddingBundleItem);
       const componentIndex = options?.componentIndex ?? matchEditorTarget.componentIndex;
       const currentBundleItems = options?.currentBundleItems ?? matchEditorTarget.currentBundleItems;
       const response = await fetch(`/api/orders/${matchEditorTarget.orderId}/items/${matchEditorTarget.itemId}/match`, {
@@ -2724,6 +2730,7 @@ export default function OrdersPage() {
           items,
           componentIndex,
           currentBundleItems,
+          isAddingComponent,
         }),
       });
       const data = await response.json().catch(() => ({}));
@@ -2736,7 +2743,7 @@ export default function OrdersPage() {
       const currentItemId = matchEditorTarget.itemId;
       const willAutoOutbound = Boolean(matchEditorTarget.autoOutbound);
 
-      if (componentIndex !== undefined) {
+      if (isAddingComponent || componentIndex !== undefined) {
         setIsMatchPickerOpen(false);
         setMatchEditorTarget(null);
         if (targetOrder?.id) {
@@ -2744,7 +2751,7 @@ export default function OrdersPage() {
           setTargetRefreshOrder({ id: targetOrder.id, timestamp: Date.now() });
         }
         setRefreshTrigger((prev) => prev + 1);
-        showToast("配件更换成功！已自动重新计算出库与成本", "success");
+        showToast(isAddingComponent ? "配件添加成功！已自动重新计算出库与成本" : "配件更换成功！已自动重新计算出库与成本", "success");
         return;
       }
 
@@ -2850,6 +2857,34 @@ export default function OrdersPage() {
       setIsSavingMatch(false);
     }
   }, [matchEditorTarget, openMatchEditor, localShops, showToast, triggerParentRefresh]);
+
+  const handleRemoveBundleComponent = useCallback(async (
+    order: AutoPickOrder,
+    item: AutoPickOrderItem,
+    componentIndex: number,
+    componentName?: string,
+  ) => {
+    if (!order?.id || !item?.id) return;
+    try {
+      const response = await fetch(`/api/orders/${order.id}/items/${item.id}/match`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          removeComponentIndex: componentIndex,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data?.error || "移除配件失败");
+      }
+      setProfitUpdatingOrderIds((prev) => Array.from(new Set([...prev, order.id])));
+      setTargetRefreshOrder({ id: order.id, timestamp: Date.now() });
+      setRefreshTrigger((prev) => prev + 1);
+      showToast(`已移除配件${componentName ? `【${componentName}】` : ""}，已自动重新核算出库与成本`, "success");
+    } catch (err: any) {
+      showToast(err.message || "移除配件失败", "error");
+    }
+  }, [showToast]);
 
   // 刷单同步确认
   const syncBrushOrders = async (targetIds?: string[], commission?: number) => {
@@ -3759,6 +3794,7 @@ export default function OrdersPage() {
             onClearProfitUpdating={clearProfitUpdating}
             onOpenCostBackfill={setBackfillTarget}
             onOpenMatchEditor={openMatchEditor}
+            onRemoveBundleComponent={handleRemoveBundleComponent}
             onOpenPurchaseDraft={setPurchaseDraft}
             profitUpdatingOrderIds={profitUpdatingOrderIds}
             onDataLoad={handleTodayDataLoad}
@@ -3777,6 +3813,7 @@ export default function OrdersPage() {
               onClearProfitUpdating={clearProfitUpdating}
               onOpenCostBackfill={setBackfillTarget}
               onOpenMatchEditor={openMatchEditor}
+              onRemoveBundleComponent={handleRemoveBundleComponent}
               onOpenPurchaseDraft={setPurchaseDraft}
               profitUpdatingOrderIds={profitUpdatingOrderIds}
               onDataLoad={handleAppointmentDataLoad}
@@ -3795,6 +3832,7 @@ export default function OrdersPage() {
               onClearProfitUpdating={clearProfitUpdating}
               onOpenCostBackfill={setBackfillTarget}
               onOpenMatchEditor={openMatchEditor}
+              onRemoveBundleComponent={handleRemoveBundleComponent}
               onOpenPurchaseDraft={setPurchaseDraft}
               profitUpdatingOrderIds={profitUpdatingOrderIds}
               onDataLoad={handleAllDataLoad}
@@ -4085,8 +4123,14 @@ export default function OrdersPage() {
         onClose={closeMatchEditor}
         showQuantityControls={true}
         onClear={() => void saveManualMatch("", [], { clear: true })}
-        clearLabel={matchEditorTarget?.componentIndex !== undefined ? undefined : "无需出库 / 解除绑定"}
-        confirmLabel={matchEditorTarget?.componentIndex !== undefined ? "确认更换配件" : "确认匹配"}
+        clearLabel={matchEditorTarget?.componentIndex !== undefined || matchEditorTarget?.isAddingBundleItem ? undefined : "无需出库 / 解除绑定"}
+        confirmLabel={
+          matchEditorTarget?.isAddingBundleItem
+            ? "确认添加配件"
+            : matchEditorTarget?.componentIndex !== undefined
+            ? "确认更换配件"
+            : "确认匹配"
+        }
         onSelect={(products) => {
           const items = products.map((p) => {
             const id = String(p.shopProductId || p.id || p.sourceProductId || p.productId || "").trim();
@@ -4096,7 +4140,7 @@ export default function OrdersPage() {
 
           const resolvedIds = items.map((item) => item.id);
           if (resolvedIds.length === 0) {
-            if (matchEditorTarget?.componentIndex !== undefined) {
+            if (matchEditorTarget?.componentIndex !== undefined || matchEditorTarget?.isAddingBundleItem) {
               closeMatchEditor();
               return;
             }
@@ -4107,23 +4151,26 @@ export default function OrdersPage() {
           void saveManualMatch(
             resolvedIds.join("+"),
             shouldSendItemQuantities ? items : undefined,
-            matchEditorTarget?.componentIndex !== undefined ? {
-              componentIndex: matchEditorTarget.componentIndex,
-              currentBundleItems: matchEditorTarget.currentBundleItems,
-            } : undefined
+            {
+              isAddingComponent: Boolean(matchEditorTarget?.isAddingBundleItem),
+              componentIndex: matchEditorTarget?.componentIndex,
+              currentBundleItems: matchEditorTarget?.currentBundleItems,
+            }
           );
         }}
-        selectedIds={matchEditorTarget?.currentMatchedProductId ? matchEditorTarget.currentMatchedProductId.split("+").filter(Boolean) : []}
+        selectedIds={matchEditorTarget?.isAddingBundleItem ? [] : (matchEditorTarget?.currentMatchedProductId ? matchEditorTarget.currentMatchedProductId.split("+").filter(Boolean) : [])}
         singleSelect={true}
         disableAlreadySelected={false}
-        allowMultipleToggle={matchEditorTarget?.componentIndex === undefined}
+        allowMultipleToggle={matchEditorTarget?.componentIndex === undefined && !matchEditorTarget?.isAddingBundleItem}
         loadAllOnOpen
         showPlatformSelector={false}
         showCategoryFilter={true}
         showPrice={false}
         allowLibrarySwitch={false}
         title={
-          matchEditorTarget?.componentIndex !== undefined
+          matchEditorTarget?.isAddingBundleItem
+            ? `添加配件 · 为【${matchEditorTarget.itemName}】配发配件（礼袋/赠品）`
+            : matchEditorTarget?.componentIndex !== undefined
             ? `更换配件 · ${matchEditorTarget.componentDisplay?.name || "当前配件"}`
             : matchEditorTarget?.shopName
             ? `修改商品匹配 · ${matchEditorTarget.shopName}`
@@ -4132,7 +4179,41 @@ export default function OrdersPage() {
         headerBanner={
           matchEditorTarget ? (
             <div className="rounded-2xl border border-black/8 dark:border-white/10 bg-slate-500/5 dark:bg-white/3 p-2.5 sm:p-3 space-y-2 text-left shrink-0 shadow-xs backdrop-blur-md">
-              {matchEditorTarget.componentIndex !== undefined ? (
+              {matchEditorTarget.isAddingBundleItem ? (
+                /* 添加配件专用卡片：展示所属主商品信息及操作提示 */
+                <div className="flex items-center gap-3.5 sm:gap-4 h-16 shrink-0">
+                  <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-amber-500/25 bg-amber-500/10 dark:bg-white/5 flex items-center justify-center shadow-xs">
+                    {matchEditorTarget.thumb ? (
+                      <Image
+                        src={matchEditorTarget.thumb}
+                        alt={matchEditorTarget.itemName}
+                        width={64}
+                        height={64}
+                        className="h-full w-full object-cover"
+                        unoptimized
+                      />
+                    ) : (
+                      <Layers className="text-amber-600/70 dark:text-amber-400/70" size={24} />
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1 flex flex-col justify-center gap-1.5 h-full">
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex shrink-0 items-center rounded-full bg-amber-500/15 px-2 py-0.5 text-[10.5px] font-semibold text-amber-700 dark:text-amber-300">
+                        按需配发配件
+                      </span>
+                      <h3
+                        className="text-xs sm:text-[13.5px] font-bold text-foreground leading-snug truncate text-left"
+                        title={matchEditorTarget.itemName}
+                      >
+                        {matchEditorTarget.itemName}
+                      </h3>
+                    </div>
+                    <div className="text-[11.5px] text-muted-foreground/80 truncate">
+                      请选择要为该商品临时配发的礼袋、礼盒或赠品，出库将自动连同扣减库存与核算成本。
+                    </div>
+                  </div>
+                </div>
+              ) : matchEditorTarget.componentIndex !== undefined ? (
                 /* 配件更换专用卡片：聚焦展示待替换的原配件信息，避免误导 */
                 <div className="flex items-center gap-3.5 sm:gap-4 h-16 shrink-0">
                   {/* 左侧原配件缩略图 */}

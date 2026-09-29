@@ -299,7 +299,12 @@ export async function PATCH(
     const shouldClear = Boolean(body?.clear);
         const productId = String(body?.productId || "").trim();
 
-    if (!shouldClear && !productId) {
+    const removeComponentIndex = typeof body?.removeComponentIndex === "number" && body.removeComponentIndex >= 0
+      ? body.removeComponentIndex
+      : undefined;
+    const isAddingComponent = Boolean(body?.isAddingComponent);
+
+    if (!shouldClear && removeComponentIndex === undefined && !productId) {
       return NextResponse.json({ error: "请选择要匹配的商品" }, { status: 400 });
     }
 
@@ -453,36 +458,7 @@ export async function PATCH(
       }
     }
 
-    const replaceComponentIndex = typeof body?.componentIndex === "number" && body.componentIndex >= 0
-      ? body.componentIndex
-      : undefined;
-
-    if (replaceComponentIndex !== undefined) {
-      const targetShopProduct = await prisma.shopProduct.findFirst({
-        where: {
-          id: productId,
-          shop: { userId: targetUserId },
-        },
-        select: {
-          id: true,
-          productId: true,
-          productName: true,
-          sku: true,
-          productImage: true,
-          costPrice: true,
-          product: {
-            select: { image: true },
-          },
-          shop: {
-            select: { name: true },
-          },
-        },
-      });
-
-      if (!targetShopProduct) {
-        return NextResponse.json({ error: "选择的配件商品不存在或无权访问" }, { status: 404 });
-      }
-
+    const resolveMainProductAndBundleItems = async () => {
       let mainProduct: any = null;
       let existingBundleItems: any[] = [];
 
@@ -560,6 +536,18 @@ export async function PATCH(
         }));
       }
 
+      if (!mainProduct && autoMatchedProduct) {
+        mainProduct = {
+          id: autoMatchedProduct.id,
+          name: autoMatchedProduct.name || orderItem.productName || "未命名商品",
+          sku: autoMatchedProduct.sku || orderItem.productNo || null,
+          image: autoMatchedProduct.image || null,
+          sourceType: autoMatchedProduct.sourceType || "shopProduct",
+          shopProductId: (autoMatchedProduct as any).shopProductId || autoMatchedProduct.id,
+          shopName: (autoMatchedProduct as any).shopName || null,
+        };
+      }
+
       if (!mainProduct) {
         mainProduct = {
           id: orderItem.id,
@@ -571,6 +559,76 @@ export async function PATCH(
           shopName: null,
         };
       }
+
+      return { mainProduct, existingBundleItems };
+    };
+
+    if (removeComponentIndex !== undefined) {
+      const { mainProduct, existingBundleItems } = await resolveMainProductAndBundleItems();
+      const nextBundleItems = [...existingBundleItems];
+      if (removeComponentIndex >= 0 && removeComponentIndex < nextBundleItems.length) {
+        nextBundleItems.splice(removeComponentIndex, 1);
+      }
+
+      const updatedMatchedProduct = {
+        ...mainProduct,
+        isManual: true,
+        isBundle: nextBundleItems.length > 0,
+        bundleItems: nextBundleItems,
+      };
+
+      await prisma.$transaction(async (tx) => {
+        await tx.autoPickOrderItem.update({
+          where: { id: orderItem.id },
+          data: {
+            rawPayload: {
+              ...restPayload,
+              manualMatchedProduct: updatedMatchedProduct,
+            },
+          },
+        });
+      });
+
+      await returnLegacyOutbound(orderItem.order.orderNo);
+      await rebuildOutbound();
+
+      return NextResponse.json({
+        ok: true,
+        matchedProduct: updatedMatchedProduct,
+      });
+    }
+
+    const replaceComponentIndex = typeof body?.componentIndex === "number" && body.componentIndex >= 0
+      ? body.componentIndex
+      : undefined;
+
+    if (isAddingComponent || replaceComponentIndex !== undefined) {
+      const targetShopProduct = await prisma.shopProduct.findFirst({
+        where: {
+          id: productId,
+          shop: { userId: targetUserId },
+        },
+        select: {
+          id: true,
+          productId: true,
+          productName: true,
+          sku: true,
+          productImage: true,
+          costPrice: true,
+          product: {
+            select: { image: true },
+          },
+          shop: {
+            select: { name: true },
+          },
+        },
+      });
+
+      if (!targetShopProduct) {
+        return NextResponse.json({ error: "选择的配件商品不存在或无权访问" }, { status: 404 });
+      }
+
+      const { mainProduct, existingBundleItems } = await resolveMainProductAndBundleItems();
 
       const rawNewImg = targetShopProduct.productImage || targetShopProduct.product?.image || null;
       const newQty = itemsQtyMap.get(targetShopProduct.id) || (body?.quantity ? Number(body.quantity) : 1);
@@ -586,7 +644,7 @@ export async function PATCH(
       };
 
       const nextBundleItems = [...existingBundleItems];
-      if (replaceComponentIndex >= 0 && replaceComponentIndex < nextBundleItems.length) {
+      if (!isAddingComponent && replaceComponentIndex !== undefined && replaceComponentIndex >= 0 && replaceComponentIndex < nextBundleItems.length) {
         nextBundleItems[replaceComponentIndex] = newComponent;
       } else {
         nextBundleItems.push(newComponent);

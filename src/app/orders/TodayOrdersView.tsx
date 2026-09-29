@@ -122,6 +122,7 @@ function CompactTodayOrderCard({
   onExpand,
   onRunAction,
   onOpenMatchEditor,
+  onRemoveBundleComponent,
   onOpenCostBackfill,
 }: {
   order: AutoPickOrder;
@@ -132,7 +133,8 @@ function CompactTodayOrderCard({
   isProfitUpdating?: boolean;
   onExpand: () => void;
   onRunAction: (action: OrderAction) => void;
-  onOpenMatchEditor: (item: AutoPickOrderItem, options?: { autoOutbound?: boolean; componentIndex?: number; componentDisplay?: any; currentBundleItems?: any[] }) => void;
+  onOpenMatchEditor: (item: AutoPickOrderItem, options?: { autoOutbound?: boolean; componentIndex?: number; componentDisplay?: any; currentBundleItems?: any[]; isAddingBundleItem?: boolean }) => void;
+  onRemoveBundleComponent?: (order: AutoPickOrder, item: AutoPickOrderItem, componentIndex: number, componentName?: string) => void;
   onOpenCostBackfill?: (order: AutoPickOrder) => void;
 }) {
   const [routeOpen, setRouteOpen] = useState(false);
@@ -302,6 +304,7 @@ function CompactTodayOrderCard({
               deleted={deleted}
               readOnly={readOnly}
               onOpenMatchEditor={(_order, targetItem, options) => onOpenMatchEditor(targetItem, options)}
+              onRemoveBundleComponent={onRemoveBundleComponent}
             />
           )) : (
             <div className="flex min-w-0 items-center gap-2 rounded-xl border border-black/6 bg-black/[0.025] px-2 py-1.5 dark:border-white/8 dark:bg-white/[0.035]">
@@ -440,7 +443,14 @@ interface TodayOrdersViewProps {
   targetRefreshOrder?: { id: string; timestamp: number } | null;
   onClearProfitUpdating?: (orderId: string) => void;
   onOpenCostBackfill: (order: AutoPickOrder) => void;
-  onOpenMatchEditor: (order: AutoPickOrder, item: AutoPickOrderItem, options?: { autoOutbound?: boolean; componentIndex?: number; componentDisplay?: any; currentBundleItems?: any[] }) => void;
+  onOpenMatchEditor: (order: AutoPickOrder, item: AutoPickOrderItem, options?: {
+    autoOutbound?: boolean;
+    componentIndex?: number;
+    componentDisplay?: any;
+    currentBundleItems?: any[];
+    isAddingBundleItem?: boolean;
+  }) => void;
+  onRemoveBundleComponent?: (order: AutoPickOrder, item: AutoPickOrderItem, componentIndex: number, componentName?: string) => void;
   onOpenPurchaseDraft?: (draft: PurchaseDraftPayload) => void;
   profitUpdatingOrderIds?: string[];
     onDataLoad: (data: {
@@ -527,6 +537,7 @@ export function TodayOrdersView({
   onClearProfitUpdating,
   onOpenCostBackfill,
   onOpenMatchEditor,
+  onRemoveBundleComponent,
   onDataLoad,
   localShops,
   onOpenPurchaseDraft,
@@ -1330,6 +1341,7 @@ export function TodayOrdersView({
                   onExpand={() => setDetailOrderId(order.id)}
                   onRunAction={(action) => runAction(order.id, action)}
                   onOpenMatchEditor={(item, options) => onOpenMatchEditor(order, item, options)}
+                  onRemoveBundleComponent={onRemoveBundleComponent}
                   onOpenCostBackfill={onOpenCostBackfill}
                 />
               ) : (
@@ -1341,6 +1353,7 @@ export function TodayOrdersView({
                   onRunAction={runAction}
                   onOpenCostBackfill={onOpenCostBackfill}
                   onOpenMatchEditor={onOpenMatchEditor}
+                  onRemoveBundleComponent={onRemoveBundleComponent}
                   onRefresh={handleRefreshOrder}
                   isProfitUpdating={profitUpdatingOrderIds.includes(order.id)}
                   readOnly={readOnly}
@@ -1611,6 +1624,7 @@ export function TodayOrdersView({
                   onRunAction={runAction}
                   onOpenCostBackfill={onOpenCostBackfill}
                   onOpenMatchEditor={onOpenMatchEditor}
+                  onRemoveBundleComponent={onRemoveBundleComponent}
                   onRefresh={handleRefreshOrder}
                   isProfitUpdating={profitUpdatingOrderIds.includes(detailOrder.id)}
                   readOnly={readOnly}

@@ -108,7 +108,14 @@ interface AllOrdersViewProps {
   targetRefreshOrder?: { id: string; timestamp: number } | null;
   onClearProfitUpdating?: (orderId: string) => void;
   onOpenCostBackfill: (order: AutoPickOrder) => void;
-  onOpenMatchEditor: (order: AutoPickOrder, item: AutoPickOrderItem, options?: { autoOutbound?: boolean; componentIndex?: number; componentDisplay?: any; currentBundleItems?: any[] }) => void;
+  onOpenMatchEditor: (order: AutoPickOrder, item: AutoPickOrderItem, options?: {
+    autoOutbound?: boolean;
+    componentIndex?: number;
+    componentDisplay?: any;
+    currentBundleItems?: any[];
+    isAddingBundleItem?: boolean;
+  }) => void;
+  onRemoveBundleComponent?: (order: AutoPickOrder, item: AutoPickOrderItem, componentIndex: number, componentName?: string) => void;
   onOpenPurchaseDraft?: (draft: PurchaseDraftPayload) => void;
   profitUpdatingOrderIds?: string[];
   onDataLoad: (data: {
@@ -158,6 +165,7 @@ export function AllOrdersView({
   onClearProfitUpdating,
   onOpenCostBackfill,
   onOpenMatchEditor,
+  onRemoveBundleComponent,
   onDataLoad,
   localShops,
   userId,
@@ -1000,6 +1008,7 @@ export function AllOrdersView({
                             onRunAction={runAction}
                             onOpenCostBackfill={onOpenCostBackfill}
                             onOpenMatchEditor={onOpenMatchEditor}
+                            onRemoveBundleComponent={onRemoveBundleComponent}
                             onRefresh={handleRefreshOrder}
                             isProfitUpdating={profitUpdatingOrderIds.includes(order.id)}
                             readOnly={readOnly}

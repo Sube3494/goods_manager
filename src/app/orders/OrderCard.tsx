@@ -2202,9 +2202,13 @@ export function ProductStripItem({
   bundleComponentCount,
   isBundleExpanded,
   onToggleBundleExpand,
+  onAddBundleItem,
+  onRemoveComponent,
 }: {
   display: { name: string; sku: string; image: string | null; quantity: number; costPrice?: number | null; costSource?: "outbound" | "current"; sourceId?: string; optionalMatch?: boolean };
   onEditMatch?: () => void;
+  onAddBundleItem?: () => void;
+  onRemoveComponent?: () => void;
   showEditMatch?: boolean;
   compact?: boolean;
   matchedProduct?: AutoPickOrderItem['matchedProduct'];
@@ -2416,8 +2420,7 @@ export function ProductStripItem({
           ) : null}
         </div>
       </div>
-      <div className="flex shrink-0 items-center self-start sm:self-center mt-0.5 sm:mt-0">
-
+      <div className="flex flex-row shrink-0 items-center self-center justify-end gap-1.5">
         {showEditMatch && onEditMatch ? (
           <button
             type="button"
@@ -2425,27 +2428,58 @@ export function ProductStripItem({
             title={isBundleComponent ? "改配件" : "改匹配"}
             aria-label={isBundleComponent ? "改配件" : "改匹配"}
             className={cn(
-              "inline-flex shrink-0 cursor-pointer items-center justify-center rounded-full font-medium transition-all",
+              "order-2 inline-flex shrink-0 cursor-pointer items-center justify-center rounded-full font-medium transition-all",
               isBundleComponent
-                ? "h-6 sm:h-7 px-2 sm:px-2.5 text-[10.5px] sm:text-xs border border-amber-500/25 bg-amber-500/10 text-amber-700 hover:bg-amber-500/18 dark:border-amber-400/25 dark:text-amber-300 dark:hover:bg-amber-500/20"
+                ? "order-1 h-6 w-6 sm:h-7 sm:w-auto p-0 sm:px-2.5 sm:gap-1 text-[10.5px] sm:text-xs border border-amber-500/25 bg-amber-500/10 text-amber-700 hover:bg-amber-500/18 dark:border-amber-400/25 dark:text-amber-300 dark:hover:bg-amber-500/20"
                 : compact
-                  ? "h-7 w-7 border border-transparent bg-black/[0.025] p-0 text-muted-foreground hover:bg-black/[0.06] hover:text-foreground dark:bg-white/[0.035] dark:hover:bg-white/[0.08]"
-                  : "h-6 w-6 sm:h-8 sm:w-auto border border-black/8 bg-white/85 p-0 sm:px-2.5 text-[11px] sm:text-[13px] text-foreground hover:border-black/12 hover:bg-zinc-100 dark:border-white/10 dark:bg-white/6 dark:text-white dark:hover:border-white/20 dark:hover:bg-white/14"
+                  ? "h-6.5 w-6.5 border border-transparent bg-black/[0.025] p-0 text-muted-foreground hover:bg-black/[0.06] hover:text-foreground dark:bg-white/[0.035] dark:hover:bg-white/[0.08]"
+                  : "h-7 w-7 p-0 sm:h-8 sm:w-auto sm:px-2.5 sm:gap-1 text-[11px] sm:text-[13px] border border-black/8 bg-white/85 text-foreground hover:border-black/12 hover:bg-zinc-100 dark:border-white/10 dark:bg-white/6 dark:text-white dark:hover:border-white/20 dark:hover:bg-white/14"
             )}
           >
             {isBundleComponent ? (
-              <span className="flex items-center gap-1">
-                <Pencil size={10} />
-                <span>改配件</span>
-              </span>
+              <>
+                <Pencil size={11} className="shrink-0 sm:w-2.5 sm:h-2.5" />
+                <span className="hidden sm:inline">改配件</span>
+              </>
             ) : compact ? (
-              <Pencil size={12} />
+              <Pencil size={11} />
             ) : (
               <>
-                <Pencil size={11} className="sm:hidden" />
+                <Pencil size={12} className="shrink-0 sm:w-2.5 sm:h-2.5" />
                 <span className="hidden sm:inline">改匹配</span>
               </>
             )}
+          </button>
+        ) : null}
+
+        {!isBundleComponent && onAddBundleItem ? (
+          <button
+            type="button"
+            onClick={onAddBundleItem}
+            title="添加配件（如按需配发礼袋、赠品等）"
+            aria-label="配礼袋"
+            className={cn(
+              "order-1 inline-flex shrink-0 cursor-pointer items-center justify-center rounded-full font-medium transition-all",
+              compact
+                ? "h-6.5 w-6.5 p-0 border border-amber-500/25 bg-amber-500/8 text-amber-700 hover:bg-amber-500/18 dark:border-amber-400/25 dark:text-amber-300 dark:hover:bg-amber-500/20"
+                : "h-7 w-7 p-0 sm:h-8 sm:w-auto sm:px-2.5 sm:gap-1 text-[11px] sm:text-[13px] border border-amber-500/30 bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 dark:border-amber-400/30 dark:text-amber-300 dark:hover:bg-amber-500/20"
+            )}
+          >
+            <Plus size={compact ? 12 : 13} className="shrink-0 sm:w-3 sm:h-3" />
+            {!compact ? <span className="hidden sm:inline">配礼袋</span> : null}
+          </button>
+        ) : null}
+
+        {isBundleComponent && onRemoveComponent ? (
+          <button
+            type="button"
+            onClick={onRemoveComponent}
+            title="移除该配件"
+            aria-label="移除该配件"
+            className="order-2 inline-flex shrink-0 cursor-pointer items-center justify-center rounded-full font-medium transition-all h-6 w-6 sm:h-7 sm:w-auto p-0 sm:px-2 sm:gap-1 text-[10.5px] sm:text-xs border border-rose-500/20 bg-rose-500/8 text-rose-600 hover:bg-rose-500/18 hover:text-rose-700 dark:border-rose-400/20 dark:text-rose-400 dark:hover:bg-rose-500/20"
+          >
+            <Trash2 size={11} className="shrink-0 sm:w-2.5 sm:h-2.5" />
+            <span className="hidden sm:inline">移除</span>
           </button>
         ) : null}
       </div>
@@ -2492,6 +2526,7 @@ export function OrderItemBundleGroup({
   deleted,
   readOnly,
   onOpenMatchEditor,
+  onRemoveBundleComponent,
   returnedItemQuantityMap,
   returnedItemDetailsMap,
   isJdPlatformOrder,
@@ -2503,7 +2538,14 @@ export function OrderItemBundleGroup({
   order: AutoPickOrder;
   deleted: boolean;
   readOnly: boolean;
-  onOpenMatchEditor: (order: AutoPickOrder, item: AutoPickOrderItem, options?: { autoOutbound?: boolean; componentIndex?: number; componentDisplay?: any; currentBundleItems?: any[] }) => void;
+  onOpenMatchEditor: (order: AutoPickOrder, item: AutoPickOrderItem, options?: {
+    autoOutbound?: boolean;
+    componentIndex?: number;
+    componentDisplay?: any;
+    currentBundleItems?: any[];
+    isAddingBundleItem?: boolean;
+  }) => void;
+  onRemoveBundleComponent?: (order: AutoPickOrder, item: AutoPickOrderItem, componentIndex: number, componentName?: string) => void;
   returnedItemQuantityMap?: Map<string, number>;
   returnedItemDetailsMap?: Map<string, any[]>;
   isJdPlatformOrder?: boolean;
@@ -2513,6 +2555,7 @@ export function OrderItemBundleGroup({
   const displays = getExpandedOrderItemDisplays(item, order.platform);
   const isBundle = displays.length > 1;
   const [isExpanded, setIsExpanded] = useState(false);
+  const [componentToRemove, setComponentToRemove] = useState<{ cIdx: number; name: string } | null>(null);
 
   const returnedQuantity = returnedItemQuantityMap?.get(getReturnedProductKey(item)) || 0;
   const returnedDetails = returnedItemDetailsMap?.get(getReturnedProductKey(item)) || [];
@@ -2528,6 +2571,7 @@ export function OrderItemBundleGroup({
         compact={compact}
         showEditMatch={!deleted && !readOnly}
         onEditMatch={() => onOpenMatchEditor(order, item)}
+        onAddBundleItem={!deleted && !readOnly ? () => onOpenMatchEditor(order, item, { isAddingBundleItem: true }) : undefined}
         matchedProduct={item.matchedProduct}
         showMatchStatus={true}
         returnedQuantity={returnedQuantity}
@@ -2555,6 +2599,10 @@ export function OrderItemBundleGroup({
         onToggleBundleExpand={() => setIsExpanded(!isExpanded)}
         showEditMatch={!deleted && !readOnly}
         onEditMatch={() => onOpenMatchEditor(order, item)}
+        onAddBundleItem={!deleted && !readOnly ? () => onOpenMatchEditor(order, item, {
+          isAddingBundleItem: true,
+          currentBundleItems: componentDisplays,
+        }) : undefined}
         matchedProduct={item.matchedProduct}
         showMatchStatus={true}
         returnedQuantity={returnedQuantity}
@@ -2584,6 +2632,9 @@ export function OrderItemBundleGroup({
                 componentDisplay: display,
                 currentBundleItems: componentDisplays,
               })}
+              onRemoveComponent={!deleted && !readOnly && onRemoveBundleComponent ? () => {
+                setComponentToRemove({ cIdx, name: display.name });
+              } : undefined}
               matchedProduct={undefined}
               showMatchStatus={false}
               returnedQuantity={0}
@@ -2596,6 +2647,22 @@ export function OrderItemBundleGroup({
           ))}
         </div>
       ) : null}
+
+      <ConfirmModal
+        isOpen={!!componentToRemove}
+        onClose={() => setComponentToRemove(null)}
+        onConfirm={() => {
+          if (componentToRemove && onRemoveBundleComponent) {
+            onRemoveBundleComponent(order, item, componentToRemove.cIdx, componentToRemove.name);
+          }
+          setComponentToRemove(null);
+        }}
+        title="移除配件"
+        message={`确定要为该商品移除配件【${componentToRemove?.name || ""}】吗？移除后将自动回滚对应出库并更新成本。`}
+        confirmLabel="确认移除"
+        cancelLabel="取消"
+        variant="danger"
+      />
     </div>
   );
 }
@@ -3106,6 +3173,7 @@ export const OrderCard = memo(function OrderCard({
   onRunAction,
   onOpenCostBackfill,
   onOpenMatchEditor,
+  onRemoveBundleComponent,
   onRefresh,
 }: {
   order: AutoPickOrder;
@@ -3119,7 +3187,14 @@ export const OrderCard = memo(function OrderCard({
   onToggleExpanded: (id: string) => void;
   onRunAction: (orderId: string, action: OrderAction) => void;
   onOpenCostBackfill: (order: AutoPickOrder) => void;
-  onOpenMatchEditor: (order: AutoPickOrder, item: AutoPickOrderItem, options?: { autoOutbound?: boolean }) => void;
+  onOpenMatchEditor: (order: AutoPickOrder, item: AutoPickOrderItem, options?: {
+    autoOutbound?: boolean;
+    componentIndex?: number;
+    componentDisplay?: any;
+    currentBundleItems?: any[];
+    isAddingBundleItem?: boolean;
+  }) => void;
+  onRemoveBundleComponent?: (order: AutoPickOrder, item: AutoPickOrderItem, componentIndex: number, componentName?: string) => void;
   onRefresh?: () => void;
 }) {
   const { showToast } = useToast();
@@ -4027,6 +4102,7 @@ export const OrderCard = memo(function OrderCard({
                   deleted={deleted}
                   readOnly={readOnly}
                   onOpenMatchEditor={onOpenMatchEditor}
+                  onRemoveBundleComponent={onRemoveBundleComponent}
                   returnedItemQuantityMap={returnedItemQuantityMap}
                   returnedItemDetailsMap={returnedItemDetailsMap}
                   isJdPlatformOrder={isJdPlatformOrder}
