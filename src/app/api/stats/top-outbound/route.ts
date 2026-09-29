@@ -2,6 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getFreshSession } from "@/lib/auth";
 import { getStorageStrategy } from "@/lib/storage";
+import { getOutboundReturnedQuantityMap, parseOutboundReturnMeta } from "@/lib/outboundReturnMeta";
+
+function getOutboundItemReturnedQuantity(
+  order: { note?: string | null; status?: string | null },
+  item: { id: string; quantity: number }
+) {
+  const returnEntries = parseOutboundReturnMeta(order.note).returns;
+  if (returnEntries.length > 0) {
+    const quantityMap = getOutboundReturnedQuantityMap(returnEntries);
+    return Math.min(item.quantity, quantityMap.get(item.id) || 0);
+  }
+  return order.status === "Returned" ? item.quantity : 0;
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -46,12 +59,15 @@ export async function GET(request: NextRequest) {
         },
       },
       select: {
+        id: true,
         productId: true,
         shopProductId: true,
         quantity: true,
         outboundOrder: {
           select: {
             date: true,
+            status: true,
+            note: true,
           },
         },
         product: {
@@ -90,6 +106,12 @@ export async function GET(request: NextRequest) {
     }>();
 
     for (const item of outboundItems) {
+      const returnedQty = getOutboundItemReturnedQuantity(item.outboundOrder, item);
+      const netQuantity = Math.max(0, item.quantity - returnedQty);
+      if (netQuantity <= 0) {
+        continue;
+      }
+
       const key = item.shopProductId || item.productId || "";
       if (!key) {
         continue;
@@ -114,7 +136,7 @@ export async function GET(request: NextRequest) {
             : null);
 
       if (current) {
-        current.totalQuantity += item.quantity;
+        current.totalQuantity += netQuantity;
         const outboundAt = item.outboundOrder?.date instanceof Date
           ? item.outboundOrder.date.toISOString()
           : null;
@@ -125,7 +147,7 @@ export async function GET(request: NextRequest) {
         aggregateMap.set(key, {
           productId: item.productId || item.shopProductId || key,
           shopProductId: item.shopProductId || undefined,
-          totalQuantity: item.quantity,
+          totalQuantity: netQuantity,
           latestOutboundAt: item.outboundOrder?.date instanceof Date ? item.outboundOrder.date.toISOString() : undefined,
           shopName: item.shopProduct?.shop?.name || undefined,
           product: displayProduct,
