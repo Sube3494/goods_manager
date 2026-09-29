@@ -1516,6 +1516,105 @@ function parseCurrencyInputToCents(value: string) {
   return Math.round(numeric * 100);
 }
 
+
+function DeliveryFeeEditModal({
+  order,
+  onClose,
+  onSave,
+}: {
+  order: AutoPickOrder;
+  onClose: () => void;
+  onSave: (values: { deliveryFee: number }) => Promise<boolean>;
+}) {
+  const { showToast } = useToast();
+  const currentFee = readDeliveryFeeFromValue(order.delivery, order.rawPayload) ?? getDeliveryFee(order.delivery, order);
+  const [deliveryFee, setDeliveryFee] = useState(() => formatCurrencyInputFromCents(currentFee > 0 ? currentFee : 0));
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSave = async () => {
+    const nextDeliveryFee = parseCurrencyInputToCents(deliveryFee);
+    if (nextDeliveryFee == null || nextDeliveryFee < 0) {
+      showToast("请输入有效的配送费金额", "error");
+      return;
+    }
+    setIsSaving(true);
+    const ok = await onSave({ deliveryFee: nextDeliveryFee });
+    setIsSaving(false);
+    if (ok) {
+      onClose();
+    }
+  };
+
+  return createPortal(
+    <div className="fixed inset-0 z-100000 flex items-center justify-center px-4">
+      <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm" onClick={() => { if (!isSaving) onClose(); }} />
+      <div className="relative w-full max-w-sm rounded-[28px] border border-black/8 bg-white/96 shadow-[0_24px_64px_rgba(15,23,42,0.20)] dark:border-white/10 dark:bg-[#0d1420]/98">
+        <div className="flex items-start justify-between gap-3 px-6 pb-4 pt-6">
+          <div>
+            <h3 className="text-xl font-semibold tracking-tight text-foreground">修改配送费</h3>
+            <p className="mt-2 text-xs leading-5 text-muted-foreground">
+              为已取消/退款订单记录实际发生的配送费支出，系统会自动计入该单真实损失与纯利润。
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isSaving}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition hover:bg-black/5 hover:text-foreground dark:hover:bg-white/5 cursor-pointer"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="space-y-4 px-6 pb-6">
+          <div className="rounded-2xl border border-black/8 bg-black/2 p-3 dark:border-white/10 dark:bg-white/3">
+            <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">实际配送支出 (元)</span>
+            <div className="mt-2 flex items-center gap-2">
+              <span className="text-base font-bold text-muted-foreground">¥</span>
+              <input
+                type="text"
+                autoFocus
+                inputMode="decimal"
+                value={deliveryFee}
+                onChange={(e) => setDeliveryFee(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    void handleSave();
+                  }
+                }}
+                placeholder="0.00"
+                className="h-11 w-full rounded-xl border border-black/8 bg-white/50 px-3 text-base font-medium text-foreground outline-none focus:border-primary/30 focus:ring-2 focus:ring-primary/12 dark:border-white/10 dark:bg-white/5 dark:focus:border-primary/40"
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isSaving}
+              className="inline-flex h-11 flex-1 items-center justify-center rounded-2xl border border-black/8 px-4 text-sm font-semibold text-foreground transition hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/5 cursor-pointer"
+            >
+              取消
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleSave()}
+              disabled={isSaving}
+              className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-2xl bg-foreground px-4 text-sm font-bold text-background transition hover:opacity-90 disabled:opacity-60 cursor-pointer dark:bg-white dark:text-black"
+            >
+              {isSaving ? <Loader2 size={15} className="animate-spin" /> : null}
+              保存配送费
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 function OrderAmountEditModal({
   order,
   onClose,
@@ -2048,7 +2147,7 @@ export function DetailStat({
 }: {
   label: string;
   labelAccessory?: ReactNode;
-  value: string;
+  value: ReactNode;
   valueClassName?: string;
   className?: string;
 }) {
@@ -3026,6 +3125,8 @@ export const OrderCard = memo(function OrderCard({
   const { showToast } = useToast();
   const [isUpdatingBrush, setIsUpdatingBrush] = useState(false);
   const [isAmountEditorOpen, setIsAmountEditorOpen] = useState(false);
+  const [isDeliveryFeeEditorOpen, setIsDeliveryFeeEditorOpen] = useState(false);
+  const [isSavingDeliveryFee, setIsSavingDeliveryFee] = useState(false);
   const [isSavingAmount, setIsSavingAmount] = useState(false);
   const [isAmountUpdating, setIsAmountUpdating] = useState(false);
   const targetExpectedIncomeRef = useRef<number | null>(null);
@@ -3132,6 +3233,33 @@ export const OrderCard = memo(function OrderCard({
       setIsUpdatingBrush(false);
     }
   }, [order.id, order.isMainSystemSelfDelivery, showToast, onRefresh]);
+
+  const handleSaveDeliveryFee = useCallback(async ({ deliveryFee: nextDeliveryFee }: { deliveryFee: number }) => {
+    try {
+      setIsSavingDeliveryFee(true);
+      const res = await fetch(`/api/orders/${order.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          deliveryFee: nextDeliveryFee,
+        }),
+      });
+      if (res.ok) {
+        showToast("配送费修改成功，已计入取消订单损失", "success");
+        onRefresh?.();
+        return true;
+      }
+      const data = await res.json().catch(() => ({}));
+      showToast(data.error || "修改配送费失败", "error");
+      return false;
+    } catch (err) {
+      console.error("修改配送费失败", err);
+      showToast("网络请求失败，请稍后重试", "error");
+      return false;
+    } finally {
+      setIsSavingDeliveryFee(false);
+    }
+  }, [order.id, onRefresh, showToast]);
 
   const handleSaveExpectedIncome = useCallback(async ({ expectedIncome: nextExpectedIncome }: { expectedIncome: number }) => {
     try {
@@ -3432,6 +3560,13 @@ export const OrderCard = memo(function OrderCard({
   const isDoudianPlatformOrder = isDoudianOrder(order.platform);
   const isMeituanPlatformOrder = isMeituanOrder(order.platform);
   const canEditExpectedIncome = !readOnly && (isJdPlatformOrder || isDoudianPlatformOrder || legacyManualDeliveryPlaceholderOrder);
+  const isCancelledOrRefunded = cancelled || deleted || abnormal || Boolean(order.refundAmount && order.refundAmount > 0) || Boolean(order.status && /退|消|cancel|refund/i.test(order.status)) || Boolean(order.delivery?.track && /取消|退单/.test(String(order.delivery.track)));
+  const canEditDeliveryFee = !readOnly && isCancelledOrRefunded;
+  const displayDeliveryFee = effectiveSendFee != null
+    ? effectiveSendFee
+    : (typeof (order.delivery as any)?.manualDeliveryFee === "number"
+      ? (order.delivery as any).manualDeliveryFee
+      : (deliveryFee > 0 ? deliveryFee : 0));
   const sourceLabel = getOrderSourceLabel(order);
   const deadlineDisplay = getDeadlineDisplay(order);
   const autoCompleteFailed = hasAutoCompleteFailure(order);
@@ -3738,11 +3873,23 @@ export const OrderCard = memo(function OrderCard({
                     <span className="shrink-0 text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground sm:text-[11px]">{commissionDisplay.label}</span>
                     <span className="truncate text-xs font-semibold text-foreground sm:text-[13px]">{commissionDisplay.value}</span>
                   </div>
-                  {effectiveSendFee != null ? (
-                    <div className="flex min-w-0 items-center justify-between gap-1.5 rounded-2xl border border-black/8 bg-black/2 px-3 py-2 dark:border-white/10 dark:bg-white/3 sm:inline-flex sm:h-8 sm:justify-start sm:rounded-full sm:px-2.5 sm:py-0">
-                      <span className="shrink-0 text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground sm:text-[11px]">配送费</span>
-                      <span className="truncate text-xs font-semibold text-foreground sm:text-[13px]">{toCurrency(effectiveSendFee)}</span>
-                    </div>
+                  {effectiveSendFee != null || canEditDeliveryFee ? (
+                    canEditDeliveryFee ? (
+                      <button
+                        type="button"
+                        onClick={() => setIsDeliveryFeeEditorOpen(true)}
+                        title="点击修改配送费"
+                        className="flex min-w-0 items-center justify-between gap-1.5 rounded-2xl border border-black/8 bg-black/2 px-3 py-2 text-left transition hover:border-black/12 hover:bg-black/3 dark:border-white/10 dark:bg-white/3 dark:hover:bg-white/4 cursor-pointer sm:inline-flex sm:h-8 sm:justify-start sm:rounded-full sm:px-2.5 sm:py-0"
+                      >
+                        <span className="shrink-0 text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground sm:text-[11px]">配送费</span>
+                        <span className="truncate text-xs font-semibold text-foreground sm:text-[13px]">{toCurrency(displayDeliveryFee)}</span>
+                      </button>
+                    ) : (
+                      <div className="flex min-w-0 items-center justify-between gap-1.5 rounded-2xl border border-black/8 bg-black/2 px-3 py-2 dark:border-white/10 dark:bg-white/3 sm:inline-flex sm:h-8 sm:justify-start sm:rounded-full sm:px-2.5 sm:py-0">
+                        <span className="shrink-0 text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground sm:text-[11px]">配送费</span>
+                        <span className="truncate text-xs font-semibold text-foreground sm:text-[13px]">{toCurrency(displayDeliveryFee)}</span>
+                      </div>
+                    )
                   ) : null}
                 </div>
               </div>
@@ -3803,9 +3950,20 @@ export const OrderCard = memo(function OrderCard({
                         <Truck size={12} className="shrink-0 text-slate-400 dark:text-zinc-500" />
                         <span>配送费</span>
                       </span>
-                      <span className="font-semibold text-foreground">
-                        {effectiveSendFee != null ? toCurrency(effectiveSendFee) : "-"}
-                      </span>
+                      {canEditDeliveryFee ? (
+                        <button
+                          type="button"
+                          onClick={() => setIsDeliveryFeeEditorOpen(true)}
+                          className="font-semibold text-foreground hover:underline cursor-pointer"
+                          title="点击修改配送费"
+                        >
+                          {toCurrency(displayDeliveryFee)}
+                        </button>
+                      ) : (
+                        <span className="font-semibold text-foreground">
+                          {effectiveSendFee != null ? toCurrency(effectiveSendFee) : "-"}
+                        </span>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-1.5 text-foreground/90 border-t border-black/6 pt-2 dark:border-white/8">
@@ -4244,7 +4402,20 @@ export const OrderCard = memo(function OrderCard({
                   />
                   <DetailStat
                     label="配送费"
-                    value={effectiveSendFee != null ? toCurrency(effectiveSendFee) : (isSelfDeliveryOrCancelled ? "¥0.00" : (riderName !== "-" ? "待同步" : "-"))}
+                    value={
+                      canEditDeliveryFee ? (
+                        <button
+                          type="button"
+                          onClick={() => setIsDeliveryFeeEditorOpen(true)}
+                          className="text-foreground hover:underline cursor-pointer"
+                          title="点击修改配送费"
+                        >
+                          {toCurrency(displayDeliveryFee)}
+                        </button>
+                      ) : (
+                        effectiveSendFee != null ? toCurrency(effectiveSendFee) : (isSelfDeliveryOrCancelled ? "¥0.00" : (riderName !== "-" ? "待同步" : "-"))
+                      )
+                    }
                     className="col-span-2"
                   />
                 </div>
@@ -4321,6 +4492,17 @@ export const OrderCard = memo(function OrderCard({
             }
           }}
           onSave={handleSaveExpectedIncome}
+        />
+      ) : null}
+      {isDeliveryFeeEditorOpen && canEditDeliveryFee ? (
+        <DeliveryFeeEditModal
+          order={order}
+          onClose={() => {
+            if (!isSavingDeliveryFee) {
+              setIsDeliveryFeeEditorOpen(false);
+            }
+          }}
+          onSave={handleSaveDeliveryFee}
         />
       ) : null}
       {isOfflineEditorOpen ? (

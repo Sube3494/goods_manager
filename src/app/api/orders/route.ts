@@ -1003,6 +1003,14 @@ function hasRealizedCancelledDeliveryCost(input: {
   if (isOffline) {
     return false;
   }
+  const d = (input.delivery && typeof input.delivery === "object" && !Array.isArray(input.delivery)) ? input.delivery as Record<string, unknown> : {};
+  const rawObj = (input.rawPayload && typeof input.rawPayload === "object" && !Array.isArray(input.rawPayload)) ? input.rawPayload as Record<string, unknown> : {};
+  const systemMeta = (rawObj.systemMeta && typeof rawObj.systemMeta === "object" && !Array.isArray(rawObj.systemMeta)) ? rawObj.systemMeta as Record<string, unknown> : null;
+  const hasManualFee = (typeof d.manualDeliveryFee === "number" && d.manualDeliveryFee >= 0)
+    || (systemMeta?.manualDeliveryFee && typeof (systemMeta.manualDeliveryFee as any)?.deliveryFee === "number");
+  if (hasManualFee) {
+    return input.deliveryFee > 0;
+  }
   return input.deliveryFee > 0
     && hasExplicitDeliveryPickupProof(input.delivery, input.rawPayload)
     && !isRefundableMeituanDelivery(input.delivery);

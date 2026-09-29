@@ -129,9 +129,17 @@ export async function PATCH(
     const hasAmountEdit = hasExpectedIncome;
     const hasShopEdit = body.shopId !== undefined;
     const hasAdminRemarkEdit = body.adminRemark !== undefined;
+    const hasDeliveryFeeEdit = typeof body.deliveryFee === "number" || typeof body.sendFee === "number";
+    const nextDeliveryFee = typeof body.deliveryFee === "number" ? body.deliveryFee : Number(body.sendFee);
 
-    if (!hasBrushToggle && !hasAmountEdit && !hasOfflineEdit && !hasShopEdit && !hasAdminRemarkEdit) {
+    if (!hasBrushToggle && !hasAmountEdit && !hasOfflineEdit && !hasShopEdit && !hasAdminRemarkEdit && !hasDeliveryFeeEdit) {
       return NextResponse.json({ error: "参数错误" }, { status: 400 });
+    }
+
+    if (hasDeliveryFeeEdit) {
+      if (!Number.isFinite(nextDeliveryFee) || nextDeliveryFee < 0) {
+        return NextResponse.json({ error: "配送费不能小于 0" }, { status: 400 });
+      }
     }
 
     if (hasAmountEdit) {
@@ -469,6 +477,14 @@ export async function PATCH(
                 customerRemark: offlineCustomerRemark || null,
                 delivery: nextDelivery as Prisma.InputJsonValue,
               }
+            : hasDeliveryFeeEdit
+            ? {
+                delivery: {
+                  ...existingDelivery,
+                  sendFee: Math.round(nextDeliveryFee),
+                  manualDeliveryFee: Math.round(nextDeliveryFee),
+                } as Prisma.InputJsonValue,
+              }
             : {}),
           ...(hasBrushToggle && !Boolean(body.isMainSystemSelfDelivery)
             ? { autoCompleteAt: null }
@@ -498,6 +514,15 @@ export async function PATCH(
                           },
                         }
                       : {}),
+                  }
+                : {}),
+              ...(hasDeliveryFeeEdit
+                ? {
+                    manualDeliveryFee: {
+                      deliveryFee: Math.round(nextDeliveryFee),
+                      updatedAt: new Date().toISOString(),
+                      updatedBy: String(user.name || user.email || user.id),
+                    },
                   }
                 : {}),
               ...(hasAmountEdit

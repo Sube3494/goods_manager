@@ -436,6 +436,9 @@ export function isAutoPickOrderRiderAssigned(order?: {
 export function isSelfDeliveryOrCancelledDelivery(delivery: unknown, rawPayloadOrFlag?: unknown): boolean {
   if (delivery && typeof delivery === "object" && !Array.isArray(delivery)) {
     const d = delivery as Record<string, unknown>;
+    if (typeof d.manualDeliveryFee === "number" && d.manualDeliveryFee >= 0) {
+      return false;
+    }
     const logisticName = String(d.logisticName || d.logistic_name || "").trim();
     const riderName = String(d.riderName || d.delivery_name || "").trim();
     const track = String(d.track || "").trim();
@@ -486,10 +489,6 @@ export function parseDeliveryFeeToCents(rawValue: unknown): number {
 }
 
 export function readDeliveryFeeFromValue(delivery: unknown, rawPayloadOrFlag?: unknown) {
-  if (isSelfDeliveryOrCancelledDelivery(delivery, rawPayloadOrFlag)) {
-    return 0;
-  }
-
   const deliveryObj = (delivery && typeof delivery === "object" && !Array.isArray(delivery))
     ? delivery as Record<string, unknown>
     : null;
@@ -497,6 +496,24 @@ export function readDeliveryFeeFromValue(delivery: unknown, rawPayloadOrFlag?: u
   const rawObj = (rawPayloadOrFlag && typeof rawPayloadOrFlag === "object" && !Array.isArray(rawPayloadOrFlag))
     ? rawPayloadOrFlag as Record<string, unknown>
     : null;
+
+  const systemMeta = (rawObj?.systemMeta && typeof rawObj.systemMeta === "object" && !Array.isArray(rawObj.systemMeta))
+    ? rawObj.systemMeta as Record<string, unknown>
+    : null;
+
+  const manualFeeValue = typeof deliveryObj?.manualDeliveryFee === "number" && deliveryObj.manualDeliveryFee >= 0
+    ? deliveryObj.manualDeliveryFee
+    : (systemMeta?.manualDeliveryFee && typeof (systemMeta.manualDeliveryFee as any)?.deliveryFee === "number")
+    ? (systemMeta.manualDeliveryFee as any).deliveryFee
+    : null;
+
+  if (manualFeeValue != null) {
+    return Math.max(0, Math.round(Number(manualFeeValue)));
+  }
+
+  if (isSelfDeliveryOrCancelledDelivery(delivery, rawPayloadOrFlag)) {
+    return 0;
+  }
 
   const rawDelivery = (rawObj?.delivery && typeof rawObj.delivery === "object" && !Array.isArray(rawObj.delivery))
     ? rawObj.delivery as Record<string, unknown>
