@@ -1156,7 +1156,7 @@ export function getProductCostStatusText(order: Pick<AutoPickOrder, "productCost
     return "";
   }
   if (order.productCostStatus === "pending-outbound") {
-    return "待出库";
+    return "";
   }
   return "";
 }
