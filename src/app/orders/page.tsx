@@ -2157,6 +2157,9 @@ export default function OrdersPage() {
     currentMatchedProductId: string;
     order?: AutoPickOrder;
     autoOutbound?: boolean;
+    componentIndex?: number;
+    componentDisplay?: any;
+    currentBundleItems?: any[];
   } | null>(null);
 
   const [brushSyncPool, setBrushSyncPool] = useState<AutoPickOrder[]>([]);
@@ -2658,7 +2661,12 @@ export default function OrdersPage() {
   }, [fetchMaiyatianShops, integrationConfig.maiyatianCookie, isIntegrationOpen, maiyatianShops.length]);
 
   // 商品匹配逻辑
-  const openMatchEditor = useCallback((order: AutoPickOrder, item: AutoPickOrderItem, options?: { autoOutbound?: boolean }) => {
+  const openMatchEditor = useCallback((order: AutoPickOrder, item: AutoPickOrderItem, options?: {
+    autoOutbound?: boolean;
+    componentIndex?: number;
+    componentDisplay?: any;
+    currentBundleItems?: any[];
+  }) => {
     const resolvedShopName = order.matchedShopName || "";
     const resolvedShop = localShops.find((s) => s.name === resolvedShopName);
     const resolvedShopId = resolvedShop?.id || "";
@@ -2677,9 +2685,14 @@ export default function OrdersPage() {
       shopName: resolvedShopName,
       shopId: resolvedShopId,
       libraryId: resolvedLibraryId,
-      currentMatchedProductId: item.matchedProduct?.shopProductId || item.matchedProduct?.id || "",
+      currentMatchedProductId: options?.componentIndex !== undefined
+        ? (options.componentDisplay?.shopProductId || options.componentDisplay?.id || "")
+        : (item.matchedProduct?.shopProductId || item.matchedProduct?.id || ""),
       order,
       autoOutbound: Boolean(options?.autoOutbound),
+      componentIndex: options?.componentIndex,
+      componentDisplay: options?.componentDisplay,
+      currentBundleItems: options?.currentBundleItems,
     });
     setIsMatchPickerOpen(true);
   }, [integrationConfig.maiyatianShopMappings, localShops]);
@@ -2690,16 +2703,27 @@ export default function OrdersPage() {
     setMatchEditorTarget(null);
   }, [isSavingMatch]);
 
-  const saveManualMatch = useCallback(async (productId: string, items?: Array<{ id: string; quantity: number }>, options?: { clear?: boolean }) => {
+  const saveManualMatch = useCallback(async (
+    productId: string,
+    items?: Array<{ id: string; quantity: number }>,
+    options?: { clear?: boolean; componentIndex?: number; currentBundleItems?: any[] }
+  ) => {
     if (!matchEditorTarget?.orderId || !matchEditorTarget.itemId) return;
 
     setIsSavingMatch(true);
     try {
       const isClear = Boolean(options?.clear);
+      const componentIndex = options?.componentIndex ?? matchEditorTarget.componentIndex;
+      const currentBundleItems = options?.currentBundleItems ?? matchEditorTarget.currentBundleItems;
       const response = await fetch(`/api/orders/${matchEditorTarget.orderId}/items/${matchEditorTarget.itemId}/match`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(isClear ? { clear: true } : { productId, items }),
+        body: JSON.stringify(isClear ? { clear: true } : {
+          productId,
+          items,
+          componentIndex,
+          currentBundleItems,
+        }),
       });
       const data = await response.json().catch(() => ({}));
 
@@ -2710,6 +2734,18 @@ export default function OrdersPage() {
       const targetOrder = matchEditorTarget.order;
       const currentItemId = matchEditorTarget.itemId;
       const willAutoOutbound = Boolean(matchEditorTarget.autoOutbound);
+
+      if (componentIndex !== undefined) {
+        setIsMatchPickerOpen(false);
+        setMatchEditorTarget(null);
+        if (targetOrder?.id) {
+          setProfitUpdatingOrderIds((prev) => Array.from(new Set([...prev, targetOrder.id])));
+          setTargetRefreshOrder({ id: targetOrder.id, timestamp: Date.now() });
+        }
+        setRefreshTrigger((prev) => prev + 1);
+        showToast("配件更换成功！已自动重新计算出库与成本", "success");
+        return;
+      }
 
       // 检查当前订单是否还有其他未匹配且未显式忽略的商品
       const otherUnmatchedItems = (targetOrder?.items || []).filter((it) => {
@@ -4048,8 +4084,8 @@ export default function OrdersPage() {
         onClose={closeMatchEditor}
         showQuantityControls={true}
         onClear={() => void saveManualMatch("", [], { clear: true })}
-        clearLabel="无需出库 / 解除绑定"
-        confirmLabel="确认匹配"
+        clearLabel={matchEditorTarget?.componentIndex !== undefined ? undefined : "无需出库 / 解除绑定"}
+        confirmLabel={matchEditorTarget?.componentIndex !== undefined ? "确认更换配件" : "确认匹配"}
         onSelect={(products) => {
           const items = products.map((p) => {
             const id = String(p.shopProductId || p.id || p.sourceProductId || p.productId || "").trim();
@@ -4059,25 +4095,55 @@ export default function OrdersPage() {
 
           const resolvedIds = items.map((item) => item.id);
           if (resolvedIds.length === 0) {
+            if (matchEditorTarget?.componentIndex !== undefined) {
+              closeMatchEditor();
+              return;
+            }
             void saveManualMatch("", [], { clear: true });
             return;
           }
           const shouldSendItemQuantities = items.length > 1 || items.some((item) => item.quantity > 1);
-          void saveManualMatch(resolvedIds.join("+"), shouldSendItemQuantities ? items : undefined);
+          void saveManualMatch(
+            resolvedIds.join("+"),
+            shouldSendItemQuantities ? items : undefined,
+            matchEditorTarget?.componentIndex !== undefined ? {
+              componentIndex: matchEditorTarget.componentIndex,
+              currentBundleItems: matchEditorTarget.currentBundleItems,
+            } : undefined
+          );
         }}
         selectedIds={matchEditorTarget?.currentMatchedProductId ? matchEditorTarget.currentMatchedProductId.split("+").filter(Boolean) : []}
         singleSelect={true}
         disableAlreadySelected={false}
-        allowMultipleToggle={true}
+        allowMultipleToggle={matchEditorTarget?.componentIndex === undefined}
         loadAllOnOpen
         showPlatformSelector={false}
-        showCategoryFilter={false}
+        showCategoryFilter={true}
         showPrice={false}
         allowLibrarySwitch={false}
-        title={matchEditorTarget?.shopName ? `修改商品匹配 · ${matchEditorTarget.shopName}` : "修改商品匹配"}
+        title={
+          matchEditorTarget?.componentIndex !== undefined
+            ? `更换配件 · ${matchEditorTarget.componentDisplay?.name || "当前配件"}`
+            : matchEditorTarget?.shopName
+            ? `修改商品匹配 · ${matchEditorTarget.shopName}`
+            : "修改商品匹配"
+        }
         headerBanner={
           matchEditorTarget ? (
             <div className="rounded-2xl border border-black/8 dark:border-white/10 bg-slate-500/5 dark:bg-white/3 p-2.5 sm:p-3 space-y-2 text-left shrink-0 shadow-xs backdrop-blur-md">
+              {matchEditorTarget.componentIndex !== undefined ? (
+                <div className="flex flex-wrap items-center justify-between gap-2 p-1 text-xs">
+                  <div className="flex items-center gap-1.5 font-medium text-foreground">
+                    <span className="inline-flex items-center rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:text-amber-300">
+                      更换配件
+                    </span>
+                    <span>正在为【{matchEditorTarget.itemName}】更换配件</span>
+                  </div>
+                  <div className="text-[11px] text-muted-foreground">
+                    原配件：<span className="font-semibold text-foreground">{matchEditorTarget.componentDisplay?.name || "未知"}</span>
+                  </div>
+                </div>
+              ) : null}
               {matchEditorTarget.order?.items && matchEditorTarget.order.items.length > 1 && (() => {
                 const items = matchEditorTarget.order.items;
                 const currentIndex = items.findIndex((it) => String(it.id || "") === matchEditorTarget.itemId);

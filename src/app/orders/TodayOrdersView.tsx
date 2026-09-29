@@ -132,7 +132,7 @@ function CompactTodayOrderCard({
   isProfitUpdating?: boolean;
   onExpand: () => void;
   onRunAction: (action: OrderAction) => void;
-  onOpenMatchEditor: (item: AutoPickOrderItem, options?: { autoOutbound?: boolean }) => void;
+  onOpenMatchEditor: (item: AutoPickOrderItem, options?: { autoOutbound?: boolean; componentIndex?: number; componentDisplay?: any; currentBundleItems?: any[] }) => void;
   onOpenCostBackfill?: (order: AutoPickOrder) => void;
 }) {
   const [routeOpen, setRouteOpen] = useState(false);
@@ -301,7 +301,7 @@ function CompactTodayOrderCard({
               compact={true}
               deleted={deleted}
               readOnly={readOnly}
-              onOpenMatchEditor={(_order, targetItem) => onOpenMatchEditor(targetItem)}
+              onOpenMatchEditor={(_order, targetItem, options) => onOpenMatchEditor(targetItem, options)}
             />
           )) : (
             <div className="flex min-w-0 items-center gap-2 rounded-xl border border-black/6 bg-black/[0.025] px-2 py-1.5 dark:border-white/8 dark:bg-white/[0.035]">
@@ -440,7 +440,7 @@ interface TodayOrdersViewProps {
   targetRefreshOrder?: { id: string; timestamp: number } | null;
   onClearProfitUpdating?: (orderId: string) => void;
   onOpenCostBackfill: (order: AutoPickOrder) => void;
-  onOpenMatchEditor: (order: AutoPickOrder, item: AutoPickOrderItem, options?: { autoOutbound?: boolean }) => void;
+  onOpenMatchEditor: (order: AutoPickOrder, item: AutoPickOrderItem, options?: { autoOutbound?: boolean; componentIndex?: number; componentDisplay?: any; currentBundleItems?: any[] }) => void;
   onOpenPurchaseDraft?: (draft: PurchaseDraftPayload) => void;
   profitUpdatingOrderIds?: string[];
     onDataLoad: (data: {

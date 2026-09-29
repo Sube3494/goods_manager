@@ -108,7 +108,7 @@ interface AllOrdersViewProps {
   targetRefreshOrder?: { id: string; timestamp: number } | null;
   onClearProfitUpdating?: (orderId: string) => void;
   onOpenCostBackfill: (order: AutoPickOrder) => void;
-  onOpenMatchEditor: (order: AutoPickOrder, item: AutoPickOrderItem, options?: { autoOutbound?: boolean }) => void;
+  onOpenMatchEditor: (order: AutoPickOrder, item: AutoPickOrderItem, options?: { autoOutbound?: boolean; componentIndex?: number; componentDisplay?: any; currentBundleItems?: any[] }) => void;
   onOpenPurchaseDraft?: (draft: PurchaseDraftPayload) => void;
   profitUpdatingOrderIds?: string[];
   onDataLoad: (data: {

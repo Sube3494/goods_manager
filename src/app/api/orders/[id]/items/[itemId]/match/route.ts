@@ -453,6 +453,173 @@ export async function PATCH(
       }
     }
 
+    const replaceComponentIndex = typeof body?.componentIndex === "number" && body.componentIndex >= 0
+      ? body.componentIndex
+      : undefined;
+
+    if (replaceComponentIndex !== undefined) {
+      const targetShopProduct = await prisma.shopProduct.findFirst({
+        where: {
+          id: productId,
+          shop: { userId: targetUserId },
+        },
+        select: {
+          id: true,
+          productId: true,
+          productName: true,
+          sku: true,
+          productImage: true,
+          costPrice: true,
+          product: {
+            select: { image: true },
+          },
+          shop: {
+            select: { name: true },
+          },
+        },
+      });
+
+      if (!targetShopProduct) {
+        return NextResponse.json({ error: "选择的配件商品不存在或无权访问" }, { status: 404 });
+      }
+
+      let mainProduct: any = null;
+      let existingBundleItems: any[] = [];
+
+      const currentManual = basePayload.manualMatchedProduct as Record<string, any> | null;
+      if (currentManual && typeof currentManual === "object") {
+        mainProduct = {
+          id: currentManual.id,
+          name: currentManual.name,
+          sku: currentManual.sku,
+          image: currentManual.image,
+          sourceType: currentManual.sourceType || "shopProduct",
+          shopProductId: currentManual.shopProductId || currentManual.id,
+          shopName: currentManual.shopName,
+          ...(currentManual.quantity ? { quantity: currentManual.quantity } : {}),
+        };
+        if (Array.isArray(currentManual.bundleItems) && currentManual.bundleItems.length > 0) {
+          existingBundleItems = [...currentManual.bundleItems];
+        }
+      }
+
+      if (!mainProduct || existingBundleItems.length === 0) {
+        const matchedCandidate = await prisma.shopProduct.findFirst({
+          where: {
+            shop: { userId: targetUserId },
+            OR: [
+              ...(orderItem.platformSkuId ? [
+                { meituanSkuId: { contains: orderItem.platformSkuId } },
+                { jdSkuId: orderItem.platformSkuId },
+                { sku: orderItem.platformSkuId },
+              ] : []),
+              ...(orderItem.productNo ? [
+                { sku: orderItem.productNo },
+                { jdSkuId: orderItem.productNo },
+              ] : []),
+            ],
+          },
+          include: {
+            product: true,
+            shop: true,
+          },
+          orderBy: { updatedAt: "desc" },
+        });
+
+        if (matchedCandidate) {
+          if (!mainProduct) {
+            const rawMainImg = matchedCandidate.productImage || matchedCandidate.product?.image || null;
+            mainProduct = {
+              id: matchedCandidate.id,
+              name: matchedCandidate.productName || orderItem.productName || "未命名商品",
+              sku: matchedCandidate.sku || orderItem.productNo || null,
+              image: rawMainImg ? storage.resolveUrl(rawMainImg) : null,
+              sourceType: "shopProduct",
+              shopProductId: matchedCandidate.id,
+              shopName: matchedCandidate.shop?.name || null,
+            };
+          }
+          if (existingBundleItems.length === 0) {
+            const rawBundle = matchedCandidate.bundleItems || matchedCandidate.product?.bundleItems;
+            if (Array.isArray(rawBundle) && rawBundle.length > 0) {
+              existingBundleItems = [...rawBundle];
+            }
+          }
+        }
+      }
+
+      if (existingBundleItems.length === 0 && Array.isArray(body?.currentBundleItems)) {
+        existingBundleItems = body.currentBundleItems.map((c: any) => ({
+          id: c.shopProductId || c.id,
+          name: c.name,
+          sku: c.sku,
+          image: c.image,
+          sourceType: "shopProduct",
+          shopProductId: c.shopProductId || c.id,
+          quantity: c.quantity || 1,
+        }));
+      }
+
+      if (!mainProduct) {
+        mainProduct = {
+          id: orderItem.id,
+          name: orderItem.productName || "未命名商品",
+          sku: orderItem.productNo || null,
+          image: orderItem.thumb ? storage.resolveUrl(orderItem.thumb) : null,
+          sourceType: "shopProduct",
+          shopProductId: orderItem.id,
+          shopName: null,
+        };
+      }
+
+      const rawNewImg = targetShopProduct.productImage || targetShopProduct.product?.image || null;
+      const newQty = itemsQtyMap.get(targetShopProduct.id) || (body?.quantity ? Number(body.quantity) : 1);
+      const newComponent = {
+        id: targetShopProduct.id,
+        name: targetShopProduct.productName || "未命名配件",
+        sku: targetShopProduct.sku || null,
+        image: rawNewImg ? storage.resolveUrl(rawNewImg) : null,
+        sourceType: "shopProduct",
+        shopProductId: targetShopProduct.id,
+        shopName: targetShopProduct.shop?.name || null,
+        quantity: Math.max(1, Number(newQty || 1)),
+      };
+
+      const nextBundleItems = [...existingBundleItems];
+      if (replaceComponentIndex >= 0 && replaceComponentIndex < nextBundleItems.length) {
+        nextBundleItems[replaceComponentIndex] = newComponent;
+      } else {
+        nextBundleItems.push(newComponent);
+      }
+
+      const updatedMatchedProduct = {
+        ...mainProduct,
+        isManual: true,
+        isBundle: true,
+        bundleItems: nextBundleItems,
+      };
+
+      await prisma.$transaction(async (tx) => {
+        await tx.autoPickOrderItem.update({
+          where: { id: orderItem.id },
+          data: {
+            rawPayload: {
+              ...restPayload,
+              manualMatchedProduct: updatedMatchedProduct,
+            },
+          },
+        });
+      });
+
+      await returnLegacyOutbound(orderItem.order.orderNo);
+      await rebuildOutbound();
+
+      return NextResponse.json({
+        ok: true,
+        matchedProduct: updatedMatchedProduct,
+      });
+    }
+
     if (productIds.length > 1) {
       const shopProducts = await prisma.shopProduct.findMany({
         where: {

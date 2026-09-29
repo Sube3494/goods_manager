@@ -2323,16 +2323,23 @@ export function ProductStripItem({
           <button
             type="button"
             onClick={onEditMatch}
-            title="改匹配"
-            aria-label="改匹配"
+            title={isBundleComponent ? "改配件" : "改匹配"}
+            aria-label={isBundleComponent ? "改配件" : "改匹配"}
             className={cn(
               "inline-flex shrink-0 cursor-pointer items-center justify-center rounded-full font-medium transition-all",
-              compact
-                ? "h-7 w-7 border border-transparent bg-black/[0.025] p-0 text-muted-foreground hover:bg-black/[0.06] hover:text-foreground dark:bg-white/[0.035] dark:hover:bg-white/[0.08]"
-                : "h-6 w-6 sm:h-8 sm:w-auto border border-black/8 bg-white/85 p-0 sm:px-2.5 text-[11px] sm:text-[13px] text-foreground hover:border-black/12 hover:bg-zinc-100 dark:border-white/10 dark:bg-white/6 dark:text-white dark:hover:border-white/20 dark:hover:bg-white/14"
+              isBundleComponent
+                ? "h-6 sm:h-7 px-2 sm:px-2.5 text-[10.5px] sm:text-xs border border-amber-500/25 bg-amber-500/10 text-amber-700 hover:bg-amber-500/18 dark:border-amber-400/25 dark:text-amber-300 dark:hover:bg-amber-500/20"
+                : compact
+                  ? "h-7 w-7 border border-transparent bg-black/[0.025] p-0 text-muted-foreground hover:bg-black/[0.06] hover:text-foreground dark:bg-white/[0.035] dark:hover:bg-white/[0.08]"
+                  : "h-6 w-6 sm:h-8 sm:w-auto border border-black/8 bg-white/85 p-0 sm:px-2.5 text-[11px] sm:text-[13px] text-foreground hover:border-black/12 hover:bg-zinc-100 dark:border-white/10 dark:bg-white/6 dark:text-white dark:hover:border-white/20 dark:hover:bg-white/14"
             )}
           >
-            {compact ? (
+            {isBundleComponent ? (
+              <span className="flex items-center gap-1">
+                <Pencil size={10} />
+                <span>改配件</span>
+              </span>
+            ) : compact ? (
               <Pencil size={12} />
             ) : (
               <>
@@ -2397,7 +2404,7 @@ export function OrderItemBundleGroup({
   order: AutoPickOrder;
   deleted: boolean;
   readOnly: boolean;
-  onOpenMatchEditor: (order: AutoPickOrder, item: AutoPickOrderItem) => void;
+  onOpenMatchEditor: (order: AutoPickOrder, item: AutoPickOrderItem, options?: { autoOutbound?: boolean; componentIndex?: number; componentDisplay?: any; currentBundleItems?: any[] }) => void;
   returnedItemQuantityMap?: Map<string, number>;
   returnedItemDetailsMap?: Map<string, any[]>;
   isJdPlatformOrder?: boolean;
@@ -2472,7 +2479,12 @@ export function OrderItemBundleGroup({
               display={display}
               compact={true}
               isBundleComponent={true}
-              showEditMatch={false}
+              showEditMatch={!deleted && !readOnly}
+              onEditMatch={() => onOpenMatchEditor(order, item, {
+                componentIndex: cIdx,
+                componentDisplay: display,
+                currentBundleItems: componentDisplays,
+              })}
               matchedProduct={undefined}
               showMatchStatus={false}
               returnedQuantity={0}
