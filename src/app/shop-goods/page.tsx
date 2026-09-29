@@ -1388,7 +1388,26 @@ export default function ShopGoodsPage() {
   );
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedSupplier, setSelectedSupplier] = useState("all");
-  const [sortBy, setSortBy] = useState("sku-desc");
+  const [sortBy, setSortByState] = useState("sku-desc");
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("shop_goods_sort_by");
+      if (saved) {
+        setSortByState(saved);
+      }
+    } catch {}
+  }, []);
+
+  const setSortBy = useCallback((val: string | ((prev: string) => string)) => {
+    setSortByState((prev) => {
+      const nextVal = typeof val === "function" ? val(prev) : val;
+      try {
+        localStorage.setItem("shop_goods_sort_by", nextVal);
+      } catch {}
+      return nextVal;
+    });
+  }, []);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [assignedTemplateIds, setAssignedTemplateIds] = useState<string[]>([]);
   const [isPickerOpen, setIsPickerOpen] = useState(false);
@@ -2560,64 +2579,53 @@ export default function ShopGoodsPage() {
         )}
       </div>
 
-      {libraries.length > 1 && (
-        <div className="flex items-center overflow-x-auto no-scrollbar py-0.5">
-          <div className="inline-flex items-center p-1 rounded-full bg-white/40 dark:bg-white/5 border border-border/60 dark:border-white/10 shadow-xs max-w-full">
-            <button
-              type="button"
-              onClick={() => setActiveLibraryId("all")}
-              className={cn(
-                "px-3.5 sm:px-4 py-1.5 text-xs sm:text-sm font-bold rounded-full transition-all duration-200 shrink-0 whitespace-nowrap",
-                activeLibraryId === "all"
-                  ? "bg-white dark:bg-white/15 text-foreground shadow-xs"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <span className="sm:hidden">全部</span>
-              <span className="hidden sm:inline">全部商品库</span>
-            </button>
-            {libraries.map((lib) => (
-              <button
-                key={lib.id}
-                type="button"
-                onClick={() => setActiveLibraryId(lib.id)}
-                className={cn(
-                  "px-3.5 sm:px-4 py-1.5 text-xs sm:text-sm font-bold rounded-full transition-all duration-200 shrink-0 whitespace-nowrap",
-                  activeLibraryId === lib.id
-                    ? "bg-white dark:bg-white/15 text-foreground shadow-xs"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                {lib.name}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
       <div className="flex flex-col xl:flex-row items-stretch xl:items-center gap-2">
-        <div className="flex items-center gap-2 flex-1">
-          <div className="h-10 sm:h-11 px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 flex-1 relative">
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <div className="h-10 sm:h-11 px-4 sm:px-5 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 flex items-center gap-2.5 sm:gap-3 focus-within:ring-2 focus-within:ring-primary/20 transition-all dark:hover:bg-white/10 flex-1 relative min-w-0">
             <Search size={18} className="text-muted-foreground shrink-0" />
-            <input type="text" placeholder="搜索商品、编号或店铺..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="bg-transparent border-none outline-none w-full text-foreground placeholder:text-muted-foreground text-sm h-full pr-8" />
-            {searchQuery && <button onClick={() => setSearchQuery("")} className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/10 p-1 rounded-full transition-colors"><X size={14} /></button>}
+            <input type="text" placeholder="搜索商品、编号或店铺..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="bg-transparent border-none outline-none w-full text-foreground placeholder:text-muted-foreground text-xs sm:text-sm h-full pr-8" />
+            {searchQuery && <button onClick={() => setSearchQuery("")} className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/10 p-1 rounded-full transition-colors"><X size={14} /></button>}
           </div>
+
+          {libraries.length > 1 && (
+            <div className="w-32 sm:w-44 h-10 sm:h-11 shrink-0">
+              <CustomSelect
+                value={activeLibraryId}
+                onChange={(val) => setActiveLibraryId(val)}
+                options={[
+                  { value: "all", label: "全部商品库" },
+                  ...libraries.map((lib) => ({ value: lib.id, label: lib.name }))
+                ]}
+                placeholder="全部商品库"
+                searchable={false}
+                matchTriggerWidth
+                align="right"
+                className="h-full"
+                triggerClassName={cn(
+                  "h-full rounded-full border text-xs sm:text-sm py-0 px-2 sm:px-4 transition-all truncate",
+                  activeLibraryId !== "all"
+                    ? "bg-primary/10 border-primary/20 text-primary dark:bg-primary/20 dark:border-primary/30 dark:text-primary font-bold"
+                    : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5"
+                )}
+              />
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-2 xl:flex gap-2 sm:gap-3 w-full xl:w-auto shrink-0">
           {filteredShops.length > 0 && (
             <div className="xl:w-52 h-10 sm:h-11">
-              <CustomSelect value={selectedShopId} onChange={setSelectedShopId} options={filteredShops.map((shop) => ({ value: shop.id, label: shop.name }))} placeholder="选择店铺" className="h-full" triggerClassName={cn("h-full rounded-full border text-xs sm:text-sm py-0 px-2 sm:px-5 transition-all truncate", selectedShop ? "bg-primary/10 border-primary/20 text-primary dark:bg-primary/20 dark:border-primary/30 dark:text-primary font-medium" : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5")} />
+              <CustomSelect value={selectedShopId} onChange={setSelectedShopId} options={filteredShops.map((shop) => ({ value: shop.id, label: shop.name }))} placeholder="选择店铺" matchTriggerWidth className="h-full" triggerClassName={cn("h-full rounded-full border text-xs sm:text-sm py-0 px-2 sm:px-5 transition-all truncate", selectedShop ? "bg-primary/10 border-primary/20 text-primary dark:bg-primary/20 dark:border-primary/30 dark:text-primary font-medium" : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5")} />
             </div>
           )}
           <div className="xl:w-44 h-10 sm:h-11">
-            <CustomSelect value={selectedCategory} onChange={setSelectedCategory} options={categoryOptions} placeholder="全部分类" className="h-full" triggerClassName="h-full rounded-full border text-xs sm:text-sm py-0 px-2 sm:px-5 transition-all truncate bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5" />
+            <CustomSelect value={selectedCategory} onChange={setSelectedCategory} options={categoryOptions} placeholder="全部分类" matchTriggerWidth className="h-full" triggerClassName="h-full rounded-full border text-xs sm:text-sm py-0 px-2 sm:px-5 transition-all truncate bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5" />
           </div>
           <div className="xl:w-44 h-10 sm:h-11">
-            <CustomSelect value={selectedSupplier} onChange={setSelectedSupplier} options={[{ value: "all", label: "所有供应商" }, { value: "unknown", label: "未知供应商" }, ...suppliers.map((supplier) => ({ value: supplier.id, label: supplier.name }))]} placeholder="所有供应商" className="h-full" triggerClassName="h-full rounded-full border text-xs sm:text-sm py-0 px-2 sm:px-5 transition-all truncate bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5" />
+            <CustomSelect value={selectedSupplier} onChange={setSelectedSupplier} options={[{ value: "all", label: "所有供应商" }, { value: "unknown", label: "未知供应商" }, ...suppliers.map((supplier) => ({ value: supplier.id, label: supplier.name }))]} placeholder="所有供应商" matchTriggerWidth className="h-full" triggerClassName="h-full rounded-full border text-xs sm:text-sm py-0 px-2 sm:px-5 transition-all truncate bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5" />
           </div>
           <div className="xl:w-48 h-10 sm:h-11">
-            <CustomSelect value={sortBy} onChange={setSortBy} options={[{ value: "sku-asc", label: "店内码从小到大" }, { value: "sku-desc", label: "店内码从大到小" }, { value: "createdAt-desc", label: "最新创建" }, { value: "createdAt-asc", label: "最早创建" }, { value: "stock-desc", label: "库存从高到低" }, { value: "stock-asc", label: "库存从低到高" }, { value: "shop-asc", label: "店铺 A-Z" }, { value: "shop-desc", label: "店铺 Z-A" }, { value: "name-asc", label: "名称 A-Z" }]} className="h-full" triggerClassName="h-full rounded-full border text-xs sm:text-sm py-0 px-2 sm:px-5 transition-all truncate bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5" />
+            <CustomSelect value={sortBy} onChange={setSortBy} options={[{ value: "sku-asc", label: "店内码从小到大" }, { value: "sku-desc", label: "店内码从大到小" }, { value: "createdAt-desc", label: "最新创建" }, { value: "createdAt-asc", label: "最早创建" }, { value: "stock-desc", label: "库存从高到低" }, { value: "stock-asc", label: "库存从低到高" }, { value: "shop-asc", label: "店铺 A-Z" }, { value: "shop-desc", label: "店铺 Z-A" }, { value: "name-asc", label: "名称 A-Z" }]} searchable={false} align="right" matchTriggerWidth className="h-full" triggerClassName="h-full rounded-full border text-xs sm:text-sm py-0 px-2 sm:px-5 transition-all truncate bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5" />
           </div>
         </div>
       </div>

@@ -47,7 +47,7 @@ export function CustomSelect({
   const [searchQuery, setSearchQuery] = useState("");
   const [isMobile, setIsMobile] = useState(false);
 
-  const isSearchable = searchable ?? options.length >= 8;
+  const isSearchable = searchable ?? options.length >= 12;
 
   useEffect(() => {
     const checkMobile = () => {
@@ -288,7 +288,7 @@ export function CustomSelect({
                         option.value === value && "bg-primary/10 text-primary font-bold dark:bg-primary/20 dark:text-primary"
                       )}
                     >
-                      <span className="whitespace-nowrap font-medium pr-1">{option.label}</span>
+                      <span className="truncate font-medium pr-1">{option.label}</span>
                       {option.value === value && (
                         <span className="absolute right-2.5 flex h-3.5 w-3.5 items-center justify-center">
                           <Check size={12} />

@@ -161,7 +161,26 @@ export default function GoodsPage() {
   const [selectedSupplier, setSelectedSupplier] = useState("all");
   const [isBatchEditOpen, setIsBatchEditOpen] = useState(false);
   const [isBatchBundleOpen, setIsBatchBundleOpen] = useState(false);
-  const [sortBy, setSortBy] = useState<string>("sku-desc");
+  const [sortBy, setSortByState] = useState<string>("sku-desc");
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("goods_sort_by");
+      if (saved) {
+        setSortByState(saved);
+      }
+    } catch {}
+  }, []);
+
+  const setSortBy = useCallback((val: string | ((prev: string) => string)) => {
+    setSortByState((prev) => {
+      const nextVal = typeof val === "function" ? val(prev) : val;
+      try {
+        localStorage.setItem("goods_sort_by", nextVal);
+      } catch {}
+      return nextVal;
+    });
+  }, []);
   const [viewMode, setViewMode] = useState<"card" | "quickEdit">("card");
   const [purchaseDraft, setPurchaseDraft] = useState<PurchaseOrder | null>(null);
 
@@ -1299,6 +1318,9 @@ export default function GoodsPage() {
                         { value: 'createdAt-asc', label: '最早创建' },
                         { value: 'name-asc', label: '名称 A-Z' }
                     ]}
+                    searchable={false}
+                    align="right"
+                    matchTriggerWidth
                     className="h-full"
                     triggerClassName={cn(
                         "h-full rounded-full border text-xs sm:text-sm py-0 px-2 sm:px-5 transition-all truncate",
