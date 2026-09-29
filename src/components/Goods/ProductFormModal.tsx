@@ -1569,15 +1569,19 @@ export function ProductFormModal({
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             className="fixed left-1/2 top-1/2 z-70001 w-[calc(100%-32px)] sm:w-full max-w-2xl -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-white dark:bg-gray-900/70 backdrop-blur-xl border border-border/50 shadow-2xl overflow-hidden flex flex-col max-h-safe-modal"
           >
-            <div className="flex items-center justify-between border-b border-white/10 p-8 shrink-0">
-              <h2 className="text-2xl font-bold text-foreground">{title || (initialData ? "编辑商品" : "新增商品")}</h2>
-              <button type="button" onClick={onClose} className="rounded-full p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors">
-                <X size={24} />
+            <div className="flex items-center justify-between border-b border-border/50 dark:border-white/10 px-4 sm:px-6 py-3 sm:py-4 shrink-0">
+              <h2 className="text-base sm:text-lg font-bold text-foreground truncate">{title || (initialData ? "编辑商品" : "新增商品")}</h2>
+              <button 
+                type="button" 
+                onClick={onClose} 
+                className="rounded-full p-1.5 sm:p-2 text-muted-foreground hover:bg-black/5 dark:hover:bg-white/10 hover:text-foreground transition-colors shrink-0"
+              >
+                <X size={18} className="sm:size-5" />
               </button>
             </div>
 
             <form onSubmit={handleSubmit} className="flex flex-col min-h-0 flex-1 overflow-hidden">
-                <div className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 space-y-6 custom-scrollbar">
+                <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 sm:py-6 space-y-5 sm:space-y-6 custom-scrollbar">
                     {!hideSkuField && (
                       <div className="space-y-1.5 sm:space-y-2">
                           <label className="text-xs sm:text-sm font-medium text-muted-foreground flex items-center gap-2">
@@ -2941,19 +2945,19 @@ export function ProductFormModal({
                     )}
 
                 </div>
-                <div className="flex flex-row justify-end items-center gap-3 sm:gap-4 border-t border-white/10 p-4 sm:p-8 shrink-0">
+                <div className="flex flex-row justify-end items-center gap-3 sm:gap-4 border-t border-border/50 dark:border-white/10 px-4 sm:px-6 py-3 sm:py-4 shrink-0">
                     <button
                         type="button"
                         onClick={onClose}
-                        className="flex-1 sm:flex-none rounded-full px-6 py-2.5 text-sm font-medium text-muted-foreground border border-border hover:text-foreground hover:bg-secondary/50 transition-all active:scale-[0.97]"
+                        className="flex-1 sm:flex-none rounded-full px-5 sm:px-6 py-2 sm:py-2.5 text-xs sm:text-sm font-medium text-muted-foreground border border-border hover:text-foreground hover:bg-secondary/50 transition-all active:scale-[0.97]"
                     >
                         取消
                     </button>
                     <button
                         type="submit"
-                        className="flex-1 sm:flex-none group flex items-center justify-center gap-2 rounded-full bg-primary px-8 sm:px-10 py-3 text-sm font-bold text-primary-foreground shadow-[0_8px_20px_-4px_rgba(var(--primary-rgb),0.5)] transition-all duration-300 hover:bg-primary/90 hover:shadow-[0_12px_24px_-4px_rgba(var(--primary-rgb),0.6)] hover:-translate-y-0.5 active:scale-[0.97]"
+                        className="flex-1 sm:flex-none group flex items-center justify-center gap-2 rounded-full bg-primary px-6 sm:px-8 py-2 sm:py-2.5 text-xs sm:text-sm font-bold text-primary-foreground shadow-[0_8px_20px_-4px_rgba(var(--primary-rgb),0.5)] transition-all duration-300 hover:bg-primary/90 hover:shadow-[0_12px_24px_-4px_rgba(var(--primary-rgb),0.6)] hover:-translate-y-0.5 active:scale-[0.97]"
                     >
-                        <CheckCircle size={18} strokeWidth={2.5} className="group-hover:rotate-12 transition-transform" />
+                        <CheckCircle size={16} strokeWidth={2.5} className="group-hover:rotate-12 transition-transform sm:size-[18px]" />
                         <span>保存数据</span>
                     </button>
                 </div>
