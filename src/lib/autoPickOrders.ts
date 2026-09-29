@@ -7128,7 +7128,13 @@ async function resolveOutboundItemsForAutoPickOrder(
           bShopProductId = b.shopProductId;
         }
         if (!bProductId) {
-          bProductId = b.productId || b.id || null;
+          bProductId = b.productId || (b.sourceType === "product" && !b.shopProductId ? b.id : null);
+        }
+        if (bShopProductId && !bProductId) {
+          const foundSp = shopProducts.find((p) => p.id === bShopProductId);
+          if (foundSp) {
+            bProductId = foundSp.productId || foundSp.sourceProductId || null;
+          }
         }
 
         const bItemQty = Math.max(1, Math.trunc(Number(b.quantity) || 1));
@@ -7739,6 +7745,17 @@ export async function createOutboundFromAutoPickOrder(
       }))
     );
 
+    const candidateProductIds = Array.from(new Set(
+      resolved.items.map((item) => item.productId).filter((id): id is string => Boolean(id))
+    ));
+    const validProductRows = candidateProductIds.length > 0
+      ? await tx.product.findMany({
+          where: { id: { in: candidateProductIds } },
+          select: { id: true },
+        })
+      : [];
+    const validProductIdSet = new Set(validProductRows.map((p) => p.id));
+
     const outboundOrder = await tx.outboundOrder.create({
       data: {
         type: "Sale",
@@ -7756,7 +7773,7 @@ export async function createOutboundFromAutoPickOrder(
           create: resolved.items.map((item) => {
             const costSnapshot = costSnapshots.shift();
             return {
-              productId: item.productId,
+              productId: item.productId && validProductIdSet.has(item.productId) ? item.productId : null,
               shopProductId: item.shopProductId,
               quantity: item.quantity,
               price: item.price,

@@ -466,6 +466,7 @@ export async function PATCH(
       if (currentManual && typeof currentManual === "object") {
         mainProduct = {
           id: currentManual.id,
+          productId: currentManual.productId || null,
           name: currentManual.name,
           sku: currentManual.sku,
           image: currentManual.image,
@@ -507,6 +508,7 @@ export async function PATCH(
             const rawMainImg = matchedCandidate.productImage || matchedCandidate.product?.image || null;
             mainProduct = {
               id: matchedCandidate.id,
+              productId: matchedCandidate.productId || matchedCandidate.sourceProductId || null,
               name: matchedCandidate.productName || orderItem.productName || "未命名商品",
               sku: matchedCandidate.sku || orderItem.productNo || null,
               image: rawMainImg ? storage.resolveUrl(rawMainImg) : null,
@@ -527,6 +529,7 @@ export async function PATCH(
       if (existingBundleItems.length === 0 && Array.isArray(body?.currentBundleItems)) {
         existingBundleItems = body.currentBundleItems.map((c: any) => ({
           id: c.shopProductId || c.id,
+          productId: c.productId || null,
           name: c.name,
           sku: c.sku,
           image: c.image,
@@ -539,6 +542,7 @@ export async function PATCH(
       if (!mainProduct && autoMatchedProduct) {
         mainProduct = {
           id: autoMatchedProduct.id,
+          productId: (autoMatchedProduct as any).productId || null,
           name: autoMatchedProduct.name || orderItem.productName || "未命名商品",
           sku: autoMatchedProduct.sku || orderItem.productNo || null,
           image: autoMatchedProduct.image || null,
@@ -551,6 +555,7 @@ export async function PATCH(
       if (!mainProduct) {
         mainProduct = {
           id: orderItem.id,
+          productId: null,
           name: orderItem.productName || "未命名商品",
           sku: orderItem.productNo || null,
           image: orderItem.thumb ? storage.resolveUrl(orderItem.thumb) : null,
@@ -611,6 +616,7 @@ export async function PATCH(
         select: {
           id: true,
           productId: true,
+          sourceProductId: true,
           productName: true,
           sku: true,
           productImage: true,
@@ -634,6 +640,7 @@ export async function PATCH(
       const newQty = itemsQtyMap.get(targetShopProduct.id) || (body?.quantity ? Number(body.quantity) : 1);
       const newComponent = {
         id: targetShopProduct.id,
+        productId: targetShopProduct.productId || targetShopProduct.sourceProductId || null,
         name: targetShopProduct.productName || "未命名配件",
         sku: targetShopProduct.sku || null,
         image: rawNewImg ? storage.resolveUrl(rawNewImg) : null,
@@ -686,6 +693,8 @@ export async function PATCH(
         },
         select: {
           id: true,
+          productId: true,
+          sourceProductId: true,
           productName: true,
           sku: true,
           productImage: true,
@@ -725,6 +734,7 @@ export async function PATCH(
           const rawItemImg = p.productImage || p.product?.image || null;
           return {
             id: p.id,
+            productId: p.productId || p.sourceProductId || null,
             name: p.productName || "未命名商品",
             sku: p.sku || null,
             image: rawItemImg ? storage.resolveUrl(rawItemImg) : null,
@@ -819,6 +829,7 @@ export async function PATCH(
     const rawSingleImage = shopProduct.productImage || shopProduct.product?.image || null;
     const matchedProduct = {
       id: shopProduct.id,
+      productId: shopProduct.productId || shopProduct.sourceProductId || null,
       name: shopProduct.productName || "未命名商品",
       sku: shopProduct.sku || null,
       image: rawSingleImage ? storage.resolveUrl(rawSingleImage) : null,
