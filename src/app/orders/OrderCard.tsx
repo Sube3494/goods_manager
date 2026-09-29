@@ -2289,8 +2289,7 @@ export function ProductStripItem({
   return (
     <>
       <div className={cn(
-        "flex border min-w-0 max-w-full",
-        compact ? "items-center" : "items-start sm:items-center",
+        "flex border min-w-0 max-w-full items-center",
         isBundleComponent
           ? "border-black/5 bg-black/[0.015] dark:border-white/6 dark:bg-white/[0.02]"
           : "border-black/6 bg-white/70 dark:border-white/8 dark:bg-white/4",
@@ -2326,10 +2325,13 @@ export function ProductStripItem({
           )}
         </div>
         <div className="min-w-0 flex-1">
-          <div className={cn(
-            "break-all wrap-break-word font-medium text-foreground",
-            compact ? "line-clamp-1 text-xs leading-4" : "line-clamp-2 text-[13px] leading-4.5 sm:line-clamp-1 sm:text-sm sm:leading-5"
-          )}>
+          <div 
+            title={display.name}
+            className={cn(
+              "break-all wrap-break-word font-medium text-foreground line-clamp-1",
+              compact ? "text-xs leading-4" : "text-[13px] leading-5 sm:text-sm"
+            )}
+          >
             {bundleComponentCount !== undefined && bundleComponentCount > 0 && onToggleBundleExpand ? (
               <button
                 type="button"
@@ -2354,7 +2356,7 @@ export function ProductStripItem({
           </div>
           <div className={cn(
             "mt-0.5 flex flex-wrap items-center font-medium text-muted-foreground",
-            compact ? "gap-x-1.5 gap-y-0.5 text-[10px]" : "gap-x-2 gap-y-1 text-[11px] sm:mt-1 sm:gap-x-2.5"
+            compact ? "gap-x-1.5 gap-y-0.5 text-[10px]" : "gap-x-1.5 sm:gap-x-2.5 gap-y-0.5 text-[11px] sm:mt-1"
           )}>
             {shouldShowItemSku ? (
               <span className="shrink-0 font-mono">{display.sku}</span>
@@ -2362,13 +2364,17 @@ export function ProductStripItem({
             <span className="shrink-0">x{display.quantity}</span>
             {typeof display.costPrice === "number" && Number.isFinite(display.costPrice) && display.costPrice > 0 ? (
               <span className="shrink-0 text-emerald-600 dark:text-emerald-400">
-                {display.costSource === "outbound" ? "出库成本" : "当前成本"} ¥{display.costPrice.toFixed(2)}
+                {display.costSource === "outbound" ? (
+                  <><span className="hidden sm:inline">出库</span>成本</>
+                ) : (
+                  <><span className="hidden sm:inline">当前</span>成本</>
+                )} ¥{display.costPrice.toFixed(2)}
               </span>
             ) : null}
             {showMatchStatus ? (
               <span className={cn(
                 "inline-flex shrink-0 items-center rounded-full py-0.5 text-[10px] font-medium leading-none whitespace-nowrap",
-                compact ? "px-1.5" : "px-2 sm:text-[11px]",
+                compact ? "px-1.5" : "px-1.5 sm:px-2 sm:text-[11px]",
                 matchMeta.className
               )}>
                 {matchMeta.text}
@@ -2420,7 +2426,7 @@ export function ProductStripItem({
           ) : null}
         </div>
       </div>
-      <div className="flex flex-row shrink-0 items-center self-center justify-end gap-1.5">
+      <div className="flex flex-col sm:flex-row shrink-0 items-center self-center justify-end gap-1 sm:gap-1.5">
         {showEditMatch && onEditMatch ? (
           <button
             type="button"
@@ -2432,8 +2438,8 @@ export function ProductStripItem({
               isBundleComponent
                 ? "order-1 h-6 w-6 sm:h-7 sm:w-auto p-0 sm:px-2.5 sm:gap-1 text-[10.5px] sm:text-xs border border-amber-500/25 bg-amber-500/10 text-amber-700 hover:bg-amber-500/18 dark:border-amber-400/25 dark:text-amber-300 dark:hover:bg-amber-500/20"
                 : compact
-                  ? "h-6.5 w-6.5 border border-transparent bg-black/[0.025] p-0 text-muted-foreground hover:bg-black/[0.06] hover:text-foreground dark:bg-white/[0.035] dark:hover:bg-white/[0.08]"
-                  : "h-7 w-7 p-0 sm:h-8 sm:w-auto sm:px-2.5 sm:gap-1 text-[11px] sm:text-[13px] border border-black/8 bg-white/85 text-foreground hover:border-black/12 hover:bg-zinc-100 dark:border-white/10 dark:bg-white/6 dark:text-white dark:hover:border-white/20 dark:hover:bg-white/14"
+                  ? "h-6 w-6 border border-transparent bg-black/[0.025] p-0 text-muted-foreground hover:bg-black/[0.06] hover:text-foreground dark:bg-white/[0.035] dark:hover:bg-white/[0.08]"
+                  : "h-6.5 w-6.5 sm:h-8 sm:w-auto p-0 sm:px-2.5 sm:gap-1 text-[11px] sm:text-[13px] border border-black/8 bg-white/85 text-foreground hover:border-black/12 hover:bg-zinc-100 dark:border-white/10 dark:bg-white/6 dark:text-white dark:hover:border-white/20 dark:hover:bg-white/14"
             )}
           >
             {isBundleComponent ? (
@@ -2445,7 +2451,7 @@ export function ProductStripItem({
               <Pencil size={11} />
             ) : (
               <>
-                <Pencil size={12} className="shrink-0 sm:w-2.5 sm:h-2.5" />
+                <Pencil size={11} className="shrink-0 sm:w-3 sm:h-3" />
                 <span className="hidden sm:inline">改匹配</span>
               </>
             )}
@@ -2461,11 +2467,11 @@ export function ProductStripItem({
             className={cn(
               "order-1 inline-flex shrink-0 cursor-pointer items-center justify-center rounded-full font-medium transition-all",
               compact
-                ? "h-6.5 w-6.5 p-0 border border-amber-500/25 bg-amber-500/8 text-amber-700 hover:bg-amber-500/18 dark:border-amber-400/25 dark:text-amber-300 dark:hover:bg-amber-500/20"
-                : "h-7 w-7 p-0 sm:h-8 sm:w-auto sm:px-2.5 sm:gap-1 text-[11px] sm:text-[13px] border border-amber-500/30 bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 dark:border-amber-400/30 dark:text-amber-300 dark:hover:bg-amber-500/20"
+                ? "h-6 w-6 p-0 border border-amber-500/25 bg-amber-500/8 text-amber-700 hover:bg-amber-500/18 dark:border-amber-400/25 dark:text-amber-300 dark:hover:bg-amber-500/20"
+                : "h-6.5 w-6.5 sm:h-8 sm:w-auto p-0 sm:px-2.5 sm:gap-1 text-[11px] sm:text-[13px] border border-amber-500/30 bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 dark:border-amber-400/30 dark:text-amber-300 dark:hover:bg-amber-500/20"
             )}
           >
-            <Plus size={compact ? 12 : 13} className="shrink-0 sm:w-3 sm:h-3" />
+            <Plus size={compact ? 11 : 12} className="shrink-0 sm:w-3 sm:h-3" />
             {!compact ? <span className="hidden sm:inline">配礼袋</span> : null}
           </button>
         ) : null}
