@@ -2542,7 +2542,7 @@ export default function ShopGoodsPage() {
   }, [fetchCategories, fetchShopProducts, fetchSuppliers, selectedShop, showToast]);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4 sm:space-y-8">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-3 min-w-0">
@@ -2566,34 +2566,37 @@ export default function ShopGoodsPage() {
       </div>
 
       {libraries.length > 1 && (
-        <div className="flex flex-wrap gap-2 border-b border-border/50 pb-3">
-          <button
-            type="button"
-            onClick={() => setActiveLibraryId("all")}
-            className={cn(
-              "px-4 py-2 text-sm font-bold rounded-xl transition-all duration-200",
-              activeLibraryId === "all"
-                ? "bg-primary text-primary-foreground shadow-md shadow-primary/10"
-                : "text-muted-foreground hover:bg-muted/10 hover:text-foreground"
-            )}
-          >
-            全部商品库
-          </button>
-          {libraries.map((lib) => (
+        <div className="flex items-center overflow-x-auto no-scrollbar py-0.5">
+          <div className="inline-flex items-center p-1 rounded-full bg-white/40 dark:bg-white/5 border border-border/60 dark:border-white/10 shadow-xs max-w-full">
             <button
-              key={lib.id}
               type="button"
-              onClick={() => setActiveLibraryId(lib.id)}
+              onClick={() => setActiveLibraryId("all")}
               className={cn(
-                "px-4 py-2 text-sm font-bold rounded-xl transition-all duration-200",
-                activeLibraryId === lib.id
-                  ? "bg-primary text-primary-foreground shadow-md shadow-primary/10"
-                  : "text-muted-foreground hover:bg-muted/10 hover:text-foreground"
+                "px-3.5 sm:px-4 py-1.5 text-xs sm:text-sm font-bold rounded-full transition-all duration-200 shrink-0 whitespace-nowrap",
+                activeLibraryId === "all"
+                  ? "bg-white dark:bg-white/15 text-foreground shadow-xs"
+                  : "text-muted-foreground hover:text-foreground"
               )}
             >
-              {lib.name}
+              <span className="sm:hidden">全部</span>
+              <span className="hidden sm:inline">全部商品库</span>
             </button>
-          ))}
+            {libraries.map((lib) => (
+              <button
+                key={lib.id}
+                type="button"
+                onClick={() => setActiveLibraryId(lib.id)}
+                className={cn(
+                  "px-3.5 sm:px-4 py-1.5 text-xs sm:text-sm font-bold rounded-full transition-all duration-200 shrink-0 whitespace-nowrap",
+                  activeLibraryId === lib.id
+                    ? "bg-white dark:bg-white/15 text-foreground shadow-xs"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {lib.name}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
