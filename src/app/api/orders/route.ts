@@ -2931,6 +2931,9 @@ export async function GET(request: NextRequest) {
               const bundleId = String(bundleItem?.shopProductId || bundleItem?.id || "").trim();
               return Boolean(bundleId && compositeIdSet.has(bundleId));
             });
+          const rawCompositeItems = Array.isArray(manualMatchedProduct?.compositeItems) && manualMatchedProduct.compositeItems.length > 0
+            ? manualMatchedProduct.compositeItems
+            : (isLegacyCompositeBundle ? storedManualBundleItems : []);
           const hasExplicitManualBundleConfig = Boolean(
             rawItemPayload.manualBundleItemsOverride === true
             || (manualMatchedProduct && (
@@ -2996,6 +2999,33 @@ export async function GET(request: NextRequest) {
                 };
               })
             : null;
+          const compositeDisplayItems = isCompositeMatch && rawCompositeItems.length > 0
+            ? rawCompositeItems.map((compositeItem: any) => {
+                const foundCompositeProduct = mappedShopProducts.find((product) =>
+                  (compositeItem.shopProductId && product.id === compositeItem.shopProductId)
+                  || (compositeItem.id && (product.id === compositeItem.id || product.productId === compositeItem.id))
+                  || (compositeItem.productId && (product.productId === compositeItem.productId || product.id === compositeItem.productId))
+                  || (compositeItem.sku && product.sku === compositeItem.sku)
+                );
+                const perOrderQuantity = Math.max(1, Number(compositeItem.quantity || 1) || 1);
+                const compositeSourceId = getProductSourceIdByPlatform(foundCompositeProduct, order.platform, parentPlatformSkuId)
+                  || getProductSourceIdByPlatform(compositeItem, order.platform, parentPlatformSkuId);
+                return {
+                  name: compositeItem.name || foundCompositeProduct?.name || "未命名商品",
+                  sku: (
+                    isJDPlatform(order.platform)
+                      ? (compositeItem.jdSkuId || foundCompositeProduct?.jdSkuId || compositeItem.sku)
+                      : (compositeItem.sku || foundCompositeProduct?.sku || compositeItem.jdSkuId)
+                  ) || "-",
+                  image: compositeItem.image
+                    ? storage.resolveUrl(compositeItem.image)
+                    : (foundCompositeProduct?.image || null),
+                  quantity: perOrderQuantity * Math.max(1, Number(item.quantity || 1) || 1),
+                  ...resolveDisplayCost(foundCompositeProduct?.shopProductId, foundCompositeProduct?.productId),
+                  sourceId: compositeSourceId || undefined,
+                };
+              })
+            : null;
 
           // 只有没有手动配置时，才允许旧出库明细作为配件展示兜底。
           // 手动清空最后一个配件会保存 bundleItems: [] / isBundle: false；此时若继续
@@ -3054,6 +3084,8 @@ export async function GET(request: NextRequest) {
 
           const displayItems = effectiveBundleDisplayItems && mainDisplayItem
             ? [mainDisplayItem, ...effectiveBundleDisplayItems]
+            : compositeDisplayItems && compositeDisplayItems.length > 0
+            ? compositeDisplayItems
             : hasStrictMatchForAllSegmentsFromSku
             ? segmentsFromSku.map((candidate) => {
                 const segmentMatchedProduct = resolveStrictLocalSkuMatch(candidate);

@@ -2570,6 +2570,33 @@ export function OrderItemBundleGroup({
   const isJd = isJdPlatformOrder ?? isJdOrder(order.platform);
   const isMeituan = isMeituanPlatformOrder ?? isMeituanOrder(order.platform);
 
+  if (isCompositeMatch && item.matchedProduct?.isBundle !== true && displays.length > 1) {
+    return (
+      <div className="space-y-1.5">
+        {displays.map((display, compositeIndex) => (
+          <ProductStripItem
+            key={`${item.productNo || item.productName}-${index}-${display.sku}-${compositeIndex}`}
+            display={display}
+            compact={compact}
+            showEditMatch={!deleted && !readOnly}
+            onEditMatch={() => onOpenMatchEditor(order, item)}
+            onAddBundleItem={!deleted && !readOnly && compositeIndex === 0
+              ? () => onOpenMatchEditor(order, item, { isAddingBundleItem: true })
+              : undefined}
+            matchedProduct={item.matchedProduct}
+            showMatchStatus={true}
+            returnedQuantity={returnedQuantity}
+            returnedDetails={returnedDetails}
+            isJdOrder={isJd}
+            isMeituanOrder={isMeituan}
+            isTaobaoOrder={isTaobaoOrder(order.platform)}
+            isDoudianOrder={isDoudianOrder(order.platform)}
+          />
+        ))}
+      </div>
+    );
+  }
+
   if (!isBundle) {
     const display = isCompositeMatch
       ? getOrderItemDisplay(item, order.platform)
