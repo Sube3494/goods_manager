@@ -5133,6 +5133,10 @@ function mergeAutoPickOrderItemRawPayload(
     }
   }
 
+  if (existingPayload.manualBundleItemsOverride === true) {
+    nextPayload.manualBundleItemsOverride = true;
+  }
+
   const manualMatchedProduct = readManualMatchedProductFromOrderItemRawPayload(existingRawPayload);
   if (!manualMatchedProduct) {
     return nextPayload;

@@ -435,6 +435,7 @@ export async function PATCH(
       ignoreOutbound: _removedIgnoreOutbound,
       isManualIgnored: _removedIsManualIgnored,
       pauseAutoOutbound: _removedPauseAutoOutbound,
+      manualBundleItemsOverride: _removedManualBundleItemsOverride,
       ...restPayload
     } = basePayload;
     const previousAutoMatchedProduct = readAutoMatchedProductSnapshot(orderItem.rawPayload);
@@ -653,10 +654,19 @@ export async function PATCH(
           data: {
             rawPayload: {
               ...restPayload,
+              manualBundleItemsOverride: true,
               manualMatchedProduct: updatedMatchedProduct,
             },
           },
         });
+      });
+
+      console.info("[orders/match] bundle component removed", {
+        orderId: id,
+        itemId: orderItem.id,
+        removeComponentIndex,
+        previousCount: existingBundleItems.length,
+        nextCount: nextBundleItems.length,
       });
 
       await returnLegacyOutbound(orderItem.order.orderNo);
@@ -739,6 +749,7 @@ export async function PATCH(
           data: {
             rawPayload: {
               ...restPayload,
+              manualBundleItemsOverride: true,
               manualMatchedProduct: updatedMatchedProduct,
             },
           },

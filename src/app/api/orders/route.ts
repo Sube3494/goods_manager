@@ -2893,6 +2893,9 @@ export async function GET(request: NextRequest) {
           };
 
           const activeMatched = matchedProduct || manualMatchedProduct;
+          const rawItemPayload = item.rawPayload && typeof item.rawPayload === "object" && !Array.isArray(item.rawPayload)
+            ? item.rawPayload as Record<string, unknown>
+            : {};
           const targetShopProduct = activeMatched
             ? mappedShopProducts.find((p) =>
                 (activeMatched.shopProductId && p.id === activeMatched.shopProductId)
@@ -2902,10 +2905,11 @@ export async function GET(request: NextRequest) {
               ) || null
             : null;
           const hasExplicitManualBundleConfig = Boolean(
-            manualMatchedProduct && (
-              Array.isArray(manualMatchedProduct.bundleItems)
-              || (manualMatchedProduct as any).isBundle === false
-            )
+            rawItemPayload.manualBundleItemsOverride === true
+            || (manualMatchedProduct && (
+                Array.isArray(manualMatchedProduct.bundleItems)
+                || (manualMatchedProduct as any).isBundle === false
+              ))
           );
           const rawBundleItems = hasExplicitManualBundleConfig
             ? (manualMatchedProduct?.bundleItems || [])
