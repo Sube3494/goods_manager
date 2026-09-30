@@ -185,6 +185,7 @@ type MatchedCatalogProduct = {
   shopName?: string | null;
   isManual?: boolean;
   quantity?: number;
+  isBundle?: boolean;
   bundleItems?: any[];
 };
 
@@ -381,6 +382,7 @@ function readManualMatchedProduct(rawPayload: unknown): MatchedCatalogProduct | 
     shopName: String(record.shopName || "").trim() || null,
     isManual: true,
     quantity: Number(record.quantity || 0) > 0 ? Math.max(1, Number(record.quantity || 1) || 1) : undefined,
+    isBundle: typeof record.isBundle === "boolean" ? record.isBundle : (Array.isArray(record.bundleItems) ? record.bundleItems.length > 0 : undefined),
     bundleItems: Array.isArray(record.bundleItems) ? record.bundleItems : undefined,
   };
 }
@@ -2899,14 +2901,24 @@ export async function GET(request: NextRequest) {
                 || (activeMatched.sku && p.sku === activeMatched.sku)
               ) || null
             : null;
-          const rawBundleItems = manualMatchedProduct?.bundleItems
-            || (activeMatched as any)?.bundleItems
-            || (targetShopProduct as any)?.bundleItems;
-          const isBundleProduct = Boolean(
-            (activeMatched as any)?.isBundle
-            || (targetShopProduct as any)?.isBundle
-            || (Array.isArray(rawBundleItems) && rawBundleItems.length > 0)
+          const hasExplicitManualBundleConfig = Boolean(
+            manualMatchedProduct && (
+              Array.isArray(manualMatchedProduct.bundleItems)
+              || (manualMatchedProduct as any).isBundle === false
+            )
           );
+          const rawBundleItems = hasExplicitManualBundleConfig
+            ? (manualMatchedProduct?.bundleItems || [])
+            : (manualMatchedProduct?.bundleItems
+                || (activeMatched as any)?.bundleItems
+                || (targetShopProduct as any)?.bundleItems);
+          const isBundleProduct = hasExplicitManualBundleConfig
+            ? Boolean((manualMatchedProduct as any)?.isBundle || (Array.isArray(rawBundleItems) && rawBundleItems.length > 0))
+            : Boolean(
+                (activeMatched as any)?.isBundle
+                || (targetShopProduct as any)?.isBundle
+                || (Array.isArray(rawBundleItems) && rawBundleItems.length > 0)
+              );
           const bundleItems = isBundleProduct && Array.isArray(rawBundleItems) && rawBundleItems.length > 0
             ? rawBundleItems
             : null;

@@ -45,14 +45,20 @@ export class FinanceMath {
   }
 
   /**
-   * 乘法: a * b (支持用于费率等非常规精度的场景)
-   * e.g. 100 * 0.06 (6% 服务费)
+   * 乘法: a * b (保持最终金额精确到分/两位小数，同时支持乘数或被乘数具备高精度单价，避免提前截断导致小计误差)
+   * e.g. 44.1567 * 3 = 132.47
    */
   static multiply(amount: number, multiplier: number): number {
-    // 因为 multiplier 可能是比如 0.06 (非标准两位小数)，这里采用放大后取整
-    const product = this.toCents(amount) * multiplier;
-    // 银行家舍入（或者简单四舍五入）后除回
-    return this.toYuan(Math.round(product));
+    const product = Number(amount) * Number(multiplier);
+    return this.toYuan(Math.round(product * 100));
+  }
+
+  /**
+   * 单价高精度保留（最多保留 decimals 位小数，默认 4 位）
+   */
+  static roundPrice(price: number, decimals: number = 4): number {
+    const factor = Math.pow(10, decimals);
+    return Math.round((Number(price) || 0) * factor) / factor;
   }
 
   /**

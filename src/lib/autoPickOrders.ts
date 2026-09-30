@@ -7208,6 +7208,7 @@ async function resolveOutboundItemsForAutoPickOrder(
         orderBy: { updatedAt: "desc" },
       });
 
+      const hasExplicitManualBundleConfig = Array.isArray(manualMatchedProduct.bundleItems) || (manualMatchedProduct as any).isBundle === false;
       let manualIsBundle = Boolean(manualMatchedProduct.bundleItems && manualMatchedProduct.bundleItems.length > 0);
       let manualBundleItems = manualMatchedProduct.bundleItems || null;
 
@@ -7219,7 +7220,7 @@ async function resolveOutboundItemsForAutoPickOrder(
           || manualResolvedProductId
           || ""
         ).trim() || null;
-        if (!manualIsBundle) {
+        if (!hasExplicitManualBundleConfig && !manualIsBundle) {
           manualIsBundle = Boolean(matchedShopProduct.isBundle || matchedShopProduct.product?.isBundle);
           manualBundleItems = (matchedShopProduct.bundleItems as any[]) || (matchedShopProduct.product?.bundleItems as any[]) || null;
         }

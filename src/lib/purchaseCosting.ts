@@ -32,7 +32,7 @@ export function allocateShippingToPurchaseItems<T extends PurchaseCostItemInput>
   if (totalAdditionalFees <= 0 || items.length === 0) {
     return items.map((item) => ({
       ...item,
-      costPrice: FinanceMath.add(Number(item.costPrice) || 0, 0),
+      costPrice: FinanceMath.roundPrice(Number(item.costPrice) || 0, 4),
     }));
   }
 
@@ -51,7 +51,7 @@ export function allocateShippingToPurchaseItems<T extends PurchaseCostItemInput>
   if (totalItemValue > 0) {
     return items.map((item) => {
       const qty = Math.max(0, Number(item.quantity) || 0);
-      const baseCost = FinanceMath.add(Number(item.costPrice) || 0, 0);
+      const baseCost = FinanceMath.roundPrice(Number(item.costPrice) || 0, 4);
       if (qty <= 0) {
         return { ...item, costPrice: baseCost };
       }
@@ -60,30 +60,30 @@ export function allocateShippingToPurchaseItems<T extends PurchaseCostItemInput>
       // 该商品明细分摊的总附加费 = 总附加费 * (该明细货值 / 总货值)
       const allocatedTotalFee = FinanceMath.multiply(
         totalAdditionalFees,
-        FinanceMath.divide(itemTotalValue, totalItemValue)
+        totalItemValue > 0 ? itemTotalValue / totalItemValue : 0
       );
       // 单位平摊附加费 = 该明细分摊总附加费 / 数量
-      const perUnitAllocatedFee = FinanceMath.divide(allocatedTotalFee, qty);
+      const perUnitAllocatedFee = qty > 0 ? allocatedTotalFee / qty : 0;
 
       return {
         ...item,
-        costPrice: FinanceMath.add(baseCost, perUnitAllocatedFee),
+        costPrice: FinanceMath.roundPrice(baseCost + perUnitAllocatedFee, 4),
       };
     });
   }
 
   // 3. 如果总货值 <= 0（如单价全为0），按数量均分
   if (totalQuantity > 0) {
-    const perUnitShippingCost = FinanceMath.divide(totalAdditionalFees, totalQuantity);
+    const perUnitShippingCost = totalAdditionalFees / totalQuantity;
     return items.map((item) => ({
       ...item,
-      costPrice: FinanceMath.add(Number(item.costPrice) || 0, perUnitShippingCost),
+      costPrice: FinanceMath.roundPrice(Number(item.costPrice || 0) + perUnitShippingCost, 4),
     }));
   }
 
   return items.map((item) => ({
     ...item,
-    costPrice: FinanceMath.add(Number(item.costPrice) || 0, 0),
+    costPrice: FinanceMath.roundPrice(Number(item.costPrice) || 0, 4),
   }));
 }
 

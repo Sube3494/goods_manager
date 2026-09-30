@@ -250,7 +250,7 @@ const PurchaseItemRow = memo(({
                     {readOnly && !allowCostEdit ? (
                         <div className="relative w-full h-9 flex items-center justify-center rounded-full bg-muted/40 dark:bg-white/[0.03] border border-border/70 dark:border-white/10 text-xs font-mono font-bold text-foreground shadow-2xs">
                             <span className="text-[10px] text-muted-foreground mr-0.5">￥</span>
-                            {item.costPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            {item.costPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
                         </div>
                     ) : (
                         <div className="relative w-full">
@@ -733,9 +733,12 @@ export function PurchaseOrderModal({
 
 
   const calculateTotal = useCallback(() => {
-    const itemsTotal = formData.items.reduce((sum, item) => sum + (item.quantity * item.costPrice), 0);
-    const gross = itemsTotal + (Number(formData.shippingFees) || 0) + (Number(formData.extraFees) || 0);
-    return Math.max(0, gross - (Number(formData.discountAmount) || 0));
+    const itemsTotal = formData.items.reduce((sum, item) => {
+      const lineSubtotal = Number(((Number(item.quantity) || 0) * (Number(item.costPrice) || 0)).toFixed(2));
+      return sum + lineSubtotal;
+    }, 0);
+    const gross = Number(itemsTotal.toFixed(2)) + (Number(formData.shippingFees) || 0) + (Number(formData.extraFees) || 0);
+    return Math.max(0, Number((gross - (Number(formData.discountAmount) || 0)).toFixed(2)));
   }, [formData.items, formData.shippingFees, formData.extraFees, formData.discountAmount]);
 
   const addItem = useCallback(() => {
@@ -846,6 +849,12 @@ export function PurchaseOrderModal({
 
   const handleQuantityInputChange = useCallback((itemKey: string, value: string) => {
     setQuantityDrafts((prev) => ({ ...prev, [itemKey]: value }));
+    setLineTotalDrafts((prev) => {
+      if (!(itemKey in prev)) return prev;
+      const next = { ...prev };
+      delete next[itemKey];
+      return next;
+    });
     if (parseDraftNumber(value) !== null) {
       updateItem(itemKey, "quantity", value);
     }
@@ -862,6 +871,12 @@ export function PurchaseOrderModal({
 
   const handleCostPriceInputChange = useCallback((itemKey: string, value: string) => {
     setCostPriceDrafts((prev) => ({ ...prev, [itemKey]: value }));
+    setLineTotalDrafts((prev) => {
+      if (!(itemKey in prev)) return prev;
+      const next = { ...prev };
+      delete next[itemKey];
+      return next;
+    });
     if (parseDraftNumber(value) !== null) {
       updateItem(itemKey, "costPrice", value);
     }
@@ -878,6 +893,12 @@ export function PurchaseOrderModal({
 
   const handleLineTotalInputChange = useCallback((itemKey: string, value: string) => {
     setLineTotalDrafts((prev) => ({ ...prev, [itemKey]: value }));
+    setCostPriceDrafts((prev) => {
+      if (!(itemKey in prev)) return prev;
+      const next = { ...prev };
+      delete next[itemKey];
+      return next;
+    });
     if (parseDraftNumber(value) !== null) {
       updateItem(itemKey, "lineTotal", value);
     }

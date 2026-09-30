@@ -504,6 +504,7 @@ export async function PATCH(
       let mainProduct: any = null;
       let existingBundleItems: any[] = [];
 
+      let hasManualBundleConfig = false;
       const currentManual = basePayload.manualMatchedProduct as Record<string, any> | null;
       if (currentManual && typeof currentManual === "object") {
         mainProduct = {
@@ -517,12 +518,15 @@ export async function PATCH(
           shopName: currentManual.shopName,
           ...(currentManual.quantity ? { quantity: currentManual.quantity } : {}),
         };
-        if (Array.isArray(currentManual.bundleItems) && currentManual.bundleItems.length > 0) {
+        if (Array.isArray(currentManual.bundleItems)) {
           existingBundleItems = [...currentManual.bundleItems];
+          hasManualBundleConfig = true;
+        } else if (currentManual.isBundle === false) {
+          hasManualBundleConfig = true;
         }
       }
 
-      if (!mainProduct || existingBundleItems.length === 0) {
+      if (!mainProduct || (!hasManualBundleConfig && existingBundleItems.length === 0)) {
         const matchedCandidate = await prisma.shopProduct.findFirst({
           where: {
             shop: { userId: targetUserId },

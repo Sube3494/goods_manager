@@ -385,7 +385,7 @@ export async function POST(request: Request) {
               supplierId: item.supplierId,
               quantity: Number(item.quantity) || 0,
               remainingQuantity: normalizedStatus === "Received" ? (Number(item.quantity) || 0) : undefined,
-              costPrice: FinanceMath.add(Number(item.costPrice) || 0, 0) // 保存用户填写的原始采购价，杜绝运费双重计费
+              costPrice: FinanceMath.roundPrice(Number(item.costPrice) || 0, 4) // 保存用户填写的原始采购价，支持4位高精度杜绝小计反算误差
             }))
           }
         },
@@ -404,7 +404,7 @@ export async function POST(request: Request) {
       if (normalizedStatus === "Received") {
         for (const item of costAllocatedItems) {
           if (item.shopProductId) {
-            const incomingCost = FinanceMath.add(Number(item.costPrice) || 0, 0);
+            const incomingCost = FinanceMath.roundPrice(Number(item.costPrice) || 0, 4);
             if (incomingCost > 0) {
               await tx.shopProduct.update({
                 where: { id: item.shopProductId },

@@ -237,7 +237,7 @@ export async function PUT(
             ...rawItem,
             id: existingItem.id,
             quantity: nextQuantity,
-            costPrice: FinanceMath.add(Number(rawItem.costPrice) || 0, 0),
+            costPrice: FinanceMath.roundPrice(Number(rawItem.costPrice) || 0, 4),
           });
         }
 
@@ -248,7 +248,7 @@ export async function PUT(
         );
         for (const item of allocatedItems) {
           if (item.id) {
-            costPriceByPurchaseOrderItemId.set(item.id, FinanceMath.add(Number(item.costPrice) || 0, 0));
+            costPriceByPurchaseOrderItemId.set(item.id, FinanceMath.roundPrice(Number(item.costPrice) || 0, 4));
           }
         }
         if (existingItemsById.size !== costPriceByPurchaseOrderItemId.size) {
@@ -258,7 +258,7 @@ export async function PUT(
         const rawCostPriceByPurchaseOrderItemId = new Map<string, number>();
         for (const item of validatedItems) {
           if (item.id) {
-            rawCostPriceByPurchaseOrderItemId.set(item.id, FinanceMath.add(Number(item.costPrice) || 0, 0));
+            rawCostPriceByPurchaseOrderItemId.set(item.id, FinanceMath.roundPrice(Number(item.costPrice) || 0, 4));
           }
         }
 
@@ -413,7 +413,7 @@ export async function PUT(
                 supplierId: item.supplierId,
                 quantity: Number(item.quantity) || 0,
                 remainingQuantity: nextStatus === "Received" ? (Number(item.quantity) || 0) : undefined,
-                costPrice: FinanceMath.add(Number(item.costPrice) || 0, 0)
+                costPrice: FinanceMath.roundPrice(Number(item.costPrice) || 0, 4)
               }))
             }
           })
