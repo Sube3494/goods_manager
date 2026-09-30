@@ -808,6 +808,7 @@ export function getOrderItemDisplay(item: AutoPickOrderItem, platform?: string |
     costSource: matchedProduct?.costSource,
     sourceId: isManualDeliveryPlaceholder && !realResolvedName ? undefined : sourceId || undefined,
     optionalMatch: isManualDeliveryPlaceholder && !realResolvedName,
+    displayType: undefined as "composite" | "accessory" | undefined,
   };
 }
 
@@ -824,6 +825,7 @@ export function getExpandedOrderItemDisplays(item: AutoPickOrderItem, platform?:
       costPrice: displayItem.costPrice || null,
       costSource: displayItem.costSource,
       sourceId: (displayItem as any).sourceId || undefined,
+      displayType: displayItem.displayType,
     }));
   }
 
@@ -2570,18 +2572,33 @@ export function OrderItemBundleGroup({
   const isJd = isJdPlatformOrder ?? isJdOrder(order.platform);
   const isMeituan = isMeituanPlatformOrder ?? isMeituanOrder(order.platform);
 
-  if (isCompositeMatch && item.matchedProduct?.isBundle !== true && displays.length > 1) {
+  if (isCompositeMatch && displays.length > 0) {
+    const storedCompositeCount = Array.isArray(item.matchedProduct?.compositeItems)
+      ? item.matchedProduct.compositeItems.length
+      : 0;
+    const explicitlyTypedCompositeDisplays = displays.filter((display) => display.displayType === "composite");
+    const compositeDisplays = explicitlyTypedCompositeDisplays.length > 0
+      ? explicitlyTypedCompositeDisplays
+      : displays.slice(0, Math.max(1, storedCompositeCount || displays.length));
+    const explicitlyTypedAccessoryDisplays = displays.filter((display) => display.displayType === "accessory");
+    const accessoryDisplays = explicitlyTypedAccessoryDisplays.length > 0
+      ? explicitlyTypedAccessoryDisplays
+      : displays.slice(compositeDisplays.length);
+
     return (
       <div className="space-y-1.5">
-        {displays.map((display, compositeIndex) => (
+        {compositeDisplays.map((display, compositeIndex) => (
           <ProductStripItem
             key={`${item.productNo || item.productName}-${index}-${display.sku}-${compositeIndex}`}
             display={display}
             compact={compact}
             showEditMatch={!deleted && !readOnly}
             onEditMatch={() => onOpenMatchEditor(order, item)}
-            onAddBundleItem={!deleted && !readOnly && compositeIndex === 0
-              ? () => onOpenMatchEditor(order, item, { isAddingBundleItem: true })
+            onAddBundleItem={!deleted && !readOnly
+              ? () => onOpenMatchEditor(order, item, {
+                  isAddingBundleItem: true,
+                  currentBundleItems: accessoryDisplays,
+                })
               : undefined}
             matchedProduct={item.matchedProduct}
             showMatchStatus={true}
@@ -2593,6 +2610,56 @@ export function OrderItemBundleGroup({
             isDoudianOrder={isDoudianOrder(order.platform)}
           />
         ))}
+
+        {accessoryDisplays.length > 0 ? (
+          <div className={cn(
+            compact
+              ? "ml-1.5 pl-1.5 border-l-2 border-black/10 dark:border-white/10 space-y-1 pt-0.5"
+              : "ml-2 sm:ml-4 pl-2 sm:pl-3 border-l-2 border-black/10 dark:border-white/10 space-y-1.5 pt-0.5"
+          )}>
+            {accessoryDisplays.map((display, accessoryIndex) => (
+              <ProductStripItem
+                key={`${item.productNo || item.productName}-${index}-accessory-${display.sku}-${accessoryIndex}`}
+                display={display}
+                compact={true}
+                isBundleComponent={true}
+                showEditMatch={!deleted && !readOnly}
+                onEditMatch={() => onOpenMatchEditor(order, item, {
+                  componentIndex: accessoryIndex,
+                  componentDisplay: display,
+                  currentBundleItems: accessoryDisplays,
+                })}
+                onRemoveComponent={!deleted && !readOnly && onRemoveBundleComponent ? () => {
+                  setComponentToRemove({ cIdx: accessoryIndex, name: display.name });
+                } : undefined}
+                matchedProduct={undefined}
+                showMatchStatus={false}
+                returnedQuantity={0}
+                returnedDetails={[]}
+                isJdOrder={isJd}
+                isMeituanOrder={isMeituan}
+                isTaobaoOrder={isTaobaoOrder(order.platform)}
+                isDoudianOrder={isDoudianOrder(order.platform)}
+              />
+            ))}
+          </div>
+        ) : null}
+
+        <ConfirmModal
+          isOpen={!!componentToRemove}
+          onClose={() => setComponentToRemove(null)}
+          onConfirm={() => {
+            if (componentToRemove && onRemoveBundleComponent) {
+              onRemoveBundleComponent(order, item, componentToRemove.cIdx, componentToRemove.name, accessoryDisplays);
+            }
+            setComponentToRemove(null);
+          }}
+          title="移除配件"
+          message={`确定要为该组合移除配件【${componentToRemove?.name || ""}】吗？移除后将自动回滚对应出库并更新成本。`}
+          confirmLabel="确认移除"
+          cancelLabel="取消"
+          variant="danger"
+        />
       </div>
     );
   }

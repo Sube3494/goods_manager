@@ -2996,6 +2996,7 @@ export async function GET(request: NextRequest) {
                   quantity: bQty,
                   ...displayCost,
                   sourceId: bSourceId || undefined,
+                  displayType: "accessory" as const,
                 };
               })
             : null;
@@ -3025,6 +3026,7 @@ export async function GET(request: NextRequest) {
                   quantity: perOrderQuantity,
                   ...resolveDisplayCost(foundCompositeProduct?.shopProductId, foundCompositeProduct?.productId),
                   sourceId: compositeSourceId || undefined,
+                  displayType: "composite" as const,
                 };
               })
             : null;
@@ -3056,6 +3058,7 @@ export async function GET(request: NextRequest) {
                   quantity: bOutbound.quantity || 1,
                   ...displayCost,
                   sourceId: bSourceId || undefined,
+                  displayType: "accessory" as const,
                 };
               })
             : null;
@@ -3084,10 +3087,10 @@ export async function GET(request: NextRequest) {
             sourceId: getProductSourceIdByPlatform(targetShopProduct, order.platform, parentPlatformSkuId),
           } : null;
 
-          const displayItems = effectiveBundleDisplayItems && mainDisplayItem
+          const displayItems = compositeDisplayItems && compositeDisplayItems.length > 0
+            ? [...compositeDisplayItems, ...(effectiveBundleDisplayItems || [])]
+            : effectiveBundleDisplayItems && mainDisplayItem
             ? [mainDisplayItem, ...effectiveBundleDisplayItems]
-            : compositeDisplayItems && compositeDisplayItems.length > 0
-            ? compositeDisplayItems
             : hasStrictMatchForAllSegmentsFromSku
             ? segmentsFromSku.map((candidate) => {
                 const segmentMatchedProduct = resolveStrictLocalSkuMatch(candidate);

@@ -190,6 +190,7 @@ export interface AutoPickOrderItem {
     costPrice?: number | null;
     costSource?: "outbound" | "current";
     sourceId?: string;
+    displayType?: "composite" | "accessory";
   }>;
   matchedProduct?: {
     id: string;
