@@ -6752,8 +6752,8 @@ async function resolveBrushOrderItemsForAutoPickOrder(
             });
             subResolvedItems.push({
               productId: resolvedProductId,
-              quantity: Math.max(1, Number(compositeItem?.quantity || 1) || 1)
-                * Math.max(1, Number(item.quantity || 1) || 1),
+              // 组合项数量由人工匹配时明确指定，表示最终实际数量。
+              quantity: Math.max(1, Number(compositeItem?.quantity || 1) || 1),
             });
           } else {
             hasUnresolved = true;
@@ -7227,7 +7227,7 @@ async function resolveOutboundItemsForAutoPickOrder(
         const entryPrice = FinanceMath.divide(priceShare, Math.max(1, outboundEntries.length));
         const orderItemQuantity = Math.max(1, Number(item.quantity || 1) || 1);
 
-        for (const entry of outboundEntries) {
+        const pushCompositeOrAccessory = (entry: any, quantity: number) => {
           const entryShopProductId = String(entry?.shopProductId || entry?.id || "").trim();
           const matchedEntry = shopProducts.find((product) =>
             (entryShopProductId && product.id === entryShopProductId)
@@ -7237,7 +7237,19 @@ async function resolveOutboundItemsForAutoPickOrder(
             id: entryShopProductId,
             productId: String(entry?.productId || "").trim() || null,
             sourceProductId: null,
-          }, Math.max(1, Number(entry?.quantity || 1) || 1) * orderItemQuantity, entryPrice);
+          }, quantity, entryPrice);
+        };
+
+        // 组合匹配选择的是最终实际数量，不再乘订单项数量。
+        for (const entry of compositeItems) {
+          pushCompositeOrAccessory(entry, Math.max(1, Number(entry?.quantity || 1) || 1));
+        }
+        // 配件数量仍是每份商品的配置，保持按订单项数量展开。
+        for (const entry of accessoryItems) {
+          pushCompositeOrAccessory(
+            entry,
+            Math.max(1, Number(entry?.quantity || 1) || 1) * orderItemQuantity,
+          );
         }
         continue;
       }

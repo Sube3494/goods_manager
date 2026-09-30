@@ -3020,7 +3020,9 @@ export async function GET(request: NextRequest) {
                   image: compositeItem.image
                     ? storage.resolveUrl(compositeItem.image)
                     : (foundCompositeProduct?.image || null),
-                  quantity: perOrderQuantity * Math.max(1, Number(item.quantity || 1) || 1),
+                  // 组合匹配弹窗中的数量是该订单项最终要匹配的实际数量，
+                  // 不能再乘原订单项数量，否则订单 x2、组合各选 1 会显示成各 x2。
+                  quantity: perOrderQuantity,
                   ...resolveDisplayCost(foundCompositeProduct?.shopProductId, foundCompositeProduct?.productId),
                   sourceId: compositeSourceId || undefined,
                 };
