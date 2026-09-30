@@ -2560,7 +2560,8 @@ export function OrderItemBundleGroup({
   compact?: boolean;
 }) {
   const displays = getExpandedOrderItemDisplays(item, order.platform);
-  const isBundle = displays.length > 1;
+  const isCompositeMatch = item.matchedProduct?.isCompositeMatch === true;
+  const isBundle = displays.length > 1 && (!isCompositeMatch || item.matchedProduct?.isBundle === true);
   const [isExpanded, setIsExpanded] = useState(false);
   const [componentToRemove, setComponentToRemove] = useState<{ cIdx: number; name: string } | null>(null);
 
@@ -2570,7 +2571,9 @@ export function OrderItemBundleGroup({
   const isMeituan = isMeituanPlatformOrder ?? isMeituanOrder(order.platform);
 
   if (!isBundle) {
-    const display = displays[0] || getOrderItemDisplay(item, order.platform);
+    const display = isCompositeMatch
+      ? getOrderItemDisplay(item, order.platform)
+      : (displays[0] || getOrderItemDisplay(item, order.platform));
     return (
       <ProductStripItem
         key={`${item.productNo || item.productName}-${index}-${display.sku}-0`}

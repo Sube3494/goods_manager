@@ -185,6 +185,8 @@ type MatchedCatalogProduct = {
   shopName?: string | null;
   isManual?: boolean;
   matchMethod?: "manual" | "id" | "sku" | "outbound";
+  isCompositeMatch?: boolean;
+  compositeItems?: any[];
   quantity?: number;
   isBundle?: boolean;
   bundleItems?: any[];
@@ -386,6 +388,8 @@ function readManualMatchedProduct(rawPayload: unknown): MatchedCatalogProduct | 
       record.matchMethod === "id" || record.matchMethod === "sku" || record.matchMethod === "outbound"
         ? record.matchMethod
         : "manual",
+    isCompositeMatch: record.isCompositeMatch === true,
+    compositeItems: Array.isArray(record.compositeItems) ? record.compositeItems : undefined,
     quantity: Number(record.quantity || 0) > 0 ? Math.max(1, Number(record.quantity || 1) || 1) : undefined,
     isBundle: typeof record.isBundle === "boolean" ? record.isBundle : (Array.isArray(record.bundleItems) ? record.bundleItems.length > 0 : undefined),
     bundleItems: Array.isArray(record.bundleItems) ? record.bundleItems : undefined,
@@ -2909,6 +2913,24 @@ export async function GET(request: NextRequest) {
                 || (activeMatched.sku && p.sku === activeMatched.sku)
               ) || null
             : null;
+          const compositeMatchIds = String(manualMatchedProduct?.shopProductId || manualMatchedProduct?.id || "")
+            .split(/[+＋]/)
+            .map((value) => value.trim())
+            .filter(Boolean);
+          const isCompositeMatch = Boolean(
+            manualMatchedProduct?.isCompositeMatch === true || compositeMatchIds.length > 1
+          );
+          const storedManualBundleItems = Array.isArray(manualMatchedProduct?.bundleItems)
+            ? manualMatchedProduct.bundleItems
+            : [];
+          const compositeIdSet = new Set(compositeMatchIds);
+          const isLegacyCompositeBundle = isCompositeMatch
+            && compositeMatchIds.length > 1
+            && storedManualBundleItems.length === compositeMatchIds.length
+            && storedManualBundleItems.every((bundleItem: any) => {
+              const bundleId = String(bundleItem?.shopProductId || bundleItem?.id || "").trim();
+              return Boolean(bundleId && compositeIdSet.has(bundleId));
+            });
           const hasExplicitManualBundleConfig = Boolean(
             rawItemPayload.manualBundleItemsOverride === true
             || (manualMatchedProduct && (
@@ -2917,7 +2939,7 @@ export async function GET(request: NextRequest) {
               ))
           );
           const rawBundleItems = hasExplicitManualBundleConfig
-            ? (manualMatchedProduct?.bundleItems || [])
+            ? (isLegacyCompositeBundle ? [] : (manualMatchedProduct?.bundleItems || []))
             : (manualMatchedProduct?.bundleItems
                 || (activeMatched as any)?.bundleItems
                 || (targetShopProduct as any)?.bundleItems);
@@ -2934,6 +2956,13 @@ export async function GET(request: NextRequest) {
           if (matchedProduct && bundleItems) {
             (matchedProduct as any).isBundle = true;
             (matchedProduct as any).bundleItems = bundleItems;
+          }
+          if (matchedProduct && isCompositeMatch) {
+            (matchedProduct as MatchedCatalogProduct).isCompositeMatch = true;
+            if (isLegacyCompositeBundle) {
+              (matchedProduct as MatchedCatalogProduct).isBundle = false;
+              (matchedProduct as MatchedCatalogProduct).bundleItems = [];
+            }
           }
           const bundleDisplayItems = bundleItems
             ? bundleItems.map((bItem: any) => {

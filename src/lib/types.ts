@@ -203,6 +203,15 @@ export interface AutoPickOrderItem {
     costSource?: "outbound" | "current";
     shopName?: string | null;
     isManual?: boolean;
+    isCompositeMatch?: boolean;
+    isBundle?: boolean;
+    bundleItems?: any[];
+    compositeItems?: Array<{
+      id?: string;
+      productId?: string | null;
+      shopProductId?: string | null;
+      quantity?: number;
+    }>;
     matchMethod?: "id" | "sku" | "manual";
   } | null;
   createdAt?: string;

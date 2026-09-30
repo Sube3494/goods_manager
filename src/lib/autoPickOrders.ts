@@ -189,6 +189,8 @@ type AutoPickManualMatchedProductMeta = {
   shopName?: string | null;
   isManual?: boolean;
   matchMethod?: "manual" | "id" | "sku" | "outbound";
+  isCompositeMatch?: boolean;
+  compositeItems?: any[];
   isBundle?: boolean;
   bundleItems?: any[];
 };
@@ -5115,6 +5117,8 @@ function readManualMatchedProductFromOrderItemRawPayload(rawPayload: unknown) {
         : manual.matchMethod === "manual"
           ? "manual"
           : undefined,
+    isCompositeMatch: manual.isCompositeMatch === true,
+    compositeItems: Array.isArray(manual.compositeItems) ? manual.compositeItems : undefined,
     quantity: Number((manual as any).quantity || 0) > 0 ? Math.max(1, Number((manual as any).quantity || 1) || 1) : undefined,
     isBundle: typeof manual.isBundle === "boolean" ? manual.isBundle : undefined,
     bundleItems: Array.isArray(manual.bundleItems) ? manual.bundleItems : undefined,
@@ -6724,6 +6728,9 @@ async function resolveBrushOrderItemsForAutoPickOrder(
       const candidateManualId = String(manualMatchedProduct.shopProductId || manualMatchedProduct.id || "").trim();
       const productIds = candidateManualId.split(/[+＋]/).map(id => id.trim()).filter(Boolean);
       if (productIds.length > 1) {
+        const compositeItems = Array.isArray(manualMatchedProduct.compositeItems)
+          ? manualMatchedProduct.compositeItems
+          : (Array.isArray(manualMatchedProduct.bundleItems) ? manualMatchedProduct.bundleItems : []);
         let hasUnresolved = false;
         const subResolvedItems: Array<{ productId: string; quantity: number }> = [];
 
@@ -6739,9 +6746,14 @@ async function resolveBrushOrderItemsForAutoPickOrder(
           ).trim();
 
           if (resolvedProductId) {
+            const compositeItem = compositeItems.find((candidate: any) => {
+              const candidateId = String(candidate?.shopProductId || candidate?.id || "").trim();
+              return candidateId === subShopProductId;
+            });
             subResolvedItems.push({
               productId: resolvedProductId,
-              quantity: Math.max(1, Number(item.quantity || 1) || 1),
+              quantity: Math.max(1, Number(compositeItem?.quantity || 1) || 1)
+                * Math.max(1, Number(item.quantity || 1) || 1),
             });
           } else {
             hasUnresolved = true;
@@ -7193,6 +7205,42 @@ async function resolveOutboundItemsForAutoPickOrder(
     // 1. 手动匹配处理
     if (manualMatchedProduct?.id) {
       const storedManualShopProductId = String(manualMatchedProduct.shopProductId || "").trim() || null;
+      const compositeIds = String(manualMatchedProduct.shopProductId || manualMatchedProduct.id || "")
+        .split(/[+＋]/)
+        .map((value) => value.trim())
+        .filter(Boolean);
+      const compositeIdSet = new Set(compositeIds);
+      const storedBundleItems = Array.isArray(manualMatchedProduct.bundleItems) ? manualMatchedProduct.bundleItems : [];
+      const isLegacyCompositeBundle = compositeIds.length > 1
+        && storedBundleItems.length === compositeIds.length
+        && storedBundleItems.every((bundleItem: any) => {
+          const bundleId = String(bundleItem?.shopProductId || bundleItem?.id || "").trim();
+          return Boolean(bundleId && compositeIdSet.has(bundleId));
+        });
+      const compositeItems = Array.isArray(manualMatchedProduct.compositeItems)
+        ? manualMatchedProduct.compositeItems
+        : (isLegacyCompositeBundle ? storedBundleItems : []);
+      const accessoryItems = isLegacyCompositeBundle ? [] : storedBundleItems;
+      const isCompositeMatch = manualMatchedProduct.isCompositeMatch === true || compositeIds.length > 1;
+      if (isCompositeMatch && compositeItems.length > 0) {
+        const outboundEntries = [...compositeItems, ...accessoryItems];
+        const entryPrice = FinanceMath.divide(priceShare, Math.max(1, outboundEntries.length));
+        const orderItemQuantity = Math.max(1, Number(item.quantity || 1) || 1);
+
+        for (const entry of outboundEntries) {
+          const entryShopProductId = String(entry?.shopProductId || entry?.id || "").trim();
+          const matchedEntry = shopProducts.find((product) =>
+            (entryShopProductId && product.id === entryShopProductId)
+            || (entry?.productId && (product.productId === entry.productId || product.sourceProductId === entry.productId))
+          );
+          expandAndPushOutboundItem(matchedEntry || {
+            id: entryShopProductId,
+            productId: String(entry?.productId || "").trim() || null,
+            sourceProductId: null,
+          }, Math.max(1, Number(entry?.quantity || 1) || 1) * orderItemQuantity, entryPrice);
+        }
+        continue;
+      }
       let manualShopProductId: string | null = storedManualShopProductId;
       let manualResolvedProductId: string | null =
         manualMatchedProduct.sourceType === "shopProduct" ? null : manualMatchedProduct.id;

@@ -41,6 +41,15 @@ function extractShopProductIdsFromCandidate(candidate: unknown): string[] {
       }
     }
   }
+  if (Array.isArray(record.compositeItems)) {
+    for (const item of record.compositeItems) {
+      if (item && typeof item === "object" && !Array.isArray(item)) {
+        const compositeItem = item as Record<string, unknown>;
+        if (compositeItem.shopProductId) ids.push(String(compositeItem.shopProductId).trim());
+        if (compositeItem.id) ids.push(String(compositeItem.id).trim());
+      }
+    }
+  }
 
   return Array.from(new Set(ids.flatMap((id) => id.split(/[+＋]/)).map((s) => s.trim()).filter(Boolean)));
 }
@@ -68,6 +77,8 @@ function normalizeMatchedProductCandidate(input: unknown) {
     shopProductId,
     shopName: String(record.shopName || "").trim() || null,
     quantity: Number(record.quantity || 0) > 0 ? Math.max(1, Number(record.quantity || 1) || 1) : undefined,
+    isCompositeMatch: record.isCompositeMatch === true,
+    compositeItems: Array.isArray(record.compositeItems) ? record.compositeItems : undefined,
     bundleItems: Array.isArray(record.bundleItems) ? record.bundleItems : undefined,
   };
 }
@@ -522,6 +533,18 @@ export async function PATCH(
       let hasManualBundleConfig = false;
       const currentManual = basePayload.manualMatchedProduct as Record<string, any> | null;
       if (currentManual && typeof currentManual === "object") {
+        const currentCompositeIds = String(currentManual.shopProductId || currentManual.id || "")
+          .split(/[+＋]/)
+          .map((value) => value.trim())
+          .filter(Boolean);
+        const currentCompositeIdSet = new Set(currentCompositeIds);
+        const currentStoredBundleItems = Array.isArray(currentManual.bundleItems) ? currentManual.bundleItems : [];
+        const isLegacyCompositeBundle = currentCompositeIds.length > 1
+          && currentStoredBundleItems.length === currentCompositeIds.length
+          && currentStoredBundleItems.every((bundleItem: any) => {
+            const bundleId = String(bundleItem?.shopProductId || bundleItem?.id || "").trim();
+            return Boolean(bundleId && currentCompositeIdSet.has(bundleId));
+          });
         mainProduct = {
           id: currentManual.id,
           productId: currentManual.productId || null,
@@ -533,11 +556,15 @@ export async function PATCH(
           shopName: currentManual.shopName,
           isManual: typeof currentManual.isManual === "boolean" ? currentManual.isManual : true,
           matchMethod: currentManual.matchMethod || (currentManual.isManual === false ? "id" : "manual"),
+          isCompositeMatch: currentManual.isCompositeMatch === true || currentCompositeIds.length > 1,
+          compositeItems: Array.isArray(currentManual.compositeItems)
+            ? currentManual.compositeItems
+            : (isLegacyCompositeBundle ? currentStoredBundleItems : undefined),
           ...(currentManual.quantity ? { quantity: currentManual.quantity } : {}),
         };
         if (existingBundleItems.length === 0) {
           if (Array.isArray(currentManual.bundleItems)) {
-            existingBundleItems = [...currentManual.bundleItems];
+            existingBundleItems = isLegacyCompositeBundle ? [] : [...currentManual.bundleItems];
             hasManualBundleConfig = true;
           } else if (currentManual.isBundle === false) {
             hasManualBundleConfig = true;
@@ -812,7 +839,9 @@ export async function PATCH(
         shopProductId: shopProducts.map((p) => p.id).join("+"),
         shopName: shopProducts[0]?.shop?.name || null,
         isManual: true,
-        bundleItems: shopProducts.map((p) => {
+        matchMethod: "manual" as const,
+        isCompositeMatch: true,
+        compositeItems: shopProducts.map((p) => {
           const rawItemImg = p.productImage || p.product?.image || null;
           return {
             id: p.id,
@@ -826,6 +855,8 @@ export async function PATCH(
             quantity: itemsQtyMap.get(p.id) || 1,
           };
         }),
+        isBundle: false,
+        bundleItems: [],
       };
 
       const isPlaceholderItem =
