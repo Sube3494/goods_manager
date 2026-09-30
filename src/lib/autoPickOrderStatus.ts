@@ -379,6 +379,7 @@ export function isAutoPickOrderRiderAssigned(order?: {
   const isCancelledByTime = cancelTime && cancelTime !== "0" && cancelTime !== 0;
 
   const deliveryStatusCandidates = [
+    order.status,
     orderDelivery.status,
     orderDelivery.delivery_status,
     orderDelivery.deliveryStatus,
@@ -395,14 +396,17 @@ export function isAutoPickOrderRiderAssigned(order?: {
 
   const isCancelledByTrack = trackCandidates.some((text) => /取消|退单|失效/.test(text));
   const isPendingRiderByTrack = trackCandidates.some((text) => /待接单|未接单|待呼叫|呼叫中|未呼叫/.test(text));
+  const isPendingRiderByStatus = deliveryStatusCandidates.some((text) => /待接单|未接单/.test(text));
+  const isAbnormalOrder = isAutoPickOrderAbnormalStatus(order.status);
 
-  // 核心：若配送已取消、已退单，或当前处于重新呼叫/等待接单阶段，则骑手并未在有效履约，绝不限制自配！
-  if (isCancelledByTime || isCancelledByStatus || isCancelledByTrack || isPendingRiderByTrack) {
+  // 异常态通常是取消当前配送后的平台状态；此时旧骑手/旧轨迹不再代表有效履约。
+  // 自配接口会先刷新异常订单，并在下发命令前按最新数据再次检查骑手状态。
+  if (isAbnormalOrder || isCancelledByTime || isCancelledByStatus || isCancelledByTrack || isPendingRiderByTrack || isPendingRiderByStatus) {
     return false;
   }
 
   // 2. 检查运单轨迹是否明确处于生效中的骑手接单/到店状态
-  const isRiderAssignedByTrack = trackCandidates.some((text) => /骑手已接单|配送已接单|骑手已到店|待取货/.test(text));
+  const isRiderAssignedByTrack = trackCandidates.some((text) => /骑手已接单|配送已接单|抢单成功|接单成功|骑手已到店|待取货/.test(text));
   if (isRiderAssignedByTrack) {
     return true;
   }
