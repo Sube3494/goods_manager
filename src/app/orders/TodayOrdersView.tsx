@@ -135,7 +135,7 @@ function CompactTodayOrderCard({
   onExpand: () => void;
   onRunAction: (action: OrderAction) => void;
   onOpenMatchEditor: (item: AutoPickOrderItem, options?: { autoOutbound?: boolean; componentIndex?: number; componentDisplay?: any; currentBundleItems?: any[]; isAddingBundleItem?: boolean }) => void;
-  onRemoveBundleComponent?: (order: AutoPickOrder, item: AutoPickOrderItem, componentIndex: number, componentName?: string) => void;
+  onRemoveBundleComponent?: (order: AutoPickOrder, item: AutoPickOrderItem, componentIndex: number, componentName?: string, currentBundleItems?: any[]) => void;
   onOpenCostBackfill?: (order: AutoPickOrder) => void;
 }) {
   const [routeOpen, setRouteOpen] = useState(false);
@@ -451,7 +451,7 @@ interface TodayOrdersViewProps {
     currentBundleItems?: any[];
     isAddingBundleItem?: boolean;
   }) => void;
-  onRemoveBundleComponent?: (order: AutoPickOrder, item: AutoPickOrderItem, componentIndex: number, componentName?: string) => void;
+  onRemoveBundleComponent?: (order: AutoPickOrder, item: AutoPickOrderItem, componentIndex: number, componentName?: string, currentBundleItems?: any[]) => void;
   onOpenPurchaseDraft?: (draft: PurchaseDraftPayload) => void;
   profitUpdatingOrderIds?: string[];
     onDataLoad: (data: {

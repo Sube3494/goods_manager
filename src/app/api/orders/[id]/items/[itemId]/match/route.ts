@@ -504,6 +504,20 @@ export async function PATCH(
       let mainProduct: any = null;
       let existingBundleItems: any[] = [];
 
+      // 1. 如果请求体直接提供了前端当前实际展示的配件列表，最高优先级采信（避免后端二次猜测产生偏差）
+      if (Array.isArray(body?.currentBundleItems) && body.currentBundleItems.length > 0) {
+        existingBundleItems = body.currentBundleItems.map((c: any) => ({
+          id: c.shopProductId || c.id,
+          productId: c.productId || null,
+          name: c.name,
+          sku: c.sku,
+          image: c.image,
+          sourceType: "shopProduct",
+          shopProductId: c.shopProductId || c.id,
+          quantity: c.quantity || 1,
+        }));
+      }
+
       let hasManualBundleConfig = false;
       const currentManual = basePayload.manualMatchedProduct as Record<string, any> | null;
       if (currentManual && typeof currentManual === "object") {
@@ -516,21 +530,29 @@ export async function PATCH(
           sourceType: currentManual.sourceType || "shopProduct",
           shopProductId: currentManual.shopProductId || currentManual.id,
           shopName: currentManual.shopName,
+          isManual: true,
+          matchMethod: currentManual.matchMethod || "manual",
           ...(currentManual.quantity ? { quantity: currentManual.quantity } : {}),
         };
-        if (Array.isArray(currentManual.bundleItems)) {
-          existingBundleItems = [...currentManual.bundleItems];
-          hasManualBundleConfig = true;
-        } else if (currentManual.isBundle === false) {
+        if (existingBundleItems.length === 0) {
+          if (Array.isArray(currentManual.bundleItems)) {
+            existingBundleItems = [...currentManual.bundleItems];
+            hasManualBundleConfig = true;
+          } else if (currentManual.isBundle === false) {
+            hasManualBundleConfig = true;
+          }
+        } else {
           hasManualBundleConfig = true;
         }
       }
 
       if (!mainProduct || (!hasManualBundleConfig && existingBundleItems.length === 0)) {
+        const targetShopProductId = mainProduct?.shopProductId || mainProduct?.id;
         const matchedCandidate = await prisma.shopProduct.findFirst({
           where: {
             shop: { userId: targetUserId },
             OR: [
+              ...(targetShopProductId ? [{ id: targetShopProductId }, { productId: targetShopProductId }] : []),
               ...(orderItem.platformSkuId ? [
                 { meituanSkuId: { contains: orderItem.platformSkuId } },
                 { jdSkuId: orderItem.platformSkuId },
@@ -581,19 +603,6 @@ export async function PATCH(
         }
       }
 
-      if (existingBundleItems.length === 0 && Array.isArray(body?.currentBundleItems)) {
-        existingBundleItems = body.currentBundleItems.map((c: any) => ({
-          id: c.shopProductId || c.id,
-          productId: c.productId || null,
-          name: c.name,
-          sku: c.sku,
-          image: c.image,
-          sourceType: "shopProduct",
-          shopProductId: c.shopProductId || c.id,
-          quantity: c.quantity || 1,
-        }));
-      }
-
       if (!mainProduct && autoMatchedProduct) {
         mainProduct = {
           id: autoMatchedProduct.id,
@@ -630,13 +639,10 @@ export async function PATCH(
         nextBundleItems.splice(removeComponentIndex, 1);
       }
 
-      const nextIsManual = typeof mainProduct.isManual === "boolean" ? mainProduct.isManual : false;
-      const nextMatchMethod = mainProduct.matchMethod || (nextIsManual ? "manual" : "id");
-
       const updatedMatchedProduct = {
         ...mainProduct,
-        isManual: nextIsManual,
-        matchMethod: nextMatchMethod,
+        isManual: true,
+        matchMethod: "manual",
         isBundle: nextBundleItems.length > 0,
         bundleItems: nextBundleItems,
       };

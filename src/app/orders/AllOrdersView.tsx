@@ -115,7 +115,7 @@ interface AllOrdersViewProps {
     currentBundleItems?: any[];
     isAddingBundleItem?: boolean;
   }) => void;
-  onRemoveBundleComponent?: (order: AutoPickOrder, item: AutoPickOrderItem, componentIndex: number, componentName?: string) => void;
+  onRemoveBundleComponent?: (order: AutoPickOrder, item: AutoPickOrderItem, componentIndex: number, componentName?: string, currentBundleItems?: any[]) => void;
   onOpenPurchaseDraft?: (draft: PurchaseDraftPayload) => void;
   profitUpdatingOrderIds?: string[];
   onDataLoad: (data: {

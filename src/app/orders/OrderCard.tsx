@@ -2552,7 +2552,7 @@ export function OrderItemBundleGroup({
     currentBundleItems?: any[];
     isAddingBundleItem?: boolean;
   }) => void;
-  onRemoveBundleComponent?: (order: AutoPickOrder, item: AutoPickOrderItem, componentIndex: number, componentName?: string) => void;
+  onRemoveBundleComponent?: (order: AutoPickOrder, item: AutoPickOrderItem, componentIndex: number, componentName?: string, currentBundleItems?: any[]) => void;
   returnedItemQuantityMap?: Map<string, number>;
   returnedItemDetailsMap?: Map<string, any[]>;
   isJdPlatformOrder?: boolean;
@@ -2660,7 +2660,7 @@ export function OrderItemBundleGroup({
         onClose={() => setComponentToRemove(null)}
         onConfirm={() => {
           if (componentToRemove && onRemoveBundleComponent) {
-            onRemoveBundleComponent(order, item, componentToRemove.cIdx, componentToRemove.name);
+            onRemoveBundleComponent(order, item, componentToRemove.cIdx, componentToRemove.name, componentDisplays);
           }
           setComponentToRemove(null);
         }}
@@ -3201,7 +3201,7 @@ export const OrderCard = memo(function OrderCard({
     currentBundleItems?: any[];
     isAddingBundleItem?: boolean;
   }) => void;
-  onRemoveBundleComponent?: (order: AutoPickOrder, item: AutoPickOrderItem, componentIndex: number, componentName?: string) => void;
+  onRemoveBundleComponent?: (order: AutoPickOrder, item: AutoPickOrderItem, componentIndex: number, componentName?: string, currentBundleItems?: any[]) => void;
   onRefresh?: () => void;
 }) {
   const { showToast } = useToast();

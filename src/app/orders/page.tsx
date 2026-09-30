@@ -2863,6 +2863,7 @@ export default function OrdersPage() {
     item: AutoPickOrderItem,
     componentIndex: number,
     componentName?: string,
+    currentBundleItems?: any[],
   ) => {
     if (!order?.id || !item?.id) return;
     try {
@@ -2871,6 +2872,7 @@ export default function OrdersPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           removeComponentIndex: componentIndex,
+          currentBundleItems: Array.isArray(currentBundleItems) ? currentBundleItems : undefined,
         }),
       });
       const data = await response.json().catch(() => ({}));
