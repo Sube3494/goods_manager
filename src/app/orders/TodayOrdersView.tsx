@@ -44,6 +44,7 @@ import {
   toCurrency,
   OrderProfitBadge,
 } from "./OrderCard";
+import { isRematchReturnReason } from "@/lib/outboundReturnMeta";
 import { motion, AnimatePresence } from "framer-motion";
 import { DeliveryDispatchModal } from "@/components/Orders/DeliveryDispatchModal";
 import { createOrderShortagePurchaseDraft, OrderPurchaseDraft, OrderShortageItem } from "@/lib/orderShortagePurchase";
@@ -140,7 +141,7 @@ function CompactTodayOrderCard({
   const [routeOpen, setRouteOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const platformBadge = getPlatformBadgeMeta(order.platform, order.rawPayload);
-  const returned = Boolean(order.outboundReturnDetails?.some((entry) => entry.items?.some((item) => Number(item.quantity || 0) > 0)));
+  const returned = Boolean(order.outboundReturnDetails?.some((entry) => !isRematchReturnReason(entry?.reason) && entry.items?.some((item) => Number(item.quantity || 0) > 0)));
   const baseStatusLabel = getBaseAutoPickStatusDisplay(order.status) || "待处理";
   const statusLabel = returned ? "已退" : baseStatusLabel;
   const cancelled = isCancelledStatus(order.status) || statusLabel === "已删除";

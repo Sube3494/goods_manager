@@ -141,14 +141,23 @@ export function buildOutboundReturnMetaNote(
   return `${visibleNote}${summarySuffix}${metaBlock}`.trim();
 }
 
-/** 改匹配/重建出库单产生的系统性退货 reason 集合，不计入销售退货率 */
+/** 改匹配/重建出库单产生的系统性退货 reason 集合，不计入销售退货率，也不视为客户退货 */
 const REMATCH_RETURN_REASONS = new Set([
   "订单商品匹配数量变更，自动重建出库单",
   "订单商品重匹配自动回滚旧出库",
+  "修改线下订单商品明细，自动回滚旧出库",
 ]);
 
-export function isRematchReturnReason(reason: string) {
-  return REMATCH_RETURN_REASONS.has(reason);
+export function isRematchReturnReason(reason: string | null | undefined): boolean {
+  if (!reason) return false;
+  const trimmed = reason.trim();
+  if (REMATCH_RETURN_REASONS.has(trimmed)) return true;
+  return /重匹配|自动回滚|自动重建|改匹配/.test(trimmed);
+}
+
+export function filterCustomerReturns(entries: OutboundReturnMetaEntry[]): OutboundReturnMetaEntry[] {
+  if (!Array.isArray(entries)) return [];
+  return entries.filter((entry) => !isRematchReturnReason(entry?.reason));
 }
 
 export function getOutboundReturnedQuantityMap(entries: OutboundReturnMetaEntry[]) {

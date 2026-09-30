@@ -43,6 +43,7 @@ import {
   readDeliveryFeeFromValue,
 } from "@/lib/autoPickOrderStatus";
 import { formatLocalDate, formatLocalDateTime } from "@/lib/dateUtils";
+import { isRematchReturnReason } from "@/lib/outboundReturnMeta";
 import { cleanCustomerRemark } from "@/lib/customerRemark";
 
 const OrderRouteModal = dynamic(() => import("@/components/Orders/OrderRouteModal").then((module) => module.OrderRouteModal), { ssr: false });
@@ -3612,6 +3613,7 @@ export const OrderCard = memo(function OrderCard({
     return acc;
   }, new Map<string, string>());
   const returnedItemQuantityMap = outboundReturnDetails.reduce((acc, entry) => {
+    if (isRematchReturnReason(entry?.reason)) return acc;
     for (const item of entry.items || []) {
       const outboundOrderItemId = String(item.outboundOrderItemId || "").trim();
       const key = productKeyByOutboundItemId.get(outboundOrderItemId) || "";
@@ -3621,6 +3623,7 @@ export const OrderCard = memo(function OrderCard({
     return acc;
   }, new Map<string, number>());
   const returnedItemDetailsMap = outboundReturnDetails.reduce((acc, entry) => {
+    if (isRematchReturnReason(entry?.reason)) return acc;
     for (const item of entry.items || []) {
       const outboundOrderItemId = String(item.outboundOrderItemId || "").trim();
       const key = productKeyByOutboundItemId.get(outboundOrderItemId) || "";

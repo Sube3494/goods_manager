@@ -37,8 +37,10 @@ import { isPrismaMissingColumnError } from "@/lib/prismaSchemaCompat";
 import { normalizeJdSkuIds } from "@/lib/productJdSku";
 import { normalizeMeituanSkuIds } from "@/lib/productMeituanSku";
 import {
+  filterCustomerReturns,
   getOutboundReturnTotals,
   getOutboundReturnedQuantityMap,
+  isRematchReturnReason,
   parseOutboundReturnMeta,
 } from "@/lib/outboundReturnMeta";
 import { isAddressDisabled } from "@/lib/addressBook";
@@ -1733,16 +1735,27 @@ export async function GET(request: NextRequest) {
       const note = String(outbound.note || "");
       const match = note.match(/平台单号:\s*([^\s|]+)/);
       const orderNo = String(match?.[1] || "").trim();
-      const isCurrentReturned = outbound.status === "Returned";
-      // A rematch or edit rollback is superseded bookkeeping, not a customer return.
-      if (isCurrentReturned && (note.includes("订单商品重匹配自动回滚旧出库") || note.includes("自动回滚旧出库"))) continue;
+      if (!orderNo) continue;
+
+      const isCurrentReturned = outbound.status === "Returned" || outbound.status === "PartialReturned";
+      const returnMeta = parseOutboundReturnMeta(outbound.note);
+      const customerReturns = filterCustomerReturns(returnMeta.returns);
+      const isPureRematchRollback = isCurrentReturned && (
+        note.includes("订单商品重匹配自动回滚旧出库") ||
+        note.includes("自动回滚旧出库") ||
+        note.includes("自动重建出库单") ||
+        (returnMeta.returns.length > 0 && customerReturns.length === 0)
+      );
+
+      // 改匹配或数量重匹配导致的系统自动出库回滚属于历史废弃出库单，严禁作为订单出库单展示或污染退货状态
+      if (isPureRematchRollback) continue;
+
       const existing = outboundByOrderNo.get(orderNo);
-      const shouldSet = !existing || (!isCurrentReturned);
-      if (orderNo && shouldSet) {
-        const returnMeta = parseOutboundReturnMeta(outbound.note);
-        const returnTotals = getOutboundReturnTotals(returnMeta.returns);
-        const returnedQuantityMap = getOutboundReturnedQuantityMap(returnMeta.returns);
-        const returnDetails = returnMeta.returns.map((entry) => ({
+      const shouldSet = !existing || (!isCurrentReturned && existing.productCost === 0);
+      if (shouldSet) {
+        const returnTotals = getOutboundReturnTotals(customerReturns);
+        const returnedQuantityMap = getOutboundReturnedQuantityMap(customerReturns);
+        const returnDetails = customerReturns.map((entry) => ({
           id: entry.id,
           createdAt: entry.createdAt,
           reason: entry.reason,
