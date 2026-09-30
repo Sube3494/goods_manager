@@ -184,6 +184,7 @@ type MatchedCatalogProduct = {
   shopId?: string | null;
   shopName?: string | null;
   isManual?: boolean;
+  matchMethod?: "manual" | "id" | "sku" | "outbound";
   quantity?: number;
   isBundle?: boolean;
   bundleItems?: any[];
@@ -380,7 +381,11 @@ function readManualMatchedProduct(rawPayload: unknown): MatchedCatalogProduct | 
     productId: String(record.productId || "").trim() || null,
     shopProductId: shopProductId || id,
     shopName: String(record.shopName || "").trim() || null,
-    isManual: true,
+    isManual: typeof record.isManual === "boolean" ? record.isManual : true,
+    matchMethod:
+      record.matchMethod === "id" || record.matchMethod === "sku" || record.matchMethod === "outbound"
+        ? record.matchMethod
+        : "manual",
     quantity: Number(record.quantity || 0) > 0 ? Math.max(1, Number(record.quantity || 1) || 1) : undefined,
     isBundle: typeof record.isBundle === "boolean" ? record.isBundle : (Array.isArray(record.bundleItems) ? record.bundleItems.length > 0 : undefined),
     bundleItems: Array.isArray(record.bundleItems) ? record.bundleItems : undefined,
@@ -2817,10 +2822,10 @@ export async function GET(request: NextRequest) {
             // 3. 如果 manualMatchedProduct 自身显式标明非手工或记录了特定匹配方式
             else if (
               manualMatchedProduct.isManual === false
-              && ((manualMatchedProduct as any).matchMethod === "id" || (manualMatchedProduct as any).matchMethod === "sku")
+              && (manualMatchedProduct.matchMethod === "id" || manualMatchedProduct.matchMethod === "sku")
             ) {
               isReallyManual = false;
-              resolvedMatchMethod = (manualMatchedProduct as any).matchMethod;
+              resolvedMatchMethod = manualMatchedProduct.matchMethod;
             }
           }
 

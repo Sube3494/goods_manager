@@ -180,12 +180,16 @@ type AutoPickSystemMeta = {
 
 type AutoPickManualMatchedProductMeta = {
   id?: string;
+  productId?: string | null;
   name?: string;
   sku?: string | null;
   image?: string | null;
   sourceType?: "product" | "shopProduct";
   shopProductId?: string | null;
   shopName?: string | null;
+  isManual?: boolean;
+  matchMethod?: "manual" | "id" | "sku" | "outbound";
+  isBundle?: boolean;
   bundleItems?: any[];
 };
 
@@ -5097,13 +5101,22 @@ function readManualMatchedProductFromOrderItemRawPayload(rawPayload: unknown) {
 
   return {
     id,
+    productId: String(manual.productId || "").trim() || null,
     name,
     sku: String(manual.sku || "").trim() || null,
     image: String(manual.image || "").trim() || null,
     sourceType,
     shopProductId,
     shopName: String(manual.shopName || "").trim() || null,
+    isManual: typeof manual.isManual === "boolean" ? manual.isManual : undefined,
+    matchMethod:
+      manual.matchMethod === "id" || manual.matchMethod === "sku" || manual.matchMethod === "outbound"
+        ? manual.matchMethod
+        : manual.matchMethod === "manual"
+          ? "manual"
+          : undefined,
     quantity: Number((manual as any).quantity || 0) > 0 ? Math.max(1, Number((manual as any).quantity || 1) || 1) : undefined,
+    isBundle: typeof manual.isBundle === "boolean" ? manual.isBundle : undefined,
     bundleItems: Array.isArray(manual.bundleItems) ? manual.bundleItems : undefined,
   };
 }

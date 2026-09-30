@@ -531,8 +531,8 @@ export async function PATCH(
           sourceType: currentManual.sourceType || "shopProduct",
           shopProductId: currentManual.shopProductId || currentManual.id,
           shopName: currentManual.shopName,
-          isManual: true,
-          matchMethod: currentManual.matchMethod || "manual",
+          isManual: typeof currentManual.isManual === "boolean" ? currentManual.isManual : true,
+          matchMethod: currentManual.matchMethod || (currentManual.isManual === false ? "id" : "manual"),
           ...(currentManual.quantity ? { quantity: currentManual.quantity } : {}),
         };
         if (existingBundleItems.length === 0) {
@@ -640,10 +640,12 @@ export async function PATCH(
         nextBundleItems.splice(removeComponentIndex, 1);
       }
 
+      const nextIsManual = typeof mainProduct.isManual === "boolean" ? mainProduct.isManual : false;
+      const nextMatchMethod = mainProduct.matchMethod || (nextIsManual ? "manual" : "id");
       const updatedMatchedProduct = {
         ...mainProduct,
-        isManual: true,
-        matchMethod: "manual",
+        isManual: nextIsManual,
+        matchMethod: nextMatchMethod,
         isBundle: nextBundleItems.length > 0,
         bundleItems: nextBundleItems,
       };
