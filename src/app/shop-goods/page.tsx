@@ -55,11 +55,6 @@ type ShopSortDraft = {
   updatedAt: number;
 };
 
-type ProductLibraryOption = {
-  id: string;
-  name: string;
-};
-
 function getShopSortDraftKey(shopId: string) {
   return `shop-sort-draft:${shopId}`;
 }
@@ -1275,40 +1270,21 @@ export default function ShopGoodsPage() {
   const [needsAddress, setNeedsAddress] = useState(false);
   const [selectedShopId, setSelectedShopId] = useState("");
   
-  const [libraries, setLibraries] = useState<ProductLibraryOption[]>([]);
-  const [activeLibraryId, setActiveLibraryId] = useState<string>("all");
   const [importErrors, setImportErrors] = useState<string[]>([]);
 
-  const filteredShops = useMemo(() => {
-    return shops.filter(
-      (shop) => !activeLibraryId || activeLibraryId === "all" || shop.libraryId === activeLibraryId
-    );
-  }, [shops, activeLibraryId]);
+  const filteredShops = shops;
 
-  // 当切换商品库导致店铺列表发生变化时，自动联动更新选中的店铺，防止出现跨库店铺被保留选中的情况
+  // 保证选中的店铺始终存在于店铺列表中
   useEffect(() => {
-    if (filteredShops.length > 0) {
-      const isCurrentShopValid = filteredShops.some((shop) => shop.id === selectedShopId);
+    if (shops.length > 0) {
+      const isCurrentShopValid = shops.some((shop) => shop.id === selectedShopId);
       if (!isCurrentShopValid) {
-        setSelectedShopId(filteredShops[0].id);
+        setSelectedShopId(shops[0].id);
       }
-    } else if (shops.length > 0 && (!activeLibraryId || activeLibraryId === "all")) {
-      setSelectedShopId(shops[0].id);
-    } else if (shops.length === 0) {
+    } else {
       setSelectedShopId("");
     }
-  }, [filteredShops, selectedShopId, shops, activeLibraryId]);
-
-  useEffect(() => {
-    fetch("/api/product-libraries")
-      .then((res) => (res.ok ? res.json() : []))
-      .then((data) => {
-        if (Array.isArray(data)) {
-          setLibraries(data);
-        }
-      })
-      .catch(() => {});
-  }, []);
+  }, [shops, selectedShopId]);
   const [items, setItems] = useState<ShopCatalogItem[]>([]);
   const itemsRef = useRef<ShopCatalogItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -1560,11 +1536,10 @@ export default function ShopGoodsPage() {
       supplierId: selectedSupplier,
       sortBy,
       ...(selectedShopId ? { shopId: selectedShopId } : {}),
-      ...(activeLibraryId && activeLibraryId !== "all" ? { libraryId: activeLibraryId } : {}),
       ...extra,
     });
     return queryParams;
-  }, [debouncedSearch, selectedCategory, selectedShopId, selectedSupplier, sortBy, activeLibraryId]);
+  }, [debouncedSearch, selectedCategory, selectedShopId, selectedSupplier, sortBy]);
 
   const fetchShopProducts = useCallback(async (isFirstPage = true) => {
     if (!selectedShopId) {
@@ -1647,7 +1622,7 @@ export default function ShopGoodsPage() {
     setItems([]);
     setSelectedIds([]);
     void fetchShopProducts(true);
-  }, [fetchShopProducts, activeLibraryId]);
+  }, [fetchShopProducts]);
 
   useEffect(() => {
     const fetchAssignedTemplateIds = async () => {
@@ -2585,30 +2560,6 @@ export default function ShopGoodsPage() {
             <input type="text" placeholder="搜索商品、编号或店铺..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="bg-transparent border-none outline-none w-full text-foreground placeholder:text-muted-foreground text-xs sm:text-sm h-full pr-8" />
             {searchQuery && <button onClick={() => setSearchQuery("")} className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/10 p-1 rounded-full transition-colors"><X size={14} /></button>}
           </div>
-
-          {libraries.length > 1 && (
-            <div className="w-28 sm:w-32 xl:w-36 h-10 sm:h-11 shrink-0">
-              <CustomSelect
-                value={activeLibraryId}
-                onChange={(val) => setActiveLibraryId(val)}
-                options={[
-                  { value: "all", label: "全部商品库" },
-                  ...libraries.map((lib) => ({ value: lib.id, label: lib.name }))
-                ]}
-                placeholder="全部商品库"
-                searchable={false}
-                matchTriggerWidth
-                align="right"
-                className="h-full"
-                triggerClassName={cn(
-                  "h-full rounded-full border text-xs sm:text-sm py-0 px-2 sm:px-3 transition-all truncate",
-                  activeLibraryId !== "all"
-                    ? "bg-primary/10 border-primary/20 text-primary dark:bg-primary/20 dark:border-primary/30 dark:text-primary font-bold"
-                    : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5"
-                )}
-              />
-            </div>
-          )}
         </div>
 
         <div className="grid grid-cols-2 xl:flex gap-2 sm:gap-2.5 w-full xl:w-auto shrink-0">
@@ -2754,11 +2705,11 @@ export default function ShopGoodsPage() {
         emptyStateText="主库里还没有商品"
         respectPublicVisibility={false}
         defaultViewMode="list"
-        defaultLibraryId={selectedShop?.libraryId || (activeLibraryId !== "all" ? activeLibraryId : undefined)}
+        defaultLibraryId={selectedShop?.libraryId || undefined}
       />
       <ImportModal isOpen={isImportOpen} onClose={() => setIsImportOpen(false)} onImport={handleImport} title={selectedShop ? `导入到 ${selectedShop.name}` : "导入店铺商品"} description="导入结果只会落到当前选中的目标店铺。已存在的店铺商品会更新，未存在的会按公开商品匹配后加入该店铺。" templateFileName="店铺商品导入模板.xlsx" templateData={[{ "*商品名称": "示例商品", "SKU/店内码": "SHOP-001", "JD SKU ID": "100234,100235 (选填)", "美团商品 ID": "MT-001,MT-002 (选填)", "*分类": "默认分类", 供应商: "默认供应商", 进货单价: 19.9, 主图: "https://example.com/cover.jpg", 备注: "店铺自定义备注" }]} />
-      <ProductFormModal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} onSubmit={async (data) => { await handleCreateStandaloneProduct(data); }} title={selectedShop ? `新建 ${selectedShop.name} 商品` : "新建店铺商品"} hideVisibilityControl={true} hideProductionControl={true} hideGallerySection={true} hideSpecsSection={true} disableHistorySection={true} showCoverSection={true} showJdSkuField={true} showMeituanSkuField={true} mainImageUploadEndpoint={selectedShopId ? `/api/shops/${selectedShopId}/products/cover-upload` : undefined} defaultLibraryId={selectedShop?.libraryId || (activeLibraryId !== "all" ? activeLibraryId : undefined)} />
-      <ProductFormModal key={editingProduct?.id || 'shop-edit'} isOpen={isEditOpen} onClose={closeEditModal} onSubmit={async (data) => { await handleSaveEdit(data); }} initialData={editingProduct} title="编辑店铺商品" hideVisibilityControl={true} hideProductionControl={true} hideGallerySection={true} hideSpecsSection={true} showCoverSection={true} showJdSkuField={true} showMeituanSkuField={true} mainImageUploadEndpoint={editingShopId ? `/api/shops/${editingShopId}/products/cover-upload` : undefined} onStockChange={handleItemStockChange} defaultLibraryId={selectedShop?.libraryId || (activeLibraryId !== "all" ? activeLibraryId : undefined)} />
+      <ProductFormModal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} onSubmit={async (data) => { await handleCreateStandaloneProduct(data); }} title={selectedShop ? `新建 ${selectedShop.name} 商品` : "新建店铺商品"} hideVisibilityControl={true} hideProductionControl={true} hideGallerySection={true} hideSpecsSection={true} disableHistorySection={true} showCoverSection={true} showJdSkuField={true} showMeituanSkuField={true} mainImageUploadEndpoint={selectedShopId ? `/api/shops/${selectedShopId}/products/cover-upload` : undefined} defaultLibraryId={selectedShop?.libraryId || undefined} />
+      <ProductFormModal key={editingProduct?.id || 'shop-edit'} isOpen={isEditOpen} onClose={closeEditModal} onSubmit={async (data) => { await handleSaveEdit(data); }} initialData={editingProduct} title="编辑店铺商品" hideVisibilityControl={true} hideProductionControl={true} hideGallerySection={true} hideSpecsSection={true} showCoverSection={true} showJdSkuField={true} showMeituanSkuField={true} mainImageUploadEndpoint={editingShopId ? `/api/shops/${editingShopId}/products/cover-upload` : undefined} onStockChange={handleItemStockChange} defaultLibraryId={selectedShop?.libraryId || undefined} />
       <BatchEditModal isOpen={isBatchEditOpen} onClose={() => setIsBatchEditOpen(false)} onConfirm={handleBatchUpdate} categories={categories} suppliers={suppliers} selectedCount={selectedIds.length} hideProductionStatus={true} />
       <BatchBundleModal
         isOpen={isBatchBundleOpen}
@@ -2766,7 +2717,7 @@ export default function ShopGoodsPage() {
         onConfirm={handleBatchBundleConfirm}
         selectedCount={selectedIds.length}
         shopId={selectedShopId}
-        libraryId={selectedShop?.libraryId || (activeLibraryId !== "all" ? activeLibraryId : undefined)}
+        libraryId={selectedShop?.libraryId || undefined}
       />
       <MeituanMappingModal
         isOpen={isMeituanMappingOpen}
