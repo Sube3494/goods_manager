@@ -2201,7 +2201,7 @@ export function ProductFormModal({
                                                     <div className="flex items-center gap-2 min-w-0">
                                                         <span className="text-[11px] font-mono text-muted-foreground shrink-0">{new Date(order.date).toLocaleDateString()}</span>
                                                         <span className={cn(
-                                                            "text-[10px] px-1.5 py-0.5 rounded-md font-medium shrink-0",
+                                                            "text-[10px] px-2 py-0.5 rounded-full font-medium shrink-0",
                                                             order.status === "Received" ? "bg-green-500/10 text-green-500 dark:bg-green-500/20" : 
                                                             (order.status === "Ordered" || order.status === "Confirmed" || order.status === "Shipped") ? "bg-blue-500/10 text-blue-500 dark:bg-blue-500/20" :
                                                             "bg-gray-500/10 text-gray-500 dark:bg-gray-500/20"
@@ -2215,7 +2215,7 @@ export function ProductFormModal({
                                                             <button
                                                                 type="button"
                                                                 onClick={() => void openBatchTrace(itemId)}
-                                                                className="inline-flex items-center gap-1 rounded-md border border-sky-500/20 bg-sky-500/10 px-2 py-0.5 text-[10px] font-medium text-sky-600 dark:text-sky-400 hover:bg-sky-500/20 transition-colors cursor-pointer"
+                                                                className="inline-flex items-center gap-1 rounded-full border border-sky-500/20 bg-sky-500/10 px-2.5 py-0.5 text-[10px] font-medium text-sky-600 dark:text-sky-400 hover:bg-sky-500/20 transition-colors cursor-pointer"
                                                                 title="查看这批入库货的出库流向"
                                                             >
                                                                 出库
@@ -2238,7 +2238,7 @@ export function ProductFormModal({
                                                                         onConfirm: () => void handleDeleteBatch(itemId, remainingQty),
                                                                     });
                                                                 }}
-                                                                className="inline-flex items-center justify-center p-1 rounded-md text-muted-foreground/80 hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
+                                                                className="inline-flex items-center justify-center p-1 rounded-full text-muted-foreground/80 hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
                                                                 title="删除此入库批次"
                                                             >
                                                                 <Trash2 size={13} />
@@ -2268,8 +2268,8 @@ export function ProductFormModal({
                                                     </div>
                                                 </div>
 
-                                                {/* 价格通栏容器：独占全宽，解决移动端狭窄错位挤压问题 */}
-                                                <div className="w-full rounded-lg bg-muted/40 dark:bg-white/[0.03] p-2 text-[11px] text-muted-foreground border border-border/20">
+                                                {/* 价格通栏容器：胶囊药丸槽 */}
+                                                <div className="w-full rounded-full bg-muted/40 dark:bg-white/[0.03] px-3 py-1.5 text-[11px] text-muted-foreground border border-border/20">
                                                     {order.status === "Received" && editingItemId === itemId ? (
                                                         <div className="flex flex-wrap items-center justify-between gap-2" onClick={(e) => e.stopPropagation()}>
                                                             <div className="flex items-center gap-1.5">
@@ -2296,7 +2296,7 @@ export function ProductFormModal({
                                                                             setEditingCostValue("");
                                                                         }
                                                                     }}
-                                                                    className="w-20 h-7 px-2 text-xs rounded border border-border bg-background text-foreground focus:outline-none focus:border-primary font-mono"
+                                                                    className="w-20 h-6 px-2.5 text-xs rounded-full border border-border dark:border-white/10 bg-background dark:bg-white/5 text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary font-mono"
                                                                     placeholder="0.00"
                                                                     disabled={isSavingCost}
                                                                     autoFocus
@@ -2311,7 +2311,7 @@ export function ProductFormModal({
                                                                         handleSaveCost(itemId, order.id);
                                                                     }}
                                                                     disabled={isSavingCost}
-                                                                    className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-white bg-green-600 hover:bg-green-700 rounded transition-colors disabled:opacity-50 cursor-pointer shadow-xs"
+                                                                    className="inline-flex items-center gap-1 px-3 py-1 text-xs font-medium text-white bg-green-600 hover:bg-green-700 rounded-full transition-colors disabled:opacity-50 cursor-pointer shadow-xs"
                                                                 >
                                                                     <Check size={12} />
                                                                     保存
@@ -2325,7 +2325,7 @@ export function ProductFormModal({
                                                                         setEditingCostValue("");
                                                                     }}
                                                                     disabled={isSavingCost}
-                                                                    className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-muted-foreground hover:bg-muted rounded transition-colors disabled:opacity-50 cursor-pointer"
+                                                                    className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-muted-foreground hover:bg-muted rounded-full transition-colors disabled:opacity-50 cursor-pointer"
                                                                 >
                                                                     <X size={12} />
                                                                     取消
@@ -2338,7 +2338,7 @@ export function ProductFormModal({
                                                             <div className="flex items-center gap-1.5 flex-wrap">
                                                                 {order.status === "Received" && item.costPrice === 0 ? (
                                                                     <>
-                                                                        <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium bg-amber-500/10 px-1.5 py-0.5 rounded">无进价</span>
+                                                                        <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium bg-amber-500/10 px-2 py-0.5 rounded-full">无进价</span>
                                                                         <button 
                                                                             type="button"
                                                                             onClick={(e) => {
@@ -2347,7 +2347,7 @@ export function ProductFormModal({
                                                                                 setEditingItemId(itemId);
                                                                                 setEditingCostValue("");
                                                                             }}
-                                                                            className="text-xs text-primary hover:underline font-medium inline-flex items-center gap-0.5 cursor-pointer ml-1"
+                                                                            className="text-[10px] text-primary bg-primary/10 hover:bg-primary/20 px-2 py-0.5 rounded-full font-medium inline-flex items-center gap-0.5 cursor-pointer ml-1 transition-colors"
                                                                         >
                                                                             补录
                                                                         </button>
@@ -2364,7 +2364,7 @@ export function ProductFormModal({
                                                                                     setEditingItemId(itemId);
                                                                                     setEditingCostValue(String(item.costPrice));
                                                                                 }}
-                                                                                className="text-muted-foreground hover:text-primary transition-colors inline-flex items-center cursor-pointer p-0.5 rounded hover:bg-black/5 dark:hover:bg-white/10"
+                                                                                className="text-muted-foreground hover:text-primary transition-colors inline-flex items-center cursor-pointer p-1 rounded-full hover:bg-black/5 dark:hover:bg-white/10"
                                                                                 title="修改进价"
                                                                             >
                                                                                 <Pencil size={11} />
