@@ -2959,7 +2959,10 @@ export async function GET(request: NextRequest) {
               })
             : null;
 
-          const outboundFallbackBundleItems = (!bundleItems && isSingleOrderItem && outboundBreakdown.length > 1)
+          // 只有没有手动配置时，才允许旧出库明细作为配件展示兜底。
+          // 手动清空最后一个配件会保存 bundleItems: [] / isBundle: false；此时若继续
+          // 回退到历史出库明细，页面会表现为“删除成功后配件仍然存在”。
+          const outboundFallbackBundleItems = (!hasExplicitManualBundleConfig && !bundleItems && isSingleOrderItem && outboundBreakdown.length > 1)
             ? outboundBreakdown.slice(1).map((bOutbound) => {
                 const foundBShopProduct = mappedShopProducts.find((p) =>
                   (bOutbound.shopProductId && p.id === bOutbound.shopProductId)
