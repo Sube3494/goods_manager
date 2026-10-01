@@ -2750,7 +2750,6 @@ export default function OrdersPage() {
           setProfitUpdatingOrderIds((prev) => Array.from(new Set([...prev, targetOrder.id])));
           setTargetRefreshOrder({ id: targetOrder.id, timestamp: Date.now() });
         }
-        setRefreshTrigger((prev) => prev + 1);
         showToast(isAddingComponent ? "配件添加成功！已自动重新计算出库与成本" : "配件更换成功！已自动重新计算出库与成本", "success");
         return;
       }
@@ -2881,7 +2880,6 @@ export default function OrdersPage() {
       }
       setProfitUpdatingOrderIds((prev) => Array.from(new Set([...prev, order.id])));
       setTargetRefreshOrder({ id: order.id, timestamp: Date.now() });
-      setRefreshTrigger((prev) => prev + 1);
       showToast(`已移除配件${componentName ? `【${componentName}】` : ""}，已自动重新核算出库与成本`, "success");
     } catch (err: any) {
       showToast(err.message || "移除配件失败", "error");
