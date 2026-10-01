@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
 import { getStorageStrategy } from "@/lib/storage";
 import { MAX_UPLOAD_SIZE_BYTES } from "@/lib/uploadValidation";
+import { getMeituanOriginalImageUrl } from "@/lib/meituanImage";
 
 const IMAGE_FIELDS = [
   "thumb",
@@ -208,7 +209,7 @@ export async function POST(
       return NextResponse.json({ error: "该店铺商品与当前订单项不匹配" }, { status: 409 });
     }
 
-    const sourceImage = readMeituanImage(item);
+    const sourceImage = getMeituanOriginalImageUrl(readMeituanImage(item));
     if (!sourceImage) {
       return NextResponse.json({ error: "当前美团订单没有商品图" }, { status: 400 });
     }

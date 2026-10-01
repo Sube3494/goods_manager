@@ -31,6 +31,7 @@ import { parseAsShanghaiTime } from "@/lib/dateUtils";
 import { doesAutoPickOrderRequirePickConfirmation, isAutoPickOrderCancelledStatus, isAutoPickOrderDeletedStatus, isAutoPickOtherPickupOrder, isAutoPickPickCompleted, isAutoPickPickupOrder, readMainSystemSelfDeliveryFlag, resolveAutoPickBusinessStatus } from "@/lib/autoPickOrderStatus";
 import { createRequestPerfTracker } from "@/lib/perf";
 import { getStorageStrategy } from "@/lib/storage";
+import { getMeituanOriginalImageUrl } from "@/lib/meituanImage";
 import { Prisma } from "../../../../prisma/generated-client";
 import { buildShopDedupeKey, normalizeExternalId, normalizeShopNameKey, isShopNameMatch } from "@/lib/shopIdentity";
 import { isPrismaMissingColumnError } from "@/lib/prismaSchemaCompat";
@@ -3172,16 +3173,17 @@ export async function GET(request: NextRequest) {
                         : (rawThumbCandidate ? storage.resolveUrl(rawThumbCandidate) : null)
                     )
               );
-          const platformImage = isMeituanPlatform(order.platform)
-            ? (rawThumbCandidate
-                ? storage.resolveUrl(rawThumbCandidate)
-                : (item.thumb ? storage.resolveUrl(item.thumb) : null))
+          const platformThumbnail = isMeituanPlatform(order.platform)
+            ? (rawThumbCandidate || item.thumb || null)
+            : null;
+          const platformImage = platformThumbnail
+            ? storage.resolveUrl(getMeituanOriginalImageUrl(platformThumbnail))
             : null;
 
           return {
             ...item,
             productName: fallbackResolvedName,
-            thumb: fallbackResolvedThumb,
+            thumb: platformThumbnail ? storage.resolveUrl(platformThumbnail) : fallbackResolvedThumb,
             platformImage,
             displayItems,
             matchedProduct,

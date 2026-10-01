@@ -763,7 +763,7 @@ function readDisplaySourceId(item: AutoPickOrderItem, platform?: string | null, 
 
 export function getOrderItemDisplay(item: AutoPickOrderItem, platform?: string | null, channelTag?: string | null) {
   const matchedProduct = item.matchedProduct;
-  const platformImage = isMeituanOrder(platform, channelTag) ? item.platformImage : null;
+  const platformThumbnail = isMeituanOrder(platform, channelTag) ? item.thumb : null;
   const rawPayload = item.rawPayload && typeof item.rawPayload === "object" && !Array.isArray(item.rawPayload)
     ? item.rawPayload as Record<string, unknown>
     : {};
@@ -804,7 +804,7 @@ export function getOrderItemDisplay(item: AutoPickOrderItem, platform?: string |
   return {
     name: realResolvedName || (isManualDeliveryPlaceholder ? "可添加发货货品" : item.productName) || "未命名商品",
     sku: matchedProduct?.sku || (isManualDeliveryPlaceholder && !realResolvedName ? "不加则只记配送费" : item.productNo) || "-",
-    image: platformImage || matchedProduct?.image || item.thumb || rawThumbCandidate,
+    image: platformThumbnail || matchedProduct?.image || item.thumb || rawThumbCandidate,
     quantity: Math.max(1, Number((matchedProduct as any)?.quantity || item.quantity || 1) || 1),
     costPrice: matchedProduct?.costPrice || null,
     costSource: matchedProduct?.costSource,
@@ -817,13 +817,13 @@ export function getOrderItemDisplay(item: AutoPickOrderItem, platform?: string |
 export function getExpandedOrderItemDisplays(item: AutoPickOrderItem, platform?: string | null, channelTag?: string | null) {
   const matchedProduct = item.matchedProduct;
   const sourceId = readDisplaySourceId(item, platform, channelTag);
-  const platformImage = isMeituanOrder(platform, channelTag) ? item.platformImage : null;
+  const platformThumbnail = isMeituanOrder(platform, channelTag) ? item.thumb : null;
 
   if (Array.isArray(item.displayItems) && item.displayItems.length > 0) {
     return item.displayItems.map((displayItem, index) => ({
       name: displayItem.name || (item.productName !== MANUAL_DELIVERY_PLACEHOLDER_PRODUCT_NAME ? item.productName : "") || "未命名商品",
       sku: displayItem.sku || matchedProduct?.sku || item.productNo || "-",
-      image: (index === 0 ? platformImage : null) || displayItem.image || item.thumb || null,
+      image: (index === 0 ? platformThumbnail : null) || displayItem.image || item.thumb || null,
       quantity: displayItem.quantity,
       costPrice: displayItem.costPrice || null,
       costSource: displayItem.costSource,
@@ -2192,6 +2192,7 @@ export function DetailBlock({
 
 export function ProductStripItem({
   display,
+  previewImage,
   onEditMatch,
   showEditMatch = false,
   compact = false,
@@ -2213,6 +2214,7 @@ export function ProductStripItem({
   onAdoptPlatformImage,
 }: {
   display: { name: string; sku: string; image: string | null; quantity: number; costPrice?: number | null; costSource?: "outbound" | "current"; sourceId?: string; optionalMatch?: boolean };
+  previewImage?: string | null;
   onEditMatch?: () => void;
   onAddBundleItem?: () => void;
   onRemoveComponent?: () => void;
@@ -2241,6 +2243,7 @@ export function ProductStripItem({
 }) {
   const [imgError, setImgError] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const expandedImage = previewImage || display.image;
 
   const matchMeta = (() => {
     if ((matchedProduct as any)?.ignoreOutbound) {
@@ -2498,7 +2501,7 @@ export function ProductStripItem({
         ) : null}
       </div>
       </div>
-      {isPreviewOpen && display.image && typeof document !== "undefined" ? createPortal(
+      {isPreviewOpen && expandedImage && typeof document !== "undefined" ? createPortal(
         <div
           className="fixed inset-0 z-[200000] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
           onClick={() => setIsPreviewOpen(false)}
@@ -2531,7 +2534,7 @@ export function ProductStripItem({
             onClick={(event) => event.stopPropagation()}
           >
             <Image
-              src={display.image}
+              src={expandedImage}
               alt={display.name}
               width={1200}
               height={1200}
@@ -2624,6 +2627,7 @@ export function OrderItemBundleGroup({
           <ProductStripItem
             key={`${item.productNo || item.productName}-${index}-${display.sku}-${compositeIndex}`}
             display={display}
+            previewImage={compositeIndex === 0 && isMeituan ? item.platformImage : undefined}
             compact={compact}
             showEditMatch={!deleted && !readOnly}
             onEditMatch={() => onOpenMatchEditor(order, item)}
@@ -2705,6 +2709,7 @@ export function OrderItemBundleGroup({
       <ProductStripItem
         key={`${item.productNo || item.productName}-${index}-${display.sku}-0`}
         display={display}
+        previewImage={isMeituan ? item.platformImage : undefined}
         compact={compact}
         showEditMatch={!deleted && !readOnly}
         onEditMatch={() => onOpenMatchEditor(order, item)}
@@ -2732,6 +2737,7 @@ export function OrderItemBundleGroup({
       {/* 主商品（本体） */}
       <ProductStripItem
         display={mainDisplay}
+        previewImage={isMeituan ? item.platformImage : undefined}
         compact={compact}
         isBundleMain={true}
         bundleComponentCount={componentDisplays.length}
