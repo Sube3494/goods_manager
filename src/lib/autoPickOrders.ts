@@ -5988,7 +5988,15 @@ export async function applyAutoPickProgress(userId: string, payload: unknown) {
         wsStatusHint: progress.statusHint || null,
       };
 
-  const nextStatus = buildProgressStatus(progress, order.status);
+  const progressStatusHint = String(progress.statusHint || "").trim().toLowerCase();
+  const isUnverifiedPlatformCancellation = !isPureManualOfflineOrder
+    && ["cancel", "close", "closed"].includes(progressStatusHint);
+  // 平台推送的取消消息也可能只是用户发起申请，并不代表商家已同意或退款已生效。
+  // 上方已主动刷新平台详情；若复核确认取消，订单会以终态提前返回。否则必须保留
+  // 当前真实状态，不能仅凭 WebSocket 文案直接判定取消。
+  const nextStatus = isUnverifiedPlatformCancellation
+    ? order.status || "confirm"
+    : buildProgressStatus(progress, order.status);
   const wasCompleted = isAutoPickOrderCompletedStatus(order.status);
   const isNowCompleted = isAutoPickOrderCompletedStatus(nextStatus);
 
