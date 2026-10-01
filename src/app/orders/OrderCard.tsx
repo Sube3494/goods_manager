@@ -3348,6 +3348,7 @@ export const OrderCard = memo(function OrderCard({
   onOpenMatchEditor,
   onRemoveBundleComponent,
   onRefresh,
+  onProductImageUpdated,
 }: {
   order: AutoPickOrder;
   expanded: boolean;
@@ -3369,6 +3370,7 @@ export const OrderCard = memo(function OrderCard({
   }) => void;
   onRemoveBundleComponent?: (order: AutoPickOrder, item: AutoPickOrderItem, componentIndex: number, componentName?: string, currentBundleItems?: any[]) => void;
   onRefresh?: () => void;
+  onProductImageUpdated?: (shopProductId: string, image: string) => void;
 }) {
   const { showToast } = useToast();
   const [isUpdatingBrush, setIsUpdatingBrush] = useState(false);
@@ -3476,14 +3478,18 @@ export const OrderCard = memo(function OrderCard({
         throw new Error(data.error || "更新店铺商品主图失败");
       }
       showToast("美团商品图已下载并更新为店铺商品主图", "success");
-      onRefresh?.();
+      if (onProductImageUpdated && typeof data.image === "string") {
+        onProductImageUpdated(target.shopProductId, data.image);
+      } else {
+        onRefresh?.();
+      }
+      setMeituanImageUpdateTarget(null);
     } catch (error) {
       showToast(error instanceof Error ? error.message : "更新店铺商品主图失败", "error");
     } finally {
       setIsUpdatingMeituanImage(false);
-      setMeituanImageUpdateTarget(null);
     }
-  }, [meituanImageUpdateTarget, onRefresh, order.id, showToast]);
+  }, [meituanImageUpdateTarget, onProductImageUpdated, onRefresh, order.id, showToast]);
 
   const handleUpdateBrush = useCallback(async (val: boolean) => {
     if (val === order.isMainSystemSelfDelivery) return;
@@ -4869,6 +4875,7 @@ export const OrderCard = memo(function OrderCard({
           </div>
         ) : ""}
         confirmLabel={isUpdatingMeituanImage ? "更新中..." : "确认更新"}
+        closeOnConfirm={false}
         cancelLabel="取消"
         variant="info"
         confirmDisabled={isUpdatingMeituanImage}

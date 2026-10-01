@@ -7,6 +7,7 @@ import { CustomSelect } from "@/components/ui/CustomSelect";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { AutoPickOrder, AutoPickOrderItem } from "@/lib/types";
+import { updateOrderProductImage } from "@/lib/orderProductImage";
 import { formatLocalDate } from "@/lib/dateUtils";
 import { createOrderShortagePurchaseDraft, OrderPurchaseDraft, OrderShortageItem } from "@/lib/orderShortagePurchase";
 import {
@@ -564,6 +565,10 @@ export function AllOrdersView({
     void fetchOrders({ silent: true, force: true, refreshMetrics: true });
   }, [fetchOrders]);
 
+  const handleProductImageUpdated = useCallback((shopProductId: string, image: string) => {
+    setOrders((current) => updateOrderProductImage(current, shopProductId, image));
+  }, []);
+
   const runAction = useCallback(async (orderId: string, action: OrderAction) => {
     if (action === "dispatch-delivery") {
       setDispatchTarget(orders.find((order) => order.id === orderId) || null);
@@ -1010,6 +1015,7 @@ export function AllOrdersView({
                             onOpenMatchEditor={onOpenMatchEditor}
                             onRemoveBundleComponent={onRemoveBundleComponent}
                             onRefresh={handleRefreshOrder}
+                            onProductImageUpdated={handleProductImageUpdated}
                             isProfitUpdating={profitUpdatingOrderIds.includes(order.id)}
                             readOnly={readOnly}
                             canExpandDetails={canExpandDetails}

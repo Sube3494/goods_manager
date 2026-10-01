@@ -17,6 +17,7 @@ interface ConfirmModalProps {
   variant?: "primary" | "danger" | "warning" | "info" | "success";
   className?: string;
   confirmDisabled?: boolean;
+  closeOnConfirm?: boolean;
 }
 
 export function ConfirmModal({
@@ -30,6 +31,7 @@ export function ConfirmModal({
   variant = "warning",
   className,
   confirmDisabled = false,
+  closeOnConfirm = true,
 }: ConfirmModalProps) {
   useEffect(() => {
     if (isOpen) {
@@ -238,7 +240,7 @@ export function ConfirmModal({
                 onClick={() => {
                   if (confirmDisabled) return;
                   onConfirm();
-                  onClose();
+                  if (closeOnConfirm) onClose();
                 }}
                 className={cn(
                   "min-w-0 px-5 text-[14px] sm:text-[15px] font-black transition-all active:scale-[0.97] flex items-center justify-center gap-1.5 sm:gap-2 text-center leading-tight cursor-pointer",

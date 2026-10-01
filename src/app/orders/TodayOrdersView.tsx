@@ -1,14 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import dynamic from "next/dynamic";
 import { createPortal } from "react-dom";
-import { ArrowUp, Package2, Search, X, ChevronUp, ChevronDown, Loader2, LayoutGrid, List, RefreshCw, Clock3, MapPin, Truck, CheckCheck, TriangleAlert, Eye, FileText, Navigation } from "lucide-react";
+import { ArrowUp, Package2, Search, X, Loader2, LayoutGrid, List, RefreshCw, Clock3, MapPin, Truck, CheckCheck, TriangleAlert, Eye, FileText, Navigation } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { AutoPickOrder, AutoPickOrderItem } from "@/lib/types";
+import { updateOrderProductImage } from "@/lib/orderProductImage";
 import { formatLocalDate, formatLocalDateTime } from "@/lib/dateUtils";
 import { extractCustomerPhoneTail } from "@/lib/customerPhoneTail";
 import { cleanCustomerRemark } from "@/lib/customerRemark";
@@ -45,7 +46,7 @@ import {
   OrderProfitBadge,
 } from "./OrderCard";
 import { isRematchReturnReason } from "@/lib/outboundReturnMeta";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, LayoutGroup, useReducedMotion } from "framer-motion";
 import { DeliveryDispatchModal } from "@/components/Orders/DeliveryDispatchModal";
 import { createOrderShortagePurchaseDraft, OrderPurchaseDraft, OrderShortageItem } from "@/lib/orderShortagePurchase";
 
@@ -601,9 +602,10 @@ export function TodayOrdersView({
   const [dispatchTarget, setDispatchTarget] = useState<AutoPickOrder | null>(null);
   const [expandedIds, setExpandedIds] = useState<string[]>([]);
   const [detailOrderId, setDetailOrderId] = useState<string | null>(null);
-  const [showBrushToday, setShowBrushToday] = useState(false);
-  const [showCompletedToday, setShowCompletedToday] = useState(true);
-  const [showCancelledToday, setShowCancelledToday] = useState(false);
+  const [activeOrderGroup, setActiveOrderGroup] = useState("pending");
+  const orderGroupLayoutId = useId();
+  const reduceMotion = useReducedMotion();
+  const orderGroupTouchRef = useRef<{ x: number; y: number } | null>(null);
   
   const isFetchingRef = useRef(false);
   const fetchAbortRef = useRef<AbortController | null>(null);
@@ -756,6 +758,16 @@ export function TodayOrdersView({
   const handleRefreshOrder = useCallback(() => {
     void fetchOrders({ silent: true, force: true });
   }, [fetchOrders]);
+
+  const handleProductImageUpdated = useCallback((shopProductId: string, image: string) => {
+    setOrders((current) => updateOrderProductImage(current, shopProductId, image));
+    for (const [key, cached] of todayOrdersMemoryCache) {
+      todayOrdersMemoryCache.set(key, {
+        ...cached,
+        orders: updateOrderProductImage(cached.orders, shopProductId, image),
+      });
+    }
+  }, []);
 
   const handleLoadMore = useCallback(() => {
     if (isFetchingRef.current || isLoadingMore || !hasMore) return;
@@ -1226,31 +1238,46 @@ export function TodayOrdersView({
     return orders;
   }, [orders]);
 
-  const todayCompletedOrders = useMemo(() => {
-    return filteredOrders.filter((order) => isCompletedStatus(order.status) && !isTodayBrushOrder(order));
+  const {
+    pending: todayPendingOrders,
+    outbound: todayOutboundOrders,
+    completed: todayCompletedOrders,
+    cancelled: todayCancelledOrders,
+    brush: todayBrushOrders,
+  } = useMemo(() => {
+    const groups = {
+      pending: [] as AutoPickOrder[],
+      outbound: [] as AutoPickOrder[],
+      completed: [] as AutoPickOrder[],
+      cancelled: [] as AutoPickOrder[],
+      brush: [] as AutoPickOrder[],
+    };
+    for (const order of filteredOrders) {
+      const displayStatus = getBaseAutoPickStatusDisplay(order.status);
+      if (isCancelledStatus(order.status) || displayStatus === "已删除") {
+        groups.cancelled.push(order);
+      } else if (order.productCostStatus === "pending-outbound") {
+        groups.outbound.push(order);
+      } else if (isTodayBrushOrder(order)) {
+        groups.brush.push(order);
+      } else if (isCompletedStatus(order.status)) {
+        groups.completed.push(order);
+      } else {
+        groups.pending.push(order);
+      }
+    }
+    return groups;
   }, [filteredOrders]);
 
-  const todayCancelledOrders = useMemo(() => {
-    return filteredOrders.filter((order) => {
-      const displayStatus = getBaseAutoPickStatusDisplay(order.status);
-      return isCancelledStatus(order.status) || displayStatus === "已删除";
-    });
-  }, [filteredOrders]);
-
-  const todayBrushOrders = useMemo(() => {
-    return filteredOrders.filter((order) => {
-      const displayStatus = getBaseAutoPickStatusDisplay(order.status);
-      const isCancelled = isCancelledStatus(order.status) || displayStatus === "已删除";
-      return !isCancelled && isTodayBrushOrder(order);
-    });
-  }, [filteredOrders]);
-
-  const todayPendingOrders = useMemo(() => {
-    return filteredOrders.filter((order) => {
-      const displayStatus = getBaseAutoPickStatusDisplay(order.status);
-      return !isCompletedStatus(order.status) && !isCancelledStatus(order.status) && displayStatus !== "已删除" && !isTodayBrushOrder(order);
-    });
-  }, [filteredOrders]);
+  const orderGroups = [
+    { key: "pending", label: "待处理", orders: todayPendingOrders },
+    { key: "outbound", label: "待出库", orders: todayOutboundOrders },
+    { key: "completed", label: "已完成", orders: todayCompletedOrders },
+    { key: "cancelled", label: "已取消", orders: todayCancelledOrders },
+    { key: "brush", label: "刷单", orders: todayBrushOrders },
+  ];
+  const activeGroupIndex = Math.max(0, orderGroups.findIndex((group) => group.key === activeOrderGroup));
+  const activeGroup = orderGroups[activeGroupIndex];
 
   const displayedSummary = useMemo(() => {
     return summary;
@@ -1356,6 +1383,7 @@ export function TodayOrdersView({
                   onOpenMatchEditor={onOpenMatchEditor}
                   onRemoveBundleComponent={onRemoveBundleComponent}
                   onRefresh={handleRefreshOrder}
+                  onProductImageUpdated={handleProductImageUpdated}
                   isProfitUpdating={profitUpdatingOrderIds.includes(order.id)}
                   readOnly={readOnly}
                   canExpandDetails={canExpandDetails}
@@ -1467,7 +1495,7 @@ export function TodayOrdersView({
             >
               <OrderListSkeleton count={4} cardMode={effectiveLayoutMode === "cards"} />
             </motion.div>
-          ) : todayPendingOrders.length === 0 && todayBrushOrders.length === 0 && todayCompletedOrders.length === 0 && todayCancelledOrders.length === 0 ? (
+          ) : filteredOrders.length === 0 ? (
             <motion.div
               key="today-orders-empty"
               initial={{ opacity: 0 }}
@@ -1490,78 +1518,75 @@ export function TodayOrdersView({
               transition={{ duration: 0.25 }}
               className="space-y-4"
             >
-              {todayPendingOrders.length > 0 && (
-                renderOrderCollection(todayPendingOrders)
-              )}
-
-
-
-
-              {todayCompletedOrders.length > 0 && (
-                <section className="flex flex-col gap-3">
+              <LayoutGroup id={orderGroupLayoutId}>
+              <div role="tablist" aria-label="今日订单分组" className="flex gap-1 overflow-x-auto rounded-full border border-black/8 bg-white/76 p-1.5 dark:border-white/10 dark:bg-white/4">
+                {orderGroups.map((group, index) => (
                   <button
+                    key={group.key}
+                    id={`today-group-tab-${group.key}`}
                     type="button"
-                    onClick={() => setShowCompletedToday((current) => !current)}
-                    className="flex w-full items-center justify-between rounded-[20px] border border-black/8 bg-white/76 px-5 py-4 text-left transition-all hover:bg-black/3 dark:border-white/10 dark:bg-white/5 shadow-xs"
+                    role="tab"
+                    aria-selected={activeOrderGroup === group.key}
+                    aria-controls={`today-group-panel-${group.key}`}
+                    tabIndex={activeOrderGroup === group.key ? 0 : -1}
+                    onClick={() => setActiveOrderGroup(group.key)}
+                    onKeyDown={(event) => {
+                      let nextIndex = index;
+                      if (event.key === "ArrowRight") nextIndex = (index + 1) % orderGroups.length;
+                      else if (event.key === "ArrowLeft") nextIndex = (index - 1 + orderGroups.length) % orderGroups.length;
+                      else if (event.key === "Home") nextIndex = 0;
+                      else if (event.key === "End") nextIndex = orderGroups.length - 1;
+                      else return;
+                      event.preventDefault();
+                      setActiveOrderGroup(orderGroups[nextIndex].key);
+                      document.getElementById(`today-group-tab-${orderGroups[nextIndex].key}`)?.focus();
+                    }}
+                    className={`relative isolate inline-flex min-h-10 flex-1 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${activeOrderGroup === group.key ? "text-background" : "text-muted-foreground hover:bg-black/4 dark:hover:bg-white/5"}`}
                   >
-                    <div>
-                      <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">今日已完成</div>
-                      <div className="mt-1 text-lg font-bold text-foreground">{todayCompletedOrders.length} 单</div>
-                    </div>
-                    <div className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-black/8 bg-black/2 transition-colors hover:bg-black/3 dark:border-white/10 dark:bg-white/3">
-                      {showCompletedToday ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                    </div>
+                    {activeOrderGroup === group.key ? (
+                      <motion.span
+                        layoutId="order-group-pill"
+                        aria-hidden="true"
+                        className="pointer-events-none absolute inset-0 -z-10 rounded-full bg-foreground shadow-sm"
+                        transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 450, damping: 36 }}
+                      />
+                    ) : null}
+                    <span className="relative">{group.label}</span>
+                    <span className="relative rounded-full bg-current/10 px-1.5 text-xs tabular-nums" title="当前已加载的订单数">{group.orders.length}</span>
                   </button>
-
-                  {showCompletedToday && (
-                    <div className="animate-in fade-in duration-200">{renderOrderCollection(todayCompletedOrders)}</div>
-                  )}
-                </section>
-              )}
-
-              {todayCancelledOrders.length > 0 && (
-                <section className="flex flex-col gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setShowCancelledToday((current) => !current)}
-                    className="flex w-full items-center justify-between rounded-[20px] border border-black/8 bg-white/76 px-5 py-4 text-left transition-all hover:bg-black/3 dark:border-white/10 dark:bg-white/5 shadow-xs"
-                  >
-                    <div>
-                      <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">今日已取消</div>
-                      <div className="mt-1 text-lg font-bold text-foreground">{overview.cancelledCount} 单</div>
-                    </div>
-                    <div className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-black/8 bg-black/2 transition-colors hover:bg-black/3 dark:border-white/10 dark:bg-white/3">
-                      {showCancelledToday ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                    </div>
-                  </button>
-
-                  {showCancelledToday && (
-                    <div className="animate-in fade-in duration-200">{renderOrderCollection(todayCancelledOrders)}</div>
-                  )}
-                </section>
-              )}
-
-              {todayBrushOrders.length > 0 && (
-                <section className="flex flex-col gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setShowBrushToday((current) => !current)}
-                    className="flex w-full items-center justify-between rounded-[20px] border border-black/8 bg-white/76 px-5 py-4 text-left transition-all hover:bg-black/3 dark:border-white/10 dark:bg-white/5 shadow-xs"
-                  >
-                    <div>
-                      <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">今日刷单</div>
-                      <div className="mt-1 text-lg font-bold text-foreground">{todayBrushOrders.length} 单</div>
-                    </div>
-                    <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-black/8 bg-black/2 transition-colors hover:bg-black/3 dark:border-white/10 dark:bg-white/3">
-                      {showBrushToday ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                    </div>
-                  </button>
-
-                  {showBrushToday && (
-                    <div className="animate-in fade-in duration-200">{renderOrderCollection(todayBrushOrders)}</div>
-                  )}
-                </section>
-              )}
+                ))}
+              </div>
+              </LayoutGroup>
+              <div
+                id={`today-group-panel-${activeGroup.key}`}
+                role="tabpanel"
+                aria-labelledby={`today-group-tab-${activeGroup.key}`}
+                tabIndex={0}
+                className="min-h-40"
+                onTouchStart={(event) => {
+                  const touch = event.touches[0];
+                  orderGroupTouchRef.current = event.touches.length === 1 ? { x: touch.clientX, y: touch.clientY } : null;
+                }}
+                onTouchCancel={() => { orderGroupTouchRef.current = null; }}
+                onTouchEnd={(event) => {
+                  const start = orderGroupTouchRef.current;
+                  orderGroupTouchRef.current = null;
+                  const touch = event.changedTouches[0];
+                  if (!start || !touch) return;
+                  const dx = touch.clientX - start.x;
+                  const dy = touch.clientY - start.y;
+                  if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+                  const nextIndex = Math.max(0, Math.min(orderGroups.length - 1, activeGroupIndex + (dx < 0 ? 1 : -1)));
+                  setActiveOrderGroup(orderGroups[nextIndex].key);
+                  document.getElementById(`today-group-tab-${orderGroups[nextIndex].key}`)?.scrollIntoView({ block: "nearest", inline: "nearest" });
+                }}
+              >
+                {activeGroup.orders.length > 0 ? renderOrderCollection(activeGroup.orders) : (
+                  <div className="rounded-2xl border border-black/8 bg-white/76 px-5 py-10 text-center text-sm text-muted-foreground dark:border-white/10 dark:bg-white/4">
+                    当前已加载的订单中暂无{activeGroup.label}订单{hasMore ? "，可继续加载更多" : ""}
+                  </div>
+                )}
+              </div>
 
               {/* 触底加载更多触发区域与状态指示 */}
               {hasMore && (
@@ -1627,6 +1652,7 @@ export function TodayOrdersView({
                   onOpenMatchEditor={onOpenMatchEditor}
                   onRemoveBundleComponent={onRemoveBundleComponent}
                   onRefresh={handleRefreshOrder}
+                  onProductImageUpdated={handleProductImageUpdated}
                   isProfitUpdating={profitUpdatingOrderIds.includes(detailOrder.id)}
                   readOnly={readOnly}
                   canExpandDetails={canExpandDetails}
