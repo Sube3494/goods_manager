@@ -1256,10 +1256,10 @@ export function TodayOrdersView({
       const displayStatus = getBaseAutoPickStatusDisplay(order.status);
       if (isCancelledStatus(order.status) || displayStatus === "已删除") {
         groups.cancelled.push(order);
-      } else if (order.productCostStatus === "pending-outbound") {
-        groups.outbound.push(order);
       } else if (isTodayBrushOrder(order)) {
         groups.brush.push(order);
+      } else if (order.productCostStatus === "pending-outbound") {
+        groups.outbound.push(order);
       } else if (isCompletedStatus(order.status)) {
         groups.completed.push(order);
       } else {
