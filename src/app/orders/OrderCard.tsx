@@ -10,6 +10,7 @@ import {
   ChevronUp,
   Clock3,
   FileText,
+  ImageUp,
   Layers,
   Loader2,
   MapPin,
@@ -2207,11 +2208,13 @@ export function ProductStripItem({
   onToggleBundleExpand,
   onAddBundleItem,
   onRemoveComponent,
+  onAdoptPlatformImage,
 }: {
   display: { name: string; sku: string; image: string | null; quantity: number; costPrice?: number | null; costSource?: "outbound" | "current"; sourceId?: string; optionalMatch?: boolean };
   onEditMatch?: () => void;
   onAddBundleItem?: () => void;
   onRemoveComponent?: () => void;
+  onAdoptPlatformImage?: () => void;
   showEditMatch?: boolean;
   compact?: boolean;
   matchedProduct?: AutoPickOrderItem['matchedProduct'];
@@ -2520,6 +2523,19 @@ export function ProductStripItem({
               onError={() => setIsPreviewOpen(false)}
             />
             <div className="mt-3 truncate text-center text-sm font-medium text-white/90">{display.name}</div>
+            {onAdoptPlatformImage ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsPreviewOpen(false);
+                  onAdoptPlatformImage();
+                }}
+                className="mt-3 inline-flex h-10 items-center gap-2 rounded-full border border-white/20 bg-white/12 px-5 text-sm font-semibold text-white shadow-lg transition-all hover:bg-white/20 active:scale-[0.98]"
+              >
+                <ImageUp size={16} />
+                使用美团图片更新主图
+              </button>
+            ) : null}
           </div>
         </div>,
         document.body
@@ -2540,6 +2556,7 @@ export function OrderItemBundleGroup({
   returnedItemDetailsMap,
   isJdPlatformOrder,
   isMeituanPlatformOrder,
+  onAdoptMeituanImage,
   compact = false,
 }: {
   item: AutoPickOrderItem;
@@ -2559,6 +2576,7 @@ export function OrderItemBundleGroup({
   returnedItemDetailsMap?: Map<string, any[]>;
   isJdPlatformOrder?: boolean;
   isMeituanPlatformOrder?: boolean;
+  onAdoptMeituanImage?: (order: AutoPickOrder, item: AutoPickOrderItem, display: { name: string; image: string | null }) => void;
   compact?: boolean;
 }) {
   const displays = getExpandedOrderItemDisplays(item, order.platform);
@@ -2571,6 +2589,17 @@ export function OrderItemBundleGroup({
   const returnedDetails = returnedItemDetailsMap?.get(getReturnedProductKey(item)) || [];
   const isJd = isJdPlatformOrder ?? isJdOrder(order.platform);
   const isMeituan = isMeituanPlatformOrder ?? isMeituanOrder(order.platform);
+  const singleMatchedShopProductId = String(item.matchedProduct?.shopProductId || item.matchedProduct?.id || "").trim();
+  const canAdoptMeituanImage = Boolean(
+    isMeituan
+    && item.id
+    && item.platformImage
+    && item.matchedProduct?.sourceType === "shopProduct"
+    && singleMatchedShopProductId
+    && !/[+＋]/.test(singleMatchedShopProductId)
+    && !isCompositeMatch
+    && onAdoptMeituanImage
+  );
 
   if (isCompositeMatch && displays.length > 0) {
     const storedCompositeCount = Array.isArray(item.matchedProduct?.compositeItems)
@@ -2676,6 +2705,9 @@ export function OrderItemBundleGroup({
         showEditMatch={!deleted && !readOnly}
         onEditMatch={() => onOpenMatchEditor(order, item)}
         onAddBundleItem={!deleted && !readOnly ? () => onOpenMatchEditor(order, item, { isAddingBundleItem: true }) : undefined}
+        onAdoptPlatformImage={!deleted && !readOnly && canAdoptMeituanImage
+          ? () => onAdoptMeituanImage?.(order, item, display)
+          : undefined}
         matchedProduct={item.matchedProduct}
         showMatchStatus={true}
         returnedQuantity={returnedQuantity}
@@ -2707,6 +2739,9 @@ export function OrderItemBundleGroup({
           isAddingBundleItem: true,
           currentBundleItems: componentDisplays,
         }) : undefined}
+        onAdoptPlatformImage={!deleted && !readOnly && canAdoptMeituanImage
+          ? () => onAdoptMeituanImage?.(order, item, mainDisplay)
+          : undefined}
         matchedProduct={item.matchedProduct}
         showMatchStatus={true}
         returnedQuantity={returnedQuantity}
@@ -3351,6 +3386,14 @@ export const OrderCard = memo(function OrderCard({
   const [editCommissionValue, setEditCommissionValue] = useState("");
   const [isSavingCommission, setIsSavingCommission] = useState(false);
   const [isShopEditorOpen, setIsShopEditorOpen] = useState(false);
+  const [meituanImageUpdateTarget, setMeituanImageUpdateTarget] = useState<{
+    itemId: string;
+    shopProductId: string;
+    productName: string;
+    currentImage: string | null;
+    platformImage: string;
+  } | null>(null);
+  const [isUpdatingMeituanImage, setIsUpdatingMeituanImage] = useState(false);
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
   const [isAdminRemarkModalOpen, setIsAdminRemarkModalOpen] = useState(false);
   const [localAdminRemark, setLocalAdminRemark] = useState<string | null>(() => order.adminRemark ?? null);
@@ -3383,6 +3426,30 @@ export const OrderCard = memo(function OrderCard({
       return false;
     }
   }, [order.id, showToast, onRefresh]);
+
+  const handleAdoptMeituanImage = useCallback(async () => {
+    const target = meituanImageUpdateTarget;
+    if (!target) return;
+    try {
+      setIsUpdatingMeituanImage(true);
+      const res = await fetch(`/api/orders/${encodeURIComponent(order.id)}/items/${encodeURIComponent(target.itemId)}/adopt-image`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ shopProductId: target.shopProductId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || "更新店铺商品主图失败");
+      }
+      showToast("美团商品图已下载并更新为店铺商品主图", "success");
+      onRefresh?.();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "更新店铺商品主图失败", "error");
+    } finally {
+      setIsUpdatingMeituanImage(false);
+      setMeituanImageUpdateTarget(null);
+    }
+  }, [meituanImageUpdateTarget, onRefresh, order.id, showToast]);
 
   const handleUpdateBrush = useCallback(async (val: boolean) => {
     if (val === order.isMainSystemSelfDelivery) return;
@@ -4213,6 +4280,19 @@ export const OrderCard = memo(function OrderCard({
                   returnedItemDetailsMap={returnedItemDetailsMap}
                   isJdPlatformOrder={isJdPlatformOrder}
                   isMeituanPlatformOrder={isMeituanPlatformOrder}
+                  onAdoptMeituanImage={(_targetOrder, targetItem, display) => {
+                    const itemId = String(targetItem.id || "").trim();
+                    const shopProductId = String(targetItem.matchedProduct?.shopProductId || targetItem.matchedProduct?.id || "").trim();
+                    const platformImage = String(targetItem.platformImage || "").trim();
+                    if (!itemId || !shopProductId || !platformImage) return;
+                    setMeituanImageUpdateTarget({
+                      itemId,
+                      shopProductId,
+                      productName: display.name,
+                      currentImage: display.image,
+                      platformImage,
+                    });
+                  }}
                 />
               ))}
             </div>
@@ -4706,6 +4786,60 @@ export const OrderCard = memo(function OrderCard({
           onSave={handleSaveAdminRemark}
         />
       ) : null}
+      <ConfirmModal
+        isOpen={Boolean(meituanImageUpdateTarget)}
+        onClose={() => {
+          if (!isUpdatingMeituanImage) setMeituanImageUpdateTarget(null);
+        }}
+        onConfirm={() => {
+          void handleAdoptMeituanImage();
+        }}
+        title="更新店铺商品主图"
+        message={meituanImageUpdateTarget ? (
+          <div className="mt-2 w-full">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <div className="mb-1.5 text-[11px] font-semibold text-muted-foreground">当前主图</div>
+                <div className="aspect-square overflow-hidden rounded-2xl border border-black/8 bg-black/3 dark:border-white/10 dark:bg-white/4">
+                  {meituanImageUpdateTarget.currentImage ? (
+                    <Image
+                      src={meituanImageUpdateTarget.currentImage}
+                      alt="当前主图"
+                      width={240}
+                      height={240}
+                      className="h-full w-full object-cover"
+                      unoptimized
+                    />
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-xs text-muted-foreground">暂无主图</div>
+                  )}
+                </div>
+              </div>
+              <div>
+                <div className="mb-1.5 text-[11px] font-semibold text-sky-600 dark:text-sky-300">美团新图</div>
+                <div className="aspect-square overflow-hidden rounded-2xl border border-sky-500/25 bg-sky-500/5">
+                  <Image
+                    src={meituanImageUpdateTarget.platformImage}
+                    alt="美团新图"
+                    width={240}
+                    height={240}
+                    className="h-full w-full object-cover"
+                    unoptimized
+                  />
+                </div>
+              </div>
+            </div>
+            <p className="mt-3 text-left text-xs leading-5 text-muted-foreground">
+              确认后会下载美团订单图、重新上传到当前存储，并仅替换【{meituanImageUpdateTarget.productName}】在当前店铺的主图。
+            </p>
+          </div>
+        ) : ""}
+        confirmLabel={isUpdatingMeituanImage ? "更新中..." : "确认更新"}
+        cancelLabel="取消"
+        variant="info"
+        confirmDisabled={isUpdatingMeituanImage}
+      />
+
       <ConfirmModal
         isOpen={isDeleteConfirmOpen}
         onClose={() => {

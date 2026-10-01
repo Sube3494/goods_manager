@@ -3172,11 +3172,17 @@ export async function GET(request: NextRequest) {
                         : (rawThumbCandidate ? storage.resolveUrl(rawThumbCandidate) : null)
                     )
               );
+          const platformImage = isMeituanPlatform(order.platform)
+            ? (item.thumb
+                ? storage.resolveUrl(item.thumb)
+                : (rawThumbCandidate ? storage.resolveUrl(rawThumbCandidate) : null))
+            : null;
 
           return {
             ...item,
             productName: fallbackResolvedName,
             thumb: fallbackResolvedThumb,
+            platformImage,
             displayItems,
             matchedProduct,
           };

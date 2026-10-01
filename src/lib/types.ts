@@ -181,6 +181,7 @@ export interface AutoPickOrderItem {
   platformSkuId?: string | null;
   quantity: number;
   thumb?: string | null;
+  platformImage?: string | null;
   rawPayload?: unknown;
   displayItems?: Array<{
     name: string;
