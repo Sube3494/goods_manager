@@ -2880,6 +2880,9 @@ export async function GET(request: NextRequest) {
           const segmentsFromSku = splitCompositeSkuSegments(matchedSkuToSplit);
           const hasStrictMatchForAllSegmentsFromSku = segmentsFromSku.length > 1
             && segmentsFromSku.every((candidate) => Boolean(resolveStrictLocalSkuMatch(candidate)));
+          if (matchedProduct && hasStrictMatchForAllSegmentsFromSku) {
+            (matchedProduct as MatchedCatalogProduct).isCompositeMatch = true;
+          }
 
           const parentPlatformSkuId = String(item.platformSkuId || "").trim();
           const getProductSourceIdByPlatform = (product: any, platform?: string | null, excludedId?: string | null) => {
@@ -3087,11 +3090,7 @@ export async function GET(request: NextRequest) {
             sourceId: getProductSourceIdByPlatform(targetShopProduct, order.platform, parentPlatformSkuId),
           } : null;
 
-          const displayItems = compositeDisplayItems && compositeDisplayItems.length > 0
-            ? [...compositeDisplayItems, ...(effectiveBundleDisplayItems || [])]
-            : effectiveBundleDisplayItems && mainDisplayItem
-            ? [mainDisplayItem, ...effectiveBundleDisplayItems]
-            : hasStrictMatchForAllSegmentsFromSku
+          const skuCompositeDisplayItems = hasStrictMatchForAllSegmentsFromSku
             ? segmentsFromSku.map((candidate) => {
                 const segmentMatchedProduct = resolveStrictLocalSkuMatch(candidate);
                 const segQty = item.quantity > 1 && item.quantity % segmentsFromSku.length === 0
@@ -3113,8 +3112,17 @@ export async function GET(request: NextRequest) {
                   quantity: segQty,
                   ...displayCost,
                   sourceId: segSourceId || undefined,
+                  displayType: "composite" as const,
                 };
               })
+            : null;
+
+          const displayItems = compositeDisplayItems && compositeDisplayItems.length > 0
+            ? [...compositeDisplayItems, ...(effectiveBundleDisplayItems || [])]
+            : skuCompositeDisplayItems && skuCompositeDisplayItems.length > 0
+            ? [...skuCompositeDisplayItems, ...(effectiveBundleDisplayItems || [])]
+            : effectiveBundleDisplayItems && mainDisplayItem
+            ? [mainDisplayItem, ...effectiveBundleDisplayItems]
             : undefined;
           const rawItemRecord = item.rawPayload && typeof item.rawPayload === "object" && !Array.isArray(item.rawPayload)
             ? item.rawPayload as Record<string, unknown>
