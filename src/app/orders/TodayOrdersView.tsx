@@ -472,7 +472,7 @@ interface TodayOrdersViewProps {
   canViewProductCosts?: boolean;
 }
 
-const TODAY_TAB_PAGE_SIZE = 40;
+const TODAY_TAB_PAGE_SIZE = 10000;
 
 type TodayCacheEntry = {
   orders: AutoPickOrder[];
@@ -565,10 +565,6 @@ export function TodayOrdersView({
   const [matchedShopOptions, setMatchedShopOptions] = useState<Array<{ value: string; label: string }>>(() => (hasValidCache && initialCache ? initialCache.matchedShopOptions : []));
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [isLoading, setIsLoading] = useState(() => !hasValidCache);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(false);
-  const loadMoreTriggerRef = useRef<HTMLDivElement | null>(null);
   
   // 筛选状态
   const [query, setQuery] = useState("");
@@ -630,7 +626,7 @@ export function TodayOrdersView({
   }, [query]);
 
   // 1. 获取订单列表
-  const fetchOrders = useCallback(async (options?: { silent?: boolean; force?: boolean; append?: boolean; targetPage?: number }) => {
+  const fetchOrders = useCallback(async (options?: { silent?: boolean; force?: boolean }) => {
     if (isFetchingRef.current && !options?.force) return;
     if (options?.force) {
       fetchAbortRef.current?.abort();
@@ -642,17 +638,13 @@ export function TodayOrdersView({
     fetchAbortRef.current = abortController;
     
     const silent = Boolean(options?.silent);
-    const append = Boolean(options?.append);
-    const targetPage = options?.targetPage || 1;
-    if (append) {
-      setIsLoadingMore(true);
-    } else if (!silent) {
+    if (!silent) {
       setIsLoading(true);
     }
 
     try {
       const params = new URLSearchParams({
-        page: String(targetPage),
+        page: "1",
         pageSize: String(TODAY_TAB_PAGE_SIZE),
         startDate: todayDate,
         endDate: todayDate,
@@ -663,11 +655,7 @@ export function TodayOrdersView({
       if (status !== "all") params.set("status", status);
       if (shop !== "all") params.set("shop", shop);
       if (userId) params.set("userId", userId);
-      if (append) {
-        params.set("_lite", "1");
-      } else {
-        params.set("_metrics", "1");
-      }
+      params.set("_metrics", "1");
 
       const response = await fetch(`/api/orders?${params.toString()}`, { cache: "no-store", signal: abortController.signal });
       const data = await response.json().catch(() => ({}));
@@ -678,22 +666,22 @@ export function TodayOrdersView({
 
       if (fetchSequenceRef.current !== requestSequence) return;
 
-      const nextItems = Array.isArray(data.items) ? data.items : [];
-      setOrders((current) => {
-        if (!append) return nextItems;
-        const seen = new Set(current.map((item) => item.id));
-        const merged = [...current];
-        for (const item of nextItems) {
-          if (!seen.has(item.id)) {
-            merged.push(item);
-          }
-        }
-        return merged;
-      });
-
-      setCurrentPage(targetPage);
+      const nextItems: AutoPickOrder[] = Array.isArray(data.items) ? [...data.items] : [];
       const totalCount = typeof data.total === "number" ? data.total : (data.meta?.total || nextItems.length);
-      setHasMore(targetPage * TODAY_TAB_PAGE_SIZE < totalCount);
+      // Fetch any remaining pages before publishing groups and counts.
+      for (let page = 2; (page - 1) * TODAY_TAB_PAGE_SIZE < totalCount; page += 1) {
+        params.set("page", String(page));
+        params.delete("_metrics");
+        params.set("_lite", "1");
+        const pageResponse = await fetch(`/api/orders?${params.toString()}`, { cache: "no-store", signal: abortController.signal });
+        const pageData = await pageResponse.json().catch(() => ({}));
+        if (!pageResponse.ok || !Array.isArray(pageData.items) || pageData.items.length === 0) {
+          throw new Error(pageData.error || "加载今日全部订单失败，请刷新重试");
+        }
+        nextItems.push(...pageData.items);
+      }
+      if (fetchSequenceRef.current !== requestSequence) return;
+      setOrders(nextItems);
 
       const nextPlatforms: string[] = Array.isArray(data.filters?.platforms)
         ? Array.from(new Set(data.filters.platforms.map((p: unknown) => normalizeDisplayPlatform(String(p || "")))))
@@ -716,8 +704,8 @@ export function TodayOrdersView({
       if (data.summary) setSummary(data.summary);
       if (data.overview) setOverview(data.overview);
 
-      // 在默认无特定过滤且第一页时更新瞬时内存缓存
-      if (!append && !debouncedQuery.trim() && platform === "all" && status === "all" && shop === "all") {
+      // 在默认无特定过滤时缓存当天完整订单
+      if (!debouncedQuery.trim() && platform === "all" && status === "all" && shop === "all") {
         todayOrdersMemoryCache.set(cacheKey, {
           orders: nextItems,
           summary: data.summary || defaultTodaySummary,
@@ -729,7 +717,7 @@ export function TodayOrdersView({
         });
       }
 
-      if (onDataLoadRef.current && !append) {
+      if (onDataLoadRef.current) {
         onDataLoadRef.current({
           summary: data.summary || defaultTodaySummary,
           overview: data.overview || defaultTodayOverview,
@@ -750,7 +738,6 @@ export function TodayOrdersView({
         isFetchingRef.current = false;
         fetchAbortRef.current = null;
         setIsLoading(false);
-        setIsLoadingMore(false);
       }
     }
   }, [platform, debouncedQuery, shop, status, todayDate, showToast, userId, cacheKey]);
@@ -768,30 +755,6 @@ export function TodayOrdersView({
       });
     }
   }, []);
-
-  const handleLoadMore = useCallback(() => {
-    if (isFetchingRef.current || isLoadingMore || !hasMore) return;
-    void fetchOrders({ append: true, targetPage: currentPage + 1 });
-  }, [currentPage, fetchOrders, hasMore, isLoadingMore]);
-
-  // 触底无限加载监听
-  useEffect(() => {
-    const triggerEl = loadMoreTriggerRef.current;
-    if (!triggerEl || !hasMore || isLoadingMore) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const [entry] = entries;
-        if (entry && entry.isIntersecting) {
-          handleLoadMore();
-        }
-      },
-      { rootMargin: "300px" }
-    );
-
-    observer.observe(triggerEl);
-    return () => observer.disconnect();
-  }, [handleLoadMore, hasMore, isLoadingMore]);
 
   // 组件挂载时先将缓存指标直出给父组件，实现 0ms 骨架屏秒开
   useEffect(() => {
@@ -1552,7 +1515,7 @@ export function TodayOrdersView({
                       />
                     ) : null}
                     <span className="relative">{group.label}</span>
-                    <span className="relative rounded-full bg-current/10 px-1.5 text-xs tabular-nums" title="当前已加载的订单数">{group.orders.length}</span>
+                    <span className="relative rounded-full bg-current/10 px-1.5 text-xs tabular-nums" title="当前筛选条件下的今日订单数">{group.orders.length}</span>
                   </button>
                 ))}
               </div>
@@ -1583,33 +1546,11 @@ export function TodayOrdersView({
               >
                 {activeGroup.orders.length > 0 ? renderOrderCollection(activeGroup.orders) : (
                   <div className="rounded-2xl border border-black/8 bg-white/76 px-5 py-10 text-center text-sm text-muted-foreground dark:border-white/10 dark:bg-white/4">
-                    当前已加载的订单中暂无{activeGroup.label}订单{hasMore ? "，可继续加载更多" : ""}
+                    当前筛选条件下暂无{activeGroup.label}订单
                   </div>
                 )}
               </div>
 
-              {/* 触底加载更多触发区域与状态指示 */}
-              {hasMore && (
-                <div
-                  ref={loadMoreTriggerRef}
-                  className="flex items-center justify-center py-6 text-xs text-muted-foreground"
-                >
-                  {isLoadingMore ? (
-                    <div className="flex items-center gap-2">
-                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                      <span>正在加载更多今日订单...</span>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={handleLoadMore}
-                      className="rounded-full border border-black/8 bg-white/76 px-4 py-2 text-xs font-medium text-muted-foreground transition hover:bg-black/5 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10"
-                    >
-                      向下滚动或点击加载更多
-                    </button>
-                  )}
-                </div>
-              )}
             </motion.div>
           )}
         </AnimatePresence>
