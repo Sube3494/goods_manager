@@ -198,7 +198,7 @@ export async function GET(request: Request) {
       AND: [unscopedStatusWhere, { NOT: { status: "Received" } }],
     };
 
-    const [purchases, total, totalStats, receivedStats, pendingStats, shopRows] = await Promise.all([
+    const [purchases, total, totalStats, receivedStats, pendingStats, shopRows, availableShopRows] = await Promise.all([
       prisma.purchaseOrder.findMany({
         where: {
           ...where,
@@ -274,6 +274,11 @@ export async function GET(request: Request) {
           shopName: "asc",
         },
       }),
+      prisma.shop.findMany({
+        where: { userId: session.id },
+        select: { name: true },
+        orderBy: { name: "asc" },
+      }),
     ]);
     const resolvedPurchases = await Promise.all(purchases.map((purchase) => resolvePurchaseOrderResponse(purchase)));
     const stats = {
@@ -292,7 +297,10 @@ export async function GET(request: Request) {
       page,
       pageSize,
       stats,
-      shops: shopRows.map((row) => row.shopName).filter(Boolean),
+      shops: Array.from(new Set([
+        ...availableShopRows.map((row) => row.name).filter(Boolean),
+        ...shopRows.map((row) => row.shopName).filter((name): name is string => Boolean(name)),
+      ])),
       hasMore: (skip + purchases.length) < total
     });
   } catch (error) {

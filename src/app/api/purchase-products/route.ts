@@ -25,6 +25,9 @@ type PurchasePickerItem = {
   supplier?: undefined;
   remark: string | null;
   isStandaloneShopProduct?: boolean;
+  sortNumber?: number | null;
+  sortGroupName?: string | null;
+  sortCategoryName?: string | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -92,9 +95,19 @@ function scopePurchasePickerItemsByShop(
 }
 
 function comparePurchasePickerItems(a: PurchasePickerItem, b: PurchasePickerItem) {
+  const aSortNumber = typeof a.sortNumber === "number" && Number.isFinite(a.sortNumber)
+    ? a.sortNumber
+    : Number.MAX_SAFE_INTEGER;
+  const bSortNumber = typeof b.sortNumber === "number" && Number.isFinite(b.sortNumber)
+    ? b.sortNumber
+    : Number.MAX_SAFE_INTEGER;
+  if (aSortNumber !== bSortNumber) {
+    return aSortNumber - bSortNumber;
+  }
+
   const skuCompare = naturalSortCollator.compare(
-    String(b.sku || "").trim(),
-    String(a.sku || "").trim()
+    String(a.sku || "").trim(),
+    String(b.sku || "").trim()
   );
   if (skuCompare !== 0) {
     return skuCompare;
@@ -234,6 +247,9 @@ export async function GET(request: Request) {
       supplier: undefined,
       remark: item.remark,
       isStandaloneShopProduct: !item.productId,
+      sortNumber: item.sortNumber,
+      sortGroupName: item.sortGroupName,
+      sortCategoryName: item.sortCategoryName,
       createdAt: item.createdAt,
       updatedAt: item.updatedAt,
     }));

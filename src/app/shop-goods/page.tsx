@@ -722,10 +722,24 @@ function ShopSortWorkbench({
     if (!shop?.id) return;
     setIsSaving(true);
     try {
+      const categoryOrderByName = new Map(categories.map((category, index) => [category.name.trim(), index]));
+      const orderedRows = [...rows].sort((a, b) => {
+        const groupA = (a.sortGroupNameInput || a.categoryName || "未分组").trim();
+        const groupB = (b.sortGroupNameInput || b.categoryName || "未分组").trim();
+        const categoryOrderA = categoryOrderByName.get(groupA) ?? Number.MAX_SAFE_INTEGER;
+        const categoryOrderB = categoryOrderByName.get(groupB) ?? Number.MAX_SAFE_INTEGER;
+        if (categoryOrderA !== categoryOrderB) return categoryOrderA - categoryOrderB;
+        const skuNumberA = getIncrementingCodeNumber(a.skuInput);
+        const skuNumberB = getIncrementingCodeNumber(b.skuInput);
+        if (skuNumberA !== skuNumberB) return skuNumberA - skuNumberB;
+        return (a.name || "").localeCompare(b.name || "", "zh-CN");
+      });
+      const sortNumberById = new Map(orderedRows.map((row, index) => [row.id, index + 1]));
       const updates = rows.map((row) => ({
         id: row.id,
         sku: row.skuInput.trim(),
         costPrice: Number(row.costPrice || 0),
+        sortNumber: sortNumberById.get(row.id) ?? null,
         sortGroupName: row.sortGroupNameInput.trim(),
         sortCategoryName: row.sortGroupNameInput.trim(),
       }));
@@ -750,7 +764,7 @@ function ShopSortWorkbench({
     } finally {
       setIsSaving(false);
     }
-  }, [onClose, onSaved, rows, shop?.id, showToast]);
+  }, [categories, onClose, onSaved, rows, shop?.id, showToast]);
 
   if (!isOpen || typeof document === "undefined") return null;
 

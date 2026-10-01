@@ -235,19 +235,6 @@ function PurchasesContent() {
     percentage: 0,
     currentStepText: "",
   });
-  const hasActiveFilters = searchQuery.trim() !== "" || statusFilter !== "Confirmed" || shopFilter !== "All";
-
-  const resetFilters = useCallback(() => {
-    setSearchQuery("");
-    setStatusFilter("Confirmed");
-    setShopFilter("All");
-    setCurrentPage(1);
-    
-    const params = new URLSearchParams(searchParams);
-    params.delete('status');
-    replaceCurrentSearch(pathname, params);
-  }, [searchParams, pathname]);
-
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -1634,11 +1621,9 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
         searchQuery={searchQuery}
         statusFilter={statusFilter}
         shopFilter={shopFilter}
-        hasActiveFilters={hasActiveFilters}
         onSearchChange={setSearchQuery}
         onStatusChange={handleStatusFilterChange}
         onShopChange={setShopFilter}
-        onReset={resetFilters}
       />
 
       {/* Table/List View */}
