@@ -189,6 +189,8 @@ export interface AutoPickOrderItem {
     image?: string | null;
     quantity: number;
     costPrice?: number | null;
+    stock?: number | null;
+    stockShopName?: string | null;
     costSource?: "outbound" | "current";
     sourceId?: string;
     displayType?: "composite" | "accessory";
@@ -202,6 +204,8 @@ export interface AutoPickOrderItem {
     shopProductId?: string | null;
     productId?: string | null;
     costPrice?: number | null;
+    stock?: number | null;
+    stockShopName?: string | null;
     costSource?: "outbound" | "current";
     shopName?: string | null;
     isManual?: boolean;

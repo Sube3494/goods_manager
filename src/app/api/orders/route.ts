@@ -2318,6 +2318,7 @@ export async function GET(request: NextRequest) {
               productId: true,
               sourceProductId: true,
               productName: true,
+              stock: true,
               productImage: true,
               isBundle: true,
               bundleItems: true,
@@ -2372,6 +2373,7 @@ export async function GET(request: NextRequest) {
             productId: true,
             sourceProductId: true,
             productName: true,
+            stock: true,
             productImage: true,
             isBundle: true,
             bundleItems: true,
@@ -2406,6 +2408,7 @@ export async function GET(request: NextRequest) {
         taobaoSkuId: item.taobaoSkuId,
         doudianSkuId: item.doudianSkuId,
         image: rawImage ? storage.resolveUrl(rawImage) : null,
+        stock: item.stock,
         costPrice: null,
         sourceType: "shopProduct" as const,
         productId: item.productId || item.sourceProductId || null,
@@ -2760,21 +2763,26 @@ export async function GET(request: NextRequest) {
             productId?: string | null,
             fallbackOutboundCostItem?: (typeof outboundBreakdown)[number] | null,
           ) => {
+            const stockProduct = mappedShopProducts.find((product) =>
+              (matchedShopId ? product.shopId === matchedShopId : Boolean(shopProductId))
+              && (shopProductId ? product.id === shopProductId : Boolean(productId && product.productId === productId))
+            );
+            const inventory = { stock: stockProduct?.stock ?? null, stockShopName: stockProduct?.shopName ?? null };
             const outboundCostItem = outboundBreakdown.find((entry) => (
               (shopProductId && entry.shopProductId === shopProductId)
               || (productId && entry.productId === productId)
             )) || fallbackOutboundCostItem;
             const outboundCostCents = Number(outboundCostItem?.unitCost || 0);
             if (Number.isFinite(outboundCostCents) && outboundCostCents > 0) {
-              return { costPrice: roundCurrency(outboundCostCents / 100), costSource: "outbound" as const };
+              return { ...inventory, costPrice: roundCurrency(outboundCostCents / 100), costSource: "outbound" as const };
             }
             if (outboundBreakdown.length > 0) {
-              return { costPrice: null, costSource: undefined };
+              return { ...inventory, costPrice: null, costSource: undefined };
             }
             const purchaseCost = resolvePurchaseDisplayCost(shopProductId, productId);
             return purchaseCost
-              ? { costPrice: purchaseCost, costSource: "current" as const }
-              : { costPrice: null, costSource: undefined };
+              ? { ...inventory, costPrice: purchaseCost, costSource: "current" as const }
+              : { ...inventory, costPrice: null, costSource: undefined };
           };
           const isSingleOrderItem = order.items.length === 1;
           let outboundItem = outboundBreakdown.length === order.items.length
@@ -3049,7 +3057,7 @@ export async function GET(request: NextRequest) {
                 const bSourceId = getProductSourceIdByPlatform(foundBShopProduct, order.platform, parentPlatformSkuId);
                 const outboundCostCents = Number(bOutbound.unitCost || 0);
                 const displayCost = Number.isFinite(outboundCostCents) && outboundCostCents > 0
-                  ? { costPrice: roundCurrency(outboundCostCents / 100), costSource: "outbound" as const }
+                  ? { ...resolveDisplayCost(bOutbound.shopProductId, bOutbound.productId, bOutbound), costPrice: roundCurrency(outboundCostCents / 100), costSource: "outbound" as const }
                   : resolveDisplayCost(bOutbound.shopProductId, bOutbound.productId, bOutbound);
                 return {
                   name: bOutbound.name || foundBShopProduct?.name || "未命名配件",

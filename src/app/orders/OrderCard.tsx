@@ -25,6 +25,7 @@ import {
   Truck,
   X,
 } from "lucide-react";
+import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/hover-card";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/Toast";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
@@ -808,6 +809,8 @@ export function getOrderItemDisplay(item: AutoPickOrderItem, platform?: string |
     quantity: Math.max(1, Number((matchedProduct as any)?.quantity || item.quantity || 1) || 1),
     costPrice: matchedProduct?.costPrice || null,
     costSource: matchedProduct?.costSource,
+    stock: matchedProduct?.stock,
+    stockShopName: matchedProduct?.stockShopName,
     sourceId: isManualDeliveryPlaceholder && !realResolvedName ? undefined : sourceId || undefined,
     optionalMatch: isManualDeliveryPlaceholder && !realResolvedName,
     displayType: undefined as "composite" | "accessory" | undefined,
@@ -827,6 +830,8 @@ export function getExpandedOrderItemDisplays(item: AutoPickOrderItem, platform?:
       quantity: displayItem.quantity,
       costPrice: displayItem.costPrice || null,
       costSource: displayItem.costSource,
+      stock: displayItem.stock,
+      stockShopName: displayItem.stockShopName,
       sourceId: (displayItem as any).sourceId || undefined,
       displayType: displayItem.displayType,
     }));
@@ -2213,7 +2218,7 @@ export function ProductStripItem({
   onRemoveComponent,
   onAdoptPlatformImage,
 }: {
-  display: { name: string; sku: string; image: string | null; quantity: number; costPrice?: number | null; costSource?: "outbound" | "current"; sourceId?: string; optionalMatch?: boolean };
+  display: { name: string; sku: string; image: string | null; quantity: number; costPrice?: number | null; costSource?: "outbound" | "current"; stock?: number | null; stockShopName?: string | null; sourceId?: string; optionalMatch?: boolean };
   previewImage?: string | null;
   onEditMatch?: () => void;
   onAddBundleItem?: () => void;
@@ -2241,6 +2246,7 @@ export function ProductStripItem({
   isBundleExpanded?: boolean;
   onToggleBundleExpand?: () => void;
 }) {
+  const [inventoryOpen, setInventoryOpen] = useState(false);
   const [imgError, setImgError] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const expandedImage = previewImage || display.image;
@@ -2374,13 +2380,31 @@ export function ProductStripItem({
             ) : null}
             <span className="shrink-0">x{display.quantity}</span>
             {typeof display.costPrice === "number" && Number.isFinite(display.costPrice) && display.costPrice > 0 ? (
-              <span className="shrink-0 text-emerald-600 dark:text-emerald-400">
-                {display.costSource === "outbound" ? (
-                  <><span className="hidden sm:inline">出库</span>成本</>
-                ) : (
-                  <><span className="hidden sm:inline">当前</span>成本</>
-                )} ¥{display.costPrice.toFixed(2)}
-              </span>
+              <HoverCard open={inventoryOpen} onOpenChange={setInventoryOpen} openDelay={150}>
+                <HoverCardTrigger asChild>
+                  <button
+                    type="button"
+                    className="shrink-0 cursor-help rounded-sm text-emerald-700 outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 dark:text-emerald-400"
+                    aria-label="查看当前库存"
+                    aria-expanded={inventoryOpen}
+                    onFocus={() => setInventoryOpen(true)}
+                    onBlur={() => setInventoryOpen(false)}
+                    onClick={(event) => { event.stopPropagation(); setInventoryOpen(true); }}
+                  >
+                    {display.costSource === "outbound" ? (
+                      <><span className="hidden sm:inline">出库</span>成本</>
+                    ) : (
+                      <><span className="hidden sm:inline">当前</span>成本</>
+                    )} ¥{display.costPrice.toFixed(2)}
+                  </button>
+                </HoverCardTrigger>
+                <HoverCardContent side="top" className="w-max max-w-64 border border-black/10 bg-popover text-xs text-popover-foreground shadow-lg ring-0 dark:border-white/15 dark:shadow-black/40" onClick={(event) => event.stopPropagation()}>
+                  <div className="space-y-1">
+                    {display.stockShopName ? <div className="text-muted-foreground">{display.stockShopName}</div> : null}
+                    <div>当前库存：<span className="font-semibold">{typeof display.stock === "number" && Number.isFinite(display.stock) ? display.stock : "暂无库存信息"}</span></div>
+                  </div>
+                </HoverCardContent>
+              </HoverCard>
             ) : null}
             {showMatchStatus ? (
               <span className={cn(
