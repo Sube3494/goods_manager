@@ -763,6 +763,7 @@ function readDisplaySourceId(item: AutoPickOrderItem, platform?: string | null, 
 
 export function getOrderItemDisplay(item: AutoPickOrderItem, platform?: string | null, channelTag?: string | null) {
   const matchedProduct = item.matchedProduct;
+  const platformImage = isMeituanOrder(platform, channelTag) ? item.platformImage : null;
   const rawPayload = item.rawPayload && typeof item.rawPayload === "object" && !Array.isArray(item.rawPayload)
     ? item.rawPayload as Record<string, unknown>
     : {};
@@ -803,7 +804,7 @@ export function getOrderItemDisplay(item: AutoPickOrderItem, platform?: string |
   return {
     name: realResolvedName || (isManualDeliveryPlaceholder ? "可添加发货货品" : item.productName) || "未命名商品",
     sku: matchedProduct?.sku || (isManualDeliveryPlaceholder && !realResolvedName ? "不加则只记配送费" : item.productNo) || "-",
-    image: matchedProduct?.image || item.thumb || rawThumbCandidate,
+    image: platformImage || matchedProduct?.image || item.thumb || rawThumbCandidate,
     quantity: Math.max(1, Number((matchedProduct as any)?.quantity || item.quantity || 1) || 1),
     costPrice: matchedProduct?.costPrice || null,
     costSource: matchedProduct?.costSource,
@@ -816,12 +817,13 @@ export function getOrderItemDisplay(item: AutoPickOrderItem, platform?: string |
 export function getExpandedOrderItemDisplays(item: AutoPickOrderItem, platform?: string | null, channelTag?: string | null) {
   const matchedProduct = item.matchedProduct;
   const sourceId = readDisplaySourceId(item, platform, channelTag);
+  const platformImage = isMeituanOrder(platform, channelTag) ? item.platformImage : null;
 
   if (Array.isArray(item.displayItems) && item.displayItems.length > 0) {
-    return item.displayItems.map((displayItem) => ({
+    return item.displayItems.map((displayItem, index) => ({
       name: displayItem.name || (item.productName !== MANUAL_DELIVERY_PLACEHOLDER_PRODUCT_NAME ? item.productName : "") || "未命名商品",
       sku: displayItem.sku || matchedProduct?.sku || item.productNo || "-",
-      image: displayItem.image || item.thumb || null,
+      image: (index === 0 ? platformImage : null) || displayItem.image || item.thumb || null,
       quantity: displayItem.quantity,
       costPrice: displayItem.costPrice || null,
       costSource: displayItem.costSource,
@@ -2509,6 +2511,21 @@ export function ProductStripItem({
           >
             <X size={20} />
           </button>
+          {onAdoptPlatformImage ? (
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                setIsPreviewOpen(false);
+                onAdoptPlatformImage();
+              }}
+              className="absolute right-16 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/12 text-white transition-all hover:bg-white/20 active:scale-95 cursor-pointer"
+              title="使用美团图片更新主图"
+              aria-label="使用美团图片更新主图"
+            >
+              <ImageUp size={18} />
+            </button>
+          ) : null}
           <div
             className="relative max-h-[86dvh] w-full max-w-4xl flex flex-col items-center justify-center"
             onClick={(event) => event.stopPropagation()}
@@ -2523,19 +2540,6 @@ export function ProductStripItem({
               onError={() => setIsPreviewOpen(false)}
             />
             <div className="mt-3 truncate text-center text-sm font-medium text-white/90">{display.name}</div>
-            {onAdoptPlatformImage ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setIsPreviewOpen(false);
-                  onAdoptPlatformImage();
-                }}
-                className="mt-3 inline-flex h-10 items-center gap-2 rounded-full border border-white/20 bg-white/12 px-5 text-sm font-semibold text-white shadow-lg transition-all hover:bg-white/20 active:scale-[0.98]"
-              >
-                <ImageUp size={16} />
-                使用美团图片更新主图
-              </button>
-            ) : null}
           </div>
         </div>,
         document.body
@@ -4289,7 +4293,7 @@ export const OrderCard = memo(function OrderCard({
                       itemId,
                       shopProductId,
                       productName: display.name,
-                      currentImage: display.image,
+                      currentImage: targetItem.matchedProduct?.image || null,
                       platformImage,
                     });
                   }}

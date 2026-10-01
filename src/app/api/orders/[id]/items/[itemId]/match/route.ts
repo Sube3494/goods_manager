@@ -875,7 +875,9 @@ export async function PATCH(
             ...(isPlaceholderItem && bundleNames ? {
               productName: bundleNames,
               productNo: bundleSkus || orderItem.productNo,
-              thumb: firstImg ? storage.resolveUrl(firstImg) : orderItem.thumb,
+              ...(!isMeituanPlatform(orderItem.order.platform) ? {
+                thumb: firstImg ? storage.resolveUrl(firstImg) : orderItem.thumb,
+              } : {}),
             } : {}),
             rawPayload: {
               ...restPayload,
@@ -981,7 +983,9 @@ export async function PATCH(
           ...(isPlaceholderItem && matchedProduct.name ? {
             productName: matchedProduct.name,
             productNo: matchedProduct.sku || orderItem.productNo,
-            thumb: matchedProduct.image || orderItem.thumb,
+            ...(!isMeituanPlatform(orderItem.order.platform) ? {
+              thumb: matchedProduct.image || orderItem.thumb,
+            } : {}),
           } : {}),
           rawPayload: {
             ...restPayload,

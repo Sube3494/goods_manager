@@ -24,13 +24,12 @@ function readRecord(value: unknown): Record<string, unknown> {
 }
 
 function readMeituanImage(item: { thumb: string | null; rawPayload: unknown }) {
-  if (String(item.thumb || "").trim()) return String(item.thumb).trim();
   const raw = readRecord(item.rawPayload);
   for (const field of IMAGE_FIELDS) {
     const value = String(raw[field] || "").trim();
     if (value) return value;
   }
-  return "";
+  return String(item.thumb || "").trim();
 }
 
 function isMeituanPlatform(platform: string) {

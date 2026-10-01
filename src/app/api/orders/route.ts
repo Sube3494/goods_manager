@@ -3173,9 +3173,9 @@ export async function GET(request: NextRequest) {
                     )
               );
           const platformImage = isMeituanPlatform(order.platform)
-            ? (item.thumb
-                ? storage.resolveUrl(item.thumb)
-                : (rawThumbCandidate ? storage.resolveUrl(rawThumbCandidate) : null))
+            ? (rawThumbCandidate
+                ? storage.resolveUrl(rawThumbCandidate)
+                : (item.thumb ? storage.resolveUrl(item.thumb) : null))
             : null;
 
           return {
