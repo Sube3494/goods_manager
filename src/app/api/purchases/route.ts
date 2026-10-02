@@ -11,6 +11,7 @@ import { sanitizePurchaseOrderItems } from "@/lib/purchaseOrderItems";
 import { InventoryService } from "@/services/inventoryService";
 import { allocateShippingToPurchaseItems, calculatePurchaseOrderTotalAmount } from "@/lib/purchaseCosting";
 import { parseAsShanghaiTime } from "@/lib/dateUtils";
+import { isAddressDisabled } from "@/lib/addressBook";
 
 export async function resolvePurchaseOrderResponse<T extends {
   status?: string;
@@ -198,7 +199,7 @@ export async function GET(request: Request) {
       AND: [unscopedStatusWhere, { NOT: { status: "Received" } }],
     };
 
-    const [purchases, total, totalStats, receivedStats, pendingStats, shopRows, availableShopRows] = await Promise.all([
+    const [purchases, total, totalStats, receivedStats, pendingStats, shopRows, shopProfile] = await Promise.all([
       prisma.purchaseOrder.findMany({
         where: {
           ...where,
@@ -274,12 +275,19 @@ export async function GET(request: Request) {
           shopName: "asc",
         },
       }),
-      prisma.shop.findMany({
-        where: { userId: session.id },
-        select: { name: true },
-        orderBy: { name: "asc" },
+      prisma.user.findUnique({
+        where: { id: session.id },
+        select: { shippingAddresses: true },
       }),
     ]);
+    // 采购店铺来自用户收货地址，不能混入智能调货的网点表。
+    const availableShopNames = (Array.isArray(shopProfile?.shippingAddresses)
+      ? shopProfile.shippingAddresses
+      : [])
+      .filter((address): address is Prisma.JsonObject => Boolean(address) && typeof address === "object" && !Array.isArray(address))
+      .filter((address) => !isAddressDisabled(address))
+      .map((address) => String(address.label || "").trim())
+      .filter(Boolean);
     const resolvedPurchases = await Promise.all(purchases.map((purchase) => resolvePurchaseOrderResponse(purchase)));
     const stats = {
       totalCount: totalStats._count._all,
@@ -298,7 +306,7 @@ export async function GET(request: Request) {
       pageSize,
       stats,
       shops: Array.from(new Set([
-        ...availableShopRows.map((row) => row.name).filter(Boolean),
+        ...availableShopNames,
         ...shopRows.map((row) => row.shopName).filter((name): name is string => Boolean(name)),
       ])),
       hasMore: (skip + purchases.length) < total
