@@ -45,6 +45,7 @@ import {
   toCurrency,
   OrderProfitBadge,
 } from "./OrderCard";
+import { ORDER_GROUPS, getOrderGroup } from "@/lib/orderGroups";
 import { isRematchReturnReason } from "@/lib/outboundReturnMeta";
 import { motion, AnimatePresence, LayoutGroup, useReducedMotion } from "framer-motion";
 import { DeliveryDispatchModal } from "@/components/Orders/DeliveryDispatchModal";
@@ -1201,44 +1202,14 @@ export function TodayOrdersView({
     return orders;
   }, [orders]);
 
-  const {
-    pending: todayPendingOrders,
-    outbound: todayOutboundOrders,
-    completed: todayCompletedOrders,
-    cancelled: todayCancelledOrders,
-    brush: todayBrushOrders,
-  } = useMemo(() => {
-    const groups = {
-      pending: [] as AutoPickOrder[],
-      outbound: [] as AutoPickOrder[],
-      completed: [] as AutoPickOrder[],
-      cancelled: [] as AutoPickOrder[],
-      brush: [] as AutoPickOrder[],
-    };
+  const orderGroups = useMemo(() => {
+    const groups = ORDER_GROUPS.map((group) => ({ ...group, orders: [] as AutoPickOrder[] }));
     for (const order of filteredOrders) {
-      const displayStatus = getBaseAutoPickStatusDisplay(order.status);
-      if (isCancelledStatus(order.status) || displayStatus === "已删除") {
-        groups.cancelled.push(order);
-      } else if (isTodayBrushOrder(order)) {
-        groups.brush.push(order);
-      } else if (order.productCostStatus === "pending-outbound") {
-        groups.outbound.push(order);
-      } else if (isCompletedStatus(order.status)) {
-        groups.completed.push(order);
-      } else {
-        groups.pending.push(order);
-      }
+      const key = getOrderGroup(order, isTodayBrushOrder(order));
+      groups.find((group) => group.key === key)!.orders.push(order);
     }
     return groups;
   }, [filteredOrders]);
-
-  const orderGroups = [
-    { key: "pending", label: "待处理", orders: todayPendingOrders },
-    { key: "outbound", label: "待出库", orders: todayOutboundOrders },
-    { key: "completed", label: "已完成", orders: todayCompletedOrders },
-    { key: "cancelled", label: "已取消", orders: todayCancelledOrders },
-    { key: "brush", label: "刷单", orders: todayBrushOrders },
-  ];
   const activeGroupIndex = Math.max(0, orderGroups.findIndex((group) => group.key === activeOrderGroup));
   const activeGroup = orderGroups[activeGroupIndex];
 
@@ -1481,6 +1452,7 @@ export function TodayOrdersView({
               transition={{ duration: 0.25 }}
               className="space-y-4"
             >
+              <p className="text-xs text-muted-foreground">按履约阶段分组；未出库、未回填请使用状态筛选。</p>
               <LayoutGroup id={orderGroupLayoutId}>
               <div role="tablist" aria-label="今日订单分组" className="flex gap-1 overflow-x-auto rounded-full border border-black/8 bg-white/76 p-1.5 dark:border-white/10 dark:bg-white/4">
                 {orderGroups.map((group, index) => (
