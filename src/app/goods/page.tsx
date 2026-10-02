@@ -246,15 +246,13 @@ export default function GoodsPage() {
     searchQuery.trim() !== "" || 
     selectedCategory !== "all" || 
     selectedStatus !== "all" || 
-    selectedSupplier !== "all" || 
-    sortBy !== "sku-desc";
+    selectedSupplier !== "all";
 
   const resetFilters = useCallback(() => {
     setSearchQuery("");
     setSelectedCategory("all");
     setSelectedStatus("all");
     setSelectedSupplier("all");
-    setSortBy("sku-desc");
   }, []);
 
   const canCreate = hasPermission(user as SessionUser | null, "product:create");
@@ -1323,8 +1321,7 @@ export default function GoodsPage() {
                     matchTriggerWidth
                     className="h-full"
                     triggerClassName={cn(
-                        "h-full rounded-full border text-xs sm:text-sm py-0 px-2 sm:px-5 transition-all truncate",
-                        sortBy !== 'sku-asc' ? "bg-primary/10 border-primary/20 text-primary dark:bg-primary/20 dark:border-primary/30 dark:text-primary font-medium" : "bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5",
+                        "h-full rounded-full border text-xs sm:text-sm py-0 px-2 sm:px-5 transition-all truncate bg-white dark:bg-white/5 border-border dark:border-white/10 hover:bg-white/5",
                         isPending && "opacity-70"
                     )}
                 />
