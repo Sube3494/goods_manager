@@ -2,8 +2,8 @@ import { getBaseAutoPickStatusDisplay } from "./autoPickOrderStatus";
 import type { AutoPickOrder } from "./types";
 
 export const ORDER_GROUPS = [
-  { key: "outbound", label: "待出库" },
   { key: "pending", label: "处理中" },
+  { key: "outbound", label: "待出库" },
   { key: "completed", label: "已完成" },
   { key: "closed", label: "已取消" },
   { key: "brush", label: "刷单" },
