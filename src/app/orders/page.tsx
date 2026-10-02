@@ -2156,6 +2156,7 @@ export default function OrdersPage() {
     shopId: string;
     libraryId: string;
     currentMatchedProductId: string;
+    currentMatchedProduct?: any;
     order?: AutoPickOrder;
     autoOutbound?: boolean;
     componentIndex?: number;
@@ -2693,6 +2694,7 @@ export default function OrdersPage() {
         : options?.componentIndex !== undefined
         ? (options.componentDisplay?.shopProductId || options.componentDisplay?.id || "")
         : (item.matchedProduct?.shopProductId || item.matchedProduct?.id || ""),
+      currentMatchedProduct: item.matchedProduct || null,
       order,
       autoOutbound: Boolean(options?.autoOutbound),
       componentIndex: options?.componentIndex,
@@ -2731,6 +2733,8 @@ export default function OrdersPage() {
           componentIndex,
           currentBundleItems,
           isAddingComponent,
+          shopId: matchEditorTarget.shopId,
+          autoMatchedProduct: matchEditorTarget.currentMatchedProduct,
         }),
       });
       const data = await response.json().catch(() => ({}));

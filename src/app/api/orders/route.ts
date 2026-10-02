@@ -2867,20 +2867,37 @@ export async function GET(request: NextRequest) {
             }
           }
 
-          const matchedProduct = manualMatchedProduct
-            ? {
-                ...manualMatchedProduct,
-                isUnmatched: isManualUnmatched ? true : (manualMatchedProduct as any).isUnmatched,
-                isManual: isReallyManual,
-                matchMethod: isManualUnmatched ? undefined : resolvedMatchMethod,
-              }
-            : platformStrictMatch
+          const effectiveAutoMainProduct = platformStrictMatch
             ? { ...platformStrictMatch, isManual: false, matchMethod: "id" as const }
             : (hasStrictMatchForAllSegments && fallbackStrictMatches[0]
               ? { ...fallbackStrictMatches[0], isManual: false, matchMethod: "sku" as const }
               : outboundMatchedProduct
                 ? { ...outboundMatchedProduct, isManual: false, matchMethod: "outbound" as const }
                 : null);
+
+          const matchedProduct = (manualMatchedProduct && !isManualUnmatched)
+            ? {
+                ...manualMatchedProduct,
+                isUnmatched: false,
+                isManual: isReallyManual,
+                matchMethod: resolvedMatchMethod,
+              }
+            : effectiveAutoMainProduct
+            ? {
+                ...effectiveAutoMainProduct,
+                ...(manualMatchedProduct?.bundleItems ? {
+                  isBundle: true,
+                  bundleItems: manualMatchedProduct.bundleItems,
+                } : {}),
+              }
+            : manualMatchedProduct
+            ? {
+                ...manualMatchedProduct,
+                isUnmatched: true,
+                isManual: false,
+                matchMethod: undefined,
+              }
+            : null;
           if (matchedProduct) {
             const foundShopProduct = mappedShopProducts.find((p) =>
               (matchedProduct.shopProductId && p.id === matchedProduct.shopProductId)

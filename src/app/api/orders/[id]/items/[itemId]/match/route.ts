@@ -593,11 +593,28 @@ export async function PATCH(
         }
       }
 
+      // 优先采信前端传来的当前有效主商品（添加配件时保留已匹配的主商品）
+      if (!mainProduct && autoMatchedProduct && autoMatchedProduct.id !== orderItem.id && !(autoMatchedProduct as any).isUnmatched) {
+        mainProduct = {
+          id: autoMatchedProduct.id,
+          productId: (autoMatchedProduct as any).productId || null,
+          name: autoMatchedProduct.name || orderItem.productName || "未命名商品",
+          sku: autoMatchedProduct.sku || orderItem.productNo || null,
+          image: autoMatchedProduct.image || null,
+          sourceType: autoMatchedProduct.sourceType || "shopProduct",
+          shopProductId: (autoMatchedProduct as any).shopProductId || autoMatchedProduct.id,
+          shopName: (autoMatchedProduct as any).shopName || null,
+          matchMethod: (autoMatchedProduct as any).matchMethod || "id",
+          isManual: (autoMatchedProduct as any).isManual === true,
+        };
+      }
+
       if (!mainProduct || (!hasManualBundleConfig && existingBundleItems.length === 0)) {
         const targetShopProductId = mainProduct?.shopProductId || mainProduct?.id;
-        const matchedCandidate = orderMatchedShopId ? await prisma.shopProduct.findFirst({
+        const effectiveShopId = body?.shopId || orderMatchedShopId;
+        const matchedCandidate = await prisma.shopProduct.findFirst({
           where: {
-            shopId: orderMatchedShopId,
+            ...(effectiveShopId ? { shopId: effectiveShopId } : { shop: { userId: targetUserId } }),
             OR: [
               ...(targetShopProductId ? [{ id: targetShopProductId }, { productId: targetShopProductId }] : []),
               ...(orderItem.platformSkuId ? [
@@ -616,7 +633,7 @@ export async function PATCH(
             shop: true,
           },
           orderBy: { updatedAt: "desc" },
-        }) : null;
+        });
 
         if (matchedCandidate) {
           if (!mainProduct) {
@@ -648,19 +665,6 @@ export async function PATCH(
             }
           }
         }
-      }
-
-      if (!mainProduct && autoMatchedProduct) {
-        mainProduct = {
-          id: autoMatchedProduct.id,
-          productId: (autoMatchedProduct as any).productId || null,
-          name: autoMatchedProduct.name || orderItem.productName || "未命名商品",
-          sku: autoMatchedProduct.sku || orderItem.productNo || null,
-          image: autoMatchedProduct.image || null,
-          sourceType: autoMatchedProduct.sourceType || "shopProduct",
-          shopProductId: (autoMatchedProduct as any).shopProductId || autoMatchedProduct.id,
-          shopName: (autoMatchedProduct as any).shopName || null,
-        };
       }
 
       if (!mainProduct) {
