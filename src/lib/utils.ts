@@ -138,8 +138,18 @@ export function parseOutboundNote(note: string | undefined | null): ParsedNote {
   // 3. 提取平台标识
   const platformMatch = workingNote.match(/\[([^\[\]]+)\]/);
   if (platformMatch) {
-    result.platform = platformMatch[1];
+    const rawPlatform = platformMatch[1].trim();
+    if (rawPlatform.includes("调拨") || rawPlatform.includes("调货") || rawPlatform.toLowerCase().includes("transfer")) {
+      result.platform = "调拨";
+    } else {
+      result.platform = rawPlatform;
+    }
     workingNote = workingNote.replace(/\[([^\[\]]+)\]\s*/, '');
+  }
+
+  // 若未提取到平台但备注包含调拨语义，兜底识别为调拨
+  if (!result.platform && (workingNote.includes("调拨") || workingNote.includes("调货"))) {
+    result.platform = "调拨";
   }
   
   // 4. 提取平台单号
@@ -176,6 +186,14 @@ export function getPlatformMeta(platform: string | undefined | null): PlatformBa
   if (!platform) return null;
   let name = platform.trim();
   const normalized = name.toLowerCase();
+
+  if (name.includes("调拨") || name.includes("调货") || normalized.includes("transfer")) {
+    return {
+      name: "调拨",
+      iconSrc: "/platform/其他.svg",
+      className: "bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20 dark:bg-purple-500/20 dark:border-purple-500/30",
+    };
+  }
 
   if (name.includes("全渠道") || normalized === "all") {
     return {

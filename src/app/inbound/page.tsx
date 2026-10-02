@@ -6,7 +6,7 @@ import { useToast } from "@/components/ui/Toast";
 import { PurchaseOrderModal } from "@/components/Purchases/PurchaseOrderModal";
 import { PurchaseOrder } from "@/lib/types";
 import { formatLocalDateTime } from "@/lib/dateUtils";
-import { DatePicker } from "@/components/ui/DatePicker";
+import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { startOfDay, endOfDay, parseISO, isWithinInterval } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
@@ -297,7 +297,7 @@ function InboundContent() {
           {hasActiveFilters && (
             <button
               onClick={resetFilters}
-              className="xl:hidden h-10 sm:h-11 px-3.5 flex items-center gap-1.5 rounded-full border border-sky-500/20 bg-sky-500/10 text-sky-600 dark:text-sky-400 text-xs font-bold hover:bg-sky-500/20 transition-all active:scale-95 shadow-2xs shrink-0 whitespace-nowrap cursor-pointer"
+              className="xl:hidden h-10 sm:h-11 px-3.5 flex items-center gap-1.5 rounded-full border border-border/60 dark:border-white/10 bg-white/70 dark:bg-white/5 text-muted-foreground hover:text-foreground text-xs font-bold hover:bg-white dark:hover:bg-white/10 transition-all active:scale-95 shadow-2xs shrink-0 whitespace-nowrap cursor-pointer"
             >
               <RotateCcw size={13} />
               <span>重置</span>
@@ -306,7 +306,7 @@ function InboundContent() {
         </div>
 
         {/* 筛选器胶囊组：移动端/中屏横向丝滑滑动，超大屏无缝平铺 */}
-        <div className="flex items-center gap-2 sm:gap-2.5 overflow-x-auto no-scrollbar py-1 shrink-0 w-full xl:w-auto -mx-1 px-1 xl:mx-0 xl:px-0 pe-4 xl:pe-0">
+        <div className="flex items-center gap-2 sm:gap-2.5 overflow-x-auto no-scrollbar py-1 shrink-0 w-full xl:w-auto -mx-1 px-1 xl:mx-0 pe-4 xl:pe-2">
           {/* 1. 门店筛选 */}
           <div className="h-10 sm:h-11 shrink-0">
             <CustomSelect
@@ -318,12 +318,7 @@ function InboundContent() {
               ]}
               placeholder="全部门店"
               className="h-full"
-              triggerClassName={cn(
-                "h-full rounded-full border shadow-2xs text-xs font-bold transition-all px-3.5 gap-1.5 justify-center text-foreground whitespace-nowrap",
-                selectedShop !== "全部" 
-                  ? "bg-sky-500/10 border-sky-500/20 text-sky-700 dark:bg-sky-500/20 dark:border-sky-500/30 dark:text-sky-300" 
-                  : "bg-white/70 dark:bg-white/5 border-border/60 dark:border-white/10 hover:bg-white dark:hover:bg-white/10"
-              )}
+              triggerClassName="h-full rounded-full border border-border/60 dark:border-white/10 bg-white/70 dark:bg-white/5 hover:bg-white dark:hover:bg-white/10 shadow-2xs text-xs font-bold transition-all px-3.5 gap-1.5 justify-center text-foreground whitespace-nowrap"
             />
           </div>
 
@@ -338,12 +333,7 @@ function InboundContent() {
               ]}
               placeholder="全部平台"
               className="h-full"
-              triggerClassName={cn(
-                "h-full rounded-full border shadow-2xs text-xs font-bold transition-all px-3.5 gap-1.5 justify-center text-foreground whitespace-nowrap",
-                platformFilter !== "全部平台" 
-                  ? "bg-sky-500/10 border-sky-500/20 text-sky-700 dark:bg-sky-500/20 dark:border-sky-500/30 dark:text-sky-300" 
-                  : "bg-white/70 dark:bg-white/5 border-border/60 dark:border-white/10 hover:bg-white dark:hover:bg-white/10"
-              )}
+              triggerClassName="h-full rounded-full border border-border/60 dark:border-white/10 bg-white/70 dark:bg-white/5 hover:bg-white dark:hover:bg-white/10 shadow-2xs text-xs font-bold transition-all px-3.5 gap-1.5 justify-center text-foreground whitespace-nowrap"
             />
           </div>
 
@@ -356,35 +346,23 @@ function InboundContent() {
               placeholder="全部类型"
               searchable={false}
               className="h-full"
-              triggerClassName={cn(
-                "h-full rounded-full border shadow-2xs text-xs font-bold transition-all px-3.5 gap-1.5 justify-center text-foreground whitespace-nowrap",
-                selectedInboundType !== INBOUND_TYPE_ALL 
-                  ? "bg-sky-500/10 border-sky-500/20 text-sky-700 dark:bg-sky-500/20 dark:border-sky-500/30 dark:text-sky-300" 
-                  : "bg-white/70 dark:bg-white/5 border-border/60 dark:border-white/10 hover:bg-white dark:hover:bg-white/10"
-              )}
+              triggerClassName="h-full rounded-full border border-border/60 dark:border-white/10 bg-white/70 dark:bg-white/5 hover:bg-white dark:hover:bg-white/10 shadow-2xs text-xs font-bold transition-all px-3.5 gap-1.5 justify-center text-foreground whitespace-nowrap"
             />
           </div>
 
-          {/* 4. Date Range Pickers: 日期 */}
-          <div className="flex items-center gap-1.5 sm:gap-2 h-10 sm:h-11 shrink-0">
-            <DatePicker 
-              value={startDate} 
-              onChange={setStartDate} 
-              maxDate={endDate}
-              placeholder="起始日期" 
-              className="h-full w-24 sm:w-28"
-              triggerClassName="rounded-full shadow-2xs border-border/60 bg-white/70 dark:bg-white/5 px-2.5"
-              isCompact
-            />
-            <span className="text-muted-foreground text-[10px] sm:text-xs shrink-0 font-medium whitespace-nowrap">至</span>
-            <DatePicker 
-              value={endDate} 
-              onChange={setEndDate} 
-              minDate={startDate}
-              placeholder="截至日期" 
-              className="h-full w-24 sm:w-28"
-              triggerClassName="rounded-full shadow-2xs border-border/60 bg-white/70 dark:bg-white/5 px-2.5"
-              isCompact
+          {/* 4. Date Range Picker: 日期范围 */}
+          <div className="h-10 sm:h-11 shrink-0">
+            <DateRangePicker 
+              startDate={startDate} 
+              endDate={endDate} 
+              onChange={({ startDate: s, endDate: e }) => {
+                setStartDate(s);
+                setEndDate(e);
+                setCurrentPage(1);
+              }}
+              placeholder="选择入库日期" 
+              className="h-full"
+              triggerClassName="h-full rounded-full border border-border/60 dark:border-white/10 bg-white/70 dark:bg-white/5 hover:bg-white dark:hover:bg-white/10 shadow-2xs text-xs font-bold transition-all px-3.5 gap-1.5 justify-center whitespace-nowrap"
             />
           </div>
 
@@ -392,7 +370,7 @@ function InboundContent() {
           {hasActiveFilters && (
             <button
               onClick={resetFilters}
-              className="hidden lg:flex h-10 sm:h-11 px-3.5 items-center gap-1.5 rounded-full border border-sky-500/20 bg-sky-500/10 text-sky-600 dark:text-sky-400 text-xs font-bold hover:bg-sky-500/20 transition-all active:scale-95 shadow-2xs shrink-0 whitespace-nowrap cursor-pointer"
+              className="hidden xl:flex h-10 sm:h-11 px-3.5 items-center gap-1.5 rounded-full border border-border/60 dark:border-white/10 bg-white/70 dark:bg-white/5 text-muted-foreground hover:text-foreground text-xs font-bold hover:bg-white dark:hover:bg-white/10 transition-all active:scale-95 shadow-2xs shrink-0 whitespace-nowrap cursor-pointer"
             >
               <RotateCcw size={13} />
               <span>重置</span>

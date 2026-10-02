@@ -488,7 +488,8 @@ export function getAutoPickSyncSkippedReasonText(raw: unknown) {
 
 
 export function getDisplayStatus(order: Pick<AutoPickOrder, "isPickup" | "status" | "platform" | "isPickCompleted">) {
-  const baseStatus = getBaseAutoPickStatusDisplay(order.status);
+  const normalizedStatus = getBaseAutoPickStatusDisplay(order.status);
+  const baseStatus = normalizedStatus === "待处理" ? "处理中" : normalizedStatus;
   if (order.platform === "线下交易") {
     return baseStatus;
   }

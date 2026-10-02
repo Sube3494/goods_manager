@@ -13,7 +13,7 @@ import Image from "next/image";
 import { format } from "date-fns";
 import { zhCN } from "date-fns/locale/zh-CN";
 import { OutboundOrder, OutboundOrderItem } from "@/lib/types";
-import { DatePicker } from "@/components/ui/DatePicker";
+import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import { useUser } from "@/hooks/useUser";
 import { hasPermission } from "@/lib/permissions";
 import { SessionUser } from "@/lib/permissions";
@@ -421,9 +421,9 @@ export default function OutboundPage() {
       </div>
 
       {/* Filter & Search Bar: 移动端自适应分层横滑，大屏单行填满 */}
-      <div className="w-full flex flex-col lg:flex-row lg:items-center gap-2.5 sm:gap-3 text-foreground">
+      <div className="w-full flex flex-col xl:flex-row xl:items-center gap-2.5 sm:gap-3 text-foreground">
         {/* 搜索框区域 */}
-        <div className="flex items-center gap-2 w-full lg:flex-1 min-w-0">
+        <div className="flex items-center gap-2 w-full xl:flex-1 min-w-0">
           <div className="h-10 sm:h-11 px-4 rounded-full bg-white/70 dark:bg-white/5 border border-border/60 dark:border-white/10 flex items-center gap-2.5 focus-within:ring-2 focus-within:ring-sky-500/20 transition-all dark:hover:bg-white/10 flex-1 min-w-0 shadow-2xs">
             <Search size={16} className="text-muted-foreground shrink-0" />
             <input
@@ -447,7 +447,7 @@ export default function OutboundPage() {
                 setSelectedShop("全部门店");
                 setCurrentPage(1);
               }}
-              className="lg:hidden h-10 sm:h-11 px-3.5 flex items-center gap-1.5 rounded-full border border-sky-500/20 bg-sky-500/10 text-sky-600 dark:text-sky-400 text-xs font-bold hover:bg-sky-500/20 transition-all active:scale-95 shadow-2xs shrink-0 whitespace-nowrap cursor-pointer"
+              className="xl:hidden h-10 sm:h-11 px-3.5 flex items-center gap-1.5 rounded-full border border-border/60 dark:border-white/10 bg-white/70 dark:bg-white/5 text-muted-foreground hover:text-foreground text-xs font-bold hover:bg-white dark:hover:bg-white/10 transition-all active:scale-95 shadow-2xs shrink-0 whitespace-nowrap cursor-pointer"
             >
               <RotateCcw size={13} />
               <span>重置</span>
@@ -456,7 +456,7 @@ export default function OutboundPage() {
         </div>
 
         {/* 筛选器胶囊组：移动端横向丝滑滑动，大屏无缝平铺 */}
-        <div className="flex items-center gap-2 sm:gap-2.5 overflow-x-auto no-scrollbar py-0.5 shrink-0 w-full lg:w-auto -mx-1 px-1 lg:mx-0 lg:px-0">
+        <div className="flex items-center gap-2 sm:gap-2.5 overflow-x-auto no-scrollbar py-1 shrink-0 w-full xl:w-auto -mx-1 px-1 xl:mx-0 pe-4 xl:pe-2">
           {/* 门店筛选 */}
           <div className="h-10 sm:h-11 shrink-0">
             <CustomSelect
@@ -468,12 +468,7 @@ export default function OutboundPage() {
               ]}
               placeholder="全部门店"
               className="h-full"
-              triggerClassName={cn(
-                "h-full rounded-full border shadow-2xs text-xs font-bold transition-all px-3.5 gap-1.5 justify-center text-foreground whitespace-nowrap",
-                selectedShop !== "全部门店" 
-                  ? "bg-sky-500/10 border-sky-500/20 text-sky-700 dark:bg-sky-500/20 dark:border-sky-500/30 dark:text-sky-300" 
-                  : "bg-white/70 dark:bg-white/5 border-border/60 dark:border-white/10 hover:bg-white dark:hover:bg-white/10"
-              )}
+              triggerClassName="h-full rounded-full border border-border/60 dark:border-white/10 bg-white/70 dark:bg-white/5 hover:bg-white dark:hover:bg-white/10 shadow-2xs text-xs font-bold transition-all px-3.5 gap-1.5 justify-center text-foreground whitespace-nowrap"
             />
           </div>
 
@@ -488,12 +483,7 @@ export default function OutboundPage() {
               ]}
               placeholder="全部平台"
               className="h-full"
-              triggerClassName={cn(
-                "h-full rounded-full border shadow-2xs text-xs font-bold transition-all px-3.5 gap-1.5 justify-center text-foreground whitespace-nowrap",
-                platformFilter !== "全部平台" 
-                  ? "bg-sky-500/10 border-sky-500/20 text-sky-700 dark:bg-sky-500/20 dark:border-sky-500/30 dark:text-sky-300" 
-                  : "bg-white/70 dark:bg-white/5 border-border/60 dark:border-white/10 hover:bg-white dark:hover:bg-white/10"
-              )}
+              triggerClassName="h-full rounded-full border border-border/60 dark:border-white/10 bg-white/70 dark:bg-white/5 hover:bg-white dark:hover:bg-white/10 shadow-2xs text-xs font-bold transition-all px-3.5 gap-1.5 justify-center text-foreground whitespace-nowrap"
             />
           </div>
 
@@ -505,40 +495,29 @@ export default function OutboundPage() {
               options={[
                 { value: "all", label: "所有类型" },
                 { value: "Sale", label: "销售出库" },
+                { value: "Transfer", label: "调拨出库" },
                 { value: "Sample", label: "样板领用" },
                 { value: "Loss", label: "损耗出库" },
                 { value: "Return", label: "退货入库" }
               ]}
               className="h-full"
-              triggerClassName={cn(
-                "h-full rounded-full border shadow-2xs text-xs font-bold transition-all px-3.5 gap-1.5 justify-center text-foreground whitespace-nowrap",
-                typeFilter !== "all" 
-                  ? "bg-sky-500/10 border-sky-500/20 text-sky-700 dark:bg-sky-500/20 dark:border-sky-500/30 dark:text-sky-300" 
-                  : "bg-white/70 dark:bg-white/5 border-border/60 dark:border-white/10 hover:bg-white dark:hover:bg-white/10"
-              )}
+              triggerClassName="h-full rounded-full border border-border/60 dark:border-white/10 bg-white/70 dark:bg-white/5 hover:bg-white dark:hover:bg-white/10 shadow-2xs text-xs font-bold transition-all px-3.5 gap-1.5 justify-center text-foreground whitespace-nowrap"
             />
           </div>
 
-          {/* Date Range Pickers: 日期 */}
-          <div className="flex items-center gap-1.5 sm:gap-2 h-10 sm:h-11 shrink-0">
-            <DatePicker 
-              value={startDate} 
-              onChange={setStartDate} 
-              maxDate={endDate}
-              placeholder="起始日期" 
-              className="h-full w-24 sm:w-28"
-              triggerClassName="rounded-full shadow-2xs border-border/60 bg-white/70 dark:bg-white/5 px-2.5"
-              isCompact
-            />
-            <span className="text-muted-foreground text-[10px] sm:text-xs shrink-0 font-medium whitespace-nowrap">至</span>
-            <DatePicker 
-              value={endDate} 
-              onChange={setEndDate} 
-              minDate={startDate}
-              placeholder="截至日期" 
-              className="h-full w-24 sm:w-28"
-              triggerClassName="rounded-full shadow-2xs border-border/60 bg-white/70 dark:bg-white/5 px-2.5"
-              isCompact
+          {/* Date Range Picker: 日期范围 */}
+          <div className="h-10 sm:h-11 shrink-0">
+            <DateRangePicker 
+              startDate={startDate} 
+              endDate={endDate} 
+              onChange={({ startDate: s, endDate: e }) => {
+                setStartDate(s);
+                setEndDate(e);
+                setCurrentPage(1);
+              }}
+              placeholder="选择出库日期" 
+              className="h-full"
+              triggerClassName="h-full rounded-full border border-border/60 dark:border-white/10 bg-white/70 dark:bg-white/5 hover:bg-white dark:hover:bg-white/10 shadow-2xs text-xs font-bold transition-all px-3.5 gap-1.5 justify-center whitespace-nowrap"
             />
           </div>
 
@@ -554,7 +533,7 @@ export default function OutboundPage() {
                 setSelectedShop("全部门店");
                 setCurrentPage(1);
               }}
-              className="hidden lg:flex h-10 sm:h-11 px-3.5 items-center gap-1.5 rounded-full border border-sky-500/20 bg-sky-500/10 text-sky-600 dark:text-sky-400 text-xs font-bold hover:bg-sky-500/20 transition-all active:scale-95 shadow-2xs shrink-0 whitespace-nowrap cursor-pointer"
+              className="hidden xl:flex h-10 sm:h-11 px-3.5 items-center gap-1.5 rounded-full border border-border/60 dark:border-white/10 bg-white/70 dark:bg-white/5 text-muted-foreground hover:text-foreground text-xs font-bold hover:bg-white dark:hover:bg-white/10 transition-all active:scale-95 shadow-2xs shrink-0 whitespace-nowrap cursor-pointer"
             >
               <RotateCcw size={13} />
               <span>重置</span>
@@ -588,7 +567,7 @@ export default function OutboundPage() {
                     
                     const isPartialReturned = order.status === 'PartialReturned';
                     const shopName = parsed.shopName || resolveOrderShopName(order);
-                    const platformName = extractPlatform(order.note);
+                    const platformName = order.type === 'Transfer' ? '调拨' : extractPlatform(order.note);
                     const platformMeta = getPlatformMeta(platformName);
                     const serialNum = parsed.serialNum;
 
@@ -604,25 +583,27 @@ export default function OutboundPage() {
                             <div className="flex flex-wrap items-center justify-center gap-1">
                               {shopName && (
                                 <span className="inline-flex items-center gap-1 border border-sky-500/20 bg-sky-500/10 px-2.5 py-0.5 rounded-full text-[10px] font-bold text-sky-700 dark:border-sky-500/30 dark:bg-sky-500/15 dark:text-sky-300 shadow-2xs">
-                                  <Store size={10} />
-                                  {shopName}
-                                </span>
-                              )}
-                            </div>
-                            <span className="font-semibold text-muted-foreground/60 text-[10px]">
-                              {serialNum ? `流水单号 #${serialNum}` : `#${order.id.slice(-6).toUpperCase()}`}
-                            </span>
+                                <Store size={10} />
+                                {shopName}
+                              </span>
+                            )}
                           </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-center">
-                          <div className="flex items-center justify-center gap-1.5">
-                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border shadow-2xs ${
-                              order.type === 'Sale' ? 'bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/20' :
-                              order.type === 'Sample' ? 'bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/20' :
-                              'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20'
-                            }`}>
-                              {order.type === 'Sale' ? '销售' : order.type === 'Sample' ? '领用' : order.type === 'Return' ? '退货' : '损耗'}
-                            </span>
+                          <span className="font-semibold text-muted-foreground/60 text-[10px]">
+                            {serialNum ? `流水单号 #${serialNum}` : `#${order.id.slice(-6).toUpperCase()}`}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-center">
+                        <div className="flex items-center justify-center gap-1.5">
+                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border shadow-2xs ${
+                            order.type === 'Sale' ? 'bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/20' :
+                            order.type === 'Transfer' ? 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-500/20' :
+                            order.type === 'Sample' ? 'bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/20' :
+                            order.type === 'Return' ? 'bg-violet-500/10 text-violet-700 dark:text-violet-300 border-violet-500/20' :
+                            'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20'
+                          }`}>
+                            {order.type === 'Sale' ? '销售' : order.type === 'Transfer' ? '调拨' : order.type === 'Sample' ? '领用' : order.type === 'Return' ? '退货' : '损耗'}
+                          </span>
                             {isReturned && (
                               <span className="flex items-center gap-1 text-[10px] font-bold text-rose-600 dark:text-rose-400 bg-rose-500/10 px-2.5 py-0.5 rounded-full border border-rose-500/20 shadow-2xs">
                                 <RotateCcw size={10} />
@@ -760,7 +741,7 @@ export default function OutboundPage() {
             const parsed = parseOutboundNote(order.note);
             
             const shopName = parsed.shopName || resolveOrderShopName(order);
-            const platformName = extractPlatform(order.note);
+            const platformName = order.type === 'Transfer' ? '调拨' : extractPlatform(order.note);
             const platformMeta = getPlatformMeta(platformName);
             const serialNum = parsed.serialNum;
 
@@ -816,10 +797,12 @@ export default function OutboundPage() {
                     {/* 3. 出库类型 Badge */}
                     <span className={`inline-flex h-6 items-center px-2 rounded-full text-[10px] font-bold border shadow-2xs whitespace-nowrap ${
                       order.type === 'Sale' ? 'bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/20' :
+                      order.type === 'Transfer' ? 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-500/20' :
                       order.type === 'Sample' ? 'bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/20' :
+                      order.type === 'Return' ? 'bg-violet-500/10 text-violet-700 dark:text-violet-300 border-violet-500/20' :
                       'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20'
                     }`}>
-                      {order.type === 'Sale' ? '销售' : order.type === 'Sample' ? '领用' : order.type === 'Return' ? '退货' : '损耗'}
+                      {order.type === 'Sale' ? '销售' : order.type === 'Transfer' ? '调拨' : order.type === 'Sample' ? '领用' : order.type === 'Return' ? '退货' : '损耗'}
                     </span>
 
                     {/* 4. 已对冲 Badge */}
@@ -969,23 +952,16 @@ export default function OutboundPage() {
 
             <div className="border-b border-border/60 dark:border-white/10 bg-white/20 dark:bg-white/[0.01] px-5 py-3.5 sm:px-7">
               <div className="flex flex-wrap items-center gap-2.5">
-                <DatePicker
-                  value={analyticsStartDate}
-                  onChange={setAnalyticsStartDate}
-                  maxDate={analyticsEndDate}
-                  placeholder="分析起始日期"
-                  className="h-10 w-full sm:w-36"
-                  triggerClassName="rounded-full shadow-2xs border-border/60 bg-white/70 dark:bg-white/5 text-xs"
-                  isCompact
-                />
-                <DatePicker
-                  value={analyticsEndDate}
-                  onChange={setAnalyticsEndDate}
-                  minDate={analyticsStartDate}
-                  placeholder="分析截至日期"
-                  className="h-10 w-full sm:w-36"
-                  triggerClassName="rounded-full shadow-2xs border-border/60 bg-white/70 dark:bg-white/5 text-xs"
-                  isCompact
+                <DateRangePicker
+                  startDate={analyticsStartDate}
+                  endDate={analyticsEndDate}
+                  onChange={({ startDate: s, endDate: e }) => {
+                    setAnalyticsStartDate(s);
+                    setAnalyticsEndDate(e);
+                  }}
+                  placeholder="分析日期范围"
+                  className="h-10 w-full sm:w-auto"
+                  triggerClassName="h-full rounded-full border border-border/60 dark:border-white/10 shadow-2xs text-xs font-bold px-3.5 bg-white/70 dark:bg-white/5 hover:bg-white dark:hover:bg-white/10 text-foreground whitespace-nowrap"
                 />
                 <div className="h-10 w-full sm:w-36">
                   <CustomSelect

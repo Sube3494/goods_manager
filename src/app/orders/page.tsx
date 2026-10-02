@@ -3049,7 +3049,7 @@ export default function OrdersPage() {
                 <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">订单管理</h1>
                 <p className="mt-1 text-sm text-muted-foreground">
                   {activeTab === "today"
-                    ? "聚焦今天待处理订单"
+                    ? "聚焦今天处理中订单"
                     : activeTab === "appointments"
                       ? "集中处理尚未完成的预约订单"
                       : "按时间和状态回看订单"}

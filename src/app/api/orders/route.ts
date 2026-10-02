@@ -1596,6 +1596,7 @@ export async function GET(request: NextRequest) {
 
     const outboundByOrderNo = new Map<string, {
       id: string;
+      isFullyReturned: boolean;
       itemCount: number;
       productCost: number;
       refundAmount: number;
@@ -1868,6 +1869,7 @@ export async function GET(request: NextRequest) {
         }
         outboundByOrderNo.set(orderNo, {
           id: outbound.id,
+          isFullyReturned: outbound.status === "Returned",
           itemCount: outbound.items.length,
           productCost: Math.max(0, productCost - Math.round(returnTotals.returnedCost * 100)),
           refundAmount: Math.round(returnTotals.refundAmount * 100),
@@ -1916,7 +1918,9 @@ export async function GET(request: NextRequest) {
       }) && !hasAutoPickFulfillmentItems(order.items);
       const hasOrderFulfillment = hasAutoPickFulfillmentItems(order.items);
       const isOutboundEmpty = Boolean(outboundMeta && (outboundMeta.itemCount === 0 || (outboundMeta.breakdown?.length || 0) === 0));
-      const effectiveHasOutbound = hasOutbound && (!hasOrderFulfillment || !isOutboundEmpty);
+      const effectiveHasOutbound = hasOutbound
+        && outboundMeta?.isFullyReturned !== true
+        && (!hasOrderFulfillment || !isOutboundEmpty);
       if (cancelledDeliveryLoss || manualDeliveryLoss) {
         return "ready";
       }
@@ -2625,7 +2629,9 @@ export async function GET(request: NextRequest) {
         deliveryFee,
       }) && !hasFulfillmentItems;
       const isOutboundEmpty = Boolean(outboundMeta && (outboundMeta.itemCount === 0 || (outboundMeta.breakdown?.length || 0) === 0));
-      const effectiveHasOutbound = hasOutbound && (!hasFulfillmentItems || !isOutboundEmpty);
+      const effectiveHasOutbound = hasOutbound
+        && outboundMeta?.isFullyReturned !== true
+        && (!hasFulfillmentItems || !isOutboundEmpty);
       const missingCostItemCount = outboundMeta?.missingCostItemCount || 0;
       const productCostStatus = cancelledDeliveryLoss || manualDeliveryLoss
         ? "ready" as const

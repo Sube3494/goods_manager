@@ -573,7 +573,6 @@ export function TodayOrdersView({
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [platform, setPlatform] = useState("all");
   const [shop, setShop] = useState("all");
-  const [status, setStatus] = useState("all");
   const [layoutMode, setLayoutMode] = useState<TodayOrderLayout>("list");
   const [isMobileViewport, setIsMobileViewport] = useState(false);
 
@@ -654,7 +653,6 @@ export function TodayOrdersView({
 
       if (debouncedQuery.trim()) params.set("query", debouncedQuery.trim());
       if (platform !== "all") params.set("platform", platform);
-      if (status !== "all") params.set("status", status);
       if (shop !== "all") params.set("shop", shop);
       if (userId) params.set("userId", userId);
       params.set("_metrics", "1");
@@ -707,7 +705,7 @@ export function TodayOrdersView({
       if (data.overview) setOverview(data.overview);
 
       // 在默认无特定过滤时缓存当天完整订单
-      if (!debouncedQuery.trim() && platform === "all" && status === "all" && shop === "all") {
+      if (!debouncedQuery.trim() && platform === "all" && shop === "all") {
         todayOrdersMemoryCache.set(cacheKey, {
           orders: nextItems,
           summary: data.summary || defaultTodaySummary,
@@ -742,7 +740,7 @@ export function TodayOrdersView({
         setIsLoading(false);
       }
     }
-  }, [platform, debouncedQuery, shop, status, todayDate, showToast, userId, cacheKey]);
+  }, [platform, debouncedQuery, shop, todayDate, showToast, userId, cacheKey]);
 
   const handleRefreshOrder = useCallback(() => {
     void fetchOrders({ silent: true, force: true });
@@ -788,7 +786,7 @@ export function TodayOrdersView({
       return;
     }
     void fetchOrders({ force: true });
-  }, [platform, debouncedQuery, shop, status, fetchOrders]);
+  }, [platform, debouncedQuery, shop, fetchOrders]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -944,7 +942,6 @@ export function TodayOrdersView({
       });
       if (debouncedQuery.trim()) params.set("query", debouncedQuery.trim());
       if (platform !== "all") params.set("platform", platform);
-      if (status !== "all") params.set("status", status);
       if (shop !== "all") params.set("shop", shop);
       if (userId) params.set("userId", userId);
 
@@ -966,7 +963,7 @@ export function TodayOrdersView({
     } catch {
       // 忽略指标静默更新失败
     }
-  }, [debouncedQuery, onClearProfitUpdating, patchOrder, platform, shop, status, todayDate, userId]);
+  }, [debouncedQuery, onClearProfitUpdating, patchOrder, platform, shop, todayDate, userId]);
 
   const lastHandledRefreshRef = useRef<number>(0);
   useEffect(() => {
@@ -1176,28 +1173,6 @@ export function TodayOrdersView({
     [platforms]
   );
 
-  const statusOptions = useMemo(() => {
-    const baseStatusOptions = Array.from(
-      new Map(
-        statuses.map((item) => {
-          const label = getAutoPickStatusFilterLabel(item);
-          return [label, { value: label, label: label === "待处理" ? "处理中" : label }] as const;
-        })
-      ).values()
-    );
-    return [
-      { value: "all", label: "全部状态" },
-      ...AUTO_PICK_EXTRA_STATUS_FILTERS,
-      ...baseStatusOptions,
-    ];
-  }, [statuses]);
-
-  useEffect(() => {
-    if (status === "all") return;
-    if (statusOptions.some((option) => option.value === status)) return;
-    setStatus("all");
-  }, [status, statusOptions]);
-
   // 筛选和统计都交给后端；前端只对当前页做展示分组。
   const filteredOrders = useMemo(() => {
     return orders;
@@ -1245,13 +1220,12 @@ export function TodayOrdersView({
     });
   }, [displayedSummary, orderOverviewCounts, overview.totalCount, eligibleBrushSyncOrders, isLoading, onDataLoad, todayDate]);
 
-  const hasActiveFilters = Boolean(query.trim() || platform !== "all" || shop !== "all" || status !== "all");
+  const hasActiveFilters = Boolean(query.trim() || platform !== "all" || shop !== "all");
 
   const resetFilters = () => {
     setQuery("");
     setPlatform("all");
     setShop("all");
-    setStatus("all");
   };
 
   const changeLayoutMode = (nextLayout: TodayOrderLayout) => {
@@ -1338,8 +1312,8 @@ export function TodayOrdersView({
       <section className="rounded-3xl border border-black/8 bg-zinc-50/45 px-4 py-4 shadow-xs dark:border-white/10 dark:bg-white/4">
         <div className="flex flex-col gap-4">
 
-          <div className="flex flex-col gap-2.5 lg:flex-row lg:items-center">
-            {/* 第一组：搜索框 + 全部店铺（移动端同行，桌面端自适应） */}
+          <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center">
+            {/* 搜索框 */}
             <div className="flex items-center gap-2 flex-1 min-w-0">
               <label className="flex h-11 flex-1 items-center gap-2.5 sm:gap-3 rounded-full border border-black/8 bg-white px-3.5 sm:px-4.5 focus-within:ring-2 focus-within:ring-primary/10 dark:border-white/10 dark:bg-white/3 min-w-0">
                 <Search size={16} className="text-muted-foreground shrink-0" />
@@ -1360,34 +1334,25 @@ export function TodayOrdersView({
                   <X size={16} />
                 </button>
               ) : null}
+            </div>
+
+            {/* 全部店铺、全部平台（移动端同行2列对称，桌面端单行紧凑排列） */}
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center shrink-0">
               <CustomSelect
                 value={shop}
                 onChange={setShop}
                 options={shopOptions}
                 align="center"
-                className="h-11 w-28 sm:w-32 lg:w-[136px] shrink-0"
+                className="h-11 w-full sm:w-32 lg:w-[136px]"
                 triggerClassName="h-full rounded-full border border-black/8 bg-white px-3 text-sm shadow-none dark:border-white/10 dark:bg-white/3 whitespace-nowrap text-center justify-center"
               />
-            </div>
-
-            {/* 第二组：全部平台、全部状态（移动端同行2列对称，桌面端单行展开） */}
-            <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center shrink-0">
               <CustomSelect
                 value={platform}
                 onChange={setPlatform}
                 options={platformOptions}
                 align="center"
                 matchTriggerWidth
-                className="h-11 w-full lg:w-[124px]"
-                triggerClassName="h-full rounded-full border border-black/8 bg-white px-3.5 text-sm shadow-none dark:border-white/10 dark:bg-white/3 whitespace-nowrap text-center justify-center"
-              />
-              <CustomSelect
-                value={status}
-                onChange={setStatus}
-                options={statusOptions}
-                align="center"
-                matchTriggerWidth
-                className="h-11 w-full lg:w-[124px]"
+                className="h-11 w-full sm:w-[124px]"
                 triggerClassName="h-full rounded-full border border-black/8 bg-white px-3.5 text-sm shadow-none dark:border-white/10 dark:bg-white/3 whitespace-nowrap text-center justify-center"
               />
             </div>
@@ -1454,7 +1419,7 @@ export function TodayOrdersView({
               className="space-y-4"
             >
               <LayoutGroup id={orderGroupLayoutId}>
-              <div role="tablist" aria-label="今日订单分组" className="flex gap-1 overflow-x-auto rounded-full border border-black/8 bg-white/76 p-1.5 dark:border-white/10 dark:bg-white/4">
+              <div role="tablist" aria-label="今日订单分组" className="flex h-12 items-center gap-1 overflow-x-auto rounded-full border border-black/8 bg-white/76 p-1 dark:border-white/10 dark:bg-white/4 no-scrollbar">
                 {orderGroups.map((group, index) => (
                   <button
                     key={group.key}
@@ -1476,18 +1441,19 @@ export function TodayOrdersView({
                       setActiveOrderGroup(orderGroups[nextIndex].key);
                       document.getElementById(`today-group-tab-${orderGroups[nextIndex].key}`)?.focus();
                     }}
-                    className={`relative isolate inline-flex min-h-10 flex-1 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${activeOrderGroup === group.key ? "text-background" : "text-muted-foreground hover:bg-black/4 dark:hover:bg-white/5"}`}
+                    className={`relative isolate inline-flex h-10 flex-1 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${activeOrderGroup === group.key ? "text-background" : "text-muted-foreground hover:bg-black/4 dark:hover:bg-white/5"}`}
                   >
                     {activeOrderGroup === group.key ? (
                       <motion.span
                         layoutId="order-group-pill"
+                        layout="position"
                         aria-hidden="true"
                         className="pointer-events-none absolute inset-0 -z-10 rounded-full bg-foreground shadow-sm"
-                        transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 450, damping: 36 }}
+                        transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 500, damping: 38 }}
                       />
                     ) : null}
                     <span className="relative">{group.label}</span>
-                    <span className="relative rounded-full bg-current/10 px-1.5 text-xs tabular-nums" title="当前筛选条件下的今日订单数">{group.orders.length}</span>
+                    <span className="relative inline-flex items-center justify-center h-5 rounded-full bg-current/10 px-1.5 text-[11px] font-medium leading-none tabular-nums" title="当前筛选条件下的今日订单数">{group.orders.length}</span>
                   </button>
                 ))}
               </div>

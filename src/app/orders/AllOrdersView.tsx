@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowUp, ChevronDown, Loader2, Package2, Search, X } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { CustomSelect } from "@/components/ui/CustomSelect";
-import { DatePicker } from "@/components/ui/DatePicker";
+import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { AutoPickOrder, AutoPickOrderItem } from "@/lib/types";
 import { updateOrderProductImage } from "@/lib/orderProductImage";
@@ -307,7 +307,13 @@ export function AllOrdersView({
 
       if (debouncedQuery.trim()) params.set("query", debouncedQuery.trim());
       if (platform !== "all") params.set("platform", platform);
-      if (status !== "all") params.set("status", status);
+      if (status === "brush") {
+        params.set("mainSystemSelfDelivery", "true");
+      } else if (status === "real") {
+        params.set("mainSystemSelfDelivery", "false");
+      } else if (status !== "all") {
+        params.set("status", status);
+      }
       if (startDate) params.set("startDate", startDate);
       if (endDate) params.set("endDate", endDate);
       if (shop !== "all") params.set("shop", shop);
@@ -758,14 +764,18 @@ export function AllOrdersView({
   const statusOptions = useMemo(() => {
     const baseStatusOptions = Array.from(
       new Map(
-        statuses.map((item) => {
-          const label = getAutoPickStatusFilterLabel(item);
-          return [label, { value: label, label }] as const;
-        })
+        statuses
+          .map((item) => {
+            const label = getAutoPickStatusFilterLabel(item);
+            return [label, { value: label, label: label === "待处理" ? "处理中" : label }] as const;
+          })
+          .filter(([label]) => label !== "待处理" && label !== "处理中")
       ).values()
     );
     return [
       { value: "all", label: "全部状态" },
+      { value: "brush", label: "刷单" },
+      { value: "real", label: "真实订单" },
       ...AUTO_PICK_EXTRA_STATUS_FILTERS,
       ...baseStatusOptions,
     ];
@@ -900,8 +910,8 @@ export function AllOrdersView({
               />
             </div>
 
-            {/* 第二组：平台、状态、开始日期、结束日期（移动端2列对称，桌面端单行展开） */}
-            <div className={mode === "appointments" ? "grid grid-cols-2 gap-2 lg:flex lg:items-center shrink-0" : "grid grid-cols-2 gap-2 sm:grid-cols-4 lg:flex lg:items-center shrink-0"}>
+            {/* 第二组：平台、状态、日期范围（移动端网格排列，中大屏自适应单行） */}
+            <div className={mode === "appointments" ? "grid grid-cols-2 gap-2 lg:flex lg:items-center shrink-0" : "grid grid-cols-2 gap-2 sm:flex sm:items-center shrink-0"}>
               <CustomSelect
                 value={platform}
                 onChange={setPlatform}
@@ -921,25 +931,20 @@ export function AllOrdersView({
                 triggerClassName="h-full rounded-full border border-black/8 bg-white px-3.5 text-sm shadow-none dark:border-white/10 dark:bg-white/3 whitespace-nowrap text-center justify-center"
               />
               {mode === "all" ? (
-                <>
-                  <DatePicker
-                    value={startDate}
-                    onChange={setStartDate}
-                    placeholder="开始日期"
-                    maxDate={endDate || todayDate}
-                    className="h-11 w-full lg:w-[134px]"
-                    triggerClassName="h-full rounded-full border border-black/8 bg-white px-3.5 text-sm shadow-none dark:border-white/10 dark:bg-white/3 whitespace-nowrap text-center justify-center"
-                  />
-                  <DatePicker
-                    value={endDate}
-                    onChange={setEndDate}
-                    placeholder="结束日期"
-                    minDate={startDate || undefined}
-                    maxDate={todayDate}
-                    className="h-11 w-full lg:w-[134px]"
-                    triggerClassName="h-full rounded-full border border-black/8 bg-white px-3.5 text-sm shadow-none dark:border-white/10 dark:bg-white/3 whitespace-nowrap text-center justify-center"
-                  />
-                </>
+                <DateRangePicker
+                  startDate={startDate}
+                  endDate={endDate}
+                  onChange={({ startDate: nextStart, endDate: nextEnd }) => {
+                    setStartDate(nextStart);
+                    setEndDate(nextEnd);
+                    setCurrentPage(1);
+                  }}
+                  placeholder="选择日期范围"
+                  maxDate={todayDate}
+                  includeToday={false}
+                  className="h-11 w-full col-span-2 sm:w-auto"
+                  triggerClassName="h-full rounded-full border border-black/8 bg-white px-3.5 text-sm shadow-none dark:border-white/10 dark:bg-white/3 whitespace-nowrap text-center justify-center"
+                />
               ) : null}
             </div>
           </div>

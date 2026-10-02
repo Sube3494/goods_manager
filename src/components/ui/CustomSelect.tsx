@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown, Check, Plus, Search } from "lucide-react";
@@ -116,6 +116,10 @@ export function CustomSelect({
     };
   }, [handleOpenChange]);
 
+  const longestLabelLength = useMemo(() => {
+    return options.reduce((max, opt) => Math.max(max, (opt.label || "").length), 0);
+  }, [options]);
+
   const updatePosition = useCallback(() => {
     if (isOpen && containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect();
@@ -125,7 +129,11 @@ export function CustomSelect({
       const showAbove = spaceBelow < dropdownHeight && rect.top > dropdownHeight;
 
       requestAnimationFrame(() => {
-        const targetWidth = matchTriggerWidth ? rect.width : Math.max(rect.width, 120);
+        // 根据选项最长文本动态估算紧凑宽度，与按钮宽度取较大值，杜绝右侧冗余空白与文字挤压截断
+        const estimatedContentWidth = Math.ceil(longestLabelLength * 13) + 38;
+        const targetWidth = matchTriggerWidth
+          ? Math.max(rect.width, estimatedContentWidth)
+          : Math.max(rect.width, 96);
         let preferredLeft = rect.left;
         if (align === "right") {
           preferredLeft = rect.right - targetWidth;
@@ -143,7 +151,7 @@ export function CustomSelect({
         });
       });
     }
-  }, [align, isOpen, matchTriggerWidth]);
+  }, [align, isOpen, matchTriggerWidth, longestLabelLength]);
 
   useEffect(() => {
     if (isOpen) {
@@ -301,13 +309,13 @@ export function CustomSelect({
                         handleOpenChange(false);
                       }}
                       className={cn(
-                        "relative flex w-full select-none items-center rounded-xl py-2 pl-3 pr-7 text-xs outline-none transition-colors hover:bg-slate-100 dark:hover:bg-white/8 cursor-pointer font-medium text-foreground",
+                        "relative flex w-full select-none items-center rounded-xl py-1.5 pl-2.5 pr-6 text-xs outline-none transition-colors hover:bg-slate-100 dark:hover:bg-white/8 cursor-pointer font-medium text-foreground",
                         option.value === value && "bg-primary/10 text-primary font-bold dark:bg-primary/20 dark:text-primary"
                       )}
                     >
-                      <span className="truncate font-medium pr-1">{option.label}</span>
+                      <span className="truncate font-medium">{option.label}</span>
                       {option.value === value && (
-                        <span className="absolute right-2.5 flex h-3.5 w-3.5 items-center justify-center">
+                        <span className="absolute right-2 flex h-3.5 w-3.5 items-center justify-center">
                           <Check size={12} />
                         </span>
                       )}
