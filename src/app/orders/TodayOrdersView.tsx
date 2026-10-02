@@ -599,7 +599,7 @@ export function TodayOrdersView({
   const [dispatchTarget, setDispatchTarget] = useState<AutoPickOrder | null>(null);
   const [expandedIds, setExpandedIds] = useState<string[]>([]);
   const [detailOrderId, setDetailOrderId] = useState<string | null>(null);
-  const [activeOrderGroup, setActiveOrderGroup] = useState("pending");
+  const [activeOrderGroup, setActiveOrderGroup] = useState("outbound");
   const orderGroupLayoutId = useId();
   const reduceMotion = useReducedMotion();
   const orderGroupTouchRef = useRef<{ x: number; y: number } | null>(null);
@@ -1452,7 +1452,6 @@ export function TodayOrdersView({
               transition={{ duration: 0.25 }}
               className="space-y-4"
             >
-              <p className="text-xs text-muted-foreground">按履约阶段分组；未出库、未回填请使用状态筛选。</p>
               <LayoutGroup id={orderGroupLayoutId}>
               <div role="tablist" aria-label="今日订单分组" className="flex gap-1 overflow-x-auto rounded-full border border-black/8 bg-white/76 p-1.5 dark:border-white/10 dark:bg-white/4">
                 {orderGroups.map((group, index) => (
