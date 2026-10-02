@@ -62,7 +62,9 @@ function extractShopNameFromNote(note: string | null | undefined) {
 }
 
 function extractOrderNoFromNote(note: string | null | undefined) {
-  const match = String(note || "").match(/平台单号[:：]\s*([^\s|]+)/);
+  const text = String(note || "");
+  const match = text.match(/(?:平台单号|订单号|单号)[:：]\s*([^\s|]+)/)
+    || text.match(/\[(?:平台单号|订单号|单号):([^\]]+)\]/);
   return String(match?.[1] || "").trim();
 }
 
@@ -312,6 +314,7 @@ export async function GET(request: NextRequest) {
 
     const rangeMode = request.nextUrl.searchParams.get("range");
     const shopName = (request.nextUrl.searchParams.get("shopName") || "").trim();
+    const platformFilter = (request.nextUrl.searchParams.get("platform") || "").trim();
     const settings = await prisma.systemSetting.findFirst({
       where: { userId: targetUserId },
     });
@@ -681,7 +684,12 @@ export async function GET(request: NextRequest) {
       const inDateRange = order.date >= startDate && order.date <= endDate;
       if (!inDateRange) return false;
       if (shopName) {
-        return isShopNameMatch(extractShopNameFromNote(order.note), shopName);
+        if (!isShopNameMatch(extractShopNameFromNote(order.note), shopName)) return false;
+      }
+      if (platformFilter) {
+        const noteMeta = parseOutboundNote(order.note);
+        const orderPlatform = normalizePlatform(noteMeta.platform || order.type);
+        if (orderPlatform !== platformFilter) return false;
       }
       return true;
     });
@@ -719,9 +727,11 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const filteredAutoPickOrdersInRange = shopName
-      ? autoPickOrdersInRange.filter((order) => resolveExistingMatchedShopName(order) === shopName)
-      : autoPickOrdersInRange;
+    const filteredAutoPickOrdersInRange = autoPickOrdersInRange.filter((order) => {
+      if (shopName && resolveExistingMatchedShopName(order) !== shopName) return false;
+      if (platformFilter && normalizePlatform(order.platform) !== platformFilter) return false;
+      return true;
+    });
 
     const pendingOrderCount = pendingOrders.length;
     const pendingInboundAmount = pendingOrders.reduce(
@@ -1615,8 +1625,43 @@ export async function GET(request: NextRequest) {
     };
 
     const salesOrderByOrderNo = new Map(
-      filteredAutoPickOrdersInRange.map((order) => [String(order.orderNo || "").trim(), order])
+      autoPickOrdersInRange.map((order) => [String(order.orderNo || "").trim(), order])
     );
+    const missingPlatformOrderNos = Array.from(new Set(
+      outboundOrdersInRange
+        .filter((o) => o.type === "Sale")
+        .map((o) => extractOrderNoFromNote(o.note))
+        .filter((no): no is string => Boolean(no && !salesOrderByOrderNo.has(no)))
+    ));
+
+    if (missingPlatformOrderNos.length > 0) {
+      const extraOrders = await prisma.autoPickOrder.findMany({
+        where: {
+          userId: targetUserId,
+          orderNo: { in: missingPlatformOrderNos },
+        },
+        select: {
+          id: true,
+          orderNo: true,
+          platform: true,
+          status: true,
+          orderTime: true,
+          shopId: true,
+          shopAddress: true,
+          rawPayload: true,
+          actualPaid: true,
+          delivery: true,
+          expectedIncome: true,
+          platformCommission: true,
+        },
+      });
+      extraOrders.forEach((order) => {
+        if (order.orderNo) {
+          salesOrderByOrderNo.set(String(order.orderNo).trim(), order as any);
+        }
+      });
+    }
+
     outboundOrdersInRange.forEach((outbound) => {
       if (outbound.type !== "Sale") return;
       const noteMeta = parseOutboundNote(outbound.note);

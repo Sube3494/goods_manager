@@ -1240,7 +1240,14 @@ export async function GET(request: NextRequest) {
 
     const baseWhereWithoutShop: Prisma.AutoPickOrderWhereInput = {
       userId: targetUserId,
-      ...(requestedOrderIds.length > 0 ? { id: { in: requestedOrderIds } } : {}),
+      ...(requestedOrderIds.length > 0
+        ? {
+            OR: [
+              { id: { in: requestedOrderIds } },
+              { orderNo: { in: requestedOrderIds } },
+            ],
+          }
+        : {}),
       ...(startDate || endDate ? {
         orderTime: {
           ...(startDate ? { gte: parseAsShanghaiTime(startDate) } : {}),

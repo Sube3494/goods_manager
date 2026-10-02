@@ -11,6 +11,7 @@ import {
   ChevronRight,
   CircleDollarSign,
   FileText,
+  LayoutGrid,
   Loader2,
   Megaphone,
   PackageOpen,
@@ -29,7 +30,7 @@ import {
   ResponsiveContainer,
   Tooltip,
 } from "recharts";
-import { DatePicker } from "@/components/ui/DatePicker";
+import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { Pagination } from "@/components/ui/Pagination";
 import { useToast } from "@/components/ui/Toast";
@@ -206,10 +207,10 @@ function Panel({
 export default function MarketingAnalysisPage() {
   const { showToast } = useToast();
   const today = format(new Date(), "yyyy-MM-dd");
-  const [preset, setPreset] = useState("30d");
   const [startDate, setStartDate] = useState(format(subDays(new Date(), 29), "yyyy-MM-dd"));
   const [endDate, setEndDate] = useState(today);
   const [shopName, setShopName] = useState("");
+  const [platform, setPlatform] = useState("");
   const [shops, setShops] = useState<Shop[]>([]);
   const [data, setData] = useState<StatsData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -238,6 +239,7 @@ export default function MarketingAnalysisPage() {
       try {
         const query = new URLSearchParams({ startDate, endDate });
         if (shopName) query.set("shopName", shopName);
+        if (platform) query.set("platform", platform);
         const response = await fetch(`/api/stats?${query.toString()}`, { cache: "no-store" });
         if (!response.ok) throw new Error("stats");
         setData(await response.json());
@@ -249,20 +251,14 @@ export default function MarketingAnalysisPage() {
         setLoading(false);
       }
     },
-    [endDate, shopName, showToast, startDate]
+    [endDate, platform, shopName, showToast, startDate]
   );
 
   useEffect(() => {
     loadData(true);
   }, [loadData]);
 
-  const applyPreset = (value: string) => {
-    setPreset(value);
-    if (value === "custom") return;
-    const days = Number(value.replace("d", ""));
-    setEndDate(today);
-    setStartDate(format(subDays(new Date(), days - 1), "yyyy-MM-dd"));
-  };
+
 
   const channelRows = useMemo(() => {
     return Object.entries(data?.platformBusinessTrend || {})
@@ -301,14 +297,18 @@ export default function MarketingAnalysisPage() {
   const productRows = useMemo(() => productSales?.items || [], [productSales]);
 
   const filteredProductRows = useMemo(() => {
+    let list = productRows;
+    if (platform) {
+      list = list.filter((item) => Number(item.platformQuantities?.[platform] || 0) > 0);
+    }
     const keyword = productSearch.trim().toLowerCase();
-    if (!keyword) return productRows;
-    return productRows.filter((item) =>
+    if (!keyword) return list;
+    return list.filter((item) =>
       [item.productName, item.sku, item.shopName, ...Object.keys(item.platformQuantities || {})].some((value) =>
         String(value || "").toLowerCase().includes(keyword)
       )
     );
-  }, [productRows, productSearch]);
+  }, [platform, productRows, productSearch]);
 
   const productTotalPages = Math.max(1, Math.ceil(filteredProductRows.length / productPageSize));
   const visibleProductRows = filteredProductRows.slice((productPage - 1) * productPageSize, productPage * productPageSize);
@@ -316,7 +316,7 @@ export default function MarketingAnalysisPage() {
   useEffect(() => {
     setProductPage(1);
     setSelectedProduct(null);
-  }, [startDate, endDate, shopName, productSearch]);
+  }, [startDate, endDate, shopName, platform, productSearch]);
 
   useEffect(() => {
     if (productPage > productTotalPages) setProductPage(productTotalPages);
@@ -330,15 +330,21 @@ export default function MarketingAnalysisPage() {
       setRelatedOrderPlatform("");
       return;
     }
-    const orderIds = Array.from(new Set(selectedProduct.orders.map((order) => order.id).filter(Boolean)));
+    const orderKeys = Array.from(new Set(
+      selectedProduct.orders
+        .map((order) => order.id || order.orderNo)
+        .filter(Boolean)
+        .filter((key) => !String(key).startsWith("outbound:"))
+    ));
     let cancelled = false;
     setRelatedOrdersLoading(true);
     setRelatedOrdersError("");
     setExpandedRelatedOrderIds([]);
     Promise.all(
-      Array.from({ length: Math.ceil(orderIds.length / 100) }, (_, index) => {
-        const ids = orderIds.slice(index * 100, (index + 1) * 100);
-        return fetch(`/api/orders?ids=${encodeURIComponent(ids.join(","))}&pageSize=${ids.length}&_lite=1&_marketing=1`, { cache: "no-store" }).then(
+      Array.from({ length: Math.max(1, Math.ceil(orderKeys.length / 100)) }, (_, index) => {
+        const keys = orderKeys.slice(index * 100, (index + 1) * 100);
+        if (keys.length === 0) return Promise.resolve([]);
+        return fetch(`/api/orders?ids=${encodeURIComponent(keys.join(","))}&pageSize=${keys.length}&_lite=1&_marketing=1`, { cache: "no-store" }).then(
           async (response) => {
             const result = await response.json().catch(() => null);
             if (!response.ok) throw new Error(result?.error || "读取关联订单失败");
@@ -370,6 +376,15 @@ export default function MarketingAnalysisPage() {
   const visibleRelatedOrders = useMemo(() => relatedOrderPlatform
     ? relatedOrders.filter((order) => order.platform === relatedOrderPlatform)
     : relatedOrders, [relatedOrderPlatform, relatedOrders]);
+
+  const unlinkedOutbounds = useMemo(() => {
+    if (!selectedProduct) return [];
+    const matchedOrderNos = new Set(relatedOrders.map((o) => o.orderNo).filter(Boolean));
+    const matchedOrderIds = new Set(relatedOrders.map((o) => o.id).filter(Boolean));
+    return selectedProduct.orders.filter(
+      (o) => (!o.orderNo || !matchedOrderNos.has(o.orderNo)) && (!o.id || !matchedOrderIds.has(o.id))
+    );
+  }, [selectedProduct, relatedOrders]);
 
   useEffect(() => {
     if (!selectedProduct) {
@@ -407,111 +422,77 @@ export default function MarketingAnalysisPage() {
                   <h1 className="text-base font-black tracking-tight text-foreground sm:text-2xl">营销分析</h1>
                   <div className="hidden sm:flex items-center gap-1.5 rounded-full border border-black/6 bg-black/3 px-2 py-0.5 text-[11px] font-medium text-muted-foreground dark:border-white/8 dark:bg-white/5">
                     <span className={cn("h-1.5 w-1.5 rounded-full", loading ? "animate-pulse bg-amber-500" : "bg-emerald-500")} />
-                    <span>{loading ? "同步中..." : lastUpdated ? `更新于 ${format(lastUpdated, "HH:mm")}` : "等待数据"}</span>
+                    <span>{loading ? "加载中..." : lastUpdated ? `更新于 ${format(lastUpdated, "HH:mm")}` : "等待数据"}</span>
                   </div>
                 </div>
                 <p className="hidden sm:block mt-0.5 truncate text-xs text-muted-foreground sm:text-sm">商品销量走势、各平台投放转化与客户复购全景洞察</p>
                 <div className="sm:hidden flex items-center gap-1.5 text-[11px] text-muted-foreground">
                   <span className={cn("h-1.5 w-1.5 rounded-full", loading ? "animate-pulse bg-amber-500" : "bg-emerald-500")} />
-                  <span>{loading ? "同步中..." : lastUpdated ? `${format(lastUpdated, "HH:mm")} 更新` : "等待数据"}</span>
+                  <span>{loading ? "加载中..." : lastUpdated ? `${format(lastUpdated, "HH:mm")} 更新` : "等待数据"}</span>
                 </div>
               </div>
             </div>
 
-            {/* 移动端紧凑圆纽刷新按钮 */}
-            <button
-              onClick={() => loadData(false)}
-              disabled={loading}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-black/8 bg-white/80 text-foreground shadow-2xs transition-all hover:bg-black/4 active:scale-95 disabled:opacity-60 dark:border-white/10 dark:bg-white/5 2xl:hidden"
-              title="刷新数据"
-            >
-              <RefreshCw size={14} className={loading ? "animate-spin text-primary" : ""} />
-            </button>
+            {/* 头部右侧操作：刷新分析数据 */}
+            <div className="flex shrink-0 items-center">
+              <button
+                type="button"
+                onClick={() => loadData(false)}
+                disabled={loading}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-black/8 bg-white/80 text-foreground shadow-2xs transition-all hover:bg-black/4 active:scale-95 disabled:opacity-60 dark:border-white/10 dark:bg-white/5"
+                title="刷新营销数据"
+              >
+                <RefreshCw size={14} className={loading ? "animate-spin text-primary" : ""} />
+              </button>
+            </div>
           </div>
 
-          {/* 全局筛选工具条：移动端流式规整排列，桌面端水平展开 */}
-          <div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-[auto_9.5rem_minmax(17rem,1fr)] sm:items-center 2xl:flex 2xl:shrink-0">
-            {/* 快捷周期切换胶囊：移动端全宽 3 等分 */}
-            <div className="grid grid-cols-3 sm:flex h-9 items-center rounded-full border border-black/8 bg-white/80 p-0.5 shadow-2xs dark:border-white/10 dark:bg-white/5" aria-label="快捷周期">
-              {[
-                { value: "7d", label: "7天" },
-                { value: "30d", label: "30天" },
-                { value: "90d", label: "90天" },
-              ].map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => applyPreset(option.value)}
-                  className={cn(
-                    "flex items-center justify-center rounded-full px-3 py-1 text-xs font-bold transition-all duration-150",
-                    preset === option.value
-                      ? "bg-foreground text-background shadow-xs"
-                      : "text-muted-foreground hover:text-foreground hover:bg-black/3 dark:hover:bg-white/5"
-                  )}
-                >
-                  {option.label}
-                </button>
-              ))}
+          {/* 全局筛选工具条：日期按钮 + 店铺筛选 + 平台筛选 */}
+          <div className="grid min-w-0 grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:items-center 2xl:flex-nowrap 2xl:shrink-0">
+            {/* 一体式日期范围选择器按钮 */}
+            <DateRangePicker
+              startDate={startDate}
+              endDate={endDate}
+              onChange={({ startDate: nextStart, endDate: nextEnd }) => {
+                setStartDate(nextStart);
+                setEndDate(nextEnd);
+              }}
+              maxDate={today}
+              includeToday={true}
+              className="h-9 min-w-0 w-full sm:w-auto"
+              triggerClassName="h-9 w-full sm:w-auto rounded-full border-black/8 bg-white/80 px-3.5 text-xs shadow-2xs dark:border-white/10 dark:bg-white/5"
+            />
+
+            {/* 店铺筛选下拉框 */}
+            <div className="relative min-w-0 sm:w-44">
+              <Store size={13} className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-muted-foreground" />
+              <CustomSelect
+                value={shopName}
+                onChange={setShopName}
+                options={[{ value: "", label: "全部店铺" }, ...shops.map((shop) => ({ value: shop.name, label: shop.name }))]}
+                className="h-9 w-full"
+                triggerClassName="h-9 rounded-full border-black/8 bg-white/80 pl-8 pr-3 text-xs shadow-2xs dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8"
+              />
             </div>
 
-            {/* 移动端两列并排：店铺筛选 + 日期范围 */}
-            <div className="grid min-w-0 grid-cols-1 gap-2 sm:contents">
-              {/* 店铺筛选下拉框 */}
-              <div className="relative min-w-0">
-                <Store size={13} className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-muted-foreground" />
-                <CustomSelect
-                  value={shopName}
-                  onChange={setShopName}
-                  options={[{ value: "", label: "全部店铺" }, ...shops.map((shop) => ({ value: shop.name, label: shop.name }))]}
-                  className="h-9 w-full"
-                  triggerClassName="h-9 rounded-full border-black/8 bg-white/80 pl-8 pr-3 text-xs shadow-2xs dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8"
-                />
-              </div>
-
-              {/* 日期选择器胶囊：无多余✕，不截断 */}
-              <div className="flex h-9 items-center rounded-full border border-black/8 bg-white/80 px-2 shadow-2xs dark:border-white/10 dark:bg-white/5 min-w-0" aria-label="日期范围">
-                <CalendarDays size={13} className="shrink-0 text-muted-foreground ml-0.5" />
-                <DatePicker
-                  value={startDate}
-                  onChange={(value) => {
-                    setPreset("custom");
-                    setStartDate(value);
-                  }}
-                  maxDate={endDate}
-                  isCompact
-                  showClear={false}
-                  className="min-w-0 flex-1"
-                  triggerClassName="h-7 border-0 bg-transparent px-1 text-xs shadow-none font-medium dark:bg-transparent"
-                />
-                <span className="text-[10px] text-muted-foreground/60 shrink-0">—</span>
-                <DatePicker
-                  value={endDate}
-                  onChange={(value) => {
-                    setPreset("custom");
-                    setEndDate(value);
-                  }}
-                  minDate={startDate}
-                  maxDate={today}
-                  isCompact
-                  showClear={false}
-                  className="min-w-0 flex-1"
-                  triggerClassName="h-7 border-0 bg-transparent px-1 text-xs shadow-none font-medium dark:bg-transparent"
-                />
-                {preset === "custom" ? (
-                  <span className="ml-1 hidden sm:inline-block rounded-full bg-primary/10 px-1.5 py-0.2 text-[9px] font-bold text-primary shrink-0">自定义</span>
-                ) : null}
-              </div>
+            {/* 平台筛选下拉框 */}
+            <div className="relative min-w-0 sm:w-36">
+              <LayoutGrid size={13} className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-muted-foreground" />
+              <CustomSelect
+                value={platform}
+                onChange={setPlatform}
+                options={[
+                  { value: "", label: "全部平台" },
+                  { value: "美团", label: "美团" },
+                  { value: "京东", label: "京东" },
+                  { value: "淘宝", label: "淘宝" },
+                  { value: "抖店", label: "抖店" },
+                  { value: "线下交易", label: "线下交易" },
+                ]}
+                className="h-9 w-full"
+                triggerClassName="h-9 rounded-full border-black/8 bg-white/80 pl-8 pr-3 text-xs shadow-2xs dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8"
+              />
             </div>
-
-            {/* 桌面端刷新按钮 */}
-            <button
-              onClick={() => loadData(false)}
-              disabled={loading}
-              className="hidden h-9 items-center justify-center gap-1.5 rounded-full border border-black/8 bg-white/80 px-4 text-xs font-bold text-foreground shadow-2xs transition-all duration-150 hover:bg-black/4 active:scale-95 disabled:opacity-60 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8 2xl:inline-flex"
-            >
-              <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
-              <span>刷新</span>
-            </button>
           </div>
         </div>
       </div>
@@ -1047,6 +1028,32 @@ export default function MarketingAnalysisPage() {
                           {relatedOrderPlatform ? `当前商品没有 ${relatedOrderPlatform} 订单` : "暂无可读取的关联订单记录"}
                         </div>
                       )}
+
+                      {/* 线下/手工出库记录（未关联平台单号的销售出库） */}
+                      {unlinkedOutbounds.length > 0 && !relatedOrderPlatform ? (
+                        <div className="mt-4 rounded-[20px] border border-black/8 bg-white/70 p-4 dark:border-white/10 dark:bg-white/5">
+                          <div className="mb-2.5 flex items-center gap-1.5 text-xs font-bold text-foreground">
+                            <PackageOpen size={14} className="text-amber-500" />
+                            <span>其他销售出库记录（{unlinkedOutbounds.length} 笔）</span>
+                          </div>
+                          <div className="divide-y divide-black/5 dark:divide-white/5 text-xs">
+                            {unlinkedOutbounds.map((item, idx) => (
+                              <div key={idx} className="flex items-center justify-between py-2 text-muted-foreground">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-mono text-[11px] font-bold text-foreground">{item.orderNo}</span>
+                                  <span>·</span>
+                                  <span>{item.shopName}</span>
+                                  <span>·</span>
+                                  <span>{item.date}</span>
+                                </div>
+                                <div className="font-bold text-foreground">
+                                  出库 {integer(item.quantity)} 件
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
                     </div>
                   </motion.div>
                 </div>
