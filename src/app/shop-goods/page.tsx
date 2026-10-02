@@ -2689,11 +2689,12 @@ export default function ShopGoodsPage() {
                 if (availableStock <= 0) return [];
 
                 return [{
-                  label: "调拨到其他店",
+                  label: "调拨",
                   icon: <ArrowRightLeft size={16} />,
                   onClick: () => {
                     handleOpenTransferModal(rawTarget);
                   },
+                  title: "跨门店调拨库存",
                 }];
               })()
             : []),

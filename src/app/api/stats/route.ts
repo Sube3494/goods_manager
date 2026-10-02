@@ -1548,29 +1548,53 @@ export async function GET(request: NextRequest) {
       status?: string | null;
       actualPaid: number;
     }) => {
-      const productName = String(input.productName || "").trim();
-      const shopProductId = String(input.shopProductId || "").trim() || null;
-      const productId = String(input.productId || "").trim() || null;
-      const shopName = String(input.shopName || "").trim() || "未匹配店铺";
-      const sku = String(input.sku || "").trim() || null;
+      let productName = String(input.productName || "").trim();
+      let shopProductId = String(input.shopProductId || "").trim() || null;
+      let productId = String(input.productId || "").trim() || null;
+      let shopName = String(input.shopName || "").trim() || "未匹配店铺";
+      let sku = String(input.sku || "").trim() || null;
       const quantity = Math.max(1, Number(input.quantity || 1) || 1);
       if (!productName || productName === "手工配送占位商品" || sku === "__manual_delivery_placeholder__") return;
-      const key = shopProductId
-        ? `shop-product:${shopProductId}`
-        : `fallback:${shopName}::${sku || ""}::${productName}`;
+
+      // 尝试在当前用户店铺商品中寻找规范商品（支持按 id、按 shop+sku、按 shop+name 关联）
+      const matchedShopProduct = (shopProductId ? shopProductRows.find((sp) => sp.id === shopProductId) : null)
+        || (sku ? shopProductRows.find((sp) => isShopNameMatch(sp.shop?.name, shopName) && sp.sku && sp.sku.trim().toUpperCase() === sku?.trim().toUpperCase()) : null)
+        || shopProductRows.find((sp) => isShopNameMatch(sp.shop?.name, shopName) && sp.productName && sp.productName.trim() === productName)
+        || null;
+
+      if (matchedShopProduct) {
+        shopProductId = matchedShopProduct.id;
+        productId = matchedShopProduct.productId || productId;
+        productName = String(matchedShopProduct.productName || productName).trim();
+        sku = String(matchedShopProduct.sku || sku || "").trim() || null;
+        shopName = String(matchedShopProduct.shop?.name || shopName).trim();
+      }
+
+      // 核心业务 Key：同一个店铺 + 同一个店内码 + 同一个商品名称，确保同一个门店商品归集到唯一记录
+      const normalizedSku = sku ? sku.toUpperCase() : "";
+      const key = `shop-product:${shopName}::${normalizedSku}::${productName}`;
+
       const current = productSalesMap.get(key) || {
         shopProductId,
         productId,
         shopName,
         productName,
         sku,
-        image: input.image || null,
+        image: input.image || matchedShopProduct?.productImage || matchedShopProduct?.product?.image || null,
         quantity: 0,
         orderNos: new Set<string>(),
         platformQuantities: {} as Record<string, number>,
         orders: new Map(),
       };
-      if (!current.image && input.image) current.image = input.image;
+      if (!current.image && (input.image || matchedShopProduct?.productImage || matchedShopProduct?.product?.image)) {
+        current.image = input.image || matchedShopProduct?.productImage || matchedShopProduct?.product?.image || null;
+      }
+      if (!current.shopProductId && shopProductId) {
+        current.shopProductId = shopProductId;
+      }
+      if (!current.productId && productId) {
+        current.productId = productId;
+      }
       current.quantity += quantity;
       current.orderNos.add(input.orderNo);
       current.platformQuantities[input.platform] = (current.platformQuantities[input.platform] || 0) + quantity;
@@ -1614,6 +1638,7 @@ export async function GET(request: NextRequest) {
         if (netQuantity <= 0) return;
         const productName = String(item.shopProduct?.productName || item.product?.name || "").trim();
         if (!productName || productName === "手工配送占位商品") return;
+        const itemShopName = String(item.shopProduct?.shop?.name || resolvedOrderShopName).trim();
         addProductSale({
           shopProductId: item.shopProduct?.id || null,
           productId: item.product?.id || item.shopProduct?.productId || null,
@@ -1625,7 +1650,7 @@ export async function GET(request: NextRequest) {
           orderId: salesOrder?.id || "",
           platform,
           dateKey,
-          shopName: resolvedOrderShopName,
+          shopName: itemShopName,
           status: salesOrder?.status || outbound.status,
           actualPaid: actualPaidYuan,
         });
@@ -1634,19 +1659,18 @@ export async function GET(request: NextRequest) {
 
     const productSalesItems = Array.from(productSalesMap.values())
       .map((item) => {
-        const stockRow = item.shopProductId
-          ? shopProductRows.find((product) => product.id === item.shopProductId) || null
-          : shopProductRows.find((product) => (
-              isShopNameMatch(product.shop?.name, item.shopName)
-              && ((item.sku && product.sku && item.sku === product.sku) || product.productName === item.productName)
-            )) || null;
+        const stockRow = (item.shopProductId ? shopProductRows.find((product) => product.id === item.shopProductId) : null)
+          || (item.sku ? shopProductRows.find((product) => isShopNameMatch(product.shop?.name, item.shopName) && product.sku && product.sku.trim().toUpperCase() === item.sku?.trim().toUpperCase()) : null)
+          || shopProductRows.find((product) => isShopNameMatch(product.shop?.name, item.shopName) && product.productName && product.productName.trim() === item.productName)
+          || null;
+        const resolvedImage = item.image || stockRow?.productImage || stockRow?.product?.image;
         return {
-          shopProductId: item.shopProductId,
-          productId: item.productId,
+          shopProductId: item.shopProductId || stockRow?.id || null,
+          productId: item.productId || stockRow?.productId || null,
           shopName: item.shopName,
           productName: item.productName,
-          sku: item.sku,
-          image: item.image ? storage.resolveUrl(item.image) : null,
+          sku: item.sku || stockRow?.sku || null,
+          image: resolvedImage ? storage.resolveUrl(resolvedImage) : null,
           quantity: item.quantity,
           orderCount: item.orderNos.size,
           stock: stockRow ? Number(stockRow.stock || 0) : null,

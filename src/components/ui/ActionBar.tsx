@@ -44,7 +44,7 @@ export function ActionBar({
           transition={{ type: "spring", stiffness: 400, damping: 30 }}
           className="fixed bottom-4 lg:bottom-10 z-50000 pointer-events-none w-[calc(100%-1rem)] sm:w-fit sm:max-w-[calc(100%-2rem)] left-1/2 lg:left-[calc(50%+(var(--sidebar-width,0)/2))] will-change-transform"
         >
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 pl-3.5 pr-2.5 py-2 sm:flex-nowrap sm:justify-start sm:gap-4 sm:pl-4 sm:pr-3 sm:h-12 sm:py-0 rounded-[24px] sm:rounded-full glass-panel shadow-[0_32px_64px_-16px_rgba(0,0,0,0.5)] pointer-events-auto">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 pl-3.5 pr-3 py-2 sm:flex-nowrap sm:justify-start sm:gap-4 sm:pl-4.5 sm:pr-4 sm:h-12 sm:py-0 rounded-[24px] sm:rounded-full overflow-hidden glass-panel shadow-[0_32px_64px_-16px_rgba(0,0,0,0.5)] pointer-events-auto">
 
             {/* Select All Checkbox - Minimal on mobile */}
             <button 
@@ -65,7 +65,7 @@ export function ActionBar({
             </div>
 
             {/* Actions */}
-            <div className="flex w-auto items-center gap-2 sm:w-auto sm:gap-2.5">
+            <div className="flex w-auto items-center gap-2 sm:w-auto sm:gap-2.5 shrink-0">
               {onEdit && (
                 <button
                   onClick={onEdit}
@@ -102,14 +102,14 @@ export function ActionBar({
                 </button>
               ))}
               
-              <div className="hidden sm:block w-px h-5 bg-black/10 dark:bg-white/10 mx-0.5" />
+              <div className="hidden sm:block w-px h-4.5 bg-black/10 dark:bg-white/10 mx-0.5 shrink-0" />
 
               <button 
                 onClick={onClear}
                 title="取消选择"
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10 transition-all outline-none"
+                className="flex h-7 w-7 sm:h-7.5 sm:w-7.5 shrink-0 items-center justify-center rounded-full text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10 transition-all outline-none active:scale-95"
               >
-                <X size={18} />
+                <X size={15} />
               </button>
             </div>
           </div>
