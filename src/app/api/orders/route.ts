@@ -2823,40 +2823,57 @@ export async function GET(request: NextRequest) {
             : null;
 
           let isReallyManual = true;
-          let resolvedMatchMethod: "manual" | "id" | "sku" | "outbound" = "manual";
+          let resolvedMatchMethod: "manual" | "id" | "sku" | "outbound" | undefined = "manual";
+
+          const isManualUnmatched = Boolean(
+            manualMatchedProduct && (
+              (manualMatchedProduct as any).isUnmatched === true
+              || (!manualMatchedProduct.productId && (!manualMatchedProduct.shopProductId || manualMatchedProduct.shopProductId === item.id))
+            )
+          );
 
           if (manualMatchedProduct) {
-            const manualTargetId = String(manualMatchedProduct.shopProductId || manualMatchedProduct.id || "").trim();
-            const manualTargetSku = String(manualMatchedProduct.sku || "").trim().toLowerCase();
+            if (isManualUnmatched) {
+              isReallyManual = false;
+              resolvedMatchMethod = undefined;
+            } else {
+              const manualTargetId = String(manualMatchedProduct.shopProductId || manualMatchedProduct.id || "").trim();
+              const manualTargetSku = String(manualMatchedProduct.sku || "").trim().toLowerCase();
 
-            // 1. 如果主商品匹配上了平台的平台商品ID (platformStrictMatch)，即便配置了配件/礼袋，主商品依然是ID匹配
-            if (platformStrictMatch && (
-              platformStrictMatch.id === manualTargetId
-              || (manualTargetSku && String(platformStrictMatch.sku || "").trim().toLowerCase() === manualTargetSku)
-            )) {
-              isReallyManual = false;
-              resolvedMatchMethod = "id";
-            }
-            // 2. 如果主商品匹配上了店内编码 (fallbackStrictMatches[0])
-            else if (fallbackStrictMatches[0] && (
-              fallbackStrictMatches[0].id === manualTargetId
-              || (manualTargetSku && String(fallbackStrictMatches[0].sku || "").trim().toLowerCase() === manualTargetSku)
-            )) {
-              isReallyManual = false;
-              resolvedMatchMethod = "sku";
-            }
-            // 3. 如果 manualMatchedProduct 自身显式标明非手工或记录了特定匹配方式
-            else if (
-              manualMatchedProduct.isManual === false
-              && (manualMatchedProduct.matchMethod === "id" || manualMatchedProduct.matchMethod === "sku")
-            ) {
-              isReallyManual = false;
-              resolvedMatchMethod = manualMatchedProduct.matchMethod;
+              // 1. 如果主商品匹配上了平台的平台商品ID (platformStrictMatch)，即便配置了配件/礼袋，主商品依然是ID匹配
+              if (platformStrictMatch && (
+                platformStrictMatch.id === manualTargetId
+                || (manualTargetSku && String(platformStrictMatch.sku || "").trim().toLowerCase() === manualTargetSku)
+              )) {
+                isReallyManual = false;
+                resolvedMatchMethod = "id";
+              }
+              // 2. 如果主商品匹配上了店内编码 (fallbackStrictMatches[0])
+              else if (fallbackStrictMatches[0] && (
+                fallbackStrictMatches[0].id === manualTargetId
+                || (manualTargetSku && String(fallbackStrictMatches[0].sku || "").trim().toLowerCase() === manualTargetSku)
+              )) {
+                isReallyManual = false;
+                resolvedMatchMethod = "sku";
+              }
+              // 3. 如果 manualMatchedProduct 自身显式标明非手工或记录了特定匹配方式
+              else if (
+                manualMatchedProduct.isManual === false
+                && (manualMatchedProduct.matchMethod === "id" || manualMatchedProduct.matchMethod === "sku")
+              ) {
+                isReallyManual = false;
+                resolvedMatchMethod = manualMatchedProduct.matchMethod;
+              }
             }
           }
 
           const matchedProduct = manualMatchedProduct
-            ? { ...manualMatchedProduct, isManual: isReallyManual, matchMethod: resolvedMatchMethod }
+            ? {
+                ...manualMatchedProduct,
+                isUnmatched: isManualUnmatched ? true : (manualMatchedProduct as any).isUnmatched,
+                isManual: isReallyManual,
+                matchMethod: isManualUnmatched ? undefined : resolvedMatchMethod,
+              }
             : platformStrictMatch
             ? { ...platformStrictMatch, isManual: false, matchMethod: "id" as const }
             : (hasStrictMatchForAllSegments && fallbackStrictMatches[0]

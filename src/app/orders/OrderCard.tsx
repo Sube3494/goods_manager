@@ -611,7 +611,10 @@ export function getAutoOutboundRecoveryTargetItem(order: Pick<AutoPickOrder, "it
     const isIgnored = rawPayload.ignoreOutbound === true
       || rawPayload.isManualIgnored === true
       || (item.matchedProduct as (AutoPickOrderItem["matchedProduct"] & { ignoreOutbound?: boolean }))?.ignoreOutbound === true;
-    return !isIgnored && !item.matchedProduct;
+    const isUnmatched = !item.matchedProduct
+      || (item.matchedProduct as any).isUnmatched === true
+      || (!item.matchedProduct.productId && (!item.matchedProduct.shopProductId || item.matchedProduct.shopProductId === item.id));
+    return !isIgnored && isUnmatched;
   });
 
   return unmatchedItems.find((item) => (
@@ -2259,7 +2262,11 @@ export function ProductStripItem({
         className: "bg-slate-500/10 text-slate-700 dark:text-slate-400",
       };
     }
-    if (!matchedProduct) {
+    const isUnmatched = !matchedProduct
+      || (matchedProduct as any).isUnmatched === true
+      || (!matchedProduct.productId && !matchedProduct.shopProductId);
+
+    if (isUnmatched) {
       return {
         text: display.optionalMatch ? "可选" : "未匹配",
         className: "bg-rose-500/10 text-rose-700 dark:text-rose-400",
@@ -2295,9 +2302,15 @@ export function ProductStripItem({
         className: "bg-sky-500/10 text-sky-700 dark:text-sky-400",
       };
     }
+    if (matchedProduct.shopProductId) {
+      return {
+        text: "ID匹配",
+        className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+      };
+    }
     return {
-      text: "ID匹配",
-      className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+      text: "未匹配",
+      className: "bg-rose-500/10 text-rose-700 dark:text-rose-400",
     };
   })();
 

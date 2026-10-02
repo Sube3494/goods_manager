@@ -16,6 +16,7 @@ import {
   unbindTaobaoSkuIdForShopProduct,
 } from "@/lib/autoPickOrders";
 import { returnOutboundOrderById } from "@/lib/outboundReturns";
+import { readShopIdFromRawPayload } from "@/lib/shopCommission";
 
 function readRawPayloadRecord(rawPayload: unknown) {
   return rawPayload && typeof rawPayload === "object" && !Array.isArray(rawPayload)
@@ -390,6 +391,7 @@ export async function PATCH(
             platform: true,
             rawPayload: true,
             userId: true,
+            shopId: true,
           },
         },
       },
@@ -400,6 +402,23 @@ export async function PATCH(
     }
 
     const targetUserId = orderItem.order.userId || user.id;
+    const orderExternalShopId = orderItem.order.shopId || readShopIdFromRawPayload(orderItem.order.rawPayload);
+    let orderMatchedShopId: string | undefined = undefined;
+    if (orderExternalShopId) {
+      const localShop = await prisma.shop.findFirst({
+        where: {
+          userId: targetUserId,
+          OR: [
+            { id: orderExternalShopId },
+            { externalId: orderExternalShopId },
+          ],
+        },
+        select: { id: true },
+      });
+      if (localShop) {
+        orderMatchedShopId = localShop.id;
+      }
+    }
     let needsOutboundRebuild = false;
     const rebuildOutbound = async () => {
       if (!needsOutboundRebuild) {
@@ -576,9 +595,9 @@ export async function PATCH(
 
       if (!mainProduct || (!hasManualBundleConfig && existingBundleItems.length === 0)) {
         const targetShopProductId = mainProduct?.shopProductId || mainProduct?.id;
-        const matchedCandidate = await prisma.shopProduct.findFirst({
+        const matchedCandidate = orderMatchedShopId ? await prisma.shopProduct.findFirst({
           where: {
-            shop: { userId: targetUserId },
+            shopId: orderMatchedShopId,
             OR: [
               ...(targetShopProductId ? [{ id: targetShopProductId }, { productId: targetShopProductId }] : []),
               ...(orderItem.platformSkuId ? [
@@ -597,7 +616,7 @@ export async function PATCH(
             shop: true,
           },
           orderBy: { updatedAt: "desc" },
-        });
+        }) : null;
 
         if (matchedCandidate) {
           if (!mainProduct) {
@@ -652,8 +671,11 @@ export async function PATCH(
           sku: orderItem.productNo || null,
           image: orderItem.thumb ? storage.resolveUrl(orderItem.thumb) : null,
           sourceType: "shopProduct",
-          shopProductId: orderItem.id,
+          shopProductId: "",
           shopName: null,
+          isManual: false,
+          isUnmatched: true,
+          matchMethod: undefined,
         };
       }
 
@@ -667,10 +689,19 @@ export async function PATCH(
         nextBundleItems.splice(removeComponentIndex, 1);
       }
 
-      const nextIsManual = typeof mainProduct.isManual === "boolean" ? mainProduct.isManual : false;
-      const nextMatchMethod = mainProduct.matchMethod || (nextIsManual ? "manual" : "id");
+      const isMainProductUnmatched = Boolean(
+        mainProduct?.isUnmatched
+        || (!mainProduct?.productId && (!mainProduct?.shopProductId || mainProduct?.shopProductId === orderItem.id))
+      );
+      const nextIsManual = isMainProductUnmatched
+        ? false
+        : (typeof mainProduct.isManual === "boolean" ? mainProduct.isManual : true);
+      const nextMatchMethod = isMainProductUnmatched
+        ? undefined
+        : (mainProduct.matchMethod || (nextIsManual ? "manual" : "id"));
       const updatedMatchedProduct = {
         ...mainProduct,
+        isUnmatched: isMainProductUnmatched,
         isManual: nextIsManual,
         matchMethod: nextMatchMethod,
         isBundle: nextBundleItems.length > 0,
@@ -761,11 +792,20 @@ export async function PATCH(
         nextBundleItems.push(newComponent);
       }
 
-      const nextIsManual = typeof mainProduct.isManual === "boolean" ? mainProduct.isManual : false;
-      const nextMatchMethod = mainProduct.matchMethod || (nextIsManual ? "manual" : "id");
+      const isMainProductUnmatched = Boolean(
+        mainProduct?.isUnmatched
+        || (!mainProduct?.productId && (!mainProduct?.shopProductId || mainProduct?.shopProductId === orderItem.id))
+      );
+      const nextIsManual = isMainProductUnmatched
+        ? false
+        : (typeof mainProduct.isManual === "boolean" ? mainProduct.isManual : true);
+      const nextMatchMethod = isMainProductUnmatched
+        ? undefined
+        : (mainProduct.matchMethod || (nextIsManual ? "manual" : "id"));
 
       const updatedMatchedProduct = {
         ...mainProduct,
+        isUnmatched: isMainProductUnmatched,
         isManual: nextIsManual,
         matchMethod: nextMatchMethod,
         isBundle: true,
