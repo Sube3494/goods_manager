@@ -56,6 +56,17 @@ function buildDateSeries(start: Date, end: Date) {
   return list;
 }
 
+function normalizePlatform(value: string | null | undefined): string {
+  const raw = String(value || "").trim();
+  const lower = raw.toLowerCase();
+  if (!raw) return "线下交易";
+  if (raw.includes("美团") || lower.includes("meituan") || lower === "shangou") return "美团";
+  if (raw.includes("京东") || lower.includes("jd") || lower === "daojia") return "京东";
+  if (raw.includes("淘宝") || raw.includes("天猫") || lower === "taobao" || lower === "ebai") return "淘宝";
+  if (raw.includes("抖店") || raw.includes("抖音") || lower === "doudian" || lower === "douyin") return "抖店";
+  return "线下交易";
+}
+
 function extractShopNameFromNote(note: string | null | undefined) {
   const match = String(note || "").match(/\[店铺:([^\]]+)\]/);
   return String(match?.[1] || "").trim();
@@ -323,7 +334,7 @@ export async function GET(request: NextRequest) {
     const endDateKey = (request.nextUrl.searchParams.get("endDate") || formatDateKey(new Date())).trim();
     let startDateKey = (request.nextUrl.searchParams.get("startDate") || "").trim();
     if (!startDateKey) {
-      const defaultStart = new Date(parseAsShanghaiTime(endDateKey).getTime() - 29 * SHANGHAI_DAY_MS);
+      const defaultStart = new Date(parseAsShanghaiTime(endDateKey).getTime() - 6 * SHANGHAI_DAY_MS);
       startDateKey = formatDateKey(defaultStart);
     }
 
@@ -680,6 +691,10 @@ export async function GET(request: NextRequest) {
     ]);
     perf.lap("all-core-queries");
 
+    const autoPickPlatformByOrderNo = new Map(
+      autoPickOrdersInRange.map((order) => [String(order.orderNo || "").trim(), normalizePlatform(order.platform)])
+    );
+
     const outboundOrdersInRange = allOutboundOrders.filter((order) => {
       const inDateRange = order.date >= startDate && order.date <= endDate;
       if (!inDateRange) return false;
@@ -687,8 +702,10 @@ export async function GET(request: NextRequest) {
         if (!isShopNameMatch(extractShopNameFromNote(order.note), shopName)) return false;
       }
       if (platformFilter) {
+        const platformOrderNo = extractOrderNoFromNote(order.note);
+        const matchedAutoPickPlatform = platformOrderNo ? autoPickPlatformByOrderNo.get(platformOrderNo) : null;
         const noteMeta = parseOutboundNote(order.note);
-        const orderPlatform = normalizePlatform(noteMeta.platform || order.type);
+        const orderPlatform = matchedAutoPickPlatform || normalizePlatform(noteMeta.platform || order.type);
         if (orderPlatform !== platformFilter) return false;
       }
       return true;
@@ -1016,17 +1033,6 @@ export async function GET(request: NextRequest) {
         .reduce((sum, bill) => FinanceMath.add(sum, getDailyUtilityCost(bill)), 0);
       point.operatingExpense = operatingExpense;
     });
-
-    const normalizePlatform = (value: string | null | undefined) => {
-      const raw = String(value || "").trim();
-      const lower = raw.toLowerCase();
-      if (!raw) return "线下交易";
-      if (raw.includes("美团") || lower.includes("meituan") || lower === "shangou") return "美团";
-      if (raw.includes("京东") || lower.includes("jd") || lower === "daojia") return "京东";
-      if (raw.includes("淘宝") || raw.includes("天猫") || lower === "taobao" || lower === "ebai") return "淘宝";
-      if (raw.includes("抖店") || raw.includes("抖音") || lower === "doudian" || lower === "douyin") return "抖店";
-      return "线下交易";
-    };
 
     const platformBuckets = new Map<string, { trueOrderCount: number; brushOrderCount: number }>();
     const platformTrendMaps = new Map<string, Map<string, ReturnType<typeof createTrendBucket>>>();

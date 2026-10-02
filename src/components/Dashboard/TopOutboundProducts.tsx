@@ -26,7 +26,7 @@ const TIME_RANGE_OPTIONS: { key: TopTimeRange; label: string }[] = [
 
 export function TopOutboundProducts() {
   const [items, setItems] = useState<TopOutboundProduct[]>([]);
-  const [timeRange, setTimeRange] = useState<TopTimeRange>("30d");
+  const [timeRange, setTimeRange] = useState<TopTimeRange>("7d");
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {

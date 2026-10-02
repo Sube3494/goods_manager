@@ -63,7 +63,7 @@ export function DashboardFeedPanel({
 }: Props) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabKey>("top");
-  const [topTimeRange, setTopTimeRange] = useState<TopTimeRange>("30d");
+  const [topTimeRange, setTopTimeRange] = useState<TopTimeRange>("7d");
   const [topItems, setTopItems] = useState<TopOutboundProduct[]>([]);
   const [isTopLoading, setIsTopLoading] = useState(true);
   const [feedShopName, setFeedShopName] = useState<string>(selectedShopName || "");

@@ -48,6 +48,7 @@ export interface DateRangePickerProps {
   maxDate?: string;
   isCompact?: boolean;
   includeToday?: boolean;
+  hasAllPreset?: boolean;
 }
 
 export function DateRangePicker({
@@ -62,6 +63,7 @@ export function DateRangePicker({
   maxDate,
   isCompact,
   includeToday = true,
+  hasAllPreset = false,
 }: DateRangePickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(() => parseSafeDate(endDate || startDate));
@@ -241,7 +243,7 @@ export function DateRangePicker({
 
   // 格式化展示标签（同一年省略后者的年份，避免截断省略号）
   const displayLabel = useMemo(() => {
-    if (!startDate && !endDate) return placeholder;
+    if (!startDate && !endDate) return hasAllPreset ? (placeholder === "选择日期范围" ? "全部" : placeholder) : placeholder;
     if (startDate && endDate) {
       if (startDate === endDate) return startDate;
       const startYear = startDate.slice(0, 4);
@@ -253,9 +255,9 @@ export function DateRangePicker({
     }
     if (startDate) return `${startDate} 起`;
     return `至 ${endDate}`;
-  }, [startDate, endDate, placeholder]);
+  }, [startDate, endDate, placeholder, hasAllPreset]);
 
-  const hasValue = Boolean(startDate || endDate);
+  const hasValue = Boolean(startDate || endDate || hasAllPreset);
 
   // 预设项计算
   const presets = useMemo(() => {
@@ -268,8 +270,12 @@ export function DateRangePicker({
     const prevMonthEnd = subDays(currentMonthStart, 1);
     const prevMonthStart = startOfMonth(prevMonthEnd);
 
-    const list = [
-      ...(includeToday ? [{ label: "今天", start: today, end: today }] : []),
+    const list: Array<{ label: string; start?: Date; end?: Date; isAll?: boolean }> = [
+      ...(hasAllPreset
+        ? [{ label: "全部", isAll: true }]
+        : includeToday
+        ? [{ label: "今天", start: today, end: today }]
+        : []),
       { label: "昨天", start: yesterday, end: yesterday },
       { label: "近7天", start: last7Days, end: today },
       { label: "近30天", start: last30Days, end: today },
@@ -278,7 +284,7 @@ export function DateRangePicker({
     ];
 
     return list;
-  }, [includeToday]);
+  }, [includeToday, hasAllPreset]);
 
   return (
     <div className={cn("relative inline-flex", className)} ref={containerRef}>
@@ -344,16 +350,33 @@ export function DateRangePicker({
                     "mb-3 pb-2.5 border-b border-black/6 dark:border-white/8 gap-1",
                     presets.length === 6 ? "grid grid-cols-3 gap-1.5" : "grid grid-cols-5"
                   )}>
-                    {presets.map((preset) => (
-                      <button
-                        key={preset.label}
-                        type="button"
-                        onClick={() => setPresetRange(preset.start, preset.end)}
-                        className="rounded-lg bg-black/4 hover:bg-black/8 dark:bg-white/6 dark:hover:bg-white/12 py-1 text-center text-xs font-medium text-foreground transition-colors"
-                      >
-                        {preset.label}
-                      </button>
-                    ))}
+                    {presets.map((preset) => {
+                      const isActiveAll = preset.isAll && !startDate && !endDate;
+                      return (
+                        <button
+                          key={preset.label}
+                          type="button"
+                          onClick={() => {
+                            if (preset.isAll) {
+                              onChange({ startDate: "", endDate: "" });
+                              setSelectingStart(null);
+                              setHoverDate(null);
+                              setIsOpen(false);
+                            } else if (preset.start && preset.end) {
+                              setPresetRange(preset.start, preset.end);
+                            }
+                          }}
+                          className={cn(
+                            "rounded-lg py-1 text-center text-xs font-medium transition-colors",
+                            isActiveAll
+                              ? "bg-primary/10 text-primary font-bold dark:bg-primary/20"
+                              : "bg-black/4 hover:bg-black/8 dark:bg-white/6 dark:hover:bg-white/12 text-foreground"
+                          )}
+                        >
+                          {preset.label}
+                        </button>
+                      );
+                    })}
                   </div>
 
                   {/* 正在选择提示 */}

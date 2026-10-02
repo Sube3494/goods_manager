@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
     }
 
     const shopName = (request.nextUrl.searchParams.get("shopName") || "").trim();
-    const range = (request.nextUrl.searchParams.get("range") || "30d").trim();
+    const range = (request.nextUrl.searchParams.get("range") || "7d").trim();
 
     let dateFilter: { gte?: Date } | undefined = undefined;
     const now = new Date();

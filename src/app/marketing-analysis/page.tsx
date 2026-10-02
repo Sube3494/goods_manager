@@ -207,8 +207,8 @@ function Panel({
 export default function MarketingAnalysisPage() {
   const { showToast } = useToast();
   const today = format(new Date(), "yyyy-MM-dd");
-  const [startDate, setStartDate] = useState(format(subDays(new Date(), 29), "yyyy-MM-dd"));
-  const [endDate, setEndDate] = useState(today);
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [shopName, setShopName] = useState("");
   const [platform, setPlatform] = useState("");
   const [shops, setShops] = useState<Shop[]>([]);
@@ -237,7 +237,13 @@ export default function MarketingAnalysisPage() {
     async (quiet = true) => {
       setLoading(true);
       try {
-        const query = new URLSearchParams({ startDate, endDate });
+        const query = new URLSearchParams();
+        if (!startDate && !endDate) {
+          query.set("range", "all");
+        } else {
+          if (startDate) query.set("startDate", startDate);
+          if (endDate) query.set("endDate", endDate);
+        }
         if (shopName) query.set("shopName", shopName);
         if (platform) query.set("platform", platform);
         const response = await fetch(`/api/stats?${query.toString()}`, { cache: "no-store" });
@@ -458,7 +464,8 @@ export default function MarketingAnalysisPage() {
                 setEndDate(nextEnd);
               }}
               maxDate={today}
-              includeToday={true}
+              hasAllPreset={true}
+              placeholder="全部"
               className="h-9 min-w-0 w-full sm:w-auto"
               triggerClassName="h-9 w-full sm:w-auto rounded-full border-black/8 bg-white/80 px-3.5 text-xs shadow-2xs dark:border-white/10 dark:bg-white/5"
             />
@@ -959,9 +966,14 @@ export default function MarketingAnalysisPage() {
                               {selectedProduct.shopName}
                             </span>
                             <span>·</span>
-                            <span>{selectedProduct.orders.length} 笔关联订单</span>
-                            <span>·</span>
                             <span className="font-bold text-sky-600 dark:text-sky-400">共售出 {integer(selectedProduct.quantity)} 件</span>
+                            <span>·</span>
+                            <span>
+                              共 {selectedProduct.orders.length} 笔销售记录
+                              {unlinkedOutbounds.length > 0 && !relatedOrdersLoading
+                                ? `（${relatedOrders.length} 笔平台订单 + ${unlinkedOutbounds.length} 笔线下出库）`
+                                : ""}
+                            </span>
                           </div>
                         </div>
                       </div>
@@ -982,7 +994,10 @@ export default function MarketingAnalysisPage() {
                       <div className="mb-4 flex items-center justify-between text-xs text-muted-foreground">
                         <div className="flex items-center gap-1.5 font-bold text-foreground">
                           <FileText size={14} className="text-sky-500" />
-                          <span>相关销售订单（{relatedOrdersLoading ? "读取中..." : relatedOrderPlatform ? `${visibleRelatedOrders.length} / ${relatedOrders.length} 笔` : `${relatedOrders.length} 笔`}）</span>
+                          <span>
+                            {unlinkedOutbounds.length > 0 ? "平台销售订单" : "相关销售订单"}
+                            （{relatedOrdersLoading ? "读取中..." : relatedOrderPlatform ? `${visibleRelatedOrders.length} / ${relatedOrders.length} 笔` : `${relatedOrders.length} 笔`}）
+                          </span>
                         </div>
                         <CustomSelect
                           value={relatedOrderPlatform}
