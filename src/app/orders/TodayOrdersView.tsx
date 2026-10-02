@@ -144,7 +144,8 @@ function CompactTodayOrderCard({
   const [historyOpen, setHistoryOpen] = useState(false);
   const platformBadge = getPlatformBadgeMeta(order.platform, order.rawPayload);
   const returned = Boolean(order.outboundReturnDetails?.some((entry) => !isRematchReturnReason(entry?.reason) && entry.items?.some((item) => Number(item.quantity || 0) > 0)));
-  const baseStatusLabel = getBaseAutoPickStatusDisplay(order.status) || "待处理";
+  const baseStatus = getBaseAutoPickStatusDisplay(order.status);
+  const baseStatusLabel = baseStatus === "待处理" ? "处理中" : baseStatus;
   const statusLabel = returned ? "已退" : baseStatusLabel;
   const cancelled = isCancelledStatus(order.status) || statusLabel === "已删除";
   const cancelReason = cancelled ? getCancelReason(order) : "";
@@ -599,7 +600,7 @@ export function TodayOrdersView({
   const [dispatchTarget, setDispatchTarget] = useState<AutoPickOrder | null>(null);
   const [expandedIds, setExpandedIds] = useState<string[]>([]);
   const [detailOrderId, setDetailOrderId] = useState<string | null>(null);
-  const [activeOrderGroup, setActiveOrderGroup] = useState("outbound");
+  const [activeOrderGroup, setActiveOrderGroup] = useState("pending");
   const orderGroupLayoutId = useId();
   const reduceMotion = useReducedMotion();
   const orderGroupTouchRef = useRef<{ x: number; y: number } | null>(null);
@@ -1180,7 +1181,7 @@ export function TodayOrdersView({
       new Map(
         statuses.map((item) => {
           const label = getAutoPickStatusFilterLabel(item);
-          return [label, { value: label, label }] as const;
+          return [label, { value: label, label: label === "待处理" ? "处理中" : label }] as const;
         })
       ).values()
     );
