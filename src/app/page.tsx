@@ -35,6 +35,7 @@ export default function Home() {
   const [endDate, setEndDate] = useState(initialEnd);
   const [shopOptions, setShopOptions] = useState<Shop[]>([]);
   const [selectedShopName, setSelectedShopName] = useState("");
+  const [selectedPlatform, setSelectedPlatform] = useState("");
   const todayDate = initialEnd;
   const latestStatsRequestRef = useRef(0);
 
@@ -66,6 +67,7 @@ export default function Home() {
       if (startDate) query.set("startDate", startDate);
       if (endDate) query.set("endDate", endDate);
       if (selectedShopName) query.set("shopName", selectedShopName);
+      if (selectedPlatform) query.set("platform", selectedPlatform);
       const res = await fetch(`/api/stats?${query.toString()}`, { cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
@@ -98,7 +100,7 @@ export default function Home() {
         setIsLoading(false);
       }
     }
-  }, [endDate, rangePreset, selectedShopName, startDate, user, showToast]);
+  }, [endDate, rangePreset, selectedPlatform, selectedShopName, startDate, user, showToast]);
 
   useEffect(() => {
     if (!user) return;
@@ -127,7 +129,7 @@ export default function Home() {
       return;
     }
     fetchData(true);
-  }, [fetchData, startDate, endDate]);
+  }, [fetchData, startDate, endDate, selectedShopName, selectedPlatform]);
 
   useEffect(() => {
     if (startDate && startDate > todayDate) {
@@ -156,6 +158,12 @@ export default function Home() {
     setStartDate(format(new Date(today.getTime() - (days - 1) * 24 * 60 * 60 * 1000), "yyyy-MM-dd"));
   }, [rangePreset]);
 
+  const handleDateRangeChange = useCallback(({ startDate: nextStart, endDate: nextEnd }: { startDate: string; endDate: string }) => {
+    setRangePreset("custom");
+    setStartDate(nextStart);
+    setEndDate(nextEnd);
+  }, []);
+
   if (isUserLoading) {
     return (
       <div className="flex items-center justify-center h-full min-h-[60dvh]">
@@ -179,11 +187,14 @@ export default function Home() {
           data={statsData}
           rangePreset={rangePreset}
           onRangePresetChange={setRangePreset}
+          selectedPlatform={selectedPlatform}
+          onSelectedPlatformChange={setSelectedPlatform}
           selectedShopName={selectedShopName}
           shopOptions={shopOptions}
           onSelectedShopNameChange={setSelectedShopName}
           startDate={startDate}
           endDate={endDate}
+          onDateRangeChange={handleDateRangeChange}
           isLoading={isLoading}
           lastSynced={lastSynced}
           onRefresh={() => fetchData(false)}

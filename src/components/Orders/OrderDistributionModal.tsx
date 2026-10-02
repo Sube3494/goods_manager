@@ -91,7 +91,7 @@ const PLATFORM_COLOR_MAP: Record<string, { bg: string; border: string; text: str
   淘宝: { bg: "bg-orange-500/15", border: "border-orange-500/30", text: "text-orange-600 dark:text-orange-400", pinBg: "#f97316", icon: "/platform/淘宝.svg" },
   抖店: { bg: "bg-sky-500/15", border: "border-sky-500/30", text: "text-sky-600 dark:text-sky-400", pinBg: "#0ea5e9", icon: "/platform/doudian.svg" },
   饿了么: { bg: "bg-blue-500/15", border: "border-blue-500/30", text: "text-blue-600 dark:text-blue-400", pinBg: "#2563eb", icon: "/platform/其他.svg" },
-  线下交易: { bg: "bg-emerald-500/15", border: "border-emerald-500/30", text: "text-emerald-600 dark:text-emerald-400", pinBg: "#10b981", icon: "/platform/线下交易.svg" },
+  线下交易: { bg: "bg-emerald-500/15", border: "border-emerald-500/30", text: "text-emerald-600 dark:text-emerald-400", pinBg: "#10b981", icon: "/platform/wechat.svg" },
 };
 
 function getPlatformTheme(platform?: string | null) {

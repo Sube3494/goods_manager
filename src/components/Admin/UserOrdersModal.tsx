@@ -64,7 +64,7 @@ const SHOP_PROFIT_PLATFORM_ICONS: Record<(typeof SHOP_PROFIT_PLATFORMS)[number],
   京东: "/platform/京东.svg",
   淘宝: "/platform/淘宝.svg",
   抖店: "/platform/doudian.svg",
-  线下交易: "/platform/线下交易.svg",
+  线下交易: "/platform/wechat.svg",
 };
 
 const CustomizedDot = (props: any) => {

@@ -452,27 +452,55 @@ export function DateRangePicker({
                         isAfter(dayStart, activeStart) &&
                         isBefore(dayStart, activeEnd);
 
+                      const isRowStart = idx % 7 === 0;
+                      const isRowEnd = idx % 7 === 6;
+                      const hasRangeSelection = Boolean(activeStart && activeEnd && !isSameDay(activeStart, activeEnd));
+
                       return (
                         <div
                           key={idx}
-                          className={cn(
-                            "relative flex items-center justify-center p-0.5",
-                            isInRange && "bg-primary/10 dark:bg-primary/20",
-                            Boolean(isStart && activeEnd && activeStart && !isSameDay(activeStart, activeEnd)) && "bg-gradient-to-r from-transparent to-primary/10 dark:to-primary/20 rounded-l-xl",
-                            Boolean(isEnd && activeStart && activeEnd && !isSameDay(activeStart, activeEnd)) && "bg-gradient-to-l from-transparent to-primary/10 dark:to-primary/20 rounded-r-xl"
-                          )}
+                          className="relative flex items-center justify-center p-0.5"
                           onMouseEnter={() => {
                             if (selectingStart) {
                               setHoverDate(dayStart);
                             }
                           }}
                         >
+                          {/* 连续选区底色胶囊轨道 (Track) */}
+                          {hasRangeSelection && isInRange && (
+                            <div
+                              className={cn(
+                                "absolute inset-y-0.5 left-0 right-0 bg-primary/10 dark:bg-primary/20",
+                                isRowStart && "rounded-l-xl",
+                                isRowEnd && "rounded-r-xl"
+                              )}
+                            />
+                          )}
+
+                          {hasRangeSelection && isStart && (
+                            <div
+                              className={cn(
+                                "absolute inset-y-0.5 left-1/2 right-0 bg-primary/10 dark:bg-primary/20",
+                                isRowEnd && "rounded-r-xl"
+                              )}
+                            />
+                          )}
+
+                          {hasRangeSelection && isEnd && (
+                            <div
+                              className={cn(
+                                "absolute inset-y-0.5 left-0 right-1/2 bg-primary/10 dark:bg-primary/20",
+                                isRowStart && "rounded-l-xl"
+                              )}
+                            />
+                          )}
+
                           <button
                             type="button"
                             disabled={isDisabled}
                             onClick={() => handleDateClick(day)}
                             className={cn(
-                              "aspect-square w-full rounded-xl text-xs flex items-center justify-center transition-all duration-150 relative",
+                              "aspect-square w-full rounded-xl text-xs flex items-center justify-center transition-all duration-150 relative z-10",
                               !isCurrentMonth && "text-muted-foreground/40",
                               isCurrentMonth && !isDisabled && "text-foreground hover:bg-primary/15 hover:text-primary",
                               isDisabled && "text-muted-foreground/20 cursor-not-allowed",

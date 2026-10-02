@@ -650,7 +650,7 @@ export function getPlatformBadgeMeta(platform?: string | null, rawPayload?: unkn
 
   if (isManualOffline || normalized === "线下交易") {
     return {
-      iconSrc: "/platform/线下交易.svg",
+      iconSrc: "/platform/wechat.svg",
       iconAlt: "线下交易",
     };
   }

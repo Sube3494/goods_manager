@@ -6,7 +6,7 @@ import { Area, AreaChart, CartesianGrid, Line, LineChart, ResponsiveContainer, T
 import { Shop, StatsData } from "@/lib/types";
 import { PromotionCalendarModal } from "@/app/orders/PromotionCalendarModal";
 import { CustomSelect } from "@/components/ui/CustomSelect";
-import { DatePicker } from "@/components/ui/DatePicker";
+import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import { RefreshCw, Maximize2, Minimize2, X, Layers, ArrowUpRight, Award, Store, ShieldCheck, Package, UserPlus, UserCheck, HelpCircle } from "lucide-react";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { format } from "date-fns";
@@ -422,11 +422,14 @@ export function DataOverview({
   data,
   rangePreset,
   onRangePresetChange,
+  selectedPlatform = "",
+  onSelectedPlatformChange,
   selectedShopName,
   shopOptions,
   onSelectedShopNameChange,
   startDate,
   endDate,
+  onDateRangeChange,
   onStartDateChange,
   onEndDateChange,
   isLoading = false,
@@ -434,15 +437,18 @@ export function DataOverview({
   onRefresh,
 }: {
   data: StatsData | null;
-  rangePreset: string;
-  onRangePresetChange: (value: string) => void;
+  rangePreset?: string;
+  onRangePresetChange?: (value: string) => void;
+  selectedPlatform?: string;
+  onSelectedPlatformChange?: (value: string) => void;
   selectedShopName: string;
   shopOptions: Shop[];
   onSelectedShopNameChange: (value: string) => void;
   startDate: string;
   endDate: string;
-  onStartDateChange: (value: string) => void;
-  onEndDateChange: (value: string) => void;
+  onDateRangeChange?: (range: { startDate: string; endDate: string }) => void;
+  onStartDateChange?: (value: string) => void;
+  onEndDateChange?: (value: string) => void;
   isLoading?: boolean;
   lastSynced?: Date | null;
   onRefresh?: () => void;
@@ -521,7 +527,11 @@ export function DataOverview({
   const cancelledLikeGap = Math.max(0, totalOrders - trueOrders - brushOrders);
   const trueShare = totalOrders > 0 ? (trueOrders / totalOrders) * 100 : 0;
   const brushShare = totalOrders > 0 ? (brushOrders / totalOrders) * 100 : 0;
-  const contextLabel = selectedShopName ? `${selectedShopName} · ${int(rangeDays)} 天` : `全部店铺 · ${int(rangeDays)} 天`;
+  const contextLabel = [
+    selectedPlatform || null,
+    selectedShopName || "全部店铺",
+    rangeDays > 0 ? `${int(rangeDays)} 天` : null,
+  ].filter(Boolean).join(" · ");
   const customerAnalysis = data?.customerAnalysis;
   const customerKnownTotal = customerAnalysis?.totalKnownOrders || 0;
   const customerTotal = customerKnownTotal + (customerAnalysis?.unknownCustomerOrders || 0);
@@ -619,8 +629,25 @@ export function DataOverview({
           ) : null}
         </div>
 
-        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-          <div className="col-span-1 space-y-1.5">
+        <div className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-3">
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">平台范围</label>
+            <CustomSelect
+              value={selectedPlatform}
+              onChange={onSelectedPlatformChange || (() => {})}
+              options={[
+                { value: "", label: "全部平台" },
+                { value: "美团", label: "美团" },
+                { value: "京东", label: "京东" },
+                { value: "淘宝", label: "淘宝" },
+                { value: "抖店", label: "抖店" },
+                { value: "线下交易", label: "线下交易" },
+              ]}
+              className="h-10"
+              triggerClassName="h-full rounded-full border border-black/8 bg-white px-4 text-xs font-bold shadow-none dark:border-white/10 dark:bg-white/3"
+            />
+          </div>
+          <div className="space-y-1.5">
             <label className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">店铺范围</label>
             <CustomSelect
               value={selectedShopName}
@@ -630,45 +657,26 @@ export function DataOverview({
               triggerClassName="h-full rounded-full border border-black/8 bg-white px-4 text-xs font-bold shadow-none dark:border-white/10 dark:bg-white/3"
             />
           </div>
-          <div className="col-span-1 space-y-1.5">
-            <label className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">时间范围</label>
-            <CustomSelect
-              value={rangePreset}
-              onChange={onRangePresetChange}
-              options={[
-                { value: "all", label: "全部" },
-                { value: "7d", label: "最近 7 天" },
-                { value: "15d", label: "最近 15 天" },
-                { value: "30d", label: "最近 30 天" },
-                { value: "90d", label: "最近 90 天" },
-                { value: "custom", label: "自定义" },
-              ]}
-              className="h-10"
-              triggerClassName="h-full rounded-full border border-black/8 bg-white px-4 text-xs font-bold shadow-none dark:border-white/10 dark:bg-white/3"
-            />
-          </div>
-          <div className="col-span-1 space-y-1.5">
-            <label className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">起始日期</label>
-            <DatePicker
-              value={startDate}
-              onChange={onStartDateChange}
-              maxDate={endDate || todayDate}
-              showClear={false}
-              className="h-10 w-full"
-              triggerClassName="h-full rounded-full border border-black/8 bg-white px-4 text-xs font-bold shadow-none dark:border-white/10 dark:bg-white/3"
-            />
-          </div>
-          <div className="col-span-1 space-y-1.5">
+          <div className="col-span-2 space-y-1.5 lg:col-span-1">
             <div className="flex items-center justify-between gap-2">
-              <label className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">结束日期</label>
-              <span className="text-[11px] font-bold text-primary">共 {int(rangeDays)} 天</span>
+              <label className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">日期范围</label>
+              {rangeDays > 0 ? (
+                <span className="text-[11px] font-bold text-primary">共 {int(rangeDays)} 天</span>
+              ) : null}
             </div>
-            <DatePicker
-              value={endDate}
-              onChange={onEndDateChange}
-              minDate={startDate}
+            <DateRangePicker
+              startDate={startDate}
+              endDate={endDate}
+              onChange={({ startDate: nextStart, endDate: nextEnd }) => {
+                if (onDateRangeChange) {
+                  onDateRangeChange({ startDate: nextStart, endDate: nextEnd });
+                } else {
+                  onStartDateChange?.(nextStart);
+                  onEndDateChange?.(nextEnd);
+                }
+              }}
               maxDate={todayDate}
-              showClear={false}
+              includeToday={true}
               className="h-10 w-full"
               triggerClassName="h-full rounded-full border border-black/8 bg-white px-4 text-xs font-bold shadow-none dark:border-white/10 dark:bg-white/3"
             />

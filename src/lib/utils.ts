@@ -206,7 +206,7 @@ export function getPlatformMeta(platform: string | undefined | null): PlatformBa
   if (normalized === "other" || name.includes("线下") || name.includes("线下交易")) {
     return {
       name: "线下交易",
-      iconSrc: "/platform/线下交易.svg",
+      iconSrc: "/platform/wechat.svg",
       className: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 dark:bg-emerald-500/20 dark:border-emerald-500/30",
     };
   }
