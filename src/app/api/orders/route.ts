@@ -953,10 +953,31 @@ function isOfflineManualDeliveryLossOrder(input: {
   expectedIncome?: number | null;
   deliveryFee?: number | null;
 }) {
-  return String(input.platform || "").trim() === "线下交易"
+  const platformStr = String(input.platform || "").trim().toLowerCase();
+  const isOffline = !platformStr || platformStr === "线下交易" || platformStr === "other";
+  return isOffline
     && Number(input.deliveryFee || 0) > 0
     && Number(input.actualPaid || 0) <= 0
     && Number(input.expectedIncome || 0) <= 0;
+}
+
+function isOrderItemIgnoredOutbound(item: {
+  rawPayload?: unknown;
+}) {
+  if (!item.rawPayload || typeof item.rawPayload !== "object" || Array.isArray(item.rawPayload)) {
+    return false;
+  }
+  const raw = item.rawPayload as Record<string, unknown>;
+  if (raw.ignoreOutbound === true || raw.isManualIgnored === true) {
+    return true;
+  }
+  const manual = raw.manualMatchedProduct && typeof raw.manualMatchedProduct === "object" && !Array.isArray(raw.manualMatchedProduct)
+    ? raw.manualMatchedProduct as Record<string, unknown>
+    : null;
+  if (manual?.ignoreOutbound === true) {
+    return true;
+  }
+  return false;
 }
 
 function isManualDeliveryPlaceholderOrderItem(item: {
@@ -972,16 +993,21 @@ function isManualDeliveryPlaceholderOrderItem(item: {
     || String(item.productName || "").trim() === "手工配送占位商品";
 }
 
-function hasAutoPickFulfillmentItems(items: Array<{
+function hasAutoPickFulfillmentItems(items?: Array<{
   productName?: string | null;
   productNo?: string | null;
   rawPayload?: unknown;
-}>) {
+}> | null) {
+  if (!items || !Array.isArray(items)) return false;
   return items.some((item) => {
+    if (isOrderItemIgnoredOutbound(item)) {
+      return false;
+    }
     if (!isManualDeliveryPlaceholderOrderItem(item)) {
       return true;
     }
-    return Boolean(readManualMatchedProduct(item.rawPayload));
+    const manual = readManualMatchedProduct(item.rawPayload);
+    return Boolean(manual && !(manual as any).ignoreOutbound);
   });
 }
 
@@ -1928,7 +1954,7 @@ export async function GET(request: NextRequest) {
       const effectiveHasOutbound = hasOutbound
         && outboundMeta?.isFullyReturned !== true
         && (!hasOrderFulfillment || !isOutboundEmpty);
-      if (cancelledDeliveryLoss || manualDeliveryLoss) {
+      if (cancelledDeliveryLoss || manualDeliveryLoss || !hasOrderFulfillment) {
         return "ready";
       }
       if (!effectiveHasOutbound) {
@@ -2114,7 +2140,7 @@ export async function GET(request: NextRequest) {
               expectedIncome: adjustedMetrics.expectedIncome,
               deliveryFee,
             }) && !hasFulfillmentItems;
-            const productCostStatus = isManualDeliveryLoss
+            const productCostStatus = isManualDeliveryLoss || !hasFulfillmentItems
               ? "ready" as const
               : !hasOutbound
               ? "pending-outbound" as const
@@ -2640,7 +2666,7 @@ export async function GET(request: NextRequest) {
         && outboundMeta?.isFullyReturned !== true
         && (!hasFulfillmentItems || !isOutboundEmpty);
       const missingCostItemCount = outboundMeta?.missingCostItemCount || 0;
-      const productCostStatus = cancelledDeliveryLoss || manualDeliveryLoss
+      const productCostStatus = cancelledDeliveryLoss || manualDeliveryLoss || !hasFulfillmentItems
         ? "ready" as const
         : !effectiveHasOutbound
         ? "pending-outbound" as const

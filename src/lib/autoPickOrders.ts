@@ -1585,16 +1585,40 @@ function isOfflineDeliveryFeeOnlyOrder(input: {
     && Number(input.expectedIncome || 0) <= 0;
 }
 
-function hasAutoPickFulfillmentItems(items: Array<{
+function isOrderItemIgnoredOutbound(item: {
+  rawPayload?: unknown;
+}) {
+  if (!item.rawPayload || typeof item.rawPayload !== "object" || Array.isArray(item.rawPayload)) {
+    return false;
+  }
+  const raw = item.rawPayload as Record<string, unknown>;
+  if (raw.ignoreOutbound === true || raw.isManualIgnored === true) {
+    return true;
+  }
+  const manual = raw.manualMatchedProduct && typeof raw.manualMatchedProduct === "object" && !Array.isArray(raw.manualMatchedProduct)
+    ? raw.manualMatchedProduct as Record<string, unknown>
+    : null;
+  if (manual?.ignoreOutbound === true) {
+    return true;
+  }
+  return false;
+}
+
+function hasAutoPickFulfillmentItems(items?: Array<{
   productName?: string | null;
   productNo?: string | null;
   rawPayload?: unknown;
-}>) {
+}> | null) {
+  if (!items || !Array.isArray(items)) return false;
   return items.some((item) => {
+    if (isOrderItemIgnoredOutbound(item)) {
+      return false;
+    }
     if (!isManualDeliveryPlaceholderOrderItem(item)) {
       return true;
     }
-    return Boolean(readManualMatchedProductFromOrderItemRawPayload(item.rawPayload));
+    const manual = readManualMatchedProductFromOrderItemRawPayload(item.rawPayload);
+    return Boolean(manual && !(manual as any).ignoreOutbound);
   });
 }
 

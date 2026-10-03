@@ -158,6 +158,25 @@ function isManualDeliveryPlaceholderOrderItem(item: {
     || String(item.productName || "").trim() === "手工配送占位商品";
 }
 
+function isOrderItemIgnoredOutbound(item: {
+  rawPayload?: unknown;
+}) {
+  if (!item.rawPayload || typeof item.rawPayload !== "object" || Array.isArray(item.rawPayload)) {
+    return false;
+  }
+  const raw = item.rawPayload as Record<string, unknown>;
+  if (raw.ignoreOutbound === true || raw.isManualIgnored === true) {
+    return true;
+  }
+  const manual = raw.manualMatchedProduct && typeof raw.manualMatchedProduct === "object" && !Array.isArray(raw.manualMatchedProduct)
+    ? raw.manualMatchedProduct as Record<string, unknown>
+    : null;
+  if (manual?.ignoreOutbound === true) {
+    return true;
+  }
+  return false;
+}
+
 function hasAutoPickFulfillmentItems(items?: Array<{
   productName?: string | null;
   productNo?: string | null;
@@ -165,13 +184,19 @@ function hasAutoPickFulfillmentItems(items?: Array<{
 }> | null) {
   if (!items || !Array.isArray(items)) return false;
   return items.some((item) => {
+    if (isOrderItemIgnoredOutbound(item)) {
+      return false;
+    }
     if (!isManualDeliveryPlaceholderOrderItem(item)) {
       return true;
     }
     const rawPayload = item.rawPayload && typeof item.rawPayload === "object" && !Array.isArray(item.rawPayload)
       ? item.rawPayload as Record<string, unknown>
       : null;
-    return Boolean(rawPayload?.matchedProduct || rawPayload?.matchedShopProduct);
+    const manual = rawPayload?.manualMatchedProduct && typeof rawPayload.manualMatchedProduct === "object"
+      ? rawPayload.manualMatchedProduct as Record<string, unknown>
+      : null;
+    return Boolean((rawPayload?.matchedProduct || rawPayload?.matchedShopProduct || manual) && !manual?.ignoreOutbound);
   });
 }
 
@@ -1216,7 +1241,7 @@ export async function GET(request: NextRequest) {
           const hasFulfillmentItems = hasAutoPickFulfillmentItems(order.items);
           const isManualDeliveryLoss = isOffline && deliveryYuan > 0 && paidYuan <= 0 && expectedIncomeYuan <= 0 && !hasFulfillmentItems;
           const missingCostItemCount = orderCostMeta?.missingCostItemCount || 0;
-          const productCostStatus = isManualDeliveryLoss
+          const productCostStatus = isManualDeliveryLoss || !hasFulfillmentItems
             ? "ready" as const
             : !hasOutbound
             ? "pending-outbound" as const
