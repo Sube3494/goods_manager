@@ -809,7 +809,9 @@ export function getOrderItemDisplay(item: AutoPickOrderItem, platform?: string |
   return {
     name: realResolvedName || (isManualDeliveryPlaceholder ? "可添加发货货品" : item.productName) || "未命名商品",
     sku: matchedProduct?.sku || (isManualDeliveryPlaceholder && !realResolvedName ? "不加则只记配送费" : item.productNo) || "-",
-    image: platformThumbnail || matchedProduct?.image || item.thumb || rawThumbCandidate,
+    image: (/[+＋]/.test(String(item.productNo || "")) || /[+＋]/.test(String(matchedProduct?.sku || "")) || matchedProduct?.isCompositeMatch === true)
+      ? (matchedProduct?.image || null)
+      : (platformThumbnail || matchedProduct?.image || item.thumb || rawThumbCandidate),
     quantity: Math.max(1, Number((matchedProduct as any)?.quantity || item.quantity || 1) || 1),
     costPrice: matchedProduct?.costPrice || null,
     costSource: matchedProduct?.costSource,
@@ -827,10 +829,17 @@ export function getExpandedOrderItemDisplays(item: AutoPickOrderItem, platform?:
   const platformThumbnail = isMeituanOrder(platform, channelTag) ? item.thumb : null;
 
   if (Array.isArray(item.displayItems) && item.displayItems.length > 0) {
-    return item.displayItems.map((displayItem, index) => ({
+    const displayItems = item.displayItems;
+    const isCompositeOrMulti = displayItems.length > 1
+      || item.matchedProduct?.isCompositeMatch === true
+      || displayItems.some((d) => d.displayType === "composite" || d.displayType === "accessory");
+
+    return displayItems.map((displayItem, index) => ({
       name: displayItem.name || (item.productName !== MANUAL_DELIVERY_PLACEHOLDER_PRODUCT_NAME ? item.productName : "") || "未命名商品",
       sku: displayItem.sku || matchedProduct?.sku || item.productNo || "-",
-      image: (index === 0 ? platformThumbnail : null) || displayItem.image || item.thumb || null,
+      image: isCompositeOrMulti
+        ? (displayItem.image || null)
+        : (displayItem.image || (index === 0 ? platformThumbnail : null) || null),
       quantity: displayItem.quantity,
       costPrice: displayItem.costPrice || null,
       costSource: displayItem.costSource,
@@ -2665,7 +2674,7 @@ export function OrderItemBundleGroup({
           <ProductStripItem
             key={`${item.productNo || item.productName}-${index}-${display.sku}-${compositeIndex}`}
             display={display}
-            previewImage={compositeIndex === 0 && isMeituan ? item.platformImage : undefined}
+            previewImage={display.image || undefined}
             compact={compact}
             showEditMatch={!deleted && !readOnly}
             onEditMatch={() => onOpenMatchEditor(order, item)}

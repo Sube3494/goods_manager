@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Plus, Search, Calendar, Share2, Edit2, Trash2, ShieldAlert, RotateCcw, ArrowLeft, Package, Eye } from "lucide-react";
+import { Plus, Search, Calendar, Share2, Edit2, Trash2, ShieldAlert, RotateCcw, ArrowLeft, Package, Eye, Copy } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { cn, copyToClipboard } from "@/lib/utils";
 import { PlanModal } from "@/components/BrushPlans/PlanModal";
+import { ClonePlanModal } from "@/components/BrushPlans/ClonePlanModal";
 import { BrushOrderPlan, BrushOrderPlanItem } from "@/lib/types";
 import { formatLocalDate } from "@/lib/dateUtils";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
@@ -24,6 +25,8 @@ export default function BrushPlansPage() {
     const [isLoading, setIsLoading] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingPlan, setEditingPlan] = useState<BrushOrderPlan | null>(null);
+    const [cloningPlan, setCloningPlan] = useState<BrushOrderPlan | null>(null);
+    const [isCloneModalOpen, setIsCloneModalOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
     const [filterDate, setFilterDate] = useState("");
     const [filterShop, setFilterShop] = useState("");
@@ -86,6 +89,11 @@ export default function BrushPlansPage() {
     const handleEdit = (plan: BrushOrderPlan) => {
         setEditingPlan(plan);
         setIsModalOpen(true);
+    };
+
+    const handleCloneClick = (plan: BrushOrderPlan) => {
+        setCloningPlan(plan);
+        setIsCloneModalOpen(true);
     };
 
     const handleSave = async (data: Partial<BrushOrderPlan>) => {
@@ -386,6 +394,13 @@ export default function BrushPlansPage() {
                                                         </button>
                                                         {canManage && (
                                                             <>
+                                                                <button
+                                                                    onClick={() => handleCloneClick(plan)}
+                                                                    className="p-1.5 rounded-lg text-muted-foreground hover:bg-emerald-600 hover:text-white dark:hover:bg-emerald-500 dark:hover:text-white transition-all"
+                                                                    title="复制计划（克隆到指定日期）"
+                                                                >
+                                                                    <Copy className="w-3.5 h-3.5" />
+                                                                </button>
                                                                 <button onClick={() => handleEdit(plan)} className="p-1.5 rounded-lg text-muted-foreground hover:bg-zinc-800 hover:text-white dark:hover:bg-white dark:hover:text-black transition-all">
                                                                     <Edit2 className="w-3.5 h-3.5" />
                                                                 </button>
@@ -513,6 +528,19 @@ export default function BrushPlansPage() {
                 variant={confirmConfig.variant}
                 onConfirm={confirmConfig.onConfirm}
                 onClose={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+            />
+
+            <ClonePlanModal
+                isOpen={isCloneModalOpen}
+                plan={cloningPlan}
+                availableShops={activeShippingAddresses}
+                onClose={() => {
+                    setIsCloneModalOpen(false);
+                    setCloningPlan(null);
+                }}
+                onSuccess={() => {
+                    fetchPlans();
+                }}
             />
         </div>
     );

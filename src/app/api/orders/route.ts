@@ -3164,7 +3164,7 @@ export async function GET(request: NextRequest) {
                       ? (segmentMatchedProduct?.jdSkuId || segmentMatchedProduct?.sku)
                       : (segmentMatchedProduct?.sku || segmentMatchedProduct?.jdSkuId)
                   ) || candidate,
-                  image: segmentMatchedProduct?.image || (item.thumb ? storage.resolveUrl(item.thumb) : null),
+                  image: segmentMatchedProduct?.image || null,
                   quantity: segQty,
                   ...displayCost,
                   sourceId: segSourceId || undefined,
