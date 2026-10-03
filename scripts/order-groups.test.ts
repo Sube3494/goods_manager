@@ -15,5 +15,41 @@ assert.equal(getOrderGroup({ status: "已完成" } as AutoPickOrder, false), "ou
 assert.equal(group("配送中", "ready"), "pending");
 assert.equal(group("已取消", "pending-outbound", true), "closed");
 assert.equal(group("已删除", "pending-outbound"), "closed");
-assert.equal(group("待处理", "pending-outbound", true), "brush");
+assert.equal(
+  getOrderGroup(
+    {
+      status: "已完成",
+      hasOutbound: false,
+      productCostStatus: "ready",
+      items: [
+        {
+          productName: "手工配送占位商品",
+          productNo: "__manual_delivery_placeholder__",
+          quantity: 1,
+        },
+      ],
+    } as any,
+    false
+  ),
+  "completed"
+);
+assert.equal(
+  getOrderGroup(
+    {
+      status: "已完成",
+      hasOutbound: false,
+      productCostStatus: "pending-outbound",
+      items: [
+        {
+          productName: "可口可乐",
+          productNo: "COLA001",
+          quantity: 1,
+        },
+      ],
+    } as any,
+    false
+  ),
+  "outbound"
+);
 console.log("Order group tests passed");
+
