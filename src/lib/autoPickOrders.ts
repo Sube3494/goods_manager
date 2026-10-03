@@ -4970,7 +4970,7 @@ function buildProgressStatus(progress: AutoPickProgressPayload, currentStatus?: 
   if (
     statusHint === "expect"
   ) {
-    return "expect";
+    return currentStatus || "待处理";
   }
   if (
     statusHint === "cancel"
@@ -5070,12 +5070,36 @@ function hasDeliveryValue(value: unknown) {
 }
 
 function mergeAutoPickDeliveryValue(incoming: unknown, existing: unknown) {
+  // 如果 incoming 显式为 false，代表平台运单已取消或清除，绝不能再沿用旧运单！
+  if (incoming === false) {
+    return null;
+  }
+
   const incomingRecord = hasDeliveryValue(incoming) ? readDeliveryRecord(incoming) : null;
   const existingRecord = hasDeliveryValue(existing) ? readDeliveryRecord(existing) : null;
   if (!incomingRecord && !existingRecord) {
     return null;
   }
+
+  // 如果 incoming 明确表明运单已取消或退单，返回已取消的 incomingRecord 或清除
+  const isIncomingCancelled = Boolean(
+    incomingRecord && (
+      incomingRecord.status === "99"
+      || incomingRecord.status === "10"
+      || /取消|退单/.test(String(incomingRecord.track || ""))
+      || (incomingRecord.cancel_time && incomingRecord.cancel_time !== "0" && incomingRecord.cancel_time !== 0)
+    )
+  );
+
+  if (isIncomingCancelled) {
+    return incomingRecord;
+  }
+
   if (!incomingRecord) {
+    // 关键修正：若旧运单已取消/退单，不再无意义地保留旧运单
+    if (existingRecord && (/取消|退单/.test(String(existingRecord.track || "")) || existingRecord.status === "99")) {
+      return null;
+    }
     return existingRecord;
   }
   if (!existingRecord) {
@@ -5273,6 +5297,17 @@ function shouldPreserveRealtimeStatus(existing: {
   rawPayload?: unknown;
 }, incomingStatus?: string | null) {
   if (!existing.status) {
+    return false;
+  }
+
+  // 关键防御：如果原状态是“配送中”，但传入的是“待配送”或“待处理”，并且运单已取消或当前无生效运单，
+  // 必须允许状态降级回“待配送”，绝不能继续卡在“配送中”！
+  const rawPayload = existing.rawPayload && typeof existing.rawPayload === "object" && !Array.isArray(existing.rawPayload)
+    ? existing.rawPayload as Record<string, unknown>
+    : {};
+  const hasRawDelivery = rawPayload.delivery !== false && rawPayload.delivery != null;
+  const isIncomingPendingDelivery = incomingStatus && ["待配送", "待处理", "已拣货", "delivery", "confirm", "pickup"].includes(incomingStatus);
+  if (!hasRawDelivery && isIncomingPendingDelivery) {
     return false;
   }
 
@@ -6013,6 +6048,9 @@ export async function applyAutoPickProgress(userId: string, payload: unknown) {
       };
 
   const progressStatusHint = String(progress.statusHint || "").trim().toLowerCase();
+  if (progressStatusHint === "expect") {
+    (nextRawPayload as Record<string, unknown>).hasArrivedExpect = true;
+  }
   const isUnverifiedPlatformCancellation = !isPureManualOfflineOrder
     && ["cancel", "close", "closed"].includes(progressStatusHint);
   // 平台推送的取消消息也可能只是用户发起申请，并不代表商家已同意或退款已生效。

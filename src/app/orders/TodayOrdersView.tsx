@@ -20,6 +20,8 @@ import {
   isAutoPickOrderDeliveringStatus,
   isAutoPickOrderRiderAssigned,
   isAutoPickPickupOrder,
+  isDeliveryCancelledOrEmpty,
+  isLockedSubscribeOrder,
 } from "@/lib/autoPickOrderStatus";
 import {
   OrderCard,
@@ -153,11 +155,13 @@ function CompactTodayOrderCard({
   const deleted = statusLabel === "已删除";
   const terminal = cancelled || completed || deleted;
   const pickup = Boolean(order.isPickup) || isAutoPickPickupOrder(order.rawPayload, order.userAddress, order.shopAddress);
-  const delivering = isAutoPickOrderDeliveringStatus(order.status);
-  const riderAssigned = isAutoPickOrderRiderAssigned(order);
+  const deliveryCancelled = isDeliveryCancelledOrEmpty(order);
+  const delivering = !deliveryCancelled && isAutoPickOrderDeliveringStatus(order.status);
+  const riderAssigned = !deliveryCancelled && isAutoPickOrderRiderAssigned(order);
   const displayAsOfflineOrder = order.platform === "线下交易" || String(order.platform || "").toLowerCase() === "other";
   const showPlatformActions = !displayAsOfflineOrder && !readOnly;
-  const cannotSelfDeliver = Boolean(actingId) || terminal || delivering || pickup || riderAssigned;
+  const isLockedSubscribe = isLockedSubscribeOrder(order);
+  const cannotSelfDeliver = Boolean(actingId) || terminal || delivering || pickup || riderAssigned || isLockedSubscribe;
   const showAutoOutboundRecovery = shouldShowAutoOutboundRecovery(order);
   const syncing = actingId === `${order.id}:sync`;
   const shopName = order.matchedShopName || order.rawShopName || order.shopId || "未匹配店铺";
@@ -367,17 +371,17 @@ function CompactTodayOrderCard({
                 icon={<Navigation size={12} />}
                 onClick={() => onRunAction("dispatch-delivery")}
                 disabled={cannotSelfDeliver}
-                title="选择第三方运力并呼叫配送"
+                title={isLockedSubscribe ? "预约单尚未到达配送时间，不能发起配送" : "选择第三方运力并呼叫配送"}
                 iconOnly
               />
             ) : null}
-            {showPlatformActions && !deleted && !order.isSubscribe ? (
+            {showPlatformActions && !deleted && !isLockedSubscribe ? (
               <ActionButton
                 label="自配"
                 icon={actingId === `${order.id}:self-delivery` ? <Loader2 size={12} className="animate-spin" /> : <Truck size={12} />}
                 onClick={() => onRunAction("self-delivery")}
                 disabled={cannotSelfDeliver}
-                title={riderAssigned ? "骑手已接单，不能发起自配" : terminal ? "订单已结束，不能发起自配" : undefined}
+                title={isLockedSubscribe ? "预约单尚未到达配送时间，不能发起自配" : riderAssigned ? "骑手已接单，不能发起自配" : terminal ? "订单已结束，不能发起自配" : undefined}
                 iconOnly
               />
             ) : null}

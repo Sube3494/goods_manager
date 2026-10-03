@@ -10,6 +10,7 @@ import {
   isAutoPickOrderDeliveringStatus,
   isAutoPickOrderRiderAssigned,
   isAutoPickPickupOrder,
+  isDeliveryCancelledOrEmpty,
 } from "@/lib/autoPickOrderStatus";
 import { getEstimatedAutoCompleteAt } from "@/lib/autoPickSchedule";
 
@@ -74,11 +75,13 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
       return NextResponse.json({ error: "Pickup order does not require self delivery" }, { status: 409 });
     }
 
-    if (isAutoPickOrderDeliveringStatus(order.status)) {
+    const deliveryCancelled = isDeliveryCancelledOrEmpty(order);
+
+    if (!deliveryCancelled && isAutoPickOrderDeliveringStatus(order.status)) {
       return NextResponse.json({ error: "订单已在配送中，不能发起自配" }, { status: 409 });
     }
 
-    if (isAutoPickOrderRiderAssigned(order)) {
+    if (!deliveryCancelled && isAutoPickOrderRiderAssigned(order)) {
       return NextResponse.json({ error: "骑手已接单，不能发起自配" }, { status: 409 });
     }
 
@@ -99,10 +102,11 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
 
       if (refreshedOrder) {
         commandOrder = refreshedOrder;
-        if (isAutoPickOrderRiderAssigned(commandOrder)) {
+        const refreshedDeliveryCancelled = isDeliveryCancelledOrEmpty(commandOrder);
+        if (!refreshedDeliveryCancelled && isAutoPickOrderRiderAssigned(commandOrder)) {
           return NextResponse.json({ error: "骑手已接单，不能发起自配" }, { status: 409 });
         }
-        if (isAutoPickOrderDeliveringStatus(commandOrder.status)) {
+        if (!refreshedDeliveryCancelled && isAutoPickOrderDeliveringStatus(commandOrder.status)) {
           return NextResponse.json({ error: "订单已在配送中，不能发起自配" }, { status: 409 });
         }
       }

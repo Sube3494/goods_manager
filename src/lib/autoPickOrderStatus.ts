@@ -1,3 +1,5 @@
+import { formatLocalDate } from "./dateUtils";
+
 export const AUTO_PICK_EXTRA_STATUS_FILTERS = [
   { value: "pending-outbound", label: "未出库" },
   { value: "pending-backfill", label: "未回填" },
@@ -80,10 +82,6 @@ export function getBaseAutoPickStatusDisplay(status?: string | null) {
     return "配送中";
   }
 
-  if (normalized === "expect" || text.includes("expect")) {
-    return "异常";
-  }
-
   if (text.includes("已拣货") || text.includes("拣货中")) {
     return "已拣货";
   }
@@ -116,6 +114,8 @@ export function getBaseAutoPickStatusDisplay(status?: string | null) {
     || normalized === "confirm"
     || normalized === "pending"
     || normalized === "processing"
+    || normalized === "expect"
+    || text.includes("expect")
   ) {
     return "待处理";
   }
@@ -357,12 +357,110 @@ export function resolveAutoPickBusinessStatus(
   return String(status || "").trim() || undefined;
 }
 
+/**
+ * 判定订单的配送运单是否已取消、失效或不存在生效的第三方运力。
+ * 典型场景：用户呼叫了配送后又取消了配送，或运单退单/配送异常。
+ */
+export function isDeliveryCancelledOrEmpty(order?: {
+  status?: string | null;
+  rawPayload?: unknown;
+  delivery?: unknown;
+} | null): boolean {
+  if (!order) return true;
+
+  const rawPayload = order.rawPayload && typeof order.rawPayload === "object" && !Array.isArray(order.rawPayload)
+    ? order.rawPayload as Record<string, unknown>
+    : {};
+  const orderDelivery = order.delivery && typeof order.delivery === "object" && !Array.isArray(order.delivery)
+    ? order.delivery as Record<string, unknown>
+    : null;
+  const rawPayloadDelivery = rawPayload.delivery && typeof rawPayload.delivery === "object" && !Array.isArray(rawPayload.delivery)
+    ? rawPayload.delivery as Record<string, unknown>
+    : null;
+
+  // 1. 平台原始 delivery 显式为 false 或 null（代表当前没有生效运单）
+  if (rawPayload.delivery === false) {
+    return true;
+  }
+
+  // 2. 检查 cancel 实体（取消配送/退单记录）
+  const cancelObj = rawPayload.cancel && typeof rawPayload.cancel === "object" && !Array.isArray(rawPayload.cancel)
+    ? rawPayload.cancel as Record<string, unknown>
+    : null;
+  if (
+    cancelObj?.is_cancel === "1"
+    || cancelObj?.is_cancel === 1
+    || cancelObj?.cancel_status === "1"
+    || cancelObj?.cancel_status === 1
+    || rawPayload.is_cancel === "1"
+    || rawPayload.is_cancel === 1
+    || rawPayload.cancel_status === "1"
+    || rawPayload.cancel_status === 1
+  ) {
+    return true;
+  }
+
+  // 3. 检查运单轨迹与取消时间戳
+  const cancelTime = rawPayloadDelivery?.cancel_time
+    ?? rawPayloadDelivery?.cancelTime
+    ?? orderDelivery?.cancel_time
+    ?? orderDelivery?.cancelTime;
+  if (cancelTime && cancelTime !== "0" && cancelTime !== 0) {
+    return true;
+  }
+
+  const trackCandidates = [
+    orderDelivery?.track,
+    rawPayloadDelivery?.track,
+  ].map((t) => String(t || "").trim()).filter(Boolean);
+  if (trackCandidates.some((t) => /取消|退单|失效|异常/.test(t))) {
+    return true;
+  }
+
+  // 4. 检查运单状态码 (麦芽田 99=取消, 10=异常)
+  const deliveryStatusCandidates = [
+    orderDelivery?.status,
+    orderDelivery?.delivery_status,
+    orderDelivery?.deliveryStatus,
+    rawPayloadDelivery?.status,
+    rawPayloadDelivery?.delivery_status,
+    rawPayloadDelivery?.deliveryStatus,
+  ].map((s) => String(s || "").trim().toLowerCase());
+  if (deliveryStatusCandidates.some((s) => s === "99" || s === "10" || s === "cancel" || s === "cancelled" || s === "canceled")) {
+    return true;
+  }
+
+  // 5. 订单自身处于“异常”状态（通常是取消当前配送后的平台状态）
+  if (isAutoPickOrderAbnormalStatus(order.status)) {
+    return true;
+  }
+
+  // 6. 如果 delivery 对象本身没有任何有效的第三方物流名称和骑手
+  const logisticName = String(orderDelivery?.logisticName || orderDelivery?.logistic_name || rawPayloadDelivery?.logistic_name || "").trim();
+  const riderName = String(orderDelivery?.riderName || orderDelivery?.delivery_name || rawPayloadDelivery?.delivery_name || "").trim();
+  if (!logisticName && !riderName) {
+    return true;
+  }
+
+  // 7. 自配送亦属于非第三方跑腿锁定状态
+  if (/自配|自配送|商家自配|oneself/i.test(logisticName) || /自配|自配送|商家自配/i.test(riderName)) {
+    return true;
+  }
+
+  return false;
+}
+
 export function isAutoPickOrderRiderAssigned(order?: {
   status?: string | null;
   rawPayload?: unknown;
   delivery?: unknown;
 } | null) {
   if (!order) return false;
+
+  // 关键：若运单已取消或不存在生效第三方运单，坚决返回 false！
+  if (isDeliveryCancelledOrEmpty(order)) {
+    return false;
+  }
 
   const rawPayload = order.rawPayload && typeof order.rawPayload === "object" && !Array.isArray(order.rawPayload)
     ? order.rawPayload as Record<string, unknown>
@@ -621,6 +719,112 @@ export function readMainSystemSelfDeliveryFlag(rawPayload: unknown, delivery?: u
     if (hasThirdPartyLogistic && (!isRecent || hasDispatcher)) {
       return false;
     }
+  }
+
+  return true;
+}
+
+/**
+ * 判定订单是否属于“尚未到达配送时间的预约单”。
+ * 规则：
+ * 1. 非预约单（!order.isSubscribe）不锁定；
+ * 2. 已收到平台到期/expect 通知（如麦芽田 expect 广播），代表已到达备餐出餐配送期，不锁定；
+ * 3. 若有发单时间 send_time，当前时间已到达发单时间，不锁定；
+ * 4. 送达时间若是今天，且距离送达时间不足 60 分钟（或已超时），已进入紧急履约配送窗口，不锁定，允许自配；
+ * 5. 未来日期（明天及以后）或尚未到发单时间的真正预约单，进行锁定，禁止点击配送/自配。
+ */
+export function isLockedSubscribeOrder(order: {
+  isSubscribe?: boolean | null;
+  deliveryDeadline?: string | null;
+  deliveryTimeRange?: string | null;
+  orderTime?: Date | string | null;
+  rawPayload?: unknown;
+}): boolean {
+  if (!order.isSubscribe) {
+    return false;
+  }
+
+  const raw = (order.rawPayload && typeof order.rawPayload === "object" && !Array.isArray(order.rawPayload))
+    ? order.rawPayload as Record<string, unknown>
+    : null;
+
+  // 1. 如果已收到 expect 提示或到达期望时间标记，代表平台已通知商家进入备餐/配送期，允许自配
+  if (
+    raw?.hasArrivedExpect === true
+    || raw?.status === "expect"
+    || (raw as Record<string, unknown>)?.expect_status === "1"
+    || (raw as Record<string, unknown>)?.expectStatus === "1"
+  ) {
+    return false;
+  }
+
+  const now = Date.now();
+
+  // 2. 检查发单时间戳 send_time (秒级时间戳)
+  const sendTimeSec = Number(raw?.send_time || 0);
+  if (Number.isFinite(sendTimeSec) && sendTimeSec > 0) {
+    const sendTimeMs = sendTimeSec * 1000;
+    if (now >= sendTimeMs) {
+      return false; // 发单时间已到，解除锁定
+    }
+    return true; // 发单时间未到，锁定
+  }
+
+  // 3. 检查送达时间字符串
+  const timeText = String(
+    raw?.delivery_time_format
+    || raw?.send_time_format
+    || order.deliveryTimeRange
+    || order.deliveryDeadline
+    || ""
+  ).trim();
+
+  if (!timeText) {
+    // 无法判断时间，作为预约单默认锁定
+    return true;
+  }
+
+  // 明确是未来日期的预约单 (明天/后天)
+  if (/明日|明天|后日|后天/.test(timeText)) {
+    return true;
+  }
+
+  // 提取日期 MM-DD 或 YYYY-MM-DD
+  const dateMatch = timeText.match(/(?:(\d{4})[-/.年])?(\d{1,2})[-/.月](\d{1,2})/);
+  const nowShanghaiDateStr = formatLocalDate(new Date());
+  const [, , monthStr, dayStr] = dateMatch || [];
+
+  if (monthStr && dayStr) {
+    const curYear = new Date().getFullYear();
+    const targetMonth = Number(monthStr);
+    const targetDay = Number(dayStr);
+    const targetDateStr = `${curYear}-${String(targetMonth).padStart(2, "0")}-${String(targetDay).padStart(2, "0")}`;
+
+    if (targetDateStr > nowShanghaiDateStr) {
+      // 明确是今天之后的未来日期（例如 10-04 > 10-03）
+      return true;
+    }
+  }
+
+  // 4. 提取具体时间 HH:mm
+  const timeMatch = timeText.match(/(\d{1,2}):(\d{2})/);
+  if (timeMatch) {
+    const [, hoursStr, minutesStr] = timeMatch;
+    const targetHours = Number(hoursStr);
+    const targetMinutes = Number(minutesStr);
+
+    const targetDate = new Date();
+    targetDate.setHours(targetHours, targetMinutes, 0, 0);
+
+    // 如果送达时间是今天的，且在接下来的 60 分钟内送达，或者已经到了/超过送达时间
+    // 说明已经进入紧急履约和出餐配送期，允许自配！
+    const diffMs = targetDate.getTime() - now;
+    if (diffMs <= 60 * 60 * 1000) {
+      return false;
+    }
+
+    // 如果送达时间在 60 分钟之后（比如离现在还有好几个小时），仍然锁定
+    return true;
   }
 
   return true;

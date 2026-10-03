@@ -41,6 +41,8 @@ import {
   isAutoPickOrderDeliveringStatus,
   isAutoPickOrderRiderAssigned,
   isAutoPickOrderTerminalStatus,
+  isDeliveryCancelledOrEmpty,
+  isLockedSubscribeOrder,
   isSelfDeliveryOrCancelledDelivery,
   readDeliveryFeeFromValue,
 } from "@/lib/autoPickOrderStatus";
@@ -3703,11 +3705,15 @@ export const OrderCard = memo(function OrderCard({
   const showManualDeliveryMarker = displayAsOfflineOrder && !pickup;
   const showPlatformActions = !displayAsOfflineOrder;
   const hideDeletedOfflineIncome = deleted && displayAsOfflineOrder;
-  const delivering = !pickup && isDeliveringStatus(order.status);
-  const riderAssigned = isAutoPickOrderRiderAssigned(order);
-  const cannotSelfDeliver = Boolean(actingId) || terminal || delivering || pickup || riderAssigned;
+  const deliveryCancelled = isDeliveryCancelledOrEmpty(order);
+  const delivering = !pickup && !deliveryCancelled && isDeliveringStatus(order.status);
+  const riderAssigned = !deliveryCancelled && isAutoPickOrderRiderAssigned(order);
+  const isLockedSubscribe = isLockedSubscribeOrder(order);
+  const cannotSelfDeliver = Boolean(actingId) || terminal || delivering || pickup || riderAssigned || isLockedSubscribe;
   const selfDeliveryTitle = pickup
     ? "到店自取订单不需要发起自配送"
+    : isLockedSubscribe
+    ? "预约单尚未到达配送时间，不能发起自配"
     : terminal
     ? (cancelled ? "订单已取消，不能发起自配" : "订单已完成，不能再次发起自配")
     : riderAssigned
@@ -4284,7 +4290,7 @@ export const OrderCard = memo(function OrderCard({
                           {order.userAddress || "地址待同步"}
                         </span>
                       </div>
-                      {showPlatformActions && !displayAsOfflineOrder && !deleted && !readOnly && !order.isSubscribe ? (
+                      {showPlatformActions && !displayAsOfflineOrder && !deleted && !readOnly && !isLockedSubscribe ? (
                         <button type="button" onClick={(e) => { e.stopPropagation(); onRunAction(order.id, "self-delivery"); }} disabled={cannotSelfDeliver} title={selfDeliveryTitle} className="ml-auto inline-flex h-6 shrink-0 items-center gap-1 rounded-full border border-sky-500/20 bg-sky-500/10 px-2 text-[11px] font-semibold text-sky-700 transition-all hover:bg-sky-500/15 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 dark:text-sky-300 sm:hidden">
                           {actingId === `${order.id}:self-delivery` ? <Loader2 size={11} className="animate-spin" /> : <Truck size={11} />}<span>自配</span>
                         </button>
@@ -4423,7 +4429,7 @@ export const OrderCard = memo(function OrderCard({
                 </span>
               </span>
             ) : null}
-            {showPlatformActions && !displayAsOfflineOrder && !deleted && !readOnly && !order.isSubscribe ? (
+            {showPlatformActions && !displayAsOfflineOrder && !deleted && !readOnly && !isLockedSubscribe ? (
               <button type="button" onClick={() => onRunAction(order.id, "self-delivery")} disabled={cannotSelfDeliver} title={selfDeliveryTitle} className="hidden h-7 sm:h-8 items-center gap-1.5 rounded-full border border-sky-500/20 bg-sky-500/10 px-2 text-[11px] font-medium leading-none text-sky-700 transition-all hover:bg-sky-500/15 disabled:cursor-not-allowed disabled:opacity-45 dark:text-sky-300 sm:inline-flex sm:px-2.5 sm:text-[13px]">
                 {actingId === `${order.id}:self-delivery` ? <Loader2 size={12} className="animate-spin" /> : <Truck size={12} />}自配
               </button>
@@ -4461,7 +4467,7 @@ export const OrderCard = memo(function OrderCard({
                 {!deleted ? (
                   <ActionButton
                     label="叫配送"
-                    title="选择第三方运力并呼叫配送"
+                    title={isLockedSubscribe ? "预约单尚未到达配送时间，不能发起配送" : "选择第三方运力并呼叫配送"}
                     icon={<Navigation size={14} />}
                     onClick={() => onRunAction(order.id, "dispatch-delivery")}
                     disabled={cannotSelfDeliver}
