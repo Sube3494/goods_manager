@@ -13,13 +13,11 @@ import {
   isAutoPickOrderTerminalStatus,
   isAutoPickOtherPickupOrder,
   isAutoPickPickupOrder,
-  isOrderFullyRefunded,
   isSelfDeliveryOrCancelledDelivery,
   readDeliveryFeeFromValue,
   resolveAutoPickBusinessStatus,
 } from "@/lib/autoPickOrderStatus";
 export {
-  isOrderFullyRefunded,
   isSelfDeliveryOrCancelledDelivery,
   readDeliveryFeeFromValue,
 };
@@ -2695,10 +2693,8 @@ async function enrichMaiyatianOrderByCookie(cookie: string, order: AutoPickInbou
   if (Array.isArray(cancelDetails) && cancelDetails.length > 0) {
     // 麦芽田 /cancel/detail 返回的是同一笔退款的生命周期流转记录（如“发起退款” status:0 与“确认退款” status:1 为同一笔退款）
     // 优先读取已确认/生效的退款流水记录，防止重复求和导致退款金额翻倍
-    const effectiveCancel = cancelDetails.filter((item) => String(item.status ?? "").trim() === "1").pop()
-      || cancelDetails.filter((item) => Number(item.total_price || 0) > 0).pop();
-    const rawTotalPriceYuan = Number(effectiveCancel?.total_price || 0) || 0;
-    const orderActualPaidFen = Math.round(Number(order.actualPaid || 0));
+    const effectiveCancel = cancelDetails.filter((item) => String(item.status ?? "").trim() === "1").pop();
+    const refundAmountYuan = Number(effectiveCancel?.total_price || 0) || 0;
 
     if (!effectiveCancel && isAutoPickOrderCancelledStatus(detailStatus)) {
       // 美团在用户仅发起取消/售后申请时，也可能提前设置 is_cancel 或取消类 tips。
@@ -2738,31 +2734,13 @@ async function enrichMaiyatianOrderByCookie(cookie: string, order: AutoPickInbou
       } catch {}
     }
 
-    // 麦芽田整单退款/取消时，流水中的 total_price 经常为 0。
-    // 若存在确认生效的退款流水（status === "1" 或有效记录），total_price 为 0 说明是整单全额退款！
-    const isConfirmedCancelOrRefund = Boolean(
-      effectiveCancel && (
-        String(effectiveCancel.status ?? "").trim() === "1"
-        || /同意|退款|取消|系统自动/.test(String(effectiveCancel.reason || effectiveCancel.title || ""))
-      )
+    const orderActualPaidYuan = (Number(order.actualPaid || 0) || 0) / 100;
+    const isPartialRefund = refundAmountYuan > 0 && (
+      (orderActualPaidYuan > 0 && refundAmountYuan < orderActualPaidYuan)
+      || returnedCount === 0
     );
 
-    if (rawTotalPriceYuan > 0) {
-      order.refundAmount = Math.round(rawTotalPriceYuan * 100);
-      orderObj.refundAmount = Math.round(rawTotalPriceYuan * 100);
-    } else if (isConfirmedCancelOrRefund && orderActualPaidFen > 0) {
-      order.refundAmount = orderActualPaidFen;
-      orderObj.refundAmount = orderActualPaidFen;
-    }
-
-    const currentRefundFen = Math.round(Number(order.refundAmount || 0));
-    const isFullRefund = (currentRefundFen > 0 && orderActualPaidFen > 0 && currentRefundFen >= orderActualPaidFen)
-      || (isConfirmedCancelOrRefund && rawTotalPriceYuan === 0);
-    const isPartialRefund = currentRefundFen > 0 && !isFullRefund;
-
-    if (isFullRefund) {
-      detailStatus = "已取消";
-    } else if (isPartialRefund) {
+    if (isPartialRefund) {
       // 确凿的部分退款：主订单未被取消
       const deliveryTrack = String(order.delivery?.track || "").trim();
       const isDelivered = deliveryTrack === "配送完成" || Boolean(order.completedAt) || Boolean(detailDataObj?.finished_time);
@@ -2773,6 +2751,8 @@ async function enrichMaiyatianOrderByCookie(cookie: string, order: AutoPickInbou
       } else {
         detailStatus = "待配送";
       }
+    } else if (refundAmountYuan >= orderActualPaidYuan && returnedCount > 0) {
+      detailStatus = "已取消";
     }
 
     const cancelReason = resolveMaiyatianCancelReason(cancelDetails);
@@ -2780,22 +2760,22 @@ async function enrichMaiyatianOrderByCookie(cookie: string, order: AutoPickInbou
     order.cancelReason = cancelReason || undefined;
     orderObj.cancelDetails = cancelDetails;
     orderObj.cancelReason = cancelReason || undefined;
+
+    if (refundAmountYuan > 0) {
+      order.refundAmount = Math.round(refundAmountYuan * 100);
+      orderObj.refundAmount = Math.round(refundAmountYuan * 100);
+    } else {
+      // status 非 1 的记录只是退款申请、处理中或已驳回，不能计作实际退款。
+      // 同步时同时清掉旧版本误写入的金额，使误取消订单可以恢复真实状态。
+      delete order.refundAmount;
+      delete orderObj.refundAmount;
+    }
   }
 
-  const finalRefundFen = Math.round(Number(order.refundAmount || 0));
-  const finalActualPaidFen = Math.round(Number(order.actualPaid || 0));
-  const isOrderFullyRefundedNow = (finalRefundFen > 0 && finalActualPaidFen > 0 && finalRefundFen >= finalActualPaidFen)
-    || (isAutoPickOrderCancelledStatus(order.status) && finalRefundFen > 0);
-
-  if (isOrderFullyRefundedNow) {
-    order.status = "已取消";
-  } else if (detailStatus) {
-    const shouldKeepCancelled = isAutoPickOrderCancelledStatus(order.status)
-      && finalRefundFen > 0
-      && !isAutoPickOrderCancelledStatus(detailStatus);
+  if (detailStatus) {
     const shouldKeepListStatus = !isAutoPickOrderAbnormalStatus(order.status)
       && isAutoPickOrderAbnormalStatus(detailStatus);
-    if (!shouldKeepListStatus && !shouldKeepCancelled) {
+    if (!shouldKeepListStatus) {
       order.status = detailStatus;
     }
   }
@@ -4062,8 +4042,6 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
         deliveryTimeRange: true,
         delivery: true,
         customerRemark: true,
-        actualPaid: true,
-        expectedIncome: true,
         createdAt: true,
         lastSyncedAt: true,
         rawPayload: true,
@@ -4156,39 +4134,10 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
       || existingShopAddress
       || resolvedInternalShop?.address
       || null;
-    const existingRawRecord = existing?.rawPayload && typeof existing.rawPayload === "object" && !Array.isArray(existing.rawPayload)
-      ? existing.rawPayload as Record<string, unknown>
-      : null;
-    const existingRefundAmount = Number.isFinite(Number(existingRawRecord?.refundAmount ?? existingRawRecord?.refund_amount))
-      ? Number(existingRawRecord?.refundAmount ?? existingRawRecord?.refund_amount)
-      : undefined;
-    const nextRefundAmount = Number.isFinite(Number(normalized.refundAmount)) && Number(normalized.refundAmount) > 0
-      ? Number(normalized.refundAmount)
-      : (existingRefundAmount && existingRefundAmount > 0 ? existingRefundAmount : undefined);
-    const existingActualPaidVal = Math.round(Number(normalized.actualPaid || existing?.actualPaid || 0));
-    const isExistingFullyRefunded = Boolean(
-      (nextRefundAmount && existingActualPaidVal > 0 && nextRefundAmount >= existingActualPaidVal)
-      || (existingRawRecord && isOrderFullyRefunded({ actualPaid: existingActualPaidVal, refundAmount: nextRefundAmount, status: existing?.status, rawPayload: existingRawRecord }))
-    );
-
     const isExistingCompleted = isAutoPickOrderCompletedStatus(existing?.status);
     const isIncomingTerminal = isAutoPickOrderTerminalStatus(normalized.status);
     const shouldKeepCompletedStatus = isExistingCompleted && !isIncomingTerminal;
     const isExistingCancelled = isAutoPickOrderCancelledStatus(existing?.status);
-    const isIncomingCompleted = isAutoPickOrderCompletedStatus(normalized.status);
-    const hasCancellationEvidence = Boolean(
-      (nextRefundAmount && nextRefundAmount > 0)
-      || isExistingFullyRefunded
-      || normalized.cancelReason
-      || (existingRawRecord && readCancelReasonFromRawPayload(existingRawRecord))
-      || (Array.isArray(normalized.cancelDetails) && normalized.cancelDetails.length > 0)
-      || (Array.isArray(existingRawRecord?.cancelDetails ?? existingRawRecord?.cancel_details) && (existingRawRecord?.cancelDetails as any)?.length > 0)
-      || isExistingCancelled
-    );
-    const shouldKeepCancelled = (isExistingCancelled || isExistingFullyRefunded)
-      && hasCancellationEvidence
-      && !isAutoPickOrderCancelledStatus(normalized.status);
-
     const preservedPickingStatus = resolvePreservedPickingStatus(existing || {}, normalized.status);
     const existingSystemMeta = readAutoPickSystemMeta(existing?.rawPayload) || {};
     const isSelfDeliveryDelivering = Boolean(
@@ -4196,11 +4145,9 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
       && existing?.status === "delivering"
       && !isAutoPickOrderTerminalStatus(normalized.status)
     );
-    const status = shouldKeepCancelled
-      ? "已取消"
-      : shouldKeepCompletedStatus
+    const status = shouldKeepCompletedStatus
       ? existing?.status || null
-      : isExistingCancelled && normalized.status && !isAutoPickOrderCancelledStatus(normalized.status) && !hasCancellationEvidence
+      : isExistingCancelled && normalized.status && !isAutoPickOrderCancelledStatus(normalized.status)
         ? normalized.status
         : isSelfDeliveryDelivering
           ? "delivering"
@@ -4220,6 +4167,9 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
       ? normalized.rawPayload as Record<string, unknown>
       : normalized as unknown as Record<string, unknown>;
     const customerType = readCustomerTypeFromRawPayload(normalizedRawPayload) || null;
+    const existingRawRecord = existing?.rawPayload && typeof existing.rawPayload === "object" && !Array.isArray(existing.rawPayload)
+      ? existing.rawPayload as Record<string, unknown>
+      : null;
     const nextCancelReason = normalized.cancelReason
       || (normalizedRawPayload.cancelReason as string)
       || (normalizedRawPayload.cancel_reason as string)
@@ -4232,19 +4182,12 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
       || existingRawRecord?.cancel_details
       || undefined;
 
-    const finalPersistedRefundAmount = isAutoPickOrderCancelledStatus(status)
-      && (!nextRefundAmount || nextRefundAmount <= 0)
-      && existingActualPaidVal > 0
-        ? existingActualPaidVal
-        : nextRefundAmount;
-
     const nextRawPayload = mergeAutoPickSystemMeta(
       {
         ...normalizedRawPayload,
         cancelReason: nextCancelReason,
         cancelDetails: nextCancelDetails,
         customerType,
-        refundAmount: finalPersistedRefundAmount,
       },
       existing?.rawPayload
     );
@@ -6205,77 +6148,10 @@ export async function refreshAutoPickOrderFromPlugin(
   const fallbackPlatform = String(lookup.platform || "").trim();
   const fallbackOrderNo = String(lookup.orderNo || "").trim();
   const canTrustLookupPlatform = Boolean(fallbackPlatform && fallbackPlatform !== "未知");
-
-  const existingOrder = await prisma.autoPickOrder.findFirst({
-    where: {
-      userId,
-      OR: [
-        ...(lookup.id ? [{ sourceId: lookup.id }] : []),
-        ...(fallbackOrderNo ? [{ orderNo: fallbackOrderNo }] : []),
-      ],
-    },
-    select: {
-      id: true,
-      status: true,
-      actualPaid: true,
-      expectedIncome: true,
-      rawPayload: true,
-    },
-  });
-
-  const existingRawPayload = existingOrder?.rawPayload && typeof existingOrder.rawPayload === "object" && !Array.isArray(existingOrder.rawPayload)
-    ? existingOrder.rawPayload as Record<string, unknown>
-    : null;
-  const existingRefundAmount = Number.isFinite(Number(existingRawPayload?.refundAmount ?? existingRawPayload?.refund_amount))
-    ? Math.round(Number(existingRawPayload?.refundAmount ?? existingRawPayload?.refund_amount))
-    : undefined;
-  const existingCancelDetails = Array.isArray(existingRawPayload?.cancelDetails ?? existingRawPayload?.cancel_details)
-    ? (existingRawPayload?.cancelDetails ?? existingRawPayload?.cancel_details) as Array<Record<string, unknown>>
-    : undefined;
-  const existingCancelReason = readCancelReasonFromRawPayload(existingRawPayload) || undefined;
-  const isExistingFullyRefunded = Boolean(
-    existingOrder && isOrderFullyRefunded({
-      actualPaid: existingOrder.actualPaid,
-      expectedIncome: existingOrder.expectedIncome,
-      refundAmount: existingRefundAmount,
-      status: existingOrder.status,
-      rawPayload: existingOrder.rawPayload,
-    })
-  );
-  const isExistingCancelled = isAutoPickOrderCancelledStatus(existingOrder?.status);
-
   const enrichAndUpsert = async (order: AutoPickInboundOrder) => {
-    // 保护已有退款字段，防止平台单次接口漏传导致被冲掉
-    if ((!order.refundAmount || order.refundAmount <= 0) && existingRefundAmount && existingRefundAmount > 0) {
-      order.refundAmount = existingRefundAmount;
-    }
-    if ((!order.cancelDetails || order.cancelDetails.length === 0) && existingCancelDetails && existingCancelDetails.length > 0) {
-      order.cancelDetails = existingCancelDetails;
-    }
-    if (!order.cancelReason && existingCancelReason) {
-      order.cancelReason = existingCancelReason;
-    }
-
     await enrichMaiyatianOrderByCookie(cookie, order).catch((error) => {
       console.warn(`[OrderSync] Failed to enrich refund details for ${order.orderNo}:`, error);
     });
-
-    if ((!order.refundAmount || order.refundAmount <= 0) && existingRefundAmount && existingRefundAmount > 0) {
-      order.refundAmount = existingRefundAmount;
-    }
-
-    const currentActualPaid = Math.round(Number(order.actualPaid || existingOrder?.actualPaid || 0));
-    const isFullRefund = (order.refundAmount && currentActualPaid > 0 && order.refundAmount >= currentActualPaid)
-      || isExistingFullyRefunded
-      || isExistingCancelled;
-
-    if (isFullRefund) {
-      order.status = "已取消";
-      if ((!order.refundAmount || order.refundAmount <= 0) && currentActualPaid > 0) {
-        order.refundAmount = currentActualPaid;
-      }
-    }
-
     return upsertAutoPickOrder(userId, order);
   };
 
@@ -6331,15 +6207,7 @@ export async function refreshAutoPickOrderFromPlugin(
               && !isAutoPickOrderCancelledStatus(fallbackMatched.status)
               && !isAutoPickOrderAbnormalStatus(fallbackMatched.status)
             ) {
-              const hasRefundEvidence = Boolean(
-                (normalizedDetailOrder.refundAmount && normalizedDetailOrder.refundAmount > 0)
-                || (existingRefundAmount && existingRefundAmount > 0)
-                || isExistingFullyRefunded
-                || isExistingCancelled
-              );
-              if (!hasRefundEvidence) {
-                normalizedDetailOrder.status = fallbackMatched.status;
-              }
+              normalizedDetailOrder.status = fallbackMatched.status;
             }
           }
         }
@@ -8280,10 +8148,6 @@ export async function syncAutoOutboundFromCompletedAutoPickOrder(userId: string,
 
   if (!order) {
     return { ok: false, skipped: true, reason: "order-not-found" as const };
-  }
-
-  if (isAutoPickOrderCancelledStatus(order.status) || isOrderFullyRefunded(order as any)) {
-    return { ok: false, skipped: true, reason: "order-cancelled-or-refunded" as const };
   }
 
   const systemMeta = readAutoPickSystemMeta(order.rawPayload);
