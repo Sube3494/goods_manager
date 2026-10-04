@@ -3135,8 +3135,8 @@ export const OrderProfitBadge = memo(function OrderProfitBadge({
   const extraExpensesRows = extraExpenses.map((expense) => {
     const isIncome = expense.type === "income";
     return {
-      label: isIncome ? `加额外收入 (${expense.name})` : `减意外花费 (${expense.name})`,
-      value: isIncome ? `+${toCurrency(expense.amount)}` : toCurrency(expense.amount),
+      label: expense.name || (isIncome ? "额外收入" : "意外花费"),
+      value: isIncome ? `+${toCurrency(expense.amount)}` : `-${toCurrency(expense.amount)}`,
       editable: !readOnly && Boolean(onEditExtraExpenses),
       onEdit: readOnly || !onEditExtraExpenses ? undefined : () => {
         closeProfitTooltip();
