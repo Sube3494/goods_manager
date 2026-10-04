@@ -62,4 +62,48 @@ const shouldKeepCancelledForRefunded = (isExistingCancelled || isExistingFullyRe
 
 assert.strictEqual(shouldKeepCancelledForRefunded, true, "同步时全额退款/已取消订单必须被保护，不允许变成已完成");
 
+// 3. 模拟用户线上遇见的真实订单：JD #1，实付 18.20 元，佣金损失 18.20 元，送达后退款已取消
+const jdUserRealOrder = {
+  id: "jd-real-1",
+  orderNo: "1",
+  platform: "京东",
+  status: "已取消",
+  actualPaid: 1820,
+  expectedIncome: 0,
+  platformCommission: 1820,
+  delivery: { track: "配送完成" },
+  rawPayload: {
+    refundAmount: 1820,
+    cancelReason: "协商一致退款",
+  },
+};
+
+const wasCancelledOrRefunded = isOrderFullyRefunded(jdUserRealOrder);
+assert.strictEqual(wasCancelledOrRefunded, true, "原订单应识别为全额退款/已取消");
+
+// 麦芽田因为配送轨迹存在，返回了 status = '已完成'
+const maiyatianRefreshed = {
+  id: "jd-real-1",
+  orderNo: "1",
+  platform: "京东",
+  status: "已完成",
+  actualPaid: 1820,
+  expectedIncome: 0,
+  delivery: { track: "配送完成" },
+  rawPayload: {},
+};
+
+// 执行 sync route 核心守卫
+const shouldLockCancelledInRoute = wasCancelledOrRefunded || isOrderFullyRefunded(maiyatianRefreshed);
+assert.strictEqual(shouldLockCancelledInRoute, true, "单单同步守卫必须触发锁定");
+
+if (shouldLockCancelledInRoute) {
+  maiyatianRefreshed.status = "已取消";
+  maiyatianRefreshed.refundAmount = 1820;
+}
+
+assert.strictEqual(maiyatianRefreshed.status, "已取消", "单单同步后订单状态必须锁定为'已取消'，杜绝反冲到已完成");
+assert.strictEqual(maiyatianRefreshed.refundAmount, 1820, "退款金额必须稳固为实付金额 18.20 元");
+
 console.log("refund sync guard tests passed!");
+

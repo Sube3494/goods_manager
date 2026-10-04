@@ -104,7 +104,43 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
     const isNowCancelledOrRefunded = isAutoPickOrderCancelledStatus(refreshedOrder.status)
       || isOrderFullyRefunded(refreshedOrder as any);
 
-    if (isAutoPickOrderCompletedStatus(refreshedOrder.status) && !wasCancelledOrRefunded && !isNowCancelledOrRefunded) {
+    const shouldLockCancelled = wasCancelledOrRefunded || isNowCancelledOrRefunded;
+    let safeRefundAmount = 0;
+    if (shouldLockCancelled) {
+      const finalActualPaid = Math.round(Number(refreshedOrder.actualPaid || order.actualPaid || 0));
+      const rawPayloadRecord = (refreshedOrder.rawPayload && typeof refreshedOrder.rawPayload === "object" && !Array.isArray(refreshedOrder.rawPayload))
+        ? refreshedOrder.rawPayload as Record<string, unknown>
+        : {};
+      const existingRawRecord = (order.rawPayload && typeof order.rawPayload === "object" && !Array.isArray(order.rawPayload))
+        ? order.rawPayload as Record<string, unknown>
+        : {};
+      safeRefundAmount = Math.max(
+        Number((refreshedOrder as any).refundAmount || 0) || 0,
+        Number((rawPayloadRecord.refundAmount ?? rawPayloadRecord.refund_amount) || 0) || 0,
+        Number((existingRawRecord.refundAmount ?? existingRawRecord.refund_amount) || 0) || 0,
+        finalActualPaid
+      );
+
+      refreshedOrder.status = "已取消";
+      (refreshedOrder as any).refundAmount = safeRefundAmount;
+      (refreshedOrder as any).rawPayload = {
+        ...rawPayloadRecord,
+        refundAmount: safeRefundAmount,
+      };
+
+      await prisma.autoPickOrder.update({
+        where: { id: refreshedOrder.id },
+        data: {
+          status: "已取消",
+          rawPayload: {
+            ...rawPayloadRecord,
+            refundAmount: safeRefundAmount,
+          },
+        },
+      }).catch(console.error);
+    }
+
+    if (isAutoPickOrderCompletedStatus(refreshedOrder.status) && !shouldLockCancelled) {
       await syncBrushOrderFromCompletedAutoPickOrder(order.userId, refreshedOrder.id).catch((brushError) => {
         console.error("Failed to sync brush order after order sync:", brushError);
       });
@@ -243,11 +279,13 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
 
       const syncedOrder = {
         ...refreshedOrder,
+        status: refreshedOrder.status,
+        refundAmount: (refreshedOrder as any).refundAmount ?? (shouldLockCancelled ? safeRefundAmount : undefined),
         shopAddress: effectiveShopAddress || (isAddressLike(refreshedOrder.shopAddress) ? refreshedOrder.shopAddress : null),
         matchedShopId,
         matchedShopName,
         isMainSystemSelfDelivery,
-        expectedIncome: computedExpectedIncome,
+        expectedIncome: shouldLockCancelled ? 0 : computedExpectedIncome,
         platformCommission: computedPlatformCommission,
         completedAt: normalized?.completedAt || null,
         customerName: readCustomerNameFromRawPayload(refreshedOrder.rawPayload),
