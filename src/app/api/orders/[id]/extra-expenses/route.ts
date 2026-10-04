@@ -85,14 +85,18 @@ export async function POST(
         id: string;
         name: string;
         amount: number;
+        type: "expense" | "income";
         createdAt: string;
       } => {
         const rawAmount = Number(item.amount ?? 0);
         const amount = Math.round(rawAmount);
+        const rawType = String(item.type || "").trim().toLowerCase();
+        const type: "expense" | "income" = rawType === "income" ? "income" : "expense";
         return {
           id: String(item.id || "").trim() || `exp_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-          name: String(item.name || "").trim() || "意外花费",
+          name: String(item.name || "").trim() || (type === "income" ? "额外收入" : "意外花费"),
           amount,
+          type,
           createdAt: typeof item.createdAt === "string" ? item.createdAt : new Date().toISOString(),
         };
       })

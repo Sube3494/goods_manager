@@ -75,7 +75,8 @@ export function hasExplicitDeliveryPickupProof(delivery: unknown, _rawPayload?: 
 }
 
 export function resolveCancelledOrderPureProfit(deliveryFeeLoss: unknown, returnExtraExpense: unknown) {
-  const totalLoss = Math.max(0, Number(deliveryFeeLoss || 0))
-    + Math.max(0, Number(returnExtraExpense || 0));
-  return totalLoss > 0 ? -totalLoss : null;
+  const delivery = Math.max(0, Number(deliveryFeeLoss || 0));
+  const expense = Number(returnExtraExpense || 0);
+  const netExpense = delivery + expense;
+  return netExpense !== 0 ? -netExpense : null;
 }

@@ -301,6 +301,7 @@ export interface AutoPickOrder {
     id: string;
     name: string;
     amount: number;
+    type?: "expense" | "income";
     createdAt?: string;
   }> | null;
   totalExtraExpense?: number | null;

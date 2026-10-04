@@ -3132,15 +3132,18 @@ export const OrderProfitBadge = memo(function OrderProfitBadge({
   const returnExtraExpense = Math.max(0, Number(order.returnExtraExpense || 0));
   const hasReturnExtraExpense = returnExtraExpense > 0;
   const extraExpenses = Array.isArray(order.extraExpenses) ? order.extraExpenses : [];
-  const extraExpensesRows = extraExpenses.map((expense) => ({
-    label: `减意外花费 (${expense.name})`,
-    value: toCurrency(expense.amount),
-    editable: !readOnly && Boolean(onEditExtraExpenses),
-    onEdit: readOnly || !onEditExtraExpenses ? undefined : () => {
-      closeProfitTooltip();
-      onEditExtraExpenses();
-    },
-  }));
+  const extraExpensesRows = extraExpenses.map((expense) => {
+    const isIncome = expense.type === "income";
+    return {
+      label: isIncome ? `加额外收入 (${expense.name})` : `减意外花费 (${expense.name})`,
+      value: isIncome ? `+${toCurrency(expense.amount)}` : toCurrency(expense.amount),
+      editable: !readOnly && Boolean(onEditExtraExpenses),
+      onEdit: readOnly || !onEditExtraExpenses ? undefined : () => {
+        closeProfitTooltip();
+        onEditExtraExpenses();
+      },
+    };
+  });
 
   if (isProfitUpdating) {
     return null;

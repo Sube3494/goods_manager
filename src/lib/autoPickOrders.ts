@@ -499,6 +499,7 @@ export function readOrderExtraExpensesFromRawPayload(rawPayload: unknown): Array
   id: string;
   name: string;
   amount: number;
+  type?: "expense" | "income";
   createdAt?: string;
 }> {
   const systemMeta = readAutoPickSystemMeta(rawPayload);
@@ -508,19 +509,28 @@ export function readOrderExtraExpensesFromRawPayload(rawPayload: unknown): Array
   const candidateList = Array.isArray(systemMeta.extraExpenses) ? (systemMeta.extraExpenses as unknown as any[]) : [];
   return candidateList
     .filter((item) => Boolean(item && typeof item === "object"))
-    .map((item) => ({
-      id: String(item.id || "").trim() || `exp_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-      name: String(item.name || "").trim() || "意外花费",
-      amount: Math.round(Number(item.amount || 0)),
-      createdAt: typeof item.createdAt === "string" ? item.createdAt : undefined,
-    }))
+    .map((item) => {
+      const rawType = String(item.type || "").trim().toLowerCase();
+      const type: "expense" | "income" = rawType === "income" ? "income" : "expense";
+      return {
+        id: String(item.id || "").trim() || `exp_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        name: String(item.name || "").trim() || (type === "income" ? "额外收入" : "意外花费"),
+        amount: Math.round(Number(item.amount || 0)),
+        type,
+        createdAt: typeof item.createdAt === "string" ? item.createdAt : undefined,
+      };
+    })
     .filter((item) => item.amount > 0);
 }
 
 export function calculateOrderTotalExtraExpense(
-  extraExpenses: Array<{ amount: number }>
+  extraExpenses: Array<{ amount: number; type?: "expense" | "income" | string }>
 ): number {
-  return extraExpenses.reduce((sum, item) => sum + (Math.max(0, item.amount) || 0), 0);
+  return extraExpenses.reduce((sum, item) => {
+    const isIncome = item.type === "income";
+    const val = Math.max(0, item.amount) || 0;
+    return sum + (isIncome ? -val : val);
+  }, 0);
 }
 
 function readResolvedAutoPickShop(rawPayload: unknown) {
