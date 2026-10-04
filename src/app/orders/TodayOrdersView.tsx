@@ -22,6 +22,7 @@ import {
   isAutoPickPickupOrder,
   isDeliveryCancelledOrEmpty,
   isLockedSubscribeOrder,
+  isOrderFullyRefunded,
 } from "@/lib/autoPickOrderStatus";
 import {
   OrderCard,
@@ -148,13 +149,14 @@ function CompactTodayOrderCard({
   const [routeOpen, setRouteOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const platformBadge = getPlatformBadgeMeta(order.platform, order.rawPayload);
+  const isFullyRefunded = isOrderFullyRefunded(order);
   const returned = Boolean(order.outboundReturnDetails?.some((entry) => !isRematchReturnReason(entry?.reason) && entry.items?.some((item) => Number(item.quantity || 0) > 0)));
   const baseStatus = getBaseAutoPickStatusDisplay(order.status);
   const baseStatusLabel = baseStatus === "待处理" ? "处理中" : baseStatus;
-  const statusLabel = returned ? "已退" : baseStatusLabel;
-  const cancelled = isCancelledStatus(order.status) || statusLabel === "已删除";
-  const cancelReason = cancelled ? getCancelReason(order) : "";
-  const completed = isCompletedStatus(order.status);
+  const statusLabel = isFullyRefunded ? "已取消" : (returned ? "已退" : baseStatusLabel);
+  const cancelled = isCancelledStatus(order.status) || statusLabel === "已删除" || isFullyRefunded;
+  const cancelReason = cancelled ? (getCancelReason(order) || (isFullyRefunded ? "全单退款" : "")) : "";
+  const completed = !isFullyRefunded && isCompletedStatus(order.status);
   const deleted = statusLabel === "已删除";
   const terminal = cancelled || completed || deleted;
   const pickup = Boolean(order.isPickup) || isAutoPickPickupOrder(order.rawPayload, order.userAddress, order.shopAddress);

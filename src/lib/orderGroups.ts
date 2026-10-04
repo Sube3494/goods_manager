@@ -1,4 +1,4 @@
-import { getBaseAutoPickStatusDisplay } from "./autoPickOrderStatus";
+import { getBaseAutoPickStatusDisplay, isOrderFullyRefunded } from "./autoPickOrderStatus";
 import type { AutoPickOrder } from "./types";
 
 export const ORDER_GROUPS = [
@@ -46,9 +46,11 @@ export function hasOrderFulfillmentItems(items?: AutoPickOrder["items"] | null):
 
 // 只有履约已完成且确认出库的普通订单才能进入已完成分组。
 // 纯配送/跑腿等无需出库商品的订单在履约完成后直接进入已完成。
+// 全单退款的订单统一归入已取消分组。
 export function getOrderGroup(order: AutoPickOrder, isBrush: boolean): OrderGroupKey {
   const status = getBaseAutoPickStatusDisplay(order.status);
-  if (order.isDeleted || status === "已删除" || status === "已取消") return "closed";
+  const fullyRefunded = isOrderFullyRefunded(order);
+  if (order.isDeleted || status === "已删除" || status === "已取消" || fullyRefunded) return "closed";
   if (isBrush) return "brush";
   if (status !== "已完成") return "pending";
 

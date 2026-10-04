@@ -2091,7 +2091,7 @@ export async function GET(request: NextRequest) {
           if (!cancelled && !deleted) {
             const isBrush = readMainSystemSelfDeliveryFlag(order.rawPayload);
             const refundAmount = readRefundAmountFromRawPayload(order.rawPayload, actualPaid, outboundMeta);
-            const fullyRefunded = isFullyRefundedOrder(actualPaid, refundAmount);
+            const fullyRefunded = isFullyRefundedOrder(actualPaid, refundAmount) || outboundMeta?.isFullyReturned === true;
             const adjustedMetrics = resolveRefundAdjustedIncomeMetrics({
               expectedIncome: metrics.expectedIncome,
               platformCommission: metrics.platformCommission,
@@ -2257,7 +2257,8 @@ export async function GET(request: NextRequest) {
         const refundAmount = readRefundAmountFromRawPayload(order.rawPayload, order.actualPaid, outboundMeta);
         const cancelled = isAutoPickOrderCancelledStatus(order.status)
           || isAutoPickOrderDeletedStatus(order.status)
-          || isFullyRefundedOrder(order.actualPaid, refundAmount);
+          || isFullyRefundedOrder(order.actualPaid, refundAmount)
+          || outboundMeta?.isFullyReturned === true;
         if (cancelled) {
           cancelledPlatformCounts[platform] = (cancelledPlatformCounts[platform] || 0) + 1;
         } else {

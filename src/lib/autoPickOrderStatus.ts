@@ -19,6 +19,67 @@ export function getAutoPickStatusFilterLabel(status?: string | null) {
   return getBaseAutoPickStatusDisplay(status);
 }
 
+export function isOrderFullyRefunded(order?: {
+  actualPaid?: number | null;
+  expectedIncome?: number | null;
+  refundAmount?: number | null;
+  status?: string | null;
+  outboundMeta?: { isFullyReturned?: boolean } | null;
+  outboundReturnDetails?: Array<{
+    reason?: string;
+    items?: Array<{ quantity?: number }>;
+  }> | null;
+  items?: Array<{ quantity?: number }>;
+  rawPayload?: unknown;
+} | null): boolean {
+  if (!order) return false;
+
+  // 1. 出库明确标记全单退货对冲
+  if (order.outboundMeta?.isFullyReturned === true) {
+    return true;
+  }
+
+  // 2. 状态文本本身含有退款成功/已退款/全额退款
+  const statusText = String(order.status || "").trim();
+  if (/已退款|全额退款|退款成功|全部退款/.test(statusText)) {
+    return true;
+  }
+
+  const actualPaid = Math.max(0, Number(order.actualPaid || 0));
+  const refundAmount = Math.max(0, Number(order.refundAmount || 0));
+
+  // 3. 退款金额大于等于实付金额（全额退款）
+  if (actualPaid > 0 && refundAmount >= actualPaid) {
+    return true;
+  }
+
+  // 4. 到手为 0 且存在退款金额或退货记录（整单退款）
+  const expectedIncome = order.expectedIncome != null ? Number(order.expectedIncome) : null;
+  if (expectedIncome === 0 && actualPaid > 0 && refundAmount > 0) {
+    return true;
+  }
+
+  // 5. 检查出库退货详情：如果退货商品总数 >= 订单商品总数（且大于0）
+  const returnDetails = Array.isArray(order.outboundReturnDetails) ? order.outboundReturnDetails : [];
+  if (returnDetails.length > 0 && Array.isArray(order.items) && order.items.length > 0) {
+    const validReturnEntries = returnDetails.filter((e) => {
+      const reason = String(e?.reason || "").trim();
+      return !/重匹配|自动回滚|自动重建|改匹配/.test(reason);
+    });
+    if (validReturnEntries.length > 0) {
+      const totalReturnedQuantity = validReturnEntries.reduce((sum, entry) => {
+        return sum + (entry.items || []).reduce((iSum, it) => iSum + Math.max(0, Number(it.quantity || 0)), 0);
+      }, 0);
+      const totalOrderQuantity = order.items.reduce((sum, item) => sum + Math.max(0, Number(item.quantity || 0)), 0);
+      if (totalOrderQuantity > 0 && totalReturnedQuantity >= totalOrderQuantity) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
 export function matchesAutoPickStatusFilter(
   order: { status?: string | null; productCostStatus?: "ready" | "pending-outbound" | "pending-backfill" | null },
   filter?: string | null
@@ -32,6 +93,13 @@ export function matchesAutoPickStatusFilter(
   }
   if (value === "pending-backfill") {
     return order.productCostStatus === "pending-backfill";
+  }
+  const fullyRefunded = isOrderFullyRefunded(order as any);
+  if (value === "已取消" && fullyRefunded) {
+    return true;
+  }
+  if (value === "已完成" && fullyRefunded) {
+    return false;
   }
   return getBaseAutoPickStatusDisplay(order.status) === getBaseAutoPickStatusDisplay(value);
 }

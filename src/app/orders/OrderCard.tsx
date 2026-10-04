@@ -44,6 +44,7 @@ import {
   isAutoPickOrderTerminalStatus,
   isDeliveryCancelledOrEmpty,
   isLockedSubscribeOrder,
+  isOrderFullyRefunded,
   isSelfDeliveryOrCancelledDelivery,
   readDeliveryFeeFromValue,
 } from "@/lib/autoPickOrderStatus";
@@ -283,7 +284,8 @@ export function summarizeOrders(orders: AutoPickOrder[]) {
     return "线下交易";
   };
   return orders.reduce((acc, order) => {
-    if (!isCancelledStatus(order.status) && !isDeletedStatus(order.status)) {
+    const isFullyRefunded = isOrderFullyRefunded(order);
+    if (!isCancelledStatus(order.status) && !isDeletedStatus(order.status) && !isFullyRefunded) {
       const isOffline = order.platform === "线下交易" || String(order.platform || "").toLowerCase() === "other";
       const expectedIncome = Math.max(0, getExpectedIncome(order.expectedIncome, order.actualPaid, order.platformCommission, order.platform));
       const actualPaid = isOffline && (!order.actualPaid || Number(order.actualPaid) <= 0) && expectedIncome > 0
@@ -490,7 +492,10 @@ export function getAutoPickSyncSkippedReasonText(raw: unknown) {
 }
 
 
-export function getDisplayStatus(order: Pick<AutoPickOrder, "isPickup" | "status" | "platform" | "isPickCompleted">) {
+export function getDisplayStatus(order: Pick<AutoPickOrder, "isPickup" | "status" | "platform" | "isPickCompleted"> & Partial<Pick<AutoPickOrder, "outboundMeta" | "refundAmount" | "actualPaid" | "expectedIncome" | "outboundReturnDetails" | "items">>) {
+  if (isOrderFullyRefunded(order as any)) {
+    return "已取消";
+  }
   const normalizedStatus = getBaseAutoPickStatusDisplay(order.status);
   const baseStatus = normalizedStatus === "待处理" ? "处理中" : normalizedStatus;
   if (order.platform === "线下交易") {
@@ -1489,11 +1494,12 @@ export function PromotionMetricCard({
 }
 
 
-export function StatusBadge({ order }: { order: Pick<AutoPickOrder, "isPickup" | "status" | "platform" | "isPickCompleted" | "cancelReason" | "rawPayload"> & { cancelDetails?: unknown } }) {
-  const display = getDisplayStatus(order);
+export function StatusBadge({ order }: { order: Pick<AutoPickOrder, "isPickup" | "status" | "platform" | "isPickCompleted" | "cancelReason" | "rawPayload"> & { cancelDetails?: unknown; outboundMeta?: unknown; refundAmount?: unknown; actualPaid?: unknown; expectedIncome?: unknown; outboundReturnDetails?: unknown; items?: unknown } }) {
+  const display = getDisplayStatus(order as any);
   const tone = getStatusTone(display);
-  const isCancelled = display === "已取消" || isCancelledStatus(order.status);
-  const cancelReason = isCancelled ? getCancelReason(order) : "";
+  const fullyRefunded = isOrderFullyRefunded(order as any);
+  const isCancelled = display === "已取消" || isCancelledStatus(order.status) || fullyRefunded;
+  const cancelReason = isCancelled ? (getCancelReason(order) || (fullyRefunded ? "全单退款" : "")) : "";
   return (
     <span className="group/status relative inline-flex">
       <span
@@ -3742,11 +3748,12 @@ export const OrderCard = memo(function OrderCard({
   const unmatchedPlaceholderItem = (order.items || []).find(isUnmatchedOrIgnoredItem);
   const itemCount = getItemCount(visibleItems);
   const usefulCustomerRemark = cleanCustomerRemark(order.customerRemark);
-  const completed = isCompletedStatus(order.status);
-  const cancelled = isCancelledStatus(order.status);
-  const cancelReason = cancelled ? getCancelReason(order) : "";
+  const isFullyRefunded = isOrderFullyRefunded(order);
+  const completed = !isFullyRefunded && isCompletedStatus(order.status);
+  const cancelled = isCancelledStatus(order.status) || isFullyRefunded;
+  const cancelReason = cancelled ? (getCancelReason(order) || (isFullyRefunded ? "全单退款" : "")) : "";
   const deleted = getBaseAutoPickStatusDisplay(order.status) === "已删除";
-  const terminal = isTerminalStatus(order.status);
+  const terminal = isTerminalStatus(order.status) || isFullyRefunded;
   const abnormal = isAbnormalStatus(order.status);
   const deliveryFee = getDeliveryFee(order.delivery, order);
   const isSelfDeliveryOrCancelled = isSelfDeliveryOrCancelledDelivery(order.delivery, order.rawPayload ?? order.isMainSystemSelfDelivery);
