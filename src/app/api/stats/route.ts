@@ -28,6 +28,7 @@ import { AUTO_INBOUND_NOTE_KEYWORD, AUTO_INBOUND_TYPE, ORDER_SHORTAGE_PURCHASE_N
 import { isAddressDisabled } from "@/lib/addressBook";
 import { normalizeShopNameKey, isShopNameMatch, stripShopSuffix } from "@/lib/shopIdentity";
 import { parseOutboundNote } from "@/lib/utils";
+import { resolveCancelledJDDeliveredCommissionLoss } from "@/lib/orderFinancials";
 
 const SHANGHAI_DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -1140,6 +1141,30 @@ export async function GET(request: NextRequest) {
             platformPoint.pureProfit = FinanceMath.add(platformPoint.pureProfit, -deliveryYuan);
             platformPoint.platformPureProfit[platform] = FinanceMath.add(platformPoint.platformPureProfit[platform] || 0, -deliveryYuan);
             addShopPureProfit(platformPoint, -deliveryYuan);
+          }
+        }
+        const cancelledCommissionLoss = resolveCancelledJDDeliveredCommissionLoss({
+          platform,
+          delivery: order.delivery,
+          rawPayload: order.rawPayload,
+          completedAt: (order as Record<string, unknown>).completedAt,
+          platformCommission: order.platformCommission,
+          actualPaid: order.actualPaid,
+          expectedIncome: order.expectedIncome,
+        });
+        const cancelledCommissionLossYuan = cancelledCommissionLoss / 100;
+        if (cancelledCommissionLossYuan > 0) {
+          if (point) {
+            point.pureProfit = FinanceMath.add(point.pureProfit, -cancelledCommissionLossYuan);
+            point.platformPureProfit[platform] = FinanceMath.add(point.platformPureProfit[platform] || 0, -cancelledCommissionLossYuan);
+            point.platformCommission = FinanceMath.add(point.platformCommission, cancelledCommissionLossYuan);
+            addShopPureProfit(point, -cancelledCommissionLossYuan);
+          }
+          if (platformPoint) {
+            platformPoint.pureProfit = FinanceMath.add(platformPoint.pureProfit, -cancelledCommissionLossYuan);
+            platformPoint.platformPureProfit[platform] = FinanceMath.add(platformPoint.platformPureProfit[platform] || 0, -cancelledCommissionLossYuan);
+            platformPoint.platformCommission = FinanceMath.add(platformPoint.platformCommission, cancelledCommissionLossYuan);
+            addShopPureProfit(platformPoint, -cancelledCommissionLossYuan);
           }
         }
         const cancelledExtraExpenses = readOrderExtraExpensesFromRawPayload(order.rawPayload);

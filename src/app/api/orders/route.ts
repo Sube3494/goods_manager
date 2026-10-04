@@ -49,6 +49,7 @@ import {
 import { isAddressDisabled } from "@/lib/addressBook";
 import {
   hasExplicitDeliveryPickupProof,
+  resolveCancelledJDDeliveredCommissionLoss,
   resolveCancelledOrderPureProfit,
   resolveOrderRefundAmount,
 } from "@/lib/orderFinancials";
@@ -2075,6 +2076,28 @@ export async function GET(request: NextRequest) {
             shopProfit.platformProfit[platform] = (shopProfit.platformProfit[platform] || 0) - deliveryFee;
           }
           if (cancelled || deleted) {
+            const cancelledCommissionLoss = resolveCancelledJDDeliveredCommissionLoss({
+              platform,
+              delivery: order.delivery,
+              rawPayload: order.rawPayload,
+              completedAt: (order as Record<string, unknown>).completedAt,
+              platformCommission: metrics.platformCommission,
+              actualPaid,
+              expectedIncome: metrics.expectedIncome,
+            });
+            if (cancelledCommissionLoss > 0) {
+              acc.pureProfit -= cancelledCommissionLoss;
+              if (!acc.platformProfit[platform]) {
+                acc.platformProfit[platform] = { amount: 0, count: 0 };
+              }
+              acc.platformProfit[platform].amount -= cancelledCommissionLoss;
+              acc.platformCommission += cancelledCommissionLoss;
+              const shopProfit = ensureShopProfit();
+              shopProfit.amount -= cancelledCommissionLoss;
+              shopProfit.platformProfit[platform] = (shopProfit.platformProfit[platform] || 0) - cancelledCommissionLoss;
+              shopProfit.platformCommission += cancelledCommissionLoss;
+            }
+
             const cancelledExtraExpenses = readOrderExtraExpensesFromRawPayload(order.rawPayload);
             const cancelledTotalExtraExpense = calculateOrderTotalExtraExpense(cancelledExtraExpenses);
             if (cancelledTotalExtraExpense > 0) {
@@ -2705,9 +2728,21 @@ export async function GET(request: NextRequest) {
       const orderBrushCommission = Math.round(orderBrushCommissionYuan * 100);
       const extraExpenses = readOrderExtraExpensesFromRawPayload(order.rawPayload);
       const totalExtraExpense = calculateOrderTotalExtraExpense(extraExpenses);
+      const cancelledCommissionLoss = (cancelled || deleted)
+        ? resolveCancelledJDDeliveredCommissionLoss({
+            platform: order.platform,
+            delivery: order.delivery,
+            rawPayload: order.rawPayload,
+            completedAt: (order as Record<string, unknown>).completedAt,
+            platformCommission: order.platformCommission,
+            actualPaid: order.actualPaid,
+            expectedIncome: order.expectedIncome,
+          })
+        : 0;
       const cancelledPureProfit = resolveCancelledOrderPureProfit(
         cancelledDeliveryLoss ? deliveryFee : 0,
         returnExtraExpense + totalExtraExpense,
+        cancelledCommissionLoss,
       );
 
       const pureProfit = hiddenDeletedOfflineIncome
@@ -2740,6 +2775,7 @@ export async function GET(request: NextRequest) {
         refundAmount,
         cancelReason: readCancelReasonFromRawPayload(order.rawPayload),
         returnExtraExpense,
+        cancelledCommissionLoss: cancelledCommissionLoss > 0 ? cancelledCommissionLoss : null,
         extraExpenses,
         totalExtraExpense,
         platformCommission: adjustedMetrics.platformCommission,

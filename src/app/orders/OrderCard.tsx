@@ -51,6 +51,7 @@ import {
 import { formatLocalDate, formatLocalDateTime } from "@/lib/dateUtils";
 import { isRematchReturnReason } from "@/lib/outboundReturnMeta";
 import { cleanCustomerRemark } from "@/lib/customerRemark";
+import { resolveCancelledJDDeliveredCommissionLoss } from "@/lib/orderFinancials";
 
 const OrderRouteModal = dynamic(() => import("@/components/Orders/OrderRouteModal").then((module) => module.OrderRouteModal), { ssr: false });
 const CustomerHistoryModal = dynamic(() => import("@/components/Orders/CustomerHistoryModal").then((module) => module.CustomerHistoryModal), { ssr: false });
@@ -3153,11 +3154,26 @@ export const OrderProfitBadge = memo(function OrderProfitBadge({
     return null;
   }
 
+  const cancelledCommissionLoss = typeof order.cancelledCommissionLoss === "number" && order.cancelledCommissionLoss > 0
+    ? order.cancelledCommissionLoss
+    : (cancelled
+        ? resolveCancelledJDDeliveredCommissionLoss({
+            platform: order.platform,
+            delivery: order.delivery,
+            rawPayload: order.rawPayload,
+            completedAt: order.completedAt,
+            platformCommission: order.platformCommission,
+            actualPaid: order.actualPaid,
+            expectedIncome: order.expectedIncome,
+          })
+        : 0);
+
   const pureProfitTooltipRows: Array<{ label: string; value: string; editable?: boolean; onEdit?: () => void }> = hasPureProfit
     ? (cancelled
       ? [
           { label: "订单状态", value: isFullyRefunded ? "全单已退款" : "订单已取消" },
           ...(deliveryFee > 0 ? [{ label: "配送费损失", value: toCurrency(-deliveryFee) }] : []),
+          ...(cancelledCommissionLoss > 0 ? [{ label: "平台佣金损失（送达不退）", value: toCurrency(-cancelledCommissionLoss) }] : []),
           ...(hasReturnExtraExpense ? [{ label: "退货支出", value: toCurrency(-returnExtraExpense) }] : []),
           ...extraExpensesRows,
         ]

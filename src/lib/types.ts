@@ -297,6 +297,7 @@ export interface AutoPickOrder {
   refundAmount?: number | null;
   cancelReason?: string | null;
   returnExtraExpense?: number | null;
+  cancelledCommissionLoss?: number | null;
   extraExpenses?: Array<{
     id: string;
     name: string;

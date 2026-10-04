@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import {
   hasExplicitDeliveryPickupProof,
+  hasOrderDeliveredProof,
+  isJDPlatformOrder,
   readConfirmedRefundAmountFromRawPayload,
+  resolveCancelledJDDeliveredCommissionLoss,
   resolveCancelledOrderPureProfit,
   resolveOrderRefundAmount,
 } from "../src/lib/orderFinancials.ts";
@@ -192,4 +195,86 @@ assert.equal(
   "骑手已取货并产生配送费时应显示负利润",
 );
 
+// 京东平台识别
+assert.equal(isJDPlatformOrder("京东"), true, "标准'京东'应识别为京东平台");
+assert.equal(isJDPlatformOrder("美团"), false, "'美团'不应识别为京东平台");
+assert.equal(isJDPlatformOrder("其他", { channel_tag: "daojia" }), true, "渠道为daojia应识别为京东平台");
+
+// 送达凭证识别
+assert.equal(
+  hasOrderDeliveredProof({ track: "配送完成" }),
+  true,
+  "配送轨迹为配送完成应识别为已送达",
+);
+assert.equal(
+  hasOrderDeliveredProof({ track: "已送达" }),
+  true,
+  "配送轨迹为已送达应识别为已送达",
+);
+assert.equal(
+  hasOrderDeliveredProof({ completedTime: "2026-10-04 12:00:00" }),
+  true,
+  "有完成时间应识别为已送达",
+);
+assert.equal(
+  hasOrderDeliveredProof({ track: "配送中" }),
+  false,
+  "仅配送中不能识别为已送达",
+);
+assert.equal(
+  hasOrderDeliveredProof({ track: "抢单成功" }),
+  false,
+  "抢单成功不能识别为已送达",
+);
+
+// 京东送达后取消佣金损失核算
+assert.equal(
+  resolveCancelledJDDeliveredCommissionLoss({
+    platform: "京东",
+    delivery: { track: "配送完成" },
+    platformCommission: 600,
+  }),
+  600,
+  "京东送达后取消应将平台佣金计为损失",
+);
+
+assert.equal(
+  resolveCancelledJDDeliveredCommissionLoss({
+    platform: "京东",
+    delivery: { track: "配送中" },
+    platformCommission: 600,
+  }),
+  0,
+  "京东送达前取消不产生佣金损失",
+);
+
+assert.equal(
+  resolveCancelledJDDeliveredCommissionLoss({
+    platform: "美团",
+    delivery: { track: "配送完成" },
+    platformCommission: 600,
+  }),
+  0,
+  "美团送达后取消不按京东规则核算佣金损失",
+);
+
+assert.equal(
+  resolveCancelledJDDeliveredCommissionLoss({
+    platform: "京东",
+    delivery: { track: "配送完成" },
+    platformCommission: 0,
+    actualPaid: 10000,
+    expectedIncome: 9400,
+  }),
+  600,
+  "京东送达后佣金为0但有实付与预计到手差额时应按差额核算损失",
+);
+
+assert.equal(
+  resolveCancelledOrderPureProfit(500, 200, 600),
+  -1300,
+  "取消订单在有配送费、退货支出及平台佣金损失时应汇总为净亏损",
+);
+
 console.log("order financial regression tests passed");
+
