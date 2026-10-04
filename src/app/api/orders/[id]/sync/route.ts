@@ -27,6 +27,7 @@ import {
   isAutoPickOrderCancelledStatus,
   isAutoPickOrderCompletedStatus,
   isAutoPickOrderDeliveringStatus,
+  isOrderFullyRefunded,
   readDeliveryFeeFromValue,
   readMainSystemSelfDeliveryFlag,
 } from "@/lib/autoPickOrderStatus";
@@ -98,7 +99,12 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
         isAutoPickOrderAbnormalStatus(refreshedOrder.status) ? "order-synced-to-abnormal" : "order-synced-to-terminal"
       );
     }
-    if (isAutoPickOrderCompletedStatus(refreshedOrder.status)) {
+    const wasCancelledOrRefunded = isAutoPickOrderCancelledStatus(order.status)
+      || isOrderFullyRefunded(order as any);
+    const isNowCancelledOrRefunded = isAutoPickOrderCancelledStatus(refreshedOrder.status)
+      || isOrderFullyRefunded(refreshedOrder as any);
+
+    if (isAutoPickOrderCompletedStatus(refreshedOrder.status) && !wasCancelledOrRefunded && !isNowCancelledOrRefunded) {
       await syncBrushOrderFromCompletedAutoPickOrder(order.userId, refreshedOrder.id).catch((brushError) => {
         console.error("Failed to sync brush order after order sync:", brushError);
       });

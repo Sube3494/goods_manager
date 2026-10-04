@@ -45,8 +45,12 @@ export function isOrderFullyRefunded(order?: {
     return true;
   }
 
-  const actualPaid = Math.max(0, Number(order.actualPaid || 0));
-  const refundAmount = Math.max(0, Number(order.refundAmount || 0));
+  const rawPayloadObj = order.rawPayload && typeof order.rawPayload === "object" && !Array.isArray(order.rawPayload)
+    ? (order.rawPayload as Record<string, unknown>)
+    : null;
+  const rawRefundAmount = rawPayloadObj ? Number(rawPayloadObj.refundAmount ?? rawPayloadObj.refund_amount) : 0;
+  const actualPaid = Math.max(0, Number(order.actualPaid || (rawPayloadObj?.actualPaid ?? rawPayloadObj?.actual_paid) || 0));
+  const refundAmount = Math.max(0, Number(order.refundAmount || (Number.isFinite(rawRefundAmount) && rawRefundAmount > 0 ? rawRefundAmount : 0)));
 
   // 3. 退款金额大于等于实付金额（全额退款）
   if (actualPaid > 0 && refundAmount >= actualPaid) {
@@ -54,7 +58,7 @@ export function isOrderFullyRefunded(order?: {
   }
 
   // 4. 到手为 0 且存在退款金额或退货记录（整单退款）
-  const expectedIncome = order.expectedIncome != null ? Number(order.expectedIncome) : null;
+  const expectedIncome = order.expectedIncome != null ? Number(order.expectedIncome) : (rawPayloadObj?.expectedIncome != null ? Number(rawPayloadObj.expectedIncome) : null);
   if (expectedIncome === 0 && actualPaid > 0 && refundAmount > 0) {
     return true;
   }
