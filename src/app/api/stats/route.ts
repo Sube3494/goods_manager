@@ -7,6 +7,8 @@ import {
   normalizeAutoPickIntegrationConfig,
   readCustomerTypeFromRawPayload,
   readDeliveryFeeFromValue,
+  readOrderExtraExpensesFromRawPayload,
+  calculateOrderTotalExtraExpense,
   resolveAutoPickMatchedShopName,
 } from "@/lib/autoPickOrders";
 import {
@@ -1140,6 +1142,21 @@ export async function GET(request: NextRequest) {
             addShopPureProfit(platformPoint, -deliveryYuan);
           }
         }
+        const cancelledExtraExpenses = readOrderExtraExpensesFromRawPayload(order.rawPayload);
+        const cancelledExtraExpensesCents = calculateOrderTotalExtraExpense(cancelledExtraExpenses);
+        const cancelledExtraExpensesYuan = cancelledExtraExpensesCents / 100;
+        if (cancelledExtraExpensesYuan > 0) {
+          if (point) {
+            point.pureProfit = FinanceMath.add(point.pureProfit, -cancelledExtraExpensesYuan);
+            point.platformPureProfit[platform] = FinanceMath.add(point.platformPureProfit[platform] || 0, -cancelledExtraExpensesYuan);
+            addShopPureProfit(point, -cancelledExtraExpensesYuan);
+          }
+          if (platformPoint) {
+            platformPoint.pureProfit = FinanceMath.add(platformPoint.pureProfit, -cancelledExtraExpensesYuan);
+            platformPoint.platformPureProfit[platform] = FinanceMath.add(platformPoint.platformPureProfit[platform] || 0, -cancelledExtraExpensesYuan);
+            addShopPureProfit(platformPoint, -cancelledExtraExpensesYuan);
+          }
+        }
       } else {
         const manualAmountOverride = readManualAmountOverride(order.rawPayload);
         const isOffline = order.platform === "线下交易" || String(order.platform || "").toLowerCase() === "other";
@@ -1215,7 +1232,9 @@ export async function GET(request: NextRequest) {
                 rawPayload: order.rawPayload,
               });
           const orderBrushCommissionCents = Math.round(orderBrushCommission * 100);
-          const brushPureProfitCents = -Math.round(commissionYuan * 100) - orderBrushCommissionCents - Math.round(returnExtraExpenseYuan * 100);
+          const extraExpenses = readOrderExtraExpensesFromRawPayload(order.rawPayload);
+          const extraExpensesCents = calculateOrderTotalExtraExpense(extraExpenses);
+          const brushPureProfitCents = -Math.round(commissionYuan * 100) - orderBrushCommissionCents - Math.round(returnExtraExpenseYuan * 100) - extraExpensesCents;
           const brushPureProfit = brushPureProfitCents / 100;
           if (point) {
             point.brushPaid = FinanceMath.add(point.brushPaid, adjustedPaidYuan);
@@ -1230,6 +1249,8 @@ export async function GET(request: NextRequest) {
             addShopPureProfit(platformPoint, brushPureProfit);
           }
         } else {
+          const extraExpenses = readOrderExtraExpensesFromRawPayload(order.rawPayload);
+          const extraExpensesCents = calculateOrderTotalExtraExpense(extraExpenses);
           const orderCostYuan = orderCostMeta?.productCost || 0;
           if (point) {
             point.productCost = FinanceMath.add(point.productCost, orderCostYuan);
@@ -1256,9 +1277,9 @@ export async function GET(request: NextRequest) {
           const returnExtraExpenseCents = Math.round(returnExtraExpenseYuan * 100);
 
           const pureProfitCents = isManualDeliveryLoss
-            ? -deliveryFeeCents
+            ? -deliveryFeeCents - extraExpensesCents
             : (productCostStatus === "ready"
-              ? Math.round(expectedIncomeCents * (1 - rate)) - deliveryFeeCents - productCostCents - returnExtraExpenseCents
+              ? Math.round(expectedIncomeCents * (1 - rate)) - deliveryFeeCents - productCostCents - returnExtraExpenseCents - extraExpensesCents
               : null);
 
           const pureProfit = typeof pureProfitCents === "number" && Number.isFinite(pureProfitCents)

@@ -17,6 +17,8 @@ import {
   readAdminRemarkFromRawPayload,
   readCustomerTypeFromRawPayload,
   readDeliveryFeeFromValue,
+  readOrderExtraExpensesFromRawPayload,
+  calculateOrderTotalExtraExpense,
   readRiderPhoneFromDelivery,
   readRiderPhoneFromRawPayload,
   syncDoudianSkuIdForShopProduct,
@@ -1952,9 +1954,8 @@ export async function GET(request: NextRequest) {
       const hasOrderFulfillment = hasAutoPickFulfillmentItems(order.items);
       const isOutboundEmpty = Boolean(outboundMeta && (outboundMeta.itemCount === 0 || (outboundMeta.breakdown?.length || 0) === 0));
       const effectiveHasOutbound = hasOutbound
-        && outboundMeta?.isFullyReturned !== true
         && (!hasOrderFulfillment || !isOutboundEmpty);
-      if (cancelledDeliveryLoss || manualDeliveryLoss || !hasOrderFulfillment) {
+      if (cancelledDeliveryLoss || manualDeliveryLoss || !hasOrderFulfillment || outboundMeta?.isFullyReturned === true) {
         return "ready";
       }
       if (!effectiveHasOutbound) {
@@ -2073,6 +2074,20 @@ export async function GET(request: NextRequest) {
             shopProfit.deliveryFee += deliveryFee;
             shopProfit.platformProfit[platform] = (shopProfit.platformProfit[platform] || 0) - deliveryFee;
           }
+          if (cancelled || deleted) {
+            const cancelledExtraExpenses = readOrderExtraExpensesFromRawPayload(order.rawPayload);
+            const cancelledTotalExtraExpense = calculateOrderTotalExtraExpense(cancelledExtraExpenses);
+            if (cancelledTotalExtraExpense > 0) {
+              acc.pureProfit -= cancelledTotalExtraExpense;
+              if (!acc.platformProfit[platform]) {
+                acc.platformProfit[platform] = { amount: 0, count: 0 };
+              }
+              acc.platformProfit[platform].amount -= cancelledTotalExtraExpense;
+              const shopProfit = ensureShopProfit();
+              shopProfit.amount -= cancelledTotalExtraExpense;
+              shopProfit.platformProfit[platform] = (shopProfit.platformProfit[platform] || 0) - cancelledTotalExtraExpense;
+            }
+          }
           if (!cancelled && !deleted) {
             const isBrush = readMainSystemSelfDeliveryFlag(order.rawPayload);
             const refundAmount = readRefundAmountFromRawPayload(order.rawPayload, actualPaid, outboundMeta);
@@ -2162,14 +2177,16 @@ export async function GET(request: NextRequest) {
                   rawPayload: order.rawPayload,
                 });
             const orderBrushCommission = Math.round(orderBrushCommissionYuan * 100);
+            const extraExpenses = readOrderExtraExpensesFromRawPayload(order.rawPayload);
+            const totalExtraExpense = calculateOrderTotalExtraExpense(extraExpenses);
             const orderPureProfit = hiddenDeletedOfflineIncome
               ? null
               : isManualDeliveryLoss
-              ? -deliveryFee
+              ? -deliveryFee - totalExtraExpense
               : isBrush
-              ? -Number(adjustedMetrics.platformCommission || 0) - orderBrushCommission - returnExtraExpense
+              ? -Number(adjustedMetrics.platformCommission || 0) - orderBrushCommission - returnExtraExpense - totalExtraExpense
               : (productCostStatus === "ready"
-                ? Math.round(Number(safeExpectedIncome || 0) * (1 - serviceFeeRate)) - deliveryFee - productCost - returnExtraExpense
+                ? Math.round(Number(safeExpectedIncome || 0) * (1 - serviceFeeRate)) - deliveryFee - productCost - returnExtraExpense - totalExtraExpense
                 : null);
 
             const profitValue = typeof orderPureProfit === "number" && Number.isFinite(orderPureProfit) ? orderPureProfit : 0;
@@ -2663,10 +2680,9 @@ export async function GET(request: NextRequest) {
       }) && !hasFulfillmentItems;
       const isOutboundEmpty = Boolean(outboundMeta && (outboundMeta.itemCount === 0 || (outboundMeta.breakdown?.length || 0) === 0));
       const effectiveHasOutbound = hasOutbound
-        && outboundMeta?.isFullyReturned !== true
         && (!hasFulfillmentItems || !isOutboundEmpty);
       const missingCostItemCount = outboundMeta?.missingCostItemCount || 0;
-      const productCostStatus = cancelledDeliveryLoss || manualDeliveryLoss || !hasFulfillmentItems
+      const productCostStatus = cancelledDeliveryLoss || manualDeliveryLoss || !hasFulfillmentItems || outboundMeta?.isFullyReturned === true
         ? "ready" as const
         : !effectiveHasOutbound
         ? "pending-outbound" as const
@@ -2688,9 +2704,11 @@ export async function GET(request: NextRequest) {
             rawPayload: order.rawPayload,
           });
       const orderBrushCommission = Math.round(orderBrushCommissionYuan * 100);
+      const extraExpenses = readOrderExtraExpensesFromRawPayload(order.rawPayload);
+      const totalExtraExpense = calculateOrderTotalExtraExpense(extraExpenses);
       const cancelledPureProfit = resolveCancelledOrderPureProfit(
         cancelledDeliveryLoss ? deliveryFee : 0,
-        returnExtraExpense,
+        returnExtraExpense + totalExtraExpense,
       );
 
       const pureProfit = hiddenDeletedOfflineIncome
@@ -2698,11 +2716,11 @@ export async function GET(request: NextRequest) {
         : (cancelled || deleted)
         ? cancelledPureProfit
         : manualDeliveryLoss
-        ? -deliveryFee
+        ? -deliveryFee - totalExtraExpense
         : order.isMainSystemSelfDelivery
-        ? -Number(order.platformCommission || 0) - orderBrushCommission - returnExtraExpense
+        ? -Number(order.platformCommission || 0) - orderBrushCommission - returnExtraExpense - totalExtraExpense
         : (productCostStatus === "ready"
-          ? Math.round(Number(safeExpectedIncome || 0) * (1 - serviceFeeRate)) - deliveryFee - productCost - returnExtraExpense
+          ? Math.round(Number(safeExpectedIncome || 0) * (1 - serviceFeeRate)) - deliveryFee - productCost - returnExtraExpense - totalExtraExpense
           : null);
 
       const normalizedDelivery = order.delivery && typeof order.delivery === "object" && !Array.isArray(order.delivery)
@@ -2723,6 +2741,8 @@ export async function GET(request: NextRequest) {
         refundAmount,
         cancelReason: readCancelReasonFromRawPayload(order.rawPayload),
         returnExtraExpense,
+        extraExpenses,
+        totalExtraExpense,
         platformCommission: adjustedMetrics.platformCommission,
         brushCommission: orderBrushCommissionYuan,
         matchedShopId,

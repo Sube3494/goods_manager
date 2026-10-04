@@ -51,6 +51,7 @@ import { ORDER_GROUPS, getOrderGroup } from "@/lib/orderGroups";
 import { isRematchReturnReason } from "@/lib/outboundReturnMeta";
 import { motion, AnimatePresence, LayoutGroup, useReducedMotion } from "framer-motion";
 import { DeliveryDispatchModal } from "@/components/Orders/DeliveryDispatchModal";
+import { OrderExtraExpenseModal } from "@/components/Orders/OrderExtraExpenseModal";
 import { createOrderShortagePurchaseDraft, OrderPurchaseDraft, OrderShortageItem } from "@/lib/orderShortagePurchase";
 
 const CompactOrderRouteModal = dynamic(() => import("@/components/Orders/OrderRouteModal").then((module) => module.OrderRouteModal), { ssr: false });
@@ -129,6 +130,7 @@ function CompactTodayOrderCard({
   onOpenMatchEditor,
   onRemoveBundleComponent,
   onOpenCostBackfill,
+  onEditExtraExpenses,
 }: {
   order: AutoPickOrder;
   actingId: string;
@@ -141,6 +143,7 @@ function CompactTodayOrderCard({
   onOpenMatchEditor: (item: AutoPickOrderItem, options?: { autoOutbound?: boolean; componentIndex?: number; componentDisplay?: any; currentBundleItems?: any[]; isAddingBundleItem?: boolean }) => void;
   onRemoveBundleComponent?: (order: AutoPickOrder, item: AutoPickOrderItem, componentIndex: number, componentName?: string, currentBundleItems?: any[]) => void;
   onOpenCostBackfill?: (order: AutoPickOrder) => void;
+  onEditExtraExpenses?: (order: AutoPickOrder) => void;
 }) {
   const [routeOpen, setRouteOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -243,6 +246,7 @@ function CompactTodayOrderCard({
                   canViewProductCosts={canViewProductCosts}
                   isProfitUpdating={isProfitUpdating}
                   onOpenCostBackfill={onOpenCostBackfill}
+                  onEditExtraExpenses={readOnly || !onEditExtraExpenses ? undefined : () => onEditExtraExpenses(order)}
                 />
               ) : (
                 <span className="group/status relative inline-flex">
@@ -601,6 +605,7 @@ export function TodayOrdersView({
   
   const [actingId, setActingId] = useState("");
   const [dispatchTarget, setDispatchTarget] = useState<AutoPickOrder | null>(null);
+  const [extraExpensesTarget, setExtraExpensesTarget] = useState<AutoPickOrder | null>(null);
   const [expandedIds, setExpandedIds] = useState<string[]>([]);
   const [detailOrderId, setDetailOrderId] = useState<string | null>(null);
   const [activeOrderGroup, setActiveOrderGroup] = useState("pending");
@@ -1284,6 +1289,7 @@ export function TodayOrdersView({
                   onOpenMatchEditor={(item, options) => onOpenMatchEditor(order, item, options)}
                   onRemoveBundleComponent={onRemoveBundleComponent}
                   onOpenCostBackfill={onOpenCostBackfill}
+                  onEditExtraExpenses={setExtraExpensesTarget}
                 />
               ) : (
                 <OrderCard
@@ -1577,6 +1583,18 @@ export function TodayOrdersView({
               failedCount > 0 ? "warning" : "success",
             );
             void refreshSingleOrder(dispatchTarget.id);
+          }}
+        />
+      ) : null}
+      {extraExpensesTarget ? (
+        <OrderExtraExpenseModal
+          isOpen={Boolean(extraExpensesTarget)}
+          onClose={() => setExtraExpensesTarget(null)}
+          orderId={extraExpensesTarget.id}
+          orderNo={extraExpensesTarget.orderNo}
+          initialExpenses={extraExpensesTarget.extraExpenses || []}
+          onSaved={() => {
+            void refreshSingleOrder(extraExpensesTarget.id);
           }}
         />
       ) : null}

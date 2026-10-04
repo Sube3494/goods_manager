@@ -30,6 +30,7 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/Toast";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { ProductSelectionModal } from "@/components/Purchases/ProductSelectionModal";
+import { OrderExtraExpenseModal } from "@/components/Orders/OrderExtraExpenseModal";
 import { createPortal } from "react-dom";
 import { AutoPickOrder, AutoPickOrderItem, AutoPickIntegrationConfig, MaiyatianCookieAccount } from "@/lib/types";
 type OrderAction = "self-delivery" | "dispatch-delivery" | "complete-delivery" | "pickup-complete" | "sync" | "outbound" | "sync-brush";
@@ -2220,6 +2221,7 @@ export function ProductStripItem({
   showMatchStatus = false,
   returnedQuantity = 0,
   returnedDetails = [],
+  isRefunded = false,
   isJdOrder = false,
   isMeituanOrder = false,
   isTaobaoOrder = false,
@@ -2251,6 +2253,7 @@ export function ProductStripItem({
     refundAmount?: number;
     extraExpense?: number;
   }>;
+  isRefunded?: boolean;
   isJdOrder?: boolean;
   isMeituanOrder?: boolean;
   isTaobaoOrder?: boolean;
@@ -2440,11 +2443,11 @@ export function ProductStripItem({
                 {matchMeta.text}
               </span>
             ) : null}
-          {returnedQuantity > 0 ? (
+          {(returnedQuantity > 0 || isRefunded) ? (
             <span
-              className="relative group inline-flex cursor-help items-center rounded-full border border-amber-500/15 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium leading-none text-amber-700 dark:text-amber-300 sm:text-[11px]"
+              className="relative group inline-flex cursor-help items-center rounded-full border border-rose-500/20 bg-rose-500/10 px-2 py-0.5 text-[10px] font-semibold leading-none text-rose-700 dark:text-rose-400 sm:text-[11px]"
             >
-              已退{returnedQuantity > 1 ? ` x${returnedQuantity}` : ""}
+              已退款{returnedQuantity > 1 ? ` x${returnedQuantity}` : ""}
               {returnedDetails && returnedDetails.length > 0 && (
                 <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-max max-w-[320px] -translate-x-1/2 rounded-xl border border-black/8 bg-white/95 p-2 text-[10px] text-slate-800 opacity-0 invisible transition-all duration-200 group-hover:opacity-100 group-hover:visible dark:border-white/10 dark:bg-zinc-900/95 dark:text-zinc-100 shadow-xl backdrop-blur-sm space-y-1.5">
                   {returnedDetails.map((detail, detailIndex) => (
@@ -2457,7 +2460,7 @@ export function ProductStripItem({
                     >
                       <div className="flex items-center justify-between gap-3">
                         <span className="font-bold text-slate-900 dark:text-white">
-                          {detail.reason || "退货"}
+                          {detail.reason || "退货退款"}
                         </span>
                         <span className="font-mono text-[9px] text-slate-400 dark:text-zinc-500 whitespace-nowrap">
                           {removeYear(detail.createdAt)}
@@ -2641,8 +2644,32 @@ export function OrderItemBundleGroup({
   const [isExpanded, setIsExpanded] = useState(false);
   const [componentToRemove, setComponentToRemove] = useState<{ cIdx: number; name: string } | null>(null);
 
-  const returnedQuantity = returnedItemQuantityMap?.get(getReturnedProductKey(item)) || 0;
-  const returnedDetails = returnedItemDetailsMap?.get(getReturnedProductKey(item)) || [];
+  const outboundReturnDetails = Array.isArray(order.outboundReturnDetails) ? order.outboundReturnDetails : [];
+  const isOrderFullyReturned = Boolean(
+    order.outboundMeta?.isFullyReturned
+    || (order.status && /已退款|退款成功|全额退款/.test(order.status))
+  );
+  const isSingleItemOrder = (order.items?.length || 0) <= 1;
+  const hasOutboundReturn = outboundReturnDetails.length > 0 || (order.outboundMeta?.totalRefundAmount || 0) > 0;
+
+  const rawReturnedQuantity = returnedItemQuantityMap?.get(getReturnedProductKey(item)) || 0;
+  const isItemReturned = rawReturnedQuantity > 0 || isOrderFullyReturned || (isSingleItemOrder && (hasOutboundReturn || Number(order.refundAmount || 0) > 0));
+  const returnedQuantity = rawReturnedQuantity > 0 
+    ? rawReturnedQuantity 
+    : (isItemReturned ? (item.quantity || 1) : 0);
+
+  const rawReturnedDetails = returnedItemDetailsMap?.get(getReturnedProductKey(item)) || [];
+  const returnedDetails = rawReturnedDetails.length > 0
+    ? rawReturnedDetails
+    : (isItemReturned && outboundReturnDetails.length > 0
+        ? outboundReturnDetails.filter((e) => !isRematchReturnReason(e?.reason)).map((entry) => ({
+            createdAt: String(entry.createdAt || ""),
+            reason: String(entry.reason || "").trim() || "退货退款",
+            quantity: returnedQuantity,
+            refundAmount: Number(entry.refundAmount || 0),
+            extraExpense: Number(entry.extraExpense || 0),
+          }))
+        : []);
   const isJd = isJdPlatformOrder ?? isJdOrder(order.platform);
   const isMeituan = isMeituanPlatformOrder ?? isMeituanOrder(order.platform);
   const singleMatchedShopProductId = String(item.matchedProduct?.shopProductId || item.matchedProduct?.id || "").trim();
@@ -2690,6 +2717,7 @@ export function OrderItemBundleGroup({
             showMatchStatus={true}
             returnedQuantity={returnedQuantity}
             returnedDetails={returnedDetails}
+            isRefunded={isItemReturned}
             isJdOrder={isJd}
             isMeituanOrder={isMeituan}
             isTaobaoOrder={isTaobaoOrder(order.platform)}
@@ -2770,6 +2798,7 @@ export function OrderItemBundleGroup({
         showMatchStatus={true}
         returnedQuantity={returnedQuantity}
         returnedDetails={returnedDetails}
+        isRefunded={isItemReturned}
         isJdOrder={isJd}
         isMeituanOrder={isMeituan}
         isTaobaoOrder={isTaobaoOrder(order.platform)}
@@ -2805,6 +2834,7 @@ export function OrderItemBundleGroup({
         showMatchStatus={true}
         returnedQuantity={returnedQuantity}
         returnedDetails={returnedDetails}
+        isRefunded={isItemReturned}
         isJdOrder={isJd}
         isMeituanOrder={isMeituan}
         isTaobaoOrder={isTaobaoOrder(order.platform)}
@@ -2995,6 +3025,7 @@ export interface OrderProfitBadgeProps {
   align?: "center" | "right";
   onOpenCostBackfill?: (order: AutoPickOrder) => void;
   onEditCommission?: () => void;
+  onEditExtraExpenses?: () => void;
 }
 
 export const OrderProfitBadge = memo(function OrderProfitBadge({
@@ -3006,6 +3037,7 @@ export const OrderProfitBadge = memo(function OrderProfitBadge({
   align = "center",
   onOpenCostBackfill,
   onEditCommission,
+  onEditExtraExpenses,
 }: OrderProfitBadgeProps) {
   const [isProfitTooltipOpen, setIsProfitTooltipOpen] = useState(false);
   const [isProfitTooltipHovering, setIsProfitTooltipHovering] = useState(false);
@@ -3091,6 +3123,16 @@ export const OrderProfitBadge = memo(function OrderProfitBadge({
   const hasRefundAmount = refundAmount > 0;
   const returnExtraExpense = Math.max(0, Number(order.returnExtraExpense || 0));
   const hasReturnExtraExpense = returnExtraExpense > 0;
+  const extraExpenses = Array.isArray(order.extraExpenses) ? order.extraExpenses : [];
+  const extraExpensesRows = extraExpenses.map((expense) => ({
+    label: `减意外花费 (${expense.name})`,
+    value: toCurrency(expense.amount),
+    editable: !readOnly && Boolean(onEditExtraExpenses),
+    onEdit: readOnly || !onEditExtraExpenses ? undefined : () => {
+      closeProfitTooltip();
+      onEditExtraExpenses();
+    },
+  }));
 
   if (isProfitUpdating) {
     return null;
@@ -3105,6 +3147,7 @@ export const OrderProfitBadge = memo(function OrderProfitBadge({
       ? [
           { label: "订单收入", value: toCurrency(expectedIncome) },
           { label: "扣配送费", value: toCurrency(-deliveryFee) },
+          ...extraExpensesRows,
         ]
       : order.isMainSystemSelfDelivery
       ? [
@@ -3118,6 +3161,7 @@ export const OrderProfitBadge = memo(function OrderProfitBadge({
               onEditCommission();
             },
           },
+          ...extraExpensesRows,
         ]
         : [
             { label: "预计到手", value: toCurrency(hasRefundAmount ? expectedIncome + refundAmount : expectedIncome) },
@@ -3126,6 +3170,7 @@ export const OrderProfitBadge = memo(function OrderProfitBadge({
             { label: "减配送费", value: toCurrency(deliveryFee) },
             ...(canViewProductCosts ? [{ label: "减货品成本", value: toCurrency(productCost), editable: canEditProductCost }] : []),
             ...(hasReturnExtraExpense ? [{ label: "减退货支出", value: toCurrency(returnExtraExpense) }] : []),
+            ...extraExpensesRows,
           ])
     : productCostStatusText
       ? [
@@ -3135,6 +3180,7 @@ export const OrderProfitBadge = memo(function OrderProfitBadge({
           { label: "配送费", value: toCurrency(deliveryFee) },
           ...(canViewProductCosts ? [{ label: "货品成本", value: productCostStatusText, editable: canEditProductCost }] : []),
           ...(hasReturnExtraExpense ? [{ label: "退货支出", value: toCurrency(returnExtraExpense) }] : []),
+          ...extraExpensesRows,
         ]
       : [];
 
@@ -3279,8 +3325,8 @@ export const OrderProfitBadge = memo(function OrderProfitBadge({
                       {row.editable ? (
                         <button
                           type="button"
-                          aria-label={row.onEdit ? "修改刷单佣金" : "修改货品成本"}
-                          title={row.onEdit ? "修改刷单佣金" : "修改货品成本"}
+                          aria-label={row.onEdit ? "修改明细" : "修改货品成本"}
+                          title={row.onEdit ? "修改明细" : "修改货品成本"}
                           onClick={() => {
                             closeProfitTooltip();
                             if (row.onEdit) {
@@ -3298,6 +3344,21 @@ export const OrderProfitBadge = memo(function OrderProfitBadge({
                   </div>
                 ))}
               </div>
+              {!readOnly && onEditExtraExpenses ? (
+                <div className="mt-2.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      closeProfitTooltip();
+                      onEditExtraExpenses();
+                    }}
+                    className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-amber-500/30 bg-amber-500/6 py-1.5 text-[11px] font-medium text-amber-700 transition-all hover:border-amber-500/50 hover:bg-amber-500/12 dark:border-amber-400/20 dark:bg-amber-400/6 dark:text-amber-300 dark:hover:border-amber-400/40 dark:hover:bg-amber-400/12 cursor-pointer"
+                  >
+                    <Plus size={12} />
+                    <span>{extraExpenses.length > 0 ? "管理意外花费明细" : "添加意外花费 (不固定支出)"}</span>
+                  </button>
+                </div>
+              ) : null}
               {canViewProductCosts && hasPureProfit && productCostBreakdown.length > 0 ? (
                 <div className="mt-3 rounded-xl border border-slate-200/80 bg-slate-50/80 p-3 dark:border-white/8 dark:bg-white/4">
                   <div className="text-[11px] font-semibold tracking-[0.08em] text-slate-500 dark:text-white/45">
@@ -3446,6 +3507,7 @@ export const OrderCard = memo(function OrderCard({
   const [isCommissionEditorOpen, setIsCommissionEditorOpen] = useState(false);
   const [editCommissionValue, setEditCommissionValue] = useState("");
   const [isSavingCommission, setIsSavingCommission] = useState(false);
+  const [isExtraExpensesModalOpen, setIsExtraExpensesModalOpen] = useState(false);
   const [isShopEditorOpen, setIsShopEditorOpen] = useState(false);
   const [meituanImageUpdateTarget, setMeituanImageUpdateTarget] = useState<{
     itemId: string;
@@ -4033,15 +4095,6 @@ export const OrderCard = memo(function OrderCard({
                     )
                   ) : null}
                   <StatusBadge order={order} />
-                  {hasRefundAmount ? (
-                    <span
-                      title="出库退款金额"
-                      className="inline-flex h-7 min-w-0 items-center gap-1 rounded-full border border-rose-500/15 bg-rose-500/10 px-2 text-[11px] font-medium leading-none text-rose-700 dark:text-rose-400 sm:h-8 sm:gap-1.5 sm:px-2.5 sm:text-[13px]"
-                    >
-                      <span className="shrink-0">已退款</span>
-                      <span className="truncate font-semibold">{toCurrency(refundAmount)}</span>
-                    </span>
-                  ) : null}
                   <OrderProfitBadge
                     order={order}
                     readOnly={readOnly}
@@ -4054,6 +4107,9 @@ export const OrderCard = memo(function OrderCard({
                         : (-pureProfit - Number(order.platformCommission || 0)) / 100;
                       setEditCommissionValue(String(currentVal > 0 ? currentVal : ""));
                       setIsCommissionEditorOpen(true);
+                    }}
+                    onEditExtraExpenses={readOnly ? undefined : () => {
+                      setIsExtraExpensesModalOpen(true);
                     }}
                   />
                   {isProfitUpdating ? (
@@ -4704,6 +4760,13 @@ export const OrderCard = memo(function OrderCard({
                       className={!hasRefundAmount ? "col-span-2 sm:col-span-1" : ""}
                     />
                   ) : null}
+                  {Number(order.totalExtraExpense || 0) > 0 ? (
+                    <DetailStat
+                      label="意外花费"
+                      value={`-${toCurrency(order.totalExtraExpense)}`}
+                      valueClassName="text-rose-600 dark:text-rose-400 font-semibold"
+                    />
+                  ) : null}
                 </div>
               </section>
               <section className="rounded-[20px] border border-black/6 bg-white/80 p-3.5 dark:border-white/8 dark:bg-white/4 sm:rounded-3xl sm:p-4">
@@ -5012,6 +5075,18 @@ export const OrderCard = memo(function OrderCard({
           order={order}
           onClose={() => setIsShopEditorOpen(false)}
           onSaveSuccess={() => {
+            onRefresh?.();
+          }}
+        />
+      ) : null}
+      {isExtraExpensesModalOpen && !readOnly ? (
+        <OrderExtraExpenseModal
+          isOpen={isExtraExpensesModalOpen}
+          onClose={() => setIsExtraExpensesModalOpen(false)}
+          orderId={order.id}
+          orderNo={order.orderNo}
+          initialExpenses={order.extraExpenses || []}
+          onSaved={() => {
             onRefresh?.();
           }}
         />

@@ -297,6 +297,13 @@ export interface AutoPickOrder {
   refundAmount?: number | null;
   cancelReason?: string | null;
   returnExtraExpense?: number | null;
+  extraExpenses?: Array<{
+    id: string;
+    name: string;
+    amount: number;
+    createdAt?: string;
+  }> | null;
+  totalExtraExpense?: number | null;
   outboundReturnDetails?: Array<{
     id: string;
     createdAt: string;
@@ -310,6 +317,12 @@ export interface AutoPickOrder {
       name?: string | null;
     }>;
   }> | null;
+  outboundMeta?: {
+    isFullyReturned?: boolean;
+    totalRefundAmount?: number;
+    totalReturnExtraExpense?: number;
+    returnedProductCost?: number;
+  } | null;
   productCostBreakdown?: Array<{
     outboundOrderItemId?: string | null;
     productId?: string | null;
@@ -345,6 +358,13 @@ export interface AutoPickOrder {
   updatedAt?: string;
   detailLoaded?: boolean;
   detailLoading?: boolean;
+}
+
+export interface OrderExtraExpense {
+  id: string;
+  name: string;
+  amount: number; // 单位：分 (cents)
+  createdAt?: string;
 }
 
 export interface AutoPickApiKey {

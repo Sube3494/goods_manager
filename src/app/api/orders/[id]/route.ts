@@ -18,6 +18,8 @@ import {
   readRiderPhoneFromDelivery,
   readRiderPhoneFromRawPayload,
   readAutoPickSystemMeta,
+  readOrderExtraExpensesFromRawPayload,
+  calculateOrderTotalExtraExpense,
   resolveAutoPickMatchedShopName,
   createOutboundFromAutoPickOrder,
   updateAutoPickOrderAutoOutboundState,
@@ -91,6 +93,8 @@ export async function GET(
         customerRemark: order.customerRemark || readCustomerRemarkFromRawPayload(order.rawPayload),
         adminRemark: readAdminRemarkFromRawPayload(order.rawPayload),
         cancelReason: readCancelReasonFromRawPayload(order.rawPayload),
+        extraExpenses: readOrderExtraExpensesFromRawPayload(order.rawPayload),
+        totalExtraExpense: calculateOrderTotalExtraExpense(readOrderExtraExpensesFromRawPayload(order.rawPayload)),
         autoOutboundStatus: autoOutboundMeta?.status || null,
         autoOutboundError: autoOutboundMeta?.error || null,
         autoOutboundAttemptedAt: autoOutboundMeta?.attemptedAt || null,
@@ -131,8 +135,9 @@ export async function PATCH(
     const hasAdminRemarkEdit = body.adminRemark !== undefined;
     const hasDeliveryFeeEdit = typeof body.deliveryFee === "number" || typeof body.sendFee === "number";
     const nextDeliveryFee = typeof body.deliveryFee === "number" ? body.deliveryFee : Number(body.sendFee);
+    const hasExtraExpensesEdit = Array.isArray(body.extraExpenses);
 
-    if (!hasBrushToggle && !hasAmountEdit && !hasOfflineEdit && !hasShopEdit && !hasAdminRemarkEdit && !hasDeliveryFeeEdit) {
+    if (!hasBrushToggle && !hasAmountEdit && !hasOfflineEdit && !hasShopEdit && !hasAdminRemarkEdit && !hasDeliveryFeeEdit && !hasExtraExpensesEdit) {
       return NextResponse.json({ error: "参数错误" }, { status: 400 });
     }
 
@@ -523,6 +528,19 @@ export async function PATCH(
                       updatedAt: new Date().toISOString(),
                       updatedBy: String(user.name || user.email || user.id),
                     },
+                  }
+                : {}),
+              ...(hasExtraExpensesEdit
+                ? {
+                    extraExpenses: (body.extraExpenses as any[])
+                      .filter((item) => Boolean(item && typeof item === "object"))
+                      .map((item) => ({
+                        id: String(item.id || "").trim() || `exp_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+                        name: String(item.name || "").trim() || "意外花费",
+                        amount: Math.round(Number(item.amount || 0)),
+                        createdAt: typeof item.createdAt === "string" ? item.createdAt : new Date().toISOString(),
+                      }))
+                      .filter((item) => item.amount > 0),
                   }
                 : {}),
               ...(hasAmountEdit
