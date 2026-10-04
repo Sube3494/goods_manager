@@ -2523,6 +2523,9 @@ export async function GET(request: NextRequest) {
             shopProductId: true,
             remainingQuantity: true,
             costPrice: true,
+            shopProduct: {
+              select: { shopId: true },
+            },
             purchaseOrder: {
               select: { date: true },
             },
@@ -2549,13 +2552,46 @@ export async function GET(request: NextRequest) {
       }
     });
 
-    const resolvePurchaseDisplayCost = (shopProductId?: string | null, productId?: string | null) => {
-      const candidates = (shopProductId ? displayPurchaseCostsByShopProduct.get(shopProductId) : null)
-        || (productId ? displayPurchaseCostsByProduct.get(productId) : null)
-        || [];
-      const availableBatch = candidates.find((item) => Number(item.remainingQuantity || 0) > 0);
-      const purchaseCost = Number(availableBatch?.costPrice || 0);
-      return Number.isFinite(purchaseCost) && purchaseCost > 0 ? purchaseCost : null;
+    const resolvePurchaseDisplayCost = (
+      shopProductId?: string | null,
+      productId?: string | null,
+      targetShopId?: string | null
+    ) => {
+      // 1. 优先按 shopProductId 查找所属店铺商品的可用采购批次
+      if (shopProductId) {
+        const shopCandidates = displayPurchaseCostsByShopProduct.get(shopProductId) || [];
+        const availableInShop = shopCandidates.find((item) => {
+          if (Number(item.remainingQuantity || 0) <= 0) return false;
+          if (targetShopId && item.shopProduct?.shopId && item.shopProduct.shopId !== targetShopId) {
+            return false;
+          }
+          return true;
+        });
+        const shopCost = Number(availableInShop?.costPrice || 0);
+        if (Number.isFinite(shopCost) && shopCost > 0) {
+          return shopCost;
+        }
+      }
+
+      // 2. 按 productId 兜底查找批次，必须严格进行店铺隔离，排除其他店铺的批次
+      if (productId) {
+        const productCandidates = displayPurchaseCostsByProduct.get(productId) || [];
+        const availableInProduct = productCandidates.find((item) => {
+          if (Number(item.remainingQuantity || 0) <= 0) return false;
+          if (targetShopId) {
+            if (item.shopProduct?.shopId && item.shopProduct.shopId !== targetShopId) {
+              return false;
+            }
+          }
+          return true;
+        });
+        const productCost = Number(availableInProduct?.costPrice || 0);
+        if (Number.isFinite(productCost) && productCost > 0) {
+          return productCost;
+        }
+      }
+
+      return null;
     };
 
 
@@ -2876,7 +2912,7 @@ export async function GET(request: NextRequest) {
             if (outboundBreakdown.length > 0) {
               return { ...inventory, costPrice: null, costSource: undefined };
             }
-            const purchaseCost = resolvePurchaseDisplayCost(shopProductId, productId);
+            const purchaseCost = resolvePurchaseDisplayCost(shopProductId, productId, matchedShopId);
             return purchaseCost
               ? { ...inventory, costPrice: purchaseCost, costSource: "current" as const }
               : { ...inventory, costPrice: null, costSource: undefined };
@@ -2983,12 +3019,21 @@ export async function GET(request: NextRequest) {
               }
             : null;
           if (matchedProduct) {
-            const foundShopProduct = mappedShopProducts.find((p) =>
-              (matchedProduct.shopProductId && p.id === matchedProduct.shopProductId)
-              || (matchedProduct.id && p.id === matchedProduct.id)
-              || (matchedProduct.productId && p.productId === matchedProduct.productId)
-              || (matchedProduct.sku && p.sku === matchedProduct.sku)
-            );
+            const foundShopProduct = (matchedShopId
+              ? mappedShopProducts.find((p) =>
+                  p.shopId === matchedShopId && (
+                    (matchedProduct.shopProductId && p.id === matchedProduct.shopProductId)
+                    || (matchedProduct.id && p.id === matchedProduct.id)
+                    || (matchedProduct.productId && p.productId === matchedProduct.productId)
+                    || (matchedProduct.sku && p.sku === matchedProduct.sku)
+                  )
+                )
+              : null) || mappedShopProducts.find((p) =>
+                (matchedProduct.shopProductId && p.id === matchedProduct.shopProductId)
+                || (matchedProduct.id && p.id === matchedProduct.id)
+                || (matchedProduct.productId && p.productId === matchedProduct.productId)
+                || (matchedProduct.sku && p.sku === matchedProduct.sku)
+              );
             const fallbackImg = foundShopProduct?.image || null;
             matchedProduct.image = matchedProduct.image ? storage.resolveUrl(matchedProduct.image) : fallbackImg;
             Object.assign(matchedProduct, resolveDisplayCost(
@@ -3049,12 +3094,21 @@ export async function GET(request: NextRequest) {
             ? item.rawPayload as Record<string, unknown>
             : {};
           const targetShopProduct = activeMatched
-            ? mappedShopProducts.find((p) =>
-                (activeMatched.shopProductId && p.id === activeMatched.shopProductId)
-                || (activeMatched.id && p.id === activeMatched.id)
-                || (activeMatched.productId && p.productId === activeMatched.productId)
-                || (activeMatched.sku && p.sku === activeMatched.sku)
-              ) || null
+            ? ((matchedShopId
+                ? mappedShopProducts.find((p) =>
+                    p.shopId === matchedShopId && (
+                      (activeMatched.shopProductId && p.id === activeMatched.shopProductId)
+                      || (activeMatched.id && p.id === activeMatched.id)
+                      || (activeMatched.productId && p.productId === activeMatched.productId)
+                      || (activeMatched.sku && p.sku === activeMatched.sku)
+                    )
+                  )
+                : null) || mappedShopProducts.find((p) =>
+                    (activeMatched.shopProductId && p.id === activeMatched.shopProductId)
+                    || (activeMatched.id && p.id === activeMatched.id)
+                    || (activeMatched.productId && p.productId === activeMatched.productId)
+                    || (activeMatched.sku && p.sku === activeMatched.sku)
+                  ) || null)
             : null;
           const compositeMatchIds = String(manualMatchedProduct?.shopProductId || manualMatchedProduct?.id || "")
             .split(/[+＋]/)
@@ -3114,12 +3168,21 @@ export async function GET(request: NextRequest) {
             ? bundleItems.map((bItem: any) => {
                 const perPackQty = typeof bItem.quantity === "number" && bItem.quantity > 0 ? bItem.quantity : 1;
                 const bQty = perPackQty * Math.max(1, Number(item.quantity || 1) || 1);
-                const foundBShopProduct = mappedShopProducts.find((p) =>
-                  (bItem.shopProductId && p.id === bItem.shopProductId)
-                  || (bItem.id && (p.id === bItem.id || p.productId === bItem.id))
-                  || (bItem.productId && (p.productId === bItem.productId || p.id === bItem.productId))
-                  || (bItem.sku && p.sku === bItem.sku)
-                );
+                const foundBShopProduct = (matchedShopId
+                  ? mappedShopProducts.find((p) =>
+                      p.shopId === matchedShopId && (
+                        (bItem.shopProductId && p.id === bItem.shopProductId)
+                        || (bItem.id && (p.id === bItem.id || p.productId === bItem.id))
+                        || (bItem.productId && (p.productId === bItem.productId || p.id === bItem.productId))
+                        || (bItem.sku && p.sku === bItem.sku)
+                      )
+                    )
+                  : null) || mappedShopProducts.find((p) =>
+                    (bItem.shopProductId && p.id === bItem.shopProductId)
+                    || (bItem.id && (p.id === bItem.id || p.productId === bItem.id))
+                    || (bItem.productId && (p.productId === bItem.productId || p.id === bItem.productId))
+                    || (bItem.sku && p.sku === bItem.sku)
+                  );
                 const bFallbackImg = foundBShopProduct?.image || null;
                 const bResolvedImg = bItem.image ? storage.resolveUrl(bItem.image) : bFallbackImg;
                 const bSourceId = getProductSourceIdByPlatform(foundBShopProduct, order.platform, parentPlatformSkuId)
@@ -3145,12 +3208,21 @@ export async function GET(request: NextRequest) {
             : null;
           const compositeDisplayItems = isCompositeMatch && rawCompositeItems.length > 0
             ? rawCompositeItems.map((compositeItem: any) => {
-                const foundCompositeProduct = mappedShopProducts.find((product) =>
-                  (compositeItem.shopProductId && product.id === compositeItem.shopProductId)
-                  || (compositeItem.id && (product.id === compositeItem.id || product.productId === compositeItem.id))
-                  || (compositeItem.productId && (product.productId === compositeItem.productId || product.id === compositeItem.productId))
-                  || (compositeItem.sku && product.sku === compositeItem.sku)
-                );
+                const foundCompositeProduct = (matchedShopId
+                  ? mappedShopProducts.find((product) =>
+                      product.shopId === matchedShopId && (
+                        (compositeItem.shopProductId && product.id === compositeItem.shopProductId)
+                        || (compositeItem.id && (product.id === compositeItem.id || product.productId === compositeItem.id))
+                        || (compositeItem.productId && (product.productId === compositeItem.productId || product.id === compositeItem.productId))
+                        || (compositeItem.sku && product.sku === compositeItem.sku)
+                      )
+                    )
+                  : null) || mappedShopProducts.find((product) =>
+                    (compositeItem.shopProductId && product.id === compositeItem.shopProductId)
+                    || (compositeItem.id && (product.id === compositeItem.id || product.productId === compositeItem.id))
+                    || (compositeItem.productId && (product.productId === compositeItem.productId || product.id === compositeItem.productId))
+                    || (compositeItem.sku && product.sku === compositeItem.sku)
+                  );
                 const perOrderQuantity = Math.max(1, Number(compositeItem.quantity || 1) || 1);
                 const compositeSourceId = getProductSourceIdByPlatform(foundCompositeProduct, order.platform, parentPlatformSkuId)
                   || getProductSourceIdByPlatform(compositeItem, order.platform, parentPlatformSkuId);
@@ -3179,10 +3251,17 @@ export async function GET(request: NextRequest) {
           // 回退到历史出库明细，页面会表现为“删除成功后配件仍然存在”。
           const outboundFallbackBundleItems = (!hasExplicitManualBundleConfig && !bundleItems && isSingleOrderItem && outboundBreakdown.length > 1)
             ? outboundBreakdown.slice(1).map((bOutbound) => {
-                const foundBShopProduct = mappedShopProducts.find((p) =>
-                  (bOutbound.shopProductId && p.id === bOutbound.shopProductId)
-                  || (bOutbound.productId && (p.productId === bOutbound.productId || p.id === bOutbound.productId))
-                );
+                const foundBShopProduct = (matchedShopId
+                  ? mappedShopProducts.find((p) =>
+                      p.shopId === matchedShopId && (
+                        (bOutbound.shopProductId && p.id === bOutbound.shopProductId)
+                        || (bOutbound.productId && (p.productId === bOutbound.productId || p.id === bOutbound.productId))
+                      )
+                    )
+                  : null) || mappedShopProducts.find((p) =>
+                    (bOutbound.shopProductId && p.id === bOutbound.shopProductId)
+                    || (bOutbound.productId && (p.productId === bOutbound.productId || p.id === bOutbound.productId))
+                  );
                 const bFallbackImg = foundBShopProduct?.image || null;
                 const bResolvedImg = bOutbound.image ? storage.resolveUrl(bOutbound.image) : bFallbackImg;
                 const bSourceId = getProductSourceIdByPlatform(foundBShopProduct, order.platform, parentPlatformSkuId);
