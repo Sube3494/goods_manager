@@ -1661,7 +1661,6 @@ function OrderAmountEditModal({
   const isOffline = order.platform === "线下交易" || String(order.platform || "").toLowerCase() === "other";
   const [expectedIncome, setExpectedIncome] = useState(() => formatCurrencyInputFromCents(getExpectedIncome(order.expectedIncome, order.actualPaid, order.platformCommission, order.platform)));
   const [isSaving, setIsSaving] = useState(false);
-  const isJd = String(order.platform || "").includes("京东");
   const isDoudian = isDoudianOrder(order.platform);
 
   const handleSave = async () => {
@@ -1689,7 +1688,7 @@ function OrderAmountEditModal({
         <div className="flex items-start justify-between gap-3 px-6 pb-4 pt-6">
           <div>
             <h3 className="text-xl font-semibold tracking-tight text-foreground">修改商家到手</h3>
-            <p className="mt-2 text-xs leading-5 text-muted-foreground">{isJd || isDoudian ? "只覆盖订单的到手金额，实付保持系统原值不变。" : isOffline ? "修改线下订单金额（实付与到手保持一致）。" : "手动记录这张手工配送单的商家到手金额，实付保持系统原值不变。"}</p>
+            <p className="mt-2 text-xs leading-5 text-muted-foreground">{isDoudian ? "只覆盖订单的到手金额，实付保持系统原值不变。" : isOffline ? "修改线下订单金额（实付与到手保持一致）。" : "手动记录这张手工配送单的商家到手金额，实付保持系统原值不变。"}</p>
           </div>
           <button
             type="button"
@@ -3897,7 +3896,7 @@ export const OrderCard = memo(function OrderCard({
   const isJdPlatformOrder = isJdOrder(order.platform);
   const isDoudianPlatformOrder = isDoudianOrder(order.platform);
   const isMeituanPlatformOrder = isMeituanOrder(order.platform);
-  const canEditExpectedIncome = !readOnly && (isJdPlatformOrder || isDoudianPlatformOrder || legacyManualDeliveryPlaceholderOrder);
+  const canEditExpectedIncome = !readOnly && !isJdPlatformOrder && (isDoudianPlatformOrder || legacyManualDeliveryPlaceholderOrder);
   const isCancelledOrRefunded = cancelled || deleted || abnormal || Boolean(order.refundAmount && order.refundAmount > 0) || Boolean(order.status && /退|消|cancel|refund/i.test(order.status)) || Boolean(order.delivery?.track && /取消|退单/.test(String(order.delivery.track)));
   const canEditDeliveryFee = !readOnly && isCancelledOrRefunded;
   const displayDeliveryFee = effectiveSendFee != null

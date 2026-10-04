@@ -206,6 +206,10 @@ export async function PATCH(
       return NextResponse.json({ error: "当前只支持修改线下订单" }, { status: 400 });
     }
 
+    if (hasAmountEdit && (order.platform === "京东" || String(order.platform || "").includes("京东"))) {
+      return NextResponse.json({ error: "京东订单已支持自动抓取到手金额，不支持手动修改" }, { status: 400 });
+    }
+
     let targetShopId: string | null = null;
     let targetShopName: string | null = null;
     let targetShopAddress: string | null = null;
