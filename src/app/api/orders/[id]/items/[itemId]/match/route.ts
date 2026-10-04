@@ -5,6 +5,10 @@ import { getStorageStrategy } from "@/lib/storage";
 import { Prisma } from "../../../../../../../../prisma/generated-client";
 import {
   createOutboundFromAutoPickOrder,
+  readPreferredMaiyatianShopAddress,
+  readPreferredMaiyatianShopName,
+  readResolvedAutoPickShop,
+  resolveAutoPickInternalShop,
   syncAutoOutboundFromCompletedAutoPickOrder,
   syncDoudianSkuIdForShopProduct,
   syncJdSkuIdForShopProduct,
@@ -402,21 +406,38 @@ export async function PATCH(
     }
 
     const targetUserId = orderItem.order.userId || user.id;
-    const orderExternalShopId = orderItem.order.shopId || readShopIdFromRawPayload(orderItem.order.rawPayload);
-    let orderMatchedShopId: string | undefined = undefined;
-    if (orderExternalShopId) {
-      const localShop = await prisma.shop.findFirst({
-        where: {
-          userId: targetUserId,
-          OR: [
-            { id: orderExternalShopId },
-            { externalId: orderExternalShopId },
-          ],
-        },
-        select: { id: true },
+    const orderRawPayloadRecord = readRawPayloadRecord(orderItem.order.rawPayload);
+    const lockedResolvedShop = readResolvedAutoPickShop(orderItem.order.rawPayload);
+    const rawShopName = readPreferredMaiyatianShopName(orderRawPayloadRecord) || null;
+    const rawShopAddress = readPreferredMaiyatianShopAddress(orderRawPayloadRecord) || null;
+
+    let orderMatchedShopId: string | undefined = lockedResolvedShop?.id || undefined;
+    if (!orderMatchedShopId) {
+      const orderExternalShopId = orderItem.order.shopId || readShopIdFromRawPayload(orderItem.order.rawPayload);
+      if (orderExternalShopId) {
+        const localShop = await prisma.shop.findFirst({
+          where: {
+            userId: targetUserId,
+            OR: [
+              { id: orderExternalShopId },
+              { externalId: orderExternalShopId },
+            ],
+          },
+          select: { id: true },
+        });
+        if (localShop) {
+          orderMatchedShopId = localShop.id;
+        }
+      }
+    }
+    if (!orderMatchedShopId) {
+      const resolvedInternal = await resolveAutoPickInternalShop(prisma, targetUserId, {
+        shopId: orderItem.order.shopId || undefined,
+        rawShopName: rawShopName || undefined,
+        rawShopAddress: rawShopAddress || undefined,
       });
-      if (localShop) {
-        orderMatchedShopId = localShop.id;
+      if (resolvedInternal?.id) {
+        orderMatchedShopId = resolvedInternal.id;
       }
     }
     let needsOutboundRebuild = false;
@@ -609,9 +630,30 @@ export async function PATCH(
         };
       }
 
-      if (!mainProduct || (!hasManualBundleConfig && existingBundleItems.length === 0)) {
+      const effectiveShopId = body?.shopId || orderMatchedShopId;
+      let needReResolveMainProduct = !mainProduct || (!hasManualBundleConfig && existingBundleItems.length === 0);
+      if (effectiveShopId && mainProduct?.shopProductId) {
+        const currentShopOfMain = await prisma.shopProduct.findUnique({
+          where: { id: mainProduct.shopProductId },
+          select: { shopId: true },
+        });
+        if (currentShopOfMain && currentShopOfMain.shopId !== effectiveShopId) {
+          needReResolveMainProduct = true;
+        }
+      }
+
+      if (needReResolveMainProduct) {
         const targetShopProductId = mainProduct?.shopProductId || mainProduct?.id;
-        const effectiveShopId = body?.shopId || orderMatchedShopId;
+        let fallbackProductId: string | null = null;
+        let fallbackSku: string | null = null;
+        if (targetShopProductId) {
+          const originalTarget = await prisma.shopProduct.findUnique({
+            where: { id: targetShopProductId },
+            select: { productId: true, sourceProductId: true, sku: true },
+          });
+          fallbackProductId = originalTarget?.productId || originalTarget?.sourceProductId || null;
+          fallbackSku = originalTarget?.sku || null;
+        }
         const matchedCandidate = await prisma.shopProduct.findFirst({
           where: {
             ...(effectiveShopId ? { shopId: effectiveShopId } : { shop: { userId: targetUserId } }),
@@ -636,28 +678,26 @@ export async function PATCH(
         });
 
         if (matchedCandidate) {
-          if (!mainProduct) {
-            const rawMainImg = matchedCandidate.productImage || matchedCandidate.product?.image || null;
-            const isPlatformMatched = Boolean(
-              orderItem.platformSkuId && (
-                matchedCandidate.meituanSkuId?.includes(orderItem.platformSkuId)
-                || matchedCandidate.jdSkuId === orderItem.platformSkuId
-                || matchedCandidate.taobaoSkuId === orderItem.platformSkuId
-              )
-            );
-            mainProduct = {
-              id: matchedCandidate.id,
-              productId: matchedCandidate.productId || matchedCandidate.sourceProductId || null,
-              name: matchedCandidate.productName || orderItem.productName || "未命名商品",
-              sku: matchedCandidate.sku || orderItem.productNo || null,
-              image: rawMainImg ? storage.resolveUrl(rawMainImg) : null,
-              sourceType: "shopProduct",
-              shopProductId: matchedCandidate.id,
-              shopName: matchedCandidate.shop?.name || null,
-              matchMethod: isPlatformMatched ? "id" : "sku",
-              isManual: false,
-            };
-          }
+          const rawMainImg = matchedCandidate.productImage || matchedCandidate.product?.image || null;
+          const isPlatformMatched = Boolean(
+            orderItem.platformSkuId && (
+              matchedCandidate.meituanSkuId?.includes(orderItem.platformSkuId)
+              || matchedCandidate.jdSkuId === orderItem.platformSkuId
+              || matchedCandidate.taobaoSkuId === orderItem.platformSkuId
+            )
+          );
+          mainProduct = {
+            id: matchedCandidate.id,
+            productId: matchedCandidate.productId || matchedCandidate.sourceProductId || null,
+            name: matchedCandidate.productName || orderItem.productName || "未命名商品",
+            sku: matchedCandidate.sku || orderItem.productNo || null,
+            image: rawMainImg ? storage.resolveUrl(rawMainImg) : null,
+            sourceType: "shopProduct",
+            shopProductId: matchedCandidate.id,
+            shopName: matchedCandidate.shop?.name || null,
+            matchMethod: isPlatformMatched ? "id" : "sku",
+            isManual: mainProduct?.isManual ?? false,
+          };
           if (existingBundleItems.length === 0) {
             const rawBundle = matchedCandidate.bundleItems || matchedCandidate.product?.bundleItems;
             if (Array.isArray(rawBundle) && rawBundle.length > 0) {
@@ -754,6 +794,7 @@ export async function PATCH(
         },
         select: {
           id: true,
+          shopId: true,
           productId: true,
           sourceProductId: true,
           productName: true,
@@ -773,19 +814,53 @@ export async function PATCH(
         return NextResponse.json({ error: "选择的配件商品不存在或无权访问" }, { status: 404 });
       }
 
+      const effectiveShopId = body?.shopId || orderMatchedShopId;
+      let resolvedShopProductForBundle = targetShopProduct;
+      if (effectiveShopId && targetShopProduct.shopId !== effectiveShopId) {
+        const sameInCurrentShop = await prisma.shopProduct.findFirst({
+          where: {
+            shopId: effectiveShopId,
+            OR: [
+              ...(targetShopProduct.productId ? [{ productId: targetShopProduct.productId }, { sourceProductId: targetShopProduct.productId }] : []),
+              ...(targetShopProduct.sourceProductId ? [{ productId: targetShopProduct.sourceProductId }, { sourceProductId: targetShopProduct.sourceProductId }] : []),
+              ...(targetShopProduct.sku ? [{ sku: targetShopProduct.sku }] : []),
+            ],
+          },
+          select: {
+            id: true,
+            shopId: true,
+            productId: true,
+            sourceProductId: true,
+            productName: true,
+            sku: true,
+            productImage: true,
+            costPrice: true,
+            product: {
+              select: { image: true },
+            },
+            shop: {
+              select: { name: true },
+            },
+          },
+        });
+        if (sameInCurrentShop) {
+          resolvedShopProductForBundle = sameInCurrentShop;
+        }
+      }
+
       const { mainProduct, existingBundleItems } = await resolveMainProductAndBundleItems();
 
-      const rawNewImg = targetShopProduct.productImage || targetShopProduct.product?.image || null;
-      const newQty = itemsQtyMap.get(targetShopProduct.id) || (body?.quantity ? Number(body.quantity) : 1);
+      const rawNewImg = resolvedShopProductForBundle.productImage || resolvedShopProductForBundle.product?.image || null;
+      const newQty = itemsQtyMap.get(targetShopProduct.id) || itemsQtyMap.get(resolvedShopProductForBundle.id) || (body?.quantity ? Number(body.quantity) : 1);
       const newComponent = {
-        id: targetShopProduct.id,
-        productId: targetShopProduct.productId || targetShopProduct.sourceProductId || null,
-        name: targetShopProduct.productName || "未命名配件",
-        sku: targetShopProduct.sku || null,
+        id: resolvedShopProductForBundle.id,
+        productId: resolvedShopProductForBundle.productId || resolvedShopProductForBundle.sourceProductId || null,
+        name: resolvedShopProductForBundle.productName || "未命名配件",
+        sku: resolvedShopProductForBundle.sku || null,
         image: rawNewImg ? storage.resolveUrl(rawNewImg) : null,
         sourceType: "shopProduct",
-        shopProductId: targetShopProduct.id,
-        shopName: targetShopProduct.shop?.name || null,
+        shopProductId: resolvedShopProductForBundle.id,
+        shopName: resolvedShopProductForBundle.shop?.name || null,
         quantity: Math.max(1, Number(newQty || 1)),
       };
 

@@ -153,7 +153,8 @@ export class InventoryService {
   static async processOutboundFIFO(
     tx: Prisma.TransactionClient,
     userId: string,
-    items: OutboundItemInput[]
+    items: OutboundItemInput[],
+    outboundShopId?: string | null
   ): Promise<OutboundFifoItemSnapshot[]> {
     const snapshots: OutboundFifoItemSnapshot[] = [];
     for (const item of items) {
@@ -162,6 +163,18 @@ export class InventoryService {
       if (!item.shopProductId && !item.productId) {
         throw new Error("出库商品缺少关联标识，无法扣减库存");
       }
+
+      let targetShopProduct = null;
+      if (item.shopProductId) {
+        targetShopProduct = await tx.shopProduct.findUnique({
+          where: { id: item.shopProductId },
+          select: { id: true, shopId: true, productId: true },
+        });
+        if (outboundShopId && targetShopProduct && targetShopProduct.shopId !== outboundShopId) {
+          throw new Error(`出库商品(${item.shopProductId})属于其他店铺，与当前出库单店铺不符，禁止跨店扣减库存`);
+        }
+      }
+      const effectiveItemShopId = outboundShopId || targetShopProduct?.shopId || null;
 
       // 如果指定了具体批次分配
       if (item.batchAllocations && item.batchAllocations.length > 0) {
@@ -196,6 +209,9 @@ export class InventoryService {
                 : {}),
             },
             include: {
+              shopProduct: {
+                select: { shopId: true },
+              },
               purchaseOrder: {
                 select: {
                   shippingFees: true,
@@ -214,6 +230,10 @@ export class InventoryService {
 
           if (!batch) {
             throw new Error(`指定的采购批次不存在、未入库或不属于当前出库商品：${alloc.purchaseOrderItemId}`);
+          }
+
+          if (effectiveItemShopId && batch.shopProduct?.shopId && batch.shopProduct.shopId !== effectiveItemShopId) {
+            throw new Error(`指定的采购批次(${alloc.purchaseOrderItemId})属于其他店铺，禁止跨店扣减`);
           }
 
           const batchRemaining = Number(batch.remainingQuantity ?? 0);
@@ -255,14 +275,16 @@ export class InventoryService {
           where: {
             ...(item.shopProductId
               ? {
-                  OR: [
-                    { shopProductId: item.shopProductId },
-                    { productId: item.shopProductId },
-                  ],
+                  shopProductId: item.shopProductId,
                 }
               : {
                   productId: item.productId!,
-                  shopProductId: null,
+                  ...(effectiveItemShopId ? {
+                    OR: [
+                      { shopProductId: null },
+                      { shopProduct: { shopId: effectiveItemShopId } },
+                    ],
+                  } : { shopProductId: null }),
                 }),
             remainingQuantity: {
               gt: 0,
@@ -273,6 +295,9 @@ export class InventoryService {
             },
           },
           include: {
+            shopProduct: {
+              select: { shopId: true },
+            },
             purchaseOrder: {
               select: {
                 shippingFees: true,

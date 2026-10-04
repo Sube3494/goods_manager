@@ -533,7 +533,7 @@ export function calculateOrderTotalExtraExpense(
   }, 0);
 }
 
-function readResolvedAutoPickShop(rawPayload: unknown) {
+export function readResolvedAutoPickShop(rawPayload: unknown) {
   const systemMeta = readAutoPickSystemMeta(rawPayload);
   const resolvedShop = systemMeta?.resolvedShop;
   if (!resolvedShop || typeof resolvedShop !== "object") {
@@ -1968,7 +1968,7 @@ function parseAmountsFromRawValues(platform: string, rawValues: {
 
 
 
-function readPreferredMaiyatianShopName(rawOrder: Record<string, unknown>) {
+export function readPreferredMaiyatianShopName(rawOrder: Record<string, unknown>) {
   const extend = rawOrder.extend && typeof rawOrder.extend === "object" && !Array.isArray(rawOrder.extend)
     ? rawOrder.extend as Record<string, unknown>
     : null;
@@ -1993,7 +1993,7 @@ function readPreferredMaiyatianShopName(rawOrder: Record<string, unknown>) {
   return undefined;
 }
 
-function readPreferredMaiyatianShopAddress(rawOrder: Record<string, unknown>) {
+export function readPreferredMaiyatianShopAddress(rawOrder: Record<string, unknown>) {
   const extend = rawOrder.extend && typeof rawOrder.extend === "object" && !Array.isArray(rawOrder.extend)
     ? rawOrder.extend as Record<string, unknown>
     : null;
@@ -5833,7 +5833,7 @@ async function findExistingShopProductByShopAndSku(
     : doesShopProductMatchAutoPickLocalSku(item, normalizedSku)) || null;
 }
 
-async function resolveAutoPickInternalShop(
+export async function resolveAutoPickInternalShop(
   tx: Prisma.TransactionClient,
   userId: string,
   normalized: Pick<AutoPickInboundOrder, "shopId" | "rawShopName" | "rawShopAddress">
@@ -7258,7 +7258,7 @@ async function resolveOutboundItemsForAutoPickOrder(
           }
         }
 
-        // 若当前店铺未建对应子件，在全部商品中查找
+        // 若当前出库店铺未建对应子件，仅提取主库商品ID，严禁跨店借用外店的shopProductId扣减外店库存
         if (!bShopProductId) {
           const anySub = shopProducts.find((p) =>
             (b.shopProductId && p.id === b.shopProductId) ||
@@ -7266,23 +7266,13 @@ async function resolveOutboundItemsForAutoPickOrder(
             (b.productId && (p.productId === b.productId || p.sourceProductId === b.productId)) ||
             (b.id && (p.productId === b.id || p.sourceProductId === b.id))
           );
-          if (anySub) {
+          bProductId = anySub?.productId || anySub?.sourceProductId || b.productId || (b.sourceType === "product" && !b.shopProductId ? b.id : null);
+          if (!currentShopId && anySub) {
             bShopProductId = anySub.id;
-            bProductId = anySub.productId || anySub.sourceProductId || bProductId;
           }
-        }
-
-        if (!bShopProductId && b.shopProductId) {
-          bShopProductId = b.shopProductId;
         }
         if (!bProductId) {
           bProductId = b.productId || (b.sourceType === "product" && !b.shopProductId ? b.id : null);
-        }
-        if (bShopProductId && !bProductId) {
-          const foundSp = shopProducts.find((p) => p.id === bShopProductId);
-          if (foundSp) {
-            bProductId = foundSp.productId || foundSp.sourceProductId || null;
-          }
         }
 
         const bItemQty = Math.max(1, Math.trunc(Number(b.quantity) || 1));
@@ -7366,37 +7356,105 @@ async function resolveOutboundItemsForAutoPickOrder(
         }
         continue;
       }
-      let manualShopProductId: string | null = storedManualShopProductId;
+      let manualShopProductId: string | null = null;
       let manualResolvedProductId: string | null =
         manualMatchedProduct.sourceType === "shopProduct" ? null : manualMatchedProduct.id;
 
-      const matchedShopProduct = await tx.shopProduct.findFirst({
-        where: {
-          shop: { userId },
-          ...(internalShop?.id ? { shopId: internalShop.id } : {}),
-          OR: [
-            ...(storedManualShopProductId ? [{ id: storedManualShopProductId }] : []),
-            { id: manualMatchedProduct.id },
-            { productId: manualMatchedProduct.id },
-            { sourceProductId: manualMatchedProduct.id },
-          ],
-        },
-        select: {
-          id: true,
-          productId: true,
-          sourceProductId: true,
-          isBundle: true,
-          bundleItems: true,
-          product: {
-            select: {
-              id: true,
-              isBundle: true,
-              bundleItems: true,
+      let matchedShopProduct = null;
+      if (internalShop?.id) {
+        matchedShopProduct = await tx.shopProduct.findFirst({
+          where: {
+            shopId: internalShop.id,
+            OR: [
+              ...(storedManualShopProductId ? [{ id: storedManualShopProductId }] : []),
+              { id: manualMatchedProduct.id },
+              { productId: manualMatchedProduct.id },
+              { sourceProductId: manualMatchedProduct.id },
+            ],
+          },
+          select: {
+            id: true,
+            productId: true,
+            sourceProductId: true,
+            isBundle: true,
+            bundleItems: true,
+            product: {
+              select: {
+                id: true,
+                isBundle: true,
+                bundleItems: true,
+              },
             },
           },
-        },
-        orderBy: { updatedAt: "desc" },
-      });
+          orderBy: { updatedAt: "desc" },
+        });
+
+        if (!matchedShopProduct) {
+          const originalTargetProduct = (storedManualShopProductId || manualMatchedProduct.id)
+            ? await tx.shopProduct.findUnique({
+                where: { id: storedManualShopProductId || manualMatchedProduct.id },
+                select: { productId: true, sourceProductId: true, sku: true },
+              })
+            : null;
+
+          const fallbackProductId = originalTargetProduct?.productId || originalTargetProduct?.sourceProductId || manualMatchedProduct.productId || null;
+          const fallbackSku = originalTargetProduct?.sku || manualMatchedProduct.sku || null;
+
+          if (fallbackProductId || fallbackSku) {
+            matchedShopProduct = await tx.shopProduct.findFirst({
+              where: {
+                shopId: internalShop.id,
+                OR: [
+                  ...(fallbackProductId ? [{ productId: fallbackProductId }, { sourceProductId: fallbackProductId }] : []),
+                  ...(fallbackSku ? [{ sku: fallbackSku }] : []),
+                ],
+              },
+              select: {
+                id: true,
+                productId: true,
+                sourceProductId: true,
+                isBundle: true,
+                bundleItems: true,
+                product: {
+                  select: {
+                    id: true,
+                    isBundle: true,
+                    bundleItems: true,
+                  },
+                },
+              },
+              orderBy: { updatedAt: "desc" },
+            });
+          }
+        }
+      } else {
+        matchedShopProduct = await tx.shopProduct.findFirst({
+          where: {
+            shop: { userId },
+            OR: [
+              ...(storedManualShopProductId ? [{ id: storedManualShopProductId }] : []),
+              { id: manualMatchedProduct.id },
+              { productId: manualMatchedProduct.id },
+              { sourceProductId: manualMatchedProduct.id },
+            ],
+          },
+          select: {
+            id: true,
+            productId: true,
+            sourceProductId: true,
+            isBundle: true,
+            bundleItems: true,
+            product: {
+              select: {
+                id: true,
+                isBundle: true,
+                bundleItems: true,
+              },
+            },
+          },
+          orderBy: { updatedAt: "desc" },
+        });
+      }
 
       const hasExplicitManualBundleConfig = Array.isArray(manualMatchedProduct.bundleItems) || (manualMatchedProduct as any).isBundle === false;
       let manualIsBundle = Boolean(manualMatchedProduct.bundleItems && manualMatchedProduct.bundleItems.length > 0);
@@ -7414,6 +7472,8 @@ async function resolveOutboundItemsForAutoPickOrder(
           manualIsBundle = Boolean(matchedShopProduct.isBundle || matchedShopProduct.product?.isBundle);
           manualBundleItems = (matchedShopProduct.bundleItems as any[]) || (matchedShopProduct.product?.bundleItems as any[]) || null;
         }
+      } else if (!internalShop?.id) {
+        manualShopProductId = storedManualShopProductId;
       }
 
       const manualQuantity = Number((manualMatchedProduct as any).quantity || 0) || 0;
@@ -7619,21 +7679,17 @@ async function resolveOutboundItemsForAutoPickOrder(
     }
   }
 
-  const resolvedShopName = resolvedItems.length > 0
-    ? (
-        shopProducts.find((candidate) => candidate.id === resolvedItems.find((item) => item.shopProductId)?.shopProductId)?.shop?.name
-        || internalShop?.name
-        || mappedShopName
-        || null
-      )
-    : (internalShop?.name || mappedShopName || null);
-  const resolvedShopId = resolvedItems.length > 0
-    ? (
-        shopProducts.find((candidate) => candidate.id === resolvedItems.find((item) => item.shopProductId)?.shopProductId)?.shop?.id
-        || internalShop?.id
-        || null
-      )
-    : (internalShop?.id || null);
+  const resolvedShopName = internalShop?.name
+    || mappedShopName
+    || (resolvedItems.length > 0
+        ? shopProducts.find((candidate) => candidate.id === resolvedItems.find((item) => item.shopProductId)?.shopProductId)?.shop?.name
+        : null)
+    || null;
+  const resolvedShopId = internalShop?.id
+    || (resolvedItems.length > 0
+        ? shopProducts.find((candidate) => candidate.id === resolvedItems.find((item) => item.shopProductId)?.shopProductId)?.shop?.id
+        : null)
+    || null;
 
   // 对拆单后的出库项按相同店铺商品/主商品进行数量与金额聚合，防止碎片行导致批次库存校验漏判
   const consolidatedItems: ResolvedAutoPickOutboundItem[] = [];
@@ -7965,7 +8021,8 @@ export async function createOutboundFromAutoPickOrder(
         productId: item.productId,
         shopProductId: item.shopProductId,
         quantity: item.quantity,
-      }))
+      })),
+      resolved.mappedShopId
     );
 
     const candidateProductIds = Array.from(new Set(
