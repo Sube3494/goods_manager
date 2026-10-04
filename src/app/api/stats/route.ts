@@ -17,7 +17,12 @@ import {
   readShopNameFromRawPayload,
   readShopAddressFromRawPayload,
 } from "@/lib/shopCommission";
-import { isAutoPickOrderCancelledStatus, isAutoPickOrderDeletedStatus, readMainSystemSelfDeliveryFlag } from "@/lib/autoPickOrderStatus";
+import {
+  isAutoPickOrderCancelledStatus,
+  isAutoPickOrderDeletedStatus,
+  isOrderFullyRefunded,
+  readMainSystemSelfDeliveryFlag,
+} from "@/lib/autoPickOrderStatus";
 import { createRequestPerfTracker } from "@/lib/perf";
 import { getStorageStrategy } from "@/lib/storage";
 import { formatLocalDate, parseAsShanghaiTime } from "@/lib/dateUtils";
@@ -1080,10 +1085,18 @@ export async function GET(request: NextRequest) {
       const platformPoint = platformTrendMaps.get(platform)?.get(key);
       const current = platformBuckets.get(platform) || { trueOrderCount: 0, brushOrderCount: 0 };
       const isBrush = readMainSystemSelfDeliveryFlag(order.rawPayload, order.delivery);
+      const orderCostMeta = outboundMetaByOrderNo.get(String(order.orderNo || "").trim());
+      const isFullyRefunded = isOrderFullyRefunded({
+        actualPaid: order.actualPaid,
+        expectedIncome: order.expectedIncome,
+        refundAmount: Math.round(Math.max(orderCostMeta?.refundAmount || 0, readRefundAmountFromRawPayload(order.rawPayload) / 100) * 100),
+        status: order.status,
+        outboundMeta: orderCostMeta ? { isFullyReturned: (orderCostMeta as any).isFullyReturned } : null,
+      });
       const isOther = isAutoPickOrderCancelledStatus(order.status)
         || isAutoPickOrderDeletedStatus(order.status)
-        || isVoidedOfflineOrder(order);
-      const orderCostMeta = outboundMetaByOrderNo.get(String(order.orderNo || "").trim());
+        || isVoidedOfflineOrder(order)
+        || isFullyRefunded;
       const matchedShopName = resolveExistingMatchedShopName(order) || "未匹配店铺";
       const addShopPureProfit = (target: ReturnType<typeof createTrendBucket> | undefined, amount: number) => {
         if (!target || amount === 0) return;

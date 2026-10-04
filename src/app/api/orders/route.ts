@@ -2017,11 +2017,14 @@ export async function GET(request: NextRequest) {
               : order.platformCommission,
             { preferExplicitExpectedIncome: Boolean(manualAmountOverride) }
           );
-          const cancelled = isAutoPickOrderCancelledStatus(order.status);
+          const rawCancelled = isAutoPickOrderCancelledStatus(order.status);
           const deleted = isAutoPickOrderDeletedStatus(order.status);
           const platform = normalizeOrderPlatformForSummary(order.platform);
           const deliveryFee = readDeliveryFee(order.delivery, order.rawPayload);
           const outboundMeta = outboundByOrderNo.get(order.orderNo) || null;
+          const refundAmount = readRefundAmountFromRawPayload(order.rawPayload, actualPaid, outboundMeta);
+          const fullyRefunded = isFullyRefundedOrder(actualPaid, refundAmount) || outboundMeta?.isFullyReturned === true;
+          const cancelled = rawCancelled || fullyRefunded;
           const lockedResolvedShop = readResolvedAutoPickShop(order.rawPayload);
           const mappingDebug = resolveMappedShopDebug(
             order.shopId,
@@ -2113,8 +2116,6 @@ export async function GET(request: NextRequest) {
           }
           if (!cancelled && !deleted) {
             const isBrush = readMainSystemSelfDeliveryFlag(order.rawPayload);
-            const refundAmount = readRefundAmountFromRawPayload(order.rawPayload, actualPaid, outboundMeta);
-            const fullyRefunded = isFullyRefundedOrder(actualPaid, refundAmount) || outboundMeta?.isFullyReturned === true;
             const adjustedMetrics = resolveRefundAdjustedIncomeMetrics({
               expectedIncome: metrics.expectedIncome,
               platformCommission: metrics.platformCommission,
@@ -2666,10 +2667,12 @@ export async function GET(request: NextRequest) {
       const autoOutboundMeta = readAutoOutboundMeta(order.rawPayload);
       const outboundMeta = outboundByOrderNo.get(order.orderNo) || null;
       const hiddenDeletedOfflineIncome = order.isDeleted && order.platform === "线下交易";
-      const cancelled = isAutoPickOrderCancelledStatus(order.status);
+      const rawCancelled = isAutoPickOrderCancelledStatus(order.status);
       const deleted = isAutoPickOrderDeletedStatus(order.status);
       // 退款金额只采用平台确认生效或退货记录中明确登记的值；取消不等于已退款。
       const refundAmount = readRefundAmountFromRawPayload(order.rawPayload, order.actualPaid, outboundMeta);
+      const isFullyRefunded = isFullyRefundedOrder(order.actualPaid, refundAmount) || outboundMeta?.isFullyReturned === true;
+      const cancelled = rawCancelled || isFullyRefunded;
       const returnExtraExpense = outboundMeta?.extraExpense || 0;
       const adjustedMetrics = resolveRefundAdjustedIncomeMetrics({
         expectedIncome: order.expectedIncome,
