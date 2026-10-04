@@ -2656,9 +2656,7 @@ export async function GET(request: NextRequest) {
       });
       const safeExpectedIncome = hiddenDeletedOfflineIncome
         ? null
-        : cancelled
-        ? 0
-        : (typeof adjustedMetrics.expectedIncome === "number" ? adjustedMetrics.expectedIncome : null);
+        : (typeof order.expectedIncome === "number" ? order.expectedIncome : null);
       const serviceFeeRate = order.platform === "线下交易"
         ? 0
         : (shopRateMap.get(matchedShopName) ?? 0.06);
@@ -2721,7 +2719,7 @@ export async function GET(request: NextRequest) {
         : order.isMainSystemSelfDelivery
         ? -Number(order.platformCommission || 0) - orderBrushCommission - returnExtraExpense - totalExtraExpense
         : (productCostStatus === "ready"
-          ? Math.round(Number(safeExpectedIncome || 0) * (1 - serviceFeeRate)) - deliveryFee - productCost - returnExtraExpense - totalExtraExpense
+          ? Math.round(Number(adjustedMetrics.expectedIncome || 0) * (1 - serviceFeeRate)) - deliveryFee - productCost - returnExtraExpense - totalExtraExpense
           : null);
 
       const normalizedDelivery = order.delivery && typeof order.delivery === "object" && !Array.isArray(order.delivery)

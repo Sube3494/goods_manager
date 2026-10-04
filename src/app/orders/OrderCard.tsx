@@ -3120,12 +3120,15 @@ export const OrderProfitBadge = memo(function OrderProfitBadge({
   const productCost = Number(order.productCost || 0);
   const productCostBreakdown = Array.isArray(order.productCostBreakdown) ? order.productCostBreakdown : [];
   const canEditProductCost = !readOnly && order.productCostStatus === "ready" && productCostBreakdown.length > 0 && Boolean(onOpenCostBackfill);
-  const settlementAfterRate = Math.round(expectedIncome * (1 - serviceFeeRate));
+  const refundAmount = Math.max(0, Number(order.refundAmount || 0));
+  const hasRefundAmount = refundAmount > 0;
+  const isFullyRefunded = isOrderFullyRefunded(order);
+  const cancelled = isCancelledStatus(order.status) || isFullyRefunded;
+  const settlementIncome = Math.max(0, expectedIncome - refundAmount);
+  const settlementAfterRate = Math.round(settlementIncome * (1 - serviceFeeRate));
   const hasPureProfit = typeof order.pureProfit === "number" && Number.isFinite(order.pureProfit);
   const pureProfit = hasPureProfit ? Number(order.pureProfit) : 0;
   const productCostStatusText = getProductCostStatusText(order);
-  const refundAmount = Math.max(0, Number(order.refundAmount || 0));
-  const hasRefundAmount = refundAmount > 0;
   const returnExtraExpense = Math.max(0, Number(order.returnExtraExpense || 0));
   const hasReturnExtraExpense = returnExtraExpense > 0;
   const extraExpenses = Array.isArray(order.extraExpenses) ? order.extraExpenses : [];
@@ -3148,7 +3151,14 @@ export const OrderProfitBadge = memo(function OrderProfitBadge({
   }
 
   const pureProfitTooltipRows: Array<{ label: string; value: string; editable?: boolean; onEdit?: () => void }> = hasPureProfit
-    ? (showManualDeliveryMarker
+    ? (cancelled
+      ? [
+          { label: "订单状态", value: isFullyRefunded ? "全单已退款" : "订单已取消" },
+          ...(deliveryFee > 0 ? [{ label: "配送费损失", value: toCurrency(-deliveryFee) }] : []),
+          ...(hasReturnExtraExpense ? [{ label: "退货支出", value: toCurrency(-returnExtraExpense) }] : []),
+          ...extraExpensesRows,
+        ]
+      : showManualDeliveryMarker
       ? [
           { label: "订单收入", value: toCurrency(expectedIncome) },
           { label: "扣配送费", value: toCurrency(-deliveryFee) },
@@ -3168,18 +3178,18 @@ export const OrderProfitBadge = memo(function OrderProfitBadge({
           },
           ...extraExpensesRows,
         ]
-        : [
-            { label: "预计到手", value: toCurrency(hasRefundAmount ? expectedIncome + refundAmount : expectedIncome) },
-            ...(hasRefundAmount ? [{ label: "减退款", value: toCurrency(refundAmount) }] : []),
-            { label: `扣抽出 ${formatPercent(serviceFeeRate)} 后`, value: toCurrency(settlementAfterRate) },
-            { label: "减配送费", value: toCurrency(deliveryFee) },
-            ...(canViewProductCosts ? [{ label: "减货品成本", value: toCurrency(productCost), editable: canEditProductCost }] : []),
-            ...(hasReturnExtraExpense ? [{ label: "减退货支出", value: toCurrency(returnExtraExpense) }] : []),
-            ...extraExpensesRows,
-          ])
+      : [
+          { label: "预计到手", value: toCurrency(expectedIncome) },
+          ...(hasRefundAmount ? [{ label: "减退款", value: toCurrency(refundAmount) }] : []),
+          { label: `扣抽出 ${formatPercent(serviceFeeRate)} 后`, value: toCurrency(settlementAfterRate) },
+          { label: "减配送费", value: toCurrency(deliveryFee) },
+          ...(canViewProductCosts ? [{ label: "减货品成本", value: toCurrency(productCost), editable: canEditProductCost }] : []),
+          ...(hasReturnExtraExpense ? [{ label: "减退货支出", value: toCurrency(returnExtraExpense) }] : []),
+          ...extraExpensesRows,
+        ])
     : productCostStatusText
       ? [
-          { label: "预计到手", value: toCurrency(hasRefundAmount ? expectedIncome + refundAmount : expectedIncome) },
+          { label: "预计到手", value: toCurrency(expectedIncome) },
           ...(hasRefundAmount ? [{ label: "退款", value: toCurrency(refundAmount) }] : []),
           { label: "抽出率", value: formatPercent(serviceFeeRate) },
           { label: "配送费", value: toCurrency(deliveryFee) },
