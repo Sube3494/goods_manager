@@ -2735,12 +2735,12 @@ async function enrichMaiyatianOrderByCookie(cookie: string, order: AutoPickInbou
     }
 
     const orderActualPaidYuan = (Number(order.actualPaid || 0) || 0) / 100;
-    const isPartialRefund = refundAmountYuan > 0 && (
-      (orderActualPaidYuan > 0 && refundAmountYuan < orderActualPaidYuan)
-      || returnedCount === 0
-    );
+    const isFullRefund = refundAmountYuan > 0 && orderActualPaidYuan > 0 && refundAmountYuan >= orderActualPaidYuan;
+    const isPartialRefund = refundAmountYuan > 0 && !isFullRefund;
 
-    if (isPartialRefund) {
+    if (isFullRefund) {
+      detailStatus = "已取消";
+    } else if (isPartialRefund) {
       // 确凿的部分退款：主订单未被取消
       const deliveryTrack = String(order.delivery?.track || "").trim();
       const isDelivered = deliveryTrack === "配送完成" || Boolean(order.completedAt) || Boolean(detailDataObj?.finished_time);
@@ -2751,8 +2751,6 @@ async function enrichMaiyatianOrderByCookie(cookie: string, order: AutoPickInbou
       } else {
         detailStatus = "待配送";
       }
-    } else if (refundAmountYuan >= orderActualPaidYuan && returnedCount > 0) {
-      detailStatus = "已取消";
     }
 
     const cancelReason = resolveMaiyatianCancelReason(cancelDetails);
