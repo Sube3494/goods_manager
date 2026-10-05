@@ -752,7 +752,7 @@ export function PurchaseOrderModal({
       selectedProducts.forEach(product => {
         const itemKey = product.shopProductId || product.id;
         const resolvedProductId = product.sourceType === "shopProduct"
-          ? (product.productId || null)
+          ? (product.productId || (product as { sourceProductId?: string | null }).sourceProductId || null)
           : product.id;
 
         // Check against the growing newItems list to prevent duplicates within the same batch

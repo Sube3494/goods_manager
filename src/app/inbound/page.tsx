@@ -94,6 +94,14 @@ function isTransferInboundOrder(order: PurchaseOrder) {
   );
 }
 
+function extractTransferSourceShop(order: PurchaseOrder): string | null {
+  const noteMatch = order.note?.match(/(?:调出自|源自)[:：]\s*([^，,）\)]+)/);
+  if (noteMatch && noteMatch[1]) return noteMatch[1].trim();
+  const addrMatch = order.shippingAddress?.match(/调出方[:：]\s*([^➔\s]+)/);
+  if (addrMatch && addrMatch[1]) return addrMatch[1].trim();
+  return null;
+}
+
 function getInboundTypeLabel(order: PurchaseOrder) {
   if (isAutoInboundOrderLike(order)) return "自动补库存";
   if (isTransferInboundOrder(order)) return "调货入库";
@@ -172,7 +180,7 @@ function InboundContent() {
   }, []);
 
   const allShopNames = useMemo(() => {
-    const names = inbounds.map(p => p.shopName).filter(Boolean) as string[];
+    const names = inbounds.flatMap(p => [p.shopName, extractTransferSourceShop(p)]).filter(Boolean) as string[];
     return Array.from(new Set(names)).sort();
   }, [inbounds]);
 
@@ -225,7 +233,8 @@ function InboundContent() {
            p.items.some(item => (item.shopProduct?.name || item.product?.name || item.shopProduct?.productName || "").toLowerCase().includes(query));
     
     // Shop filter
-    const matchesShop = selectedShop === "全部" || p.shopName === selectedShop;
+    const transferSource = extractTransferSourceShop(p);
+    const matchesShop = selectedShop === "全部" || p.shopName === selectedShop || (Boolean(transferSource) && transferSource === selectedShop);
 
     // Inbound type filter
     const orderType = isAutoInboundOrderLike(p)
@@ -444,6 +453,11 @@ function InboundContent() {
                                   <span>{po.shopName}</span>
                                 </span>
                               )}
+                              {extractTransferSourceShop(po) && (
+                                <span className="inline-flex items-center gap-1 rounded-full border border-teal-500/20 bg-teal-500/10 px-2 py-0.5 text-[9px] font-bold text-teal-700 dark:border-teal-500/30 dark:bg-teal-500/15 dark:text-teal-300 shadow-2xs" title={`从【${extractTransferSourceShop(po)}】调拨入库至【${po.shopName || "目标店"}】`}>
+                                  <span>调自: {extractTransferSourceShop(po)}</span>
+                                </span>
+                              )}
                             </div>
                             <span className="text-[10px] font-mono text-muted-foreground/60 font-medium">{serialText}</span>
                           </div>
@@ -585,6 +599,11 @@ function InboundContent() {
                             <span className="inline-flex items-center gap-1 rounded-full border border-sky-500/20 bg-sky-500/10 px-2 py-0.5 text-[10px] font-bold text-sky-700 dark:border-sky-500/30 dark:bg-sky-500/15 dark:text-sky-300 shadow-2xs">
                               <Store size={9} className="text-sky-600 dark:text-sky-400 shrink-0" />
                               <span>{po.shopName}</span>
+                            </span>
+                          )}
+                          {extractTransferSourceShop(po) && (
+                            <span className="inline-flex items-center gap-1 rounded-full border border-teal-500/20 bg-teal-500/10 px-2 py-0.5 text-[9px] font-bold text-teal-700 dark:border-teal-500/30 dark:bg-teal-500/15 dark:text-teal-300 shadow-2xs">
+                              <span>调自: {extractTransferSourceShop(po)}</span>
                             </span>
                           )}
                           <span className="inline-flex items-center rounded-full border border-border/60 bg-muted/40 dark:border-white/10 dark:bg-white/5 px-2 py-0.5 text-[10px] font-mono font-bold text-foreground/80 whitespace-nowrap">

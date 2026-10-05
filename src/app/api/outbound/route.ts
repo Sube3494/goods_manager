@@ -8,6 +8,7 @@ import { getStorageStrategy } from "@/lib/storage";
 import { getOutboundOrderItemSchemaErrorMessage } from "@/lib/prismaSchemaCompat";
 import { getOutboundReturnedQuantityMap, getOutboundSalesReturnedQuantityMap, parseOutboundReturnMeta } from "@/lib/outboundReturnMeta";
 import { getPlatformMeta, parseOutboundNote } from "@/lib/utils";
+import { isAccessoryProduct } from "@/lib/accessoryUtils";
  
 interface OutboundItem {
   productId: string;
@@ -141,6 +142,11 @@ export async function GET(request: NextRequest) {
               name: true,
               sku: true,
               image: true,
+              category: {
+                select: {
+                  name: true,
+                },
+              },
             },
           },
           shopProduct: {
@@ -252,6 +258,12 @@ export async function GET(request: NextRequest) {
       const countedOrderKeys = new Set<string>();
       order.items.forEach((item) => {
         const shopProduct = item.shopProduct;
+        const candidateName = shopProduct?.productName || item.product?.name || "";
+        const candidateCategory = shopProduct?.categoryName || item.product?.category?.name || "";
+        if (isAccessoryProduct(candidateName, candidateCategory)) {
+          return;
+        }
+
         const shopName = shopProduct?.shop?.name || resolveOutboundShopName(order) || null;
         const productKey = item.shopProductId || item.productId || item.product?.sku || item.product?.name || item.id;
         const key = `${shopName || "未分门店"}::${productKey}`;

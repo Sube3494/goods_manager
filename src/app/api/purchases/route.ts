@@ -80,7 +80,8 @@ export async function GET(request: Request) {
   const statusFilter = String(searchParams.get("status") || "").trim();
   const shopFilter = String(searchParams.get("shop") || "").trim();
   const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
-  const pageSize = Math.min(200, Math.max(1, parseInt(searchParams.get("pageSize") || "50")));
+  const rawPageSize = parseInt(searchParams.get("pageSize") || "50", 10);
+  const pageSize = Math.min(5000, Math.max(1, Number.isFinite(rawPageSize) ? rawPageSize : 50));
   const skip = (page - 1) * pageSize;
 
   if (!session) {
@@ -170,14 +171,41 @@ export async function GET(request: Request) {
       });
     }
     if (productId) {
+      // 穿透关联主库与门店商品关系，确保入库记录双向无缝匹配，彻底解决因来源关联差异导致入库对不上的问题
+      const relatedProductIds = new Set<string>([productId]);
+      const relatedShopProductIds = new Set<string>([productId]);
+
+      const targetShopProduct = await prisma.shopProduct.findUnique({
+        where: { id: productId },
+        select: { productId: true, sourceProductId: true },
+      });
+      if (targetShopProduct) {
+        if (targetShopProduct.productId) relatedProductIds.add(targetShopProduct.productId);
+        if (targetShopProduct.sourceProductId) relatedProductIds.add(targetShopProduct.sourceProductId);
+      }
+
+      const linkedShopProducts = await prisma.shopProduct.findMany({
+        where: {
+          OR: [
+            { productId },
+            { sourceProductId: productId },
+          ],
+        },
+        select: { id: true, productId: true },
+      });
+      linkedShopProducts.forEach((sp) => {
+        relatedShopProductIds.add(sp.id);
+        if (sp.productId) relatedProductIds.add(sp.productId);
+      });
+
       andWhere.push({
         items: {
           some: {
             OR: [
-              { productId },
-              { shopProductId: productId },
+              { productId: { in: Array.from(relatedProductIds) } },
+              { shopProductId: { in: Array.from(relatedShopProductIds) } },
             ],
-          }
+          },
         },
       });
     }

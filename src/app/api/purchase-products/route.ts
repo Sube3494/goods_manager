@@ -7,6 +7,7 @@ import { getStorageStrategy } from "@/lib/storage";
 type PurchasePickerItem = {
   id: string;
   sourceType: "product" | "shopProduct";
+  productId?: string | null;
   shopProductId?: string;
   sourceProductId?: string;
   shopId?: string;
@@ -225,6 +226,7 @@ export async function GET(request: Request) {
     const merged: PurchasePickerItem[] = shopProducts.map((item) => ({
       id: item.id,
       sourceType: "shopProduct" as const,
+      productId: item.productId || null,
       shopProductId: item.id,
       sourceProductId: item.sourceProductId || item.productId || item.id,
       shopId: item.shopId,

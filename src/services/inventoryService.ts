@@ -473,7 +473,13 @@ export class InventoryService {
         where: {
           productId: pId,
           remainingQuantity: { gt: 0 },
-          purchaseOrder: { status: "Received" },
+          purchaseOrder: {
+            status: "Received",
+            NOT: [
+              { id: { startsWith: "PO-TR-" } },
+              { note: { contains: "跨门店调" } },
+            ],
+          },
         },
         _sum: {
           remainingQuantity: true,

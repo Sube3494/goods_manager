@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { getFreshSession } from "@/lib/auth";
 import { getStorageStrategy } from "@/lib/storage";
 import { getOutboundReturnedQuantityMap, parseOutboundReturnMeta } from "@/lib/outboundReturnMeta";
+import { isAccessoryProduct } from "@/lib/accessoryUtils";
 
 function getOutboundItemReturnedQuantity(
   order: { note?: string | null; status?: string | null },
@@ -76,6 +77,11 @@ export async function GET(request: NextRequest) {
             name: true,
             sku: true,
             image: true,
+            category: {
+              select: {
+                name: true,
+              },
+            },
           }
         },
         shopProduct: {
@@ -109,6 +115,13 @@ export async function GET(request: NextRequest) {
       const returnedQty = getOutboundItemReturnedQuantity(item.outboundOrder, item);
       const netQuantity = Math.max(0, item.quantity - returnedQty);
       if (netQuantity <= 0) {
+        continue;
+      }
+
+      // 严格剔除配件、礼袋、包装等非主营商品
+      const candidateName = item.shopProduct?.productName || item.product?.name || "";
+      const candidateCategory = item.shopProduct?.categoryName || item.product?.category?.name || "";
+      if (isAccessoryProduct(candidateName, candidateCategory)) {
         continue;
       }
 

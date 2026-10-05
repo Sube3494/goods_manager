@@ -34,6 +34,7 @@ import { isAddressDisabled } from "@/lib/addressBook";
 import { normalizeShopNameKey, isShopNameMatch, stripShopSuffix } from "@/lib/shopIdentity";
 import { parseOutboundNote } from "@/lib/utils";
 import { resolveCancelledJDDeliveredCommissionLoss } from "@/lib/orderFinancials";
+import { isAccessoryProduct } from "@/lib/accessoryUtils";
 
 const SHANGHAI_DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -517,7 +518,13 @@ export async function GET(request: NextRequest) {
           productName: true,
           productImage: true,
           sourceProductId: true,
-          product: { select: { image: true } },
+          categoryName: true,
+          product: {
+            select: {
+              image: true,
+              category: { select: { name: true } },
+            },
+          },
           shop: { select: { id: true, name: true } },
         },
       }),
@@ -1670,6 +1677,9 @@ export async function GET(request: NextRequest) {
         shopName = String(matchedShopProduct.shop?.name || shopName).trim();
       }
 
+      // 严格剔除配件、礼袋、包装等非主营商品，不计入销量排行榜
+      if (isAccessoryProduct(productName, matchedShopProduct?.categoryName || matchedShopProduct?.product?.category?.name)) return;
+
       // 核心业务 Key：同一个店铺 + 同一个店内码 + 同一个商品名称，确保同一个门店商品归集到唯一记录
       const normalizedSku = sku ? sku.toUpperCase() : "";
       const key = `shop-product:${shopName}::${normalizedSku}::${productName}`;
@@ -1881,8 +1891,6 @@ export async function GET(request: NextRequest) {
       const resolvedShopName =
         item.purchaseOrder?.shopName ||
         itemShopProduct?.shop?.name ||
-        matchedShopProduct?.shop?.name ||
-        shopName ||
         "";
 
       return {
