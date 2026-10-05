@@ -5617,22 +5617,38 @@ export async function backfillPlatformIdsForSyncedAutoPickOrder(userId: string, 
   let count = 0;
 
   for (const item of order.items) {
+    const platformProductId = normalizeAutoPickSkuForMatch(item.platformSkuId) || readAutoPickPlatformProductIdForMatch(order.platform, item.rawPayload, item.productNo);
+    const skuFallbacks = splitCompositeAutoPickSku(item.productNo);
+    const matchKeys = Array.from(new Set([platformProductId, ...skuFallbacks].filter(Boolean)));
+    const platformSkuForBackfill = normalizeAutoPickSkuForMatch(item.platformSkuId) || resolveAutoPickItemPlatformSkuId(order.platform, item.rawPayload);
+
+    // 优先按商品库已有平台 ID 查找：如果商品库已存在明确配置，说明用户已权威维护，绝不可反向覆盖
+    const matchedByPlatformId = platformProductId
+      ? shopProducts.find((product) => doesShopProductMatchAutoPickStableKey(order.platform, product, platformProductId))
+      : null;
+
+    if (matchedByPlatformId) {
+      // 商品库已正确匹配，直接跳过回填，保持商品库绝对权威
+      details.push({
+        itemId: item.id,
+        productNo: item.productNo,
+        platformSkuId: platformSkuForBackfill,
+        matchKeys,
+        resolvedShopId,
+        matchedShopProductId: matchedByPlatformId.id,
+        reason: "already-configured-in-catalog",
+      });
+      continue;
+    }
+
     const manualMatchedProduct = readManualMatchedProductFromOrderItemRawPayload(item.rawPayload);
     const manualShopProductId = String(manualMatchedProduct?.shopProductId || "").trim() || null;
     let matchedShopProductId = manualShopProductId && !manualShopProductId.includes("+")
       ? manualShopProductId
       : null;
 
-    const platformProductId = normalizeAutoPickSkuForMatch(item.platformSkuId) || readAutoPickPlatformProductIdForMatch(order.platform, item.rawPayload, item.productNo);
-    const skuFallbacks = splitCompositeAutoPickSku(item.productNo);
-    const matchKeys = Array.from(new Set([platformProductId, ...skuFallbacks].filter(Boolean)));
-    const platformSkuForBackfill = normalizeAutoPickSkuForMatch(item.platformSkuId) || resolveAutoPickItemPlatformSkuId(order.platform, item.rawPayload);
-
     if (!matchedShopProductId) {
-      const matchedByPlatformId = platformProductId
-        ? shopProducts.find((product) => doesShopProductMatchAutoPickStableKey(order.platform, product, platformProductId))
-        : null;
-      const matched = matchedByPlatformId || shopProducts.find((product) =>
+      const matched = shopProducts.find((product) =>
         skuFallbacks.some((key) => doesShopProductMatchAutoPickLocalSku(product, key))
       );
       matchedShopProductId = matched?.id || null;

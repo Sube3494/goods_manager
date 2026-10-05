@@ -2313,22 +2313,8 @@ export async function GET(request: NextRequest) {
             cancelledPlatformCounts,
           },
         };
-    // 异步后台静默回填平台 SKU，不阻塞用户查询主干道响应
-    void (async () => {
-      try {
-        await backfillJdSkuIdForManualMatchedShopProducts(prisma, targetUserId);
-        await backfillMeituanSkuIdForManualMatchedShopProducts(prisma, targetUserId);
-        await Promise.all(
-          responseOrders
-            .filter((order) => isMeituanPlatform(order.platform) || isJDPlatform(order.platform) || isTaobaoPlatform(order.platform))
-            .map((order) => backfillPlatformIdsForSyncedAutoPickOrder(targetUserId, order.id).catch((error) => {
-              console.warn("[orders/route] 忽略当前页平台 SKU 自动回填失败:", error);
-            }))
-        );
-      } catch (err) {
-        console.warn("[orders/route] 后台回填任务异常:", err);
-      }
-    })();
+    // 已禁用异步后台静默回填平台 SKU，以商品库配置为唯一权威准则，防止历史订单的手动记录反向覆盖用户填写的真实商品 ID
+
 
     const productNames = Array.from(new Set(
       responseOrders.flatMap((order) => order.items.map((item) => String(item.productName || "").trim()).filter(Boolean))
@@ -2995,7 +2981,20 @@ export async function GET(request: NextRequest) {
                 ? { ...outboundMatchedProduct, isManual: false, matchMethod: "outbound" as const }
                 : null);
 
-          const matchedProduct = (manualMatchedProduct && !isManualUnmatched)
+          // 核心优化：权威平台 ID 匹配高于历史手动记录。
+          // 用户在商品管理中修正/填写的平台 ID 享有最高权威，不再被历史订单的手动缓存死锁。
+          const matchedProduct = (platformStrictMatch && !isManualUnmatched)
+            ? {
+                ...platformStrictMatch,
+                isUnmatched: false,
+                isManual: false,
+                matchMethod: "id" as const,
+                ...(manualMatchedProduct?.bundleItems ? {
+                  isBundle: true,
+                  bundleItems: manualMatchedProduct.bundleItems,
+                } : {}),
+              }
+            : (manualMatchedProduct && !isManualUnmatched)
             ? {
                 ...manualMatchedProduct,
                 isUnmatched: false,
@@ -3409,34 +3408,7 @@ export async function GET(request: NextRequest) {
         }),
       };
     });
-    const uniqueAutoMatchedMeituanBackfills = Array.from(
-      new Map(autoMatchedMeituanBackfills.map((item) => [`${item.shopProductId}:${item.meituanSkuId}`, item])).values()
-    );
-    await Promise.all(uniqueAutoMatchedMeituanBackfills.map((item) =>
-      syncMeituanSkuIdForShopProduct(prisma, targetUserId, item.shopProductId, item.meituanSkuId).catch((error) => {
-        console.warn("[orders/route] 忽略展示层自动匹配美团 SKU 回填失败:", error);
-      })
-    ));
-    const uniqueAutoMatchedTaobaoBackfills = Array.from(
-      new Map(autoMatchedTaobaoBackfills.map((item) => [`${item.shopProductId}:${item.taobaoSkuId}`, item])).values()
-    );
-    await Promise.all(uniqueAutoMatchedTaobaoBackfills.map((item) =>
-      syncTaobaoSkuIdForShopProduct(prisma, targetUserId, item.shopProductId, item.taobaoSkuId).catch((error) => {
-        console.warn("[orders/route] 忽略展示层自动匹配淘宝 SKU 回填失败:", error);
-      })
-    ));
-    const uniqueAutoMatchedDoudianBackfills = Array.from(
-      new Map(autoMatchedDoudianBackfills.map((item) => [`${item.shopProductId}:${item.doudianSkuId}`, item])).values()
-    );
-    await Promise.all(uniqueAutoMatchedDoudianBackfills.map((item) =>
-      syncDoudianSkuIdForShopProduct(prisma, targetUserId, item.shopProductId, item.doudianSkuId).then((result) => {
-        if (!result.ok) {
-          console.warn("[orders/route] 忽略展示层自动匹配抖音 SKU 回填失败:", result.shopFieldError || result.reason);
-        }
-      }).catch((error) => {
-        console.warn("[orders/route] 忽略展示层自动匹配抖音 SKU 回填失败:", error);
-      })
-    ));
+    // 已禁用展示层自动回填商品平台 SKU 逻辑，避免只读查询意外污染商品库
     perf.lap("response-build");
     perf.log("GET /api/orders", { page, pageSize, count: responseOrders.length, total: responseTotal });
 

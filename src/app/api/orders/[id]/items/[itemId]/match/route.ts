@@ -1061,6 +1061,7 @@ export async function PATCH(
     const rawSingleQty = itemsQtyMap.get(shopProduct.id) || (body?.quantity ? Number(body.quantity) : undefined);
     const singleQty = rawSingleQty && rawSingleQty > 0 ? rawSingleQty : undefined;
     const rawSingleImage = shopProduct.productImage || shopProduct.product?.image || null;
+    const hasPlatformSkuBinding = Boolean(currentPlatformSkuId && !/[+＋]/.test(String(orderItem.productNo || "")));
     const matchedProduct = {
       id: shopProduct.id,
       productId: shopProduct.productId || shopProduct.sourceProductId || null,
@@ -1070,7 +1071,8 @@ export async function PATCH(
       sourceType: "shopProduct" as const,
       shopProductId: shopProduct.id,
       shopName: shopProduct.shop?.name || null,
-      isManual: true,
+      isManual: !hasPlatformSkuBinding,
+      matchMethod: hasPlatformSkuBinding ? ("id" as const) : undefined,
       ...(singleQty && singleQty > 0 ? { quantity: singleQty } : {}),
     };
 
@@ -1116,6 +1118,8 @@ export async function PATCH(
               sourceType: matchedProduct.sourceType,
               shopProductId: matchedProduct.shopProductId,
               shopName: matchedProduct.shopName,
+              isManual: matchedProduct.isManual,
+              matchMethod: matchedProduct.matchMethod,
               ...(singleQty && singleQty > 0 ? { quantity: singleQty } : {}),
               ...(autoMatchedProduct ? { autoMatchedProduct } : {}),
             },
