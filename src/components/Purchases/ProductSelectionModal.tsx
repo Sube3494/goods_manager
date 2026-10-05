@@ -57,6 +57,66 @@ function getProductCode(product: Product) {
   return String(product.sku || product.shopProductId || product.sourceProductId || "").trim();
 }
 
+const naturalSortCollator = new Intl.Collator("zh-CN", {
+  numeric: true,
+  sensitivity: "base",
+});
+
+const SORT_OPTIONS = [
+  { value: "sku-desc", label: "编号从大到小" },
+  { value: "sku-asc", label: "编号从小到大" },
+  { value: "createdAt-desc", label: "最新创建" },
+  { value: "createdAt-asc", label: "最早创建" },
+  { value: "name-asc", label: "名称 A-Z" },
+  { value: "stock-desc", label: "库存从高到低" },
+  { value: "stock-asc", label: "库存从低到高" },
+];
+
+function sortProducts(items: Product[], sortKey: string) {
+  const cloned = [...items];
+  cloned.sort((a, b) => {
+    if (sortKey === "sku-asc") {
+      const cmp = naturalSortCollator.compare(
+        String(a.sku || (a as any).shopProductId || a.id || "").trim(),
+        String(b.sku || (b as any).shopProductId || b.id || "").trim()
+      );
+      if (cmp !== 0) return cmp;
+    } else if (sortKey === "sku-desc") {
+      const cmp = naturalSortCollator.compare(
+        String(b.sku || (b as any).shopProductId || b.id || "").trim(),
+        String(a.sku || (a as any).shopProductId || a.id || "").trim()
+      );
+      if (cmp !== 0) return cmp;
+    } else if (sortKey === "createdAt-desc") {
+      const diff = new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+      if (diff !== 0) return diff;
+    } else if (sortKey === "createdAt-asc") {
+      const diff = new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime();
+      if (diff !== 0) return diff;
+    } else if (sortKey === "name-asc") {
+      const cmp = naturalSortCollator.compare(String(a.name || "").trim(), String(b.name || "").trim());
+      if (cmp !== 0) return cmp;
+    } else if (sortKey === "stock-desc") {
+      const diff = ((b.stock ?? 0) as number) - ((a.stock ?? 0) as number);
+      if (diff !== 0) return diff;
+    } else if (sortKey === "stock-asc") {
+      const diff = ((a.stock ?? 0) as number) - ((b.stock ?? 0) as number);
+      if (diff !== 0) return diff;
+    } else {
+      const cmp = naturalSortCollator.compare(
+        String(b.sku || (b as any).shopProductId || b.id || "").trim(),
+        String(a.sku || (a as any).shopProductId || a.id || "").trim()
+      );
+      if (cmp !== 0) return cmp;
+    }
+
+    const nameCmp = naturalSortCollator.compare(String(a.name || "").trim(), String(b.name || "").trim());
+    if (nameCmp !== 0) return nameCmp;
+    return naturalSortCollator.compare(String(a.id || "").trim(), String(b.id || "").trim());
+  });
+  return cloned;
+}
+
 interface ProductSelectionModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -76,6 +136,7 @@ interface ProductSelectionModalProps {
   allowMultipleToggle?: boolean; // 是否允许切换多选开关
   minimalView?: boolean;
   showCategoryFilter?: boolean;
+  showSortSelector?: boolean;
   query?: Record<string, string>;
   emptyStateText?: string;
   prefetchedProducts?: Product[];
@@ -151,6 +212,7 @@ export function ProductSelectionModal({
   allowLibrarySwitch = true,
   showQuantityControls = false,
   disableAlreadySelected = true,
+  showSortSelector = true,
   defaultViewMode,
   onClear,
   clearLabel = "解除匹配",
@@ -166,6 +228,27 @@ export function ProductSelectionModal({
   const [searchQuery, setSearchQuery] = useState(initialSearchQuery || "");
   const debouncedSearch = useDebounce(searchQuery, searchQuery ? 300 : 0);
   const hasAppliedPreferredCategoryRef = useRef(false);
+
+  const [sortBy, setSortByState] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const savedGoodsSort = localStorage.getItem("goods_sort_by");
+        if (savedGoodsSort) return savedGoodsSort;
+        const savedShopSort = localStorage.getItem("shop_goods_sort_by");
+        if (savedShopSort) return savedShopSort;
+      } catch {}
+    }
+    return "sku-desc";
+  });
+
+  const handleSortChange = useCallback((newSort: string) => {
+    setSortByState(newSort);
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("goods_sort_by", newSort);
+      } catch {}
+    }
+  }, []);
 
   useEffect(() => {
     if (initialSearchQuery !== undefined) {
@@ -278,6 +361,7 @@ export function ProductSelectionModal({
     selectedCategoryName: remoteCategoryName,
     debouncedSearch: remoteSearch,
     activeLibraryId: effectiveLibraryId,
+    sortBy,
   });
 
   const getSelectionKey = useCallback((product: Product) => {
@@ -295,6 +379,13 @@ export function ProductSelectionModal({
   // 初始化重置逻辑
   useEffect(() => {
     if (isOpen) {
+      try {
+        const saved = localStorage.getItem("goods_sort_by") || localStorage.getItem("shop_goods_sort_by");
+        if (saved) {
+          setSortByState(saved);
+        }
+      } catch {}
+
       setLocalSingleSelect(Boolean(singleSelect));
       if (!disableAlreadySelected && Array.isArray(selectedIds) && selectedIds.length > 0) {
         setTempSelectedIds(selectedIds);
@@ -472,6 +563,7 @@ export function ProductSelectionModal({
         ...(loadAllOnOpen ? { all: "true" } : { pageSize: "40" }),
         ...(remoteSearch ? { search: remoteSearch } : {}),
         ...(queryRef.current || {}),
+        sortBy,
         ...(effectiveLibraryId && effectiveLibraryId !== "all" ? { libraryId: effectiveLibraryId } : {}),
         ...(remoteCategoryName !== "all" ? { category: remoteCategoryName, categoryName: remoteCategoryName } : {}),
         ...(fetchPath === "/api/products" && minimalView ? { view: "picker" } : {}),
@@ -523,7 +615,7 @@ export function ProductSelectionModal({
         setIsNextPageLoading(false);
       }
     }
-  }, [effectiveLibraryId, fetchPath, loadAllOnOpen, querySignature, remoteCategoryName, remoteSearch, shouldShowCategoryFilter]);
+  }, [effectiveLibraryId, fetchPath, loadAllOnOpen, querySignature, remoteCategoryName, remoteSearch, shouldShowCategoryFilter, sortBy]);
 
   useEffect(() => {
     if (loadingDelayRef.current) {
@@ -595,16 +687,17 @@ export function ProductSelectionModal({
 
   const filteredProducts = useMemo(() => {
     const rawList = filterVisibleProducts(Array.isArray(products) ? products : [], displayCategoryName);
+    const sortedRawList = sortProducts(rawList, sortBy);
 
-    // 搜索模式下保持原生搜索结果，避免搜索结果里强行塞入不匹配的商品
+    // 搜索模式下保持原生搜索结果并保持排序
     if (debouncedSearch.trim()) {
-      return rawList;
+      return sortedRawList;
     }
 
     // 未搜索模式下：将已勾选的商品置顶显示，避免用户搜索选中后清空搜索时，因分页或排序找不到刚才选中的商品
     const selectedKeySet = new Set(tempSelectedIds);
     if (selectedKeySet.size === 0) {
-      return rawList;
+      return sortedRawList;
     }
 
     const selectedInList: Product[] = [];
@@ -620,8 +713,8 @@ export function ProductSelectionModal({
       }
     }
 
-    // 再遍历当前店铺的 rawList
-    for (const p of rawList) {
+    // 再遍历当前店铺排序后的 sortedRawList
+    for (const p of sortedRawList) {
       const key = getSelectionKey(p);
       if (selectedKeySet.has(key)) {
         if (!seenKeys.has(key)) {
@@ -637,7 +730,7 @@ export function ProductSelectionModal({
     }
 
     return [...selectedInList, ...unselectedInList];
-  }, [debouncedSearch, displayCategoryName, filterVisibleProducts, getSelectionKey, products, selectedProducts, tempSelectedIds]);
+  }, [debouncedSearch, displayCategoryName, filterVisibleProducts, getSelectionKey, products, selectedProducts, sortBy, tempSelectedIds]);
 
   const hasMoreLocal = filteredProducts.length > localVisibleCount;
 
@@ -846,6 +939,19 @@ export function ProductSelectionModal({
                       onChange={setSelectedCategoryName}
                       placeholder="筛选分类"
                       triggerClassName="h-11 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-4 text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all dark:hover:bg-white/10"
+                    />
+                  </div>
+                )}
+
+                {showSortSelector && (
+                  <div className="w-32 sm:w-40 shrink-0">
+                    <CustomSelect
+                      options={SORT_OPTIONS}
+                      value={sortBy}
+                      onChange={handleSortChange}
+                      searchable={false}
+                      placeholder="排序方式"
+                      triggerClassName="h-11 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 focus:border-primary/20 px-3.5 text-xs sm:text-sm text-foreground outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 transition-all dark:hover:bg-white/10"
                     />
                   </div>
                 )}

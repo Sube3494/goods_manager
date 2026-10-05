@@ -95,23 +95,61 @@ function scopePurchasePickerItemsByShop(
   });
 }
 
-function comparePurchasePickerItems(a: PurchasePickerItem, b: PurchasePickerItem) {
-  const aSortNumber = typeof a.sortNumber === "number" && Number.isFinite(a.sortNumber)
-    ? a.sortNumber
-    : Number.MAX_SAFE_INTEGER;
-  const bSortNumber = typeof b.sortNumber === "number" && Number.isFinite(b.sortNumber)
-    ? b.sortNumber
-    : Number.MAX_SAFE_INTEGER;
-  if (aSortNumber !== bSortNumber) {
-    return aSortNumber - bSortNumber;
-  }
+function comparePurchasePickerItems(a: PurchasePickerItem, b: PurchasePickerItem, sortBy: string = "sku-desc") {
+  if (sortBy === "sku-asc") {
+    const skuCompare = naturalSortCollator.compare(
+      String(a.sku || "").trim(),
+      String(b.sku || "").trim()
+    );
+    if (skuCompare !== 0) return skuCompare;
+  } else if (sortBy === "sku-desc") {
+    const skuCompare = naturalSortCollator.compare(
+      String(b.sku || "").trim(),
+      String(a.sku || "").trim()
+    );
+    if (skuCompare !== 0) return skuCompare;
+  } else if (sortBy === "createdAt-desc") {
+    const diff = new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+    if (diff !== 0) return diff;
+  } else if (sortBy === "createdAt-asc") {
+    const diff = new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime();
+    if (diff !== 0) return diff;
+  } else if (sortBy === "name-asc") {
+    const nameCompare = naturalSortCollator.compare(
+      String(a.name || "").trim(),
+      String(b.name || "").trim()
+    );
+    if (nameCompare !== 0) return nameCompare;
+  } else if (sortBy === "name-desc") {
+    const nameCompare = naturalSortCollator.compare(
+      String(b.name || "").trim(),
+      String(a.name || "").trim()
+    );
+    if (nameCompare !== 0) return nameCompare;
+  } else if (sortBy === "stock-desc") {
+    const diff = (b.stock ?? 0) - (a.stock ?? 0);
+    if (diff !== 0) return diff;
+  } else if (sortBy === "stock-asc") {
+    const diff = (a.stock ?? 0) - (b.stock ?? 0);
+    if (diff !== 0) return diff;
+  } else {
+    const aSortNumber = typeof a.sortNumber === "number" && Number.isFinite(a.sortNumber)
+      ? a.sortNumber
+      : Number.MAX_SAFE_INTEGER;
+    const bSortNumber = typeof b.sortNumber === "number" && Number.isFinite(b.sortNumber)
+      ? b.sortNumber
+      : Number.MAX_SAFE_INTEGER;
+    if (aSortNumber !== bSortNumber) {
+      return aSortNumber - bSortNumber;
+    }
 
-  const skuCompare = naturalSortCollator.compare(
-    String(a.sku || "").trim(),
-    String(b.sku || "").trim()
-  );
-  if (skuCompare !== 0) {
-    return skuCompare;
+    const skuCompare = naturalSortCollator.compare(
+      String(b.sku || "").trim(),
+      String(a.sku || "").trim()
+    );
+    if (skuCompare !== 0) {
+      return skuCompare;
+    }
   }
 
   const nameCompare = naturalSortCollator.compare(
@@ -178,6 +216,7 @@ export async function GET(request: Request) {
     const shopId = searchParams.get("shopId") || "";
     const shopName = (searchParams.get("shopName") || "").trim();
     const aggregateSource = searchParams.get("aggregateSource") === "true";
+    const sortBy = (searchParams.get("sortBy") || searchParams.get("sort") || "sku-desc").trim();
     const matchedCategoryIds = categoryName !== "all"
       ? (
           await prisma.category.findMany({
@@ -298,7 +337,7 @@ export async function GET(request: Request) {
       }, new Map<string, PurchasePickerItem>())
     ).map(([, value]) => value);
 
-    dedupedItems.sort(comparePurchasePickerItems);
+    dedupedItems.sort((a, b) => comparePurchasePickerItems(a, b, sortBy));
 
     const start = (page - 1) * pageSize;
     const items = dedupedItems.slice(start, start + pageSize);

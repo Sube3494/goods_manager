@@ -37,7 +37,7 @@ import { TodayOrdersView } from "@/app/orders/TodayOrdersView";
 import { AllOrdersView } from "@/app/orders/AllOrdersView";
 import { PromotionCalendarModal } from "@/app/orders/PromotionCalendarModal";
 import { CustomSelect } from "@/components/ui/CustomSelect";
-import { DatePicker } from "@/components/ui/DatePicker";
+import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import { StatsData } from "@/lib/types";
 
 interface UserOrdersModalProps {
@@ -330,7 +330,6 @@ function UserProfitTrendView({
   const initialEnd = useMemo(() => format(today, "yyyy-MM-dd"), [today]);
   const initialStart = useMemo(() => format(subDays(today, 6), "yyyy-MM-dd"), [today]);
 
-  const [rangePreset, setRangePreset] = useState("7d");
   const [startDate, setStartDate] = useState(initialStart);
   const [endDate, setEndDate] = useState(initialEnd);
   const [selectedShopName, setSelectedShopName] = useState("");
@@ -346,28 +345,25 @@ function UserProfitTrendView({
     try {
       const query = new URLSearchParams();
       query.set("userId", userId);
-      if (rangePreset === "all") {
+      if (!startDate && !endDate) {
         query.set("range", "all");
+      } else {
+        if (startDate) query.set("startDate", startDate);
+        if (endDate) query.set("endDate", endDate);
       }
-      if (startDate) query.set("startDate", startDate);
-      if (endDate) query.set("endDate", endDate);
       if (selectedShopName) query.set("shopName", selectedShopName);
 
       const res = await fetch(`/api/stats?${query.toString()}`, { cache: "no-store" });
       if (res.ok) {
         const data = await res.json();
         setStatsData(data);
-        if (rangePreset === "all" && data?.rangeStart && data?.rangeEnd) {
-          setStartDate(data.rangeStart);
-          setEndDate(data.rangeEnd);
-        }
       }
     } catch (err) {
       console.error("Failed to load user profit trend:", err);
     } finally {
       setIsLoading(false);
     }
-  }, [userId, rangePreset, startDate, endDate, selectedShopName]);
+  }, [userId, startDate, endDate, selectedShopName]);
 
   useEffect(() => {
     void fetchStats();
@@ -378,32 +374,6 @@ function UserProfitTrendView({
       void fetchStats();
     }
   }, [refreshTrigger, fetchStats]);
-
-  const timeRangeOptions = [
-    { value: "7d", label: "近 7 天" },
-    { value: "15d", label: "近 15 天" },
-    { value: "30d", label: "近 30 天" },
-    { value: "month", label: "本月" },
-    { value: "all", label: "全部时间" },
-    { value: "custom", label: "自定义区间" },
-  ];
-
-  const handleRangePresetChange = (preset: string) => {
-    setRangePreset(preset);
-    if (preset === "7d") {
-      setStartDate(format(subDays(today, 6), "yyyy-MM-dd"));
-      setEndDate(format(today, "yyyy-MM-dd"));
-    } else if (preset === "15d") {
-      setStartDate(format(subDays(today, 14), "yyyy-MM-dd"));
-      setEndDate(format(today, "yyyy-MM-dd"));
-    } else if (preset === "30d") {
-      setStartDate(format(subDays(today, 29), "yyyy-MM-dd"));
-      setEndDate(format(today, "yyyy-MM-dd"));
-    } else if (preset === "month") {
-      setStartDate(format(startOfMonth(today), "yyyy-MM-dd"));
-      setEndDate(format(endOfMonth(today), "yyyy-MM-dd"));
-    }
-  };
 
   const businessTrend = statsData?.businessTrend || [];
   const platformBusinessTrend = statsData?.platformBusinessTrend || {};
@@ -442,56 +412,44 @@ function UserProfitTrendView({
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      {/* 顶部控制栏与筛选器：三个下拉列表一行（先店铺、后平台、后日子） */}
-      <div className="rounded-2xl border border-black/8 bg-white/70 p-2.5 sm:p-3 shadow-xs backdrop-blur-sm dark:border-white/10 dark:bg-white/4 space-y-2.5">
-        <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
-          {/* 下拉 1：店铺筛选 */}
-          <CustomSelect
-            value={selectedShopName}
-            onChange={setSelectedShopName}
-            options={shopSelectOptions}
-            className="h-8.5 sm:h-9 w-full"
-            triggerClassName="h-full rounded-xl text-xs sm:text-sm border border-black/8 bg-white px-2 sm:px-3 text-center justify-center dark:border-white/10 dark:bg-white/5 font-medium"
-          />
-
-          {/* 下拉 2：平台筛选 */}
-          <CustomSelect
-            value={selectedPlatform}
-            onChange={setSelectedPlatform}
-            options={platformOptions}
-            className="h-8.5 sm:h-9 w-full"
-            triggerClassName="h-full rounded-xl text-xs sm:text-sm border border-black/8 bg-white px-2 sm:px-3 text-center justify-center dark:border-white/10 dark:bg-white/5 font-medium"
-          />
-
-          {/* 下拉 3：时间范围（日子） */}
-          <CustomSelect
-            value={rangePreset}
-            onChange={handleRangePresetChange}
-            options={timeRangeOptions}
-            className="h-8.5 sm:h-9 w-full"
-            triggerClassName="h-full rounded-xl text-xs sm:text-sm border border-black/8 bg-white px-2 sm:px-3 text-center justify-center dark:border-white/10 dark:bg-white/5 font-medium"
-          />
-        </div>
-
-        {/* 当选择自定义区间时，优雅展开日期选择 */}
-        {rangePreset === "custom" && (
-          <div className="flex items-center gap-1.5 sm:gap-2 pt-2 border-t border-black/5 dark:border-white/5 text-xs animate-in fade-in duration-200">
-            <span className="text-[11px] text-muted-foreground shrink-0">自定义区间:</span>
-            <DatePicker
-              value={startDate}
-              onChange={(val) => setStartDate(val)}
-              className="flex-1 min-w-0"
-              triggerClassName="h-8 rounded-xl text-xs border border-black/8 dark:border-white/10 bg-white dark:bg-white/5"
+      {/* 顶部控制栏与筛选器：店铺、平台、以及与订单页面完全一致的 DateRangePicker 组件 */}
+      <div className="rounded-2xl border border-black/8 bg-white/70 p-2 sm:p-2.5 shadow-xs backdrop-blur-sm dark:border-white/10 dark:bg-white/4">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2">
+          {/* 店铺与平台筛选 */}
+          <div className="grid grid-cols-2 gap-1.5 sm:gap-2 sm:flex sm:items-center shrink-0 flex-1">
+            <CustomSelect
+              value={selectedShopName}
+              onChange={setSelectedShopName}
+              options={shopSelectOptions}
+              className="h-8.5 sm:h-9 w-full sm:w-[130px]"
+              triggerClassName="h-full rounded-xl text-xs sm:text-sm border border-black/8 bg-white px-2 sm:px-3 text-center justify-center dark:border-white/10 dark:bg-white/5 font-medium whitespace-nowrap"
             />
-            <span className="text-muted-foreground shrink-0 text-xs">至</span>
-            <DatePicker
-              value={endDate}
-              onChange={(val) => setEndDate(val)}
-              className="flex-1 min-w-0"
-              triggerClassName="h-8 rounded-xl text-xs border border-black/8 dark:border-white/10 bg-white dark:bg-white/5"
+
+            <CustomSelect
+              value={selectedPlatform}
+              onChange={setSelectedPlatform}
+              options={platformOptions}
+              className="h-8.5 sm:h-9 w-full sm:w-[110px]"
+              triggerClassName="h-full rounded-xl text-xs sm:text-sm border border-black/8 bg-white px-2 sm:px-3 text-center justify-center dark:border-white/10 dark:bg-white/5 font-medium whitespace-nowrap"
             />
           </div>
-        )}
+
+          {/* 统一日期范围选择组件：预设与日历选区一体化 */}
+          <div className="w-full sm:w-auto shrink-0">
+            <DateRangePicker
+              startDate={startDate}
+              endDate={endDate}
+              onChange={({ startDate: nextStart, endDate: nextEnd }) => {
+                setStartDate(nextStart);
+                setEndDate(nextEnd);
+              }}
+              hasAllPreset={true}
+              placeholder="选择日期范围"
+              className="h-8.5 sm:h-9 w-full sm:w-auto"
+              triggerClassName="h-full rounded-xl text-xs sm:text-sm border border-black/8 bg-white px-2.5 sm:px-3 text-center justify-center dark:border-white/10 dark:bg-white/5 font-medium whitespace-nowrap shadow-none"
+            />
+          </div>
+        </div>
       </div>
 
       {isLoading && !statsData ? (
