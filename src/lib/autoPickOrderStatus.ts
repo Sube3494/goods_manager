@@ -425,15 +425,37 @@ export function resolveAutoPickBusinessStatus(
   return String(status || "").trim() || undefined;
 }
 
-/**
- * 判定订单的配送运单是否已取消、失效或不存在生效的第三方运力。
- * 典型场景：用户呼叫了配送后又取消了配送，或运单退单/配送异常。
- */
-export function isDeliveryCancelledOrEmpty(order?: {
+type DeliveryStateOrder = {
   status?: string | null;
   rawPayload?: unknown;
   delivery?: unknown;
-} | null): boolean {
+  isMainSystemSelfDelivery?: boolean;
+};
+
+function hasSelfDeliveryMarker(order: DeliveryStateOrder) {
+  const record = (value: unknown): Record<string, unknown> => value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown> : {};
+  const raw = record(order.rawPayload);
+  const systemMeta = record(raw.systemMeta);
+  const marker = record(systemMeta.mainSystemSelfDelivery);
+  if (order.isMainSystemSelfDelivery || raw.isMainSystemSelfDelivery === true || marker.triggered === true
+    || systemMeta.isSelfDelivery === true || systemMeta.isMainSystemSelfDelivery === true) return true;
+  return [record(order.delivery), record(raw.delivery), raw].some((delivery) => [
+    delivery.logisticName, delivery.logistic_name, delivery.logisticTag, delivery.logistic_tag,
+    delivery.riderName, delivery.delivery_name,
+  ].some((value) => /自配|oneself/i.test(String(value || ""))));
+}
+
+export function isAutoPickOrderSelfDeliveryActive(order?: DeliveryStateOrder | null) {
+  return Boolean(order && !isAutoPickOrderTerminalStatus(order.status)
+    && hasSelfDeliveryMarker(order) && !isDeliveryCancelledOrEmpty(order));
+}
+
+/**
+ * 判定订单的配送运单是否已取消、失效或不存在生效配送任务（含自配）。
+ * 典型场景：用户呼叫了配送后又取消了配送，或运单退单/配送异常。
+ */
+export function isDeliveryCancelledOrEmpty(order?: DeliveryStateOrder | null): boolean {
   if (!order) return true;
 
   const rawPayload = order.rawPayload && typeof order.rawPayload === "object" && !Array.isArray(order.rawPayload)
@@ -445,11 +467,6 @@ export function isDeliveryCancelledOrEmpty(order?: {
   const rawPayloadDelivery = rawPayload.delivery && typeof rawPayload.delivery === "object" && !Array.isArray(rawPayload.delivery)
     ? rawPayload.delivery as Record<string, unknown>
     : null;
-
-  // 1. 平台原始 delivery 显式为 false 或 null（代表当前没有生效运单）
-  if (rawPayload.delivery === false) {
-    return true;
-  }
 
   // 2. 检查 cancel 实体（取消配送/退单记录）
   const cancelObj = rawPayload.cancel && typeof rawPayload.cancel === "object" && !Array.isArray(rawPayload.cancel)
@@ -503,15 +520,14 @@ export function isDeliveryCancelledOrEmpty(order?: {
     return true;
   }
 
+  // 自配也是生效的配送任务；不能因缺少第三方运单而开放重复发单。
+  if (hasSelfDeliveryMarker(order)) return false;
+  if (rawPayload.delivery === false) return true;
+
   // 6. 如果 delivery 对象本身没有任何有效的第三方物流名称和骑手
   const logisticName = String(orderDelivery?.logisticName || orderDelivery?.logistic_name || rawPayloadDelivery?.logistic_name || "").trim();
   const riderName = String(orderDelivery?.riderName || orderDelivery?.delivery_name || rawPayloadDelivery?.delivery_name || "").trim();
   if (!logisticName && !riderName) {
-    return true;
-  }
-
-  // 7. 自配送亦属于非第三方跑腿锁定状态
-  if (/自配|自配送|商家自配|oneself/i.test(logisticName) || /自配|自配送|商家自配/i.test(riderName)) {
     return true;
   }
 

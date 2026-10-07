@@ -9,6 +9,7 @@ import {
   isAutoPickOrderCompletedStatus,
   isAutoPickOrderDeliveringStatus,
   isAutoPickOrderRiderAssigned,
+  isAutoPickOrderSelfDeliveryActive,
   isAutoPickPickupOrder,
   isDeliveryCancelledOrEmpty,
 } from "@/lib/autoPickOrderStatus";
@@ -77,7 +78,7 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
 
     const deliveryCancelled = isDeliveryCancelledOrEmpty(order);
 
-    if (!deliveryCancelled && isAutoPickOrderDeliveringStatus(order.status)) {
+    if (isAutoPickOrderSelfDeliveryActive(order) || (!deliveryCancelled && isAutoPickOrderDeliveringStatus(order.status))) {
       return NextResponse.json({ error: "订单已在配送中，不能发起自配" }, { status: 409 });
     }
 
@@ -106,7 +107,7 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
         if (!refreshedDeliveryCancelled && isAutoPickOrderRiderAssigned(commandOrder)) {
           return NextResponse.json({ error: "骑手已接单，不能发起自配" }, { status: 409 });
         }
-        if (!refreshedDeliveryCancelled && isAutoPickOrderDeliveringStatus(commandOrder.status)) {
+        if (isAutoPickOrderSelfDeliveryActive(commandOrder) || (!refreshedDeliveryCancelled && isAutoPickOrderDeliveringStatus(commandOrder.status))) {
           return NextResponse.json({ error: "订单已在配送中，不能发起自配" }, { status: 409 });
         }
       }

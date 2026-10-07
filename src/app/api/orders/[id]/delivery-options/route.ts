@@ -8,6 +8,7 @@ import {
   isAutoPickOrderCompletedStatus,
   isAutoPickOrderDeliveringStatus,
   isAutoPickOrderRiderAssigned,
+  isAutoPickOrderSelfDeliveryActive,
   isAutoPickPickupOrder,
 } from "@/lib/autoPickOrderStatus";
 
@@ -61,7 +62,7 @@ export async function GET(_: NextRequest, context: { params: Promise<{ id: strin
     if (isAutoPickPickupOrder(order.rawPayload, order.userAddress, order.shopAddress)) {
       return NextResponse.json({ error: "到店自取订单不需要呼叫配送" }, { status: 409 });
     }
-    if (isAutoPickOrderDeliveringStatus(order.status) || isAutoPickOrderRiderAssigned(order)) {
+    if (isAutoPickOrderSelfDeliveryActive(order) || isAutoPickOrderDeliveringStatus(order.status) || isAutoPickOrderRiderAssigned(order)) {
       return NextResponse.json({ error: "订单已有配送任务，不能重复呼叫" }, { status: 409 });
     }
     if (hasActiveShansongDelivery(order.rawPayload)) {

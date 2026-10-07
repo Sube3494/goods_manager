@@ -6,6 +6,7 @@ import { FinanceMath } from "@/lib/math";
 import { Prisma } from "../../../../../prisma/generated-client";
 import { calculatePurchaseOrderTotalAmount } from "@/lib/purchaseCosting";
 import { InventoryService } from "@/services/inventoryService";
+import { readRecordedCost } from "@/lib/outboundCostSnapshot";
 
 type ParsedOutboundSnapshotBatch = {
   purchaseOrderItemId: string;
@@ -193,10 +194,10 @@ export async function POST(request: Request) {
       for (const item of bindItems) {
         const outboundItemId = String(item.outboundOrderItemId).trim();
         const purchaseOrderItemId = String(item.purchaseOrderItemId).trim();
-        const costPrice = Number(item.costPrice);
+        const costPrice = readRecordedCost(item.costPrice);
         const deductQty = Number(item.quantity || 1);
 
-        if (!outboundItemId || !purchaseOrderItemId || !Number.isFinite(costPrice) || costPrice < 0) {
+        if (!outboundItemId || !purchaseOrderItemId || costPrice === null) {
           throw new Error(`回填数据项无效: ${JSON.stringify(item)}`);
         }
 
@@ -267,9 +268,9 @@ export async function POST(request: Request) {
       // B. 处理纯手动兜底回填（仅有出库单明细 ID，没有可用入库批次）
       for (const item of manualOnlyItems) {
         const outboundItemId = String(item.outboundOrderItemId).trim();
-        const costPrice = Number(item.costPrice);
+        const costPrice = readRecordedCost(item.costPrice);
 
-        if (!outboundItemId || !Number.isFinite(costPrice) || costPrice < 0) {
+        if (!outboundItemId || costPrice === null) {
           throw new Error(`手动回填数据项无效: ${JSON.stringify(item)}`);
         }
 
@@ -290,6 +291,7 @@ export async function POST(request: Request) {
           totalCost: totalCost,
           averageUnitCost: costPrice,
           batches: [],
+          manualCostRecorded: true,
         };
 
         await tx.outboundOrderItem.update({
@@ -303,8 +305,8 @@ export async function POST(request: Request) {
       // C. 处理常规回填（只含有采购批次ID的价格变动同步）
       for (const item of regularItems) {
         const id = String(item.purchaseOrderItemId || "").trim();
-        const costPrice = Number(item.costPrice);
-        if (!id || !Number.isFinite(costPrice) || costPrice < 0) {
+        const costPrice = readRecordedCost(item.costPrice);
+        if (!id || costPrice === null) {
           throw new Error(`常规回填数据项无效: ${JSON.stringify(item)}`);
         }
         costPriceByPurchaseOrderItemId.set(id, costPrice);

@@ -1,14 +1,15 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { X, Loader2, Check, AlertTriangle, Coins, RefreshCw } from "lucide-react";
 import Image from "next/image";
-import { ConfirmModal } from "@/components/ui/ConfirmModal";
+import { readRecordedCost } from "@/lib/outboundCostSnapshot";
 
 type OutboundBatch = {
   purchaseOrderItemId: string;
   purchaseOrderId: string | null;
   quantity: number;
   unitCost: number;
+  purchaseCostPrice?: number | null;
   isVirtual?: boolean;
 };
 
@@ -74,8 +75,6 @@ export default function CostBackfillModal({
 }: CostBackfillModalProps) {
   const [isMounted, setIsMounted] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
-  const pendingSubmitItemsRef = useRef<any[] | null>(null);
   
   // 记录每个批次输入框的修改值: { purchaseOrderItemId_or_outboundOrderItemId: string_value }
   const [costInputs, setCostInputs] = useState<Record<string, string>>({});
@@ -173,9 +172,9 @@ export default function CostBackfillModal({
       const hasBackfilled = item.hasBackfilled;
       if (displayBatches.length > 0) {
         displayBatches.forEach((batch) => {
-          // 如果已回填过（包括填 0），或者批次本身的单价大于 0，则使用当前值作为初始值
-          const hasValue = hasBackfilled || batch.unitCost > 0;
-          initialInputs[batch.purchaseOrderItemId] = hasValue ? String(batch.unitCost) : "";
+          // 编辑采购原价，避免将已分摊的运费再次计入采购单价；明确的 0 也是有效成本。
+          const purchaseCost = batch.purchaseCostPrice === undefined ? batch.unitCost : batch.purchaseCostPrice;
+          initialInputs[batch.purchaseOrderItemId] = readRecordedCost(purchaseCost) !== null ? String(purchaseCost) : "";
         });
       } else if (item.outboundOrderItemId) {
         const hasValue = hasBackfilled || item.unitCost > 0;
@@ -287,12 +286,6 @@ export default function CostBackfillModal({
     }
   };
 
-  const handleConfirmSave = () => {
-    if (pendingSubmitItemsRef.current) {
-      void executeSave(pendingSubmitItemsRef.current);
-    }
-  };
-
   const handleSave = async () => {
     if (isSaving) return;
     
@@ -303,7 +296,7 @@ export default function CostBackfillModal({
       quantity?: number;
       costPrice: number;
     }> = [];
-    let hasEmptyOrZero = false;
+    let hasMissingCost = false;
 
     if (!order.productCostBreakdown) return;
 
@@ -314,8 +307,8 @@ export default function CostBackfillModal({
           const rawVal = costInputs[batch.purchaseOrderItemId];
           const costPrice = parseFloat(rawVal || "0");
           
-          if (isNaN(costPrice) || costPrice <= 0) {
-            hasEmptyOrZero = true;
+          if (readRecordedCost(rawVal) === null) {
+            hasMissingCost = true;
           }
           
           submitItems.push({
@@ -330,8 +323,8 @@ export default function CostBackfillModal({
         const rawVal = costInputs[item.outboundOrderItemId];
         const costPrice = parseFloat(rawVal || "0");
         
-        if (isNaN(costPrice) || costPrice <= 0) {
-          hasEmptyOrZero = true;
+        if (readRecordedCost(rawVal) === null) {
+          hasMissingCost = true;
         }
         
         submitItems.push({
@@ -341,9 +334,8 @@ export default function CostBackfillModal({
       }
     }
 
-    if (hasEmptyOrZero) {
-      pendingSubmitItemsRef.current = submitItems;
-      setIsConfirmOpen(true);
+    if (hasMissingCost) {
+      alert("请填写每个批次的有效成本；成本为零时请明确输入 0。");
       return;
     }
 
@@ -628,16 +620,6 @@ export default function CostBackfillModal({
   return (
     <>
       {createPortal(modalContent, document.body)}
-      <ConfirmModal
-        isOpen={isConfirmOpen}
-        onClose={() => setIsConfirmOpen(false)}
-        onConfirm={handleConfirmSave}
-        title="成本确认提示"
-        message="部分商品的成本未填写或填写为 0，这会导致利润计算不准。确定要直接保存吗？"
-        confirmLabel="确定保存"
-        cancelLabel="返回修改"
-        variant="warning"
-      />
     </>
   );
 }

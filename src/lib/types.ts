@@ -338,6 +338,7 @@ export interface AutoPickOrder {
       purchaseOrderId: string | null;
       quantity: number;
       unitCost: number;
+      purchaseCostPrice?: number | null;
     }>;
     availableBatches?: Array<{
       purchaseOrderItemId: string;

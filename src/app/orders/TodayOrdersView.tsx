@@ -19,6 +19,7 @@ import {
   getAutoPickStatusFilterLabel,
   isAutoPickOrderDeliveringStatus,
   isAutoPickOrderRiderAssigned,
+  isAutoPickOrderSelfDeliveryActive,
   isAutoPickPickupOrder,
   isDeliveryCancelledOrEmpty,
   isLockedSubscribeOrder,
@@ -166,7 +167,8 @@ function CompactTodayOrderCard({
   const displayAsOfflineOrder = order.platform === "线下交易" || String(order.platform || "").toLowerCase() === "other";
   const showPlatformActions = !displayAsOfflineOrder && !readOnly;
   const isLockedSubscribe = isLockedSubscribeOrder(order);
-  const cannotSelfDeliver = Boolean(actingId) || terminal || delivering || pickup || riderAssigned || isLockedSubscribe;
+  const selfDeliveryActive = isAutoPickOrderSelfDeliveryActive(order);
+  const cannotSelfDeliver = Boolean(actingId) || terminal || delivering || selfDeliveryActive || pickup || riderAssigned || isLockedSubscribe;
   const showAutoOutboundRecovery = shouldShowAutoOutboundRecovery(order);
   const syncing = actingId === `${order.id}:sync`;
   const shopName = order.matchedShopName || order.rawShopName || order.shopId || "未匹配店铺";
@@ -239,7 +241,7 @@ function CompactTodayOrderCard({
                     {actingId === `${order.id}:outbound` ? "处理中" : "出库"}
                   </button>
                 )
-              ) : canShowPureProfit ? (
+              ) : canShowPureProfit || (canViewProductCosts && Boolean(getProductCostStatusText(order))) ? (
                 <OrderProfitBadge
                   order={order}
                   compact
@@ -377,7 +379,7 @@ function CompactTodayOrderCard({
                 icon={<Navigation size={12} />}
                 onClick={() => onRunAction("dispatch-delivery")}
                 disabled={cannotSelfDeliver}
-                title={isLockedSubscribe ? "预约单尚未到达配送时间，不能发起配送" : "选择第三方运力并呼叫配送"}
+                title={isLockedSubscribe ? "预约单尚未到达配送时间，不能发起配送" : delivering || selfDeliveryActive ? "订单已有配送任务，不能重复呼叫配送" : "选择第三方运力并呼叫配送"}
                 iconOnly
               />
             ) : null}
@@ -387,7 +389,7 @@ function CompactTodayOrderCard({
                 icon={actingId === `${order.id}:self-delivery` ? <Loader2 size={12} className="animate-spin" /> : <Truck size={12} />}
                 onClick={() => onRunAction("self-delivery")}
                 disabled={cannotSelfDeliver}
-                title={isLockedSubscribe ? "预约单尚未到达配送时间，不能发起自配" : riderAssigned ? "骑手已接单，不能发起自配" : terminal ? "订单已结束，不能发起自配" : undefined}
+                title={isLockedSubscribe ? "预约单尚未到达配送时间，不能发起自配" : terminal ? "订单已结束，不能发起自配" : delivering || selfDeliveryActive ? "订单已有配送任务，不能重复发起自配" : riderAssigned ? "骑手已接单，不能发起自配" : undefined}
                 iconOnly
               />
             ) : null}
@@ -397,8 +399,8 @@ function CompactTodayOrderCard({
                 variant="primary"
                 icon={actingId === `${order.id}:${pickup ? "pickup-complete" : "complete-delivery"}` ? <Loader2 size={12} className="animate-spin" /> : <CheckCheck size={12} />}
                 onClick={() => onRunAction(pickup ? "pickup-complete" : "complete-delivery")}
-                disabled={Boolean(actingId) || terminal || (!pickup && (!delivering || !order.isMainSystemSelfDelivery))}
-                title={terminal ? "订单已结束，不能重复完成" : !pickup && !order.isMainSystemSelfDelivery ? "平台骑手配送不能在主系统完成" : undefined}
+                disabled={Boolean(actingId) || terminal || (!pickup && (!delivering || !selfDeliveryActive))}
+                title={terminal ? "订单已结束，不能重复完成" : !pickup && !selfDeliveryActive ? "当前没有生效的自配送任务，不能手动完成配送" : !pickup && !delivering ? "订单还未进入配送中，不能直接完成配送" : undefined}
                 iconOnly
               />
             ) : null}

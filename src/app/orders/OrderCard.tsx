@@ -41,6 +41,7 @@ import {
   isAutoPickOrderCompletedStatus,
   isAutoPickOrderDeliveringStatus,
   isAutoPickOrderRiderAssigned,
+  isAutoPickOrderSelfDeliveryActive,
   isAutoPickOrderTerminalStatus,
   isDeliveryCancelledOrEmpty,
   isLockedSubscribeOrder,
@@ -51,6 +52,7 @@ import {
 import { formatLocalDate, formatLocalDateTime } from "@/lib/dateUtils";
 import { isRematchReturnReason } from "@/lib/outboundReturnMeta";
 import { cleanCustomerRemark } from "@/lib/customerRemark";
+import { getOrderCostStatusText } from "@/lib/outboundCostSnapshot";
 import { resolveCancelledJDDeliveredCommissionLoss } from "@/lib/orderFinancials";
 
 const OrderRouteModal = dynamic(() => import("@/components/Orders/OrderRouteModal").then((module) => module.OrderRouteModal), { ssr: false });
@@ -1185,13 +1187,7 @@ export function getFilterDateValue(value: string | null | undefined, referenceDa
 }
 
 export function getProductCostStatusText(order: Pick<AutoPickOrder, "productCostStatus" | "missingCostItemCount">) {
-  if (order.productCostStatus === "pending-backfill") {
-    return "";
-  }
-  if (order.productCostStatus === "pending-outbound") {
-    return "";
-  }
-  return "";
+  return getOrderCostStatusText(order);
 }
 
 export function shiftTimeMinutes(timeStr: string, deltaMinutes: number): string {
@@ -3120,7 +3116,7 @@ export const OrderProfitBadge = memo(function OrderProfitBadge({
   const serviceFeeRate = Number(order.serviceFeeRate || 0);
   const productCost = Number(order.productCost || 0);
   const productCostBreakdown = Array.isArray(order.productCostBreakdown) ? order.productCostBreakdown : [];
-  const canEditProductCost = !readOnly && order.productCostStatus === "ready" && productCostBreakdown.length > 0 && Boolean(onOpenCostBackfill);
+  const canEditProductCost = !readOnly && canViewProductCosts && productCostBreakdown.length > 0 && Boolean(onOpenCostBackfill);
   const refundAmount = Math.max(0, Number(order.refundAmount || 0));
   const hasRefundAmount = refundAmount > 0;
   const isFullyRefunded = isOrderFullyRefunded(order);
@@ -3150,7 +3146,7 @@ export const OrderProfitBadge = memo(function OrderProfitBadge({
     return null;
   }
 
-  if (!hasPureProfit && !productCostStatusText) {
+  if (!hasPureProfit && (!canViewProductCosts || !productCostStatusText)) {
     return null;
   }
 
@@ -3225,7 +3221,7 @@ export const OrderProfitBadge = memo(function OrderProfitBadge({
       onMouseEnter={openProfitTooltipHover}
       onMouseLeave={closeProfitTooltipHover}
     >
-      {hasPureProfit ? (
+      {hasPureProfit && !(canViewProductCosts && productCostStatusText) ? (
         compact ? (
           <button
             type="button"
@@ -3758,7 +3754,8 @@ export const OrderCard = memo(function OrderCard({
   const delivering = !pickup && !deliveryCancelled && isDeliveringStatus(order.status);
   const riderAssigned = !deliveryCancelled && isAutoPickOrderRiderAssigned(order);
   const isLockedSubscribe = isLockedSubscribeOrder(order);
-  const cannotSelfDeliver = Boolean(actingId) || terminal || delivering || pickup || riderAssigned || isLockedSubscribe;
+  const selfDeliveryActive = isAutoPickOrderSelfDeliveryActive(order);
+  const cannotSelfDeliver = Boolean(actingId) || terminal || delivering || selfDeliveryActive || pickup || riderAssigned || isLockedSubscribe;
   const selfDeliveryTitle = pickup
     ? "到店自取订单不需要发起自配送"
     : isLockedSubscribe
@@ -3767,7 +3764,7 @@ export const OrderCard = memo(function OrderCard({
     ? (cancelled ? "订单已取消，不能发起自配" : "订单已完成，不能再次发起自配")
     : riderAssigned
       ? "骑手已接单，不能发起自配"
-      : delivering
+      : delivering || selfDeliveryActive
         ? "订单已在配送中，不能重复发起自配"
         : "发起商家自配送";
   const hasOutbound = Boolean(order.hasOutbound);
@@ -4455,7 +4452,7 @@ export const OrderCard = memo(function OrderCard({
                 {!deleted ? (
                   <ActionButton
                     label="叫配送"
-                    title={isLockedSubscribe ? "预约单尚未到达配送时间，不能发起配送" : "选择第三方运力并呼叫配送"}
+                    title={isLockedSubscribe ? "预约单尚未到达配送时间，不能发起配送" : delivering || selfDeliveryActive ? "订单已有配送任务，不能重复呼叫配送" : "选择第三方运力并呼叫配送"}
                     icon={<Navigation size={14} />}
                     onClick={() => onRunAction(order.id, "dispatch-delivery")}
                     disabled={cannotSelfDeliver}
@@ -4475,15 +4472,15 @@ export const OrderCard = memo(function OrderCard({
                   variant="primary"
                   icon={actingId === `${order.id}:${pickup ? "pickup-complete" : "complete-delivery"}` ? <Loader2 size={14} className="animate-spin" /> : <CheckCheck size={14} />}
                   onClick={() => onRunAction(order.id, pickup ? "pickup-complete" : "complete-delivery")}
-                  disabled={Boolean(actingId) || terminal || (!pickup && (!delivering || !order.isMainSystemSelfDelivery))}
+                  disabled={Boolean(actingId) || terminal || (!pickup && (!delivering || !selfDeliveryActive))}
                   mobileIconOnly
                   title={
                     pickup
                       ? (terminal ? (cancelled ? "订单已取消，不能完成取货" : "订单已取货，不能重复完成取货") : undefined)
                       : terminal
                         ? (cancelled ? "订单已取消，不能完成配送" : "订单已完成，不能重复完成配送")
-                        : !order.isMainSystemSelfDelivery
-                          ? "当前是平台骑手配送，不能在主系统直接完成配送"
+                        : !selfDeliveryActive
+                          ? "当前没有生效的自配送任务，不能手动完成配送"
                         : !delivering
                           ? "订单还未进入配送中，不能直接完成配送"
                           : undefined

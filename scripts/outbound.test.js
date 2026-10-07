@@ -42,7 +42,10 @@ const tx = {
     },
   },
 };
-mock.module("../src/lib/auth", () => ({ getAuthorizedUser: async () => ({ id: "user-1" }) }));
+mock.module("../src/lib/auth", () => ({
+  getFreshSession: async () => ({ id: "user-1" }),
+  getAuthorizedUser: async () => ({ id: "user-1" }),
+}));
 mock.module("../src/lib/prisma", () => ({ default: {
   shop: { findFirst: async ({ where }) => where.id === "shop-1" ? { id: "shop-1", name: "南山店" } : null },
   shopProduct: { findMany: async ({ where }) => where.id.in.includes("sp-1") ? [shopProduct] : [] },

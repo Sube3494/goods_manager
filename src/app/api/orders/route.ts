@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { parseOutboundCostSnapshot, resolvePurchaseBatchSnapshotCost } from "@/lib/outboundCostSnapshot";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser, getAuthorizedUserAny } from "@/lib/auth";
 import { hasAdminAccess, hasPermission } from "@/lib/permissions";
@@ -1064,93 +1065,6 @@ function hasRealizedCancelledDeliveryCost(input: {
     && !isRefundableMeituanDelivery(input.delivery);
 }
 
-type ParsedOutboundCostSnapshot = {
-  quantity: number;
-  totalCost: number;
-  averageUnitCost: number;
-  batches: Array<{
-    purchaseOrderItemId: string;
-    quantity: number;
-    unitCost: number;
-    totalCost: number;
-  }>;
-};
-
-function parseOutboundCostSnapshot(value: unknown): ParsedOutboundCostSnapshot | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return null;
-  }
-  const raw = value as Record<string, unknown>;
-  const batches = Array.isArray(raw.batches)
-    ? raw.batches
-        .map((entry) => {
-          if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
-            return null;
-          }
-          const batch = entry as Record<string, unknown>;
-          const purchaseOrderItemId = String(batch.purchaseOrderItemId || "").trim();
-          const quantity = Number(batch.quantity || 0);
-          const unitCost = Number(batch.unitCost || 0);
-          const totalCost = Number(batch.totalCost || 0);
-          if (!purchaseOrderItemId || !Number.isFinite(quantity) || quantity <= 0) {
-            return null;
-          }
-          return {
-            purchaseOrderItemId,
-            quantity,
-            unitCost: Number.isFinite(unitCost) ? unitCost : 0,
-            totalCost: Number.isFinite(totalCost) ? totalCost : 0,
-          };
-        })
-        .filter((entry): entry is ParsedOutboundCostSnapshot["batches"][number] => Boolean(entry))
-    : [];
-  const quantity = Number(raw.quantity || 0);
-  const totalCost = Number(raw.totalCost || 0);
-  const averageUnitCost = Number(raw.averageUnitCost || 0);
-  return {
-    quantity: Number.isFinite(quantity) ? quantity : 0,
-    totalCost: Number.isFinite(totalCost) ? totalCost : 0,
-    averageUnitCost: Number.isFinite(averageUnitCost) ? averageUnitCost : 0,
-    batches,
-  };
-}
-
-function resolvePurchaseBatchSnapshotCost(
-  snapshot: ParsedOutboundCostSnapshot | null,
-  expectedQuantity: number
-) {
-  const quantity = Math.max(0, Number(expectedQuantity || 0));
-  if (!snapshot || quantity <= 0 || snapshot.batches.length === 0) {
-    return null;
-  }
-
-  const allocatedQuantity = snapshot.batches.reduce(
-    (sum, batch) => sum + Math.max(0, Number(batch.quantity || 0)),
-    0
-  );
-  if (allocatedQuantity + 1e-6 < quantity) {
-    return null;
-  }
-
-  const hasInvalidBatchCost = snapshot.batches.some((batch) => (
-    !batch.purchaseOrderItemId
-    || !Number.isFinite(Number(batch.unitCost))
-    || Number(batch.unitCost) <= 0
-  ));
-  if (hasInvalidBatchCost) {
-    return null;
-  }
-
-  const totalCost = snapshot.batches.reduce(
-    (sum, batch) => sum + Number(batch.unitCost) * Number(batch.quantity),
-    0
-  );
-  return {
-    totalCost,
-    averageUnitCost: totalCost / allocatedQuantity,
-  };
-}
-
 function roundCurrency(value: number) {
   if (!Number.isFinite(value)) {
     return 0;
@@ -1679,11 +1593,15 @@ export async function GET(request: NextRequest) {
           select: {
             id: true,
             purchaseOrderId: true,
+            costPrice: true,
           },
         })
       : [];
     const purchaseOrderIdByItemId = new Map(
       purchaseOrderItems.map((item) => [item.id, item.purchaseOrderId] as const)
+    );
+    const purchaseCostPriceByItemId = new Map(
+      purchaseOrderItems.map((item) => [item.id, item.costPrice] as const)
     );
 
     // 查询所有相关出库商品的可用采购批次列表，供后续回填补录参考
@@ -1838,6 +1756,7 @@ export async function GET(request: NextRequest) {
             return {
               ...batch,
               purchaseOrderId,
+              purchaseCostPrice: purchaseCostPriceByItemId.get(purchaseOrderItemId),
             };
           });
 

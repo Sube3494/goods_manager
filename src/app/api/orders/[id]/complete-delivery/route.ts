@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
-import { callAutoPickCommand, refreshAutoPickOrderFromPlugin, resolveAutoPickCommandPlatform, syncAutoOutboundFromCompletedAutoPickOrder, syncBrushOrderFromCompletedAutoPickOrder, wasAutoPickOrderSelfDeliveryTriggeredByMainSystem } from "@/lib/autoPickOrders";
+import { callAutoPickCommand, refreshAutoPickOrderFromPlugin, resolveAutoPickCommandPlatform, syncAutoOutboundFromCompletedAutoPickOrder, syncBrushOrderFromCompletedAutoPickOrder } from "@/lib/autoPickOrders";
 import { cancelAutoCompleteJob } from "@/lib/autoPickAutoComplete";
 import { emitAutoPickOrderEvent } from "@/lib/autoPickOrderEvents";
 import {
   isAutoPickOrderCancelledStatus,
   isAutoPickOrderCompletedStatus,
   isAutoPickOrderDeliveringStatus,
+  isAutoPickOrderSelfDeliveryActive,
   isAutoPickPickupOrder,
 } from "@/lib/autoPickOrderStatus";
 
@@ -53,9 +54,8 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
       return NextResponse.json({ error: "Order is not delivering yet" }, { status: 409 });
     }
 
-    const triggeredByMainSystem = await wasAutoPickOrderSelfDeliveryTriggeredByMainSystem(order.userId, order.orderNo);
-    if (!triggeredByMainSystem) {
-      return NextResponse.json({ error: "Order is not main-system self delivery" }, { status: 409 });
+    if (!isAutoPickOrderSelfDeliveryActive(order)) {
+      return NextResponse.json({ error: "当前没有生效的自配送任务，不能手动完成配送" }, { status: 409 });
     }
 
     const commandPlatform = resolveAutoPickCommandPlatform(order);
