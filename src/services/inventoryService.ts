@@ -198,7 +198,7 @@ export class InventoryService {
                 ? {
                     OR: [
                       { shopProductId: item.shopProductId },
-                      { productId: item.shopProductId },
+                      { productId: item.shopProductId, shopProductId: null },
                     ],
                   }
                 : item.productId
@@ -275,7 +275,10 @@ export class InventoryService {
           where: {
             ...(item.shopProductId
               ? {
-                  shopProductId: item.shopProductId,
+                  OR: [
+                    { shopProductId: item.shopProductId },
+                    { productId: item.shopProductId, shopProductId: null },
+                  ],
                 }
               : {
                   productId: item.productId!,

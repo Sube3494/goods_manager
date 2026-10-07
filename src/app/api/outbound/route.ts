@@ -11,7 +11,7 @@ import { getPlatformMeta, parseOutboundNote } from "@/lib/utils";
 import { isAccessoryProduct } from "@/lib/accessoryUtils";
  
 interface OutboundItem {
-  productId: string;
+  productId?: string | null;
   shopProductId?: string;
   quantity: number;
   price?: number;
@@ -385,9 +385,22 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const { type, date, note, items } = body;
+    const shopId = typeof body.shopId === "string" ? body.shopId.trim() : "";
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json({ error: "Invalid items" }, { status: 400 });
+    }
+
+    if (items.some((item: OutboundItem) => !item || !Number.isSafeInteger(item.quantity) || item.quantity <= 0)) {
+      return NextResponse.json({ error: "出库数量必须为正整数" }, { status: 400 });
+    }
+
+    const outboundShop = shopId ? await prisma.shop.findFirst({
+      where: { id: shopId, userId: user.id },
+      select: { id: true, name: true },
+    }) : null;
+    if (shopId && !outboundShop) {
+      return NextResponse.json({ error: "出库门店不存在或无权操作" }, { status: 400 });
     }
 
     const requestedShopProductIds = items
@@ -403,14 +416,27 @@ export async function POST(request: Request) {
           select: {
             id: true,
             productId: true,
+            shopId: true,
           }
         })
       : [];
     const shopProductMap = new Map(shopProducts.map((item) => [item.id, item]));
+    if (requestedShopProductIds.some((id: string) => !shopProductMap.has(id))) {
+      return NextResponse.json({ error: "出库商品不存在或无权操作，请刷新商品列表" }, { status: 400 });
+    }
+    const itemShopIds = new Set(shopProducts.map((item) => item.shopId));
+    if (itemShopIds.size > 1 || (shopId && shopProducts.some((item) => item.shopId !== shopId))) {
+      return NextResponse.json({ error: "出库商品与所选门店不一致，禁止跨店扣减库存" }, { status: 400 });
+    }
+    if (shopId && items.some((item: OutboundItem) => !item.shopProductId)) {
+      return NextResponse.json({ error: "门店出库必须选择该门店的商品" }, { status: 400 });
+    }
+    const effectiveShopId = shopId || shopProducts[0]?.shopId || null;
     const normalizedItems = items.map((item: OutboundItem) => {
       const shopProduct = item.shopProductId ? shopProductMap.get(item.shopProductId) : null;
       return {
-        productId: shopProduct?.productId || item.productId || null,
+        // 门店商品没有主库关联时必须保留 null，不能使用客户端的来源 ID。
+        productId: shopProduct ? shopProduct.productId : item.productId || null,
         shopProductId: shopProduct?.id || null,
         quantity: item.quantity,
         price: item.price,
@@ -433,7 +459,8 @@ export async function POST(request: Request) {
           shopProductId: item.shopProductId || null,
           quantity: item.quantity,
           batchAllocations: item.batchAllocations,
-        }))
+        })),
+        effectiveShopId
       );
 
       // 1. 创建出库单记录
@@ -441,7 +468,9 @@ export async function POST(request: Request) {
         data: {
           type: type || "Sale",
           date: date ? new Date(date) : new Date(),
-          note: note || "",
+          note: outboundShop
+            ? `[店铺:${outboundShop.name}] ${String(note || "").replace(/\[店铺:[^\]]*\]\s*/g, "").trim()}`.trim()
+            : note || "",
           userId: user.id,
           items: {
             create: normalizedItems.map((item) => {

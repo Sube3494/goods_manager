@@ -47,7 +47,7 @@ interface SelectedOutboundItem {
 interface OutboundModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: Partial<OutboundOrder>) => void;
+  onSubmit: (data: Partial<OutboundOrder>) => void | Promise<void>;
 }
 
 export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps) {
@@ -62,9 +62,13 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
   const [isLoadingProducts, setIsLoadingProducts] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [isNextPageLoading, setIsNextPageLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const submittingRef = useRef(false);
   const [hasMore, setHasMore] = useState(true);
   const pageRef = useRef(1);
   const observerTarget = useRef<HTMLDivElement>(null);
+  const productsRequestRef = useRef<AbortController | null>(null);
+  const selectionScopeRef = useRef(0);
   const { showToast } = useToast();
 
   const [mobileView, setMobileView] = useState<"selection" | "review">("selection");
@@ -77,6 +81,11 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
   );
 
   const fetchProducts = useCallback(async (mode: 'initial' | 'search' | 'next' = 'initial') => {
+    if (!selectedShopId) return;
+    if (mode === 'next' && productsRequestRef.current) return;
+    productsRequestRef.current?.abort();
+    const controller = new AbortController();
+    productsRequestRef.current = controller;
     if (mode === 'initial') {
       setIsLoadingProducts(true);
       pageRef.current = 1;
@@ -97,9 +106,14 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
         ...(selectedShopId ? { shopId: selectedShopId } : {}),
       });
 
-      const res = await fetch(`/api/purchase-products?${queryParams.toString()}`);
+      const res = await fetch(`/api/purchase-products?${queryParams.toString()}`, { signal: controller.signal });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error || "商品加载失败，请稍后重试");
+      }
       if (res.ok) {
         const data = await res.json();
+        if (controller.signal.aborted || productsRequestRef.current !== controller) return;
         const newItems = Array.isArray(data.items) ? data.items : [];
         
         if (mode === 'initial' || mode === 'search') {
@@ -115,18 +129,23 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
         pageRef.current = targetPage + 1;
       }
     } catch (error) {
-      console.error("Failed to fetch products:", error);
+      if (!controller.signal.aborted) {
+        console.error("Failed to fetch products:", error);
+        showToast(error instanceof Error ? error.message : "商品加载失败，请稍后重试", "error");
+      }
     } finally {
-      setIsLoadingProducts(false);
-      setIsSearching(false);
-      setIsNextPageLoading(false);
+      if (productsRequestRef.current === controller) {
+        productsRequestRef.current = null;
+        setIsLoadingProducts(false);
+        setIsSearching(false);
+        setIsNextPageLoading(false);
+      }
     }
-  }, [debouncedSearch, selectedShopId]);
+  }, [debouncedSearch, selectedShopId, showToast]);
 
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
-      fetchProducts('initial');
     } else {
       document.body.style.overflow = '';
       setSelectedItems([]);
@@ -143,16 +162,31 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
     return () => {
       document.body.style.overflow = '';
     };
-  }, [isOpen, fetchProducts]);
+  }, [isOpen]);
+
+  useEffect(() => {
+    setProducts([]);
+    setHasMore(false);
+    setIsLoadingProducts(false);
+    setIsSearching(false);
+    setIsNextPageLoading(false);
+    if (isOpen && selectedShopId) fetchProducts('initial');
+    return () => {
+      productsRequestRef.current?.abort();
+      productsRequestRef.current = null;
+    };
+  }, [isOpen, selectedShopId, fetchProducts]);
 
   useEffect(() => {
     if (!isOpen) return;
+    let cancelled = false;
 
     const fetchShops = async () => {
       try {
         const res = await fetch("/api/shops?source=shipping-addresses");
         if (!res.ok) return;
         const data = await res.json();
+        if (cancelled) return;
         const items = Array.isArray(data?.shops) ? data.shops : [];
         setShops(items);
         setSelectedShopId((prev) => {
@@ -167,16 +201,16 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
     };
 
     fetchShops();
+    return () => { cancelled = true; };
   }, [isOpen]);
 
   useEffect(() => {
-    if (!isOpen || isLoadingProducts) return;
-    fetchProducts('search');
-  }, [debouncedSearch, isOpen, isLoadingProducts, fetchProducts]);
-
-  useEffect(() => {
+    selectionScopeRef.current += 1;
     if (!isOpen) return;
     setSelectedItems([]);
+    setItemBatchesMap({});
+    setLoadingBatchesMap({});
+    setExpandedBatchItemKey(null);
   }, [selectedShopId, isOpen]);
 
   useEffect(() => {
@@ -199,6 +233,10 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
   }, [isOpen, hasMore, isLoadingProducts, isSearching, isNextPageLoading, fetchProducts]);
 
   const addItem = (product: Product) => {
+    if (!selectedShopId || product.shopId !== selectedShopId) {
+      showToast("请选择当前出库门店的商品", "error");
+      return;
+    }
     const itemKey = product.shopProductId || product.id;
     const existing = selectedItems.find(item => getItemKey(item) === itemKey);
     if (existing) {
@@ -216,7 +254,7 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
     setSelectedItems([
       ...selectedItems,
       {
-        productId: product.sourceProductId || product.productId || (product.sourceType === "shopProduct" ? null : product.id),
+        productId: product.sourceType === "shopProduct" ? product.productId || null : product.id,
         shopProductId: product.shopProductId,
         shopName: product.shopName,
         name: product.name,
@@ -263,18 +301,29 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
     if (itemBatchesMap[itemKey]) return;
 
     setLoadingBatchesMap((prev) => ({ ...prev, [itemKey]: true }));
+    const selectionScope = selectionScopeRef.current;
     try {
       const targetId = item.shopProductId || item.productId;
       const url = `/api/products/${targetId}/batches${item.shopProductId ? `?shopProductId=${encodeURIComponent(item.shopProductId)}` : ""}`;
       const res = await fetch(url);
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error || "批次加载失败，请稍后重试");
+      }
       if (res.ok) {
         const data = await res.json();
+        if (selectionScope !== selectionScopeRef.current) return;
         setItemBatchesMap((prev) => ({ ...prev, [itemKey]: Array.isArray(data) ? data : [] }));
       }
     } catch (err) {
-      console.error("Failed to load batches:", err);
+      if (selectionScope === selectionScopeRef.current) {
+        console.error("Failed to load batches:", err);
+        showToast(err instanceof Error ? err.message : "批次加载失败，请稍后重试", "error");
+      }
     } finally {
-      setLoadingBatchesMap((prev) => ({ ...prev, [itemKey]: false }));
+      if (selectionScope === selectionScopeRef.current) {
+        setLoadingBatchesMap((prev) => ({ ...prev, [itemKey]: false }));
+      }
     }
   };
 
@@ -304,8 +353,9 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
     }));
   };
 
-  const handleSubmit = (e?: React.FormEvent) => {
+  const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+    if (submittingRef.current) return;
 
     if (selectedItems.length === 0) {
       showToast("请至少选择一个商品", "error");
@@ -318,7 +368,7 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
       return;
     }
 
-    if (shops.length > 0 && !selectedShopId) {
+    if (!selectedShopId) {
       showToast("请先选择出库门店", "error");
       return;
     }
@@ -339,20 +389,28 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
       }
     }
 
-    onSubmit({
-      type,
-      note: `${selectedShopId ? `[店铺:${shops.find((shop) => shop.id === selectedShopId)?.name || ""}] ` : ""}${note}`.trim(),
-      items: selectedItems.map(item => ({
-        productId: item.productId,
-        shopProductId: item.shopProductId,
-        quantity: item.quantity,
-        price: item.price,
-        batchAllocations: item.batchAllocations && item.batchAllocations.length > 0 ? item.batchAllocations : undefined,
-      }))
-    });
+    submittingRef.current = true;
+    setIsSubmitting(true);
+    try {
+      await onSubmit({
+        shopId: selectedShopId,
+        type,
+        note: `${selectedShopId ? `[店铺:${shops.find((shop) => shop.id === selectedShopId)?.name || ""}] ` : ""}${note}`.trim(),
+        items: selectedItems.map(item => ({
+          productId: item.productId,
+          shopProductId: item.shopProductId,
+          quantity: item.quantity,
+          price: item.price,
+          batchAllocations: item.batchAllocations && item.batchAllocations.length > 0 ? item.batchAllocations : undefined,
+        }))
+      });
+    } finally {
+      submittingRef.current = false;
+      setIsSubmitting(false);
+    }
   };
 
-  const displayProducts = products;
+  const displayProducts = products.filter(product => product.shopId === selectedShopId);
 
   if (!isOpen) return null;
 
@@ -774,11 +832,11 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
                   <div className="p-4 sm:p-5 border-t border-border/60 dark:border-white/10 shrink-0 hidden md:block bg-white/50 dark:bg-white/[0.03]">
                       <button
                           onClick={handleSubmit}
-                          disabled={selectedItems.length === 0}
+                          disabled={selectedItems.length === 0 || isSubmitting}
                           className="w-full h-11 sm:h-12 rounded-full bg-primary text-primary-foreground font-black text-sm shadow-lg shadow-primary/25 hover:shadow-primary/40 hover:-translate-y-0.5 transition-all active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50 disabled:pointer-events-none"
                       >
                           <CheckCircle size={18} />
-                          <span>确认并减扣库存</span>
+                          <span>{isSubmitting ? "正在登记..." : "确认并减扣库存"}</span>
                       </button>
                   </div>
                 </div>
@@ -809,7 +867,7 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
               <button
                   type="button"
                   onClick={handleSubmit}
-                  disabled={selectedItems.length === 0}
+                  disabled={selectedItems.length === 0 || isSubmitting}
                   className="w-full h-11 rounded-xl bg-primary text-primary-foreground font-black text-sm shadow-lg shadow-primary/25 flex items-center justify-center gap-2 disabled:opacity-50 active:scale-98 transition-all"
               >
                   {mobileView === "selection" ? (
@@ -820,7 +878,7 @@ export function OutboundModal({ isOpen, onClose, onSubmit }: OutboundModalProps)
                   ) : (
                       <>
                           <CheckCircle size={16} />
-                          <span>确认出库并扣减库存</span>
+                          <span>{isSubmitting ? "正在登记..." : "确认出库并扣减库存"}</span>
                       </>
                   )}
               </button>

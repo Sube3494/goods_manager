@@ -280,7 +280,8 @@ export default function OutboundPage() {
         setIsModalOpen(false);
         fetchOrders();
       } else {
-        showToast("登记失败", "error");
+        const result = await res.json().catch(() => null);
+        showToast(result?.error || "登记失败，请稍后重试", "error");
       }
     } catch (error) {
       console.error("Create outbound failed:", error);

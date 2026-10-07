@@ -864,6 +864,7 @@ export interface OutboundOrderItem {
 export interface OutboundOrder {
   id: string;
   type: string;
+  shopId?: string | null;
   shopName?: string | null;
   status?: string;
   date: string | Date;

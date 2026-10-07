@@ -202,7 +202,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (!hasPermission(session, "purchase:manage") && !hasPermission(session, "inbound:manage")) {
+    if (!hasPermission(session, "purchase:manage") && !hasPermission(session, "inbound:manage") && !hasPermission(session, "outbound:manage")) {
       return NextResponse.json({ error: "Permission denied" }, { status: 403 });
     }
 
