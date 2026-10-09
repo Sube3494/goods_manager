@@ -154,7 +154,6 @@ export const PERMISSION_TREE = [
       { key: "brush:products", label: "刷单商品管理" },
       { key: "brush:plans", label: "刷单计划管理" },
       { key: "brush:orders", label: "刷单订单管理" },
-      { key: "brush:simulate", label: "刷单模拟显示" },
     ]
   },
   {
@@ -334,7 +333,6 @@ export const PAGE_PERMISSION_TREE: PagePermissionGroup[] = [
           { key: "brush:products", label: "刷单商品管理" },
           { key: "brush:plans", label: "刷单计划管理" },
           { key: "brush:orders", label: "刷单订单管理" },
-          { key: "brush:simulate", label: "刷单模拟显示" },
         ],
       },
       {
@@ -680,6 +678,8 @@ export function hasPermission(user: SessionUser | null, permission: Permission):
   
   // SUPER_ADMIN has all permissions
   if (user.role === "SUPER_ADMIN") return true;
+  // Simulation is reserved for super admins, including when legacy grants or all are present.
+  if (permission === "brush:simulate") return false;
 
   const effectivePermissions = getEffectivePermissions(user);
   if (effectivePermissions[permission] || effectivePermissions["all"]) {
@@ -697,6 +697,8 @@ export function hasPermission(user: SessionUser | null, permission: Permission):
 export function hasDirectPermission(user: SessionUser | null, permission: Permission): boolean {
   if (!user) return false;
   if (user.role === "SUPER_ADMIN") return true;
+  // Simulation is reserved for super admins, including when legacy grants or all are present.
+  if (permission === "brush:simulate") return false;
 
   const effectivePermissions = getEffectivePermissions(user);
   return !!(effectivePermissions[permission] || effectivePermissions["all"]);
@@ -710,6 +712,7 @@ export function clearUserPermissionOverrides(source: Record<string, unknown>): R
   const permissionKeys = new Set([
     "all",
     "system:manage",
+    "brush:simulate", // Clear legacy grants even though this permission is no longer assignable.
     ...PERMISSION_TREE.flatMap((group) => group.children.map((item) => item.key)),
     ...PAGE_PERMISSION_TREE.flatMap((group) => group.pages.flatMap((page) => [
       page.accessKey,
