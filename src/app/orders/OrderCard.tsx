@@ -3213,7 +3213,6 @@ export const OrderProfitBadge = memo(function OrderProfitBadge({
         ]
       : [
           { label: "预计到手", value: toCurrency(expectedIncome) },
-          ...(hasRefundAmount ? [{ label: "顾客实付退款", value: toCurrency(refundAmount) }] : []),
           { label: `扣抽出 ${formatPercent(serviceFeeRate)} 后`, value: toCurrency(settlementAfterRate) },
           { label: "减配送费", value: toCurrency(deliveryFee) },
           ...(canViewProductCosts ? [{ label: "减货品成本", value: toCurrency(productCost), editable: canEditProductCost }] : []),
@@ -3223,7 +3222,6 @@ export const OrderProfitBadge = memo(function OrderProfitBadge({
     : productCostStatusText
       ? [
           { label: "预计到手", value: toCurrency(expectedIncome) },
-          ...(hasRefundAmount ? [{ label: "顾客实付退款", value: toCurrency(refundAmount) }] : []),
           { label: "抽出率", value: formatPercent(serviceFeeRate) },
           { label: "配送费", value: toCurrency(deliveryFee) },
           ...(canViewProductCosts ? [{ label: "货品成本", value: productCostStatusText, editable: canEditProductCost }] : []),
