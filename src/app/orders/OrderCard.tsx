@@ -2462,43 +2462,41 @@ export function ProductStripItem({
             </button>
             </HoverCardTrigger>
               {returnedDetails && returnedDetails.length > 0 && (
-                <HoverCardContent side="top" collisionPadding={12} className="w-80 max-w-[calc(100vw-24px)] space-y-1.5 text-[11px]">
-                  <div className="flex items-center justify-between sm:hidden">
-                    <span className="font-semibold">退款详情</span>
-                    <button type="button" aria-label="关闭退款详情" onClick={(event) => { event.stopPropagation(); setRefundDetailsOpen(false); }} className="inline-flex h-8 w-8 items-center justify-center rounded-lg"><X size={16} /></button>
+                <HoverCardContent side="top" sideOffset={8} collisionPadding={12} className="w-72 max-w-[calc(100vw-24px)] overflow-hidden rounded-2xl border border-rose-500/15 bg-white p-0 shadow-xl shadow-black/10 ring-0 dark:bg-[#151923] dark:shadow-black/30">
+                  <div className="flex items-center justify-between border-b border-black/5 bg-rose-500/[0.04] px-3.5 py-2.5 dark:border-white/5 dark:bg-rose-500/[0.06]">
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-rose-500/10 text-rose-600 dark:text-rose-400"><CheckCheck size={13} /></span>
+                      <span className="text-xs font-semibold text-foreground">退款详情</span>
+                    </div>
+                    <button type="button" aria-label="关闭退款详情" onClick={(event) => { event.stopPropagation(); setRefundDetailsOpen(false); }} className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-black/5 hover:text-foreground dark:hover:bg-white/5"><X size={14} /></button>
                   </div>
+                  <div className="max-h-72 overflow-y-auto px-3.5">
                   {returnedDetails.map((detail, detailIndex) => (
                     <div 
                       key={detailIndex} 
                       className={cn(
-                        "flex flex-col gap-1 text-left min-w-[160px] max-w-[280px]",
-                        detailIndex > 0 && "border-t border-black/[0.06] pt-1.5 dark:border-white/[0.06]"
+                        "space-y-2.5 py-3 text-left",
+                        detailIndex > 0 && "border-t border-black/[0.06] dark:border-white/[0.06]"
                       )}
                     >
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="font-bold text-slate-900 dark:text-white">
-                          {detail.reason || "退货退款"}
-                        </span>
-                        <span className="font-mono text-[9px] text-slate-400 dark:text-zinc-500 whitespace-nowrap">
-                          {removeYear(detail.createdAt)}
-                        </span>
-                      </div>
-                      {(Number(detail.refundAmount) > 0 || Number(detail.extraExpense) > 0) && (
-                        <div className="flex flex-wrap gap-1 mt-0.5">
-                          {Number(detail.refundAmount) > 0 && (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-rose-500/10 text-[9px] font-semibold text-rose-600 dark:text-rose-400 whitespace-nowrap">
-                              该次退款 ¥{(Number(detail.refundAmount) / 100).toFixed(2)}
-                            </span>
-                          )}
-                          {Number(detail.extraExpense) > 0 && (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-amber-500/10 text-[9px] font-semibold text-amber-600 dark:text-amber-400 whitespace-nowrap">
-                              支出 ¥{(Number(detail.extraExpense) / 100).toFixed(2)}
-                            </span>
-                          )}
+                      {Number(detail.refundAmount) > 0 ? (
+                        <div className="flex items-baseline justify-between gap-3">
+                          <span className="text-[11px] text-muted-foreground">该次退款</span>
+                          <span className="text-lg font-semibold tabular-nums tracking-tight text-rose-600 dark:text-rose-400">¥{(Number(detail.refundAmount) / 100).toFixed(2)}</span>
                         </div>
-                      )}
+                      ) : null}
+                      <div className="flex items-start justify-between gap-4 text-xs">
+                        <span className="shrink-0 text-muted-foreground">退款原因</span>
+                        <span className="break-words text-right font-medium text-foreground">{detail.reason || "退货退款"}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-3 text-[11px] text-muted-foreground">
+                        <span>{Number(detail.quantity) > 0 ? `退 ${detail.quantity} 件` : "已退款"}</span>
+                        {detail.createdAt ? <span className="inline-flex items-center gap-1 tabular-nums"><Clock3 size={11} />{removeYear(detail.createdAt)}</span> : null}
+                      </div>
+                      {Number(detail.extraExpense) > 0 ? <div className="flex items-center justify-between text-[11px] text-amber-600 dark:text-amber-400"><span>额外支出</span><span className="font-medium tabular-nums">¥{(Number(detail.extraExpense) / 100).toFixed(2)}</span></div> : null}
                     </div>
                   ))}
+                  </div>
                 </HoverCardContent>
               )}
             </HoverCard>
@@ -4133,7 +4131,6 @@ export const OrderCard = memo(function OrderCard({
                     <div className="min-w-0">
                       <div className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">实付</div>
                       <div className="mt-0.5 truncate text-sm font-semibold text-foreground">{actualPaidDisplay}</div>
-                      {hasRefundAmount ? <div className="mt-1 text-[11px] text-rose-600 dark:text-rose-400">已退 {toCurrency(refundAmount)}</div> : null}
                     </div>
                     {canEditExpectedIncome ? (
                       <div className="min-w-0 text-right">
@@ -4172,11 +4169,6 @@ export const OrderCard = memo(function OrderCard({
                     <span className="shrink-0 text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground sm:text-[11px]">实付</span>
                     <span className="truncate text-xs font-semibold text-foreground sm:text-[13px]">{actualPaidDisplay}</span>
                   </div>
-                  {hasRefundAmount ? (
-                    <div title={`原实付 ${toCurrency(order.actualPaid)}，退款后实付 ${actualPaidDisplay}`} className="inline-flex h-8 items-center gap-1.5 rounded-full border border-rose-500/20 bg-rose-500/10 px-2.5 text-xs text-rose-700 dark:text-rose-400">
-                      <span>已退</span><span className="font-semibold">{toCurrency(refundAmount)}</span>
-                    </div>
-                  ) : null}
                   {canEditExpectedIncome ? (
                     <button
                       type="button"
