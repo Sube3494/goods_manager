@@ -2462,32 +2462,20 @@ export function ProductStripItem({
             </button>
             </HoverCardTrigger>
               {returnedDetails && returnedDetails.length > 0 && (
-                <HoverCardContent side="top" sideOffset={8} collisionPadding={12} className="w-72 max-w-[calc(100vw-24px)] overflow-hidden rounded-2xl border border-rose-500/15 bg-white p-0 shadow-xl shadow-black/10 ring-0 dark:bg-[#151923] dark:shadow-black/30">
-                  <div className="flex items-center justify-between border-b border-black/5 bg-rose-500/[0.04] px-3.5 py-2.5 dark:border-white/5 dark:bg-rose-500/[0.06]">
-                    <div className="flex items-center gap-2">
-                      <span className="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-rose-500/10 text-rose-600 dark:text-rose-400"><CheckCheck size={13} /></span>
-                      <span className="text-xs font-semibold text-foreground">退款详情</span>
-                    </div>
-                    <button type="button" aria-label="关闭退款详情" onClick={(event) => { event.stopPropagation(); setRefundDetailsOpen(false); }} className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-black/5 hover:text-foreground dark:hover:bg-white/5"><X size={14} /></button>
-                  </div>
-                  <div className="max-h-72 overflow-y-auto px-3.5">
+                <HoverCardContent side="top" sideOffset={6} collisionPadding={12} className="relative w-56 max-w-[calc(100vw-24px)] overflow-hidden rounded-xl border border-rose-500/15 bg-white p-0 shadow-lg shadow-black/10 ring-0 dark:bg-[#151923] dark:shadow-black/30">
+                  <button type="button" aria-label="关闭退款详情" onClick={(event) => { event.stopPropagation(); setRefundDetailsOpen(false); }} className="absolute right-1 top-1 z-10 inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:bg-black/5 dark:hover:bg-white/5 sm:hidden"><X size={12} /></button>
+                  <div className="max-h-48 overflow-y-auto px-3">
                   {returnedDetails.map((detail, detailIndex) => (
                     <div 
                       key={detailIndex} 
                       className={cn(
-                        "space-y-2.5 py-3 text-left",
+                        "space-y-1.5 py-2.5 text-left",
                         detailIndex > 0 && "border-t border-black/[0.06] dark:border-white/[0.06]"
                       )}
                     >
-                      {Number(detail.refundAmount) > 0 ? (
-                        <div className="flex items-baseline justify-between gap-3">
-                          <span className="text-[11px] text-muted-foreground">该次退款</span>
-                          <span className="text-lg font-semibold tabular-nums tracking-tight text-rose-600 dark:text-rose-400">¥{(Number(detail.refundAmount) / 100).toFixed(2)}</span>
-                        </div>
-                      ) : null}
-                      <div className="flex items-start justify-between gap-4 text-xs">
-                        <span className="shrink-0 text-muted-foreground">退款原因</span>
-                        <span className="break-words text-right font-medium text-foreground">{detail.reason || "退货退款"}</span>
+                      <div className="flex items-start justify-between gap-3 pr-4 sm:pr-0">
+                        <span className="min-w-0 break-words text-xs font-semibold text-foreground">{detail.reason || "退货退款"}</span>
+                        {Number(detail.refundAmount) > 0 ? <span title="该次退款金额" className="shrink-0 text-sm font-semibold tabular-nums text-rose-600 dark:text-rose-400">¥{(Number(detail.refundAmount) / 100).toFixed(2)}</span> : null}
                       </div>
                       <div className="flex items-center justify-between gap-3 text-[11px] text-muted-foreground">
                         <span>{Number(detail.quantity) > 0 ? `退 ${detail.quantity} 件` : "已退款"}</span>
