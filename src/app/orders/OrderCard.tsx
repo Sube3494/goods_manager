@@ -2268,6 +2268,7 @@ export function ProductStripItem({
   onToggleBundleExpand?: () => void;
 }) {
   const [inventoryOpen, setInventoryOpen] = useState(false);
+  const [refundDetailsOpen, setRefundDetailsOpen] = useState(false);
   const [imgError, setImgError] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const expandedImage = previewImage || display.image;
@@ -2447,18 +2448,25 @@ export function ProductStripItem({
               </span>
             ) : null}
           {(returnedQuantity > 0 || isRefunded) ? (
-            <HoverCard openDelay={150}>
+            <HoverCard open={refundDetailsOpen} onOpenChange={setRefundDetailsOpen} openDelay={150}>
             <HoverCardTrigger asChild>
-            <span
-              tabIndex={0}
+            <button
+              type="button"
+              onClick={(event) => { event.stopPropagation(); setRefundDetailsOpen(true); }}
+              aria-label="查看退款详情"
+              aria-expanded={refundDetailsOpen}
               title={returnedDetails?.map((detail) => `${detail.reason} · 退款 ¥${(Number(detail.refundAmount || 0) / 100).toFixed(2)}`).join("\n") || "平台已退款"}
-              className="relative group inline-flex cursor-help items-center rounded-full border border-rose-500/20 bg-rose-500/10 px-2 py-0.5 text-[10px] font-semibold leading-none text-rose-700 dark:text-rose-400 sm:text-[11px]"
+              className="relative group inline-flex min-h-7 cursor-pointer items-center rounded-full border border-rose-500/20 bg-rose-500/10 px-2 py-0.5 text-[10px] font-semibold leading-none text-rose-700 dark:text-rose-400 sm:min-h-0 sm:text-[11px]"
             >
               已退款{returnedQuantity > 0 ? ` ${returnedQuantity}/${display.quantity} 件` : ""}
-            </span>
+            </button>
             </HoverCardTrigger>
               {returnedDetails && returnedDetails.length > 0 && (
-                <HoverCardContent side="top" className="w-max max-w-[320px] space-y-1.5 text-[11px]">
+                <HoverCardContent side="top" collisionPadding={12} className="w-80 max-w-[calc(100vw-24px)] space-y-1.5 text-[11px]">
+                  <div className="flex items-center justify-between sm:hidden">
+                    <span className="font-semibold">退款详情</span>
+                    <button type="button" aria-label="关闭退款详情" onClick={(event) => { event.stopPropagation(); setRefundDetailsOpen(false); }} className="inline-flex h-8 w-8 items-center justify-center rounded-lg"><X size={16} /></button>
+                  </div>
                   {returnedDetails.map((detail, detailIndex) => (
                     <div 
                       key={detailIndex} 
