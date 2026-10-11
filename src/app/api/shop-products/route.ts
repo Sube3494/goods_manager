@@ -25,10 +25,7 @@ function resolveMeituanSkuIds(item: {
     meituanSkuMappings?: Array<{ meituanSkuId: string }> | null;
   } | null;
 }) {
-  return Array.from(new Set([
-    ...normalizeMeituanSkuIds(item.meituanSkuId),
-    ...(item.product?.meituanSkuMappings || []).flatMap((mapping) => normalizeMeituanSkuIds(mapping.meituanSkuId)),
-  ]));
+  return normalizeMeituanSkuIds(item.meituanSkuId);
 }
 
 export async function GET(request: NextRequest) {

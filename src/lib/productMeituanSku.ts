@@ -98,7 +98,7 @@ export async function replaceProductMeituanSkuMappings(
   if (!userId || meituanSkuIds.length === 0) {
     // 同时更新相关导入项的状态为 UNMATCHED
     await tx.meituanImportItem.updateMany({
-      where: { bindProductId: productId },
+      where: { bindProductId: productId, platform: "meituan" },
       data: {
         bindProductId: null,
         status: "UNMATCHED",
@@ -121,6 +121,7 @@ export async function replaceProductMeituanSkuMappings(
   await tx.meituanImportItem.updateMany({
     where: {
       userId,
+      platform: "meituan",
       meituanSkuId: { in: meituanSkuIds },
     },
     data: {
@@ -133,6 +134,7 @@ export async function replaceProductMeituanSkuMappings(
   await tx.meituanImportItem.updateMany({
     where: {
       userId,
+      platform: "meituan",
       bindProductId: productId,
       meituanSkuId: { notIn: meituanSkuIds },
     },

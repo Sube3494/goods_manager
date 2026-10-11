@@ -49,6 +49,7 @@ export async function PATCH(
         shopId: true,
         productId: true,
         productName: true,
+        shop: { select: { userId: true } },
       },
     });
 
@@ -56,9 +57,21 @@ export async function PATCH(
       return NextResponse.json({ error: "店铺商品不存在或无权限" }, { status: 404 });
     }
 
-    const value = normalizePlatformId(body?.value);
+    const requestedValue = normalizePlatformId(body?.value);
+    const operation = body?.operation ?? "replace";
+    if (!["replace", "append", "remove"].includes(operation) || (platform !== "meituan" && operation !== "replace")) {
+      return NextResponse.json({ error: "不支持的配对操作" }, { status: 400 });
+    }
+    const ownerId = existing.shop.userId;
 
     const updated = await prisma.$transaction(async (tx) => {
+      const current = await tx.shopProduct.findUniqueOrThrow({ where: { id: existing.id }, select: { meituanSkuId: true } });
+      const requestedIds = normalizeMeituanSkuIds(requestedValue);
+      const currentIds = normalizeMeituanSkuIds(current.meituanSkuId);
+      const nextIds = operation === "append" ? Array.from(new Set([...currentIds, ...requestedIds]))
+        : operation === "remove" ? currentIds.filter((skuId) => !requestedIds.includes(skuId))
+        : requestedIds;
+      const value = platform === "meituan" ? nextIds.join(",") || null : requestedValue;
       if (value) {
         const conflictingItems = await tx.shopProduct.findMany({
           where: {
@@ -80,7 +93,7 @@ export async function PATCH(
           const otherId = String(other.id);
           if (platform === "meituan") {
             const otherIds = normalizeMeituanSkuIds(other.meituanSkuId);
-            const remainingIds = otherIds.filter((id) => id !== value);
+            const remainingIds = otherIds.filter((id) => !nextIds.includes(id));
             if (remainingIds.length !== otherIds.length) {
               await tx.shopProduct.update({
                 where: { id: otherId },
@@ -95,8 +108,8 @@ export async function PATCH(
                 });
                 const remainingOtherProductMeituanSkuIds = otherProductSkus
                   .map((i) => i.meituanSkuId)
-                  .filter((id) => id !== value);
-                await replaceProductMeituanSkuMappings(tx, other.productId, user.id, remainingOtherProductMeituanSkuIds);
+                  .filter((id) => !nextIds.includes(id));
+                await replaceProductMeituanSkuMappings(tx, other.productId, ownerId, remainingOtherProductMeituanSkuIds);
               }
             }
           } else if (platform === "jd" && other.jdSkuId === value) {
@@ -131,12 +144,11 @@ export async function PATCH(
       });
 
       if (platform === "meituan" && existing.productId) {
-        const nextIds = value ? normalizeMeituanSkuIds(value) : [];
         const otherShopProducts = await tx.shopProduct.findMany({
           where: {
             productId: existing.productId,
             id: { not: existing.id },
-            shop: { userId: user.id },
+            shop: { userId: ownerId },
           },
           select: { meituanSkuId: true },
         });
@@ -144,15 +156,15 @@ export async function PATCH(
           ...nextIds,
           ...otherShopProducts.flatMap((p) => normalizeMeituanSkuIds(p.meituanSkuId)),
         ]));
-        await replaceProductMeituanSkuMappings(tx, existing.productId, user.id, allMeituanSkuIds);
+        await replaceProductMeituanSkuMappings(tx, existing.productId, ownerId, allMeituanSkuIds);
       }
 
       if (value) {
         await tx.meituanImportItem.updateMany({
           where: {
-            userId: user.id,
+            userId: ownerId,
             platform,
-            meituanSkuId: value,
+            meituanSkuId: { in: platform === "meituan" ? nextIds : [value] },
           },
           data: {
             bindProductId: existing.productId || null,

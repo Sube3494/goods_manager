@@ -270,7 +270,7 @@ export function MeituanMappingModal({
     try {
       setIsLoading(true);
       const params = new URLSearchParams({
-        status: activePlatform === "meituan" ? statusFilter : "ALL",
+        status: statusFilter,
         search: searchQuery,
         page: page.toString(),
         pageSize: pageSize.toString(),
@@ -339,34 +339,12 @@ export function MeituanMappingModal({
   );
 
   const platformProducts = useMemo(() => {
-    if (activePlatform === "meituan") {
-      return products;
-    }
-
-    const field = activePlatformConfig.field;
-    if (statusFilter === "BOUND") {
-      return products.filter((product) => Boolean(String(product[field] || "").trim()));
-    }
-    if (statusFilter === "UNBOUND") {
-      return products.filter((product) => !String(product[field] || "").trim());
-    }
     return products;
-  }, [activePlatform, activePlatformConfig.field, products, statusFilter]);
+  }, [products]);
 
   const platformStatusCounts = useMemo(() => {
-    if (activePlatform === "meituan") {
-      return statusCounts;
-    }
-
-    const field = activePlatformConfig.field;
-    const bound = products.filter((product) => Boolean(String(product[field] || "").trim())).length;
-    return {
-      TOTAL: products.length,
-      BOUND: bound,
-      UNBOUND: products.length - bound,
-      HAS_SUGGESTION: 0,
-    };
-  }, [activePlatform, activePlatformConfig.field, products, statusCounts]);
+    return statusCounts;
+  }, [statusCounts]);
 
   const handleSavePlatformId = async (product: ShopProductWithMapping, nextValue?: string) => {
     if (!product.shopProductId) {
@@ -394,6 +372,7 @@ export function MeituanMappingModal({
       }
 
       showToast(`已保存${activePlatformConfig.idLabel}`, "success");
+      setPlatformIdDrafts((prev) => ({ ...prev, [draftKey]: value }));
       await fetchShopProducts();
     } catch (err: any) {
       showToast(err?.message || "保存平台商品 ID 失败", "error");
@@ -413,15 +392,14 @@ export function MeituanMappingModal({
     }
   ) => {
     try {
-      const res = await fetch("/api/meituan-mapping/bind-to-product", {
-        method: "POST",
+      if (!product.shopProductId) throw new Error("当前商品没有对应的店铺商品记录");
+      const res = await fetch(`/api/shop-products/${product.shopProductId}/platform-id`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          productId: product.id,
-          meituanSkuId: meituanItem.meituanSkuId,
-          meituanSpuId: meituanItem.meituanSpuId || undefined,
-          meituanName: meituanItem.name,
-          meituanSpec: meituanItem.spec || undefined,
+          platform: "meituan",
+          value: meituanItem.meituanSkuId,
+          operation: "append",
         }),
       });
 
@@ -450,12 +428,15 @@ export function MeituanMappingModal({
     productName: string
   ) => {
     try {
-      const res = await fetch("/api/meituan-mapping/unbind-from-product", {
-        method: "POST",
+      const product = products.find((item) => item.id === productId);
+      if (!product?.shopProductId) throw new Error("当前商品没有对应的店铺商品记录");
+      const res = await fetch(`/api/shop-products/${product.shopProductId}/platform-id`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          productId,
-          meituanSkuId,
+          platform: "meituan",
+          value: meituanSkuId,
+          operation: "remove",
         }),
       });
 
@@ -487,14 +468,14 @@ export function MeituanMappingModal({
       let successCount = 0;
       for (const prod of productsWithSuggestion) {
         const sugg = prod.suggestedMeituanItem!;
-        const res = await fetch("/api/meituan-mapping/bind-to-product", {
-          method: "POST",
+        if (!prod.shopProductId) continue;
+        const res = await fetch(`/api/shop-products/${prod.shopProductId}/platform-id`, {
+          method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            productId: prod.id,
-            meituanSkuId: sugg.meituanSkuId,
-            meituanName: sugg.name,
-            meituanSpec: sugg.spec || undefined,
+            platform: "meituan",
+            value: sugg.meituanSkuId,
+            operation: "append",
           }),
         });
         if (res.ok) successCount++;
@@ -1087,7 +1068,7 @@ export function MeituanMappingModal({
                   <div
                     key={prod.id}
                     className={cn(
-                      "group relative flex flex-col md:flex-row md:items-center justify-between gap-3 px-4 py-3 rounded-2xl border transition-all duration-150 shadow-xs hover:shadow-md",
+                      "group relative flex min-w-0 flex-col gap-3 px-4 py-3 rounded-2xl border transition-all duration-150 shadow-xs hover:shadow-md",
                       activePlatform === "meituan" && isBound
                         ? "border-emerald-500/30 bg-emerald-500/[0.02] dark:bg-emerald-950/[0.04]"
                         : activePlatform === "meituan" && hasSuggestion
@@ -1114,7 +1095,7 @@ export function MeituanMappingModal({
                       <div className="flex-1 min-w-0 space-y-1">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-black text-xs sm:text-sm text-foreground group-hover:text-primary transition-colors truncate max-w-xs sm:max-w-md">
-                            {prod.name}
+                            {prod.shopProductName || prod.name}
                           </span>
                           {prod.category && (
                             <span className="text-[10px] font-bold bg-muted dark:bg-white/10 px-2 py-0.5 rounded-md text-muted-foreground shrink-0">
@@ -1134,7 +1115,7 @@ export function MeituanMappingModal({
                     </div>
 
                     {/* 右侧：美团配对状态与操作区域 */}
-                    <div className="flex flex-wrap items-center gap-2.5 self-end md:self-auto shrink-0">
+                    <div className="flex w-full min-w-0 flex-wrap items-center gap-2.5 sm:pl-[62px]">
                       {/* 1. 已关联美团 ID 徽章展示（允许多对一） */}
                       {activePlatform === "meituan" && isBound && (
                         <div className="flex flex-wrap items-center gap-2">

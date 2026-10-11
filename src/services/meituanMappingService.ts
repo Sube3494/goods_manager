@@ -2,6 +2,7 @@ import * as XLSX from "xlsx";
 import ExcelJS from "exceljs";
 import prisma from "@/lib/prisma";
 import { getStorageStrategy } from "@/lib/storage";
+import { normalizeMeituanSkuIds } from "@/lib/productMeituanSku";
 
 export interface ParsedMeituanItem {
   meituanSkuId: string;
@@ -400,14 +401,14 @@ export class MeituanMappingService {
         } else {
           // 如果没传 itemId，更新所有该美团ID的导入明细
           const updatedItems = await tx.meituanImportItem.findMany({
-            where: { userId, meituanSkuId: b.meituanSkuId },
+            where: { userId, platform: "meituan", meituanSkuId: b.meituanSkuId },
             select: { id: true, batchId: true },
           });
           for (const it of updatedItems) {
             affectedBatchIds.add(it.batchId);
           }
           await tx.meituanImportItem.updateMany({
-            where: { userId, meituanSkuId: b.meituanSkuId },
+            where: { userId, platform: "meituan", meituanSkuId: b.meituanSkuId },
             data: {
               bindProductId: b.productId,
               status: "BOUND",
@@ -471,7 +472,7 @@ export class MeituanMappingService {
           }
         } else {
           const updatedItems = await tx.meituanImportItem.findMany({
-            where: { userId, meituanSkuId: it.meituanSkuId },
+            where: { userId, platform: "meituan", meituanSkuId: it.meituanSkuId },
             select: { id: true, batchId: true, suggestedProductId: true },
           });
           for (const row of updatedItems) {
@@ -679,6 +680,10 @@ export class MeituanMappingService {
           select: { id: true, name: true },
         },
         shopProducts: {
+          where: {
+            ...(shopId && shopId !== "ALL" ? { shopId } : {}),
+            ...(userId ? { shop: { userId } } : {}),
+          },
           select: {
             id: true,
             shopId: true,
@@ -686,6 +691,7 @@ export class MeituanMappingService {
             jdSkuId: true,
             meituanSkuId: true,
             taobaoSkuId: true,
+            doudianSkuId: true,
             productName: true,
             productImage: true,
           },
@@ -733,6 +739,7 @@ export class MeituanMappingService {
     const meituanByName = new Map<string, typeof availableMeituanItems[0]>();
 
     for (const mItem of availableMeituanItems) {
+      if (mItem.status === "BOUND") continue;
       if (mItem.barcode && mItem.barcode.trim()) {
         meituanByBarcode.set(mItem.barcode.trim(), mItem);
       }
@@ -760,20 +767,35 @@ export class MeituanMappingService {
     };
 
     const enrichedProducts: EnrichedProduct[] = rawProducts.map((prod) => {
-      const boundCount = prod.meituanSkuMappings.length;
-      const isBound = boundCount > 0;
-
       // 提取主图：优先使用店铺商品独立图，其次使用商品全局主图，并通过 storage.resolveUrl 转换为完整URL
       const matchedShopProduct = shopId && shopId !== "ALL"
         ? prod.shopProducts.find((sp) => sp.shopId === shopId)
         : prod.shopProducts[0];
+      // 店铺平台字段是配对依据，主商品映射包含其他店铺的历史 ID。
+      const meituanSkuMappings = normalizeMeituanSkuIds(matchedShopProduct?.meituanSkuId).map((skuId) => {
+        const metadata = prod.meituanSkuMappings.find((mapping) => mapping.meituanSkuId === skuId);
+        return metadata || {
+          id: `${matchedShopProduct?.id}:${skuId}`,
+          meituanSkuId: skuId,
+          meituanSpuId: null,
+          meituanName: null,
+          meituanSpec: null,
+          createdAt: new Date(0),
+        };
+      });
+      const platformId = platform === "jd" ? matchedShopProduct?.jdSkuId
+        : platform === "taobao" ? matchedShopProduct?.taobaoSkuId
+        : platform === "doudian" ? matchedShopProduct?.doudianSkuId
+        : matchedShopProduct?.meituanSkuId;
+      const boundCount = platform === "meituan" ? meituanSkuMappings.length : platformId ? 1 : 0;
+      const isBound = boundCount > 0;
       const rawImage = matchedShopProduct?.productImage || prod.image || null;
       const resolvedImage = rawImage ? storage.resolveUrl(rawImage) : null;
 
       let suggestedMeituanItem: EnrichedProduct["suggestedMeituanItem"] = null;
 
       // 如果尚未绑定美团 ID，尝试从美团数据池匹配推荐
-      if (!isBound) {
+      if (!isBound && platform === "meituan") {
         // ① 提取商品 specs 中可能包含的条形码
         const prodSpecs = (prod.specs as Record<string, any>) || {};
         const prodBarcode = String(
@@ -817,6 +839,7 @@ export class MeituanMappingService {
           const normProdName = prod.name.replace(/\s+/g, "").toLowerCase();
           if (normProdName.length >= 2) {
             const candidate = availableMeituanItems.find((m) => {
+              if (m.status === "BOUND") return false;
               const mName = m.name.replace(/\s+/g, "").toLowerCase();
               return (
                 mName.includes(normProdName) || normProdName.includes(mName)
@@ -840,6 +863,7 @@ export class MeituanMappingService {
 
       return {
         ...prod,
+        meituanSkuMappings,
         image: resolvedImage,
         shopProductId: matchedShopProduct?.id || null,
         shopSku: matchedShopProduct?.sku || null,
@@ -847,6 +871,7 @@ export class MeituanMappingService {
         jdSkuId: matchedShopProduct?.jdSkuId || null,
         meituanSkuId: matchedShopProduct?.meituanSkuId || null,
         taobaoSkuId: matchedShopProduct?.taobaoSkuId || null,
+        doudianSkuId: matchedShopProduct?.doudianSkuId || null,
         boundCount,
         isBound,
         suggestedMeituanItem,
@@ -1105,6 +1130,7 @@ export class MeituanMappingService {
     // 3. 将美团导入池中所有对应的 meituanSkuId 标记为已绑定该 productId
     await prisma.meituanImportItem.updateMany({
       where: {
+        platform: "meituan",
         meituanSkuId,
         ...(userId ? { userId } : {}),
       },
@@ -1116,7 +1142,7 @@ export class MeituanMappingService {
 
     // 4. 更新相关导入批次的配对计数
     const affectedBatches = await prisma.meituanImportItem.findMany({
-      where: { meituanSkuId, ...(userId ? { userId } : {}) },
+      where: { platform: "meituan", meituanSkuId, ...(userId ? { userId } : {}) },
       select: { batchId: true },
       distinct: ["batchId"],
     });
@@ -1160,6 +1186,7 @@ export class MeituanMappingService {
     // 2. 将美团明细重置为未绑定
     await prisma.meituanImportItem.updateMany({
       where: {
+        platform: "meituan",
         meituanSkuId,
         bindProductId: productId,
         ...(userId ? { userId } : {}),
@@ -1172,7 +1199,7 @@ export class MeituanMappingService {
 
     // 3. 更新批次计数
     const affectedBatches = await prisma.meituanImportItem.findMany({
-      where: { meituanSkuId, ...(userId ? { userId } : {}) },
+      where: { platform: "meituan", meituanSkuId, ...(userId ? { userId } : {}) },
       select: { batchId: true },
       distinct: ["batchId"],
     });
