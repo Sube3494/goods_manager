@@ -36,6 +36,7 @@ import { parseOutboundNote } from "@/lib/utils";
 import { readConfirmedRefundAmountFromRawPayload, resolveCancelledJDDeliveredCommissionLoss, resolveRefundAdjustedIncomeMetrics } from "@/lib/orderFinancials";
 import { isAccessoryProduct } from "@/lib/accessoryUtils";
 import { buildRecentInboundOrderWhere, resolveRecentInboundProduct } from "@/lib/recentInbound";
+import { resolveCompanyCommission } from "@/lib/companyCommission";
 
 const SHANGHAI_DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -975,7 +976,7 @@ export async function GET(request: NextRequest) {
           const companyRate = isOffline ? 0 : (shopRateMap.get(matchedShopName) ?? 0.06);
           userPaid = FinanceMath.add(userPaid, incomeYuan);
           platformCommission = FinanceMath.add(platformCommission, commissionYuan);
-          companyCommission = FinanceMath.add(companyCommission, FinanceMath.multiply(expectedIncomeYuan, companyRate));
+          companyCommission = FinanceMath.add(companyCommission, resolveCompanyCommission(expectedIncomeYuan, companyRate).commission);
           productCost = FinanceMath.add(productCost, orderCostYuan);
           returnExtraExpense = FinanceMath.add(returnExtraExpense, returnExtraExpenseYuan);
         } else {
@@ -1280,7 +1281,7 @@ export async function GET(request: NextRequest) {
               : "ready" as const;
 
           const rate = isOffline ? 0 : (shopRateMap.get(matchedShopName) ?? 0.06);
-          const expectedIncomeCents = Math.round(expectedIncomeYuan * 100);
+          const { retainedIncomeCents } = resolveCompanyCommission(expectedIncomeYuan, rate);
           const deliveryFeeCents = deliveryFee;
           const productCostCents = Math.round(orderCostYuan * 100);
           const returnExtraExpenseCents = Math.round(returnExtraExpenseYuan * 100);
@@ -1288,7 +1289,7 @@ export async function GET(request: NextRequest) {
           const pureProfitCents = isManualDeliveryLoss
             ? -deliveryFeeCents - extraExpensesCents
             : (productCostStatus === "ready"
-              ? Math.round(expectedIncomeCents * (1 - rate)) - deliveryFeeCents - productCostCents - returnExtraExpenseCents - extraExpensesCents
+              ? retainedIncomeCents - deliveryFeeCents - productCostCents - returnExtraExpenseCents - extraExpensesCents
               : null);
 
           const pureProfit = typeof pureProfitCents === "number" && Number.isFinite(pureProfitCents)
