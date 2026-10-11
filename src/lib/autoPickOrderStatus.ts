@@ -41,21 +41,15 @@ export function isOrderFullyRefunded(order?: {
 
   // 2. 状态文本本身含有退款成功/已退款/全额退款
   const statusText = String(order.status || "").trim();
-  if (/已退款|全额退款|退款成功|全部退款/.test(statusText)) {
-    return true;
-  }
-
   const actualPaid = Math.max(0, Number(order.actualPaid || 0));
   const refundAmount = Math.max(0, Number(order.refundAmount || 0));
+  const isPartialRefund = actualPaid > 0 && refundAmount > 0 && refundAmount < actualPaid;
+  if (!isPartialRefund && !/部分退款|部分已退款/.test(statusText) && /已退款|全额退款|退款成功|全部退款/.test(statusText)) {
+    return true;
+  }
 
   // 3. 退款金额大于等于实付金额（全额退款）
   if (actualPaid > 0 && refundAmount >= actualPaid) {
-    return true;
-  }
-
-  // 4. 到手为 0 且存在退款金额或退货记录（整单退款）
-  const expectedIncome = order.expectedIncome != null ? Number(order.expectedIncome) : null;
-  if (expectedIncome === 0 && actualPaid > 0 && refundAmount > 0) {
     return true;
   }
 

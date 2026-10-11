@@ -4,6 +4,7 @@ import { getAuthorizedUser, getAuthorizedUserAny } from "@/lib/auth";
 import { Prisma } from "../../../../../prisma/generated-client";
 import { returnOutboundOrderById } from "@/lib/outboundReturns";
 import { cancelAutoCompleteJob } from "@/lib/autoPickAutoComplete";
+import { hasOrderRefundState } from "@/lib/orderFinancials";
 import {
   getAutoPickIntegrationConfigByUserId,
   normalizeAutoPickOrderPayload,
@@ -177,6 +178,7 @@ export async function PATCH(
         id: true,
         orderNo: true,
         platform: true,
+        status: true,
         actualPaid: true,
         expectedIncome: true,
         platformCommission: true,
@@ -283,6 +285,10 @@ export async function PATCH(
       });
 
     const isOfflineOrder = order.platform === "线下交易";
+    if (hasAmountEdit && hasOrderRefundState(order)
+      && !isOfflineOrder && !/抖店|抖音|doudian|douyin/i.test(String(order.platform || ""))) {
+      return NextResponse.json({ error: "退款订单到手金额由系统自动计算，不支持手动修改" }, { status: 400 });
+    }
     const actualPaid = offlineEdit
       ? Math.round(offlineActualPaid)
       : (hasAmountEdit && isOfflineOrder

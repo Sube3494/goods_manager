@@ -22,6 +22,7 @@ import {
   syncBrushOrderFromCompletedAutoPickOrder,
 } from "@/lib/autoPickOrders";
 import { cancelAutoCompleteJob } from "@/lib/autoPickAutoComplete";
+import { readConfirmedRefundAmountFromRawPayload, resolveRefundAdjustedIncomeMetrics } from "@/lib/orderFinancials";
 import {
   isAutoPickOrderAbnormalStatus,
   isAutoPickOrderCancelledStatus,
@@ -170,6 +171,17 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
       computedPlatformCommission = Math.max(0, Math.round(Number(refreshedOrder.platformCommission || 0)));
     }
 
+    const refundAmount = readConfirmedRefundAmountFromRawPayload(refreshedOrder.rawPayload);
+    const refundMetrics = resolveRefundAdjustedIncomeMetrics({
+      platform: refreshedOrder.platform,
+      actualPaid: actualPaidNum,
+      expectedIncome: computedExpectedIncome,
+      platformCommission: computedPlatformCommission,
+      refundAmount,
+    });
+    computedExpectedIncome = refundMetrics.expectedIncome;
+    computedPlatformCommission = refundMetrics.platformCommission;
+
     const user = await prisma.user.findUnique({
       where: { id: order.userId },
       select: { permissions: true },
@@ -243,6 +255,7 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
         isMainSystemSelfDelivery,
         expectedIncome: computedExpectedIncome,
         platformCommission: computedPlatformCommission,
+        refundAmount,
         completedAt: normalized?.completedAt || null,
         customerName: readCustomerNameFromRawPayload(refreshedOrder.rawPayload),
         customerPhone: readCustomerPhoneFromRawPayload(refreshedOrder.rawPayload),

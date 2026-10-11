@@ -53,6 +53,7 @@ import {
   resolveCancelledJDDeliveredCommissionLoss,
   resolveCancelledOrderPureProfit,
   resolveOrderRefundAmount,
+  resolveRefundAdjustedIncomeMetrics,
 } from "@/lib/orderFinancials";
 
 export const dynamic = "force-dynamic";
@@ -691,39 +692,6 @@ function resolveIncomeMetrics(
   return {
     expectedIncome: null,
     platformCommission: Math.max(0, Math.round(Number(fallbackCommission || 0))),
-  };
-}
-
-function resolveRefundAdjustedIncomeMetrics(options: {
-  expectedIncome: number | null | undefined;
-  platformCommission: number | null | undefined;
-  actualPaid: number | null | undefined;
-  refundAmount: number | null | undefined;
-}) {
-  const expectedIncome = Math.max(0, Number(options.expectedIncome || 0));
-  const platformCommission = Number(options.platformCommission || 0);
-  const actualPaid = Math.max(0, Number(options.actualPaid || 0));
-  const refundAmount = Math.max(0, Number(options.refundAmount || 0));
-
-  if (refundAmount <= 0) {
-    return {
-      actualPaid,
-      expectedIncome,
-      platformCommission,
-      refundedExpectedIncome: 0,
-      refundedCommission: 0,
-    };
-  }
-
-  // 退款全额直接从商家的到手金额中扣除
-  const adjustedExpectedIncome = Math.max(0, expectedIncome - refundAmount);
-
-  return {
-    actualPaid,
-    expectedIncome: adjustedExpectedIncome,
-    platformCommission,
-    refundedExpectedIncome: refundAmount,
-    refundedCommission: 0,
   };
 }
 
@@ -2036,6 +2004,7 @@ export async function GET(request: NextRequest) {
           if (!cancelled && !deleted) {
             const isBrush = readMainSystemSelfDeliveryFlag(order.rawPayload);
             const adjustedMetrics = resolveRefundAdjustedIncomeMetrics({
+              platform: order.platform,
               expectedIncome: metrics.expectedIncome,
               platformCommission: metrics.platformCommission,
               actualPaid,
@@ -2616,6 +2585,7 @@ export async function GET(request: NextRequest) {
       const cancelled = rawCancelled || isFullyRefunded;
       const returnExtraExpense = outboundMeta?.extraExpense || 0;
       const adjustedMetrics = resolveRefundAdjustedIncomeMetrics({
+        platform: order.platform,
         expectedIncome: order.expectedIncome,
         platformCommission: order.platformCommission,
         actualPaid: order.actualPaid,
@@ -2623,7 +2593,7 @@ export async function GET(request: NextRequest) {
       });
       const safeExpectedIncome = hiddenDeletedOfflineIncome
         ? null
-        : (typeof order.expectedIncome === "number" ? order.expectedIncome : null);
+        : (typeof order.expectedIncome === "number" ? adjustedMetrics.expectedIncome : null);
       const serviceFeeRate = order.platform === "线下交易"
         ? 0
         : (shopRateMap.get(matchedShopName) ?? 0.06);

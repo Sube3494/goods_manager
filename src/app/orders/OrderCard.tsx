@@ -53,7 +53,8 @@ import { formatLocalDate, formatLocalDateTime } from "@/lib/dateUtils";
 import { isRematchReturnReason } from "@/lib/outboundReturnMeta";
 import { cleanCustomerRemark } from "@/lib/customerRemark";
 import { getOrderCostStatusText } from "@/lib/outboundCostSnapshot";
-import { resolveCancelledJDDeliveredCommissionLoss } from "@/lib/orderFinancials";
+import { hasOrderRefundState, resolveCancelledJDDeliveredCommissionLoss } from "@/lib/orderFinancials";
+import { readMaiyatianItemRefundQuantity } from "@/lib/maiyatianRefund";
 
 const OrderRouteModal = dynamic(() => import("@/components/Orders/OrderRouteModal").then((module) => module.OrderRouteModal), { ssr: false });
 const CustomerHistoryModal = dynamic(() => import("@/components/Orders/CustomerHistoryModal").then((module) => module.CustomerHistoryModal), { ssr: false });
@@ -2449,7 +2450,7 @@ export function ProductStripItem({
             <span
               className="relative group inline-flex cursor-help items-center rounded-full border border-rose-500/20 bg-rose-500/10 px-2 py-0.5 text-[10px] font-semibold leading-none text-rose-700 dark:text-rose-400 sm:text-[11px]"
             >
-              已退款{returnedQuantity > 1 ? ` x${returnedQuantity}` : ""}
+              已退款{returnedQuantity > 0 ? ` ${returnedQuantity}/${display.quantity} 件` : ""}
               {returnedDetails && returnedDetails.length > 0 && (
                 <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-max max-w-[320px] -translate-x-1/2 rounded-xl border border-black/8 bg-white/95 p-2 text-[10px] text-slate-800 opacity-0 invisible transition-all duration-200 group-hover:opacity-100 group-hover:visible dark:border-white/10 dark:bg-zinc-900/95 dark:text-zinc-100 shadow-xl backdrop-blur-sm space-y-1.5">
                   {returnedDetails.map((detail, detailIndex) => (
@@ -2655,8 +2656,11 @@ export function OrderItemBundleGroup({
   const hasOutboundReturn = outboundReturnDetails.length > 0 || (order.outboundMeta?.totalRefundAmount || 0) > 0;
 
   const rawReturnedQuantity = returnedItemQuantityMap?.get(getReturnedProductKey(item)) || 0;
-  const isItemReturned = rawReturnedQuantity > 0 || isOrderFullyReturned || (isSingleItemOrder && (hasOutboundReturn || Number(order.refundAmount || 0) > 0));
-  const returnedQuantity = rawReturnedQuantity > 0 
+  const platformRefundQuantity = readMaiyatianItemRefundQuantity(item.rawPayload, order.rawPayload);
+  const isItemReturned = platformRefundQuantity > 0 || rawReturnedQuantity > 0 || isOrderFullyReturned || (isSingleItemOrder && (hasOutboundReturn || Number(order.refundAmount || 0) > 0));
+  const returnedQuantity = platformRefundQuantity > 0
+    ? platformRefundQuantity
+    : rawReturnedQuantity > 0
     ? rawReturnedQuantity 
     : (isItemReturned ? (item.quantity || 1) : 0);
 
@@ -3121,7 +3125,7 @@ export const OrderProfitBadge = memo(function OrderProfitBadge({
   const hasRefundAmount = refundAmount > 0;
   const isFullyRefunded = isOrderFullyRefunded(order);
   const cancelled = isCancelledStatus(order.status) || isFullyRefunded;
-  const settlementIncome = Math.max(0, expectedIncome - refundAmount);
+  const settlementIncome = Math.max(0, expectedIncome);
   const settlementAfterRate = Math.round(settlementIncome * (1 - serviceFeeRate));
   const hasPureProfit = typeof order.pureProfit === "number" && Number.isFinite(order.pureProfit);
   const pureProfit = hasPureProfit ? Number(order.pureProfit) : 0;
@@ -3195,7 +3199,7 @@ export const OrderProfitBadge = memo(function OrderProfitBadge({
         ]
       : [
           { label: "预计到手", value: toCurrency(expectedIncome) },
-          ...(hasRefundAmount ? [{ label: "减退款", value: toCurrency(refundAmount) }] : []),
+          ...(hasRefundAmount ? [{ label: "顾客实付退款", value: toCurrency(refundAmount) }] : []),
           { label: `扣抽出 ${formatPercent(serviceFeeRate)} 后`, value: toCurrency(settlementAfterRate) },
           { label: "减配送费", value: toCurrency(deliveryFee) },
           ...(canViewProductCosts ? [{ label: "减货品成本", value: toCurrency(productCost), editable: canEditProductCost }] : []),
@@ -3205,7 +3209,7 @@ export const OrderProfitBadge = memo(function OrderProfitBadge({
     : productCostStatusText
       ? [
           { label: "预计到手", value: toCurrency(expectedIncome) },
-          ...(hasRefundAmount ? [{ label: "退款", value: toCurrency(refundAmount) }] : []),
+          ...(hasRefundAmount ? [{ label: "顾客实付退款", value: toCurrency(refundAmount) }] : []),
           { label: "抽出率", value: formatPercent(serviceFeeRate) },
           { label: "配送费", value: toCurrency(deliveryFee) },
           ...(canViewProductCosts ? [{ label: "货品成本", value: productCostStatusText, editable: canEditProductCost }] : []),
@@ -3779,7 +3783,7 @@ export const OrderCard = memo(function OrderCard({
     && expectedIncome > 0
       ? expectedIncome
       : order.actualPaid;
-  const displayedPlatformCommission = !isJdOrder(order.platform)
+  const displayedPlatformCommission = !hasOrderRefundState(order) && !isJdOrder(order.platform)
     && Number.isFinite(Number(expectedIncome))
     && Number.isFinite(Number(effectiveActualPaid))
     ? Math.round(Number(effectiveActualPaid || 0) - Number(expectedIncome || 0))
@@ -4669,7 +4673,7 @@ export const OrderCard = memo(function OrderCard({
                   <DetailStat label={commissionDisplay.label} value={commissionDisplay.value} />
                   {hasRefundAmount ? (
                     <DetailStat
-                      label="退款金额"
+                      label="实付退款"
                       value={toCurrency(refundAmount)}
                       className={!hasReturnExtraExpense ? "col-span-2 sm:col-span-1" : ""}
                     />

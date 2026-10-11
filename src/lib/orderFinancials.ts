@@ -1,4 +1,4 @@
-function readEffectiveConfirmedRefunds(rawPayload: unknown) {
+export function readEffectiveConfirmedRefunds(rawPayload: unknown) {
   if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) return [];
   const record = rawPayload as Record<string, unknown>;
   const cancelDetails = Array.isArray(record.cancelDetails || record.cancel_details)
@@ -7,9 +7,13 @@ function readEffectiveConfirmedRefunds(rawPayload: unknown) {
   if (cancelDetails.length === 0) return [];
 
   const latestByRefundRequest = new Map<string, Record<string, unknown>>();
-  cancelDetails.forEach((item, index) => {
+  cancelDetails.forEach((item) => {
     const requestId = String(item.source_cancel_id || item.sourceCancelId || "").trim();
-    latestByRefundRequest.set(requestId || `record:${index}`, item);
+    const key = requestId || "unknown-request";
+    const previous = latestByRefundRequest.get(key);
+    if (previous && /^\d+$/.test(String(previous.id || "")) && /^\d+$/.test(String(item.id || ""))
+      && BigInt(String(previous.id)) > BigInt(String(item.id))) return;
+    latestByRefundRequest.set(key, item);
   });
 
   return [...latestByRefundRequest.values()].filter((item) => {
@@ -24,9 +28,23 @@ export function hasEffectiveConfirmedRefund(rawPayload: unknown) {
   return readEffectiveConfirmedRefunds(rawPayload).length > 0;
 }
 
+export function hasOrderRefundState(order: {
+  rawPayload?: unknown;
+  refundAmount?: unknown;
+  status?: string | null;
+}) {
+  if (hasEffectiveConfirmedRefund(order.rawPayload)) return true;
+  if (Number(order.refundAmount || 0) > 0) return true;
+  const raw = order.rawPayload && typeof order.rawPayload === "object" && !Array.isArray(order.rawPayload)
+    ? order.rawPayload as Record<string, unknown>
+    : {};
+  if (Number(raw.refundAmount || raw.refund_amount || 0) > 0) return true;
+  return /已退款|退款成功|全额退款|全部退款|部分退款/.test(String(order.status || ""));
+}
+
 export function readConfirmedRefundAmountFromRawPayload(rawPayload: unknown) {
-  return readEffectiveConfirmedRefunds(rawPayload).reduce((maxAmount, item) => (
-    Math.max(maxAmount, Math.round(Math.max(0, Number(item.total_price || 0) || 0) * 100))
+  return readEffectiveConfirmedRefunds(rawPayload).reduce((total, item) => (
+    total + Math.round(Math.max(0, Number(item.total_price || 0) || 0) * 100)
   ), 0);
 }
 
@@ -52,13 +70,45 @@ export function resolveOrderRefundAmount(options: {
   const directRefundAmount = readDirectRefundAmountWithoutMaiyatianDetails(options.rawPayload);
   const hasConfirmedRefund = hasEffectiveConfirmedRefund(options.rawPayload);
   const platformRefundAmount = readConfirmedRefundAmountFromRawPayload(options.rawPayload);
-  const returnedRefundAmount = options.hasReturnedGoods && hasConfirmedRefund
-    ? (platformRefundAmount > 0
-        ? platformRefundAmount
-        : Math.max(0, Number(options.actualPaid || 0) || 0))
-    : 0;
+  // 确认退款的金额独立于本地是否已经做退货入库。
+  const returnedRefundAmount = platformRefundAmount > 0
+    ? platformRefundAmount
+    : options.hasReturnedGoods && hasConfirmedRefund
+      ? Math.max(0, Number(options.actualPaid || 0) || 0)
+      : 0;
 
   return Math.max(recordedRefundAmount, directRefundAmount, returnedRefundAmount);
+}
+
+// 美团退款后按剩余实付和固定 6% 佣金重算，包括历史上曾手动修改的订单。
+export function resolveRefundAdjustedIncomeMetrics(options: {
+  expectedIncome: number | null | undefined;
+  platformCommission: number | null | undefined;
+  actualPaid: number | null | undefined;
+  refundAmount: number | null | undefined;
+  platform?: string | null;
+  // 以分传入时为 1，以元传入时为 100，统一精确到分。
+  amountScale?: 1 | 100;
+}) {
+  const actualPaid = Math.max(0, Number(options.actualPaid || 0));
+  const refundAmount = Math.max(0, Number(options.refundAmount || 0));
+  const remainingPaid = Math.max(0, actualPaid - refundAmount);
+  const shouldRecalculate = refundAmount > 0
+    && /美团|meituan|shangou/i.test(String(options.platform || ""));
+  const scale = options.amountScale || 1;
+  const commission = shouldRecalculate
+    ? Math.round(remainingPaid * 0.06 * scale) / scale
+    : Number(options.platformCommission || 0);
+  const expectedIncome = shouldRecalculate
+    ? Math.round((remainingPaid - commission) * scale) / scale
+    : Math.max(0, Number(options.expectedIncome || 0));
+  return {
+    actualPaid: remainingPaid,
+    expectedIncome,
+    platformCommission: commission,
+    refundedExpectedIncome: 0,
+    refundedCommission: 0,
+  };
 }
 
 export function hasExplicitDeliveryPickupProof(delivery: unknown, _rawPayload?: unknown) {

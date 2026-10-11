@@ -2,6 +2,8 @@ import prisma from "@/lib/prisma";
 import { assertMaiyatianCookieResponse } from "@/lib/maiyatianCookieResponse";
 import { formatLocalDate, parseAsShanghaiTime } from "@/lib/dateUtils";
 import { cleanCustomerRemark, firstMeaningfulCustomerRemark } from "@/lib/customerRemark";
+import { readConfirmedRefundAmountFromRawPayload, readEffectiveConfirmedRefunds } from "@/lib/orderFinancials";
+import { resolveMaiyatianRefundStatus, summarizeMaiyatianRefund } from "@/lib/maiyatianRefund";
 import {
   getBaseAutoPickStatusDisplay,
   hasAutoPickCompletionProof,
@@ -1811,6 +1813,10 @@ function parseMaiyatianStatusValue(rawValue: unknown) {
 }
 
 function resolveMaiyatianOrderStatus(rawOrder: Record<string, unknown>) {
+  const refund = summarizeMaiyatianRefund(rawOrder);
+  if (refund.kind === "partial" || refund.kind === "full") {
+    return resolveMaiyatianRefundStatus(rawOrder);
+  }
   const rawStatus = String(rawOrder.status || "").trim().toLowerCase();
   const isCancelled = rawOrder.is_cancel === true || rawOrder.is_cancel === 1 || rawOrder.is_cancel === "1"
     || rawStatus === "cancel"
@@ -2693,8 +2699,9 @@ async function enrichMaiyatianOrderByCookie(cookie: string, order: AutoPickInbou
   if (Array.isArray(cancelDetails) && cancelDetails.length > 0) {
     // 麦芽田 /cancel/detail 返回的是同一笔退款的生命周期流转记录（如“发起退款” status:0 与“确认退款” status:1 为同一笔退款）
     // 优先读取已确认/生效的退款流水记录，防止重复求和导致退款金额翻倍
-    const effectiveCancel = cancelDetails.filter((item) => String(item.status ?? "").trim() === "1").pop();
-    const refundAmountYuan = Number(effectiveCancel?.total_price || 0) || 0;
+    const refundPayload = { ...(detailDataObj || {}), cancelDetails };
+    const effectiveCancel = readEffectiveConfirmedRefunds(refundPayload).at(-1);
+    const refundAmountYuan = readConfirmedRefundAmountFromRawPayload(refundPayload) / 100;
 
     if (!effectiveCancel && isAutoPickOrderCancelledStatus(detailStatus)) {
       // 美团在用户仅发起取消/售后申请时，也可能提前设置 is_cancel 或取消类 tips。
@@ -2722,38 +2729,7 @@ async function enrichMaiyatianOrderByCookie(cookie: string, order: AutoPickInbou
       }
     }
 
-    let returnedCount = 0;
-    if (effectiveCancel?.goods_format && typeof effectiveCancel.goods_format === "string") {
-      try {
-        const parsed = JSON.parse(effectiveCancel.goods_format);
-        if (Array.isArray(parsed)) {
-          for (const g of parsed) {
-            returnedCount += Number(g.number || 0) || 0;
-          }
-        }
-      } catch {}
-    }
-
-    const orderActualPaidYuan = (Number(order.actualPaid || 0) || 0) / 100;
-    const isPartialRefund = refundAmountYuan > 0 && (
-      (orderActualPaidYuan > 0 && refundAmountYuan < orderActualPaidYuan)
-      || returnedCount === 0
-    );
-
-    if (isPartialRefund) {
-      // 确凿的部分退款：主订单未被取消
-      const deliveryTrack = String(order.delivery?.track || "").trim();
-      const isDelivered = deliveryTrack === "配送完成" || Boolean(order.completedAt) || Boolean(detailDataObj?.finished_time);
-      if (isDelivered) {
-        detailStatus = "已完成";
-      } else if (deliveryTrack.includes("配送中") || deliveryTrack.includes("派送中")) {
-        detailStatus = "配送中";
-      } else {
-        detailStatus = "待配送";
-      }
-    } else if (refundAmountYuan >= orderActualPaidYuan && returnedCount > 0) {
-      detailStatus = "已取消";
-    }
+    detailStatus = resolveMaiyatianRefundStatus(refundPayload, detailStatus, order.actualPaid) || detailStatus;
 
     const cancelReason = resolveMaiyatianCancelReason(cancelDetails);
     order.cancelDetails = cancelDetails;
@@ -4614,8 +4590,10 @@ export async function enrichAutoPickInboundOrderIfNeeded(
     );
 
     const shouldEnrichOrderDetail =
-      !existing
-      || (isCancelled && !hasCancelReason)
+      options?.force
+      || !existing
+      || isCancelled
+      || hasCancelReason
       || (!isCancelled && (
         !existing.customerRemark
         || !hasCustomerName

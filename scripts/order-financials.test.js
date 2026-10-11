@@ -68,8 +68,8 @@ assert.equal(
     actualPaid: 17510,
     hasReturnedGoods: false,
   }),
-  0,
-  "平台金额为正但商品未退时也不能显示退款",
+  12910,
+  "平台确认正数退款后，无需等待本地退货入库即可显示",
 );
 
 assert.equal(

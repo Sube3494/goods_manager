@@ -33,7 +33,7 @@ import { AUTO_INBOUND_NOTE_KEYWORD, AUTO_INBOUND_TYPE, ORDER_SHORTAGE_PURCHASE_N
 import { isAddressDisabled } from "@/lib/addressBook";
 import { normalizeShopNameKey, isShopNameMatch, stripShopSuffix } from "@/lib/shopIdentity";
 import { parseOutboundNote } from "@/lib/utils";
-import { resolveCancelledJDDeliveredCommissionLoss } from "@/lib/orderFinancials";
+import { readConfirmedRefundAmountFromRawPayload, resolveCancelledJDDeliveredCommissionLoss, resolveRefundAdjustedIncomeMetrics } from "@/lib/orderFinancials";
 import { isAccessoryProduct } from "@/lib/accessoryUtils";
 
 const SHANGHAI_DAY_MS = 24 * 60 * 60 * 1000;
@@ -238,43 +238,10 @@ type OutboundCostLookupRow = {
   }>;
 };
 
-function resolveRefundAdjustedIncomeMetrics(options: {
-  expectedIncome: number | null | undefined;
-  platformCommission: number | null | undefined;
-  actualPaid: number | null | undefined;
-  refundAmount: number | null | undefined;
-}) {
-  const expectedIncome = Math.max(0, Number(options.expectedIncome || 0));
-  const platformCommission = Number(options.platformCommission || 0);
-  const actualPaid = Math.max(0, Number(options.actualPaid || 0));
-  const refundAmount = Math.max(0, Number(options.refundAmount || 0));
-
-  if (refundAmount <= 0) {
-    return {
-      actualPaid,
-      expectedIncome,
-      platformCommission,
-      refundedExpectedIncome: 0,
-      refundedCommission: 0,
-    };
-  }
-
-  // 退款全额直接从商家的到手金额中扣除
-  const adjustedExpectedIncome = Math.max(0, expectedIncome - refundAmount);
-
-  return {
-    actualPaid,
-    expectedIncome: adjustedExpectedIncome,
-    platformCommission,
-    refundedExpectedIncome: refundAmount,
-    refundedCommission: 0,
-  };
-}
-
 function readRefundAmountFromRawPayload(rawPayload: unknown) {
   if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) return 0;
   const record = rawPayload as Record<string, unknown>;
-  return Number(record.refundAmount || record.refund_amount || 0) || 0;
+  return Math.max(readConfirmedRefundAmountFromRawPayload(rawPayload), Number(record.refundAmount || record.refund_amount || 0) || 0);
 }
 
 function isJDPlatform(platform: string | null | undefined) {
@@ -983,12 +950,14 @@ export async function GET(request: NextRequest) {
         const returnExtraExpenseYuan = orderCostMeta?.extraExpense || 0;
         const refundAmountYuan = Math.max(orderCostMeta?.refundAmount || 0, readRefundAmountFromRawPayload(order.rawPayload) / 100);
         const adjustedMetrics = resolveRefundAdjustedIncomeMetrics({
+          platform: order.platform,
+          amountScale: 100,
           expectedIncome: metrics.expectedIncome,
           platformCommission: isOffline ? 0 : metrics.platformCommission,
           actualPaid: paidYuan,
           refundAmount: refundAmountYuan,
         });
-        const adjustedPaidYuan = paidYuan;
+        const adjustedPaidYuan = adjustedMetrics.actualPaid;
         const commissionYuan = adjustedMetrics.platformCommission;
         const expectedIncomeYuan = adjustedMetrics.expectedIncome;
         const incomeYuan = (manualAmountOverride || isOffline) ? expectedIncomeYuan : adjustedPaidYuan;
@@ -1234,12 +1203,14 @@ export async function GET(request: NextRequest) {
         const refundAmountYuan = Math.max(orderCostMeta?.refundAmount || 0, readRefundAmountFromRawPayload(order.rawPayload) / 100);
         const returnExtraExpenseYuan = orderCostMeta?.extraExpense || 0;
         const adjustedMetrics = resolveRefundAdjustedIncomeMetrics({
+          platform: order.platform,
+          amountScale: 100,
           expectedIncome: metrics.expectedIncome,
           platformCommission: isOffline ? 0 : metrics.platformCommission,
           actualPaid: paidYuan,
           refundAmount: refundAmountYuan,
         });
-        const adjustedPaidYuan = paidYuan;
+        const adjustedPaidYuan = adjustedMetrics.actualPaid;
         const commissionYuan = adjustedMetrics.platformCommission;
         const expectedIncomeYuan = adjustedMetrics.expectedIncome;
         const incomeYuan = (manualAmountOverride || isOffline) ? expectedIncomeYuan : adjustedPaidYuan;
