@@ -37,6 +37,7 @@ import { readConfirmedRefundAmountFromRawPayload, resolveCancelledJDDeliveredCom
 import { isAccessoryProduct } from "@/lib/accessoryUtils";
 import { buildRecentInboundOrderWhere, resolveRecentInboundProduct } from "@/lib/recentInbound";
 import { resolveCompanyCommission } from "@/lib/companyCommission";
+import { getEffectivePromotionExpenses } from "@/services/promotionService";
 
 const SHANGHAI_DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -665,20 +666,7 @@ export async function GET(request: NextRequest) {
         },
         orderBy: { date: "asc" },
       }),
-      prisma.dailyPromotionExpense.findMany({
-        where: {
-          userId: targetUserId,
-          ...(shopName ? { shopName } : {}),
-          date: { gte: startDate, lte: endDate },
-        },
-        select: {
-          date: true,
-          amount: true,
-          amountMeituan: true,
-          amountJingdong: true,
-          amountTaobao: true,
-        },
-      }),
+      getEffectivePromotionExpenses(targetUserId, startDate, endDate, shopName || undefined),
       prisma.operatingCostProfile.findMany({
         where: { userId: targetUserId, ...(shopName ? { shopName } : {}) },
       }),
@@ -1344,6 +1332,9 @@ export async function GET(request: NextRequest) {
       if (taobaoPoint && item.amountTaobao) {
         taobaoPoint.promotionExpense = FinanceMath.add(taobaoPoint.promotionExpense, item.amountTaobao || 0);
       }
+      const doudianPoint = platformTrendMaps.get("抖店")?.get(key);
+      const amountOther = FinanceMath.subtract(item.amount, FinanceMath.sum(item.amountMeituan, item.amountJingdong, item.amountTaobao));
+      if (doudianPoint && amountOther > 0) doudianPoint.promotionExpense = FinanceMath.add(doudianPoint.promotionExpense, amountOther);
     });
 
     const buildTrendSeries = (source: Map<string, ReturnType<typeof createTrendBucket>>) => {

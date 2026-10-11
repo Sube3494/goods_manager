@@ -40,6 +40,7 @@ export interface DateRangePickerProps {
   startDate?: string; // YYYY-MM-DD
   endDate?: string;   // YYYY-MM-DD
   onChange: (range: { startDate: string; endDate: string }) => void;
+  onPresetChange?: (preset: string) => void;
   placeholder?: string;
   className?: string;
   triggerClassName?: string;
@@ -55,6 +56,7 @@ export function DateRangePicker({
   startDate = "",
   endDate = "",
   onChange,
+  onPresetChange,
   placeholder = "选择日期范围",
   className,
   triggerClassName,
@@ -111,18 +113,14 @@ export function DateRangePicker({
     return () => cancelAnimationFrame(handle);
   }, []);
 
-  // 同步当前月份
-  useEffect(() => {
-    if (isOpen) {
-      if (parsedEndDate) {
-        setCurrentMonth(parsedEndDate);
-      } else if (parsedStartDate) {
-        setCurrentMonth(parsedStartDate);
-      }
+  const toggleOpen = () => {
+    if (!isOpen) {
+      setCurrentMonth(parsedEndDate || parsedStartDate || new Date());
       setSelectingStart(null);
       setHoverDate(null);
     }
-  }, [isOpen]);
+    setIsOpen(!isOpen);
+  };
 
   const updatePosition = useCallback(() => {
     if (isOpen && containerRef.current) {
@@ -222,10 +220,11 @@ export function DateRangePicker({
     }
   };
 
-  const setPresetRange = (start: Date, end: Date) => {
+  const setPresetRange = (start: Date, end: Date, preset: string) => {
     const clampedEnd = parsedMaxDate && isAfter(end, parsedMaxDate) ? parsedMaxDate : end;
     const clampedStart = parsedMinDate && isBefore(start, parsedMinDate) ? parsedMinDate : start;
-    onChange({
+    if (onPresetChange) onPresetChange(preset);
+    else onChange({
       startDate: format(clampedStart, "yyyy-MM-dd"),
       endDate: format(clampedEnd, "yyyy-MM-dd"),
     });
@@ -270,17 +269,17 @@ export function DateRangePicker({
     const prevMonthEnd = subDays(currentMonthStart, 1);
     const prevMonthStart = startOfMonth(prevMonthEnd);
 
-    const list: Array<{ label: string; start?: Date; end?: Date; isAll?: boolean }> = [
+    const list: Array<{ label: string; preset: string; start?: Date; end?: Date; isAll?: boolean }> = [
       ...(hasAllPreset
-        ? [{ label: "全部", isAll: true }]
+        ? [{ label: "全部", preset: "all", isAll: true }]
         : includeToday
-        ? [{ label: "今天", start: today, end: today }]
+        ? [{ label: "今天", preset: "today", start: today, end: today }]
         : []),
-      { label: "昨天", start: yesterday, end: yesterday },
-      { label: "近7天", start: last7Days, end: today },
-      { label: "近30天", start: last30Days, end: today },
-      { label: "本月", start: currentMonthStart, end: today },
-      { label: "上月", start: prevMonthStart, end: prevMonthEnd },
+      { label: "昨天", preset: "yesterday", start: yesterday, end: yesterday },
+      { label: "近7天", preset: "7d", start: last7Days, end: today },
+      { label: "近30天", preset: "30d", start: last30Days, end: today },
+      { label: "本月", preset: "month", start: currentMonthStart, end: today },
+      { label: "上月", preset: "lastMonth", start: prevMonthStart, end: prevMonthEnd },
     ];
 
     return list;
@@ -290,7 +289,7 @@ export function DateRangePicker({
     <div className={cn("relative inline-flex", className)} ref={containerRef}>
       <button
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={toggleOpen}
         title={hasValue ? (startDate && endDate ? `${startDate} ~ ${endDate}` : displayLabel) : ""}
         className={cn(
           "flex w-full h-full items-center justify-center rounded-full bg-white dark:bg-white/5 border border-black/8 dark:border-white/10 px-3.5 text-xs transition-all outline-none whitespace-nowrap",
@@ -358,12 +357,13 @@ export function DateRangePicker({
                           type="button"
                           onClick={() => {
                             if (preset.isAll) {
-                              onChange({ startDate: "", endDate: "" });
+                              if (onPresetChange) onPresetChange("all");
+                              else onChange({ startDate: "", endDate: "" });
                               setSelectingStart(null);
                               setHoverDate(null);
                               setIsOpen(false);
                             } else if (preset.start && preset.end) {
-                              setPresetRange(preset.start, preset.end);
+                              setPresetRange(preset.start, preset.end, preset.preset);
                             }
                           }}
                           className={cn(

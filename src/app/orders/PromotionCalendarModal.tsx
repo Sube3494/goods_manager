@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import { X, ChevronLeft, ChevronRight, Loader2, Check, Calendar as CalendarIcon, ChevronDown, Store } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
@@ -20,7 +20,7 @@ import {
 // 自定义折线图悬浮框
 interface CustomTooltipProps {
   active?: boolean;
-  payload?: any[];
+  payload?: Array<{ payload: { dateStr: string }; value: number | string }>;
   platform: PromotionPlatformKey;
 }
 
@@ -226,6 +226,10 @@ export function PromotionCalendarModal({
   const [shopInputs, setShopInputs] = useState<Record<string, PromotionPlatformInputValues>>({});
   const [isDetailLoading, setIsDetailLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [entryMode, setEntryMode] = useState<"daily" | "fixed">("daily");
+  const detailRequestRef = useRef(0);
+  const [loadedDetailKey, setLoadedDetailKey] = useState("");
+  const isDetailReady = loadedDetailKey === `${entryMode}:${selectedDateStr}:${userId || ""}`;
 
   // 计算当前月份的 42 天网格
   const gridDays = useMemo(() => {
@@ -345,12 +349,16 @@ export function PromotionCalendarModal({
   // 获取当前日期所有店铺的推广费明细列表
   // 获取当前日期所有店铺的推广费明细列表
   const fetchDayDetail = useCallback(async (dateStr: string) => {
+    const requestId = ++detailRequestRef.current;
     setIsDetailLoading(true);
     try {
       const userParam = userId ? `&userId=${encodeURIComponent(userId)}` : "";
-      const res = await fetch(`/api/promotion?date=${dateStr}${userParam}`, { cache: "no-store" });
+      const endpoint = entryMode === "fixed" ? "/api/promotion/fixed" : "/api/promotion";
+      const res = await fetch(`${endpoint}?date=${dateStr}${userParam}`, { cache: "no-store" });
+      if (!res.ok) throw new Error("无法加载推广费明细");
       if (res.ok) {
         const body = await res.json();
+        if (requestId !== detailRequestRef.current) return;
         const items = Array.isArray(body.items) ? body.items : [];
         const mappedExpenses: Record<string, PromotionPlatformAmounts> = {};
         const mappedInputs: Record<string, PromotionPlatformInputValues> = {};
@@ -371,7 +379,7 @@ export function PromotionCalendarModal({
           };
         });
 
-        items.forEach((item: any) => {
+        items.forEach((item: PromotionPlatformAmounts & { shopName?: string }) => {
           const sName = item.shopName || (availableShops[0]?.name || "默认店铺");
           mappedExpenses[sName] = {
             amountMeituan: item.amountMeituan || 0,
@@ -389,13 +397,18 @@ export function PromotionCalendarModal({
 
         setShopExpenses(mappedExpenses);
         setShopInputs(mappedInputs);
+        setLoadedDetailKey(`${entryMode}:${dateStr}:${userId || ""}`);
       }
     } catch (e) {
       console.error("Failed to fetch day detail:", e);
+      if (requestId === detailRequestRef.current) {
+        setLoadedDetailKey("");
+        showToast("无法加载推广费明细，请重试", "error");
+      }
     } finally {
-      setIsDetailLoading(false);
+      if (requestId === detailRequestRef.current) setIsDetailLoading(false);
     }
-  }, [availableShops, userId]);
+  }, [availableShops, userId, entryMode, showToast]);
 
   // 当选择日期变化时，异步拉取该日期各店铺的明细
   useEffect(() => {
@@ -439,7 +452,7 @@ export function PromotionCalendarModal({
 
   // 某个店铺的某个渠道输入变动
   const handleFieldChange = (shopName: string, key: keyof PromotionPlatformAmounts, rawValue: string) => {
-    if (readOnly) return;
+    if (readOnly || isDetailLoading || isSaving || !isDetailReady) return;
     if (!/^\d*(\.\d{0,2})?$/.test(rawValue)) {
       return;
     }
@@ -472,7 +485,7 @@ export function PromotionCalendarModal({
 
   // 保存当日所有店铺的推广费
   const handleSave = async () => {
-    if (readOnly) return;
+    if (readOnly || isDetailLoading || isSaving || !isDetailReady) return;
     setIsSaving(true);
     try {
       const items = availableShops.map((shop) => {
@@ -493,7 +506,7 @@ export function PromotionCalendarModal({
         };
       });
 
-      const res = await fetch("/api/promotion", {
+      const res = await fetch(entryMode === "fixed" ? "/api/promotion/fixed" : "/api/promotion", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -504,11 +517,12 @@ export function PromotionCalendarModal({
       });
 
       if (res.ok) {
-        showToast(`${selectedDateStr} 各店铺推广费已保存`, "success");
+        showToast(entryMode === "fixed" ? `每日固定推广费已保存，从 ${selectedDateStr} 起生效` : `${selectedDateStr} 各店铺推广费已保存`, "success");
         // 重新加载该月统计以同步更新大盘日历的聚合求和结果
         void fetchCalendarData();
       } else {
-        showToast("保存失败，请稍后重试", "error");
+        const error = await res.json().catch(() => ({}));
+        showToast(error.error || "保存失败，请稍后重试", "error");
       }
     } catch (e) {
       console.error(e);
@@ -901,6 +915,18 @@ export function PromotionCalendarModal({
             </div>
 
             {/* 店铺推广费手风琴列表 */}
+            {!readOnly && (
+              <div className="space-y-2">
+                <div className="flex gap-1 rounded-full bg-muted p-1" role="group" aria-label="推广费录入方式">
+                  {([{ key: "daily", label: "当日费用" }, { key: "fixed", label: "每日固定" }] as const).map((mode) => (
+                    <button key={mode.key} type="button" disabled={isSaving} aria-pressed={entryMode === mode.key} onClick={() => setEntryMode(mode.key)} className={cn("flex-1 rounded-full px-3 py-2 text-xs font-bold transition-colors disabled:opacity-50", entryMode === mode.key ? "bg-primary text-primary-foreground shadow-xs" : "text-muted-foreground hover:text-foreground")}>{mode.label}</button>
+                  ))}
+                </div>
+                <p className="text-[11px] leading-relaxed text-muted-foreground">
+                  {entryMode === "fixed" ? `从 ${selectedDateStr} 起每天自动计入。当天单独录入优先；填 0 可从该日期起停止。` : "单独保存当天金额会覆盖当天的固定推广费。"}
+                </p>
+              </div>
+            )}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">
@@ -1013,7 +1039,7 @@ export function PromotionCalendarModal({
                                   placeholder="0.00"
                                   value={inputs[row.key]}
                                   onChange={(e) => !readOnly && handleFieldChange(shop.name, row.key, e.target.value)}
-                                  disabled={isSaving || readOnly}
+                                  disabled={isSaving || isDetailLoading || !isDetailReady || readOnly}
                                   readOnly={readOnly}
                                   onKeyDown={(e) => {
                                     if (!readOnly && e.key === "Enter") handleSave();
@@ -1038,7 +1064,7 @@ export function PromotionCalendarModal({
           {/* 表单底部合计与保存按钮 */}
             <div className="shrink-0 border-t border-border/60 bg-white/95 dark:bg-[#111827]/95 backdrop-blur-sm p-4 md:px-6 md:py-4 flex items-center justify-between gap-3 shadow-xs">
             <div className="text-xs text-muted-foreground">
-              <span className="text-[10px] font-bold uppercase tracking-wider block">当日合计</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider block">{entryMode === "fixed" ? "每日合计" : "当日合计"}</span>
               <div className="text-base font-black text-foreground mt-0.5 tabular-nums">
                 {editTotalAmount > 0 ? "-" : ""}¥{editTotalAmount.toFixed(2)}
               </div>
@@ -1047,11 +1073,11 @@ export function PromotionCalendarModal({
 {!readOnly ? (
               <button
                 onClick={handleSave}
-                disabled={isSaving}
+                disabled={isSaving || isDetailLoading || !isDetailReady}
                 className="h-10 px-6 rounded-full bg-primary text-primary-foreground font-bold text-xs shadow-md shadow-primary/20 hover:opacity-95 disabled:opacity-50 flex items-center gap-1.5 cursor-pointer active:scale-95 transition-all"
               >
                 {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} strokeWidth={2.5} />}
-                保存数据
+                {entryMode === "fixed" ? "保存固定费用" : "保存数据"}
               </button>
             ) : (
               <span className="text-[11px] text-muted-foreground/80 px-2 py-1 font-medium select-none">

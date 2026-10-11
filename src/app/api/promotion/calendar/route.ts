@@ -4,24 +4,12 @@ import { getAuthorizedUser } from "@/lib/auth";
 import { hasAdminAccess } from "@/lib/permissions";
 import { isAutoPickOrderCancelledStatus, isAutoPickOrderDeletedStatus } from "@/lib/autoPickOrderStatus";
 import { resolveAutoPickMatchedShopName } from "@/lib/autoPickOrders";
-
-function startOfDay(input: Date) {
-  const date = new Date(input);
-  date.setHours(0, 0, 0, 0);
-  return date;
-}
-
-function endOfDay(input: Date) {
-  const date = new Date(input);
-  date.setHours(23, 59, 59, 999);
-  return date;
-}
+import { getEffectivePromotionExpenses } from "@/services/promotionService";
+import { formatLocalDate, parseAsShanghaiTime } from "@/lib/dateUtils";
+import { validPromotionDate } from "@/lib/fixedPromotion";
 
 function formatDateKey(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+  return formatLocalDate(date);
 }
 
 function readAutoPickSystemMeta(rawPayload: unknown) {
@@ -65,32 +53,15 @@ export async function GET(request: NextRequest) {
     // 可选：按店铺过滤推广费数据（为空则汇总所有店铺）
     const shopName = request.nextUrl.searchParams.get("shopName") || null;
 
-    if (!startDateStr || !endDateStr) {
+    if (!validPromotionDate(startDateStr) || !validPromotionDate(endDateStr) || startDateStr > endDateStr) {
       return NextResponse.json({ error: "Missing startDate or endDate" }, { status: 400 });
     }
 
-    const startDate = startOfDay(new Date(startDateStr));
-    const endDate = endOfDay(new Date(endDateStr));
+    const startDate = parseAsShanghaiTime(startDateStr);
+    const endDate = parseAsShanghaiTime(`${endDateStr} 23:59:59`);
 
     // 1. 获取时间范围内的推广费记录（可按店铺过滤）
-    const promotionExpenses = await prisma.dailyPromotionExpense.findMany({
-      where: {
-        userId: targetUserId,
-        date: {
-          gte: startDate,
-          lte: endDate,
-        },
-        ...(shopName ? { shopName } : {}),
-      },
-      select: {
-        date: true,
-        shopName: true,
-        amount: true,
-        amountMeituan: true,
-        amountJingdong: true,
-        amountTaobao: true,
-      },
-    });
+    const promotionExpenses = await getEffectivePromotionExpenses(targetUserId, startDate, endDate, shopName || undefined);
 
     // 2. 获取订单用于统计真实订单数
     const orders = await prisma.autoPickOrder.findMany({
@@ -163,7 +134,7 @@ export async function GET(request: NextRequest) {
         cancelledOrderDoudian: 0,
         shopBreakdown: {},
       };
-      cursor.setDate(cursor.getDate() + 1);
+      cursor.setTime(cursor.getTime() + 86400000);
     }
 
     // 4. 填充推广费数据（多店铺累加，并记录各店铺明细）

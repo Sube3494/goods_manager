@@ -8,8 +8,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { RefreshCw, Loader2 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Loader2 } from "lucide-react";
 import { DataOverview } from "@/components/Dashboard/DataOverview";
 import { DashboardFeedPanel } from "@/components/Dashboard/DashboardFeedPanel";
 import { format } from "date-fns";
@@ -18,6 +17,7 @@ import { useUser } from "@/hooks/useUser";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/Toast";
 import { canAccessDashboardPage, getDefaultAuthorizedPath, SessionUser } from "@/lib/permissions";
+import { dashboardDateRangeKey, presetDashboardDateRange, restoreDashboardDateRange, serializeDashboardDateRange } from "@/lib/dashboardDateRange";
 
 export default function Home() {
   const { user, isLoading: isUserLoading } = useUser();
@@ -38,6 +38,30 @@ export default function Home() {
   const [selectedPlatform, setSelectedPlatform] = useState("");
   const todayDate = initialEnd;
   const latestStatsRequestRef = useRef(0);
+  const [datePreferenceUserId, setDatePreferenceUserId] = useState<string | null>(null);
+  const userId = user?.id;
+
+  useEffect(() => {
+    latestStatsRequestRef.current += 1;
+    if (!userId) {
+      setDatePreferenceUserId(null);
+      return;
+    }
+    let saved: string | null = null;
+    try { saved = localStorage.getItem(dashboardDateRangeKey(userId)); } catch { /* Storage may be disabled. */ }
+    const range = restoreDashboardDateRange(saved, format(new Date(), "yyyy-MM-dd"));
+    setRangePreset(range.rangePreset);
+    setStartDate(range.startDate);
+    setEndDate(range.endDate);
+    setDatePreferenceUserId(userId);
+  }, [userId]);
+
+  useEffect(() => {
+    if (!userId || datePreferenceUserId !== userId) return;
+    try {
+      localStorage.setItem(dashboardDateRangeKey(userId), serializeDashboardDateRange({ rangePreset, startDate, endDate }));
+    } catch { /* The date picker still works when storage is unavailable. */ }
+  }, [userId, datePreferenceUserId, rangePreset, startDate, endDate]);
 
   useEffect(() => {
     if (!isUserLoading && !user) {
@@ -54,7 +78,7 @@ export default function Home() {
   }, [user, isUserLoading, router]);
 
   const fetchData = useCallback(async (quiet = false) => {
-    if (!user) return; // Don't fetch if not logged in
+    if (!user || datePreferenceUserId !== user.id) return;
 
     const requestId = latestStatsRequestRef.current + 1;
     latestStatsRequestRef.current = requestId;
@@ -100,7 +124,7 @@ export default function Home() {
         setIsLoading(false);
       }
     }
-  }, [endDate, rangePreset, selectedPlatform, selectedShopName, startDate, user, showToast]);
+  }, [endDate, rangePreset, selectedPlatform, selectedShopName, startDate, user, showToast, datePreferenceUserId]);
 
   useEffect(() => {
     if (!user) return;
@@ -120,6 +144,7 @@ export default function Home() {
   }, [user]);
 
   useEffect(() => {
+    if (!userId || datePreferenceUserId !== userId) return;
     if (!startDate || !endDate) {
       const today = new Date();
       const end = format(today, "yyyy-MM-dd");
@@ -129,7 +154,7 @@ export default function Home() {
       return;
     }
     fetchData(true);
-  }, [fetchData, startDate, endDate, selectedShopName, selectedPlatform]);
+  }, [fetchData, startDate, endDate, selectedShopName, selectedPlatform, userId, datePreferenceUserId]);
 
   useEffect(() => {
     if (startDate && startDate > todayDate) {
@@ -145,24 +170,22 @@ export default function Home() {
     }
   }, [endDate, startDate, todayDate]);
 
-  useEffect(() => {
-    if (rangePreset === "custom") return;
-    if (rangePreset === "all") {
-      const today = new Date();
-      setEndDate(format(today, "yyyy-MM-dd"));
-      return;
-    }
-    const days = rangePreset === "30d" ? 30 : rangePreset === "15d" ? 15 : rangePreset === "90d" ? 90 : 7;
-    const today = new Date();
-    setEndDate(format(today, "yyyy-MM-dd"));
-    setStartDate(format(new Date(today.getTime() - (days - 1) * 24 * 60 * 60 * 1000), "yyyy-MM-dd"));
-  }, [rangePreset]);
+  const handleRangePresetChange = useCallback((preset: string) => {
+    const range = presetDashboardDateRange(preset, format(new Date(), "yyyy-MM-dd"));
+    setRangePreset(range.rangePreset);
+    setStartDate(range.startDate);
+    setEndDate(range.endDate);
+  }, []);
 
   const handleDateRangeChange = useCallback(({ startDate: nextStart, endDate: nextEnd }: { startDate: string; endDate: string }) => {
+    if (!nextStart || !nextEnd) {
+      handleRangePresetChange("7d");
+      return;
+    }
     setRangePreset("custom");
     setStartDate(nextStart);
     setEndDate(nextEnd);
-  }, []);
+  }, [handleRangePresetChange]);
 
   if (isUserLoading) {
     return (
@@ -186,7 +209,7 @@ export default function Home() {
         <DataOverview
           data={statsData}
           rangePreset={rangePreset}
-          onRangePresetChange={setRangePreset}
+          onRangePresetChange={handleRangePresetChange}
           selectedPlatform={selectedPlatform}
           onSelectedPlatformChange={setSelectedPlatform}
           selectedShopName={selectedShopName}

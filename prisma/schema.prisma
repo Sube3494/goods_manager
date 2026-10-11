@@ -277,6 +277,7 @@ model User {
   roleProfile        RoleProfile?        @relation(fields: [roleProfileId], references: [id])
   batches            ProductBatch[]
   dailyPromotionExpenses DailyPromotionExpense[]
+  fixedPromotionExpenses FixedPromotionExpense[]
   operatingCostProfiles OperatingCostProfile[]
   operatingCostMonthlyBills OperatingCostMonthlyBill[]
   inventoryAdjustments InventoryAdjustment[]
@@ -828,6 +829,23 @@ model DailyPromotionExpense {
 
   @@unique([userId, date, shopName])
   @@index([userId, date])
+}
+
+model FixedPromotionExpense {
+  id              String   @id @default(cuid())
+  userId          String
+  shopName        String
+  effectiveDate   DateTime @db.Date
+  amountMeituan   Float    @default(0)
+  amountJingdong  Float    @default(0)
+  amountTaobao    Float    @default(0)
+  amountOther     Float    @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, shopName, effectiveDate])
+  @@index([userId, effectiveDate])
 }
 
 model OperatingCostProfile {

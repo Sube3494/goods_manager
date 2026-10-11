@@ -667,6 +667,7 @@ export function DataOverview({
             <DateRangePicker
               startDate={startDate}
               endDate={endDate}
+              onPresetChange={onRangePresetChange}
               onChange={({ startDate: nextStart, endDate: nextEnd }) => {
                 if (onDateRangeChange) {
                   onDateRangeChange({ startDate: nextStart, endDate: nextEnd });

@@ -2,12 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
 import { hasAdminAccess } from "@/lib/permissions";
-
-function startOfDay(input: Date) {
-  const date = new Date(input);
-  date.setHours(0, 0, 0, 0);
-  return date;
-}
+import { getEffectivePromotionExpenses } from "@/services/promotionService";
+import { formatLocalDate, parseAsShanghaiTime } from "@/lib/dateUtils";
+import { validPromotionDate, parsePromotionAmounts } from "@/lib/fixedPromotion";
+import { FinanceMath } from "@/lib/math";
 
 export async function GET(request: NextRequest) {
   try {
@@ -26,15 +24,11 @@ export async function GET(request: NextRequest) {
       || String(user.roleProfile?.name || "").includes("管理");
     const targetUserId = requestedUserId && canManageMembers ? requestedUserId : user.id;
 
-    const dateStr = request.nextUrl.searchParams.get("date") || new Date().toISOString().slice(0, 10);
-    const targetDate = startOfDay(new Date(dateStr));
+    const dateStr = request.nextUrl.searchParams.get("date") || formatLocalDate(new Date());
+    if (!validPromotionDate(dateStr)) return NextResponse.json({ error: "日期无效" }, { status: 400 });
+    const targetDate = parseAsShanghaiTime(dateStr);
 
-    const records = await prisma.dailyPromotionExpense.findMany({
-      where: {
-        userId: targetUserId,
-        date: targetDate,
-      },
-    });
+    const records = await getEffectivePromotionExpenses(targetUserId, targetDate, parseAsShanghaiTime(`${dateStr} 23:59:59`));
 
     let amountMeituan = 0;
     let amountJingdong = 0;
@@ -42,13 +36,13 @@ export async function GET(request: NextRequest) {
     let amount = 0;
 
     records.forEach((record) => {
-      amountMeituan += record.amountMeituan ?? 0;
-      amountJingdong += record.amountJingdong ?? 0;
-      amountTaobao += record.amountTaobao ?? 0;
-      amount += record.amount ?? 0;
+      amountMeituan = FinanceMath.add(amountMeituan, record.amountMeituan ?? 0);
+      amountJingdong = FinanceMath.add(amountJingdong, record.amountJingdong ?? 0);
+      amountTaobao = FinanceMath.add(amountTaobao, record.amountTaobao ?? 0);
+      amount = FinanceMath.add(amount, record.amount ?? 0);
     });
 
-    const amountOther = Math.max(0, amount - amountMeituan - amountJingdong - amountTaobao);
+    const amountOther = Math.max(0, FinanceMath.sum(amount, -amountMeituan, -amountJingdong, -amountTaobao));
 
     return NextResponse.json({
       amount,
@@ -61,7 +55,7 @@ export async function GET(request: NextRequest) {
         amountMeituan: r.amountMeituan,
         amountJingdong: r.amountJingdong,
         amountTaobao: r.amountTaobao,
-        amountOther: Math.max(0, r.amount - r.amountMeituan - r.amountJingdong - r.amountTaobao),
+        amountOther: Math.max(0, FinanceMath.sum(r.amount, -r.amountMeituan, -r.amountJingdong, -r.amountTaobao)),
         amount: r.amount,
       })),
     });
@@ -94,7 +88,7 @@ export async function POST(request: NextRequest) {
       itemsToProcess = body;
     } else if (Array.isArray(body?.items)) {
       const { date, userId } = body;
-      itemsToProcess = body.items.map((item: any) => ({
+      itemsToProcess = body.items.map((item: (typeof itemsToProcess)[number]) => ({
         ...item,
         date: item.date || date,
         userId: item.userId || userId,
@@ -114,22 +108,39 @@ export async function POST(request: NextRequest) {
       if (cleanRequestedUserId && cleanRequestedUserId !== user.id) {
         return NextResponse.json({ error: "不允许修改其他成员的推广费数据" }, { status: 403 });
       }
-      if (!item.date) {
+      if (!validPromotionDate(item.date)) {
         return NextResponse.json({ error: "Invalid date" }, { status: 400 });
       }
     }
 
-    const results = await prisma.$transaction(
-      itemsToProcess.map((item) => {
-        const targetDate = startOfDay(new Date(item.date));
+    let normalizedItems;
+    try {
+      normalizedItems = itemsToProcess.map((item) => ({ ...item, ...parsePromotionAmounts(item as Record<string, unknown>) }));
+    } catch (error) {
+      return NextResponse.json({ error: error instanceof Error ? error.message : "推广费数据无效" }, { status: 400 });
+    }
+    const results = await prisma.$transaction(async (tx) => {
+      const records = [];
+      for (const item of normalizedItems) {
+        const targetDate = parseAsShanghaiTime(item.date);
         const finalShopName = String(item.shopName || "").trim();
         const meituan = Math.max(0, Number(item.amountMeituan) || 0);
         const jingdong = Math.max(0, Number(item.amountJingdong) || 0);
         const taobao = Math.max(0, Number(item.amountTaobao) || 0);
         const other = Math.max(0, Number(item.amountOther) || 0);
-        const total = meituan + jingdong + taobao + other;
+        const total = FinanceMath.sum(meituan, jingdong, taobao, other);
+        const existing = await tx.dailyPromotionExpense.findFirst({
+          where: { userId: targetUserId, shopName: finalShopName, date: { gte: targetDate, lte: parseAsShanghaiTime(`${item.date} 23:59:59`) } },
+          orderBy: { updatedAt: "desc" },
+          select: { id: true },
+        });
+        const data = { amount: total, amountMeituan: meituan, amountJingdong: jingdong, amountTaobao: taobao };
+        if (existing) {
+          records.push(await tx.dailyPromotionExpense.update({ where: { id: existing.id }, data }));
+          continue;
+        }
 
-        return prisma.dailyPromotionExpense.upsert({
+        records.push(await tx.dailyPromotionExpense.upsert({
           where: {
             userId_date_shopName: {
               userId: targetUserId,
@@ -152,9 +163,10 @@ export async function POST(request: NextRequest) {
             amountJingdong: jingdong,
             amountTaobao: taobao,
           },
-        });
-      })
-    );
+        }));
+      }
+      return records;
+    });
 
     return NextResponse.json({
       success: true,

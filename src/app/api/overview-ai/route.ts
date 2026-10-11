@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
 import { Prisma } from "../../../../prisma/generated-client";
 import crypto from "node:crypto";
+import { getAllEffectivePromotionExpenses } from "@/services/promotionService";
 
 const KEY_NAME = "deepseekApiKey";
 const MODEL_NAME = "deepseekModel";
@@ -122,7 +123,7 @@ export async function PUT(request: Request) {
     userBusinessProfile,
   ] = await Promise.all([
     prisma.autoPickOrder.findMany({ where: { userId: user.id }, include: { items: { orderBy: { createdAt: "asc" } }, autoCompleteJob: true }, orderBy: { orderTime: "desc" } }),
-    prisma.dailyPromotionExpense.findMany({ where: { userId: user.id }, orderBy: { date: "desc" } }),
+    getAllEffectivePromotionExpenses(user.id),
     prisma.shop.findMany({ where: { userId: user.id }, orderBy: { createdAt: "desc" } }),
     prisma.shopProduct.findMany({ where: { shop: { userId: user.id } }, include: { shop: true, product: true }, orderBy: { createdAt: "desc" } }),
     prisma.product.findMany({ where: { userId: user.id }, include: { category: true, supplier: true, jdSkuMappings: true }, orderBy: { createdAt: "desc" } }),
