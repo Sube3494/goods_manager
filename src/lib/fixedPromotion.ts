@@ -3,7 +3,7 @@ import { formatLocalDate, parseAsShanghaiTime } from "./dateUtils";
 
 export const PROMOTION_AMOUNT_FIELDS = ["amountMeituan", "amountJingdong", "amountTaobao", "amountOther"] as const;
 export type PromotionAmounts = Record<typeof PROMOTION_AMOUNT_FIELDS[number], number>;
-export type FixedPromotionRule = PromotionAmounts & { id: string; userId: string; shopName: string; effectiveDate: Date; createdAt: Date; updatedAt: Date };
+export type FixedPromotionRule = PromotionAmounts & { id: string; userId: string; shopName: string; effectiveDate: Date; endDate?: Date | null; createdAt: Date; updatedAt: Date };
 export type PromotionExpenseRecord = Omit<FixedPromotionRule, "effectiveDate" | "amountOther"> & { date: Date; amount: number };
 
 export function validPromotionDate(value: unknown): value is string {
@@ -27,6 +27,7 @@ export function parsePromotionAmounts(input: Record<string, unknown>): Promotion
 export function mergeFixedPromotionExpenses(
   manual: PromotionExpenseRecord[], rules: FixedPromotionRule[], startDate: Date, endDate: Date,
   today = formatLocalDate(new Date()),
+  includeFuture = false,
 ): PromotionExpenseRecord[] {
   const start = formatLocalDate(startDate);
   const end = formatLocalDate(endDate);
@@ -39,16 +40,10 @@ export function mergeFixedPromotionExpenses(
     const previous = result.get(key);
     if (!previous || previous.updatedAt <= item.updatedAt) result.set(key, item);
   }
-  const ordered = [...rules].sort((a, b) => a.effectiveDate.getTime() - b.effectiveDate.getTime());
-  const active = new Map<string, FixedPromotionRule>();
-  let ruleIndex = 0;
-  for (let cursor = parseAsShanghaiTime(start); formatLocalDate(cursor) <= end && formatLocalDate(cursor) <= today; cursor = new Date(cursor.getTime() + 86400000)) {
+  const preparedRules = prepareRules(rules);
+  for (let cursor = parseAsShanghaiTime(start); formatLocalDate(cursor) <= end && (includeFuture || formatLocalDate(cursor) <= today); cursor = new Date(cursor.getTime() + 86400000)) {
     const day = formatLocalDate(cursor);
-    while (ruleIndex < ordered.length && formatLocalDate(ordered[ruleIndex].effectiveDate) <= day) {
-      const rule = ordered[ruleIndex++];
-      active.set(rule.shopName, rule);
-    }
-    for (const rule of active.values()) {
+    for (const rule of selectActiveRules(preparedRules, day)) {
       const key = `${day}:${rule.shopName}`;
       if (result.has(key)) continue;
       const amount = FinanceMath.sum(...PROMOTION_AMOUNT_FIELDS.map((field) => rule[field]));
@@ -61,4 +56,25 @@ export function mergeFixedPromotionExpenses(
     }
   }
   return [...result.values()].sort((a, b) => a.date.getTime() - b.date.getTime());
+}
+
+// 重叠区间按最后一次保存的设置生效；结束后恢复区间外原有设置。
+export function getActiveFixedPromotionRules<T extends FixedPromotionRule>(rules: T[], day: string): T[] {
+  return selectActiveRules(prepareRules(rules), day);
+}
+
+function prepareRules<T extends FixedPromotionRule>(rules: T[]) {
+  return rules.map(rule => ({ rule, start: formatLocalDate(rule.effectiveDate), end: rule.endDate ? formatLocalDate(rule.endDate) : null }));
+}
+
+function selectActiveRules<T extends FixedPromotionRule>(rules: ReturnType<typeof prepareRules<T>>, day: string): T[] {
+  const active = new Map<string, T>();
+  for (const { rule, start, end } of rules) {
+    if (start > day || end && end < day) continue;
+    const previous = active.get(rule.shopName);
+    if (!previous || rule.updatedAt > previous.updatedAt || rule.updatedAt.getTime() === previous.updatedAt.getTime() && rule.effectiveDate >= previous.effectiveDate) {
+      active.set(rule.shopName, rule);
+    }
+  }
+  return [...active.values()];
 }

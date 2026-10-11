@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
     const endDate = parseAsShanghaiTime(`${endDateStr} 23:59:59`);
 
     // 1. 获取时间范围内的推广费记录（可按店铺过滤）
-    const promotionExpenses = await getEffectivePromotionExpenses(targetUserId, startDate, endDate, shopName || undefined);
+    const promotionExpenses = await getEffectivePromotionExpenses(targetUserId, startDate, endDate, shopName || undefined, true);
 
     // 2. 获取订单用于统计真实订单数
     const orders = await prisma.autoPickOrder.findMany({

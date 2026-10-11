@@ -16,12 +16,12 @@ export async function getFixedPromotionRules(userId: string, endDate: Date, shop
   }
 }
 
-export async function getEffectivePromotionExpenses(userId: string, startDate: Date, endDate: Date, shopName?: string) {
+export async function getEffectivePromotionExpenses(userId: string, startDate: Date, endDate: Date, shopName?: string, includeFuture = false) {
   const [manual, rules] = await Promise.all([
     prisma.dailyPromotionExpense.findMany({ where: { userId, date: { gte: startDate, lte: endDate }, ...(shopName ? { shopName } : {}) } }),
     getFixedPromotionRules(userId, endDate, shopName),
   ]);
-  return mergeFixedPromotionExpenses(manual, rules, startDate, endDate);
+  return mergeFixedPromotionExpenses(manual, rules, startDate, endDate, formatLocalDate(new Date()), includeFuture);
 }
 
 export async function getAllEffectivePromotionExpenses(userId: string) {

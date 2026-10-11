@@ -836,6 +836,7 @@ model FixedPromotionExpense {
   userId          String
   shopName        String
   effectiveDate   DateTime @db.Date
+  endDate         DateTime? @db.Date
   amountMeituan   Float    @default(0)
   amountJingdong  Float    @default(0)
   amountTaobao    Float    @default(0)

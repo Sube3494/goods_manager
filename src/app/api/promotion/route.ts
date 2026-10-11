@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
     if (!validPromotionDate(dateStr)) return NextResponse.json({ error: "日期无效" }, { status: 400 });
     const targetDate = parseAsShanghaiTime(dateStr);
 
-    const records = await getEffectivePromotionExpenses(targetUserId, targetDate, parseAsShanghaiTime(`${dateStr} 23:59:59`));
+    const records = await getEffectivePromotionExpenses(targetUserId, targetDate, parseAsShanghaiTime(`${dateStr} 23:59:59`), undefined, true);
 
     let amountMeituan = 0;
     let amountJingdong = 0;

@@ -42,3 +42,30 @@ test("拒绝非法金额和不存在的日期", () => {
   expect(validPromotionDate("2028-02-29")).toBe(true);
   for (const amount of [-1, Infinity, "garbage"]) expect(() => parsePromotionAmounts({ amountMeituan: amount })).toThrow();
 });
+
+test("整月范围含首尾，日历预览未来费用，概览只计入今天以前", () => {
+  const monthly = { ...rule("2026-10-01", 10), endDate: new Date("2026-10-31T00:00:00Z") };
+  const preview = mergeFixedPromotionExpenses([], [monthly], date("2026-09-30"), date("2026-11-01"), "2026-10-11", true);
+  expect(preview).toHaveLength(31);
+  expect(formatLocalDate(preview[0].date)).toBe("2026-10-01");
+  expect(formatLocalDate(preview[30].date)).toBe("2026-10-31");
+  expect(preview.reduce((total, item) => total + item.amount, 0)).toBe(310);
+  const accrued = mergeFixedPromotionExpenses([], [monthly], date("2026-10-01"), date("2026-10-31"), "2026-10-11");
+  expect(accrued.reduce((total, item) => total + item.amount, 0)).toBe(110);
+});
+
+test("跨月范围到期停止，重叠区间以最后保存为准且保留区间外设置", () => {
+  const original = rule("2026-09-01", 5);
+  const later = rule("2026-10-02", 7);
+  const replacement = { ...rule("2026-09-30", 20), endDate: new Date("2026-10-03T00:00:00Z"), updatedAt: new Date("2026-10-11T00:00:00Z") };
+  const items = mergeFixedPromotionExpenses([], [original, later, replacement], date("2026-09-29"), date("2026-10-04"), "2026-10-11");
+  expect(items.map(item => item.amount)).toEqual([5, 20, 20, 20, 20, 7]);
+  const isolated = mergeFixedPromotionExpenses([], [replacement], date("2026-09-29"), date("2026-10-04"), "2026-10-11");
+  expect(isolated).toHaveLength(4);
+});
+
+test("范围内当天手动费用优先，零额范围只暂停该区间", () => {
+  const pause = { ...rule("2026-10-02", 0), endDate: new Date("2026-10-03T00:00:00Z"), updatedAt: new Date("2026-10-11T00:00:00Z") };
+  const items = mergeFixedPromotionExpenses([manual("2026-10-03", 8)], [rule("2026-10-01", 10), pause], date("2026-10-01"), date("2026-10-04"), "2026-10-11");
+  expect(items.map(item => item.amount)).toEqual([10, 8, 10]);
+});

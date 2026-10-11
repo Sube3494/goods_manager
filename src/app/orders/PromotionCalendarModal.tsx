@@ -6,6 +6,7 @@ import { X, ChevronLeft, ChevronRight, Loader2, Check, Calendar as CalendarIcon,
 import { useToast } from "@/components/ui/Toast";
 import { cn } from "@/lib/utils";
 import { CustomSelect } from "@/components/ui/CustomSelect";
+import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import {
   ResponsiveContainer,
   LineChart,
@@ -227,6 +228,10 @@ export function PromotionCalendarModal({
   const [isDetailLoading, setIsDetailLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [entryMode, setEntryMode] = useState<"daily" | "fixed">("daily");
+  const [fixedRange, setFixedRange] = useState<{ startDate: string; endDate: string } | null>(null);
+  const fixedEndDate = fixedRange?.startDate === selectedDateStr
+    ? fixedRange.endDate
+    : formatDate(new Date(Number(selectedDateStr.slice(0, 4)), Number(selectedDateStr.slice(5, 7)), 0));
   const detailRequestRef = useRef(0);
   const [loadedDetailKey, setLoadedDetailKey] = useState("");
   const isDetailReady = loadedDetailKey === `${entryMode}:${selectedDateStr}:${userId || ""}`;
@@ -360,6 +365,13 @@ export function PromotionCalendarModal({
         const body = await res.json();
         if (requestId !== detailRequestRef.current) return;
         const items = Array.isArray(body.items) ? body.items : [];
+        if (entryMode === "fixed") {
+          const ends = new Set<string>(items.map((item: { endDate?: string | null }) => item.endDate?.slice(0, 10) || ""));
+          const savedEnd = ends.size === 1 ? [...ends][0] : "";
+          if (savedEnd && savedEnd >= dateStr) {
+            setFixedRange(previous => previous?.startDate === dateStr ? previous : { startDate: dateStr, endDate: savedEnd });
+          }
+        }
         const mappedExpenses: Record<string, PromotionPlatformAmounts> = {};
         const mappedInputs: Record<string, PromotionPlatformInputValues> = {};
 
@@ -511,13 +523,14 @@ export function PromotionCalendarModal({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           date: selectedDateStr,
+          ...(entryMode === "fixed" ? { endDate: fixedEndDate } : {}),
           userId,
           items,
         }),
       });
 
       if (res.ok) {
-        showToast(entryMode === "fixed" ? `每日固定推广费已保存，从 ${selectedDateStr} 起生效` : `${selectedDateStr} 各店铺推广费已保存`, "success");
+        showToast(entryMode === "fixed" ? `固定推广费已保存：${selectedDateStr} 至 ${fixedEndDate}` : `${selectedDateStr} 各店铺推广费已保存`, "success");
         // 重新加载该月统计以同步更新大盘日历的聚合求和结果
         void fetchCalendarData();
       } else {
@@ -923,8 +936,24 @@ export function PromotionCalendarModal({
                   ))}
                 </div>
                 <p className="text-[11px] leading-relaxed text-muted-foreground">
-                  {entryMode === "fixed" ? `从 ${selectedDateStr} 起每天自动计入。当天单独录入优先；填 0 可从该日期起停止。` : "单独保存当天金额会覆盖当天的固定推广费。"}
+                  {entryMode === "fixed" ? "在选定日期范围内每天生效，包含开始和结束当天。重叠范围以最后保存为准；当天单独录入优先。未来费用在日历预览，到当天才计入概览。" : "单独保存当天金额会覆盖当天的固定推广费。"}
                 </p>
+                {entryMode === "fixed" && (
+                  <div className={cn("space-y-1.5", isSaving && "pointer-events-none opacity-50")}>
+                    <span className="text-[11px] font-bold text-muted-foreground">生效日期范围</span>
+                    <DateRangePicker
+                      startDate={selectedDateStr}
+                      endDate={fixedEndDate}
+                      showClear={false}
+                      className="h-10 w-full"
+                      onChange={(range) => {
+                        if (isSaving || !range.startDate || !range.endDate) return;
+                        setFixedRange(range);
+                        setSelectedDateStr(range.startDate);
+                      }}
+                    />
+                  </div>
+                )}
               </div>
             )}
             <div className="space-y-3">
