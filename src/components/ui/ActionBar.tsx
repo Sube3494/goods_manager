@@ -42,12 +42,12 @@ export function ActionBar({
           animate={{ y: 0, x: "-50%" }}
           exit={{ y: 80, x: "-50%" }}
           transition={{ type: "spring", stiffness: 400, damping: 30 }}
-          className="fixed bottom-4 lg:bottom-10 z-50000 pointer-events-none w-[calc(100%-1rem)] sm:w-fit sm:max-w-[calc(100%-2rem)] left-1/2 lg:left-[calc(50%+(var(--sidebar-width,0)/2))] will-change-transform"
+          className="fixed bottom-4 lg:bottom-10 z-50000 pointer-events-none w-[calc(100%-1rem)] sm:w-max sm:max-w-[calc(100%-2rem)] lg:max-w-[calc(100%-var(--sidebar-width,0px)-2rem)] left-1/2 lg:left-[calc(50%+(var(--sidebar-width,0)/2))] will-change-transform"
         >
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 pl-3.5 pr-3 py-2 sm:flex-nowrap sm:justify-start sm:gap-4 sm:pl-4.5 sm:pr-4 sm:h-12 sm:py-0 rounded-[24px] sm:rounded-full overflow-hidden glass-panel shadow-[0_32px_64px_-16px_rgba(0,0,0,0.5)] pointer-events-auto">
+          <div className="flex min-w-0 flex-nowrap items-center gap-2 pl-3.5 pr-3 py-2 sm:justify-start sm:gap-3 sm:pl-4.5 sm:pr-4 sm:min-h-12 rounded-full overflow-hidden glass-panel shadow-[0_32px_64px_-16px_rgba(0,0,0,0.5)] pointer-events-auto">
 
             {/* Select All Checkbox - Minimal on mobile */}
-            <button 
+            <button
               onClick={onToggleSelectAll}
               className={`h-5 w-5 shrink-0 rounded-full border-2 flex items-center justify-center transition-all duration-300 ${
                 isAllSelected 
@@ -59,13 +59,13 @@ export function ActionBar({
             </button>
 
             {/* Left Info */}
-            <div className="flex min-w-0 flex-1 items-center gap-2 sm:flex-none sm:gap-2.5">
+            <div className="flex min-w-0 max-w-[35%] shrink-0 items-center gap-2 sm:gap-2.5">
               <span className="text-[13px] sm:text-sm font-black text-black dark:text-white whitespace-nowrap truncate">已选 <span className="font-number">{selectedCount}</span> {label}</span>
               <span className="text-[10px] font-bold text-black/40 dark:text-white/40 uppercase tracking-widest hidden md:inline">批量管理</span>
             </div>
 
             {/* Actions */}
-            <div className="flex w-auto items-center gap-2 sm:w-auto sm:gap-2.5 shrink-0">
+            <div className="flex min-w-0 flex-1 flex-nowrap items-center gap-2 overflow-x-auto overscroll-x-contain py-1 -my-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:gap-2.5">
               {onEdit && (
                 <button
                   onClick={onEdit}
@@ -102,16 +102,18 @@ export function ActionBar({
                 </button>
               ))}
               
-              <div className="hidden sm:block w-px h-4.5 bg-black/10 dark:bg-white/10 mx-0.5 shrink-0" />
-
-              <button 
-                onClick={onClear}
-                title="取消选择"
-                className="flex h-7 w-7 sm:h-7.5 sm:w-7.5 shrink-0 items-center justify-center rounded-full text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10 transition-all outline-none active:scale-95"
-              >
-                <X size={15} />
-              </button>
             </div>
+
+            <div className="hidden sm:block w-px h-4.5 bg-black/10 dark:bg-white/10 shrink-0" />
+
+            <button
+              onClick={onClear}
+              title="取消选择"
+              aria-label="取消选择"
+              className="flex h-7 w-7 sm:h-7.5 sm:w-7.5 shrink-0 items-center justify-center rounded-full text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10 transition-all outline-none active:scale-95"
+            >
+              <X size={15} />
+            </button>
           </div>
         </motion.div>
       )}
