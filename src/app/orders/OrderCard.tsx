@@ -2456,7 +2456,7 @@ export function ProductStripItem({
               aria-label="查看退款详情"
               aria-expanded={refundDetailsOpen}
               title={returnedDetails?.map((detail) => `${detail.reason} · 退款 ¥${(Number(detail.refundAmount || 0) / 100).toFixed(2)}`).join("\n") || "平台已退款"}
-              className="relative group inline-flex min-h-7 cursor-pointer items-center rounded-full border border-rose-500/20 bg-rose-500/10 px-2 py-0.5 text-[10px] font-semibold leading-none text-rose-700 dark:text-rose-400 sm:min-h-0 sm:text-[11px]"
+              className="relative group inline-flex shrink-0 cursor-pointer items-center whitespace-nowrap rounded-full border border-rose-500/20 bg-rose-500/10 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-rose-700 dark:text-rose-400 sm:px-2 sm:text-[11px]"
             >
               已退款{returnedQuantity > 0 ? ` ${returnedQuantity}/${display.quantity} 件` : ""}
             </button>
