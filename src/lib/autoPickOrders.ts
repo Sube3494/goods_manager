@@ -3,7 +3,7 @@ import { assertMaiyatianCookieResponse } from "@/lib/maiyatianCookieResponse";
 import { formatLocalDate, parseAsShanghaiTime } from "@/lib/dateUtils";
 import { cleanCustomerRemark, firstMeaningfulCustomerRemark } from "@/lib/customerRemark";
 import { readConfirmedRefundAmountFromRawPayload, readEffectiveConfirmedRefunds } from "@/lib/orderFinancials";
-import { resolveMaiyatianRefundStatus, summarizeMaiyatianRefund } from "@/lib/maiyatianRefund";
+import { getMaiyatianFulfillmentItems, resolveMaiyatianRefundStatus, summarizeMaiyatianRefund } from "@/lib/maiyatianRefund";
 import {
   getBaseAutoPickStatusDisplay,
   hasAutoPickCompletionProof,
@@ -6693,6 +6693,7 @@ async function resolveBrushOrderItemsForAutoPickOrder(
     items: Array<{ productName: string; productNo?: string | null; platformSkuId?: string | null; quantity: number; rawPayload?: unknown }>;
   }
 ) {
+  order = { ...order, items: getMaiyatianFulfillmentItems(order.items, order.rawPayload) };
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { permissions: true },
@@ -6857,6 +6858,7 @@ async function resolveBrushOrderItemsForAutoPickOrder(
               const candidateId = String(candidate?.shopProductId || candidate?.id || "").trim();
               return candidateId === subShopProductId;
             });
+            if (Number(compositeItem?.quantity) === 0) continue;
             subResolvedItems.push({
               productId: resolvedProductId,
               // 组合项数量由人工匹配时明确指定，表示最终实际数量。
@@ -7072,6 +7074,7 @@ async function resolveOutboundItemsForAutoPickOrder(
     }>;
   }
 ) {
+  order = { ...order, items: getMaiyatianFulfillmentItems(order.items, order.rawPayload) };
   const user = await tx.user.findUnique({
     where: { id: userId },
     select: { permissions: true },
@@ -7339,6 +7342,7 @@ async function resolveOutboundItemsForAutoPickOrder(
 
         // 组合匹配选择的是最终实际数量，不再乘订单项数量。
         for (const entry of compositeItems) {
+          if (Number(entry?.quantity) === 0) continue;
           pushCompositeOrAccessory(entry, Math.max(1, Number(entry?.quantity || 1) || 1));
         }
         // 配件数量仍是每份商品的配置，保持按订单项数量展开。
@@ -7472,6 +7476,10 @@ async function resolveOutboundItemsForAutoPickOrder(
 
       const manualQuantity = Number((manualMatchedProduct as any).quantity || 0) || 0;
       const orderItemQuantity = Math.max(1, Number(item.quantity || 1) || 1);
+      const manualFulfillmentQuantity = typeof itemRawPayload.refundAdjustedManualQuantity === "number"
+        ? itemRawPayload.refundAdjustedManualQuantity
+        : (manualQuantity > 1 ? Math.max(1, manualQuantity) : orderItemQuantity);
+      if (manualFulfillmentQuantity <= 0) continue;
 
       if (manualShopProductId) {
         expandAndPushOutboundItem({
@@ -7480,7 +7488,7 @@ async function resolveOutboundItemsForAutoPickOrder(
           sourceProductId: null,
           isBundle: manualIsBundle,
           bundleItems: manualBundleItems,
-        }, manualQuantity > 1 ? Math.max(1, manualQuantity) : orderItemQuantity, priceShare);
+        }, manualFulfillmentQuantity, priceShare);
       } else if (manualIsBundle && manualBundleItems && manualBundleItems.length > 0) {
         expandAndPushOutboundItem({
           id: manualMatchedProduct.id,
@@ -7488,12 +7496,12 @@ async function resolveOutboundItemsForAutoPickOrder(
           sourceProductId: null,
           isBundle: true,
           bundleItems: manualBundleItems,
-        }, manualQuantity > 1 ? Math.max(1, manualQuantity) : orderItemQuantity, priceShare);
+        }, manualFulfillmentQuantity, priceShare);
       } else {
         resolvedItems.push({
           productId: manualResolvedProductId,
           shopProductId: manualShopProductId,
-          quantity: manualQuantity > 1 ? Math.max(1, manualQuantity) : orderItemQuantity,
+          quantity: manualFulfillmentQuantity,
           price: priceShare,
         });
       }

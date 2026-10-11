@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { readMaiyatianItemRefundQuantity, resolveMaiyatianRefundStatus, summarizeMaiyatianRefund } from "../src/lib/maiyatianRefund";
+import { getMaiyatianFulfillmentItems, readMaiyatianItemRefundDetails, readMaiyatianItemRefundQuantity, resolveMaiyatianRefundStatus, summarizeMaiyatianRefund } from "../src/lib/maiyatianRefund";
 import { readConfirmedRefundAmountFromRawPayload, resolveOrderRefundAmount, resolveRefundAdjustedIncomeMetrics } from "../src/lib/orderFinancials";
 import { isOrderFullyRefunded } from "../src/lib/autoPickOrderStatus";
 
@@ -12,6 +12,29 @@ const refund = { id: "1109058862", source_cancel_id: "86596309843", status: "1",
 const detail = { id: "13244231622", status: "delivering", is_cancel: 1, finished_time: "",
   fee: { user_fee: "66110", shop_fee: "62237" }, goods: [goods], delivery: { track: "配送中", finished_time: "0" },
   cancelDetails: [{ ...refund, id: "1109058848", status: "0", title: "发起退款" }, refund] };
+
+test("平台退款悬停读取已确认的原因和本次金额，申请记录不重复显示", () => {
+  expect(readMaiyatianItemRefundDetails(goods, { ...detail, cancelDetails: detail.cancelDetails.map((entry) => ({ ...entry, reason: "改数量", ctime: "13:32" })) })).toEqual([
+    { reason: "改数量", createdAt: "13:32", quantity: 2, refundAmount: 26440 },
+  ]);
+});
+
+test("出库扣除2件退款，只保留3件且不改写订单原始数量", () => {
+  const items = [{ quantity: 5, rawPayload: goods }];
+  expect(getMaiyatianFulfillmentItems(items, detail)[0].quantity).toBe(3);
+  expect(items[0].quantity).toBe(5);
+  expect(getMaiyatianFulfillmentItems(items, { ...detail, cancelDetails: [], goods: [] })[0].quantity).toBe(3);
+  expect(getMaiyatianFulfillmentItems([{ quantity: 5, rawPayload: { ...goods, part_refund_title: "" } }], { cancelDetails: [] })[0].quantity).toBe(5);
+  expect(getMaiyatianFulfillmentItems(items, { cancelDetails: [{ ...refund, goods_format: JSON.stringify([{ ...refundGoods, number: 5 }]) }] })).toEqual([]);
+});
+
+test("退款后的手工匹配总数量和组合匹配随剩余数量缩减", () => {
+  const rawPayload = { ...goods, manualMatchedProduct: { quantity: 5, compositeItems: [{ id: "part", quantity: 10 }] } };
+  const result = getMaiyatianFulfillmentItems([{ quantity: 5, rawPayload }], detail)[0];
+  expect(result.rawPayload.manualMatchedProduct.quantity).toBe(3);
+  expect(result.rawPayload.manualMatchedProduct.compositeItems[0].quantity).toBe(6);
+  expect(rawPayload.manualMatchedProduct.quantity).toBe(5);
+});
 
 test("真实样例：配送中、退款2/5件、退款264.40元，不能整单取消", () => {
   expect(summarizeMaiyatianRefund(detail)).toEqual({ kind: "partial", amount: 26440, returnedQuantity: 2, totalQuantity: 5 });

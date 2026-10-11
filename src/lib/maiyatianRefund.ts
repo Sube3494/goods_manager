@@ -34,6 +34,43 @@ export function readMaiyatianItemRefundQuantity(goodsValue: unknown, rawPayload:
   return Math.min(quantity, Math.max(fromDetails, taggedQuantity ? Number(taggedQuantity[1]) : 0));
 }
 
+export function readMaiyatianItemRefundDetails(goodsValue: unknown, rawPayload: unknown) {
+  const goods = record(goodsValue);
+  return readEffectiveConfirmedRefunds(rawPayload).flatMap((refund) => {
+    const quantity = readMaiyatianRefundGoods(refund).filter((entry) => matchesGoods(goods, entry))
+      .reduce((sum, entry) => sum + Math.max(0, Number(entry.number || 0)), 0);
+    if (quantity <= 0) return [];
+    return [{
+      createdAt: String(refund.ctime || ""),
+      reason: String(refund.reason || "").trim() || "平台确认退款",
+      quantity,
+      refundAmount: Math.round(Math.max(0, Number(refund.total_price || 0)) * 100),
+    }];
+  });
+}
+
+// 保留订单原始数量用于退款核对，只在履约计算时扣除已确认退款的件数。
+export function getMaiyatianFulfillmentItems<T extends { quantity: number; rawPayload?: unknown }>(items: T[], rawPayload: unknown): T[] {
+  return items.flatMap((item) => {
+    const originalQuantity = Math.max(0, Number(item.quantity || 0));
+    const refundedQuantity = readMaiyatianItemRefundQuantity({ ...record(item.rawPayload), quantity: originalQuantity, number: originalQuantity }, rawPayload);
+    const quantity = Math.max(0, originalQuantity - refundedQuantity);
+    if (quantity <= 0) return [];
+    if (refundedQuantity === 0) return [item];
+    const raw = record(item.rawPayload);
+    const manual = record(raw.manualMatchedProduct);
+    const scaleQuantity = (value: unknown) => Math.max(0, Math.floor(Number(value || 0) * quantity / originalQuantity));
+    const nextManual = Object.keys(manual).length ? {
+      ...manual,
+      ...(Number(manual.quantity) > 1 ? { quantity: scaleQuantity(manual.quantity) } : {}),
+      ...(Array.isArray(manual.compositeItems) ? { compositeItems: manual.compositeItems.map((entry) => ({ ...record(entry), quantity: scaleQuantity(record(entry).quantity || 1) })) } : {}),
+    } : undefined;
+    return [{ ...item, quantity, rawPayload: { ...raw,
+      ...(Number(manual.quantity) > 1 ? { refundAdjustedManualQuantity: scaleQuantity(manual.quantity) } : {}),
+      ...(nextManual ? { manualMatchedProduct: nextManual } : {}) } }];
+  });
+}
+
 export function summarizeMaiyatianRefund(rawPayload: unknown, actualPaid?: unknown) {
   const raw = record(rawPayload);
   const goods = Array.isArray(raw.goods) ? raw.goods.map(record) : [];

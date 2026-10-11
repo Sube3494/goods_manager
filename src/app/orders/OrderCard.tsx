@@ -54,7 +54,7 @@ import { isRematchReturnReason } from "@/lib/outboundReturnMeta";
 import { cleanCustomerRemark } from "@/lib/customerRemark";
 import { getOrderCostStatusText } from "@/lib/outboundCostSnapshot";
 import { hasOrderRefundState, resolveCancelledJDDeliveredCommissionLoss } from "@/lib/orderFinancials";
-import { readMaiyatianItemRefundQuantity } from "@/lib/maiyatianRefund";
+import { readMaiyatianItemRefundDetails, readMaiyatianItemRefundQuantity } from "@/lib/maiyatianRefund";
 
 const OrderRouteModal = dynamic(() => import("@/components/Orders/OrderRouteModal").then((module) => module.OrderRouteModal), { ssr: false });
 const CustomerHistoryModal = dynamic(() => import("@/components/Orders/CustomerHistoryModal").then((module) => module.CustomerHistoryModal), { ssr: false });
@@ -2447,12 +2447,18 @@ export function ProductStripItem({
               </span>
             ) : null}
           {(returnedQuantity > 0 || isRefunded) ? (
+            <HoverCard openDelay={150}>
+            <HoverCardTrigger asChild>
             <span
+              tabIndex={0}
+              title={returnedDetails?.map((detail) => `${detail.reason} · 退款 ¥${(Number(detail.refundAmount || 0) / 100).toFixed(2)}`).join("\n") || "平台已退款"}
               className="relative group inline-flex cursor-help items-center rounded-full border border-rose-500/20 bg-rose-500/10 px-2 py-0.5 text-[10px] font-semibold leading-none text-rose-700 dark:text-rose-400 sm:text-[11px]"
             >
               已退款{returnedQuantity > 0 ? ` ${returnedQuantity}/${display.quantity} 件` : ""}
+            </span>
+            </HoverCardTrigger>
               {returnedDetails && returnedDetails.length > 0 && (
-                <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-max max-w-[320px] -translate-x-1/2 rounded-xl border border-black/8 bg-white/95 p-2 text-[10px] text-slate-800 opacity-0 invisible transition-all duration-200 group-hover:opacity-100 group-hover:visible dark:border-white/10 dark:bg-zinc-900/95 dark:text-zinc-100 shadow-xl backdrop-blur-sm space-y-1.5">
+                <HoverCardContent side="top" className="w-max max-w-[320px] space-y-1.5 text-[11px]">
                   {returnedDetails.map((detail, detailIndex) => (
                     <div 
                       key={detailIndex} 
@@ -2473,7 +2479,7 @@ export function ProductStripItem({
                         <div className="flex flex-wrap gap-1 mt-0.5">
                           {Number(detail.refundAmount) > 0 && (
                             <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-rose-500/10 text-[9px] font-semibold text-rose-600 dark:text-rose-400 whitespace-nowrap">
-                              退款 ¥{(Number(detail.refundAmount) / 100).toFixed(2)}
+                              该次退款 ¥{(Number(detail.refundAmount) / 100).toFixed(2)}
                             </span>
                           )}
                           {Number(detail.extraExpense) > 0 && (
@@ -2485,10 +2491,9 @@ export function ProductStripItem({
                       )}
                     </div>
                   ))}
-                  <span className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-white dark:border-t-zinc-900 filter drop-shadow-[0_1px_1px_rgba(0,0,0,0.08)]" />
-                </span>
+                </HoverCardContent>
               )}
-            </span>
+            </HoverCard>
           ) : null}
         </div>
       </div>
@@ -2665,7 +2670,10 @@ export function OrderItemBundleGroup({
     : (isItemReturned ? (item.quantity || 1) : 0);
 
   const rawReturnedDetails = returnedItemDetailsMap?.get(getReturnedProductKey(item)) || [];
-  const returnedDetails = rawReturnedDetails.length > 0
+  const platformReturnedDetails = readMaiyatianItemRefundDetails(item.rawPayload, order.rawPayload);
+  const returnedDetails = platformReturnedDetails.length > 0
+    ? platformReturnedDetails
+    : rawReturnedDetails.length > 0
     ? rawReturnedDetails
     : (isItemReturned && outboundReturnDetails.length > 0
         ? outboundReturnDetails.filter((e) => !isRematchReturnReason(e?.reason)).map((entry) => ({
@@ -3782,7 +3790,7 @@ export const OrderCard = memo(function OrderCard({
     && (!order.actualPaid || Number(order.actualPaid) <= 0)
     && expectedIncome > 0
       ? expectedIncome
-      : order.actualPaid;
+      : Math.max(0, Number(order.actualPaid || 0) - Math.max(0, Number(order.refundAmount || 0)));
   const displayedPlatformCommission = !hasOrderRefundState(order) && !isJdOrder(order.platform)
     && Number.isFinite(Number(expectedIncome))
     && Number.isFinite(Number(effectiveActualPaid))
@@ -4117,6 +4125,7 @@ export const OrderCard = memo(function OrderCard({
                     <div className="min-w-0">
                       <div className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">实付</div>
                       <div className="mt-0.5 truncate text-sm font-semibold text-foreground">{actualPaidDisplay}</div>
+                      {hasRefundAmount ? <div className="mt-1 text-[11px] text-rose-600 dark:text-rose-400">已退 {toCurrency(refundAmount)}</div> : null}
                     </div>
                     {canEditExpectedIncome ? (
                       <div className="min-w-0 text-right">
@@ -4155,6 +4164,11 @@ export const OrderCard = memo(function OrderCard({
                     <span className="shrink-0 text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground sm:text-[11px]">实付</span>
                     <span className="truncate text-xs font-semibold text-foreground sm:text-[13px]">{actualPaidDisplay}</span>
                   </div>
+                  {hasRefundAmount ? (
+                    <div title={`原实付 ${toCurrency(order.actualPaid)}，退款后实付 ${actualPaidDisplay}`} className="inline-flex h-8 items-center gap-1.5 rounded-full border border-rose-500/20 bg-rose-500/10 px-2.5 text-xs text-rose-700 dark:text-rose-400">
+                      <span>已退</span><span className="font-semibold">{toCurrency(refundAmount)}</span>
+                    </div>
+                  ) : null}
                   {canEditExpectedIncome ? (
                     <button
                       type="button"
