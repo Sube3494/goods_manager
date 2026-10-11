@@ -3796,7 +3796,7 @@ export const OrderCard = memo(function OrderCard({
     && (!order.actualPaid || Number(order.actualPaid) <= 0)
     && expectedIncome > 0
       ? expectedIncome
-      : Math.max(0, Number(order.actualPaid || 0) - Math.max(0, Number(order.refundAmount || 0)));
+      : Math.max(0, Number(order.actualPaid || 0));
   const displayedPlatformCommission = !hasOrderRefundState(order) && !isJdOrder(order.platform)
     && Number.isFinite(Number(expectedIncome))
     && Number.isFinite(Number(effectiveActualPaid))
