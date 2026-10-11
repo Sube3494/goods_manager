@@ -32,10 +32,10 @@ export function mergeFixedPromotionExpenses(
   const start = formatLocalDate(startDate);
   const end = formatLocalDate(endDate);
   const result = new Map<string, PromotionExpenseRecord>();
-  // 同一店铺同一天手动记录优先；兼容历史记录不同的午夜时区。
+  // 先取当天最后一次手动记录；兼容历史记录不同的午夜时区。
   for (const item of manual) {
     const day = formatLocalDate(item.date);
-    if (day < start || day > end) continue;
+    if (day < start || day > end || !includeFuture && day > today) continue;
     const key = `${day}:${item.shopName}`;
     const previous = result.get(key);
     if (!previous || previous.updatedAt <= item.updatedAt) result.set(key, item);
@@ -45,9 +45,14 @@ export function mergeFixedPromotionExpenses(
     const day = formatLocalDate(cursor);
     for (const rule of selectActiveRules(preparedRules, day)) {
       const key = `${day}:${rule.shopName}`;
-      if (result.has(key)) continue;
+      const manualRecord = result.get(key);
+      // 固定设置覆盖之前填写的每日费用，之后重新修改当天费用仍可覆盖固定设置。
+      if (manualRecord && manualRecord.updatedAt > rule.updatedAt) continue;
       const amount = FinanceMath.sum(...PROMOTION_AMOUNT_FIELDS.map((field) => rule[field]));
-      if (amount === 0) continue;
+      if (amount === 0) {
+        result.delete(key);
+        continue;
+      }
       result.set(key, {
         id: `fixed:${rule.id}:${day}`, userId: rule.userId, shopName: rule.shopName, date: new Date(cursor), amount,
         amountMeituan: rule.amountMeituan, amountJingdong: rule.amountJingdong, amountTaobao: rule.amountTaobao,

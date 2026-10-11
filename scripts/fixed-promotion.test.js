@@ -5,7 +5,7 @@ import { parseAsShanghaiTime, formatLocalDate } from "../src/lib/dateUtils";
 const date = parseAsShanghaiTime;
 const stamp = new Date("2026-10-01T00:00:00Z");
 const rule = (start, amount, shop = "A") => ({ id: `${shop}:${start}`, userId: "owner", shopName: shop, effectiveDate: new Date(`${start}T00:00:00Z`), amountMeituan: amount, amountJingdong: 0, amountTaobao: 0, amountOther: 0, createdAt: stamp, updatedAt: stamp });
-const manual = (day, amount, shop = "A") => ({ id: `manual:${day}`, userId: "owner", shopName: shop, date: date(day), amount, amountMeituan: amount, amountJingdong: 0, amountTaobao: 0, createdAt: stamp, updatedAt: stamp });
+const manual = (day, amount, shop = "A") => ({ id: `manual:${day}`, userId: "owner", shopName: shop, date: date(day), amount, amountMeituan: amount, amountJingdong: 0, amountTaobao: 0, createdAt: stamp, updatedAt: new Date("2026-10-12T00:00:00Z") });
 
 test("每日规则从生效日期开始，跨月继续累计且不提前计入未来费用", () => {
   const items = mergeFixedPromotionExpenses([], [rule("2026-09-30", 10)], date("2026-09-29"), date("2026-10-03"), "2026-10-02");
@@ -13,9 +13,31 @@ test("每日规则从生效日期开始，跨月继续累计且不提前计入�
   expect(items.reduce((sum, item) => sum + item.amount, 0)).toBe(30);
 });
 
-test("单日记录覆盖固定费用，手动零元也不会被固定费用回填", () => {
+test("固定保存后重新修改单日费用可以覆盖固定费用，手动零元也生效", () => {
   const items = mergeFixedPromotionExpenses([manual("2026-10-02", 0)], [rule("2026-10-01", 10)], date("2026-10-01"), date("2026-10-03"), "2026-10-03");
   expect(items.map((item) => item.amount)).toEqual([10, 0, 10]);
+});
+
+test("新保存的固定范围覆盖旧每日记录，范围外与其他店铺不受影响", () => {
+  const fixed = { ...rule("2026-10-02", 10), endDate: new Date("2026-10-03T00:00:00Z"), updatedAt: new Date("2026-10-11T00:00:00Z") };
+  const old = day => ({ ...manual(day, 8), updatedAt: stamp });
+  const items = mergeFixedPromotionExpenses([old("2026-10-01"), old("2026-10-02"), { ...old("2026-10-03"), amount: 0, amountMeituan: 0 }, old("2026-10-04"), { ...old("2026-10-02"), shopName: "B" }], [fixed], date("2026-10-01"), date("2026-10-04"), "2026-10-11");
+  expect(items.filter(item => item.shopName === "A").map(item => item.amount)).toEqual([8, 10, 10, 8]);
+  expect(items.find(item => item.shopName === "B").amount).toBe(8);
+});
+
+test("固定零元覆盖旧单日金额，同一时间保存时固定设置优先", () => {
+  const old = { ...manual("2026-10-01", 8), updatedAt: stamp };
+  expect(mergeFixedPromotionExpenses([old], [rule("2026-10-01", 0)], date("2026-10-01"), date("2026-10-01"), "2026-10-01")).toHaveLength(0);
+});
+
+test("覆盖未来已填写金额时，日历预览固定费用而利润不提前扣", () => {
+  const old = { ...manual("2026-10-20", 80), updatedAt: stamp };
+  const fixed = { ...rule("2026-10-01", 10), endDate: new Date("2026-10-31T00:00:00Z"), updatedAt: new Date("2026-10-11T00:00:00Z") };
+  expect(mergeFixedPromotionExpenses([old], [fixed], date("2026-10-20"), date("2026-10-20"), "2026-10-11")).toHaveLength(0);
+  const preview = mergeFixedPromotionExpenses([old], [fixed], date("2026-10-20"), date("2026-10-20"), "2026-10-11", true);
+  expect(preview).toHaveLength(1);
+  expect(preview[0].amount).toBe(10);
 });
 
 test("改价与停止仅从新生效日期开始，各店铺费用独立", () => {

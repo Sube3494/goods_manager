@@ -936,7 +936,7 @@ export function PromotionCalendarModal({
                   ))}
                 </div>
                 <p className="text-[11px] leading-relaxed text-muted-foreground">
-                  {entryMode === "fixed" ? "在选定日期范围内每天生效，包含开始和结束当天。重叠范围以最后保存为准；当天单独录入优先。未来费用在日历预览，到当天才计入概览。" : "单独保存当天金额会覆盖当天的固定推广费。"}
+                  {entryMode === "fixed" ? "在选定日期范围内每天生效，包含开始和结束当天。保存后覆盖范围内已填写的每日费用；之后单独修改某天，以新金额为准。未来费用只在日历预览，到当天才计入概览。" : "保存后覆盖当天的固定推广费；之后重新保存固定费用，将覆盖该金额。"}
                 </p>
                 {entryMode === "fixed" && (
                   <div className={cn("space-y-1.5", isSaving && "pointer-events-none opacity-50")}>
