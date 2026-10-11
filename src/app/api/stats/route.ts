@@ -35,6 +35,7 @@ import { normalizeShopNameKey, isShopNameMatch, stripShopSuffix } from "@/lib/sh
 import { parseOutboundNote } from "@/lib/utils";
 import { readConfirmedRefundAmountFromRawPayload, resolveCancelledJDDeliveredCommissionLoss, resolveRefundAdjustedIncomeMetrics } from "@/lib/orderFinancials";
 import { isAccessoryProduct } from "@/lib/accessoryUtils";
+import { buildRecentInboundOrderWhere, resolveRecentInboundProduct } from "@/lib/recentInbound";
 
 const SHANGHAI_DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -498,16 +499,7 @@ export async function GET(request: NextRequest) {
       prisma.purchaseOrderItem.findMany({
         take: 10,
         where: {
-          purchaseOrder: {
-            userId: targetUserId,
-            status: "Received",
-            NOT: [
-              { type: AUTO_INBOUND_TYPE },
-              { id: { startsWith: "PO-AUTO-" } },
-              { note: { contains: AUTO_INBOUND_NOTE_KEYWORD, mode: "insensitive" } },
-              { note: { contains: ORDER_SHORTAGE_PURCHASE_NOTE_KEYWORD, mode: "insensitive" } },
-            ],
-          },
+          purchaseOrder: buildRecentInboundOrderWhere(targetUserId),
           ...(shopName ? {
             OR: [
               { purchaseOrder: { shopName: { in: matchedShopNames } } },
@@ -526,13 +518,14 @@ export async function GET(request: NextRequest) {
             select: {
               id: true,
               productName: true,
+              productImage: true,
               sku: true,
               shop: { select: { id: true, name: true } },
             },
           },
           purchaseOrder: { select: { id: true, type: true, date: true, status: true, shopName: true, shippingAddress: true, note: true } },
         },
-        orderBy: { purchaseOrder: { date: "desc" } },
+        orderBy: [{ purchaseOrder: { date: "desc" } }, { createdAt: "desc" }, { id: "desc" }],
       }),
       prisma.purchaseOrder.findMany({
         where: {
@@ -1845,8 +1838,8 @@ export async function GET(request: NextRequest) {
     ];
 
     const transformedInboundItems = recentInboundItems.map((item) => {
-      const itemShopProduct = (item as any).shopProduct;
-      const matchedShopProduct = itemShopProduct || shopProductRows.find((sp) =>
+      const itemShopProduct = item.shopProduct;
+      const matchingShopProducts = item.shopProductId ? [] : shopProductRows.filter((sp) =>
         (
           (sp.productId && sp.productId === item.productId) ||
           (sp.sourceProductId && sp.sourceProductId === item.productId) ||
@@ -1854,27 +1847,18 @@ export async function GET(request: NextRequest) {
         ) &&
         (!item.purchaseOrder?.shopName || isShopNameMatch(sp.shop?.name, item.purchaseOrder.shopName))
       );
-
-      // 店铺商品与模板库严格隔离：只能且只使用店铺本身(ShopProduct)的编号与属性
-      const shopProductSku = matchedShopProduct ? (matchedShopProduct.sku || "") : "";
-      const cleanSku = String(shopProductSku).replace(/\(自编\)|（自编）/gi, "").trim();
+      const matchedShopProduct = itemShopProduct || (matchingShopProducts.length === 1 ? matchingShopProducts[0] : null);
 
       const resolvedShopName =
-        item.purchaseOrder?.shopName ||
         itemShopProduct?.shop?.name ||
+        item.purchaseOrder?.shopName ||
+        matchedShopProduct?.shop?.name ||
         "";
 
       return {
         id: item.id,
-        productId: item.productId,
-        product: item.product
-          ? {
-              ...item.product,
-              name: matchedShopProduct?.productName || item.product.name,
-              sku: cleanSku || itemShopProduct?.sku || null,
-              image: item.product.image ? storage.resolveUrl(item.product.image) : null,
-            }
-          : null,
+        productId: item.productId || item.shopProductId,
+        product: resolveRecentInboundProduct(item.product, matchedShopProduct, (image) => storage.resolveUrl(image)),
         supplier: item.supplier,
         quantity: item.quantity,
         costPrice: item.costPrice,
