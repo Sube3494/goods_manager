@@ -219,6 +219,7 @@ export function Sidebar({ onClose, isOpen, isCollapsed, onToggleCollapse }: Side
                           itemRefs.current[item.href] = node;
                         }}
                         href={item.href}
+                        prefetch={false}
                         onClick={onClose}
                         title={isCollapsed ? item.name : undefined}
                         className={cn(
@@ -259,6 +260,7 @@ export function Sidebar({ onClose, isOpen, isCollapsed, onToggleCollapse }: Side
                 <>
                     <Link 
                         href="/profile"
+                        prefetch={false}
                         onClick={onClose}
                         title={isCollapsed ? "个人中心" : undefined}
                         className={cn(
@@ -315,7 +317,7 @@ export function Sidebar({ onClose, isOpen, isCollapsed, onToggleCollapse }: Side
                     </button>
                 </>
                 ) : (
-                <Link href="/login" onClick={onClose} title={isCollapsed ? "登录" : undefined} className={cn(
+                <Link href="/login" prefetch={false} onClick={onClose} title={isCollapsed ? "登录" : undefined} className={cn(
                     "flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 transition-colors group",
                     isCollapsed ? "justify-center p-0 h-10 w-10" : "mx-1"
                 )}>
