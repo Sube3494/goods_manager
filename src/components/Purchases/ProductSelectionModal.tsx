@@ -129,6 +129,8 @@ interface ProductSelectionModalProps {
   singleSelect?: boolean;
   showPrice?: boolean;
   showSku?: boolean;
+  showStock?: boolean;
+  showCategory?: boolean;
   fetchPath?: string;
   title?: string;
   showPlatformSelector?: boolean;
@@ -194,6 +196,8 @@ export function ProductSelectionModal({
   singleSelect = false,
   showPrice = true,
   showSku = true,
+  showStock = true,
+  showCategory = true,
   fetchPath = "/api/products",
   title = "选择商品",
   showPlatformSelector = true,
@@ -229,7 +233,7 @@ export function ProductSelectionModal({
   const debouncedSearch = useDebounce(searchQuery, searchQuery ? 300 : 0);
   const hasAppliedPreferredCategoryRef = useRef(false);
 
-  const [sortBy, setSortByState] = useState<string>(() => {
+  const [savedSortBy, setSortByState] = useState<string>(() => {
     if (typeof window !== "undefined") {
       try {
         const savedGoodsSort = localStorage.getItem("goods_sort_by");
@@ -240,6 +244,8 @@ export function ProductSelectionModal({
     }
     return "sku-desc";
   });
+  const sortBy = !showStock && savedSortBy.startsWith("stock-") ? "sku-desc" : savedSortBy;
+  const sortOptions = showStock ? SORT_OPTIONS : SORT_OPTIONS.filter(option => !option.value.startsWith("stock-"));
 
   const handleSortChange = useCallback((newSort: string) => {
     setSortByState(newSort);
@@ -946,7 +952,7 @@ export function ProductSelectionModal({
                 {showSortSelector && (
                   <div className="w-32 sm:w-40 shrink-0">
                     <CustomSelect
-                      options={SORT_OPTIONS}
+                      options={sortOptions}
                       value={sortBy}
                       onChange={handleSortChange}
                       searchable={false}
@@ -1108,12 +1114,12 @@ export function ProductSelectionModal({
                                       #{productCode}
                                     </span>
                                   )}
-                                  {typeof product.stock === "number" && product.stock > 0 && (
+                                  {showStock && typeof product.stock === "number" && product.stock > 0 && (
                                     <span className="shrink-0 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-1.5 py-0.5 text-[9px] sm:text-[10px] font-medium text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-400">
                                       库存 {product.stock}
                                     </span>
                                   )}
-                                  {product.category?.name && (
+                                  {showCategory && product.category?.name && (
                                     <span className="truncate max-w-full rounded bg-primary/10 px-1.5 py-0.5 text-[9px] sm:text-[10px] font-medium text-primary">
                                       {product.category.name}
                                     </span>
@@ -1134,12 +1140,12 @@ export function ProductSelectionModal({
                                        {product.shopName}
                                      </span>
                                    )}
-                                  {product.category?.name && (
+                                  {showCategory && product.category?.name && (
                                     <span className="shrink-0 rounded bg-secondary/80 px-1.5 py-0.5 text-[10px] text-muted-foreground">
                                       {product.category.name}
                                     </span>
                                   )}
-                                  {typeof product.stock === "number" && product.stock > 0 && (
+                                  {showStock && typeof product.stock === "number" && product.stock > 0 && (
                                     <span className="shrink-0 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-400">
                                       库存 {product.stock}
                                     </span>
@@ -1175,12 +1181,12 @@ export function ProductSelectionModal({
                                     {`编号 ${productCode}`}
                                   </span>
                                 )}
-                                {typeof product.stock === "number" && product.stock > 0 && (
+                                {showStock && typeof product.stock === "number" && product.stock > 0 && (
                                   <span className="inline-flex max-w-full items-center rounded-full bg-emerald-600/80 px-2 py-0.5 text-[10px] font-medium text-white">
                                     {`库存 ${product.stock}`}
                                   </span>
                                 )}
-                                {product.category?.name && (
+                                {showCategory && product.category?.name && (
                                   <span className="inline-flex max-w-full items-center rounded-full bg-white/12 px-2 py-0.5 text-[10px] text-white/70">
                                     {product.category.name}
                                   </span>

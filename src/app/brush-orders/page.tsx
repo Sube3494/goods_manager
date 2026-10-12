@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { BackButton } from "@/components/ui/BackButton";
 import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from "react";
 import { Plus, Search, ShoppingBag, Upload, Download, Check, X as ClearIcon, ChevronDown, RotateCcw, ArrowLeft } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
@@ -486,13 +486,12 @@ export default function BrushOrdersPage() {
       {/* Header section with unified style */}
       <div className="flex flex-row items-center justify-between gap-4 mb-6 md:mb-8 transition-all">
         <div className="flex-1 min-w-0">
-          <Link
-            href="/brush"
+          <BackButton
             className="group inline-flex items-center gap-2 rounded-full border border-border/70 bg-white/70 px-3 py-1.5 text-sm font-medium text-muted-foreground transition-all hover:border-primary/30 hover:text-foreground dark:bg-white/5"
           >
             <ArrowLeft size={16} className="transition-transform group-hover:-translate-x-0.5" />
-            <span>返回刷单中心</span>
-          </Link>
+            <span>返回上一页</span>
+          </BackButton>
           <h1 className="mt-3 text-2xl sm:text-4xl font-bold tracking-tight text-foreground truncate">刷单管理</h1>
           <p className="hidden md:block text-muted-foreground mt-2 text-sm sm:text-lg">管理刷单记录及佣金统计。</p>
         </div>

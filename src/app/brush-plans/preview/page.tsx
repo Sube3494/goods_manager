@@ -1,16 +1,17 @@
 "use client";
 
-import Link from "next/link";
+import { BackButton } from "@/components/ui/BackButton";
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { ArrowLeft, Calendar, ChevronRight, Package, Search, Store } from "lucide-react";
+import { ArrowLeft, Calendar, Package, Search, Store } from "lucide-react";
 import { BrushOrderPlan, BrushOrderPlanItem } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { formatLocalDate } from "@/lib/dateUtils";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 type PreviewItem = BrushOrderPlanItem & {
+    __planId: string;
+    __orderGroup: number;
     __shopName: string;
     __platform: string;
 };
@@ -66,8 +67,10 @@ export default function BrushPlansPreviewPage() {
 
     const groupedPreview = useMemo(() => {
         const flattenedItems: PreviewItem[] = plans.flatMap((plan) =>
-            plan.items.map((item) => ({
+            plan.items.map((item, index) => ({
                 ...item,
+                __planId: plan.id,
+                __orderGroup: item.orderGroup || index + 1,
                 __shopName: String(plan.shopName || "").trim() || "通用店铺",
                 __platform: normalizePlatform(item.platform),
             }))
@@ -87,6 +90,8 @@ export default function BrushPlansPreviewPage() {
         )
             .map(([shopName, platformMap]) => ({
                 shopName,
+                orderCount: Array.from(platformMap.values()).reduce((sum, items) => sum + groupPlanItemsByOrder(items).length, 0),
+                itemCount: Array.from(platformMap.values()).reduce((sum, items) => sum + items.length, 0),
                 totalQuantity: Array.from(platformMap.values()).flat().reduce((sum, item) => sum + (item.quantity || 1), 0),
                 platforms: sortPlatforms(
                     Array.from(platformMap.entries()).map(([platform, items]) => ({
@@ -104,13 +109,13 @@ export default function BrushPlansPreviewPage() {
                 <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 pb-4 pt-6 sm:px-6 lg:px-8">
                     <div className="flex items-center justify-between gap-3">
                         <div className="flex flex-wrap items-center gap-3">
-                            <Link
-                                href="/brush-plans"
+                            <BackButton
+                                fallbackHref="/brush-plans"
                                 className="group inline-flex items-center gap-2 rounded-full border border-border/70 bg-white/90 px-3 py-1.5 text-sm font-medium text-muted-foreground transition-all hover:border-primary/30 hover:text-foreground dark:bg-white/5"
                             >
                                 <ArrowLeft size={16} className="transition-transform group-hover:-translate-x-0.5" />
-                                返回安排表
-                            </Link>
+                                返回上一页
+                            </BackButton>
                             <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-3 py-1.5 text-xs font-black text-primary">
                                 <Calendar size={14} />
                                 {date || "未指定日期"}
@@ -155,17 +160,12 @@ export default function BrushPlansPreviewPage() {
                                                 </div>
                                                 <div className="min-w-0">
                                                     <h2 className="truncate text-[22px] font-black leading-none tracking-tight text-foreground sm:text-lg sm:leading-tight">{shopGroup.shopName}</h2>
-                                                    <div className="mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] font-bold text-muted-foreground sm:hidden">
-                                                        <span>{shopGroup.platforms.length} 个平台</span>
-                                                        <span className="opacity-40">•</span>
-                                                        <span>{shopGroup.platforms.reduce((sum, platform) => sum + platform.items.length, 0)} 个任务</span>
-                                                    </div>
                                                 </div>
                                             </div>
-                                            <div className="mt-2 hidden flex-wrap items-center gap-2 text-xs font-bold text-muted-foreground sm:flex">
-                                                <span>{shopGroup.platforms.length} 个平台</span>
-                                                <span className="opacity-40">•</span>
-                                                <span>{shopGroup.platforms.reduce((sum, platform) => sum + platform.items.length, 0)} 个任务</span>
+                                            <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                                                <span className="rounded-lg bg-zinc-100 px-2.5 py-1 dark:bg-white/5">订单数 <strong className="ml-1 text-foreground">{shopGroup.orderCount} 单</strong></span>
+                                                <span className="rounded-lg bg-zinc-100 px-2.5 py-1 dark:bg-white/5" title="每条商品安排分别计数，同一商品出现在不同订单中会重复计数">商品安排 <strong className="ml-1 text-foreground">{shopGroup.itemCount} 条</strong></span>
+                                                <span className="rounded-lg bg-amber-500/10 px-2.5 py-1 text-amber-700 dark:text-amber-300" title="所有商品安排的数量相加，每种商品的数量请看下方商品名称右侧">商品总数量 <strong className="ml-1">{shopGroup.totalQuantity}</strong></span>
                                             </div>
                                         </div>
                                     </div>
@@ -193,7 +193,7 @@ export default function BrushPlansPreviewPage() {
                                                     </span>
                                                 </div>
 
-                                                <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                                                <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5">
                                                     {groupPlanItemsByOrder(platformGroup.items).map((orderGroup, index) => (
                                                         <CompactOrderCard
                                                             key={`${shopGroup.shopName}-${platformGroup.platform}-${orderGroup.group}-${index}`}
@@ -232,7 +232,7 @@ function CompactOrderCard({
         <div className="overflow-hidden rounded-[20px] border border-border/60 bg-white p-2 shadow-sm transition-all hover:border-primary/25 hover:shadow-md dark:border-white/10 dark:bg-white/6 dark:hover:bg-white/10 sm:rounded-2xl">
             <div className="mb-2 px-1">
                 <div className="flex min-w-0 items-center justify-between gap-2">
-                <div className={cn("inline-flex h-5 shrink-0 items-center rounded-full px-2 text-[10px] font-black", accentClassName)}>
+                <div className={cn("inline-flex h-5 shrink-0 items-center rounded-full px-2 text-[10px] font-normal", accentClassName)}>
                     第 {index + 1} 单
                 </div>
                 {title ? <div className="min-w-0 truncate text-right text-[12px] font-black text-foreground">{title}</div> : null}
@@ -244,7 +244,7 @@ function CompactOrderCard({
                     items.length === 2 ? "grid-cols-1 grid-rows-2" : items.length > 2 ? "grid-cols-2" : "grid-cols-1"
                 )}>
                     {items.slice(0, 4).map((item, itemIndex) => (
-                        <ProductImageTile key={`${item.id || itemIndex}-image`} item={item} compact={items.length > 1} />
+                        <ProductImageTile key={`${item.id || itemIndex}-image`} item={item} />
                     ))}
                 </div>
                 {items.length > 4 ? (
@@ -261,38 +261,46 @@ function CompactOrderCard({
                     <span className="truncate text-[12px] font-black text-foreground">{orderKeyword}</span>
                 </div>
                 {items.length > 4 ? (
-                    <div className="mt-1.5 text-[10px] font-black text-muted-foreground">另 {items.length - 4} 项未显示图片</div>
+                    <div className="mt-2 space-y-1">
+                        {items.slice(4).map((item, itemIndex) => (
+                            <div key={item.id || itemIndex} className="flex min-w-0 items-center gap-2 text-[10px] font-normal">
+                                <span className="min-w-0 flex-1 truncate text-muted-foreground">{item.productName || item.product?.name || "未绑定商品"}</span>
+                                <span className="shrink-0 rounded-full bg-amber-500/15 px-2 py-0.5 text-[13px] font-black text-amber-700 dark:text-amber-300">×{item.quantity || 1}</span>
+                            </div>
+                        ))}
+                    </div>
                 ) : null}
             </div>
         </div>
     );
 }
 
-function ProductImageTile({ item }: { item: PreviewItem; compact?: boolean }) {
+function ProductImageTile({ item }: { item: PreviewItem }) {
     const imageUrl = resolveProductImage(item.product?.image);
+    const productName = item.productName || item.product?.name || "未绑定商品";
 
     return (
-        <div className="relative isolate overflow-hidden rounded-md bg-muted/50">
-            {imageUrl ? (
-                <Image src={imageUrl} alt="" fill className="object-cover" unoptimized />
-            ) : (
-                <div className="flex h-full w-full items-center justify-center text-muted-foreground/35">
-                    <Package size={18} />
-                </div>
-            )}
-            <div className="absolute right-1 top-1 rounded-full bg-white/95 px-1.5 py-0.5 text-[10px] font-black leading-none text-zinc-900 shadow-sm dark:bg-zinc-900/90 dark:text-white">
-                x{item.quantity || 1}
+        <div className="relative isolate min-h-0 min-w-0 overflow-hidden rounded-md bg-muted/50">
+            <div className="absolute inset-0">
+                {imageUrl ? (
+                    <Image src={imageUrl} alt={productName} fill className="object-cover" unoptimized />
+                ) : (
+                    <div className="absolute inset-0 flex items-center justify-center text-muted-foreground/35">
+                        <Package size={18} />
+                    </div>
+                )}
             </div>
-            <div className="absolute inset-x-0 bottom-0 bg-zinc-900/80 px-1.5 py-0.5 text-[9px] font-black leading-3 text-white">
-                <div className="truncate">{item.productName || item.product?.name || "未绑定商品"}</div>
+            <div className="absolute inset-x-0 bottom-0 flex items-center gap-1 bg-zinc-900/80 px-1.5 py-0.5 text-[9px] font-normal leading-3 text-white">
+                <span className="min-w-0 flex-1 truncate" title={productName}>{productName}</span>
+                <span className="shrink-0 rounded-full bg-amber-500/20 px-2 py-0.5 text-[13px] font-black leading-4 text-amber-300">×{item.quantity || 1}</span>
             </div>
         </div>
     );
 }
 function groupPlanItemsByOrder(items: PreviewItem[]) {
-    const groups = new Map<number, PreviewItem[]>();
-    items.forEach((item, index) => {
-        const group = item.orderGroup || index + 1;
+    const groups = new Map<string, PreviewItem[]>();
+    items.forEach((item) => {
+        const group = `${item.__planId}:${item.__orderGroup}`;
         const current = groups.get(group) || [];
         current.push(item);
         groups.set(group, current);

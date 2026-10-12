@@ -61,6 +61,13 @@ export default function SharedPlanPage() {
         </div>
     );
 
+    const orderCount = new Set(plan.items.map((item, index) => {
+        const platform = (item.platform || "").trim();
+        const platformGroup = ["美团", "淘宝", "京东"].includes(platform) ? platform : "其他";
+        return `${platformGroup}:${item.orderGroup || index + 1}`;
+    })).size;
+    const totalQuantity = plan.items.reduce((sum, item) => sum + (item.quantity || 1), 0);
+
     return (
         <div className="min-h-dynamic-screen bg-zinc-50 dark:bg-zinc-950 flex flex-col no-scrollbar">
             {/* Optimized Shared Header */}
@@ -75,12 +82,15 @@ export default function SharedPlanPage() {
                                 <h1 className="text-xl font-black tracking-tight truncate">{plan.title || "刷单任务清单"}</h1>
                                 <ThemeToggle />
                             </div>
-                            <div className="flex items-center flex-wrap gap-2 text-[11px] font-bold text-muted-foreground opacity-70">
+                            <div className="flex items-center flex-wrap gap-2 text-[11px] font-bold text-muted-foreground">
                                 <span className="flex items-center gap-1"><Calendar size={12} /> {formatLocalDate(plan.date)}</span>
                                 <span>•</span>
                                 <span className="flex items-center gap-1"><Store size={12} /> {plan.shopName || "通用店铺"}</span>
-                                <span>•</span>
-                                <span>共 {groupPlanItemsByOrder(plan.items).length} 单 · {plan.items.length} 项，合计 {plan.items.reduce((sum, item) => sum + (item.quantity || 1), 0)} 份</span>
+                            </div>
+                            <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
+                                <span className="rounded-lg bg-zinc-100 px-2.5 py-1 dark:bg-white/5">订单数 <strong className="ml-1 text-zinc-900 dark:text-zinc-100">{orderCount} 单</strong></span>
+                                <span className="rounded-lg bg-zinc-100 px-2.5 py-1 dark:bg-white/5" title="每条商品安排分别计数，同一商品出现在不同订单中会重复计数">商品安排 <strong className="ml-1 text-zinc-900 dark:text-zinc-100">{plan.items.length} 条</strong></span>
+                                <span className="rounded-lg bg-amber-500/10 px-2.5 py-1 text-amber-700 dark:text-amber-300" title="所有商品安排的数量相加，每种商品的数量请看下方商品名称右侧">商品总数量 <strong className="ml-1">{totalQuantity}</strong></span>
                             </div>
                         </div>
                     </div>
@@ -153,7 +163,7 @@ export default function SharedPlanPage() {
                                                 </div>
                                             </div>
 
-                                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+                                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-6">
                                                 {groupPlanItemsByOrder(platformItems).map((orderGroup, pIdx) => (
                                                     <ItemCard
                                                         key={`${platformName}-${orderGroup.group}-${pIdx}`}
@@ -169,7 +179,7 @@ export default function SharedPlanPage() {
                         );
                     } else {
                         return (
-                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-6">
                                 {groupPlanItemsByOrder(plan.items).map((orderGroup, index) => (
                                     <ItemCard
                                         key={`fallback-${orderGroup.group}-${index}`}
@@ -188,7 +198,6 @@ export default function SharedPlanPage() {
 }
 
 function ItemCard({ items, index }: { items: BrushOrderPlan["items"]; index: number }) {
-    const title = items.length > 1 ? `${items.length} 种商品` : "";
     const orderKeyword = items.find((item) => item.searchKeyword?.trim())?.searchKeyword || "暂无关键字";
 
     return (
@@ -199,10 +208,10 @@ function ItemCard({ items, index }: { items: BrushOrderPlan["items"]; index: num
         )}>
             <div className="px-3.5 pb-2 pt-3.5 sm:px-4 sm:pt-4">
                 <div className="flex min-w-0 items-center justify-between gap-2">
-                    <span className="shrink-0 text-[10px] font-black text-emerald-600 dark:text-emerald-400">第 {index + 1} 单</span>
-                    {title ? <span className="min-w-0 truncate text-right text-[13px] font-black text-zinc-900 dark:text-zinc-100">
-                        {title}
-                    </span> : null}
+                    <span className="shrink-0 text-[10px] font-normal text-emerald-600 dark:text-emerald-400">第 {index + 1} 单</span>
+                    {items.length > 1 && (
+                        <span className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400">{items.length} 种商品</span>
+                    )}
                 </div>
             </div>
             <div className="relative aspect-square w-full overflow-hidden p-1.5">
@@ -211,7 +220,7 @@ function ItemCard({ items, index }: { items: BrushOrderPlan["items"]; index: num
                     items.length === 2 ? "grid-cols-1 grid-rows-2" : items.length > 2 ? "grid-cols-2" : "grid-cols-1"
                 )}>
                     {items.slice(0, 4).map((item, itemIndex) => (
-                        <ProductImageTile key={`${item.id || itemIndex}-image`} item={item} compact={items.length > 1} />
+                        <ProductImageTile key={`${item.id || itemIndex}-image`} item={item} />
                     ))}
                 </div>
                 {items.length > 4 ? (
@@ -228,14 +237,21 @@ function ItemCard({ items, index }: { items: BrushOrderPlan["items"]; index: num
                     <span className="truncate text-[13px] font-black text-zinc-900 dark:text-zinc-100">{orderKeyword}</span>
                 </div>
                 {items.length > 4 ? (
-                    <div className="text-[10px] font-black text-muted-foreground">另 {items.length - 4} 项未显示图片</div>
+                    <div className="mt-2 space-y-1">
+                        {items.slice(4).map((item, itemIndex) => (
+                            <div key={item.id || itemIndex} className="flex min-w-0 items-center gap-2 text-[10px] font-normal">
+                                <span className="min-w-0 flex-1 truncate text-muted-foreground">{item.productName || item.product?.name || "未绑定商品"}</span>
+                                <span className="shrink-0 rounded-full bg-amber-500/15 px-2 py-0.5 text-[13px] font-black text-amber-700 dark:text-amber-300">×{item.quantity || 1}</span>
+                            </div>
+                        ))}
+                    </div>
                 ) : null}
             </div>
         </div>
     );
 }
 
-function ProductImageTile({ item, compact = false }: { item: BrushOrderPlan["items"][number]; compact?: boolean }) {
+function ProductImageTile({ item }: { item: BrushOrderPlan["items"][number] }) {
     const image = item.product?.image;
     const src = image
         ? image.startsWith("http") || image.startsWith("/")
@@ -252,11 +268,11 @@ function ProductImageTile({ item, compact = false }: { item: BrushOrderPlan["ite
                     <Package size={24} />
                 </div>
             )}
-            <div className="absolute right-1.5 top-1.5 rounded-full bg-white/95 px-2 py-0.5 text-[10px] font-black text-zinc-900 shadow-sm dark:bg-zinc-900/90 dark:text-white">
-                x{item.quantity || 1}
-            </div>
-            <div className="absolute inset-x-0 bottom-0 bg-zinc-900/80 px-2 py-1 text-[10px] font-black leading-3.5 text-white">
-                <div className="truncate">{item.productName || item.product?.name || "未绑定商品"}</div>
+            <div className="absolute inset-x-0 bottom-0 bg-zinc-900/80 px-2 py-1 text-[10px] font-normal leading-3.5 text-white">
+                <div className="flex items-center gap-1">
+                    <span className="min-w-0 flex-1 truncate">{item.productName || item.product?.name || "未绑定商品"}</span>
+                    <span className="shrink-0 rounded-full bg-amber-500/20 px-2 py-0.5 text-[13px] font-black leading-4 text-amber-300">×{item.quantity || 1}</span>
+                </div>
             </div>
         </div>
     );

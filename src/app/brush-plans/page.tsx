@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { BackButton } from "@/components/ui/BackButton";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Plus, Search, Calendar, Share2, Edit2, Trash2, ShieldAlert, RotateCcw, ArrowLeft, Package, Eye, Copy } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
@@ -10,7 +11,7 @@ import { ClonePlanModal } from "@/components/BrushPlans/ClonePlanModal";
 import { BrushOrderPlan, BrushOrderPlanItem } from "@/lib/types";
 import { formatLocalDate } from "@/lib/dateUtils";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
-import { DatePicker } from "@/components/ui/DatePicker";
+import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { useUser } from "@/hooks/useUser";
 import { hasPermission, SessionUser } from "@/lib/permissions";
@@ -28,7 +29,7 @@ export default function BrushPlansPage() {
     const [cloningPlan, setCloningPlan] = useState<BrushOrderPlan | null>(null);
     const [isCloneModalOpen, setIsCloneModalOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
-    const [filterDate, setFilterDate] = useState("");
+    const [filterDateRange, setFilterDateRange] = useState({ startDate: "", endDate: "" });
     const [filterShop, setFilterShop] = useState("");
     const [filterPlatform, setFilterPlatform] = useState("");
     const activeShippingAddresses = useMemo(
@@ -76,7 +77,7 @@ export default function BrushPlansPage() {
 
     const resetFilters = () => {
         setSearchQuery("");
-        setFilterDate("");
+        setFilterDateRange({ startDate: "", endDate: "" });
         setFilterShop("");
         setFilterPlatform("");
     };
@@ -148,13 +149,15 @@ export default function BrushPlansPage() {
                 (p.title && p.title.toLowerCase().includes(searchQuery.toLowerCase())) ||
                 p.items.some((i: BrushOrderPlanItem) => i.productName?.toLowerCase().includes(searchQuery.toLowerCase()) || i.product?.name.toLowerCase().includes(searchQuery.toLowerCase()))
             );
-            const matchesDate = !filterDate || formatLocalDate(p.date) === filterDate;
+            const planDate = formatLocalDate(p.date);
+            const matchesDate = (!filterDateRange.startDate || planDate >= filterDateRange.startDate)
+                && (!filterDateRange.endDate || planDate <= filterDateRange.endDate);
             const matchesShop = !filterShop || p.shopName === filterShop;
             const matchesPlatform = !filterPlatform || p.items.some((item: BrushOrderPlanItem) => item.platform === filterPlatform);
             return matchesSearch && matchesDate && matchesShop && matchesPlatform;
             })
             .sort((a, b) => new Date(String(b.date)).getTime() - new Date(String(a.date)).getTime());
-    }, [plans, searchQuery, filterDate, filterShop, filterPlatform]);
+    }, [plans, searchQuery, filterDateRange, filterShop, filterPlatform]);
 
     const planStats = useMemo(() => {
         const shopCount = new Set(filteredPlans.map((plan) => plan.shopName || "通用店铺")).size;
@@ -212,13 +215,12 @@ export default function BrushPlansPage() {
         <div className="space-y-6 sm:space-y-8">
             <div className="mb-5 flex flex-col gap-4 sm:mb-8 sm:flex-row sm:items-end sm:justify-between sm:gap-6">
                 <div className="min-w-0 flex-1 space-y-4">
-                    <Link
-                        href="/brush"
+                    <BackButton
                         className="group inline-flex items-center gap-2 rounded-full border border-border/70 bg-white/90 px-3 py-1.5 text-sm font-medium text-muted-foreground transition-all hover:border-primary/30 hover:text-foreground dark:bg-white/5"
                     >
                         <ArrowLeft size={16} className="transition-transform group-hover:-translate-x-0.5" />
-                        <span>返回刷单中心</span>
-                    </Link>
+                        <span>返回上一页</span>
+                    </BackButton>
                     <div className="space-y-1">
                         <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-foreground">刷单安排表</h1>
                         <p className="text-muted-foreground text-xs sm:text-sm font-medium">按日期统筹计划，先看节奏，再看每家店的商品安排。</p>
@@ -243,13 +245,22 @@ export default function BrushPlansPage() {
                     </div>
                 </div>
                 {canManage && (
-                    <button
-                        onClick={handleCreate}
-                        className="h-11 sm:h-12 w-full sm:w-auto flex items-center justify-center gap-2 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-black px-4 sm:px-6 text-xs sm:text-sm font-black shadow-xl hover:-translate-y-0.5 transition-all shrink-0 active:scale-95 sm:self-auto"
-                    >
-                        <Plus size={16} />
-                        <span>新建计划</span>
-                    </button>
+                    <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:gap-3 shrink-0">
+                        <Link
+                            href="/brush-products"
+                            className="h-11 sm:h-12 flex items-center justify-center gap-2 rounded-full border border-border/70 bg-white/90 dark:bg-white/5 px-4 sm:px-6 text-xs sm:text-sm font-bold text-foreground hover:border-primary/30 hover:bg-muted/50 transition-all active:scale-95"
+                        >
+                            <Package size={16} />
+                            <span>商品库</span>
+                        </Link>
+                        <button
+                            onClick={handleCreate}
+                            className="h-11 sm:h-12 w-full sm:w-auto flex items-center justify-center gap-2 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-black px-4 sm:px-6 text-xs sm:text-sm font-black shadow-xl hover:-translate-y-0.5 transition-all shrink-0 active:scale-95 sm:self-auto"
+                        >
+                            <Plus size={16} />
+                            <span>新建计划</span>
+                        </button>
+                    </div>
                 )}
             </div>
 
@@ -259,7 +270,7 @@ export default function BrushPlansPage() {
                         <div className="text-xs font-black uppercase tracking-[0.18em] text-muted-foreground">筛选工作区</div>
                         <div className="mt-1 text-sm font-medium text-foreground/75">先按日期、店铺、平台缩小范围，再看每一天的安排。</div>
                     </div>
-                    {(searchQuery || filterDate || filterShop || filterPlatform) && (
+                    {(searchQuery || filterDateRange.startDate || filterDateRange.endDate || filterShop || filterPlatform) && (
                         <button
                             onClick={resetFilters}
                             className="h-10 px-4 flex items-center justify-center gap-1.5 rounded-full border border-primary/20 bg-primary/5 text-primary text-xs font-bold hover:bg-primary/10 transition-all active:scale-95 shadow-sm shrink-0 whitespace-nowrap"
@@ -281,9 +292,10 @@ export default function BrushPlansPage() {
                         />
                     </div>
                     <div className="col-span-2 h-12 min-w-0 xl:col-span-1">
-                        <DatePicker
-                            value={filterDate}
-                            onChange={setFilterDate}
+                        <DateRangePicker
+                            startDate={filterDateRange.startDate}
+                            endDate={filterDateRange.endDate}
+                            onChange={setFilterDateRange}
                             placeholder="日期筛选"
                             className="h-full w-full"
                             triggerClassName="rounded-full h-full text-sm"

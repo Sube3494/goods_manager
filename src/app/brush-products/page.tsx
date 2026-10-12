@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { BackButton } from "@/components/ui/BackButton";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { Plus, Search, Tags, Package, RotateCcw, Store, Download, Check, ArrowLeft } from "lucide-react";
@@ -566,13 +566,12 @@ export default function BrushProductsPage() {
     <div className="space-y-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <Link
-            href="/brush"
+          <BackButton
             className="group inline-flex h-10 items-center gap-2 rounded-full border border-black/8 bg-white/76 px-4 text-sm font-bold text-muted-foreground shadow-2xs transition-all hover:border-black/12 hover:bg-white hover:text-foreground dark:border-white/10 dark:bg-white/[0.04] dark:hover:bg-white/[0.08]"
           >
             <ArrowLeft size={16} className="transition-transform group-hover:-translate-x-0.5" />
-            <span>返回刷单中心</span>
-          </Link>
+            <span>返回上一页</span>
+          </BackButton>
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-4xl">刷单商品库</h1>
             <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-full border border-black/8 bg-white/76 px-3 text-xs font-bold leading-none text-foreground shadow-2xs dark:border-white/10 dark:bg-white/[0.04]">

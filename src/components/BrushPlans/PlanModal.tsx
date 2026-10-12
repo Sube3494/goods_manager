@@ -72,16 +72,11 @@ export function PlanModal({ isOpen, onClose, onSubmit, initialData, readOnly = f
     }, [activeShippingAddresses, initialData, formData.shopName]);
 
     const handleBatchAdd = (selectedProducts: Product[], platform: string) => {
-        const newItems = [...(formData.items || [])];
-
-        selectedProducts.forEach(product => {
-            const brushProduct = product as BrushSelectableProduct;
-            const platformKey = platform || "美团";
-            const isDuplicate = (formData.items || []).some(
-                (item: BrushOrderPlanItem) => item.productId === product.id && (item.platform || "美团") === platformKey
-            );
-            
-            if (!isDuplicate) {
+        setFormData(prev => {
+            const newItems = [...(prev.items || [])];
+            let maxGroup = newItems.reduce((max, item, index) => Math.max(max, item.orderGroup || index + 1), 0);
+            selectedProducts.forEach(product => {
+                const brushProduct = product as BrushSelectableProduct;
                 newItems.push({
                     productId: product.id,
                     product: product,
@@ -90,11 +85,37 @@ export function PlanModal({ isOpen, onClose, onSubmit, initialData, readOnly = f
                     searchKeyword: brushProduct.brushKeyword || "",
                     platform: platform || "美团",
                     done: false,
-                    orderGroup: newItems.length + 1,
+                    orderGroup: ++maxGroup,
                 });
-            }
+            });
+            return { ...prev, items: newItems };
         });
-        setFormData({ ...formData, items: newItems });
+    };
+
+    const duplicateItem = (index: number) => {
+        setFormData(prev => {
+            const items: BrushOrderPlanItem[] = (prev.items || []).map((entry, entryIndex) => ({
+                ...entry,
+                orderGroup: entry.orderGroup || entryIndex + 1,
+            }));
+            const item = items[index];
+            if (!item) return prev;
+            const maxGroup = items.reduce((max, entry, entryIndex) => Math.max(max, entry.orderGroup || entryIndex + 1), 0);
+            const orderStartIndex = items.findIndex(entry =>
+                entry.orderGroup === item.orderGroup && (entry.platform || "美团") === (item.platform || "美团")
+            );
+            const duplicate: BrushOrderPlanItem = {
+                ...item,
+                id: undefined,
+                planId: undefined,
+                sortOrder: undefined,
+                done: false,
+                orderGroup: maxGroup + 1,
+            };
+            // 按订单首次出现的位置插入，组合商品仍归在原单，新单紧随其后。
+            items.splice(orderStartIndex + 1, 0, duplicate);
+            return { ...prev, items };
+        });
     };
 
     const removeItem = (index: number) => {
@@ -379,6 +400,13 @@ export function PlanModal({ isOpen, onClose, onSubmit, initialData, readOnly = f
                                                                                 </div>
  
                                                                                 <div className="flex flex-row items-center gap-2">
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={() => duplicateItem(originalIndex)}
+                                                                                        className="shrink-0 rounded-full bg-primary/10 px-2.5 py-1.5 text-[11px] font-bold text-primary hover:bg-primary/20 transition-all"
+                                                                                    >
+                                                                                        再加一单
+                                                                                    </button>
                                                                                     <div className="flex items-center gap-1.5 bg-muted/30 dark:bg-white/5 rounded-lg px-2 h-9 border border-transparent focus-within:border-primary/20 focus-within:bg-background transition-all w-[65px] shrink-0">
                                                                                         <span className="text-[9px] font-black text-muted-foreground uppercase opacity-40 shrink-0">份</span>
                                                                                         <input
@@ -483,13 +511,15 @@ export function PlanModal({ isOpen, onClose, onSubmit, initialData, readOnly = f
                 isOpen={isSelectionModalOpen}
                 onClose={() => setIsSelectionModalOpen(false)}
                 onSelect={(products, platform) => handleBatchAdd(products, platform)}
-                selectedIds={(formData.items || []).map((item) => item.product?.shopProductId || item.productId!).filter(Boolean)}
+                selectedIds={[]}
                 fetchPath="/api/brush-products/products"
                 query={{
                     ...(formData.shopName ? { shopName: formData.shopName } : {}),
                 }}
                 allowLibrarySwitch={false}
                 title="选择刷单商品"
+                showStock={false}
+                showCategory={false}
                 hideUnselectedOnlyToggle
                 imageOnly
             />
