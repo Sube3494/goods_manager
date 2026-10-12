@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma";
+import { buildCustomerMemoryFields } from "@/lib/customerMemoryStore";
 import { assertMaiyatianCookieResponse } from "@/lib/maiyatianCookieResponse";
 import { formatLocalDate, parseAsShanghaiTime } from "@/lib/dateUtils";
 import { cleanCustomerRemark, firstMeaningfulCustomerRemark } from "@/lib/customerRemark";
@@ -4018,6 +4019,9 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
         deliveryTimeRange: true,
         delivery: true,
         customerRemark: true,
+        customerPhoneTail: true,
+        customerAddressKey: true,
+        customerShopKey: true,
         createdAt: true,
         lastSyncedAt: true,
         rawPayload: true,
@@ -4231,6 +4235,14 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
       ...nextRawPayload,
       systemMeta: nextSystemMeta,
     };
+    const customerMemoryFields = buildCustomerMemoryFields({
+      ...existing,
+      platform: normalized.platform,
+      shopId,
+      userAddress: normalized.userAddress,
+      customerMaskedPhone: normalized.customerMaskedPhone,
+      rawPayload: nextRawPayloadWithResolvedShop,
+    });
     type ExistingSyncedItem = NonNullable<typeof existing>["items"][number];
     const exactQueue = new Map<string, ExistingSyncedItem[]>();
     const productNoQueue = new Map<string, ExistingSyncedItem[]>();
@@ -4299,6 +4311,7 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
     });
 
     const createData = {
+      ...customerMemoryFields,
       userId,
       sourceId,
       deliveryId,
@@ -4327,6 +4340,7 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
     } satisfies Prisma.AutoPickOrderUncheckedCreateInput;
 
     const updateData = {
+      ...customerMemoryFields,
       sourceId,
       deliveryId,
       city: normalized.city,
@@ -8539,6 +8553,8 @@ export async function fixHistoryShopOrdersForUser(userId: string): Promise<numbe
             where: { id: order.id },
             data: {
               shopId: targetShop.id,
+              customerIdentityVersion: 0,
+              customerIdentityKey: null,
               rawPayload: nextRawPayload as Prisma.InputJsonValue
             }
           })

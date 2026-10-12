@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { parseOutboundCostSnapshot, resolvePurchaseBatchSnapshotCost } from "@/lib/outboundCostSnapshot";
 import prisma from "@/lib/prisma";
+import { resolveRememberedCustomerTypes } from "@/lib/customerMemoryStore";
 import { getAuthorizedUser, getAuthorizedUserAny } from "@/lib/auth";
 import { hasAdminAccess, hasPermission } from "@/lib/permissions";
 import {
@@ -1279,6 +1280,7 @@ export async function GET(request: NextRequest) {
           delivery: true,
           rawPayload: true,
           customerRemark: true,
+          customerPhoneTail: true,
           lastSyncedAt: true,
           autoCompleteAt: true,
           createdAt: true,
@@ -2473,6 +2475,7 @@ export async function GET(request: NextRequest) {
     const autoMatchedTaobaoBackfills: Array<{ shopProductId: string; taobaoSkuId: string }> = [];
     const autoMatchedDoudianBackfills: Array<{ shopProductId: string; doudianSkuId: string }> = [];
 
+    const rememberedCustomerTypes = await resolveRememberedCustomerTypes(targetUserId, responseOrders);
     const enrichedOrders = responseOrders.map((order) => {
       const manualAmountOverride = readManualAmountOverride(order.rawPayload);
       const isOffline = order.platform === "线下交易" || String(order.platform || "").toLowerCase() === "other";
@@ -2507,7 +2510,9 @@ export async function GET(request: NextRequest) {
       const otherPickup = isAutoPickOtherPickupOrder(order.rawPayload);
       const businessStatus = resolveAutoPickBusinessStatus(order.status, order.rawPayload, order.userAddress, order.shopAddress);
       const normalized = normalizeAutoPickOrderPayload(order.rawPayload);
-      const customerType = readCustomerTypeFromRawPayload(order.rawPayload)
+      const customerType = rememberedCustomerTypes.has(order.id)
+        ? rememberedCustomerTypes.get(order.id) ?? null
+        : readCustomerTypeFromRawPayload(order.rawPayload)
         || normalized?.customerType
         || null;
       return {

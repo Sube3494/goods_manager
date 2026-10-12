@@ -12,6 +12,7 @@ import { AutoPickOrder, AutoPickOrderItem } from "@/lib/types";
 import { updateOrderProductImage } from "@/lib/orderProductImage";
 import { formatLocalDate, formatLocalDateTime } from "@/lib/dateUtils";
 import { extractCustomerPhoneTail } from "@/lib/customerPhoneTail";
+import { getCustomerMemoryPlatform } from "@/lib/customerMemory";
 import { cleanCustomerRemark } from "@/lib/customerRemark";
 import {
   AUTO_PICK_EXTRA_STATUS_FILTERS,
@@ -175,7 +176,7 @@ function CompactTodayOrderCard({
   const deadlineDisplay = getDeadlineDisplay(order);
   const deliveryFee = getDeliveryFee(order.delivery, order);
   const customerPhoneTail = extractCustomerPhoneTail(order);
-  const customerType = order.customerType;
+  const customerType = order.customerType || (getCustomerMemoryPlatform(order.platform) ? "new" : null);
   const usefulCustomerRemark = cleanCustomerRemark(order.customerRemark);
   const orderTypeLabel = getOrderTypeLabel(order);
   const showBrushMarker = isTodayBrushOrder(order);
@@ -204,6 +205,7 @@ function CompactTodayOrderCard({
           isOpen={historyOpen}
           onClose={() => setHistoryOpen(false)}
           phoneTail={customerPhoneTail}
+          currentOrderId={order.id}
           currentOrderNo={order.orderNo}
         />
       ) : null}
@@ -295,7 +297,7 @@ function CompactTodayOrderCard({
               <span>{pickup ? "-" : (order.distanceKm != null ? `${order.distanceKm.toFixed(2)} km` : "距离待同步")}</span>
             </button>
             {customerType === "new" ? (
-              <span title="门店新客" className="shrink-0 whitespace-nowrap rounded-full border border-orange-500/25 bg-orange-500/10 px-1.5 py-0.5 text-[9.5px] font-medium leading-none text-orange-600 dark:text-orange-400">新客</span>
+              <span title={getCustomerMemoryPlatform(order.platform) ? "本店本平台暂无匹配的顾客历史记录，标记为新客（含刷单、取消及退款订单）" : "门店新客"} className="shrink-0 whitespace-nowrap rounded-full border border-orange-500/25 bg-orange-500/10 px-1.5 py-0.5 text-[9.5px] font-medium leading-none text-orange-600 dark:text-orange-400">新客</span>
             ) : customerType === "returning" ? (
               <button
                 type="button"

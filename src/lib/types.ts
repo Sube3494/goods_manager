@@ -276,6 +276,7 @@ export interface AutoPickOrder {
   customerMaskedPhone?: string | null;
   customerPhoneExtension?: string | null;
   customerType?: "new" | "returning" | null;
+  customerPhoneTail?: string | null;
   customerRemark?: string | null;
   adminRemark?: string | null;
   items: AutoPickOrderItem[];

@@ -709,6 +709,11 @@ model AutoPickOrder {
   delivery              Json?
   rawPayload            Json?
   customerRemark        String?
+  customerPhoneTail      String?
+  customerAddressKey     String?
+  customerShopKey        String?
+  customerIdentityKey    String?
+  customerIdentityVersion Int                @default(0)
   lastSyncedAt          DateTime?
   autoCompleteAt        DateTime?
   createdAt             DateTime            @default(now())
@@ -723,6 +728,8 @@ model AutoPickOrder {
   @@index([userId, platform])
   @@index([sourceId])
   @@index([autoCompleteAt])
+  @@index([userId, customerIdentityVersion])
+  @@index([userId, customerIdentityKey, orderTime])
 }
 
 model AutoPickAutoCompleteJob {

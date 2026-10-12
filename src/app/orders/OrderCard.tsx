@@ -59,6 +59,7 @@ import { readMaiyatianItemRefundDetails, readMaiyatianItemRefundQuantity } from 
 const OrderRouteModal = dynamic(() => import("@/components/Orders/OrderRouteModal").then((module) => module.OrderRouteModal), { ssr: false });
 const CustomerHistoryModal = dynamic(() => import("@/components/Orders/CustomerHistoryModal").then((module) => module.CustomerHistoryModal), { ssr: false });
 import { extractCustomerPhoneTail } from "@/lib/customerPhoneTail";
+import { getCustomerMemoryPlatform } from "@/lib/customerMemory";
 import { CourierPhotosViewer } from "@/components/Orders/CourierPhotosViewer";
 
 export function createDefaultSelfDeliveryTiming() {
@@ -3824,8 +3825,10 @@ export const OrderCard = memo(function OrderCard({
     || displayAsOfflineOrder
     || isPureOffline
     || isUnsupportedCustomerTypePayload(order.rawPayload);
-  const resolvedCustomerType = isUnsupportedPlatform
-    ? null
+  const usesCustomerMemory = Boolean(getCustomerMemoryPlatform(order.platform));
+  const resolvedCustomerType = usesCustomerMemory
+    ? order.customerType || "new"
+    : isUnsupportedPlatform ? null
     : (order.customerType || readCustomerTypeFromOrderPayload(order.rawPayload));
   const customerTypeText = resolvedCustomerType === "new"
     ? "新客"
@@ -3857,6 +3860,7 @@ export const OrderCard = memo(function OrderCard({
     }
     return (
       <span
+        title={usesCustomerMemory && resolvedCustomerType === "new" ? "本店本平台暂无匹配的顾客历史记录，标记为新客（含刷单、取消及退款订单）" : undefined}
         className={cn(
           "inline-flex h-[15px] shrink-0 items-center justify-center rounded-full border px-1 text-[9.5px] font-medium leading-none",
           resolvedCustomerType === "new"
@@ -3946,6 +3950,7 @@ export const OrderCard = memo(function OrderCard({
           isOpen={historyModalOpen}
           onClose={() => setHistoryModalOpen(false)}
           phoneTail={customerPhoneTail}
+          currentOrderId={order.id}
           currentOrderNo={order.orderNo}
           shopId={order.shopId || undefined}
           shopName={order.matchedShopName || undefined}

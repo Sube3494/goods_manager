@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { resolveRememberedCustomerTypes } from "@/lib/customerMemoryStore";
 import { getAuthorizedUser } from "@/lib/auth";
 import {
   backfillPersistedAutoPickOrderFields,
@@ -225,7 +226,10 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
       }).catch(() => {});
     }
 
-    const customerType = readCustomerTypeFromRawPayload(refreshedOrder.rawPayload)
+    const rememberedCustomerTypes = await resolveRememberedCustomerTypes(refreshedOrder.userId, [refreshedOrder]);
+    const customerType = rememberedCustomerTypes.has(refreshedOrder.id)
+      ? rememberedCustomerTypes.get(refreshedOrder.id) ?? null
+      : readCustomerTypeFromRawPayload(refreshedOrder.rawPayload)
       || normalized?.customerType
       || null;
 

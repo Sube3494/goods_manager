@@ -4,6 +4,8 @@ import { getAuthorizedUser } from "@/lib/auth";
 import { extractCustomerPhoneTail, getCustomerMaskedPhoneDisplay } from "@/lib/customerPhoneTail";
 import { getBaseAutoPickStatusDisplay } from "@/lib/autoPickOrderStatus";
 import { resolveAutoPickMatchedShopName } from "@/lib/autoPickOrders";
+import { ensureCustomerMemory } from "@/lib/customerMemoryStore";
+import { getCustomerMemoryPlatform, CUSTOMER_MEMORY_PLATFORMS } from "@/lib/customerMemory";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +18,7 @@ export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const rawTail = String(searchParams.get("phoneTail") || "").trim();
   const currentOrderNo = String(searchParams.get("currentOrderNo") || "").trim();
+  const currentOrderId = String(searchParams.get("currentOrderId") || "").trim();
   const rawShopName = String(searchParams.get("shopName") || "").trim();
   const rawShopId = String(searchParams.get("shopId") || "").trim();
 
@@ -25,6 +28,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "请提供有效的4位真实手机尾号" }, { status: 400 });
   }
   const phoneTail = tailMatch[1];
+  if (!currentOrderId && !currentOrderNo) {
+    return NextResponse.json({ error: "请提供当前订单以限定门店和平台" }, { status: 400 });
+  }
 
   try {
     // 获取当前商户用户的权限配置（用于精准匹配门店名称）
@@ -34,25 +40,34 @@ export async function GET(request: NextRequest) {
     });
     const userPermissions = userRecord?.permissions;
 
-    // 若未直接传入 shopName 但提供了当前订单号，先查询当前订单获取其门店名称
-    let targetShopName = rawShopName || null;
-    if (!targetShopName && currentOrderNo) {
-      const currentOrder = await prisma.autoPickOrder.findFirst({
-        where: {
-          orderNo: currentOrderNo,
-          userId: session.id,
-        },
-        select: { shopId: true, rawPayload: true },
-      });
-      if (currentOrder) {
-        targetShopName = resolveAutoPickMatchedShopName(currentOrder, userPermissions) || null;
-      }
+    let currentOrder = await prisma.autoPickOrder.findFirst({
+      where: { userId: session.id, ...(currentOrderId ? { id: currentOrderId } : { orderNo: currentOrderNo }) },
+    });
+    if (!currentOrder) {
+      return NextResponse.json({ error: "当前订单不存在" }, { status: 404 });
     }
+    const memoryPlatform = getCustomerMemoryPlatform(currentOrder.platform);
+    if (memoryPlatform) {
+      await ensureCustomerMemory(session.id);
+      currentOrder = await prisma.autoPickOrder.findFirst({ where: { id: currentOrder.id, userId: session.id } });
+      if (!currentOrder) return NextResponse.json({ error: "当前订单不存在" }, { status: 404 });
+    }
+    const targetShopName = resolveAutoPickMatchedShopName(currentOrder, userPermissions) || rawShopName || null;
+    const targetShopId = currentOrder.shopId || rawShopId;
+    const platformAliases = memoryPlatform
+      ? CUSTOMER_MEMORY_PLATFORMS.filter((platform) => getCustomerMemoryPlatform(platform) === memoryPlatform)
+      : [currentOrder.platform];
 
-    // 严格限定在当前用户账号（绝不跨商户账号），读取所有历史订单
+    // 以当前订单为锚点，不能用另一平台、另一地址的同尾号顾客拼接历史。
     const allOrders = await prisma.autoPickOrder.findMany({
       where: {
         userId: session.id,
+        platform: { in: platformAliases, mode: "insensitive" },
+        ...(memoryPlatform
+          ? currentOrder.customerIdentityKey
+            ? { customerIdentityKey: currentOrder.customerIdentityKey }
+            : { id: "__missing_customer_identity__" }
+          : targetShopId ? { shopId: targetShopId } : {}),
       },
       include: {
         items: true,
@@ -62,13 +77,14 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    // 过滤同门店与同真实尾号
+    // 京东、淘宝的数据库标识已包含门店、平台、尾号、详细地址。
     const matchedOrders = allOrders.filter((order) => {
       // 1. 真实尾号严格匹配
       const tail = extractCustomerPhoneTail(order);
       if (tail !== phoneTail) {
         return false;
       }
+      if (memoryPlatform) return true;
 
       // 2. 门店归属过滤（同商户同门店）：
       // 如果指定了门店名称（例如“南山店”），判定候选订单是否也属于该门店
@@ -77,7 +93,7 @@ export async function GET(request: NextRequest) {
         // 如果候选订单有匹配的门店名称，要求与目标门店一致
         if (orderShopName && orderShopName !== targetShopName) {
           // 容错：如果两者的 shopId 一致，仍视为同店
-          const isSameShopId = rawShopId && order.shopId && rawShopId === order.shopId;
+          const isSameShopId = targetShopId && order.shopId && targetShopId === order.shopId;
           if (!isSameShopId) {
             return false;
           }
@@ -134,7 +150,7 @@ export async function GET(request: NextRequest) {
         customerRemark: order.customerRemark,
         customerName: (order.rawPayload as Record<string, unknown> | null)?.customerName || null,
         maskedPhone: maskedPhone || null,
-        isCurrentOrder: Boolean(currentOrderNo && order.orderNo === currentOrderNo),
+        isCurrentOrder: order.id === currentOrder.id,
         items,
       };
     });
@@ -145,6 +161,8 @@ export async function GET(request: NextRequest) {
       totalCount: matchedOrders.length,
       totalActualPaidYuan: (totalActualPaidCents / 100).toFixed(2),
       orders: formattedOrders,
+      platform: currentOrder.platform,
+      matchBasis: memoryPlatform ? "同门店、同平台、真实尾号＋详细地址" : "同门店、同平台、真实手机尾号",
     });
   } catch (error) {
     console.error("[CustomerHistoryAPI] Failed to fetch customer history:", error);

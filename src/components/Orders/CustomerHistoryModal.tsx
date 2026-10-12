@@ -55,6 +55,8 @@ interface CustomerHistoryData {
   totalCount: number;
   totalActualPaidYuan: string;
   orders: HistoryOrder[];
+  matchBasis?: string;
+  platform?: string | null;
 }
 
 interface CustomerHistoryModalProps {
@@ -62,6 +64,7 @@ interface CustomerHistoryModalProps {
   onClose: () => void;
   phoneTail: string;
   currentOrderNo?: string;
+  currentOrderId?: string;
   shopId?: string;
   shopName?: string;
   maskedPhone?: string | null;
@@ -72,6 +75,7 @@ export function CustomerHistoryModal({
   onClose,
   phoneTail: initialPhoneTail,
   currentOrderNo,
+  currentOrderId,
   shopId,
   shopName,
   maskedPhone: initialMaskedPhone,
@@ -95,6 +99,7 @@ export function CustomerHistoryModal({
       const query = new URLSearchParams({
         phoneTail: tail,
         ...(currentOrderNo ? { currentOrderNo } : {}),
+        ...(currentOrderId ? { currentOrderId } : {}),
         ...(shopId ? { shopId } : {}),
         ...(shopName ? { shopName } : {}),
       });
@@ -109,7 +114,7 @@ export function CustomerHistoryModal({
     } finally {
       setLoading(false);
     }
-  }, [currentOrderNo, shopId, shopName]);
+  }, [currentOrderNo, currentOrderId, shopId, shopName]);
 
   useEffect(() => {
     if (isOpen && phoneTail) {
@@ -199,16 +204,16 @@ export function CustomerHistoryModal({
           {data && !loading && (
             <div className="grid grid-cols-2 gap-2 border-b border-border/40 bg-muted/20 px-5 py-2.5 text-xs sm:grid-cols-3 shrink-0">
               <div>
-                <span className="text-muted-foreground">本店历史单数：</span>
+                <span className="text-muted-foreground">本店本平台单数：</span>
                 <span className="font-bold text-foreground">{data.totalCount} 笔</span>
               </div>
               <div>
-                <span className="text-muted-foreground">累计消费：</span>
+                <span className="text-muted-foreground">订单实付合计：</span>
                 <span className="font-bold font-mono text-emerald-600 dark:text-emerald-400">¥{data.totalActualPaidYuan}</span>
               </div>
               <div className="hidden sm:block text-right">
                 <span className="text-muted-foreground">匹配依据：</span>
-                <span className="text-foreground/80">平台脱敏真实手机尾号</span>
+                <span className="text-foreground/80">{data.matchBasis || "平台脱敏真实手机尾号"}</span>
               </div>
             </div>
           )}

@@ -2,6 +2,7 @@
  * 顾客真实脱敏手机号与 4 位尾号纯工具库
  * 必须保持 100% 零服务端/零 Node.js 依赖，确保在 Next.js Client Component 中安全打包
  */
+import { getCustomerMemoryPlatform, readCustomerMemoryPhoneTail } from "./customerMemory";
 
 function readTrimmedCandidateValue(candidates: unknown[]): string | null {
   for (const candidate of candidates) {
@@ -73,6 +74,9 @@ function readDeepCustomerMaskedPhone(rawPayload: unknown): string | null {
  */
 export function extractCustomerPhoneTail(source: unknown): string | null {
   if (!source) return null;
+  if (typeof source === "object" && getCustomerMemoryPlatform((source as { platform?: string }).platform)) {
+    return readCustomerMemoryPhoneTail(source as Parameters<typeof readCustomerMemoryPhoneTail>[0]);
+  }
 
   let directMaskedPhone: string | null = null;
   let rawPayload: unknown = source;
@@ -135,5 +139,9 @@ export function getCustomerMaskedPhoneDisplay(source: unknown): string | null {
     return deepMasked;
   }
 
+  if (typeof source === "object" && getCustomerMemoryPlatform((source as { platform?: string }).platform)) {
+    const tail = readCustomerMemoryPhoneTail(source as Parameters<typeof readCustomerMemoryPhoneTail>[0]);
+    return tail ? `****${tail}` : null;
+  }
   return null;
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { resolveRememberedCustomerTypes } from "@/lib/customerMemoryStore";
 import { getAuthorizedUser, getAuthorizedUserAny } from "@/lib/auth";
 import { Prisma } from "../../../../../prisma/generated-client";
 import { returnOutboundOrderById } from "@/lib/outboundReturns";
@@ -47,11 +48,14 @@ export async function GET(
       select: {
         id: true,
         sourceId: true,
+        userId: true,
+        platform: true,
         longitude: true,
         latitude: true,
         delivery: true,
         rawPayload: true,
         customerRemark: true,
+        customerPhoneTail: true,
       },
     });
 
@@ -70,7 +74,10 @@ export async function GET(
         })
       : null;
     const normalized = normalizeAutoPickOrderPayload(order.rawPayload);
-    const customerType = readCustomerTypeFromRawPayload(order.rawPayload)
+    const rememberedCustomerTypes = await resolveRememberedCustomerTypes(order.userId, [order]);
+    const customerType = rememberedCustomerTypes.has(order.id)
+      ? rememberedCustomerTypes.get(order.id) ?? null
+      : readCustomerTypeFromRawPayload(order.rawPayload)
       || normalized?.customerType
       || null;
 
@@ -91,6 +98,7 @@ export async function GET(
         customerMaskedPhone: readCustomerMaskedPhoneFromRawPayload(order.rawPayload),
         customerPhoneExtension: readCustomerPhoneExtensionFromRawPayload(order.rawPayload),
         customerType,
+        customerPhoneTail: order.customerPhoneTail,
         customerRemark: order.customerRemark || readCustomerRemarkFromRawPayload(order.rawPayload),
         adminRemark: readAdminRemarkFromRawPayload(order.rawPayload),
         cancelReason: readCancelReasonFromRawPayload(order.rawPayload),
@@ -481,6 +489,8 @@ export async function PATCH(
             ? {
                 shopId: targetShopId,
                 shopAddress: targetShopAddress,
+                customerIdentityVersion: 0,
+                customerIdentityKey: null,
               }
             : {}),
           ...(offlineEdit

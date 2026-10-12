@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { resolveRememberedCustomerTypes } from "@/lib/customerMemoryStore";
+import { getCustomerMemoryPlatform } from "@/lib/customerMemory";
 import { getAuthorizedUserAny } from "@/lib/auth";
 import { hasAdminAccess } from "@/lib/permissions";
 import { FinanceMath } from "@/lib/math";
@@ -738,6 +740,7 @@ export async function GET(request: NextRequest) {
       if (platformFilter && normalizePlatform(order.platform) !== platformFilter) return false;
       return true;
     });
+    const rememberedCustomerTypes = await resolveRememberedCustomerTypes(targetUserId, filteredAutoPickOrdersInRange);
 
     const pendingOrderCount = pendingOrders.length;
     const pendingInboundAmount = pendingOrders.reduce(
@@ -1423,7 +1426,7 @@ export async function GET(request: NextRequest) {
         || String(order.platform || "").toLowerCase() === "other";
       const isOther = isAutoPickOrderCancelledStatus(order.status)
         || isAutoPickOrderDeletedStatus(order.status);
-      if (isBrush || isOther || isOffline) return;
+      if (isOffline || (!getCustomerMemoryPlatform(order.platform) && (isBrush || isOther))) return;
 
       const manualAmountOverride = readManualAmountOverride(order.rawPayload);
       let paidYuan = (order.actualPaid || 0) / 100;
@@ -1437,7 +1440,9 @@ export async function GET(request: NextRequest) {
 
       const dateKey = resolveAutoPickOrderDateKey(order);
       const daily = customerDailyMap.get(dateKey);
-      const customerType = readCustomerTypeFromRawPayload(order.rawPayload);
+      const customerType = rememberedCustomerTypes.has(order.id)
+        ? rememberedCustomerTypes.get(order.id) ?? null
+        : readCustomerTypeFromRawPayload(order.rawPayload);
       if (customerType === "new") {
         newCustomerOrders += 1;
         newCustomerAmount = FinanceMath.add(newCustomerAmount, orderAmount);
