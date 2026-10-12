@@ -1030,7 +1030,6 @@ export function AllOrdersView({
                           <OrderCard
                             order={order}
                             allowCustomerHistory={!customerHistoryOrderId}
-                            showFullOrderNo={Boolean(customerHistoryOrderId)}
                             expanded={expandedIds.includes(order.id)}
                             actingId={actingId}
                             onToggleExpanded={toggleExpanded}
