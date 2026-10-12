@@ -46,7 +46,7 @@ import {
   isDeliveryCancelledOrEmpty,
   isLockedSubscribeOrder,
   isOrderFullyRefunded,
-  isSelfDeliveryOrCancelledDelivery,
+  isSelfDeliveryForFee,
   readDeliveryFeeFromValue,
 } from "@/lib/autoPickOrderStatus";
 import { formatLocalDate, formatLocalDateTime } from "@/lib/dateUtils";
@@ -271,9 +271,6 @@ export function getExpectedIncome(
 }
 
 export function getDeliveryFee(delivery: unknown, order?: { isMainSystemSelfDelivery?: boolean; rawPayload?: unknown } | null) {
-  if (isSelfDeliveryOrCancelledDelivery(delivery, order?.rawPayload ?? order?.isMainSystemSelfDelivery)) {
-    return 0;
-  }
   return readDeliveryFeeFromValue(delivery, order?.rawPayload ?? order?.isMainSystemSelfDelivery);
 }
 
@@ -3736,8 +3733,8 @@ export const OrderCard = memo(function OrderCard({
   const terminal = isTerminalStatus(order.status) || isFullyRefunded;
   const abnormal = isAbnormalStatus(order.status);
   const deliveryFee = getDeliveryFee(order.delivery, order);
-  const isSelfDeliveryOrCancelled = isSelfDeliveryOrCancelledDelivery(order.delivery, order.rawPayload ?? order.isMainSystemSelfDelivery);
-  const effectiveSendFee = isSelfDeliveryOrCancelled
+  const isSelfDeliveryFeeExempt = isSelfDeliveryForFee(order.delivery, order.rawPayload ?? order.isMainSystemSelfDelivery);
+  const effectiveSendFee = isSelfDeliveryFeeExempt
     ? 0
     : (() => {
         const fee = readDeliveryFeeFromValue(order.delivery, order.rawPayload);
@@ -4732,7 +4729,7 @@ export const OrderCard = memo(function OrderCard({
                           {toCurrency(displayDeliveryFee)}
                         </button>
                       ) : (
-                        effectiveSendFee != null ? toCurrency(effectiveSendFee) : (isSelfDeliveryOrCancelled ? "¥0.00" : (riderName !== "-" ? "待同步" : "-"))
+                        effectiveSendFee != null ? toCurrency(effectiveSendFee) : (isSelfDeliveryFeeExempt ? "¥0.00" : (riderName !== "-" ? "待同步" : "-"))
                       )
                     }
                     className="col-span-2"
@@ -4745,7 +4742,7 @@ export const OrderCard = memo(function OrderCard({
                   <div className="mt-2.5 pt-2.5 border-t border-black/6 dark:border-white/6">
                     <CourierPhotosViewer
                       orderId={order.id}
-                      isSelfDelivery={isSelfDeliveryOrCancelled}
+                      isSelfDelivery={isSelfDeliveryFeeExempt}
                       autoLoad={Boolean(order.delivery?.track || order.delivery?.completedTime || order.delivery?.pickupTime)}
                     />
                   </div>

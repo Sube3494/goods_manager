@@ -7,7 +7,6 @@ import {
   backfillJdSkuIdForManualMatchedShopProducts,
   backfillMeituanSkuIdForManualMatchedShopProducts,
   backfillPlatformIdsForSyncedAutoPickOrder,
-  isSelfDeliveryOrCancelledDelivery,
   normalizeAutoPickOrderPayload,
   normalizeAutoPickIntegrationConfig,
   readCustomerMaskedPhoneFromRawPayload,
@@ -2674,7 +2673,7 @@ export async function GET(request: NextRequest) {
       const normalizedDelivery = order.delivery && typeof order.delivery === "object" && !Array.isArray(order.delivery)
         ? {
             ...(order.delivery as Record<string, unknown>),
-            sendFee: (hiddenDeletedOfflineIncome || isSelfDeliveryOrCancelledDelivery(order.delivery, order.isMainSystemSelfDelivery))
+            sendFee: hiddenDeletedOfflineIncome
               ? 0
               : (deliveryFee > 0 ? deliveryFee : undefined),
           }

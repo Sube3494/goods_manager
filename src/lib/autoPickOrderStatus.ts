@@ -613,7 +613,17 @@ export function isAutoPickOrderRiderAssigned(order?: {
   return false;
 }
 
-export function isSelfDeliveryOrCancelledDelivery(delivery: unknown, rawPayloadOrFlag?: unknown): boolean {
+// 配送取消只表示任务状态，不能据此抹掉平台仍返回的配送费用。
+export function isSelfDeliveryForFee(delivery: unknown, rawPayloadOrFlag?: unknown): boolean {
+  const raw = rawPayloadOrFlag && typeof rawPayloadOrFlag === "object" && !Array.isArray(rawPayloadOrFlag)
+    ? rawPayloadOrFlag as Record<string, unknown>
+    : null;
+  const systemMeta = raw?.systemMeta && typeof raw.systemMeta === "object" && !Array.isArray(raw.systemMeta)
+    ? raw.systemMeta as Record<string, unknown>
+    : null;
+  const manualFee = systemMeta?.manualDeliveryFee as { deliveryFee?: unknown } | undefined;
+  if (typeof manualFee?.deliveryFee === "number" && manualFee.deliveryFee >= 0) return false;
+
   if (delivery && typeof delivery === "object" && !Array.isArray(delivery)) {
     const d = delivery as Record<string, unknown>;
     if (typeof d.manualDeliveryFee === "number" && d.manualDeliveryFee >= 0) {
@@ -621,12 +631,6 @@ export function isSelfDeliveryOrCancelledDelivery(delivery: unknown, rawPayloadO
     }
     const logisticName = String(d.logisticName || d.logistic_name || "").trim();
     const riderName = String(d.riderName || d.delivery_name || "").trim();
-    const track = String(d.track || "").trim();
-
-    // 取消或退单
-    if (/取消|退单/.test(track)) return true;
-    if (d.cancel_time != null || d.cancelTime != null) return true;
-
     // 显式标注自配送
     if (/自配|自配送|商家自配|oneself/i.test(logisticName)) return true;
     if (/自配|自配送|商家自配/i.test(riderName)) return true;
@@ -691,7 +695,7 @@ export function readDeliveryFeeFromValue(delivery: unknown, rawPayloadOrFlag?: u
     return Math.max(0, Math.round(Number(manualFeeValue)));
   }
 
-  if (isSelfDeliveryOrCancelledDelivery(delivery, rawPayloadOrFlag)) {
+  if (isSelfDeliveryForFee(delivery, rawPayloadOrFlag)) {
     return 0;
   }
 

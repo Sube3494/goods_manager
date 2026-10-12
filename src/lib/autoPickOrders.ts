@@ -15,12 +15,12 @@ import {
   isAutoPickOrderTerminalStatus,
   isAutoPickOtherPickupOrder,
   isAutoPickPickupOrder,
-  isSelfDeliveryOrCancelledDelivery,
+  isSelfDeliveryForFee,
   readDeliveryFeeFromValue,
   resolveAutoPickBusinessStatus,
 } from "@/lib/autoPickOrderStatus";
 export {
-  isSelfDeliveryOrCancelledDelivery,
+  isSelfDeliveryForFee,
   readDeliveryFeeFromValue,
 };
 import { Prisma } from "../../prisma/generated-client";
@@ -2196,8 +2196,8 @@ function parseDeliveryInfoFromDetail(detail: MaiyatianOrderDetailResponse["data"
     ...(deliveryRecord || {}),
     sendFee: rawSendFee,
   }, detail);
-  const isSelfOrCancelled = isSelfDeliveryOrCancelledDelivery(deliveryRecord, detail);
-  const sendFee = isSelfOrCancelled ? 0 : (parsedSendFee > 0 ? parsedSendFee : undefined);
+  const isSelfDelivery = isSelfDeliveryForFee(deliveryRecord, detail);
+  const sendFee = isSelfDelivery ? 0 : (parsedSendFee > 0 ? parsedSendFee : undefined);
   const jdLikePickupCandidates = [
     detail?.pickup_time,
     detail?.pickupTime,
@@ -3796,8 +3796,8 @@ export function normalizeAutoPickOrderPayload(payload: unknown): AutoPickInbound
         { ...(deliveryRecord || {}), sendFee: rawSendFee },
         input
       );
-      const isSelfOrCancelled = isSelfDeliveryOrCancelledDelivery(deliveryRecord, input);
-      const normalizedSendFee = isSelfOrCancelled
+      const isSelfDelivery = isSelfDeliveryForFee(deliveryRecord, input);
+      const normalizedSendFee = isSelfDelivery
         ? 0
         : (parsedSendFee > 0 ? parsedSendFee : undefined);
 
