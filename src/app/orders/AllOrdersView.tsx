@@ -26,6 +26,7 @@ import {
 } from "./OrderCard";
 import { motion, AnimatePresence } from "framer-motion";
 import { DeliveryDispatchModal } from "@/components/Orders/DeliveryDispatchModal";
+import { OrderListContext } from "@/components/Orders/OrderListContext";
 
 function OrderListSkeleton({ count = 3 }: { count?: number }) {
   return (
@@ -104,7 +105,7 @@ function normalizeDisplayPlatform(platform?: string | null) {
   return raw;
 }
 
-interface AllOrdersViewProps {
+export interface AllOrdersViewProps {
   refreshTrigger: number;
   targetRefreshOrder?: { id: string; timestamp: number } | null;
   onClearProfitUpdating?: (orderId: string) => void;
@@ -156,6 +157,7 @@ interface AllOrdersViewProps {
   canExpandDetails?: boolean;
   canViewProductCosts?: boolean;
   mode?: "all" | "appointments";
+  customerHistoryOrderId?: string;
 }
 
 const ALL_ORDERS_BATCH_SIZE = 30;
@@ -178,7 +180,15 @@ export function AllOrdersView({
   canExpandDetails = true,
   canViewProductCosts = true,
   mode = "all",
+  customerHistoryOrderId,
 }: AllOrdersViewProps) {
+  const orderListContext = useMemo(() => ({
+    refreshTrigger, targetRefreshOrder, onClearProfitUpdating, onOpenCostBackfill,
+    onOpenMatchEditor, onRemoveBundleComponent, onOpenPurchaseDraft, profitUpdatingOrderIds,
+    localShops, userId, readOnly, canExpandDetails, canViewProductCosts,
+  }), [refreshTrigger, targetRefreshOrder, onClearProfitUpdating, onOpenCostBackfill,
+    onOpenMatchEditor, onRemoveBundleComponent, onOpenPurchaseDraft, profitUpdatingOrderIds,
+    localShops, userId, readOnly, canExpandDetails, canViewProductCosts]);
   const { showToast } = useToast();
   const [orders, setOrders] = useState<AutoPickOrder[]>([]);
   const [meta, setMeta] = useState({
@@ -318,6 +328,7 @@ export function AllOrdersView({
       if (endDate) params.set("endDate", endDate);
       if (shop !== "all") params.set("shop", shop);
       if (userId) params.set("userId", userId);
+      if (customerHistoryOrderId) params.set("customerHistoryOrderId", customerHistoryOrderId);
       if (mode === "appointments") params.set("subscription", "pending");
       if (!silent || options?.refreshMetrics) {
         params.set("_metrics", "1");
@@ -383,7 +394,7 @@ export function AllOrdersView({
         setIsLoadingMore(false);
       }
     }
-  }, [platform, debouncedQuery, startDate, endDate, status, shop, showToast, userId, mode]);
+  }, [platform, debouncedQuery, startDate, endDate, status, shop, showToast, userId, mode, customerHistoryOrderId]);
 
   // 外部刷新信号监听
   useEffect(() => {
@@ -498,6 +509,7 @@ export function AllOrdersView({
         pageSize: "1",
       });
       if (userId) params.set("userId", userId);
+      if (customerHistoryOrderId) params.set("customerHistoryOrderId", customerHistoryOrderId);
       const response = await fetch(`/api/orders?${params.toString()}`, { cache: "no-store" });
       const data = await response.json().catch(() => ({}));
       const refreshedOrder = Array.isArray(data?.items) ? data.items[0] : null;
@@ -530,6 +542,7 @@ export function AllOrdersView({
       if (endDate) params.set("endDate", endDate);
       if (shop !== "all") params.set("shop", shop);
       if (userId) params.set("userId", userId);
+      if (customerHistoryOrderId) params.set("customerHistoryOrderId", customerHistoryOrderId);
       if (mode === "appointments") params.set("subscription", "pending");
 
       const metricsRes = await fetch(`/api/orders?${params.toString()}`, { cache: "no-store" });
@@ -541,7 +554,7 @@ export function AllOrdersView({
     } catch {
       // 忽略指标静默更新失败
     }
-  }, [debouncedQuery, endDate, mode, onClearProfitUpdating, patchOrder, platform, shop, startDate, status, userId]);
+  }, [debouncedQuery, endDate, mode, onClearProfitUpdating, patchOrder, platform, shop, startDate, status, userId, customerHistoryOrderId]);
 
   const lastHandledRefreshRef = useRef<number>(0);
   useEffect(() => {
@@ -874,6 +887,7 @@ export function AllOrdersView({
   };
 
   return (
+    <OrderListContext.Provider value={orderListContext}>
     <div className="space-y-6">
       {/* 筛选栏 */}
       <section className="rounded-3xl border border-black/8 bg-zinc-50/45 px-4 py-4 shadow-xs dark:border-white/10 dark:bg-white/4">
@@ -1010,8 +1024,13 @@ export function AllOrdersView({
                     <div className="grid gap-4">
                       {group.orders.map((order) => (
                         <OrderCardErrorBoundary key={order.id} orderNo={order.orderNo || order.id}>
+                          {order.id === customerHistoryOrderId ? (
+                            <div className="mb-2 text-xs font-semibold text-primary">当前查看的订单</div>
+                          ) : null}
                           <OrderCard
                             order={order}
+                            allowCustomerHistory={!customerHistoryOrderId}
+                            showFullOrderNo={Boolean(customerHistoryOrderId)}
                             expanded={expandedIds.includes(order.id)}
                             actingId={actingId}
                             onToggleExpanded={toggleExpanded}
@@ -1094,5 +1113,6 @@ export function AllOrdersView({
         />
       ) : null}
     </div>
+    </OrderListContext.Provider>
   );
 }

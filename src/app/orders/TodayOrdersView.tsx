@@ -13,6 +13,7 @@ import { updateOrderProductImage } from "@/lib/orderProductImage";
 import { formatLocalDate, formatLocalDateTime } from "@/lib/dateUtils";
 import { extractCustomerPhoneTail } from "@/lib/customerPhoneTail";
 import { getCustomerMemoryPlatform } from "@/lib/customerMemory";
+import { OrderListContext } from "@/components/Orders/OrderListContext";
 import { cleanCustomerRemark } from "@/lib/customerRemark";
 import {
   AUTO_PICK_EXTRA_STATUS_FILTERS,
@@ -567,6 +568,13 @@ export function TodayOrdersView({
   canExpandDetails = true,
   canViewProductCosts = true,
 }: TodayOrdersViewProps) {
+  const orderListContext = useMemo(() => ({
+    refreshTrigger, targetRefreshOrder, onClearProfitUpdating, onOpenCostBackfill,
+    onOpenMatchEditor, onRemoveBundleComponent, onOpenPurchaseDraft, profitUpdatingOrderIds,
+    localShops, userId, readOnly, canExpandDetails, canViewProductCosts,
+  }), [refreshTrigger, targetRefreshOrder, onClearProfitUpdating, onOpenCostBackfill,
+    onOpenMatchEditor, onRemoveBundleComponent, onOpenPurchaseDraft, profitUpdatingOrderIds,
+    localShops, userId, readOnly, canExpandDetails, canViewProductCosts]);
   const { showToast } = useToast();
   const todayDate = useMemo(() => formatLocalDate(new Date()), []);
   const cacheKey = `${userId || "self"}_${todayDate}`;
@@ -1323,6 +1331,7 @@ export function TodayOrdersView({
   );
 
   return (
+    <OrderListContext.Provider value={orderListContext}>
     <div className="space-y-6">
       {/* 筛选栏 */}
       <section className="rounded-3xl border border-black/8 bg-zinc-50/45 px-4 py-4 shadow-xs dark:border-white/10 dark:bg-white/4">
@@ -1605,5 +1614,6 @@ export function TodayOrdersView({
         />
       ) : null}
     </div>
+    </OrderListContext.Provider>
   );
 }

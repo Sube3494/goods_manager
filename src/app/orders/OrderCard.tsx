@@ -3459,6 +3459,7 @@ export const OrderCard = memo(function OrderCard({
   canExpandDetails = true,
   canViewProductCosts = true,
   showFullOrderNo = false,
+  allowCustomerHistory = true,
   isProfitUpdating = false,
   onToggleExpanded,
   onRunAction,
@@ -3475,6 +3476,7 @@ export const OrderCard = memo(function OrderCard({
   canExpandDetails?: boolean;
   canViewProductCosts?: boolean;
   showFullOrderNo?: boolean;
+  allowCustomerHistory?: boolean;
   isProfitUpdating?: boolean;
   onToggleExpanded: (id: string) => void;
   onRunAction: (orderId: string, action: OrderAction) => void;
@@ -3839,7 +3841,7 @@ export const OrderCard = memo(function OrderCard({
   const customerPhoneTail = extractCustomerPhoneTail(order);
   const renderCustomerTypeBadge = (extraClassName?: string) => {
     if (!showCustomerTypeBadge) return null;
-    const isReturning = resolvedCustomerType === "returning" && Boolean(customerPhoneTail);
+    const isReturning = allowCustomerHistory && resolvedCustomerType === "returning" && Boolean(customerPhoneTail);
     if (isReturning) {
       return (
         <button

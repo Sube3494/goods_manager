@@ -60,6 +60,7 @@ mock.module("../src/lib/auth", () => ({ getAuthorizedUser: async () => ({ id: "u
 mock.module("../src/lib/autoPickOrders", () => ({ resolveAutoPickMatchedShopName: () => "测试门店" }));
 const { buildCustomerMemoryFields, resolveRememberedCustomerTypes } = await import("../src/lib/customerMemoryStore");
 const { GET: getHistory } = await import("../src/app/api/orders/customer-history/route");
+const { resolveCustomerHistoryScope } = await import("../src/lib/customerHistory");
 
 function order(id, overrides = {}) {
   return { id, userId: "user-1", platform: "京东", shopId: "shop-1", orderNo: id,
@@ -189,4 +190,14 @@ test("无法识别不降级为宽泛尾号搜索，不能跨账号读取当前�
   expect((await missing.json()).orders).toEqual([]);
   const forbidden = await getHistory(new NextRequest("http://localhost/api/orders/customer-history?phoneTail=1234&currentOrderId=foreign"));
   expect(forbidden.status).toBe(404);
+});
+
+test("订单列表的顾客范围包含超过100笔历史，始终排除其他平台、门店和账号", async () => {
+  rows = Array.from({ length: 135 }, (_, index) => order(`history-${index}`));
+  rows.push(order("other-platform", { platform: "淘宝" }), order("other-shop", { shopId: "shop-2" }),
+    order("other-user", { userId: "user-2" }));
+  const scope = await resolveCustomerHistoryScope("user-1", "history-0");
+  expect(query({ where: scope.where })).toHaveLength(135);
+  expect(await resolveCustomerHistoryScope("user-1", "other-user")).toBeNull();
+  expect(await resolveCustomerHistoryScope("user-1", "missing")).toBeNull();
 });

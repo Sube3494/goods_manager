@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { parseOutboundCostSnapshot, resolvePurchaseBatchSnapshotCost } from "@/lib/outboundCostSnapshot";
 import prisma from "@/lib/prisma";
 import { resolveRememberedCustomerTypes } from "@/lib/customerMemoryStore";
+import { resolveCustomerHistoryScope } from "@/lib/customerHistory";
 import { getAuthorizedUser, getAuthorizedUserAny } from "@/lib/auth";
 import { hasAdminAccess, hasPermission } from "@/lib/permissions";
 import {
@@ -1095,6 +1096,13 @@ export async function GET(request: NextRequest) {
       || hasPermission(session, "order:manage");
     const targetUserId = (canManageMembers && requestedUserId) ? requestedUserId : session.id;
     const canViewProductCosts = targetUserId === session.id || session.role === "SUPER_ADMIN";
+    const customerHistoryOrderId = String(searchParams.get("customerHistoryOrderId") || "").trim();
+    const customerHistoryScope = customerHistoryOrderId
+      ? await resolveCustomerHistoryScope(targetUserId, customerHistoryOrderId, session.permissions)
+      : null;
+    if (customerHistoryOrderId && !customerHistoryScope) {
+      return NextResponse.json({ error: "当前订单不存在或无权查看顾客历史" }, { status: 404 });
+    }
 
     const shopFilter = String(searchParams.get("shop") || "").trim();
     let shopWhereFilter: Prisma.AutoPickOrderWhereInput | undefined = undefined;
@@ -1151,6 +1159,7 @@ export async function GET(request: NextRequest) {
 
     const baseWhereWithoutShop: Prisma.AutoPickOrderWhereInput = {
       userId: targetUserId,
+      ...(customerHistoryScope ? { AND: [customerHistoryScope.where] } : {}),
       ...(requestedOrderIds.length > 0
         ? {
             OR: [

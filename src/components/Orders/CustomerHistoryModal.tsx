@@ -1,63 +1,19 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useContext, useRef } from "react";
 import { createPortal } from "react-dom";
+import dynamic from "next/dynamic";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  X,
-  History,
-  Phone,
-  ShoppingBag,
-  Clock,
-  MapPin,
-  FileText,
-  AlertCircle,
-  Loader2,
-  CheckCircle2,
-  XCircle,
-  Truck,
-} from "lucide-react";
-import Image from "next/image";
-import { cn } from "@/lib/utils";
-import { formatLocalDateTime } from "@/lib/dateUtils";
+import { X, History, Phone, Loader2 } from "lucide-react";
+import { OrderListContext } from "./OrderListContext";
+import type { AllOrdersViewProps } from "@/app/orders/AllOrdersView";
 
-interface OrderItem {
-  id: string;
-  productName: string;
-  productNo?: string | null;
-  spec?: string;
-  quantity: number;
-  price: string | null;
-  imageUrl: string | null;
-}
-
-interface HistoryOrder {
-  id: string;
-  orderNo: string;
-  platform: string;
-  orderTime: string;
-  status: string | null;
-  statusDisplay: string;
-  actualPaid: number;
-  actualPaidYuan: string;
-  expectedIncome: number | null;
-  userAddress: string;
-  customerRemark?: string | null;
-  customerName?: string | null;
-  maskedPhone?: string | null;
-  isCurrentOrder: boolean;
-  items: OrderItem[];
-}
-
-interface CustomerHistoryData {
-  phoneTail: string;
-  representativeMaskedPhone: string;
-  totalCount: number;
-  totalActualPaidYuan: string;
-  orders: HistoryOrder[];
-  matchBasis?: string;
-  platform?: string | null;
-}
+const HistoryOrdersView = dynamic(() => import("@/app/orders/AllOrdersView").then((module) => module.AllOrdersView), {
+  ssr: false,
+  loading: () => <div className="flex items-center justify-center gap-2 py-16 text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" />加载历史订单...</div>,
+});
+const emptyShops: AllOrdersViewProps["localShops"] = [];
+const noAction = () => {};
 
 interface CustomerHistoryModalProps {
   isOpen: boolean;
@@ -71,68 +27,31 @@ interface CustomerHistoryModalProps {
 }
 
 export function CustomerHistoryModal({
-  isOpen,
-  onClose,
-  phoneTail: initialPhoneTail,
-  currentOrderNo,
-  currentOrderId,
-  shopId,
-  shopName,
-  maskedPhone: initialMaskedPhone,
+  isOpen, onClose, phoneTail, currentOrderId, maskedPhone,
 }: CustomerHistoryModalProps) {
-  const [phoneTail, setPhoneTail] = useState(initialPhoneTail);
-  const [data, setData] = useState<CustomerHistoryData | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const orderList = useContext(OrderListContext);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const [total, setTotal] = useState<number | null>(null);
+  const handleDataLoad = useCallback<AllOrdersViewProps["onDataLoad"]>((data) => {
+    setTotal(data.isLoading ? null : data.total);
+  }, []);
 
-  useEffect(() => {
-    if (isOpen) {
-      setPhoneTail(initialPhoneTail);
-    }
-  }, [isOpen, initialPhoneTail]);
-
-  const fetchHistory = useCallback(async (tail: string) => {
-    if (!tail || tail.length < 4) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const query = new URLSearchParams({
-        phoneTail: tail,
-        ...(currentOrderNo ? { currentOrderNo } : {}),
-        ...(currentOrderId ? { currentOrderId } : {}),
-        ...(shopId ? { shopId } : {}),
-        ...(shopName ? { shopName } : {}),
-      });
-      const res = await fetch(`/api/orders/customer-history?${query.toString()}`);
-      const json = await res.json();
-      if (!res.ok) {
-        throw new Error(json.error || "获取历史订单失败");
-      }
-      setData(json);
-    } catch (e: any) {
-      setError(e.message || "请求失败");
-    } finally {
-      setLoading(false);
-    }
-  }, [currentOrderNo, currentOrderId, shopId, shopName]);
-
-  useEffect(() => {
-    if (isOpen && phoneTail) {
-      fetchHistory(phoneTail);
-    }
-  }, [isOpen, phoneTail, fetchHistory]);
-
-  // 快捷键 ESC 关闭与背景锁定
   useEffect(() => {
     if (!isOpen) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+      const target = event.target instanceof Element ? event.target : null;
+      // 编辑、照片等子弹窗自己处理 Escape，避免同时关闭底下的历史列表。
+      if (!target || !dialogRef.current?.contains(target) || target.closest('[role="dialog"]') !== dialogRef.current) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      onClose();
     };
-    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown, true);
     const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
-      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keydown", handleKeyDown, true);
       document.body.style.overflow = originalOverflow;
     };
   }, [isOpen, onClose]);
@@ -141,253 +60,45 @@ export function CustomerHistoryModal({
 
   return createPortal(
     <AnimatePresence>
-      <div className="fixed inset-0 z-[160000] flex items-center justify-center p-3 sm:p-5">
-        {/* 背景遮罩 */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          onClick={onClose}
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-all"
-        />
-
-        {/* 弹窗主体容器 */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.96, y: 12 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.96, y: 12 }}
-          transition={{ duration: 0.2, ease: "easeOut" }}
-          className="relative z-110001 flex flex-col w-full max-w-2xl max-h-[88vh] rounded-[28px] border border-border/70 dark:border-white/10 bg-background/98 dark:bg-[#141822]/95 backdrop-blur-2xl shadow-2xl overflow-hidden text-foreground"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {/* 头部 Header */}
-          <div className="flex items-center justify-between border-b border-border/50 px-5 py-4 shrink-0">
-            <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                <History size={18} />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="text-base font-bold text-foreground">
-                    老客历史订单档案
-                  </h3>
-                  <span className="inline-flex h-[15px] items-center justify-center rounded-full border border-slate-400/20 bg-slate-500/8 px-1 text-[9.5px] font-medium leading-none text-slate-500 dark:text-slate-300">
-                    老客
-                  </span>
-                </div>
-                <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
-                  <span className="flex items-center gap-1">
-                    <Phone size={11} className="shrink-0" />
-                    <span>真实尾号: <strong className="font-mono text-foreground">{phoneTail}</strong></span>
-                  </span>
-                  {(data?.representativeMaskedPhone || initialMaskedPhone) && (
-                    <>
-                      <span>·</span>
-                      <span className="font-mono">{data?.representativeMaskedPhone || initialMaskedPhone}</span>
-                    </>
-                  )}
+      <div className="fixed inset-0 z-[95000] flex items-center justify-center p-2 sm:p-5">
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+          onClick={onClose} className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+        <motion.div initial={{ opacity: 0, scale: 0.96, y: 12 }} animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.96, y: 12 }} transition={{ duration: 0.2, ease: "easeOut" }}
+          ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="customer-history-title"
+          className="relative flex h-[90dvh] w-full max-w-[1440px] flex-col overflow-hidden rounded-[28px] border border-border/70 bg-background text-foreground shadow-2xl dark:border-white/10"
+          onClick={(event) => event.stopPropagation()}>
+          <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border/50 px-4 py-4 sm:px-6">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><History size={20} /></div>
+              <div className="min-w-0">
+                <h3 id="customer-history-title" className="text-base font-bold">老客历史订单</h3>
+                <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                  <span className="inline-flex items-center gap-1"><Phone size={12} />真实尾号 <strong className="font-mono text-foreground">{phoneTail}</strong></span>
+                  {maskedPhone ? <span>{maskedPhone}</span> : null}
+                  {total !== null ? <span>当前结果 <strong className="text-foreground">{total}</strong> 笔</span> : null}
                 </div>
               </div>
             </div>
-
-            <button
-              type="button"
-              onClick={onClose}
-              title="关闭 (Esc)"
-              className="rounded-full p-2 text-muted-foreground hover:bg-black/5 dark:hover:bg-white/10 hover:text-foreground transition-all active:scale-90"
-            >
-              <X size={18} />
-            </button>
+            <button type="button" autoFocus onClick={onClose} aria-label="关闭历史订单" title="关闭 (Esc)"
+              className="rounded-full p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground"><X size={20} /></button>
           </div>
-
-          {/* 统计概览条 */}
-          {data && !loading && (
-            <div className="grid grid-cols-2 gap-2 border-b border-border/40 bg-muted/20 px-5 py-2.5 text-xs sm:grid-cols-3 shrink-0">
-              <div>
-                <span className="text-muted-foreground">本店本平台单数：</span>
-                <span className="font-bold text-foreground">{data.totalCount} 笔</span>
-              </div>
-              <div>
-                <span className="text-muted-foreground">订单实付合计：</span>
-                <span className="font-bold font-mono text-emerald-600 dark:text-emerald-400">¥{data.totalActualPaidYuan}</span>
-              </div>
-              <div className="hidden sm:block text-right">
-                <span className="text-muted-foreground">匹配依据：</span>
-                <span className="text-foreground/80">{data.matchBasis || "平台脱敏真实手机尾号"}</span>
-              </div>
-            </div>
-          )}
-
-          {/* 列表主体 Content */}
-          <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3 custom-scrollbar">
-            {loading ? (
-              <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-                <Loader2 className="h-8 w-8 animate-spin text-primary mb-2" />
-                <span className="text-xs">正在检索本店真实尾号历史订单...</span>
-              </div>
-            ) : error ? (
-              <div className="flex flex-col items-center justify-center py-12 text-rose-500">
-                <AlertCircle size={32} className="mb-2" />
-                <span className="text-sm font-medium">{error}</span>
-                <button
-                  onClick={() => fetchHistory(phoneTail)}
-                  className="mt-3 rounded-xl bg-rose-500/10 px-3 py-1.5 text-xs text-rose-600 hover:bg-rose-500/15 dark:text-rose-400 transition-colors"
-                >
-                  重新尝试
-                </button>
-              </div>
-            ) : !data || data.orders.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-                <ShoppingBag size={36} className="mb-2 text-muted-foreground/40" />
-                <span className="text-sm font-medium text-foreground">本店暂无该真实尾号的历史订单</span>
-                <span className="mt-1 text-xs text-muted-foreground">该顾客可能首次在本店下单或使用不同号码下单</span>
-              </div>
-            ) : (
-              data.orders.map((order) => {
-                const isCancelled = order.statusDisplay === "已取消" || order.status?.includes("取消");
-                const isDelivering = order.statusDisplay === "配送中";
-                const isCompleted = order.statusDisplay === "已完成";
-
-                return (
-                  <div
-                    key={order.id}
-                    className={cn(
-                      "relative rounded-2xl border p-3.5 sm:p-4 transition-all text-left shadow-xs",
-                      order.isCurrentOrder
-                        ? "border-primary/40 bg-primary/[0.03] dark:border-primary/30 dark:bg-primary/[0.02]"
-                        : "border-border/60 bg-card/60 hover:border-border/90 hover:bg-muted/15"
-                    )}
-                  >
-                    {/* 顶部：平台、订单号、时间、状态 */}
-                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/40 pb-2.5">
-                      <div className="flex items-center gap-2">
-                        <span className="inline-flex items-center rounded-lg bg-muted px-2 py-0.5 text-[10.5px] font-semibold text-foreground">
-                          {order.platform}
-                        </span>
-                        <span className="font-mono text-xs font-medium text-foreground/85">
-                          #{order.orderNo}
-                        </span>
-                        {order.isCurrentOrder && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
-                            当前正在查看
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                          <Clock size={11} />
-                          {formatLocalDateTime(order.orderTime)}
-                        </span>
-                        <span
-                          className={cn(
-                            "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium border",
-                            isCancelled
-                              ? "border-rose-500/20 bg-rose-500/10 text-rose-600 dark:text-rose-400"
-                              : isDelivering
-                              ? "border-sky-500/20 bg-sky-500/10 text-sky-600 dark:text-sky-400"
-                              : isCompleted
-                              ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                              : "border-border/50 bg-muted text-muted-foreground"
-                          )}
-                        >
-                          {isCancelled ? <XCircle size={11} /> : isCompleted ? <CheckCircle2 size={11} /> : isDelivering ? <Truck size={11} /> : null}
-                          {order.statusDisplay}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* 商品清单 */}
-                    <div className="py-2.5 space-y-2">
-                      {order.items.map((item, itemIdx) => (
-                        <div key={item.id || itemIdx} className="flex items-center justify-between gap-3 text-xs">
-                          <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                            {item.imageUrl ? (
-                              <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-xl border border-border/50 bg-muted/30">
-                                <Image
-                                  src={item.imageUrl}
-                                  alt={item.productName}
-                                  fill
-                                  sizes="36px"
-                                  className="object-cover"
-                                  unoptimized
-                                />
-                              </div>
-                            ) : (
-                              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-border/50 bg-muted/30 text-muted-foreground">
-                                <ShoppingBag size={15} />
-                              </div>
-                            )}
-                            <div className="min-w-0 flex-1">
-                              <p className="truncate font-medium text-foreground" title={item.productName}>
-                                {item.productName}
-                              </p>
-                              {item.spec && (
-                                <p className="truncate text-[10.5px] text-muted-foreground">
-                                  规格: {item.spec}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-2.5 shrink-0">
-                            <span className="font-mono text-muted-foreground">
-                              x{item.quantity}
-                            </span>
-                            {item.price && (
-                              <span className="font-mono font-medium text-foreground">
-                                ¥{item.price}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* 底部：实付金额与收货地址 */}
-                    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/40 pt-2 text-xs">
-                      <div className="flex items-center gap-1.5 text-muted-foreground max-w-[70%] truncate">
-                        <MapPin size={12} className="shrink-0" />
-                        <span className="truncate" title={order.userAddress}>
-                          {order.userAddress || "无需配送/地址未提供"}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center gap-1">
-                        <span className="text-muted-foreground text-[11px]">实付:</span>
-                        <span className="font-bold font-mono text-sm text-foreground">
-                          ¥{order.actualPaidYuan}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* 顾客备注 */}
-                    {order.customerRemark && (
-                      <div className="mt-1.5 flex items-start gap-1.5 rounded-xl border border-amber-500/15 bg-amber-500/8 px-2.5 py-1.5 text-[11px] text-amber-700 dark:text-amber-400">
-                        <FileText size={11} className="mt-0.5 shrink-0" />
-                        <span className="line-clamp-1">备注: {order.customerRemark}</span>
-                      </div>
-                    )}
-                  </div>
-                );
-              })
-            )}
+          <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-5 custom-scrollbar">
+            {currentOrderId ? (
+              <HistoryOrdersView
+                {...(orderList || { refreshTrigger: 0, localShops: emptyShops, readOnly: true,
+                  onOpenCostBackfill: noAction, onOpenMatchEditor: noAction })}
+                customerHistoryOrderId={currentOrderId}
+                onDataLoad={handleDataLoad}
+              />
+            ) : <p className="py-12 text-center text-muted-foreground">当前订单信息缺失，请关闭后重试。</p>}
           </div>
-
-          {/* 底部 Footer */}
-          <div className="flex items-center justify-between border-t border-border/50 bg-muted/10 px-5 py-3 text-xs text-muted-foreground shrink-0">
-            <span>* 仅限本店全部历史订单，基于脱敏真实手机号末4位精确聚合</span>
-            <button
-              type="button"
-              onClick={onClose}
-              className="h-8.5 inline-flex items-center justify-center rounded-xl border border-border/70 bg-background px-4 text-xs font-medium text-foreground hover:bg-muted transition-colors"
-            >
-              关闭
-            </button>
+          <div className="flex shrink-0 items-center justify-between gap-3 border-t border-border/50 px-4 py-3 text-xs text-muted-foreground sm:px-6">
+            <span>仅查看本店本平台该顾客的历史订单，包含刷单、取消及退款。</span>
+            <button type="button" onClick={onClose} className="shrink-0 rounded-xl border border-border bg-background px-4 py-2 text-foreground transition hover:bg-muted">关闭</button>
           </div>
         </motion.div>
       </div>
-    </AnimatePresence>,
-    document.body
+    </AnimatePresence>, document.body,
   );
 }
