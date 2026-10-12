@@ -4241,6 +4241,7 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
       shopId,
       userAddress: normalized.userAddress,
       customerMaskedPhone: normalized.customerMaskedPhone,
+      customerPhone: normalized.customerPhone,
       rawPayload: nextRawPayloadWithResolvedShop,
     });
     type ExistingSyncedItem = NonNullable<typeof existing>["items"][number];

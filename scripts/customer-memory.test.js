@@ -12,6 +12,7 @@ function matches(row, where = {}) {
       return value.in.some((candidate) => value.mode === "insensitive"
         ? String(candidate).toLowerCase() === String(row[key]).toLowerCase() : candidate === row[key]);
     }
+    if (value && typeof value === "object" && "lt" in value) return row[key] < value.lt;
     return row[key] === value;
   });
 }
@@ -76,6 +77,39 @@ test("真实尾号优先，虚拟号和分机号不能识别顾客", () => {
     expect(readCustomerMemoryPhoneTail(order("a", { rawPayload }))).toBeNull();
     expect(extractCustomerPhoneTail(order("a", { rawPayload }))).toBeNull();
   }
+});
+
+test("京东直接返回手机尾号，文字、脱敏号及明确真实号码字段均可识别", () => {
+  for (const rawPayload of [
+    { unencrypted_phone: "手机尾号9897" }, { customerPhone: "手机尾号9897" },
+    { phone: "手机尾号：9897" }, { userInfo: { phone: "手机尾号 9897" } },
+    { secret_phone: "9897" }, { phone: "138****9897" },
+  ]) {
+    expect(readCustomerMemoryPhoneTail(order("a", { rawPayload }))).toBe("9897");
+    expect(extractCustomerPhoneTail(order("a", { rawPayload }))).toBe("9897");
+  }
+  expect(readCustomerMemoryPhoneTail(order("a", { rawPayload: {}, customerPhone: "手机尾号9897" }))).toBe("9897");
+  expect(readCustomerMemoryPhoneTail(order("a", { rawPayload: { phone: "手机尾号9897_55" } }))).toBeNull();
+});
+
+test("相同尾号和A栋32C地址的两单重算旧索引，次日订单标老客", async () => {
+  rows = [order("oct-12", { customerIdentityVersion: 1, customerIdentityKey: null,
+    userAddress: "测试市测试区测试街道测试家园A栋32C",
+    rawPayload: { phone: "手机尾号9897" }, orderTime: new Date("2026-10-12T11:44:00Z") }),
+    order("oct-11", { customerIdentityVersion: 1, customerIdentityKey: null,
+      userAddress: "测试市测试区测试街道测试家园A栋32C",
+      rawPayload: { phone: "手机尾号9897" }, orderTime: new Date("2026-10-11T05:19:00Z") })];
+  const types = await resolveRememberedCustomerTypes("user-1", rows);
+  expect(types.get("oct-11")).toBe("new");
+  expect(types.get("oct-12")).toBe("returning");
+  expect(rows[0].customerIdentityKey).toBe(rows[1].customerIdentityKey);
+  expect(rows[0].customerPhoneTail).toBe("9897");
+  expect(rows[0].customerIdentityVersion).toBe(2);
+  const response = await getHistory(new NextRequest("http://localhost/api/orders/customer-history?phoneTail=9897&currentOrderId=oct-12"));
+  expect((await response.json()).totalCount).toBe(2);
+  expect(updates).toBe(2);
+  await resolveRememberedCustomerTypes("user-1", rows);
+  expect(updates).toBe(2);
 });
 
 test("地址只归一格式，房号和数字间的连字符始终保留", () => {

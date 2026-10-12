@@ -2,11 +2,13 @@ import { createHash } from "node:crypto";
 import prisma from "@/lib/prisma";
 import { CUSTOMER_MEMORY_PLATFORMS, CustomerMemoryOrder, getCustomerMemoryIdentity, getCustomerMemoryParts, getCustomerMemoryPlatform } from "./customerMemory";
 
+export const CUSTOMER_IDENTITY_VERSION = 2;
+
 export function buildCustomerMemoryFields(order: CustomerMemoryOrder) {
   const identity = getCustomerMemoryIdentity(order);
   const parts = getCustomerMemoryParts(order);
   return {
-    customerIdentityVersion: 1,
+    customerIdentityVersion: CUSTOMER_IDENTITY_VERSION,
     customerIdentityKey: identity ? createHash("sha256").update(JSON.stringify(identity)).digest("hex") : null,
     customerPhoneTail: parts?.phoneTail || null,
     customerAddressKey: parts?.addressKey || null,
@@ -22,15 +24,15 @@ export async function ensureCustomerMemory(userId: string) {
   const pending = (async () => {
     for (;;) {
       const orders = await prisma.autoPickOrder.findMany({
-        where: { userId, platform: { in: CUSTOMER_MEMORY_PLATFORMS, mode: "insensitive" }, customerIdentityVersion: 0 },
+        where: { userId, platform: { in: CUSTOMER_MEMORY_PLATFORMS, mode: "insensitive" }, customerIdentityVersion: { lt: CUSTOMER_IDENTITY_VERSION } },
         take: 200,
-        select: { id: true, platform: true, shopId: true, userAddress: true, rawPayload: true, updatedAt: true,
+        select: { id: true, platform: true, shopId: true, userAddress: true, rawPayload: true, updatedAt: true, customerIdentityVersion: true,
           customerPhoneTail: true, customerAddressKey: true, customerShopKey: true },
       });
       if (!orders.length) break;
       await prisma.$transaction(orders.map((order) => prisma.autoPickOrder.updateMany({
         // 与同步并发时，不用旧载荷覆盖刚更新的顾客标识。
-        where: { id: order.id, userId, customerIdentityVersion: 0, updatedAt: order.updatedAt },
+        where: { id: order.id, userId, customerIdentityVersion: order.customerIdentityVersion, updatedAt: order.updatedAt },
         data: buildCustomerMemoryFields(order),
       })));
     }

@@ -5,6 +5,7 @@ export type CustomerMemoryOrder = {
   shopId?: string | null;
   userAddress?: string | null;
   customerMaskedPhone?: string | null;
+  customerPhone?: string | null;
   rawPayload?: unknown;
   customerPhoneTail?: string | null;
   customerAddressKey?: string | null;
@@ -29,14 +30,25 @@ export function readCustomerMemoryPhoneTail(order: CustomerMemoryOrder): string 
   const root = record(order.rawPayload);
   const records = [root, ...["data", "extend", "order", "orderInfo", "order_info", "payload", "userInfo", "user_info"].map((key) => record(root[key]))];
   const candidates: unknown[] = [order.customerMaskedPhone];
+  const displayCandidates: unknown[] = [order.customerPhone];
   for (const item of records) {
     candidates.push(item.customerMaskedPhone, item.secret_phone, item.secretPhone, item.unencryptedPhone, item.unencrypted_phone);
     const user = record(item.userInfo || item.user_info);
     candidates.push(user.secret_phone, user.secretPhone, user.unencryptedPhone, user.unencrypted_phone);
+    displayCandidates.push(item.customerPhone, item.phone, item.mobile, user.customerPhone, user.phone, user.mobile);
   }
   for (const candidate of candidates) {
     const phone = String(candidate || "").trim();
     if (/^1\d{2}(?:\d{4}|[*＊xX•]{3,8})\d{4}$/.test(phone)) return phone.slice(-4);
+    if (/^\d{4}$/.test(phone)) return phone;
+  }
+  // 京东会直接返回“手机尾号9897”，并不一定提供完整的脱敏号。
+  for (const candidate of [...candidates, ...displayCandidates]) {
+    const phone = String(candidate || "").normalize("NFKC").trim();
+    const tail = phone.match(/^(?:真实)?(?:手机|手机号|电话)?(?:尾号|后四位)\s*:?\s*(\d{4})$/);
+    if (tail) return tail[1];
+    // 普通 phone 字段只允许脱敏号；完整虚拟拨号号码仍不作为真实顾客身份。
+    if (/^1\d{2}[*＊xX•]{3,8}\d{4}$/.test(phone)) return phone.slice(-4);
   }
   return /^\d{4}$/.test(order.customerPhoneTail || "") ? order.customerPhoneTail! : null;
 }
