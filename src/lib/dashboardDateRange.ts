@@ -2,6 +2,12 @@ export type DashboardDateRange = { rangePreset: string; startDate: string; endDa
 
 export const dashboardDateRangeKey = (userId: string) => `dashboard:date-range:v1:${userId}`;
 
+export function dashboardRangeDayCount(range: DashboardDateRange, resolvedDays?: number, isLoading = false): number {
+  if (range.rangePreset === "all") return isLoading ? 0 : Math.max(0, resolvedDays ?? 0);
+  if (!validDate(range.startDate) || !validDate(range.endDate) || range.startDate > range.endDate) return 0;
+  return Math.floor((Date.parse(range.endDate) - Date.parse(range.startDate)) / 86400000) + 1;
+}
+
 const validDate = (value: unknown): value is string => {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const date = new Date(`${value}T00:00:00Z`);

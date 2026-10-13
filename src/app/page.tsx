@@ -38,6 +38,8 @@ export default function Home() {
   const latestStatsRequestRef = useRef(0);
   const [datePreferenceUserId, setDatePreferenceUserId] = useState<string | null>(null);
   const userId = user?.id;
+  const requestStartDate = rangePreset === "all" ? "" : startDate;
+  const requestEndDate = rangePreset === "all" ? todayDate : endDate;
 
   useEffect(() => {
     latestStatsRequestRef.current += 1;
@@ -86,8 +88,8 @@ export default function Home() {
       if (rangePreset === "all") {
         query.set("range", "all");
       }
-      if (startDate) query.set("startDate", startDate);
-      if (endDate) query.set("endDate", endDate);
+      if (requestStartDate) query.set("startDate", requestStartDate);
+      if (requestEndDate) query.set("endDate", requestEndDate);
       if (selectedShopName) query.set("shopName", selectedShopName);
       if (selectedPlatform) query.set("platform", selectedPlatform);
       const res = await fetch(`/api/stats?${query.toString()}`, { cache: 'no-store' });
@@ -122,7 +124,7 @@ export default function Home() {
         setIsLoading(false);
       }
     }
-  }, [endDate, rangePreset, selectedPlatform, selectedShopName, startDate, user, showToast, datePreferenceUserId]);
+  }, [requestEndDate, rangePreset, selectedPlatform, selectedShopName, requestStartDate, user, showToast, datePreferenceUserId]);
 
   useEffect(() => {
     if (!user) return;
@@ -143,16 +145,8 @@ export default function Home() {
 
   useEffect(() => {
     if (!userId || datePreferenceUserId !== userId) return;
-    if (!startDate || !endDate) {
-      const today = new Date();
-      const end = format(today, "yyyy-MM-dd");
-      setRangePreset("all");
-      setStartDate(end);
-      setEndDate(end);
-      return;
-    }
     fetchData(true);
-  }, [fetchData, startDate, endDate, selectedShopName, selectedPlatform, userId, datePreferenceUserId]);
+  }, [fetchData, userId, datePreferenceUserId]);
 
   useEffect(() => {
     if (startDate && startDate > todayDate) {

@@ -40,7 +40,8 @@ import { isAccessoryProduct } from "@/lib/accessoryUtils";
 import { buildRecentInboundOrderWhere, resolveRecentInboundProduct } from "@/lib/recentInbound";
 import { resolveCompanyCommission } from "@/lib/companyCommission";
 import { getEffectivePromotionExpenses } from "@/services/promotionService";
-import { buildOrderTimeBuckets } from "@/lib/orderTimeAnalysis";
+import { buildOrderTimeAnalysis } from "@/lib/orderTimeAnalysis";
+import { findEarliestMatchingDashboardOrder } from "@/lib/dashboardOrderRange";
 
 const SHANGHAI_DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -399,7 +400,16 @@ export async function GET(request: NextRequest) {
           orderBy: { createdAt: "asc" },
           select: { createdAt: true },
         }),
-        prisma.autoPickOrder.findFirst({
+        shopName ? findEarliestMatchingDashboardOrder(
+          (afterId, take) => prisma.autoPickOrder.findMany({
+            where: { userId: targetUserId },
+            orderBy: [{ orderTime: "asc" }, { id: "asc" }],
+            take,
+            ...(afterId ? { cursor: { id: afterId }, skip: 1 } : {}),
+            select: { id: true, orderTime: true, shopId: true, rawPayload: true },
+          }),
+          (order) => isShopNameMatch(resolveAutoPickMatchedShopName(order, permissionsObj) || "", shopName),
+        ) : prisma.autoPickOrder.findFirst({
           where: {
             userId: targetUserId,
           },
@@ -418,9 +428,7 @@ export async function GET(request: NextRequest) {
         firstBrush?.date,
         firstSettlement?.date,
         firstShopProduct?.createdAt,
-        !shopName || resolveAutoPickMatchedShopName(firstAutoPickOrder || {}, permissionsObj) === shopName
-          ? firstAutoPickOrder?.orderTime
-          : null,
+        firstAutoPickOrder?.orderTime,
       ].filter((value): value is Date => value instanceof Date && !Number.isNaN(value.getTime()));
 
       if (candidates.length > 0) {
@@ -710,6 +718,7 @@ export async function GET(request: NextRequest) {
       return nameKey ? localShopByNameKey.get(nameKey) || null : null;
     };
 
+    const brushOrderTimeRecords = [...brushOrdersInRange];
     const customBrushCommissionMap = new Map<string, number>(
       brushOrdersInRange
         .filter((b): b is typeof b & { platformOrderId: string } => Boolean(b.platformOrderId))
@@ -727,8 +736,9 @@ export async function GET(request: NextRequest) {
           userId: targetUserId,
           platformOrderId: { in: missingBrushOrderNos },
         },
-        select: { platformOrderId: true, commission: true },
+        select: { id: true, date: true, type: true, shopName: true, paymentAmount: true, receivedAmount: true, platformOrderId: true, commission: true },
       });
+      brushOrderTimeRecords.push(...extraBrushOrders);
       extraBrushOrders.forEach((b) => {
         if (b.platformOrderId && typeof b.commission === "number") {
           customBrushCommissionMap.set(b.platformOrderId, b.commission);
@@ -1890,6 +1900,34 @@ export async function GET(request: NextRequest) {
         subtotal: FinanceMath.multiply(item.costPrice, item.quantity),
       };
     });
+    const timedOrderKeys = new Set(autoPickOrdersInRange.map((order) => JSON.stringify([normalizePlatform(order.platform), order.orderNo.trim()])));
+    const missingLinkedBrushOrderNos = Array.from(new Set(brushOrdersInRange
+      .filter((order) => order.platformOrderId?.trim() && !timedOrderKeys.has(JSON.stringify([normalizePlatform(order.type), order.platformOrderId.trim()])))
+      .map((order) => order.platformOrderId!.trim())));
+    const linkedBrushOrders = missingLinkedBrushOrderNos.length > 0 ? await prisma.autoPickOrder.findMany({
+      where: { userId: targetUserId, orderNo: { in: missingLinkedBrushOrderNos } },
+      select: { orderNo: true, platform: true, orderTime: true, rawPayload: true, shopId: true, delivery: true },
+    }) : [];
+    const inRangeBrushIds = new Set(brushOrdersInRange
+      .filter((order) => !platformFilter || normalizePlatform(order.type) === platformFilter)
+      .map((order) => order.id));
+    const orderTimeAnalysis = buildOrderTimeAnalysis(
+      [...autoPickOrdersInRange, ...linkedBrushOrders].map((order) => ({
+        orderNo: order.orderNo,
+        platform: normalizePlatform(order.platform),
+        orderTime: order.orderTime,
+        isBrush: readMainSystemSelfDeliveryFlag(order.rawPayload, order.delivery),
+        included: order.orderTime >= startDate && order.orderTime <= endDate
+          && (!shopName || resolveExistingMatchedShopName(order) === shopName)
+          && (!platformFilter || normalizePlatform(order.platform) === platformFilter),
+      })),
+      brushOrderTimeRecords.map((order) => ({
+        id: order.id,
+        platformOrderId: order.platformOrderId,
+        platform: normalizePlatform(order.type),
+        included: inRangeBrushIds.has(order.id),
+      })),
+    );
     perf.lap("response-build");
     perf.log("GET /api/stats", {
       shopName: shopName || null,
@@ -1937,10 +1975,8 @@ export async function GET(request: NextRequest) {
       },
       customerAnalysis,
       productSales,
-      orderTimeDistribution: buildOrderTimeBuckets(filteredAutoPickOrdersInRange.map((order) => ({
-        orderTime: order.orderTime,
-        isBrush: readMainSystemSelfDeliveryFlag(order.rawPayload, order.delivery),
-      }))),
+      orderTimeDistribution: orderTimeAnalysis.buckets,
+      orderTimeBrushWithoutTime: orderTimeAnalysis.brushWithoutTime,
       businessTrend: canViewProductCosts ? businessTrend : businessTrend.map(({ productCost: _productCost, ...point }) => point),
       platformBusinessTrend: canViewProductCosts
         ? platformBusinessTrend

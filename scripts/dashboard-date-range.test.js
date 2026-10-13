@@ -1,5 +1,29 @@
 import { expect, test } from "bun:test";
-import { dashboardDateRangeKey, presetDashboardDateRange, restoreDashboardDateRange, serializeDashboardDateRange } from "../src/lib/dashboardDateRange";
+import { dashboardDateRangeKey, dashboardRangeDayCount, presetDashboardDateRange, restoreDashboardDateRange, serializeDashboardDateRange } from "../src/lib/dashboardDateRange";
+import { findEarliestMatchingDashboardOrder } from "../src/lib/dashboardOrderRange";
+
+test("全部范围使用后端实际天数，加载时不把今天占位日期显示为一天", () => {
+  const range = presetDashboardDateRange("all", "2026-10-13");
+  expect(dashboardRangeDayCount(range)).toBe(0);
+  expect(dashboardRangeDayCount(range, 135, true)).toBe(0);
+  expect(dashboardRangeDayCount(range, 135)).toBe(135);
+  expect(dashboardRangeDayCount(presetDashboardDateRange("today", "2026-10-13"), 135)).toBe(1);
+  expect(dashboardRangeDayCount(presetDashboardDateRange("30d", "2026-10-13"), 135)).toBe(30);
+});
+
+test("查找所选门店最早订单时跳过其他门店，支持跨页", async () => {
+  const orders = Array.from({ length: 202 }, (_, index) => ({ id: String(index), shop: index >= 201 ? "乙店" : "甲店" }));
+  const calls = [];
+  const readPage = async (afterId, take) => {
+    calls.push(afterId);
+    const start = afterId === undefined ? 0 : Number(afterId) + 1;
+    return orders.slice(start, start + take);
+  };
+  expect(await findEarliestMatchingDashboardOrder(readPage, (order) => order.shop === "乙店")).toEqual(orders[201]);
+  expect(calls).toEqual([undefined, "199"]);
+  expect(await findEarliestMatchingDashboardOrder(readPage, (order) => order.shop === "甲店")).toEqual(orders[0]);
+  expect(await findEarliestMatchingDashboardOrder(readPage, (order) => order.shop === "无记录门店")).toBeNull();
+});
 
 test("预设只保存类型，重新打开按当天滚动日期", () => {
   const saved = serializeDashboardDateRange(presetDashboardDateRange("30d", "2026-10-11"));

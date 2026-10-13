@@ -680,6 +680,7 @@ export interface StatsData {
   businessTrend?: DashboardBusinessTrendPoint[];
   platformBusinessTrend?: Record<string, DashboardBusinessTrendPoint[]>;
   orderTimeDistribution?: import("./orderTimeAnalysis").OrderTimeBucket[];
+  orderTimeBrushWithoutTime?: number;
   customerAnalysis?: DashboardCustomerAnalysis;
   productSales?: DashboardProductSales;
 }

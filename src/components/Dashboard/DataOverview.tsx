@@ -14,6 +14,7 @@ import { cn, getPlatformMeta } from "@/lib/utils";
 import { OverviewAiPanel } from "@/components/Dashboard/OverviewAiPanel";
 import { DataOverviewSkeleton } from "@/components/Dashboard/DataOverviewSkeleton";
 import { OrderTimeAnalysis } from "@/components/Dashboard/OrderTimeAnalysis";
+import { dashboardRangeDayCount } from "@/lib/dashboardDateRange";
 
 const PLATFORM_THEMES: Record<string, { bar: string; dot: string }> = {
   美团: {
@@ -212,14 +213,6 @@ function ExpenseBreakdownDetails({
       </div>
     </>
   );
-}
-
-function countDays(startDate: string, endDate: string) {
-  if (!startDate || !endDate) return 0;
-  const start = new Date(startDate);
-  const end = new Date(endDate);
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) return 0;
-  return Math.floor((end.getTime() - start.getTime()) / 86400000) + 1;
 }
 
 function amountTooltip(value: unknown) {
@@ -565,7 +558,7 @@ export function DataOverview({
   }, [isCustomerDetailOpen, activeBreakdown]);
 
   const businessTrend = data?.businessTrend || [];
-  const rangeDays = useMemo(() => countDays(startDate, endDate), [endDate, startDate]);
+  const rangeDays = dashboardRangeDayCount({ rangePreset: rangePreset || "custom", startDate, endDate }, data?.rangeDays, isLoading);
   const matrix = data?.platformMatrix;
   const platformBusinessTrend = data?.platformBusinessTrend || {};
   const platformOptions = [
@@ -735,7 +728,9 @@ export function DataOverview({
           <div className="col-span-2 space-y-1.5 lg:col-span-1">
             <div className="flex items-center justify-between gap-2">
               <label className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">日期范围</label>
-              {rangeDays > 0 ? (
+              {rangePreset === "all" && isLoading ? (
+                <span className="text-[11px] text-muted-foreground">计算中...</span>
+              ) : rangeDays > 0 ? (
                 <span className="text-[11px] font-bold text-primary">共 {int(rangeDays)} 天</span>
               ) : null}
             </div>
@@ -1765,7 +1760,7 @@ export function DataOverview({
         </div>
       </Panel>
 
-      <OrderTimeAnalysis buckets={data?.orderTimeDistribution || []} rangeDays={data?.rangeDays || 1} />
+      <OrderTimeAnalysis buckets={data?.orderTimeDistribution || []} rangeDays={data?.rangeDays || 1} brushWithoutTime={data?.orderTimeBrushWithoutTime || 0} />
 
       <div className={cn("grid gap-6", isChartsFullWidth ? "grid-cols-1" : "grid-cols-1 xl:grid-cols-2")}>
         <Panel
