@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { createHash } from "node:crypto";
 import prisma from "@/lib/prisma";
 import { getAuthorizedAdmin, getAuthorizedAdminAny, getOnlineDeviceCutoff } from "@/lib/auth";
 import { sendInvitationEmail } from "@/lib/email";
@@ -80,10 +81,17 @@ export async function GET() {
             const activeCookies = (autoPickConfig.maiyatianCookies || []).filter((c) => c.enabled && c.cookie.trim());
             const hasMaiyatianCookie = activeCookies.length > 0 || Boolean(String(autoPickConfig.maiyatianCookie || "").trim());
             const maiyatianCookieCount = activeCookies.length > 0 ? activeCookies.length : (hasMaiyatianCookie ? 1 : 0);
+            // Bind browser detection results to the credentials that were checked.
+            const maiyatianCookieVersion = createHash("sha256")
+                .update(JSON.stringify(activeCookies.length > 0
+                    ? activeCookies.map((account) => account.cookie)
+                    : hasMaiyatianCookie ? [autoPickConfig.maiyatianCookie] : []))
+                .digest("hex");
             userWithConfig = {
                 ...userRecord,
                 hasMaiyatianCookie,
                 maiyatianCookieCount,
+                maiyatianCookieVersion,
             };
         }
         return userWithConfig;

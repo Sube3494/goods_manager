@@ -57,6 +57,7 @@ interface WhitelistEntry {
     isInternal?: boolean;
     hasMaiyatianCookie?: boolean;
     maiyatianCookieCount?: number;
+    maiyatianCookieVersion?: string;
     accessibleLibraries?: Array<{ id: string; name: string }>;
   };
 }
@@ -521,12 +522,7 @@ export function UserManager() {
   const cookieLabel = (id: string) => ({ valid: "可用", partial: "部分账号不可用", invalid: "Cookie 不可用，请更新或重试", missing: "未配置", checking: "检测中", error: "检测失败，请重试" }[cookieStatuses[id]] || "未检测");
   const cookieShortLabel = (id: string) => ({ valid: "可用", partial: "部分异常", invalid: "不可用", missing: "未配置", checking: "检测中", error: "失败" }[cookieStatuses[id]] || "未检测");
   const isMaiyatianConfigured = (user?: WhitelistEntry["user"]) => {
-    if (!user) return false;
-    const status = cookieStatuses[user.id];
-    if (status) {
-      return status !== "missing";
-    }
-    return Boolean(user.hasMaiyatianCookie);
+    return Boolean(user?.hasMaiyatianCookie);
   };
   const cookieTone = (id: string) => cookieStatuses[id] === "valid"
     ? "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10"
@@ -537,12 +533,15 @@ export function UserManager() {
     if (!canViewMemberOrders || !entries.length) return;
     const controller = new AbortController();
     const ids = [...new Set(entries.flatMap((entry) => entry.user ? [entry.user.id] : []))];
+    const versions = new Map(entries.flatMap((entry) => entry.user
+      ? [[entry.user.id, entry.user.maiyatianCookieVersion] as const] : []));
     const dayMs = 24 * 60 * 60 * 1000;
     const cache = new Map<string, { status: string; checkedAt: number }>();
     for (const id of ids) {
       try {
         const value = JSON.parse(localStorage.getItem(`member-cookie-status:${id}`) || "null");
-        if (value && ["valid", "partial", "invalid", "missing", "error"].includes(value.status)
+        if (value && versions.get(id) && value.version === versions.get(id)
+          && ["valid", "partial", "invalid", "missing", "error"].includes(value.status)
           && Number.isFinite(value.checkedAt) && value.checkedAt <= Date.now()) {
           cache.set(id, value);
         }
@@ -550,7 +549,7 @@ export function UserManager() {
     }
     const saveStatus = (id: string, status: string) => {
       if (controller.signal.aborted) return;
-      const value = { status, checkedAt: Date.now() };
+      const value = { status, checkedAt: Date.now(), version: versions.get(id) };
       cache.set(id, value);
       try { localStorage.setItem(`member-cookie-status:${id}`, JSON.stringify(value)); } catch { /* Use the in-memory result. */ }
       setCookieStatuses((prev) => ({ ...prev, [id]: status }));
