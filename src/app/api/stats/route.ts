@@ -41,7 +41,7 @@ import { buildRecentInboundOrderWhere, resolveRecentInboundProduct } from "@/lib
 import { resolveCompanyCommission } from "@/lib/companyCommission";
 import { getEffectivePromotionExpenses } from "@/services/promotionService";
 import { buildOrderTimeAnalysis } from "@/lib/orderTimeAnalysis";
-import { findEarliestMatchingDashboardOrder } from "@/lib/dashboardOrderRange";
+import { createDashboardFirstOrderDateLookup } from "@/lib/dashboardOrderRange";
 
 const SHANGHAI_DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -349,50 +349,18 @@ export async function GET(request: NextRequest) {
     const endDate = parseAsShanghaiTime(`${endDateKey} 23:59:59.999`);
     let startDate = parseAsShanghaiTime(startDateKey);
 
-    const firstOrderDateCache = new Map<string, Promise<Date | null>>();
-    const getFirstOrderDate = (targetShopName: string): Promise<Date | null> => {
-      const cacheKey = normalizeShopNameKey(targetShopName);
-      const cached = firstOrderDateCache.get(cacheKey);
-      if (cached) return cached;
-      const lookup = Promise.all([
-        findEarliestMatchingDashboardOrder(
-          (afterId, take) => prisma.autoPickOrder.findMany({
-            where: { userId: targetUserId, orderTime: { lte: endDate } },
-            orderBy: [{ orderTime: "asc" }, { id: "asc" }],
-            take,
-            ...(afterId ? { cursor: { id: afterId }, skip: 1 } : {}),
-            select: { id: true, orderTime: true, shopId: true, rawPayload: true, platform: true, status: true },
-          }),
-          (order) => !isAutoPickOrderDeletedStatus(order.status) && !isVoidedOfflineOrder(order)
-            && (!targetShopName || isShopNameMatch(resolveAutoPickMatchedShopName(order, permissionsObj) || "", targetShopName)),
-        ),
-        prisma.outboundOrder.findFirst({
-          where: {
-            userId: targetUserId,
-            type: "Sale",
-            date: { lte: endDate },
-            ...(targetShopName ? { note: { contains: `[店铺:${targetShopName}]` } } : {}),
-          },
-          orderBy: { date: "asc" },
-          select: { date: true },
-        }),
-        prisma.brushOrder.findFirst({
-          where: {
-            userId: targetUserId,
-            date: { lte: endDate },
-            ...(targetShopName ? { shopName: targetShopName } : {}),
-          },
-          orderBy: { date: "asc" },
-          select: { date: true },
-        }),
-      ]).then(([firstOrder, firstSale, firstBrush]) => {
-        const dates = [firstOrder?.orderTime, firstSale?.date, firstBrush?.date].filter((value): value is Date => value instanceof Date && Number.isFinite(value.getTime()));
-        return dates.length ? new Date(Math.min(...dates.map((date) => date.getTime()))) : null;
-      });
-      firstOrderDateCache.set(cacheKey, lookup);
-      return lookup;
-    };
-
+    const getFirstOrderDate = createDashboardFirstOrderDateLookup(
+      (_targetShopName, afterId, take) => prisma.autoPickOrder.findMany({
+        where: { userId: targetUserId, orderTime: { lte: endDate } },
+        orderBy: [{ orderTime: "asc" }, { id: "asc" }],
+        take,
+        ...(afterId ? { cursor: { id: afterId }, skip: 1 } : {}),
+        select: { id: true, orderTime: true, shopId: true, rawPayload: true, platform: true, status: true },
+      }),
+      (order, targetShopName) => !isAutoPickOrderDeletedStatus(order.status) && !isVoidedOfflineOrder(order)
+        && (!targetShopName || isShopNameMatch(resolveAutoPickMatchedShopName(order, permissionsObj) || "", targetShopName)),
+      normalizeShopNameKey,
+    );
     if (rangeMode === "all") {
       const firstOrderDate = await getFirstOrderDate(shopName);
       startDate = parseAsShanghaiTime(firstOrderDate ? formatDateKey(firstOrderDate) : endDateKey);
