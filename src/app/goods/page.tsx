@@ -114,6 +114,7 @@ export default function GoodsPage() {
   // 新增：商品库相关状态
   const [libraries, setLibraries] = useState<any[]>([]);
   const [activeLibraryId, setActiveLibraryId] = useState<string>("");
+  const [librariesLoaded, setLibrariesLoaded] = useState(false);
   const [isManageLibrariesOpen, setIsManageLibrariesOpen] = useState(false);
   const [importErrors, setImportErrors] = useState<string[]>([]);
   const observerTarget = useRef<HTMLDivElement>(null);
@@ -128,6 +129,7 @@ export default function GoodsPage() {
   const currentPageRef = useRef(1);
   const isFetchingRef = useRef(false);
   const requestVersionRef = useRef(0);
+  const goodsRequestControllerRef = useRef<AbortController | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const [isNextPageLoading, setIsNextPageLoading] = useState(false);
   const [totalResults, setTotalResults] = useState(0);
@@ -345,21 +347,20 @@ export default function GoodsPage() {
   }, []);
 
   // 新增：拉取有权访问的商品库的方法
-  const fetchLibraries = useCallback(() => {
-    fetch("/api/product-libraries")
-      .then(r => r.ok ? r.json() : [])
-      .then(data => {
-        if (Array.isArray(data)) {
-          setLibraries(data);
-          if (data.length > 0) {
-            setActiveLibraryId(prev => {
-              const stillExists = data.some(lib => lib.id === prev);
-              return stillExists ? prev : data[0].id;
-            });
-          }
-        }
-      })
-      .catch(() => {});
+  const fetchLibraries = useCallback(async () => {
+    try {
+      const res = await fetch("/api/product-libraries");
+      if (!res.ok) throw new Error("Failed to fetch libraries");
+      const data = await res.json();
+      const nextLibraries = Array.isArray(data) ? data : [];
+      setLibraries(nextLibraries);
+      setActiveLibraryId(prev => nextLibraries.some(lib => lib.id === prev)
+        ? prev : nextLibraries[0]?.id || "");
+    } catch (error) {
+      console.error("Failed to fetch libraries", error);
+    } finally {
+      setLibrariesLoaded(true);
+    }
   }, []);
 
   // 新增：挂载时拉取有权访问的商品库，并初始化默认选中第一个
@@ -368,7 +369,12 @@ export default function GoodsPage() {
   }, [fetchLibraries]);
 
   const handleLibraryChange = (libId: string) => {
+    if (libId === activeLibraryId) return;
+    goodsRequestControllerRef.current?.abort();
+    requestVersionRef.current += 1;
+    isFetchingRef.current = false;
     setActiveLibraryId(libId);
+    setTotalResults(0);
     setItems([]);
     setSelectedIds([]);
     setPage(1);
@@ -377,10 +383,14 @@ export default function GoodsPage() {
   };
 
   const fetchGoods = useCallback(async (isFirstPage = true) => {
-    if (isFetchingRef.current) {
-      return;
-    }
+    // Never request an unscoped list while the default library is loading.
+    if (!librariesLoaded || !activeLibraryId) return;
+    if (!isFirstPage && isFetchingRef.current) return;
 
+    // A refresh or a new filter/library must replace the previous request.
+    goodsRequestControllerRef.current?.abort();
+    const controller = new AbortController();
+    goodsRequestControllerRef.current = controller;
     isFetchingRef.current = true;
     const requestVersion = ++requestVersionRef.current;
 
@@ -409,7 +419,7 @@ export default function GoodsPage() {
         queryParams.append("libraryId", activeLibraryId);
       }
 
-      const res = await fetch(`/api/products?${queryParams.toString()}`);
+      const res = await fetch(`/api/products?${queryParams.toString()}`, { signal: controller.signal });
       if (!res.ok) throw new Error("Fetch failed");
       
       const data = await res.json();
@@ -433,17 +443,18 @@ export default function GoodsPage() {
       setHasMore(data.hasMore);
       setTotalResults(data.total || 0);
     } catch (error) {
-      console.error("Failed to fetch data", error);
+      if (!controller.signal.aborted && requestVersion === requestVersionRef.current) {
+        console.error("Failed to fetch data", error);
+      }
     } finally {
       if (requestVersion === requestVersionRef.current) {
         isFetchingRef.current = false;
-      } else if (isFetchingRef.current) {
-        isFetchingRef.current = false;
+        goodsRequestControllerRef.current = null;
+        setIsLoading(false);
+        setIsNextPageLoading(false);
       }
-      setIsLoading(false);
-      setIsNextPageLoading(false);
     }
-  }, [debouncedSearch, selectedCategory, selectedStatus, selectedSupplier, sortBy, activeLibraryId]);
+  }, [debouncedSearch, selectedCategory, selectedStatus, selectedSupplier, sortBy, activeLibraryId, librariesLoaded]);
 
   // Fetch metadata once on mount
   useEffect(() => {
@@ -462,9 +473,21 @@ export default function GoodsPage() {
   }, [user]);
 
   useEffect(() => {
-    // We use a small delay or ensure this only captures external triggers
-    fetchGoods(true);
-  }, [fetchGoods]);
+    setItems([]);
+    setSelectedIds([]);
+    setTotalResults(0);
+    setPage(1);
+    currentPageRef.current = 1;
+    setHasMore(Boolean(activeLibraryId));
+    if (librariesLoaded && !activeLibraryId) setIsLoading(false);
+    void fetchGoods(true);
+    return () => {
+      goodsRequestControllerRef.current?.abort();
+      goodsRequestControllerRef.current = null;
+      requestVersionRef.current += 1;
+      isFetchingRef.current = false;
+    };
+  }, [fetchGoods, activeLibraryId, librariesLoaded]);
 
   // Infinite Scroll Observer
   useEffect(() => {
@@ -522,6 +545,10 @@ export default function GoodsPage() {
   };
 
   const handleDelete = (id: string, name: string) => {
+    if (!activeLibraryId || !items.some(item => item.id === id && item.libraryId === activeLibraryId)) {
+      showToast("商品与当前库不一致，请刷新页面后重试", "error");
+      return;
+    }
     setConfirmConfig({
       isOpen: true,
       title: "删除商品",
@@ -530,7 +557,7 @@ export default function GoodsPage() {
         : `确定删除商品 "${name}" 及你名下的复制商品吗？历史交易记录保留。此操作不可恢复。`,
       onConfirm: async () => {
         try {
-          const res = await fetch(`/api/products?id=${id}`, {
+          const res = await fetch(`/api/products?${new URLSearchParams({ id, libraryId: activeLibraryId })}`, {
             method: "DELETE",
           });
           const data = await res.json();
@@ -588,6 +615,8 @@ export default function GoodsPage() {
   }, [items]);
 
   const handleToggleSelectAll = useCallback(async () => {
+    if (!activeLibraryId) return;
+    const requestVersion = requestVersionRef.current;
     // If all possible matches are already selected, clear all
     if (selectedIds.length === totalResults && totalResults > 0) {
       setSelectedIds([]);
@@ -611,7 +640,7 @@ export default function GoodsPage() {
       const res = await fetch(`/api/products?${queryParams.toString()}`);
       if (res.ok) {
         const data = await res.json();
-        if (data.ids) {
+        if (data.ids && requestVersion === requestVersionRef.current) {
           setSelectedIds(data.ids);
         }
       } else {
@@ -621,7 +650,7 @@ export default function GoodsPage() {
       console.error("Failed to fetch all IDs:", error);
       showToast("网络请求失败", "error");
     }
-  }, [selectedIds.length, totalResults, debouncedSearch, selectedCategory, selectedStatus, selectedSupplier, sortBy, showToast]);
+  }, [selectedIds.length, totalResults, debouncedSearch, selectedCategory, selectedStatus, selectedSupplier, sortBy, activeLibraryId, showToast]);
 
 
   const handleBatchUpdate = async (updateData: { 
@@ -723,6 +752,7 @@ export default function GoodsPage() {
   };
 
   const handleBatchDelete = useCallback(() => {
+    if (!activeLibraryId || selectedIds.length === 0) return;
     const count = selectedIds.length;
     setConfirmConfig({
       isOpen: true,
@@ -735,7 +765,7 @@ export default function GoodsPage() {
           const res = await fetch("/api/products/batch", {
             method: "DELETE",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ids: selectedIds }),
+            body: JSON.stringify({ ids: selectedIds, libraryId: activeLibraryId }),
           });
           const data = await res.json();
           if (res.ok) {
@@ -752,7 +782,7 @@ export default function GoodsPage() {
         }
       },
     });
-  }, [selectedIds, showToast, user?.role, fetchGoods]);
+  }, [selectedIds, showToast, user?.role, fetchGoods, activeLibraryId]);
 
   const handleSaveItem = async (data: Partial<Product>, galleryItems?: GalleryItem[]) => {
     try {
@@ -1336,7 +1366,7 @@ export default function GoodsPage() {
       {/* 视图切换按钮与总计 */}
       <div className="flex items-center justify-between gap-3 my-4">
         <p className="text-xs sm:text-sm font-medium text-muted-foreground">
-          共 <strong className="text-foreground font-bold">{totalResults || items.length}</strong> 件商品
+          共 <strong className="text-foreground font-bold">{totalResults}</strong> 件商品
         </p>
         <div className="flex items-center gap-1.5 p-1 bg-muted/60 dark:bg-white/5 rounded-2xl border border-border/50 shrink-0">
           <button

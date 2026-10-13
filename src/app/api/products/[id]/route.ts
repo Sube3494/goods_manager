@@ -1,5 +1,5 @@
 import deletionPrisma from "@/lib/prisma";
-import { deleteCatalogProducts } from "@/lib/deleteCatalogProducts";
+import { deleteCatalogProducts, CatalogDeletionScopeError } from "@/lib/deleteCatalogProducts";
 import { NextResponse } from "next/server";
 import { Prisma } from "../../../../../prisma/generated-client";
 import prisma from "@/lib/catalogPrisma";
@@ -245,12 +245,17 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   try {
     const user = await getAuthorizedUser("product:delete");
     if (!user) return NextResponse.json({ error: "Unauthorized or insufficient permissions" }, { status: 401 });
+    const libraryId = new URL(request.url).searchParams.get("libraryId")?.trim();
+    if (!libraryId) return NextResponse.json({ error: "缺少商品库信息，请刷新页面后重试" }, { status: 400 });
     const id = (await params).id;
     if (!id) return NextResponse.json({ error: "Product ID is required" }, { status: 400 });
-    const result = await deletionPrisma.$transaction((tx) => deleteCatalogProducts(tx, [id], user));
+    const result = await deletionPrisma.$transaction((tx) => deleteCatalogProducts(tx, [id], user, libraryId));
     if (!result.count) return NextResponse.json({ error: "Product not found or permission denied" }, { status: 404 });
     return NextResponse.json({ success: true, ...result, message: "商品及其复制商品已删除，历史交易记录已保留。" });
   } catch (error) {
+    if (error instanceof CatalogDeletionScopeError) {
+      return NextResponse.json({ error: error.message }, { status: 409 });
+    }
     return handlePrismaError(error, "商品", "Failed to delete product");
   }
 }

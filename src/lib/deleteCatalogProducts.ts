@@ -2,21 +2,35 @@ import type { Prisma } from "../../prisma/generated-client";
 
 type CatalogTransaction = Pick<Prisma.TransactionClient, "product" | "shopProduct" | "brushProduct">;
 
+export class CatalogDeletionScopeError extends Error {
+  constructor() {
+    super("待删除商品不属于当前商品库，请刷新页面后重试。未删除任何商品。");
+    this.name = "CatalogDeletionScopeError";
+  }
+}
+
 /** Run in a transaction. Keep referenced rows intact for historical accounting. */
 export async function deleteCatalogProducts(
   tx: CatalogTransaction,
   requestedIds: string[],
   actor: { id: string; role?: string },
+  libraryId: string,
 ) {
+  if (!libraryId.trim()) throw new CatalogDeletionScopeError();
+  const uniqueRequestedIds = [...new Set(requestedIds)];
   const isSuperAdmin = actor.role === "SUPER_ADMIN";
   const roots = await tx.product.findMany({
     where: {
-      id: { in: [...new Set(requestedIds)] },
+      id: { in: uniqueRequestedIds },
       deletedAt: null,
       ...(isSuperAdmin ? {} : { userId: actor.id }),
     },
-    select: { id: true },
+    select: { id: true, libraryId: true },
   });
+  if (roots.some((product) => product.libraryId !== libraryId)
+    || (roots.length > 0 && roots.length !== uniqueRequestedIds.length)) {
+    throw new CatalogDeletionScopeError();
+  }
   const productIds = new Set(roots.map((product) => product.id));
   let frontier = [...productIds];
   // Copies can themselves be copied. Walk descendants without deleting sources
@@ -25,6 +39,7 @@ export async function deleteCatalogProducts(
     const copies = await tx.product.findMany({
       where: {
         sourceProductId: { in: frontier },
+        OR: [{ libraryId: null }, { libraryId }],
         ...(isSuperAdmin ? {} : { userId: actor.id }),
       },
       select: { id: true },
@@ -40,6 +55,7 @@ export async function deleteCatalogProducts(
     where: {
       deletedAt: null,
       OR: [{ productId: { in: ids } }, { sourceProductId: { in: ids } }],
+      AND: [{ OR: [{ productId: null }, { productId: { in: ids } }] }],
       ...(isSuperAdmin ? {} : { shop: { userId: actor.id } }),
     },
     select: { id: true },
@@ -59,7 +75,7 @@ export async function deleteCatalogProducts(
   });
   await tx.product.updateMany({
     where: { id: { in: ids } },
-    data: { deletedAt, isPublic: false, libraryId: null },
+    data: { deletedAt, isPublic: false },
   });
   return {
     count: roots.length,

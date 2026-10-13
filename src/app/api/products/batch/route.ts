@@ -1,6 +1,6 @@
 import { handlePrismaError } from "@/lib/api-errors";
 import deletionPrisma from "@/lib/prisma";
-import { deleteCatalogProducts } from "@/lib/deleteCatalogProducts";
+import { deleteCatalogProducts, CatalogDeletionScopeError } from "@/lib/deleteCatalogProducts";
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import prisma from "@/lib/catalogPrisma";
@@ -166,13 +166,19 @@ export async function DELETE(request: Request) {
   try {
     const user = await getAuthorizedUser("product:delete");
     if (!user) return NextResponse.json({ error: "Unauthorized or insufficient permissions" }, { status: 401 });
-    const { ids } = await request.json();
+    const { ids, libraryId } = await request.json();
+    if (typeof libraryId !== "string" || !libraryId.trim()) {
+      return NextResponse.json({ error: "缺少商品库信息，请刷新页面后重试" }, { status: 400 });
+    }
     if (!Array.isArray(ids) || !ids.length) {
       return NextResponse.json({ error: "No product IDs provided" }, { status: 400 });
     }
-    const result = await deletionPrisma.$transaction((tx) => deleteCatalogProducts(tx, ids.map(String), user));
+    const result = await deletionPrisma.$transaction((tx) => deleteCatalogProducts(tx, ids.map(String), user, libraryId.trim()));
     return NextResponse.json({ success: true, ...result, totalProcessed: result.count });
   } catch (error) {
+    if (error instanceof CatalogDeletionScopeError) {
+      return NextResponse.json({ error: error.message }, { status: 409 });
+    }
     return handlePrismaError(error, "商品", "Failed to batch delete products");
   }
 }

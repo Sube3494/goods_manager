@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { deleteCatalogProducts } from "../src/lib/deleteCatalogProducts";
+import { deleteCatalogProducts, CatalogDeletionScopeError } from "../src/lib/deleteCatalogProducts";
 import type { Prisma } from "../prisma/generated-client";
 import basePrisma from "../src/lib/prisma";
 import catalogPrisma from "../src/lib/catalogPrisma";
@@ -7,6 +7,7 @@ import catalogPrisma from "../src/lib/catalogPrisma";
 type Row = Record<string, unknown>;
 function matches(row: Row, where: Row): boolean {
   return Object.entries(where).every(([key, value]) => {
+    if (key === "AND") return (value as Row[]).every((condition) => matches(row, condition));
     if (key === "OR") return (value as Row[]).some((condition) => matches(row, condition));
     if (value && typeof value === "object") {
       if ("in" in value) return (value.in as unknown[]).includes(row[key]);
@@ -47,7 +48,7 @@ function fixture() {
 
 const all = fixture();
 const historyBefore = JSON.stringify(all.history);
-const result = await deleteCatalogProducts(all.tx, ["template", "template"], { id: "admin", role: "SUPER_ADMIN" });
+const result = await deleteCatalogProducts(all.tx, ["template", "template"], { id: "admin", role: "SUPER_ADMIN" }, "templates");
 assert.deepEqual(result, { count: 1, copiedCount: 2, shopProductCount: 3, deletedIds: ["template"] });
 for (const item of all.products.slice(0, 3)) {
   assert(item.deletedAt instanceof Date);
@@ -56,6 +57,7 @@ for (const item of all.products.slice(0, 3)) {
   assert.equal(item.image, `${item.id}.jpg`);
   assert.equal(item.costPrice, 10);
 }
+assert.equal(all.products[0].libraryId, "templates", "deletion must preserve the original library for auditing and recovery");
 assert.equal(all.products[3].deletedAt, null);
 assert.equal(all.shops[3].deletedAt, null);
 assert.equal(all.shops[1].stock, 8);
@@ -63,15 +65,40 @@ assert.equal(all.brush[0].isActive, false);
 assert.equal(JSON.stringify(all.history), historyBefore);
 assert(all.products.some((p) => p.id === all.history[0].productId));
 assert(all.shops.some((p) => p.id === all.history[0].shopProductId));
-assert.equal((await deleteCatalogProducts(all.tx, ["template"], { id: "admin", role: "SUPER_ADMIN" })).count, 0);
+assert.equal((await deleteCatalogProducts(all.tx, ["template"], { id: "admin", role: "SUPER_ADMIN" }, "templates")).count, 0);
 
 const own = fixture();
-assert.equal((await deleteCatalogProducts(own.tx, ["template"], { id: "alice", role: "USER" })).count, 0);
-const ownResult = await deleteCatalogProducts(own.tx, ["copy"], { id: "alice", role: "USER" });
+assert.equal((await deleteCatalogProducts(own.tx, ["template"], { id: "alice", role: "USER" }, "templates")).count, 0);
+const ownResult = await deleteCatalogProducts(own.tx, ["copy"], { id: "alice", role: "USER" }, "templates");
 assert.equal(ownResult.count, 1);
 assert.equal(ownResult.copiedCount, 0);
 assert.equal(own.products[0].deletedAt, null);
 assert.equal(own.products[2].deletedAt, null);
+
+const mismatch = fixture();
+const beforeMismatch = JSON.stringify(mismatch);
+await assert.rejects(
+  deleteCatalogProducts(mismatch.tx, ["template"], { id: "admin", role: "SUPER_ADMIN" }, "other-library"),
+  CatalogDeletionScopeError,
+);
+assert.equal(JSON.stringify(mismatch), beforeMismatch, "wrong-library deletion must not mutate anything");
+mismatch.products[3].libraryId = "other-library";
+const beforeMixed = JSON.stringify(mismatch);
+await assert.rejects(
+  deleteCatalogProducts(mismatch.tx, ["template", "unrelated"], { id: "admin", role: "SUPER_ADMIN" }, "templates"),
+  CatalogDeletionScopeError,
+);
+assert.equal(JSON.stringify(mismatch), beforeMixed, "a mixed-library batch must be rejected entirely");
+
+const protectedLibrary = fixture();
+protectedLibrary.products[1].libraryId = null;
+protectedLibrary.products[2].libraryId = "other-library";
+protectedLibrary.shops.push({ id: "other-template-shop", productId: "grandchild", sourceProductId: "template", deletedAt: null });
+await deleteCatalogProducts(protectedLibrary.tx, ["template"], { id: "admin", role: "SUPER_ADMIN" }, "templates");
+assert(protectedLibrary.products[1].deletedAt instanceof Date, "member copies can still be removed");
+assert.equal(protectedLibrary.products[2].deletedAt, null, "another template library cannot be cascaded away");
+assert.equal(protectedLibrary.shops[2].deletedAt, null);
+assert.equal(protectedLibrary.shops[4].deletedAt, null, "a source reference cannot override another template product");
 
 // Query extensions execute after middleware. Intercept with a final query
 // extension to inspect the real predicates without connecting to a database.
