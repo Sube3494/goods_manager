@@ -35,10 +35,8 @@ export function ClonePlanModal({
     if (isOpen && plan) {
       setTargetShop(plan.shopName || "");
 
-      // 默认目标日期为明天
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      setTargetDate(formatLocalDate(tomorrow));
+      // 每次打开都默认复制到今天（上海时区）。
+      setTargetDate(formatLocalDate(new Date()));
     }
   }, [isOpen, plan]);
 
