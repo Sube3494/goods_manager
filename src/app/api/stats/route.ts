@@ -1418,6 +1418,26 @@ export async function GET(request: NextRequest) {
     let returningCustomerAmount = 0;
     let returningCustomerTotalQuantity = 0;
 
+    const isReturningProductAccessory = (
+      productName: string,
+      sku: string | null,
+      matched: Record<string, unknown> | null,
+      orderShopName: string | null,
+    ) => {
+      const matchedId = String(matched?.shopProductId || matched?.id || "").trim();
+      const productId = String(matched?.productId || "").trim();
+      const shopProduct = (matchedId ? shopProductRows.find((sp) => sp.id === matchedId) : null)
+        || shopProductRows.find((sp) => isShopNameMatch(sp.shop.name, orderShopName) && (
+          (productId && sp.productId === productId)
+          || (sku && sp.sku?.trim().toUpperCase() === sku.toUpperCase())
+          || sp.productName?.trim() === productName
+        ));
+
+      return isAccessoryProduct(productName, String(matched?.categoryName || ""))
+        || isAccessoryProduct(shopProduct?.productName, shopProduct?.categoryName)
+        || isAccessoryProduct(null, shopProduct?.product?.category?.name);
+    };
+
     filteredAutoPickOrdersInRange.forEach((order) => {
       const isBrush = readMainSystemSelfDeliveryFlag(order.rawPayload, order.delivery);
       const isOffline = isVoidedOfflineOrder(order)
@@ -1451,6 +1471,7 @@ export async function GET(request: NextRequest) {
         returningCustomerOrders += 1;
         returningCustomerAmount = FinanceMath.add(returningCustomerAmount, orderAmount);
         if (daily) daily.returningCustomerOrders += 1;
+        const orderShopName = resolveAutoPickMatchedShopName(order, permissionsObj);
         order.items.forEach((item) => {
           returningCustomerTotalQuantity += Math.max(1, Number(item.quantity || 1) || 1);
           const payloadObj = item.rawPayload && typeof item.rawPayload === "object" && !Array.isArray(item.rawPayload)
@@ -1488,6 +1509,7 @@ export async function GET(request: NextRequest) {
             bundleItems.forEach((b) => {
               const bName = String(b?.name || "").trim() || "未命名商品";
               const bSku = String(b?.sku || "").trim() || null;
+              if (isReturningProductAccessory(bName, bSku, b, orderShopName)) return;
               const bImg = String((b as any)?.image || itemImage || "").trim() || null;
               const bQty = Math.max(1, Number(b?.quantity || 1) || 1);
               const bKey = `${bSku || ""}::${bName}`;
@@ -1514,6 +1536,7 @@ export async function GET(request: NextRequest) {
           const productName = String(manualMatched?.name || (item.productName !== "手工配送占位商品" ? item.productName : "") || "").trim() || "未命名商品";
           const sku = String(manualMatched?.sku || (item.productNo !== "__manual_delivery_placeholder__" ? item.productNo : "") || "").trim() || null;
           if (productName === "手工配送占位商品" || sku === "__manual_delivery_placeholder__") return;
+          if (isReturningProductAccessory(productName, sku, manualMatched || payloadObj, orderShopName)) return;
 
           const key = `${sku || ""}::${productName}`;
           const current = returningProductMap.get(key) || {
