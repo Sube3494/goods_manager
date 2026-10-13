@@ -1,7 +1,9 @@
+import deletionPrisma from "@/lib/prisma";
+import { deleteCatalogProducts } from "@/lib/deleteCatalogProducts";
 import { NextResponse } from "next/server";
 import { Prisma } from "../../../../../prisma/generated-client";
-import prisma from "@/lib/prisma";
-import { getLightSession } from "@/lib/auth";
+import prisma from "@/lib/catalogPrisma";
+import { getLightSession, getAuthorizedUser } from "@/lib/auth";
 import { getStorageStrategy } from "@/lib/storage";
 import { handlePrismaError } from "@/lib/api-errors";
 import { findConflictingProductJdSkuIds, getPrimaryJdSkuId, normalizeJdSkuIds, replaceProductJdSkuMappings } from "@/lib/productJdSku";
@@ -239,60 +241,16 @@ export async function PUT(
   }
 }
 
-export async function DELETE(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const session = await getLightSession();
-    if (!session || !session.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    const { id } = await params;
-
-    // Fetch existing product to check ownership
-    const product = await prisma.product.findUnique({
-      where: { id },
-      include: { gallery: true }
-    });
-
-    if (!product) {
-      return NextResponse.json({ error: "Product not found" }, { status: 404 });
-    }
-
-    // Ownership check for non-admin
-    if (session.role !== "SUPER_ADMIN" && product.userId !== session.id) {
-      return NextResponse.json({ error: "Permission denied" }, { status: 403 });
-    }
-
-    if (product) {
-      try {
-        const storage = await getStorageStrategy();
-        const urlsToDelete: string[] = [];
-
-        // 商品主图
-        if (product.image) urlsToDelete.push(product.image);
-        // 相册图片
-        product.gallery.forEach(item => {
-          if (item.url) urlsToDelete.push(item.url);
-          if (item.thumbnailUrl) urlsToDelete.push(item.thumbnailUrl);
-        });
-
-        // 执行物理删除
-        await Promise.allSettled(
-          urlsToDelete.map(url => storage.delete(url))
-        );
-      } catch (storageError) {
-        console.error("Product physical file deletion failed:", storageError);
-      }
-
-      await prisma.product.delete({
-        where: { id }
-      });
-    }
-
-    return NextResponse.json({ success: true });
-  } catch {
-    return NextResponse.json({ error: "Failed to delete product" }, { status: 500 });
+    const user = await getAuthorizedUser("product:delete");
+    if (!user) return NextResponse.json({ error: "Unauthorized or insufficient permissions" }, { status: 401 });
+    const id = (await params).id;
+    if (!id) return NextResponse.json({ error: "Product ID is required" }, { status: 400 });
+    const result = await deletionPrisma.$transaction((tx) => deleteCatalogProducts(tx, [id], user));
+    if (!result.count) return NextResponse.json({ error: "Product not found or permission denied" }, { status: 404 });
+    return NextResponse.json({ success: true, ...result, message: "商品及其复制商品已删除，历史交易记录已保留。" });
+  } catch (error) {
+    return handlePrismaError(error, "商品", "Failed to delete product");
   }
 }

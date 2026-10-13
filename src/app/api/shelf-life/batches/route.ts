@@ -44,6 +44,10 @@ export async function GET(request: NextRequest) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const where: Record<string, any> = {
       remainingStock: { gt: 0 },
+        AND: [
+          { product: { deletedAt: null } },
+          { OR: [{ shopProductId: null }, { shopProduct: { deletedAt: null } }] },
+        ],
       ...userScope,
     };
 

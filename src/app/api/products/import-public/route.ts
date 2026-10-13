@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
+import prisma from "@/lib/catalogPrisma";
+import historyPrisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
 import { ProductService } from "@/services/productService";
 
@@ -50,7 +51,7 @@ async function generateAvailableSku(baseSku: string | null) {
     return null;
   }
 
-  const directHit = await prisma.product.findUnique({
+  const directHit = await historyPrisma.product.findUnique({
     where: { sku: normalizedBase },
     select: { id: true },
   });
@@ -61,7 +62,7 @@ async function generateAvailableSku(baseSku: string | null) {
 
   for (let i = 1; i <= 999; i += 1) {
     const candidate = `${normalizedBase}-COPY${i}`;
-    const hit = await prisma.product.findUnique({
+    const hit = await historyPrisma.product.findUnique({
       where: { sku: candidate },
       select: { id: true },
     });

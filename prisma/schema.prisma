@@ -40,6 +40,7 @@ model Product {
   specs           Json?
   pinyin          String?
   isDiscontinued  Boolean             @default(false)
+  deletedAt       DateTime?
   isShopOnly      Boolean             @default(false)
   isShelfLife     Boolean             @default(false)
   shelfLifeDays   Int?
@@ -648,6 +649,7 @@ model ShopProduct {
   stock           Int      @default(0)
   isPublic        Boolean  @default(true)
   isDiscontinued  Boolean  @default(false)
+  deletedAt       DateTime?
   remark          String?
   specs           Json?
   sourceProductId String?

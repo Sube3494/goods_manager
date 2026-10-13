@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
+import prisma from "@/lib/catalogPrisma";
 import { getFreshSession } from "@/lib/auth";
 import { SessionUser } from "@/lib/permissions";
 
@@ -56,7 +56,7 @@ export async function GET() {
         where: { isPublic: true },
         include: {
           _count: {
-            select: { products: true }
+            select: { products: { where: { deletedAt: null } } }
           }
         },
         orderBy: { createdAt: "asc" },
@@ -69,7 +69,7 @@ export async function GET() {
       const allLibs = await prisma.productLibrary.findMany({
         include: {
           _count: {
-            select: { products: true }
+            select: { products: { where: { deletedAt: null } } }
           }
         },
         orderBy: { createdAt: "asc" },
@@ -86,7 +86,7 @@ export async function GET() {
       },
       include: {
         _count: {
-          select: { products: true }
+          select: { products: { where: { deletedAt: null } } }
         }
       },
       orderBy: { createdAt: "asc" },

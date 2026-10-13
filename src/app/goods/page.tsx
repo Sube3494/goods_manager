@@ -525,18 +525,21 @@ export default function GoodsPage() {
     setConfirmConfig({
       isOpen: true,
       title: "删除商品",
-      message: `确定要删除商品 "${name}" 吗？此操作不可恢复。`,
+      message: user?.role === "SUPER_ADMIN"
+        ? `确定删除商品 "${name}" 及所有用户、门店中的复制商品吗？历史交易记录保留。此操作不可恢复。`
+        : `确定删除商品 "${name}" 及你名下的复制商品吗？历史交易记录保留。此操作不可恢复。`,
       onConfirm: async () => {
         try {
           const res = await fetch(`/api/products?id=${id}`, {
             method: "DELETE",
           });
+          const data = await res.json();
           if (res.ok) {
-            showToast("商品已删除", "success");
+            showToast(data.message || "商品已删除", "success");
             fetchGoods();
             setConfirmConfig(prev => ({ ...prev, isOpen: false }));
           } else {
-            showToast("删除失败", "error");
+            showToast(data.error || "删除失败", "error");
           }
         } catch {
           showToast("删除请求失败", "error");
@@ -724,7 +727,9 @@ export default function GoodsPage() {
     setConfirmConfig({
       isOpen: true,
       title: "批量删除商品",
-      message: `确定要删除选中的 ${count} 个商品吗？此操作不可恢复。`,
+      message: user?.role === "SUPER_ADMIN"
+        ? `确定删除选中的 ${count} 个商品及所有用户、门店中的复制商品吗？历史交易记录保留。此操作不可恢复。`
+        : `确定删除选中的 ${count} 个商品及你名下的复制商品吗？历史交易记录保留。此操作不可恢复。`,
       onConfirm: async () => {
         try {
           const res = await fetch("/api/products/batch", {
@@ -732,24 +737,22 @@ export default function GoodsPage() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ ids: selectedIds }),
           });
+          const data = await res.json();
           if (res.ok) {
-            showToast(`成功删除 ${count} 个商品`, "success");
-            
-            // 本地删除，避免全量刷新
-            setItems(prev => prev.filter(item => !selectedIds.includes(item.id)));
-            setTotalResults(prev => Math.max(0, prev - count));
+            showToast(`已删除 ${data.count} 个商品、${data.copiedCount} 个复制商品及 ${data.shopProductCount} 个门店商品，历史交易记录已保留`, "success");
+            fetchGoods();
             
             setSelectedIds([]);
             setConfirmConfig(prev => ({ ...prev, isOpen: false }));
           } else {
-            showToast("删除失败", "error");
+            showToast(data.error || "删除失败", "error");
           }
         } catch {
           showToast("请求失败", "error");
         }
       },
     });
-  }, [selectedIds, showToast]);
+  }, [selectedIds, showToast, user?.role, fetchGoods]);
 
   const handleSaveItem = async (data: Partial<Product>, galleryItems?: GalleryItem[]) => {
     try {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
+import prisma from "@/lib/catalogPrisma";
 import { getAuthorizedUser } from "@/lib/auth";
 import { getStorageStrategy } from "@/lib/storage";
 import { Prisma } from "../../../../../prisma/generated-client";
@@ -110,6 +110,7 @@ export async function GET(request: NextRequest) {
     const where: Prisma.BrushProductWhereInput = {
       userId: user.id,
       isActive: true,
+      product: { deletedAt: null },
       ...(andWhere.length > 0 ? { AND: andWhere } : {}),
     };
 

@@ -411,6 +411,7 @@ export async function POST(request: Request) {
       ? await prisma.shopProduct.findMany({
           where: {
             id: { in: requestedShopProductIds },
+            deletedAt: null,
             shop: { userId: user.id },
           },
           select: {

@@ -410,6 +410,7 @@ export async function GET(request: NextRequest) {
       Promise.resolve(allUserShops),
       prisma.shopProduct.findMany({
         where: {
+          deletedAt: null,
           shop: {
             userId: targetUserId,
             ...(shopName ? { name: { in: matchedShopNames } } : {}),

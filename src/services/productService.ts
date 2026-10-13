@@ -1,4 +1,4 @@
-import prisma from "@/lib/prisma";
+import prisma from "@/lib/catalogPrisma";
 import { pinyin } from "pinyin-pro";
 import { getStorageStrategy } from "@/lib/storage";
 import { Prisma } from "../../prisma/generated-client";

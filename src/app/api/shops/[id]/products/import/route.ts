@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
+import prisma from "@/lib/catalogPrisma";
+import historyPrisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
 import { getStorageStrategy } from "@/lib/storage";
 import { normalizeJdSkuIds, replaceProductJdSkuMappings } from "@/lib/productJdSku";
@@ -234,7 +235,7 @@ export async function POST(
         if (!newSku) {
           newSku = `AUTO-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
         } else {
-          const isSkuDup = await prisma.product.findUnique({
+          const isSkuDup = await historyPrisma.product.findUnique({
             where: { sku: newSku }
           });
           if (isSkuDup) {

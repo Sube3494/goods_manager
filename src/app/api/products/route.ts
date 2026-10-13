@@ -1,5 +1,7 @@
+import deletionPrisma from "@/lib/prisma";
+import { deleteCatalogProducts } from "@/lib/deleteCatalogProducts";
 import { NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
+import prisma from "@/lib/catalogPrisma";
 import { getStorageStrategy } from "@/lib/storage";
 import { getLightSession, getCachedSettings, getAuthorizedUser } from "@/lib/auth";
 import { handlePrismaError } from "@/lib/api-errors";
@@ -500,62 +502,13 @@ export async function PUT(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const user = await getAuthorizedUser("product:delete");
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized or insufficient permissions" }, { status: 401 });
-    }
-
-    const { searchParams } = new URL(request.url);
-    const id = searchParams.get("id");
-
-    if (!id) {
-      return NextResponse.json({ error: "Product ID is required" }, { status: 400 });
-    }
-
-    // Security check: Global access
-    const product = await prisma.product.findFirst({
-      where: user.role === 'SUPER_ADMIN' ? { id } : { id, OR: [{ userId: user.id }, { isPublic: true }] }
-    });
-
-    if (!product) {
-      return NextResponse.json({ error: "Product not found" }, { status: 404 });
-    }
-
-    // Delete related records first to avoid foreign key constraint errors
-    // 1. Delete gallery items
-    await prisma.galleryItem.deleteMany({
-      where: { productId: id }
-    });
-
-    // 2. Finally delete the product
-    await prisma.product.delete({
-      where: { id },
-    });
-
-    return NextResponse.json({ success: true });
-  } catch (error: unknown) {
-    // 软删除机制 (Soft Delete Fallback): 
-    // 如果发生外键冲突（已被订单关联），系统将其转为“下架”状态并修改 SKU 防止冲突
-    if (error && typeof error === 'object' && 'code' in error && error.code === 'P2003') {
-      const url = new URL(request.url);
-      const id = url.searchParams.get("id");
-      if (id) {
-        try {
-          await prisma.product.update({
-            where: { id },
-            data: { 
-              isDiscontinued: true,
-              sku: `DEL-${Date.now().toString().slice(-4)}` // 修改 SKU，释放原 SKU 给用户重用
-            }
-          });
-          return NextResponse.json({ 
-            success: true, 
-            message: "商品存在交易记录，已自动转为下架并释放原 SKU 以供重新录入。" 
-          });
-        } catch (updateError) {
-          console.error("Soft delete fallback failed:", updateError);
-        }
-      }
-    }
+    if (!user) return NextResponse.json({ error: "Unauthorized or insufficient permissions" }, { status: 401 });
+    const id = new URL(request.url).searchParams.get("id");
+    if (!id) return NextResponse.json({ error: "Product ID is required" }, { status: 400 });
+    const result = await deletionPrisma.$transaction((tx) => deleteCatalogProducts(tx, [id], user));
+    if (!result.count) return NextResponse.json({ error: "Product not found or permission denied" }, { status: 404 });
+    return NextResponse.json({ success: true, ...result, message: "商品及其复制商品已删除，历史交易记录已保留。" });
+  } catch (error) {
     return handlePrismaError(error, "商品", "Failed to delete product");
   }
 }

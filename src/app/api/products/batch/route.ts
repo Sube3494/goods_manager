@@ -1,6 +1,9 @@
+import { handlePrismaError } from "@/lib/api-errors";
+import deletionPrisma from "@/lib/prisma";
+import { deleteCatalogProducts } from "@/lib/deleteCatalogProducts";
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
-import prisma from "@/lib/prisma";
+import prisma from "@/lib/catalogPrisma";
 import { getAuthorizedUser } from "@/lib/auth";
 
 function normalizeSku(sku: unknown) {
@@ -162,71 +165,14 @@ export async function PATCH(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const user = await getAuthorizedUser("product:delete");
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized or insufficient permissions" }, { status: 401 });
-    }
-
-    const body = await request.json();
-    const { ids } = body || {};
-
-    if (!Array.isArray(ids) || ids.length === 0) {
+    if (!user) return NextResponse.json({ error: "Unauthorized or insufficient permissions" }, { status: 401 });
+    const { ids } = await request.json();
+    if (!Array.isArray(ids) || !ids.length) {
       return NextResponse.json({ error: "No product IDs provided" }, { status: 400 });
     }
-
-    const validIds = ids.map(String);
-
-    const userProducts = await prisma.product.findMany({
-      where: {
-        id: { in: validIds },
-        userId: user.id,
-      },
-      select: { id: true },
-    });
-
-    const allowedIds = userProducts.map((p) => p.id);
-
-    if (allowedIds.length === 0) {
-      return NextResponse.json({ success: true, count: 0 });
-    }
-
-    let deletedCount = 0;
-    let softDeletedCount = 0;
-
-    for (const id of allowedIds) {
-      try {
-        await prisma.galleryItem.deleteMany({
-          where: { productId: id },
-        });
-
-        await prisma.product.delete({
-          where: { id },
-        });
-        deletedCount++;
-      } catch (error: unknown) {
-        if (error && typeof error === "object" && "code" in error && error.code === "P2003") {
-          await prisma.product.update({
-            where: { id },
-            data: {
-              isDiscontinued: true,
-              sku: `DEL-${Date.now().toString().slice(-4)}-${Math.floor(Math.random() * 1000)}`,
-            },
-          });
-          softDeletedCount++;
-        } else {
-          console.error(`Failed to delete product ${id}:`, error);
-        }
-      }
-    }
-
-    return NextResponse.json({
-      success: true,
-      deletedCount,
-      softDeletedCount,
-      totalProcessed: deletedCount + softDeletedCount,
-    });
+    const result = await deletionPrisma.$transaction((tx) => deleteCatalogProducts(tx, ids.map(String), user));
+    return NextResponse.json({ success: true, ...result, totalProcessed: result.count });
   } catch (error) {
-    console.error("Failed to batch delete products:", error);
-    return NextResponse.json({ error: "Failed to batch delete products" }, { status: 500 });
+    return handlePrismaError(error, "商品", "Failed to batch delete products");
   }
 }
-

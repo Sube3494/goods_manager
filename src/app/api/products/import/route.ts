@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
+import prisma from "@/lib/catalogPrisma";
+import historyPrisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
 import { hasPermission, SessionUser } from "@/lib/permissions";
 import { getPrimaryJdSkuId, normalizeJdSkuIds, replaceProductJdSkuMappings } from "@/lib/productJdSku";
@@ -121,7 +122,7 @@ export async function POST(request: Request) {
     let nextAutoNumber = globalMaxNum + 1;
     
     // 查询全局所有已存在的 SKU 集合，防止主键唯一约束冲突
-    const allGlobalSkuRecords = await prisma.product.findMany({
+    const allGlobalSkuRecords = await historyPrisma.product.findMany({
       select: { sku: true },
     });
     const globalExistingSkuSet = new Set(allGlobalSkuRecords.map(r => r.sku).filter(Boolean));

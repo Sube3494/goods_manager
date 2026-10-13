@@ -5599,6 +5599,7 @@ export async function backfillPlatformIdsForSyncedAutoPickOrder(userId: string, 
 
   const shopProducts = await prisma.shopProduct.findMany({
     where: {
+      deletedAt: null,
       shop: { userId },
       shopId: resolvedShopId,
     },
@@ -6736,6 +6737,7 @@ async function resolveBrushOrderItemsForAutoPickOrder(
 
   const shopProducts = await prisma.shopProduct.findMany({
       where: {
+        deletedAt: null,
         shop: { userId },
       },
       select: {

@@ -30,6 +30,10 @@ export async function GET() {
     const allBatches = await prisma.productBatch.findMany({
       where: {
         remainingStock: { gt: 0 },
+        AND: [
+          { product: { deletedAt: null } },
+          { OR: [{ shopProductId: null }, { shopProduct: { deletedAt: null } }] },
+        ],
         ...userScope,
       },
       include: {
