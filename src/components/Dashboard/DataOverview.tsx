@@ -13,6 +13,7 @@ import { format } from "date-fns";
 import { cn, getPlatformMeta } from "@/lib/utils";
 import { OverviewAiPanel } from "@/components/Dashboard/OverviewAiPanel";
 import { DataOverviewSkeleton } from "@/components/Dashboard/DataOverviewSkeleton";
+import { OrderTimeAnalysis } from "@/components/Dashboard/OrderTimeAnalysis";
 
 const PLATFORM_THEMES: Record<string, { bar: string; dot: string }> = {
   美团: {
@@ -1763,6 +1764,8 @@ export function DataOverview({
           })}
         </div>
       </Panel>
+
+      <OrderTimeAnalysis buckets={data?.orderTimeDistribution || []} rangeDays={data?.rangeDays || 1} />
 
       <div className={cn("grid gap-6", isChartsFullWidth ? "grid-cols-1" : "grid-cols-1 xl:grid-cols-2")}>
         <Panel

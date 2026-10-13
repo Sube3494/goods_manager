@@ -679,6 +679,7 @@ export interface StatsData {
   platformMatrix?: DashboardPlatformMatrix;
   businessTrend?: DashboardBusinessTrendPoint[];
   platformBusinessTrend?: Record<string, DashboardBusinessTrendPoint[]>;
+  orderTimeDistribution?: import("./orderTimeAnalysis").OrderTimeBucket[];
   customerAnalysis?: DashboardCustomerAnalysis;
   productSales?: DashboardProductSales;
 }

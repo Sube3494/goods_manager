@@ -40,6 +40,7 @@ import { isAccessoryProduct } from "@/lib/accessoryUtils";
 import { buildRecentInboundOrderWhere, resolveRecentInboundProduct } from "@/lib/recentInbound";
 import { resolveCompanyCommission } from "@/lib/companyCommission";
 import { getEffectivePromotionExpenses } from "@/services/promotionService";
+import { buildOrderTimeBuckets } from "@/lib/orderTimeAnalysis";
 
 const SHANGHAI_DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -344,7 +345,7 @@ export async function GET(request: NextRequest) {
       startDateKey = formatDateKey(defaultStart);
     }
 
-    const endDate = parseAsShanghaiTime(`${endDateKey} 23:59:59`);
+    const endDate = parseAsShanghaiTime(`${endDateKey} 23:59:59.999`);
     let startDate = parseAsShanghaiTime(startDateKey);
 
     if (rangeMode === "all") {
@@ -1936,6 +1937,10 @@ export async function GET(request: NextRequest) {
       },
       customerAnalysis,
       productSales,
+      orderTimeDistribution: buildOrderTimeBuckets(filteredAutoPickOrdersInRange.map((order) => ({
+        orderTime: order.orderTime,
+        isBrush: readMainSystemSelfDeliveryFlag(order.rawPayload, order.delivery),
+      }))),
       businessTrend: canViewProductCosts ? businessTrend : businessTrend.map(({ productCost: _productCost, ...point }) => point),
       platformBusinessTrend: canViewProductCosts
         ? platformBusinessTrend
