@@ -29,7 +29,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { format, subDays, startOfMonth, endOfMonth } from "date-fns";
+import { format, startOfMonth, endOfMonth } from "date-fns";
 import { cn, getPlatformMeta } from "@/lib/utils";
 import { simplifyShopName } from "@/lib/shopIdentity";
 import { toCurrency, getPlatformBadgeMeta } from "@/app/orders/OrderCard";
@@ -326,12 +326,8 @@ function UserProfitTrendView({
   localShops: Array<{ id: string; name: string; address: string }>;
   refreshTrigger?: number;
 }) {
-  const today = useMemo(() => new Date(), []);
-  const initialEnd = useMemo(() => format(today, "yyyy-MM-dd"), [today]);
-  const initialStart = useMemo(() => format(subDays(today, 6), "yyyy-MM-dd"), [today]);
-
-  const [startDate, setStartDate] = useState(initialStart);
-  const [endDate, setEndDate] = useState(initialEnd);
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [selectedShopName, setSelectedShopName] = useState("");
   const [selectedPlatform, setSelectedPlatform] = useState("all");
   const [orderScope, setOrderScope] = useState<"all" | "true">("all");

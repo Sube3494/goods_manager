@@ -945,6 +945,7 @@ export function PromotionCalendarModal({
                       startDate={selectedDateStr}
                       endDate={fixedEndDate}
                       showClear={false}
+                      hasAllPreset={false}
                       className="h-10 w-full"
                       onChange={(range) => {
                         if (isSaving || !range.startDate || !range.endDate) return;

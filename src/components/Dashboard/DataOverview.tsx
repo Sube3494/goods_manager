@@ -7,7 +7,7 @@ import { Shop, StatsData } from "@/lib/types";
 import { PromotionCalendarModal } from "@/app/orders/PromotionCalendarModal";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { DateRangePicker } from "@/components/ui/DateRangePicker";
-import { RefreshCw, Maximize2, Minimize2, X, Layers, ArrowUpRight, Award, Store, ShieldCheck, Package, UserPlus, UserCheck, HelpCircle } from "lucide-react";
+import { RefreshCw, Maximize2, Minimize2, X, Layers, ArrowUpRight, Award, Store, ShieldCheck, Package, UserPlus, UserCheck, HelpCircle, ReceiptText, Truck, Megaphone, Repeat2, Ellipsis, BadgePercent, Wallet } from "lucide-react";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { format } from "date-fns";
 import { cn, getPlatformMeta } from "@/lib/utils";
@@ -138,6 +138,80 @@ const money = (value: number | undefined) =>
 
 const int = (value: number | undefined) => Number(value || 0).toLocaleString();
 const percent = (value: number) => `${value.toFixed(1)}%`;
+
+const EXPENSE_ITEM_STYLES = {
+  配送费: { icon: Truck, tone: "bg-sky-500/10 text-sky-600 dark:text-sky-400" },
+  推广费: { icon: Megaphone, tone: "bg-violet-500/10 text-violet-600 dark:text-violet-400" },
+  刷单支出: { icon: Repeat2, tone: "bg-amber-500/10 text-amber-600 dark:text-amber-400" },
+  经营成本: { icon: Store, tone: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" },
+  其他支出: { icon: Ellipsis, tone: "bg-slate-500/10 text-slate-600 dark:text-slate-400" },
+  平台佣金: { icon: Layers, tone: "bg-sky-500/10 text-sky-600 dark:text-sky-400" },
+  公司扣点: { icon: BadgePercent, tone: "bg-violet-500/10 text-violet-600 dark:text-violet-400" },
+};
+
+function ExpenseBreakdownDetails({
+  label,
+  items,
+  onClose,
+}: {
+  label: string;
+  items: Array<{ label: string; value: number }>;
+  onClose?: () => void;
+}) {
+  const total = items.reduce((sum, item) => sum + item.value, 0);
+  const isOperatingExpense = label === "运营与支出";
+
+  return (
+    <>
+      <div className="flex items-center gap-2.5 px-1 pb-3">
+        <span className={cn(
+          "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ring-1 ring-inset",
+          isOperatingExpense ? "bg-rose-500/10 text-rose-500 ring-rose-500/10 dark:text-rose-400" : "bg-sky-500/10 text-sky-600 ring-sky-500/10 dark:text-sky-400"
+        )}>
+          <ReceiptText aria-hidden="true" className="h-4 w-4" strokeWidth={1.8} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <h3 className="text-[13px] font-bold tracking-tight text-popover-foreground">{label}明细</h3>
+          <p className="mt-0.5 text-[10px] text-muted-foreground">本期费用构成 · {items.length} 项</p>
+        </div>
+        {onClose ? (
+          <button type="button" onClick={onClose} aria-label="关闭费用明细" className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full bg-muted/60 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+            <X aria-hidden="true" className="h-4 w-4" />
+          </button>
+        ) : null}
+      </div>
+
+      <div className="max-h-[min(50dvh,320px)] space-y-1 overflow-y-auto">
+        {items.map((item) => {
+          const style = EXPENSE_ITEM_STYLES[item.label as keyof typeof EXPENSE_ITEM_STYLES] || EXPENSE_ITEM_STYLES.其他支出;
+          const Icon = style.icon;
+          return (
+            <div key={item.label} className="flex items-center gap-2.5 rounded-xl bg-muted/45 px-2.5 py-2 dark:bg-white/[0.035]">
+              <span className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-lg", style.tone)}>
+                <Icon aria-hidden="true" className="h-3.5 w-3.5" strokeWidth={1.8} />
+              </span>
+              <span className="min-w-0 flex-1 text-xs font-medium text-muted-foreground">{item.label}</span>
+              <span className="shrink-0 text-[13px] font-semibold tracking-tight tabular-nums text-popover-foreground">{money(item.value)}</span>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className={cn(
+        "mt-3 flex items-center justify-between gap-3 rounded-xl border px-3 py-3",
+        isOperatingExpense ? "border-rose-500/10 bg-rose-500/[0.06]" : "border-sky-500/10 bg-sky-500/[0.06]"
+      )}>
+        <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+          <Wallet aria-hidden="true" className="h-3.5 w-3.5" strokeWidth={1.8} />
+          合计金额
+        </span>
+        <span className={cn("text-base font-bold tracking-tight tabular-nums", isOperatingExpense && total > 0 ? "text-rose-500 dark:text-rose-400" : "text-popover-foreground")}>
+          {money(total)}
+        </span>
+      </div>
+    </>
+  );
+}
 
 function countDays(startDate: string, endDate: string) {
   if (!startDate || !endDate) return 0;
@@ -665,8 +739,8 @@ export function DataOverview({
               ) : null}
             </div>
             <DateRangePicker
-              startDate={startDate}
-              endDate={endDate}
+              startDate={rangePreset === "all" ? "" : startDate}
+              endDate={rangePreset === "all" ? "" : endDate}
               onPresetChange={onRangePresetChange}
               onChange={({ startDate: nextStart, endDate: nextEnd }) => {
                 if (onDateRangeChange) {
@@ -879,54 +953,50 @@ export function DataOverview({
                       key={item.label}
                       className="relative group/breakdown min-w-0 z-10 hover:z-30"
                     >
-                      <div
-                        onClick={() => {
-                          if (hasBreakdown && typeof window !== "undefined" && window.innerWidth < 768) {
-                            setActiveBreakdown({ label: item.label, items: item.breakdown! });
-                          }
-                        }}
-                        className={cn(
-                          "relative min-w-0 rounded-2xl border border-black/6 bg-white/65 p-2 transition-all duration-200 dark:border-white/8 dark:bg-white/[0.025] sm:p-2.5",
-                          hasBreakdown && "cursor-default sm:cursor-pointer hover:border-primary/30 hover:bg-white/90 dark:hover:border-primary/40 dark:hover:bg-white/[0.05]"
-                        )}
-                      >
-                        <div className="flex items-center justify-between gap-1">
-                          <div className="truncate text-[10px] sm:text-[11px] font-bold text-muted-foreground">{item.label}</div>
-                          {hasBreakdown ? (
-                            <span className="flex shrink-0 items-center gap-0.5 text-[9px] sm:text-[10px] font-bold text-primary/80 transition-colors group-hover/breakdown:text-primary">
-                              明细 <ArrowUpRight className="h-2.5 w-2.5" />
-                            </span>
-                          ) : null}
-                        </div>
-                        <div className={cn("mt-1 truncate font-mono text-sm sm:text-base tracking-tight tabular-nums", item.tone)}>
-                          {item.value}
-                        </div>
-                        <div className="mt-0.5 truncate text-[9px] sm:text-[10px] text-muted-foreground/70">{item.hint}</div>
-                      </div>
-
-                    {/* PC 端原生 120fps 丝滑悬停浮层：锚定在当前卡片正上方，绝对不可能双卡片重叠 */}
-                    {hasBreakdown ? (
-                      <div className="pointer-events-none absolute bottom-[calc(100%+8px)] left-1/2 -translate-x-1/2 z-50 w-56 rounded-2xl border border-border bg-popover p-3 text-popover-foreground shadow-2xl opacity-0 translate-y-1 invisible group-hover/breakdown:opacity-100 group-hover/breakdown:translate-y-0 group-hover/breakdown:visible transition-all duration-150 ease-out hidden sm:block ring-1 ring-foreground/5">
-                        <div className="flex items-center justify-between border-b border-border/70 pb-2">
-                          <span className="text-xs font-black tracking-tight text-foreground">{item.label}明细</span>
-                          <span className="font-mono text-[10px] font-bold text-muted-foreground">共 {item.breakdown!.length} 项</span>
-                        </div>
-                        <div className="my-2 space-y-1.5">
-                          {item.breakdown!.map((b) => (
-                            <div key={b.label} className="flex items-center justify-between text-xs">
-                              <span className="text-muted-foreground font-medium">{b.label}</span>
-                              <span className="font-mono font-bold tabular-nums text-foreground">{money(b.value)}</span>
+                      <HoverCard openDelay={120} closeDelay={80}>
+                        <HoverCardTrigger asChild>
+                          <div
+                            role={hasBreakdown ? "button" : undefined}
+                            tabIndex={hasBreakdown ? 0 : undefined}
+                            aria-label={hasBreakdown ? `查看${item.label}明细` : undefined}
+                            onClick={() => {
+                              if (hasBreakdown) {
+                                setActiveBreakdown({ label: item.label, items: item.breakdown! });
+                              }
+                            }}
+                            onKeyDown={(event) => {
+                              if (hasBreakdown && (event.key === "Enter" || event.key === " ")) {
+                                event.preventDefault();
+                                setActiveBreakdown({ label: item.label, items: item.breakdown! });
+                              }
+                            }}
+                            className={cn(
+                              "relative min-w-0 rounded-2xl border border-black/6 bg-white/65 p-2 transition-all duration-200 dark:border-white/8 dark:bg-white/[0.025] sm:p-2.5",
+                              hasBreakdown && "cursor-pointer hover:border-primary/30 hover:bg-white/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring dark:hover:border-primary/40 dark:hover:bg-white/[0.05]"
+                            )}
+                          >
+                            <div className="flex items-center justify-between gap-1">
+                              <div className="truncate text-[10px] sm:text-[11px] font-bold text-muted-foreground">{item.label}</div>
+                              {hasBreakdown ? (
+                                <span className="flex shrink-0 items-center gap-0.5 text-[9px] sm:text-[10px] font-bold text-primary/80 transition-colors group-hover/breakdown:text-primary">
+                                  明细 <ArrowUpRight className="h-2.5 w-2.5" />
+                                </span>
+                              ) : null}
                             </div>
-                          ))}
-                        </div>
-                        <div className="flex items-center justify-between border-t border-border/70 pt-2 text-xs">
-                          <span className="font-bold text-muted-foreground">合计</span>
-                          <span className="font-mono font-black tabular-nums text-foreground">
-                            {money(item.breakdown!.reduce((sum, b) => sum + b.value, 0))}
-                          </span>
-                        </div>
-                      </div>
-                    ) : null}
+                            <div className={cn("mt-1 truncate font-mono text-sm sm:text-base tracking-tight tabular-nums", item.tone)}>
+                              {item.value}
+                            </div>
+                            <div className="mt-0.5 truncate text-[9px] sm:text-[10px] text-muted-foreground/70">{item.hint}</div>
+                          </div>
+                        </HoverCardTrigger>
+
+                        {/* 桌面悬停与键盘聚焦时展示费用明细 */}
+                        {hasBreakdown && !activeBreakdown ? (
+                          <HoverCardContent side="top" sideOffset={10} collisionPadding={16} className="hidden w-72 max-w-[calc(100vw-32px)] rounded-[20px] border border-border/80 bg-popover p-3.5 text-popover-foreground shadow-xl shadow-black/10 ring-1 ring-foreground/[0.03] dark:shadow-black/30 sm:block motion-reduce:animate-none">
+                            <ExpenseBreakdownDetails label={item.label} items={item.breakdown!} />
+                          </HoverCardContent>
+                        ) : null}
+                      </HoverCard>
                   </div>
                 );
               })}
@@ -1962,48 +2032,20 @@ export function DataOverview({
         </div>
       ) : null}
 
-      {/* 费用与扣点明细弹窗（严格继承系统标准的 bg-popover 与 border-border 语义配色） */}
+      {/* 费用与扣点明细弹窗，与桌面浮层共用费用展示 */}
       {activeBreakdown ? (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-200 touch-none overscroll-contain"
           onClick={() => setActiveBreakdown(null)}
         >
           <div
-            className="w-full max-w-sm overflow-hidden rounded-[26px] border border-border bg-popover p-5 text-popover-foreground shadow-2xl backdrop-blur-xl ring-1 ring-foreground/5 sm:rounded-[28px] animate-in zoom-in-95 duration-200 touch-auto overscroll-contain"
+            role="dialog"
+            aria-modal="true"
+            aria-label={`${activeBreakdown.label}明细`}
+            className="w-full max-w-sm overflow-hidden rounded-[24px] border border-border/80 bg-popover p-4 text-popover-foreground shadow-2xl ring-1 ring-foreground/[0.03] animate-in zoom-in-95 duration-200 touch-auto overscroll-contain motion-reduce:animate-none"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between border-b border-border/70 pb-3.5">
-              <div>
-                <h3 className="text-base font-black tracking-tight text-foreground">{activeBreakdown.label}明细</h3>
-                <p className="mt-0.5 text-xs text-muted-foreground">共 {activeBreakdown.items.length} 个拆解项目</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setActiveBreakdown(null)}
-                className="flex h-8 w-8 items-center justify-center rounded-full border border-border/60 bg-muted/50 text-muted-foreground transition-all hover:bg-muted hover:text-foreground cursor-pointer active:scale-95"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            <div className="my-3.5 space-y-2 max-h-60 overflow-y-auto">
-              {activeBreakdown.items.map((b) => (
-                <div
-                  key={b.label}
-                  className="flex items-center justify-between rounded-xl border border-border/40 bg-muted/30 px-3.5 py-2.5"
-                >
-                  <span className="text-xs font-semibold text-muted-foreground">{b.label}</span>
-                  <span className="font-mono text-sm font-black tabular-nums text-foreground">{money(b.value)}</span>
-                </div>
-              ))}
-            </div>
-
-            <div className="flex items-center justify-between border-t border-border/70 pt-3.5">
-              <span className="text-xs font-bold text-muted-foreground">合计金额</span>
-              <span className="font-mono text-base font-black tabular-nums text-foreground">
-                {money(activeBreakdown.items.reduce((sum, i) => sum + i.value, 0))}
-              </span>
-            </div>
+            <ExpenseBreakdownDetails label={activeBreakdown.label} items={activeBreakdown.items} onClose={() => setActiveBreakdown(null)} />
           </div>
         </div>
       ) : null}

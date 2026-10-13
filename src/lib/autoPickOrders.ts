@@ -1,5 +1,6 @@
 import prisma from "@/lib/prisma";
 import { buildCustomerMemoryFields } from "@/lib/customerMemoryStore";
+import { mergeOrderCustomerPayload, readRetainedCustomerAddress, retainCustomerAddress } from "@/lib/orderCustomerData";
 import { assertMaiyatianCookieResponse } from "@/lib/maiyatianCookieResponse";
 import { formatLocalDate, parseAsShanghaiTime } from "@/lib/dateUtils";
 import { cleanCustomerRemark, firstMeaningfulCustomerRemark } from "@/lib/customerRemark";
@@ -4019,6 +4020,7 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
         deliveryTimeRange: true,
         delivery: true,
         customerRemark: true,
+        userAddress: true,
         customerPhoneTail: true,
         customerAddressKey: true,
         customerShopKey: true,
@@ -4150,6 +4152,10 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
     const existingRawRecord = existing?.rawPayload && typeof existing.rawPayload === "object" && !Array.isArray(existing.rawPayload)
       ? existing.rawPayload as Record<string, unknown>
       : null;
+    const customerRawPayload = mergeOrderCustomerPayload(normalizedRawPayload, existingRawRecord);
+    const previousUserAddress = retainCustomerAddress(existing?.userAddress, readRetainedCustomerAddress(existingRawRecord));
+    const userAddress = retainCustomerAddress(normalized.userAddress, previousUserAddress)
+      || readRetainedCustomerAddress(customerRawPayload);
     const nextCancelReason = normalized.cancelReason
       || (normalizedRawPayload.cancelReason as string)
       || (normalizedRawPayload.cancel_reason as string)
@@ -4164,7 +4170,7 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
 
     const nextRawPayload = mergeAutoPickSystemMeta(
       {
-        ...normalizedRawPayload,
+        ...customerRawPayload,
         cancelReason: nextCancelReason,
         cancelDetails: nextCancelDetails,
         customerType,
@@ -4239,7 +4245,7 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
       ...existing,
       platform: normalized.platform,
       shopId,
-      userAddress: normalized.userAddress,
+      userAddress,
       customerMaskedPhone: normalized.customerMaskedPhone,
       customerPhone: normalized.customerPhone,
       rawPayload: nextRawPayloadWithResolvedShop,
@@ -4321,7 +4327,7 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
       dailyPlatformSequence: normalized.dailyPlatformSequence || 0,
       orderNo: normalized.orderNo || "",
       orderTime,
-      userAddress: normalized.userAddress || "",
+      userAddress,
       shopId,
       shopAddress,
       longitude: normalized.longitude,
@@ -4349,7 +4355,7 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
       dailyPlatformSequence: normalized.dailyPlatformSequence || 0,
       orderNo: normalized.orderNo || "",
       orderTime,
-      userAddress: normalized.userAddress || "",
+      userAddress,
       shopId,
       shopAddress,
       longitude: normalized.longitude,

@@ -65,7 +65,7 @@ export function DateRangePicker({
   maxDate,
   isCompact,
   includeToday = true,
-  hasAllPreset = false,
+  hasAllPreset = true,
 }: DateRangePickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(() => parseSafeDate(endDate || startDate));
@@ -242,7 +242,7 @@ export function DateRangePicker({
 
   // 格式化展示标签（同一年省略后者的年份，避免截断省略号）
   const displayLabel = useMemo(() => {
-    if (!startDate && !endDate) return hasAllPreset ? (placeholder === "选择日期范围" ? "全部" : placeholder) : placeholder;
+    if (!startDate && !endDate) return hasAllPreset ? "全部" : placeholder;
     if (startDate && endDate) {
       if (startDate === endDate) return startDate;
       const startYear = startDate.slice(0, 4);
@@ -256,27 +256,24 @@ export function DateRangePicker({
     return `至 ${endDate}`;
   }, [startDate, endDate, placeholder, hasAllPreset]);
 
-  const hasValue = Boolean(startDate || endDate || hasAllPreset);
+  const hasValue = Boolean(startDate || endDate);
 
   // 预设项计算
   const presets = useMemo(() => {
     const now = new Date();
     const today = startOfDay(now);
     const yesterday = subDays(today, 1);
-    const last7Days = subDays(today, 6);
     const last30Days = subDays(today, 29);
     const currentMonthStart = startOfMonth(today);
     const prevMonthEnd = subDays(currentMonthStart, 1);
     const prevMonthStart = startOfMonth(prevMonthEnd);
 
     const list: Array<{ label: string; preset: string; start?: Date; end?: Date; isAll?: boolean }> = [
-      ...(hasAllPreset
-        ? [{ label: "全部", preset: "all", isAll: true }]
-        : includeToday
+      ...(includeToday
         ? [{ label: "今天", preset: "today", start: today, end: today }]
         : []),
       { label: "昨天", preset: "yesterday", start: yesterday, end: yesterday },
-      { label: "近7天", preset: "7d", start: last7Days, end: today },
+      ...(hasAllPreset ? [{ label: "全部", preset: "all", isAll: true }] : []),
       { label: "近30天", preset: "30d", start: last30Days, end: today },
       { label: "本月", preset: "month", start: currentMonthStart, end: today },
       { label: "上月", preset: "lastMonth", start: prevMonthStart, end: prevMonthEnd },
@@ -345,10 +342,7 @@ export function DateRangePicker({
               >
                 <div className="max-w-[320px] mx-auto">
                   {/* 快捷范围预设按钮 */}
-                  <div className={cn(
-                    "mb-3 pb-2.5 border-b border-black/6 dark:border-white/8 gap-1",
-                    presets.length === 6 ? "grid grid-cols-3 gap-1.5" : "grid grid-cols-5"
-                  )}>
+                  <div className="mb-3 grid grid-cols-3 gap-1.5 border-b border-black/6 pb-2.5 dark:border-white/8">
                     {presets.map((preset) => {
                       const isActiveAll = preset.isAll && !startDate && !endDate;
                       return (

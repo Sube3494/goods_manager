@@ -955,7 +955,6 @@ export function AllOrdersView({
                   }}
                   placeholder="选择日期范围"
                   maxDate={todayDate}
-                  includeToday={false}
                   className="h-11 w-full col-span-2 sm:w-auto"
                   triggerClassName="h-full rounded-full border border-black/8 bg-white px-3.5 text-sm shadow-none dark:border-white/10 dark:bg-white/3 whitespace-nowrap text-center justify-center"
                 />

@@ -1,6 +1,6 @@
 import { beforeEach, expect, mock, test } from "bun:test";
 import { NextRequest } from "next/server";
-import { getCustomerMemoryIdentity, normalizeCustomerMemoryAddress, readCustomerMemoryPhoneTail } from "../src/lib/customerMemory";
+import { getCustomerMemoryIdentity, getCustomerMemoryPlatform, normalizeCustomerMemoryAddress, readCustomerMemoryPhoneTail } from "../src/lib/customerMemory";
 import { extractCustomerPhoneTail } from "../src/lib/customerPhoneTail";
 
 let rows = [];
@@ -58,7 +58,7 @@ mock.module("../src/lib/prisma", () => ({ default: {
 } }));
 mock.module("../src/lib/auth", () => ({ getAuthorizedUser: async () => ({ id: "user-1" }) }));
 mock.module("../src/lib/autoPickOrders", () => ({ resolveAutoPickMatchedShopName: () => "测试门店" }));
-const { buildCustomerMemoryFields, resolveRememberedCustomerTypes } = await import("../src/lib/customerMemoryStore");
+const { buildCustomerMemoryFields, resolveRememberedCustomerTypes, CUSTOMER_IDENTITY_VERSION } = await import("../src/lib/customerMemoryStore");
 const { GET: getHistory } = await import("../src/app/api/orders/customer-history/route");
 const { resolveCustomerHistoryScope } = await import("../src/lib/customerHistory");
 
@@ -70,6 +70,44 @@ function order(id, overrides = {}) {
     actualPaid: 14800, expectedIncome: 14060, items: [], ...overrides };
 }
 beforeEach(() => { rows = []; updates = 0; historyQueries = []; });
+
+test("抖店及其别名接入历史顾客识别，已处理过的旧版本订单重新建索引", async () => {
+  for (const platform of ["抖店", "抖音", "doudian", "Douyin"]) expect(getCustomerMemoryPlatform(platform)).toBe("抖店");
+  rows = [order("first-doudian", { platform: "抖店", customerIdentityVersion: 2,
+    orderTime: new Date("2026-10-01T01:00:00Z") }),
+    order("yesterday-doudian", { platform: "抖音", customerIdentityVersion: 2 }),
+    order("other-platform", { platform: "京东" }), order("other-shop", { platform: "抖店", shopId: "shop-2" })];
+  const types = await resolveRememberedCustomerTypes("user-1", rows);
+  expect(types.get("first-doudian")).toBe("new");
+  expect(types.get("yesterday-doudian")).toBe("returning");
+  expect(types.get("other-platform")).toBe("new");
+  expect(types.get("other-shop")).toBe("new");
+  expect(rows[1].customerIdentityVersion).toBe(CUSTOMER_IDENTITY_VERSION);
+  const scope = await resolveCustomerHistoryScope("user-1", "yesterday-doudian");
+  expect(query({ where: scope.where }).map(row => row.id).sort()).toEqual(["first-doudian", "yesterday-doudian"]);
+});
+
+test("隐私地址提示不能成为身份，已有地址索引和原始真实地址可继续识别抖店老客", () => {
+  const hidden = "为保护用户隐私，根据小时达平台要求，订单完成/取消后将不支持地址信息查看";
+  expect(normalizeCustomerMemoryAddress(hidden)).toBeNull();
+  const original = order("doudian", { platform: "抖店" });
+  const fields = buildCustomerMemoryFields(original);
+  expect(buildCustomerMemoryFields({ ...original, ...fields, userAddress: hidden, rawPayload: {} })).toEqual(fields);
+  expect(buildCustomerMemoryFields({ ...original, userAddress: hidden,
+    rawPayload: { secret_phone: "138****1234", userInfo: { unencrypted_address: original.userAddress } } })).toEqual(fields);
+  expect(getCustomerMemoryIdentity({ ...original, userAddress: hidden })).toBeNull();
+});
+
+test("抖店历史回填能从仍保留的收货载荷修复被提示覆盖的地址", async () => {
+  const hidden = "为保护用户隐私，订单完成后不支持地址信息查看";
+  const originalAddress = order("original").userAddress;
+  rows = [order("first", { platform: "抖店", orderTime: new Date("2026-10-01T01:00:00Z") }),
+    order("hidden", { platform: "抖店", customerIdentityVersion: 2, userAddress: hidden,
+      rawPayload: { userAddress: hidden, secret_phone: "138****1234", user_info: { unencrypted_address: originalAddress } } })];
+  const types = await resolveRememberedCustomerTypes("user-1", rows);
+  expect(rows[1].userAddress).toBe(originalAddress);
+  expect(types.get("hidden")).toBe("returning");
+});
 
 test("真实尾号优先，虚拟号和分机号不能识别顾客", () => {
   expect(readCustomerMemoryPhoneTail(order("a"))).toBe("1234");
@@ -105,7 +143,7 @@ test("相同尾号和A栋32C地址的两单重算旧索引，次日订单标老�
   expect(types.get("oct-12")).toBe("returning");
   expect(rows[0].customerIdentityKey).toBe(rows[1].customerIdentityKey);
   expect(rows[0].customerPhoneTail).toBe("9897");
-  expect(rows[0].customerIdentityVersion).toBe(2);
+  expect(rows[0].customerIdentityVersion).toBe(CUSTOMER_IDENTITY_VERSION);
   const response = await getHistory(new NextRequest("http://localhost/api/orders/customer-history?phoneTail=9897&currentOrderId=oct-12"));
   expect((await response.json()).totalCount).toBe(2);
   expect(updates).toBe(2);

@@ -28,10 +28,8 @@ export default function Home() {
   const [lastSynced, setLastSynced] = useState<Date | null>(null);
   const today = new Date();
   const initialEnd = format(today, "yyyy-MM-dd");
-  const initialStart = format(new Date(today.getTime() - 6 * 24 * 60 * 60 * 1000), "yyyy-MM-dd");
-
-  const [rangePreset, setRangePreset] = useState("7d");
-  const [startDate, setStartDate] = useState(initialStart);
+  const [rangePreset, setRangePreset] = useState("all");
+  const [startDate, setStartDate] = useState(initialEnd);
   const [endDate, setEndDate] = useState(initialEnd);
   const [shopOptions, setShopOptions] = useState<Shop[]>([]);
   const [selectedShopName, setSelectedShopName] = useState("");
@@ -148,8 +146,8 @@ export default function Home() {
     if (!startDate || !endDate) {
       const today = new Date();
       const end = format(today, "yyyy-MM-dd");
-      const start = format(new Date(today.getTime() - 6 * 24 * 60 * 60 * 1000), "yyyy-MM-dd");
-      setStartDate(start);
+      setRangePreset("all");
+      setStartDate(end);
       setEndDate(end);
       return;
     }
@@ -179,7 +177,7 @@ export default function Home() {
 
   const handleDateRangeChange = useCallback(({ startDate: nextStart, endDate: nextEnd }: { startDate: string; endDate: string }) => {
     if (!nextStart || !nextEnd) {
-      handleRangePresetChange("7d");
+      handleRangePresetChange("all");
       return;
     }
     setRangePreset("custom");

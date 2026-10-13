@@ -24,7 +24,7 @@ export function presetDashboardDateRange(preset: string, today: string): Dashboa
     case "7d": case "15d": case "30d": case "90d":
       date.setUTCDate(date.getUTCDate() - (Number.parseInt(preset, 10) - 1));
       break;
-    default: return presetDashboardDateRange("7d", today);
+    default: return presetDashboardDateRange("all", today);
   }
   return { rangePreset: preset, startDate: date.toISOString().slice(0, 10), endDate };
 }
@@ -32,13 +32,14 @@ export function presetDashboardDateRange(preset: string, today: string): Dashboa
 export function restoreDashboardDateRange(saved: string | null, today: string): DashboardDateRange {
   try {
     const value = JSON.parse(saved || "null");
-    if (value?.version !== 1) return presetDashboardDateRange("7d", today);
+    if (value?.version !== 1) return presetDashboardDateRange("all", today);
+    if (value.rangePreset === "7d") return presetDashboardDateRange("all", today);
     if (value.rangePreset !== "custom") return presetDashboardDateRange(value.rangePreset, today);
     if (validDate(value.startDate) && validDate(value.endDate) && value.startDate <= value.endDate) {
       return { rangePreset: "custom", startDate: value.startDate > today ? today : value.startDate, endDate: value.endDate > today ? today : value.endDate };
     }
   } catch { /* Corrupt or outdated preferences fall back to the default range. */ }
-  return presetDashboardDateRange("7d", today);
+  return presetDashboardDateRange("all", today);
 }
 
 export function serializeDashboardDateRange(range: DashboardDateRange): string {

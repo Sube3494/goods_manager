@@ -1,8 +1,9 @@
 import { createHash } from "node:crypto";
 import prisma from "@/lib/prisma";
 import { CUSTOMER_MEMORY_PLATFORMS, CustomerMemoryOrder, getCustomerMemoryIdentity, getCustomerMemoryParts, getCustomerMemoryPlatform } from "./customerMemory";
+import { readRetainedCustomerAddress, retainCustomerAddress } from "./orderCustomerData";
 
-export const CUSTOMER_IDENTITY_VERSION = 2;
+export const CUSTOMER_IDENTITY_VERSION = 3;
 
 export function buildCustomerMemoryFields(order: CustomerMemoryOrder) {
   const identity = getCustomerMemoryIdentity(order);
@@ -30,11 +31,17 @@ export async function ensureCustomerMemory(userId: string) {
           customerPhoneTail: true, customerAddressKey: true, customerShopKey: true },
       });
       if (!orders.length) break;
-      await prisma.$transaction(orders.map((order) => prisma.autoPickOrder.updateMany({
-        // 与同步并发时，不用旧载荷覆盖刚更新的顾客标识。
-        where: { id: order.id, userId, customerIdentityVersion: order.customerIdentityVersion, updatedAt: order.updatedAt },
-        data: buildCustomerMemoryFields(order),
-      })));
+      await prisma.$transaction(orders.map((order) => {
+        const userAddress = retainCustomerAddress(order.userAddress, readRetainedCustomerAddress(order.rawPayload));
+        return prisma.autoPickOrder.updateMany({
+          // 与同步并发时，不用旧载荷覆盖刚更新的收货地址或顾客标识。
+          where: { id: order.id, userId, customerIdentityVersion: order.customerIdentityVersion, updatedAt: order.updatedAt },
+          data: {
+            ...buildCustomerMemoryFields(order),
+            ...(userAddress && userAddress !== order.userAddress ? { userAddress } : {}),
+          },
+        });
+      }));
     }
   })();
   backfills.set(userId, pending);

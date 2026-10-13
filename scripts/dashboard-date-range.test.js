@@ -21,9 +21,16 @@ test("自定义保留日期，未来日期限制到当天", () => {
 });
 
 test("无效、损坏和旧版记忆安全回退，账号使用独立键", () => {
-  const fallback = presetDashboardDateRange("7d", "2026-10-11");
+  const fallback = presetDashboardDateRange("all", "2026-10-11");
   for (const value of [null, "broken", '{"version":2}', '{"version":1,"rangePreset":"unknown"}', serializeDashboardDateRange({ rangePreset: "custom", startDate: "2026-02-30", endDate: "2026-03-01" }), serializeDashboardDateRange({ rangePreset: "custom", startDate: "2026-10-10", endDate: "2026-10-01" })]) {
     expect(restoreDashboardDateRange(value, "2026-10-11")).toEqual(fallback);
   }
   expect(dashboardDateRangeKey("a")).not.toBe(dashboardDateRangeKey("b"));
+});
+
+test("旧的七天偏好迁移为全部，其余有效预设和自定义日期保留", () => {
+  expect(restoreDashboardDateRange('{"version":1,"rangePreset":"7d"}', "2026-10-13"))
+    .toEqual(presetDashboardDateRange("all", "2026-10-13"));
+  expect(restoreDashboardDateRange(serializeDashboardDateRange(presetDashboardDateRange("all", "2026-10-12")), "2026-10-13"))
+    .toEqual(presetDashboardDateRange("all", "2026-10-13"));
 });
