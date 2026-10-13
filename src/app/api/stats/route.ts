@@ -30,7 +30,7 @@ import { getStorageStrategy } from "@/lib/storage";
 import { formatLocalDate, parseAsShanghaiTime } from "@/lib/dateUtils";
 import { isPrismaMissingColumnError } from "@/lib/prismaSchemaCompat";
 import { getOutboundReturnTotals, getOutboundReturnedQuantityMap, parseOutboundReturnMeta } from "@/lib/outboundReturnMeta";
-import { getDailyFixedOperatingCost, getDailyUtilityCost, normalizeMonthKey } from "@/lib/operatingCosts";
+import { getDailyOperatingCostAfterFirstOrder, normalizeMonthKey } from "@/lib/operatingCosts";
 import { AUTO_INBOUND_NOTE_KEYWORD, AUTO_INBOUND_TYPE, ORDER_SHORTAGE_PURCHASE_NOTE_KEYWORD } from "@/lib/purchaseOrderTypes";
 import { isAddressDisabled } from "@/lib/addressBook";
 import { normalizeShopNameKey, isShopNameMatch, stripShopSuffix } from "@/lib/shopIdentity";
@@ -349,20 +349,29 @@ export async function GET(request: NextRequest) {
     const endDate = parseAsShanghaiTime(`${endDateKey} 23:59:59.999`);
     let startDate = parseAsShanghaiTime(startDateKey);
 
-    if (rangeMode === "all") {
-      const [firstPurchase, firstOutbound, firstBrush, firstSettlement, firstShopProduct, firstAutoPickOrder] = await Promise.all([
-        prisma.purchaseOrder.findFirst({
-          where: {
-            userId: targetUserId,
-            ...(shopName ? { shopName } : {}),
-          },
-          orderBy: { date: "asc" },
-          select: { date: true },
-        }),
+    const firstOrderDateCache = new Map<string, Promise<Date | null>>();
+    const getFirstOrderDate = (targetShopName: string): Promise<Date | null> => {
+      const cacheKey = normalizeShopNameKey(targetShopName);
+      const cached = firstOrderDateCache.get(cacheKey);
+      if (cached) return cached;
+      const lookup = Promise.all([
+        findEarliestMatchingDashboardOrder(
+          (afterId, take) => prisma.autoPickOrder.findMany({
+            where: { userId: targetUserId, orderTime: { lte: endDate } },
+            orderBy: [{ orderTime: "asc" }, { id: "asc" }],
+            take,
+            ...(afterId ? { cursor: { id: afterId }, skip: 1 } : {}),
+            select: { id: true, orderTime: true, shopId: true, rawPayload: true, platform: true, status: true },
+          }),
+          (order) => !isAutoPickOrderDeletedStatus(order.status) && !isVoidedOfflineOrder(order)
+            && (!targetShopName || isShopNameMatch(resolveAutoPickMatchedShopName(order, permissionsObj) || "", targetShopName)),
+        ),
         prisma.outboundOrder.findFirst({
           where: {
             userId: targetUserId,
-            ...(shopName ? { note: { contains: `[店铺:${shopName}]` } } : {}),
+            type: "Sale",
+            date: { lte: endDate },
+            ...(targetShopName ? { note: { contains: `[店铺:${targetShopName}]` } } : {}),
           },
           orderBy: { date: "asc" },
           select: { date: true },
@@ -370,70 +379,23 @@ export async function GET(request: NextRequest) {
         prisma.brushOrder.findFirst({
           where: {
             userId: targetUserId,
-            ...(shopName ? { shopName } : {}),
+            date: { lte: endDate },
+            ...(targetShopName ? { shopName: targetShopName } : {}),
           },
           orderBy: { date: "asc" },
           select: { date: true },
         }),
-        prisma.settlement.findFirst({
-          where: {
-            userId: targetUserId,
-            ...(shopName
-              ? {
-                  OR: [
-                    { shopName },
-                    { items: { some: { shopName } } },
-                  ],
-                }
-              : {}),
-          },
-          orderBy: { date: "asc" },
-          select: { date: true },
-        }),
-        prisma.shopProduct.findFirst({
-          where: {
-            shop: {
-              userId: targetUserId,
-              ...(shopName ? { name: shopName } : {}),
-            },
-          },
-          orderBy: { createdAt: "asc" },
-          select: { createdAt: true },
-        }),
-        shopName ? findEarliestMatchingDashboardOrder(
-          (afterId, take) => prisma.autoPickOrder.findMany({
-            where: { userId: targetUserId },
-            orderBy: [{ orderTime: "asc" }, { id: "asc" }],
-            take,
-            ...(afterId ? { cursor: { id: afterId }, skip: 1 } : {}),
-            select: { id: true, orderTime: true, shopId: true, rawPayload: true },
-          }),
-          (order) => isShopNameMatch(resolveAutoPickMatchedShopName(order, permissionsObj) || "", shopName),
-        ) : prisma.autoPickOrder.findFirst({
-          where: {
-            userId: targetUserId,
-          },
-          orderBy: { orderTime: "asc" },
-          select: {
-            orderTime: true,
-            shopId: true,
-            rawPayload: true,
-          },
-        }),
-      ]);
+      ]).then(([firstOrder, firstSale, firstBrush]) => {
+        const dates = [firstOrder?.orderTime, firstSale?.date, firstBrush?.date].filter((value): value is Date => value instanceof Date && Number.isFinite(value.getTime()));
+        return dates.length ? new Date(Math.min(...dates.map((date) => date.getTime()))) : null;
+      });
+      firstOrderDateCache.set(cacheKey, lookup);
+      return lookup;
+    };
 
-      const candidates = [
-        firstPurchase?.date,
-        firstOutbound?.date,
-        firstBrush?.date,
-        firstSettlement?.date,
-        firstShopProduct?.createdAt,
-        firstAutoPickOrder?.orderTime,
-      ].filter((value): value is Date => value instanceof Date && !Number.isNaN(value.getTime()));
-
-      if (candidates.length > 0) {
-        startDate = parseAsShanghaiTime(formatDateKey(new Date(Math.min(...candidates.map((item) => item.getTime())))));
-      }
+    if (rangeMode === "all") {
+      const firstOrderDate = await getFirstOrderDate(shopName);
+      startDate = parseAsShanghaiTime(firstOrderDate ? formatDateKey(firstOrderDate) : endDateKey);
     }
     perf.lap("range-bootstrap");
 
@@ -1002,6 +964,14 @@ export async function GET(request: NextRequest) {
     );
     const otherExpense = 0;
 
+    const operatingShopNames = Array.from(new Set([
+      ...operatingCostProfiles.map((profile) => profile.shopName),
+      ...operatingCostBills.map((bill) => bill.shopName),
+    ]));
+    const operatingStartDates = new Map(await Promise.all(operatingShopNames.map(async (name) => {
+      const date = await getFirstOrderDate(name);
+      return [normalizeShopNameKey(name), date ? formatDateKey(date) : null] as const;
+    })));
     const dateSeries = buildDateSeries(startDate, endDate);
     const createTrendBucket = () => ({
       trueOrderCount: 0,
@@ -1032,10 +1002,10 @@ export async function GET(request: NextRequest) {
       if (!point) return;
       const monthKey = normalizeMonthKey(item.date);
       const operatingExpense = operatingCostProfiles.reduce((sum, profile) =>
-        FinanceMath.add(sum, getDailyFixedOperatingCost(profile)), 0
+        FinanceMath.add(sum, getDailyOperatingCostAfterFirstOrder(item.date, operatingStartDates.get(normalizeShopNameKey(profile.shopName)), profile)), 0
       ) + operatingCostBills
         .filter((bill) => normalizeMonthKey(bill.monthKey) === monthKey)
-        .reduce((sum, bill) => FinanceMath.add(sum, getDailyUtilityCost(bill)), 0);
+        .reduce((sum, bill) => FinanceMath.add(sum, getDailyOperatingCostAfterFirstOrder(item.date, operatingStartDates.get(normalizeShopNameKey(bill.shopName)), null, bill)), 0);
       point.operatingExpense = operatingExpense;
     });
 

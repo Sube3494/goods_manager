@@ -751,6 +751,13 @@ export function DataOverview({
               className="h-10 w-full"
               triggerClassName="h-full rounded-full border border-black/8 bg-white px-4 text-xs font-bold shadow-none dark:border-white/10 dark:bg-white/3"
             />
+            {rangePreset === "all" ? (
+              <p aria-live="polite" className="px-1 text-[11px] leading-relaxed tabular-nums text-muted-foreground">
+                {isLoading ? "正在确认统计起止日期..." : data?.rangeStart && data?.rangeEnd ? (
+                  <>统计范围：<time dateTime={data.rangeStart}>{data.rangeStart}</time> 至 <time dateTime={data.rangeEnd}>{data.rangeEnd}</time></>
+                ) : "统计范围尚未获取"}
+              </p>
+            ) : null}
           </div>
         </div>
       </section>

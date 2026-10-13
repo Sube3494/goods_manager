@@ -60,3 +60,14 @@ export function getDailyUtilityCost(bill: OperatingCostMonthlyBillLike | null | 
   const days = getDaysInMonthKey(bill.monthKey);
   return (waterAmount + electricAmount + sharedElectricAmount + propertyFeeAmount) / Math.max(1, days);
 }
+
+export function getDailyOperatingCostAfterFirstOrder(
+  dateKey: string,
+  firstOrderDateKey: string | null | undefined,
+  profile?: OperatingCostProfileLike | null,
+  bill?: OperatingCostMonthlyBillLike | null,
+) {
+  if (!firstOrderDateKey || dateKey < firstOrderDateKey) return 0;
+  return getDailyFixedOperatingCost(profile)
+    + (bill && normalizeMonthKey(dateKey) === normalizeMonthKey(bill.monthKey) ? getDailyUtilityCost(bill) : 0);
+}
