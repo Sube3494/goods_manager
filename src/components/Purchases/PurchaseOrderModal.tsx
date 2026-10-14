@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback, memo } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef, memo } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Check, CheckCircle, Package, Truck, Calendar, Plus, Minus, Trash2, ListOrdered, FileText, ShoppingBag, Download, AlertCircle, MapPin, BarChart3, Search, Loader2 } from "lucide-react";
@@ -430,6 +430,7 @@ export function PurchaseOrderModal({
   const [shippingFeeInput, setShippingFeeInput] = useState(initialData?.shippingFees?.toString() || "0");
   const [extraFeeInput, setExtraFeeInput] = useState(initialData?.extraFees?.toString() || "0");
   const [discountInput, setDiscountInput] = useState(initialData?.discountAmount?.toString() || "0");
+  const formSessionRef = useRef<{ recordId: string | null; type: string } | null>(null);
   const [quantityDrafts, setQuantityDrafts] = useState<Record<string, string>>({});
   const [costPriceDrafts, setCostPriceDrafts] = useState<Record<string, string>>({});
   const [lineTotalDrafts, setLineTotalDrafts] = useState<Record<string, string>>({});
@@ -636,13 +637,21 @@ export function PurchaseOrderModal({
     return () => cancelAnimationFrame(handle);
   }, [isOpen, hasFetchedData, purchaseCatalogFetchPath, purchaseCatalogQuery]);
 
-  // Sync data and reset form when modal opens or initialData changes
+  // Initialize each editing session once; background user/list updates must not overwrite a draft.
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      formSessionRef.current = null;
+      return;
+    }
+    const recordId = initialData?.id ?? null;
+    if (formSessionRef.current?.recordId === recordId && formSessionRef.current.type === defaultType) return;
 
     // Use setTimeout to avoid the "cascading renders" lint error while 
     // keeping initialization out of the render path (fixing the Math.random error)
     const timeoutId = setTimeout(() => {
+        formSessionRef.current = { recordId, type: defaultType };
+        setQuantityDrafts({});
+        setLineTotalDrafts({});
         if (initialData) {
             const sortedItems = sortPurchaseItems(
                 initialData.items,
@@ -688,7 +697,7 @@ export function PurchaseOrderModal({
     }, 0);
 
     return () => clearTimeout(timeoutId);
-  }, [defaultType, isOpen, initialData, user, activeShippingAddresses]);
+  }, [defaultType, isOpen, initialData, activeShippingAddresses]);
 
   // Auto-select default address if empty and list is available
   useEffect(() => {

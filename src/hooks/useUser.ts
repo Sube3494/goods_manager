@@ -58,7 +58,8 @@ function useUserRequest(enabled: boolean) {
         const res = await fetch("/api/auth/me", { cache: "no-store" });
         if (res.ok) {
           const data = await res.json();
-          setUser(data.user ?? null);
+          const nextUser: User | null = data.user ?? null;
+          setUser(current => JSON.stringify(current) === JSON.stringify(nextUser) ? current : nextUser);
         } else {
           setUser(null);
         }
