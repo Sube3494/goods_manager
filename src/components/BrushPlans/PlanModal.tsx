@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Package, Plus, Trash2, Search, Circle, Store, ChevronDown, ChevronRight, LayoutGrid, ArrowUp, ArrowDown } from "lucide-react";
+import { X, Package, Plus, Trash2, Search, Circle, Store, ChevronDown, ChevronRight, LayoutGrid, Copy, ArrowUp, ArrowDown } from "lucide-react";
 import Image from "next/image";
 import { BrushOrderPlan, BrushOrderPlanItem, Product, AddressItem } from "@/lib/types";
 import { DatePicker } from "@/components/ui/DatePicker";
@@ -12,6 +12,7 @@ import { ProductSelectionModal } from "../Purchases/ProductSelectionModal";
 import { useToast } from "@/components/ui/Toast";
 import { useUser } from "@/hooks/useUser";
 import { isAddressDisabled } from "@/lib/addressBook";
+import { reorderBrushPlanItems, type PlanSortTarget } from "@/lib/brushPlanSort";
 
 interface PlanModalProps {
   isOpen: boolean;
@@ -28,6 +29,44 @@ export function PlanModal({ isOpen, onClose, onSubmit, initialData, readOnly = f
     const { showToast } = useToast();
     const [mounted, setMounted] = useState(false);
     const [isSelectionModalOpen, setIsSelectionModalOpen] = useState(false);
+    const [draggingItem, setDraggingItem] = useState<PlanSortTarget | null>(null);
+    const [dropTarget, setDropTarget] = useState<PlanSortTarget | null>(null);
+    const clearDrag = () => {
+        setDraggingItem(null);
+        setDropTarget(null);
+    };
+
+    const handleItemDrop = (target: PlanSortTarget, source = draggingItem) => {
+        if (readOnly || !source || source.platform !== target.platform) {
+            clearDrag();
+            return;
+        }
+        const items = formData.items || [];
+        const platformItems = items.filter(item => {
+            const platform = item.platform || "美团";
+            return target.platform === "其他" ? !PLATFORMS.includes(platform) : platform === target.platform;
+        });
+        const visibleIndexes = groupItemsByOrder(platformItems, items).flatMap(group => group.items.map(entry => entry.originalIndex));
+        const after = visibleIndexes.indexOf(source.id) < visibleIndexes.indexOf(target.id);
+        setFormData(prev => ({ ...prev, items: reorderBrushPlanItems(prev.items || [], source, target, after) }));
+        clearDrag();
+    };
+
+    const moveItemByButton = (index: number, platform: string, direction: -1 | 1) => {
+        if (readOnly) return;
+        setFormData(prev => {
+            const items = prev.items || [];
+            const platformItems = items.filter(item => {
+                const itemPlatform = item.platform || "美团";
+                return platform === "其他" ? !PLATFORMS.includes(itemPlatform) : itemPlatform === platform;
+            });
+            const visibleIndexes = groupItemsByOrder(platformItems, items).flatMap(group => group.items.map(entry => entry.originalIndex));
+            const targetIndex = visibleIndexes[visibleIndexes.indexOf(index) + direction];
+            if (targetIndex === undefined) return prev;
+            return { ...prev, items: reorderBrushPlanItems(items,
+                { kind: "item", platform, id: index }, { kind: "item", platform, id: targetIndex }, direction === 1) };
+        });
+    };
 
     const { user } = useUser();
     const activeShippingAddresses = useMemo(
@@ -125,27 +164,6 @@ export function PlanModal({ isOpen, onClose, onSubmit, initialData, readOnly = f
         });
     };
 
-    const moveItemWithinPlatform = (index: number, direction: -1 | 1) => {
-        const items = [...(formData.items || [])];
-        const currentItem = items[index];
-        if (!currentItem) return;
-
-        const currentPlatform = currentItem.platform || "美团";
-        const platformIndexes = items
-            .map((item, itemIndex) => ({ item, itemIndex }))
-            .filter(({ item }) => {
-                const itemPlatform = item.platform || "美团";
-                return itemPlatform === currentPlatform;
-            })
-            .map(({ itemIndex }) => itemIndex);
-        const position = platformIndexes.indexOf(index);
-        const targetIndex = platformIndexes[position + direction];
-        if (targetIndex === undefined) return;
-
-        [items[index], items[targetIndex]] = [items[targetIndex], items[index]];
-        setFormData({ ...formData, items });
-    };
-
     const updateItem = (index: number, field: keyof BrushOrderPlanItem, value: string | number | boolean) => {
         const newItems = [...(formData.items || [])];
         newItems[index] = { ...newItems[index], [field]: value } as BrushOrderPlanItem;
@@ -225,7 +243,7 @@ export function PlanModal({ isOpen, onClose, onSubmit, initialData, readOnly = f
                                 initial={{ opacity: 0, scale: 0.95, y: 20 }}
                                 animate={{ opacity: 1, scale: 1, y: 0 }}
                                 exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                                className="fixed left-1/2 top-1/2 z-60 w-[calc(100%-32px)] sm:w-full max-w-4xl -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-white dark:bg-gray-900/80 backdrop-blur-xl border border-gray-200 dark:border-white/10 shadow-2xl overflow-hidden flex flex-col max-h-safe-modal"
+                                className="fixed left-1/2 top-1/2 z-60 w-[calc(100%-16px)] sm:w-full max-w-4xl -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-white dark:bg-gray-900/80 backdrop-blur-xl border border-gray-200 dark:border-white/10 shadow-2xl overflow-hidden flex flex-col max-h-safe-modal"
                             >
                                 <div className="flex items-center justify-between border-b border-gray-100 dark:border-white/10 p-5 sm:p-8">
                                     <div>
@@ -237,7 +255,7 @@ export function PlanModal({ isOpen, onClose, onSubmit, initialData, readOnly = f
                                     </button>
                                 </div>
 
-                                <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 sm:p-8 space-y-6">
+                                <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 sm:p-8 space-y-6">
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         <div className="space-y-2">
                                             <label className="text-sm font-medium text-gray-500 flex items-center gap-1.5 pl-1">
@@ -270,7 +288,7 @@ export function PlanModal({ isOpen, onClose, onSubmit, initialData, readOnly = f
                                     </div>
 
                                     <div className="space-y-4">
-                                        <div className="flex items-center justify-between">
+                                        <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-2">
                                             <h3 className="font-bold flex items-center gap-2">
                                                 <Package size={18} className="text-primary" /> 商品安排
                                             </h3>
@@ -282,6 +300,10 @@ export function PlanModal({ isOpen, onClose, onSubmit, initialData, readOnly = f
                                                 <Plus size={16} /> 从刷单商品库选择
                                             </button>
                                         </div>
+
+                                        {!readOnly && (formData.items?.length || 0) > 1 && (
+                                            <p className="text-xs text-muted-foreground"><span className="sm:hidden">点击商品下方的上移、下移按钮调整顺序</span><span className="hidden sm:inline">拖动商品左侧的 :: 调整顺序</span></p>
+                                        )}
 
                                         <div className="space-y-6">
                                             {PLATFORMS.concat("其他").map(platform => {
@@ -296,6 +318,8 @@ export function PlanModal({ isOpen, onClose, onSubmit, initialData, readOnly = f
                                                 if (platformItems.length === 0) return null;
                                                 
                                                 const isExpanded = expandedPlatforms[platform] !== false;
+                                                const groupedOrders = groupItemsByOrder(platformItems, formData.items || []);
+                                                const visibleIndexes = groupedOrders.flatMap(group => group.items.map(entry => entry.originalIndex));
                                                 
                                                 return (
                                                     <div key={platform} className="space-y-3">
@@ -313,8 +337,8 @@ export function PlanModal({ isOpen, onClose, onSubmit, initialData, readOnly = f
 
                                                         {isExpanded && (
                                                             <div className="space-y-4 pl-0 sm:pl-4">
-                                                                {groupItemsByOrder(platformItems, formData.items || []).map((orderGroup, orderIndex) => (
-                                                                    <div key={`${platform}-order-${orderGroup.group}`} className="rounded-[22px] border border-primary/10 bg-primary/[0.03] p-3 dark:bg-white/[0.03]">
+                                                                {groupedOrders.map((orderGroup, orderIndex) => (
+                                                                    <div key={`${platform}-order-${orderGroup.group}`} className="rounded-[22px] border border-primary/10 bg-primary/[0.03] p-2 sm:p-3 dark:bg-white/[0.03]">
                                                                         <div className="mb-3 flex items-center justify-between gap-3">
                                                                             <div className="flex items-center gap-2">
                                                                                 <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-[11px] font-black text-emerald-600 dark:text-emerald-400">第 {orderIndex + 1} 单</span>
@@ -324,14 +348,55 @@ export function PlanModal({ isOpen, onClose, onSubmit, initialData, readOnly = f
                                                                             </div>
                                                                         </div>
                                                                         <div className="space-y-2.5">
-                                                                            {orderGroup.items.map(({ item, originalIndex, platformIndex }) => {
-                                                                                const isFirstInPlatform = platformIndex === 0;
-                                                                                const isLastInPlatform = platformIndex === platformItems.length - 1;
+                                                                            {orderGroup.items.map(({ item, originalIndex }) => {
                                                                                 const isFirstInOrder = orderGroup.items[0]?.originalIndex === originalIndex;
                                                                                 const canMergeToPreviousOrder = isFirstInOrder && orderIndex > 0;
+                                                                                const canSplitOrder = !readOnly && orderGroup.items.length > 1;
                                                                                 return (
-                                                                            <div key={`${platform}-${originalIndex}`} className="flex flex-col gap-2.5 p-3 sm:p-4 rounded-[18px] border border-border bg-white dark:bg-white/5 hover:border-primary/30 transition-all shadow-sm">
-                                                                                <div className="flex items-center gap-3 min-w-0">
+                                                                            <div
+                                                                                key={`${platform}-${originalIndex}`}
+                                                                                data-sort-item={originalIndex}
+                                                                                data-sort-platform={platform}
+                                                                                onDragOver={event => {
+                                                                                    if (readOnly || draggingItem?.platform !== platform || draggingItem.id === originalIndex) return;
+                                                                                    event.preventDefault();
+                                                                                    event.dataTransfer.dropEffect = "move";
+                                                                                    setDropTarget({ kind: "item", platform, id: originalIndex });
+                                                                                }}
+                                                                                onDragLeave={event => {
+                                                                                    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDropTarget(null);
+                                                                                }}
+                                                                                onDrop={event => {
+                                                                                    event.preventDefault();
+                                                                                    handleItemDrop({ kind: "item", platform, id: originalIndex });
+                                                                                }}
+                                                                                className={`flex flex-col gap-2.5 p-3 sm:p-4 rounded-[18px] border bg-white dark:bg-white/5 transition-colors shadow-sm ${
+                                                                                    dropTarget?.platform === platform && dropTarget.id === originalIndex ? "border-primary bg-primary/5" : "border-border hover:border-primary/30"
+                                                                                } ${draggingItem?.platform === platform && draggingItem.id === originalIndex ? "opacity-60" : ""}`}
+                                                                            >
+                                                                                <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                                                                                    {!readOnly && (
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            draggable
+                                                                                            onDragStart={event => {
+                                                                                                event.dataTransfer.effectAllowed = "move";
+                                                                                                event.dataTransfer.setData("text/plain", String(originalIndex));
+                                                                                                const card = event.currentTarget.closest<HTMLElement>("[data-sort-item]");
+                                                                                                if (card) {
+                                                                                                    const bounds = card.getBoundingClientRect();
+                                                                                                    event.dataTransfer.setDragImage(card, event.clientX - bounds.left, event.clientY - bounds.top);
+                                                                                                }
+                                                                                                setDraggingItem({ kind: "item", platform, id: originalIndex });
+                                                                                            }}
+                                                                                            onDragEnd={clearDrag}
+                                                                                            className="hidden sm:inline-flex sm:items-center sm:justify-center select-none h-8 w-6 shrink-0 cursor-grab rounded-lg text-muted-foreground hover:bg-muted active:cursor-grabbing"
+                                                                                            title="拖动调整商品顺序"
+                                                                                            aria-label={`拖动调整${item.productName || item.product?.name || "商品"}顺序`}
+                                                                                        >
+                                                                                            ::
+                                                                                        </button>
+                                                                                    )}
                                                                                     <div className="w-10 h-10 rounded-lg bg-muted border border-border/50 overflow-hidden shrink-0">
                                                                                         {item.product?.image ? (
                                                                                             <Image src={item.product.image} width={40} height={40} className="w-full h-full object-cover" alt={item.product.name} unoptimized />
@@ -345,7 +410,16 @@ export function PlanModal({ isOpen, onClose, onSubmit, initialData, readOnly = f
                                                                                         <div className="text-[9px] font-mono text-muted-foreground/50 uppercase tracking-wider">{item.product?.sku || "NO SKU"}</div>
                                                                                     </div>
 
-                                                                                    <div className="flex items-center gap-1 shrink-0">
+                                                                                    <div className="contents sm:flex sm:items-center sm:gap-1 sm:shrink-0">
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            onClick={() => duplicateItem(originalIndex)}
+                                                                                            className="inline-flex h-11 w-11 sm:h-8 sm:w-auto shrink-0 items-center justify-center gap-1.5 rounded-lg sm:px-2.5 text-xs sm:text-[10px] font-bold text-primary bg-primary/10 hover:bg-primary/20 transition-colors"
+                                                                                            title="复制商品为新的一单"
+                                                                                            aria-label="复制商品"
+                                                                                        >
+                                                                                            <Copy size={14} /><span className="hidden sm:inline">复制</span>
+                                                                                        </button>
                                                                                         {canMergeToPreviousOrder && (
                                                                                             <button
                                                                                                 type="button"
@@ -356,62 +430,39 @@ export function PlanModal({ isOpen, onClose, onSubmit, initialData, readOnly = f
                                                                                                         updateOrderGroup(originalIndex, getItemOrderGroup(previousItem.item, previousItem.originalIndex));
                                                                                                     }
                                                                                                 }}
-                                                                                                className="px-2 py-1 text-[10px] font-black text-primary bg-primary/10 hover:bg-primary/20 rounded-full transition-all whitespace-nowrap"
+                                                                                                className="hidden sm:inline-flex h-8 items-center px-2 text-[10px] font-bold text-primary bg-primary/10 hover:bg-primary/20 rounded-lg transition-colors whitespace-nowrap"
                                                                                                 title="合并到上一单"
                                                                                             >
                                                                                                 合并到上一单
                                                                                             </button>
                                                                                         )}
-                                                                                        <button
-                                                                                            type="button"
-                                                                                            onClick={() => splitToNewOrder(originalIndex)}
-                                                                                            className="px-2 py-1 text-[10px] font-black text-muted-foreground bg-muted/60 hover:bg-muted rounded-full transition-all whitespace-nowrap"
-                                                                                            title="拆成单独一单"
-                                                                                        >
-                                                                                            拆单
-                                                                                        </button>
-                                                                                        <button
-                                                                                            type="button"
-                                                                                            onClick={() => moveItemWithinPlatform(originalIndex, -1)}
-                                                                                            disabled={isFirstInPlatform}
-                                                                                            className="p-1.5 text-muted-foreground/50 hover:text-primary hover:bg-primary/10 rounded-full transition-all disabled:opacity-25 disabled:hover:bg-transparent disabled:hover:text-muted-foreground/50"
-                                                                                            title="上移"
-                                                                                        >
-                                                                                            <ArrowUp size={15} />
-                                                                                        </button>
-                                                                                        <button
-                                                                                            type="button"
-                                                                                            onClick={() => moveItemWithinPlatform(originalIndex, 1)}
-                                                                                            disabled={isLastInPlatform}
-                                                                                            className="p-1.5 text-muted-foreground/50 hover:text-primary hover:bg-primary/10 rounded-full transition-all disabled:opacity-25 disabled:hover:bg-transparent disabled:hover:text-muted-foreground/50"
-                                                                                            title="下移"
-                                                                                        >
-                                                                                            <ArrowDown size={15} />
-                                                                                        </button>
-                                                                                    </div>
- 
+                                                                                        {canSplitOrder && (
+                                                                                            <button
+                                                                                                type="button"
+                                                                                                onClick={() => splitToNewOrder(originalIndex)}
+                                                                                                className="hidden sm:inline-flex h-8 items-center px-2 text-[10px] font-bold text-muted-foreground bg-muted/60 hover:bg-muted rounded-lg transition-colors whitespace-nowrap"
+                                                                                                title="拆成单独一单"
+                                                                                            >
+                                                                                                拆单
+                                                                                            </button>
+                                                                                        )}
                                                                                     <button 
                                                                                         type="button" 
                                                                                         onClick={() => removeItem(originalIndex)}
-                                                                                        className="p-1.5 text-muted-foreground/30 hover:text-red-500 hover:bg-red-500/10 rounded-full transition-all shrink-0"
+                                                                                        className="inline-flex h-11 w-11 sm:h-8 sm:w-8 items-center justify-center text-muted-foreground/50 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors shrink-0"
+                                                                                        aria-label="删除商品"
                                                                                     >
                                                                                         <Trash2 size={16} />
                                                                                     </button>
+                                                                                    </div>
                                                                                 </div>
  
                                                                                 <div className="flex flex-row items-center gap-2">
-                                                                                    <button
-                                                                                        type="button"
-                                                                                        onClick={() => duplicateItem(originalIndex)}
-                                                                                        className="shrink-0 rounded-full bg-primary/10 px-2.5 py-1.5 text-[11px] font-bold text-primary hover:bg-primary/20 transition-all"
-                                                                                    >
-                                                                                        再加一单
-                                                                                    </button>
-                                                                                    <div className="flex items-center gap-1.5 bg-muted/30 dark:bg-white/5 rounded-lg px-2 h-9 border border-transparent focus-within:border-primary/20 focus-within:bg-background transition-all w-[65px] shrink-0">
+                                                                                    <div className="flex items-center gap-1.5 bg-muted/30 dark:bg-white/5 rounded-lg px-2 h-11 sm:h-9 border border-transparent focus-within:border-primary/20 focus-within:bg-background transition-all w-[65px] shrink-0">
                                                                                         <span className="text-[9px] font-black text-muted-foreground uppercase opacity-40 shrink-0">份</span>
                                                                                         <input
                                                                                             type="number"
-                                                                                            className="w-full bg-transparent text-xs text-center outline-none font-black text-foreground [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                                                            className="w-full bg-transparent text-base sm:text-xs text-center outline-none font-black text-foreground [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                                                                             value={item.quantity ?? ""}
                                                                                             min="1"
                                                                                             onChange={e => {
@@ -421,14 +472,14 @@ export function PlanModal({ isOpen, onClose, onSubmit, initialData, readOnly = f
                                                                                         />
                                                                                     </div>
  
-                                                                                    <div className="relative flex-1 flex items-center h-9">
+                                                                                    <div className="relative min-w-0 flex-1 flex items-center h-11 sm:h-9">
                                                                                         <div className="absolute left-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1 text-muted-foreground pointer-events-none opacity-40">
                                                                                             <Search size={12} />
                                                                                         </div>
                                                                                         <input
                                                                                             type="text"
                                                                                             placeholder="关键词..."
-                                                                                            className={`w-full h-full pl-8 pr-3 rounded-lg border text-[12px] outline-none transition-all font-bold text-foreground ${
+                                                                                            className={`w-full h-full pl-8 pr-3 rounded-lg border text-base sm:text-[12px] outline-none transition-all font-bold text-foreground ${
                                                                                                 !item.searchKeyword || item.searchKeyword.trim() === "" 
                                                                                                 ? "bg-red-500/5 border-red-500/20 focus:border-red-500/40" 
                                                                                                 : "bg-muted/30 dark:bg-white/5 border-transparent focus:border-primary/20 focus:bg-background"
@@ -439,6 +490,29 @@ export function PlanModal({ isOpen, onClose, onSubmit, initialData, readOnly = f
                                                                                         />
                                                                                     </div>
                                                                                 </div>
+                                                                                {!readOnly && (
+                                                                                    <div className="flex items-center justify-between gap-2 sm:hidden">
+                                                                                        <div className="flex items-center gap-1">
+                                                                                            <button type="button" onClick={() => moveItemByButton(originalIndex, platform, -1)} disabled={visibleIndexes[0] === originalIndex} aria-label="上移商品" title="上移商品" className="inline-flex h-11 w-11 items-center justify-center rounded-lg bg-muted/50 text-muted-foreground active:bg-primary/10 disabled:opacity-25">
+                                                                                                <ArrowUp size={16} />
+                                                                                            </button>
+                                                                                            <button type="button" onClick={() => moveItemByButton(originalIndex, platform, 1)} disabled={visibleIndexes[visibleIndexes.length - 1] === originalIndex} aria-label="下移商品" title="下移商品" className="inline-flex h-11 w-11 items-center justify-center rounded-lg bg-muted/50 text-muted-foreground active:bg-primary/10 disabled:opacity-25">
+                                                                                                <ArrowDown size={16} />
+                                                                                            </button>
+                                                                                        </div>
+                                                                                        <div className="flex items-center gap-1">
+                                                                                            {canMergeToPreviousOrder && (
+                                                                                                <button type="button" onClick={() => {
+                                                                                                    const previous = groupedOrders[orderIndex - 1]?.items[0];
+                                                                                                    if (previous) updateOrderGroup(originalIndex, getItemOrderGroup(previous.item, previous.originalIndex));
+                                                                                                }} title="合并到上一单" className="h-11 min-w-11 rounded-lg bg-primary/10 px-2 text-xs font-bold text-primary">合并</button>
+                                                                                            )}
+                                                                                            {canSplitOrder && (
+                                                                                                <button type="button" onClick={() => splitToNewOrder(originalIndex)} title="拆成单独一单" className="h-11 min-w-11 rounded-lg bg-muted/50 px-2 text-xs font-bold text-muted-foreground">拆单</button>
+                                                                                            )}
+                                                                                        </div>
+                                                                                    </div>
+                                                                                )}
                                                                             </div>
                                                                             );
                                                                             })}
