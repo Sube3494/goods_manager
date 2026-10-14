@@ -51,7 +51,7 @@ import {
 } from "@/lib/autoPickOrderStatus";
 import { formatLocalDate, formatLocalDateTime } from "@/lib/dateUtils";
 import { isRematchReturnReason } from "@/lib/outboundReturnMeta";
-import { cleanCustomerRemark } from "@/lib/customerRemark";
+import { readOrderCustomerRemark } from "@/lib/customerRemark";
 import { getOrderCostStatusText } from "@/lib/outboundCostSnapshot";
 import { hasOrderRefundState, resolveCancelledJDDeliveredCommissionLoss } from "@/lib/orderFinancials";
 import { readMaiyatianItemRefundDetails, readMaiyatianItemRefundQuantity } from "@/lib/maiyatianRefund";
@@ -3727,7 +3727,7 @@ export const OrderCard = memo(function OrderCard({
   const visibleItems = getVisibleOrderItems(order.items);
   const unmatchedPlaceholderItem = (order.items || []).find(isUnmatchedOrIgnoredItem);
   const itemCount = getItemCount(visibleItems);
-  const usefulCustomerRemark = cleanCustomerRemark(order.customerRemark);
+  const usefulCustomerRemark = readOrderCustomerRemark(order.rawPayload, order.customerRemark);
   const isFullyRefunded = isOrderFullyRefunded(order);
   const completed = !isFullyRefunded && isCompletedStatus(order.status);
   const cancelled = isCancelledStatus(order.status) || isFullyRefunded;

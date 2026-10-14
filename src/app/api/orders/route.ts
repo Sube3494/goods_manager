@@ -2552,7 +2552,7 @@ export async function GET(request: NextRequest) {
         customerMaskedPhone: readCustomerMaskedPhoneFromRawPayload(order.rawPayload),
         customerPhoneExtension: readCustomerPhoneExtensionFromRawPayload(order.rawPayload),
         customerType,
-        customerRemark: order.customerRemark || readCustomerRemarkFromRawPayload(order.rawPayload),
+        customerRemark: readCustomerRemarkFromRawPayload(order.rawPayload, order.customerRemark),
         adminRemark: readAdminRemarkFromRawPayload(order.rawPayload),
         delivery: order.delivery && typeof order.delivery === "object"
           ? {

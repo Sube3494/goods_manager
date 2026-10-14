@@ -3,7 +3,7 @@ import { buildCustomerMemoryFields } from "@/lib/customerMemoryStore";
 import { mergeOrderCustomerPayload, readRetainedCustomerAddress, retainCustomerAddress } from "@/lib/orderCustomerData";
 import { assertMaiyatianCookieResponse } from "@/lib/maiyatianCookieResponse";
 import { formatLocalDate, parseAsShanghaiTime } from "@/lib/dateUtils";
-import { cleanCustomerRemark, firstMeaningfulCustomerRemark } from "@/lib/customerRemark";
+import { cleanCustomerRemark, readOrderCustomerRemark } from "@/lib/customerRemark";
 import { readConfirmedRefundAmountFromRawPayload, readEffectiveConfirmedRefunds } from "@/lib/orderFinancials";
 import { getMaiyatianFulfillmentItems, resolveMaiyatianRefundStatus, summarizeMaiyatianRefund } from "@/lib/maiyatianRefund";
 import {
@@ -556,51 +556,8 @@ export function readResolvedAutoPickShop(rawPayload: unknown) {
   };
 }
 
-export function readCustomerRemarkFromRawPayload(rawPayload: unknown): string | null {
-  if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
-    return null;
-  }
-
-  const readRemarkFromRecord = (record: Record<string, unknown>) => {
-    return firstMeaningfulCustomerRemark(
-      record.customerRemark,
-      record.user_remark,
-      record.userRemark,
-      record.buyer_remark,
-      record.buyerRemark,
-      record.remark,
-      record.memo,
-      record.note,
-    );
-  };
-
-  const root = rawPayload as Record<string, unknown>;
-  const directValue = readRemarkFromRecord(root);
-  if (directValue) {
-    return directValue;
-  }
-
-  const nestedCandidates = [
-    root.data,
-    root.extend,
-    root.order,
-    root.orderInfo,
-    root.order_info,
-    root.extra,
-    root.payload,
-  ];
-
-  for (const candidate of nestedCandidates) {
-    if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
-      continue;
-    }
-    const nestedValue = readRemarkFromRecord(candidate as Record<string, unknown>);
-    if (nestedValue) {
-      return nestedValue;
-    }
-  }
-
-  return null;
+export function readCustomerRemarkFromRawPayload(rawPayload: unknown, existingRemark?: unknown): string | null {
+  return readOrderCustomerRemark(rawPayload, existingRemark);
 }
 
 export function readAdminRemarkFromRawPayload(rawPayload: unknown): string | null {
@@ -2638,16 +2595,7 @@ async function enrichMaiyatianOrderByCookie(cookie: string, order: AutoPickInbou
     order.delivery = deliveryInfo;
   }
 
-  const customerRemark = detailData ? firstMeaningfulCustomerRemark(
-    detailData.customerRemark,
-    detailData.user_remark,
-    detailData.userRemark,
-    detailData.buyer_remark,
-    detailData.buyerRemark,
-    detailData.remark,
-    detailData.memo,
-    detailData.note,
-  ) : null;
+  const customerRemark = readCustomerRemarkFromRawPayload(detailData);
   if (customerRemark) {
     order.customerRemark = customerRemark;
   }
@@ -2662,12 +2610,6 @@ async function enrichMaiyatianOrderByCookie(cookie: string, order: AutoPickInbou
   const detailItems = buildItemsFromDetailJSON(detailData);
   if (detailItems.length > 0) {
     order.items = detailItems;
-  }
-
-  const detailRemark = detailDataObj?.user_remark || detailDataObj?.remark || detailDataObj?.buyer_remark || detailDataObj?.memo;
-  if (detailRemark) {
-    const cleanedDetailRemark = cleanCustomerRemark(detailRemark);
-    if (cleanedDetailRemark) order.customerRemark = cleanedDetailRemark;
   }
 
   const detailOrderTime = String(detailData.order_time || "").trim();
@@ -3647,16 +3589,7 @@ export function normalizeAutoPickOrderPayload(payload: unknown): AutoPickInbound
 
   const normalized: AutoPickInboundOrder = {
     id: String(input.id || "").trim(),
-    customerRemark: firstMeaningfulCustomerRemark(
-      input.customerRemark,
-      input.user_remark,
-      input.userRemark,
-      input.buyer_remark,
-      input.buyerRemark,
-      input.remark,
-      input.memo,
-      input.note,
-    ) || undefined,
+    customerRemark: readCustomerRemarkFromRawPayload(input) || undefined,
     user_remark: input.user_remark !== undefined ? String(input.user_remark).trim() : undefined,
     userRemark: input.userRemark !== undefined ? String(input.userRemark).trim() : undefined,
     buyer_remark: input.buyer_remark !== undefined ? String(input.buyer_remark).trim() : undefined,
