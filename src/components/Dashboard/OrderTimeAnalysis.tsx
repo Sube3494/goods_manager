@@ -89,7 +89,7 @@ export function OrderTimeAnalysis({ buckets, rangeDays, brushWithoutTime = 0 }: 
           <div className="flex items-center gap-3 text-[11px] text-muted-foreground"><span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-sky-500" />普通时段</span><span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-amber-500" />高峰时段</span></div>
         </div>
         {hasOrders ? (
-          <div className="mt-3 h-56 w-full min-w-0 sm:h-72">
+          <div className="mt-3 h-56 w-full min-w-0 sm:h-72 [&_:focus:not(:focus-visible)]:outline-none [&_:focus-visible]:outline-2 [&_:focus-visible]:outline-offset-2 [&_:focus-visible]:outline-sky-500">
             <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <BarChart data={buckets} accessibilityLayer margin={{ top: 12, right: 8, left: -10, bottom: 0 }} barCategoryGap="25%">
                 <defs>
