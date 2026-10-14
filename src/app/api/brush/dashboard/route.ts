@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
-import { formatLocalDate } from "@/lib/dateUtils";
+import { formatLocalDate, parseAsShanghaiTime } from "@/lib/dateUtils";
 
 type DailyAggregate = {
   dateKey: string;
@@ -29,6 +29,10 @@ export async function GET() {
   }
 
   try {
+    const today = formatLocalDate(new Date());
+    const todayStart = parseAsShanghaiTime(today);
+    const tomorrowStart = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
+    const dateFormatter = new Intl.DateTimeFormat("zh-CN", { timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit" });
     const [brushProducts, plans, orders] = await Promise.all([
       prisma.brushProduct.findMany({
         where: {
@@ -69,7 +73,7 @@ export async function GET() {
         },
       }),
       prisma.brushOrderPlan.findMany({
-        where: { userId: session.id },
+        where: { userId: session.id, date: { gte: todayStart, lt: tomorrowStart } },
         select: {
           date: true,
           shopName: true,
@@ -82,7 +86,6 @@ export async function GET() {
       }),
       prisma.brushOrder.findMany({
         where: { userId: session.id },
-        orderBy: { date: "desc" },
         select: {
           date: true,
           shopName: true,
@@ -132,7 +135,6 @@ export async function GET() {
       }))
       .sort((a, b) => a.shopName.localeCompare(b.shopName, "zh-CN"));
 
-    const today = formatLocalDate(new Date());
     let todayPlanItemCount = 0;
     const todayShops = new Set<string>();
 
@@ -158,7 +160,7 @@ export async function GET() {
     let todayExpense = 0;
 
     orders.forEach((order) => {
-      const dateKey = formatLocalDate(order.date);
+      const dateKey = dateFormatter.format(order.date).replace(/\//g, "-");
       const label = dateKey;
       const shopName = order.shopName?.trim() || "未分店铺";
       const expense = (order.paymentAmount - order.receivedAmount) + order.commission;

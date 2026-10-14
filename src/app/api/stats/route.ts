@@ -323,7 +323,12 @@ export async function GET(request: NextRequest) {
           select: { id: true, permissions: true },
         });
 
-    const storage = await getStorageStrategy();
+    const isMarketingView = request.nextUrl.searchParams.get("view") === "marketing";
+    const [storage, settings, allUserShops] = await Promise.all([
+      getStorageStrategy(),
+      isMarketingView ? Promise.resolve(null) : prisma.systemSetting.findFirst({ where: { userId: targetUserId } }),
+      prisma.shop.findMany({ where: { userId: targetUserId }, select: { id: true, name: true, address: true } }),
+    ]);
 
     const permissionsObj = targetUserRecord?.permissions && typeof targetUserRecord.permissions === "object" && !Array.isArray(targetUserRecord.permissions)
       ? targetUserRecord.permissions as Record<string, unknown>
@@ -334,9 +339,6 @@ export async function GET(request: NextRequest) {
     const rangeMode = request.nextUrl.searchParams.get("range");
     const shopName = (request.nextUrl.searchParams.get("shopName") || "").trim();
     const platformFilter = (request.nextUrl.searchParams.get("platform") || "").trim();
-    const settings = await prisma.systemSetting.findFirst({
-      where: { userId: targetUserId },
-    });
     const threshold = settings?.lowStockThreshold ?? 10;
 
     const endDateKey = (request.nextUrl.searchParams.get("endDate") || formatDateKey(new Date())).trim();
@@ -349,14 +351,25 @@ export async function GET(request: NextRequest) {
     const endDate = parseAsShanghaiTime(`${endDateKey} 23:59:59.999`);
     let startDate = parseAsShanghaiTime(startDateKey);
 
+    // Each shop lookup reads the same ordered pages; share those reads within this request.
+    const readFirstOrderPage = (afterId: string | undefined, take: number) => prisma.autoPickOrder.findMany({
+      where: { userId: targetUserId, orderTime: { lte: endDate } },
+      orderBy: [{ orderTime: "asc" }, { id: "asc" }],
+      take,
+      ...(afterId ? { cursor: { id: afterId }, skip: 1 } : {}),
+      select: { id: true, orderTime: true, shopId: true, rawPayload: true, platform: true, status: true },
+    }).then(rows => rows);
+    const firstOrderPages = new Map<string, ReturnType<typeof readFirstOrderPage>>();
     const getFirstOrderDate = createDashboardFirstOrderDateLookup(
-      (_targetShopName, afterId, take) => prisma.autoPickOrder.findMany({
-        where: { userId: targetUserId, orderTime: { lte: endDate } },
-        orderBy: [{ orderTime: "asc" }, { id: "asc" }],
-        take,
-        ...(afterId ? { cursor: { id: afterId }, skip: 1 } : {}),
-        select: { id: true, orderTime: true, shopId: true, rawPayload: true, platform: true, status: true },
-      }),
+      (_targetShopName, afterId, take) => {
+        const key = JSON.stringify([afterId, take]);
+        let page = firstOrderPages.get(key);
+        if (!page) {
+          page = readFirstOrderPage(afterId, take);
+          firstOrderPages.set(key, page);
+        }
+        return page;
+      },
       (order, targetShopName) => !isAutoPickOrderDeletedStatus(order.status) && !isVoidedOfflineOrder(order)
         && (!targetShopName || isShopNameMatch(resolveAutoPickMatchedShopName(order, permissionsObj) || "", targetShopName)),
       normalizeShopNameKey,
@@ -366,11 +379,6 @@ export async function GET(request: NextRequest) {
       startDate = parseAsShanghaiTime(firstOrderDate ? formatDateKey(firstOrderDate) : endDateKey);
     }
     perf.lap("range-bootstrap");
-
-    const allUserShops = await prisma.shop.findMany({
-      where: { userId: targetUserId },
-      select: { id: true, name: true, address: true },
-    });
 
     const matchedShops = shopName
       ? allUserShops.filter((s) => isShopNameMatch(s.name, shopName))
@@ -400,7 +408,7 @@ export async function GET(request: NextRequest) {
       operatingCostBills,
       userDb,
     ] = await Promise.all([
-      prisma.shop.count({
+      isMarketingView ? Promise.resolve(0) : prisma.shop.count({
         where: {
           userId: targetUserId,
           isSource: true,
@@ -440,7 +448,7 @@ export async function GET(request: NextRequest) {
           shop: { select: { id: true, name: true } },
         },
       }),
-      prisma.purchaseOrderItem.findMany({
+      isMarketingView ? Promise.resolve([]) : prisma.purchaseOrderItem.findMany({
         take: 10,
         where: {
           purchaseOrder: buildRecentInboundOrderWhere(targetUserId),
@@ -471,7 +479,7 @@ export async function GET(request: NextRequest) {
         },
         orderBy: [{ purchaseOrder: { date: "desc" } }, { createdAt: "desc" }, { id: "desc" }],
       }),
-      prisma.purchaseOrder.findMany({
+      isMarketingView ? Promise.resolve([]) : prisma.purchaseOrder.findMany({
         where: {
           userId: targetUserId,
           ...(shopName ? {
@@ -535,7 +543,7 @@ export async function GET(request: NextRequest) {
         },
         orderBy: { date: "asc" },
       }),
-      prisma.purchaseOrder.findMany({
+      isMarketingView ? Promise.resolve([]) : prisma.purchaseOrder.findMany({
         where: {
           userId: targetUserId,
           status: "Ordered",
@@ -1781,6 +1789,33 @@ export async function GET(request: NextRequest) {
       daily: Array.from(productSalesDailyMap.values()),
     };
 
+    const visibleBusinessTrend = canViewProductCosts ? businessTrend : businessTrend.map(({ productCost: _productCost, ...point }) => point);
+    const visiblePlatformBusinessTrend = canViewProductCosts ? platformBusinessTrend : Object.fromEntries(
+      Object.entries(platformBusinessTrend).map(([platform, points]) => [platform, points.map(({ productCost: _productCost, ...point }) => point)]),
+    );
+
+    if (isMarketingView) {
+      perf.lap("response-build");
+      perf.log("GET /api/stats marketing", { rangeDays: businessTrend.length, autoPickOrders: filteredAutoPickOrdersInRange.length });
+      return NextResponse.json({
+        rangeStart: formatDateKey(startDate),
+        rangeEnd: formatDateKey(endDate),
+        rangeDays: businessTrend.length,
+        userPaid,
+        promotionExpense,
+        platformMatrix: {
+          columns: platformMatrixColumns,
+          trueOrderTotal: platformMatrixColumns.reduce((sum, item) => sum + item.trueOrderCount, 0),
+          brushOrderTotal: platformMatrixColumns.reduce((sum, item) => sum + item.brushOrderCount, 0),
+          grandTotal: platformMatrixColumns.reduce((sum, item) => sum + item.totalCount, 0),
+        },
+        customerAnalysis,
+        productSales,
+        businessTrend: visibleBusinessTrend,
+        platformBusinessTrend: visiblePlatformBusinessTrend,
+      }, { headers: perf.headers() });
+    }
+
     const shopBreakdownMap = new Map<string, { shopId: string; shopName: string; skuCount: number; stock: number; lowStockCount: number; value: number }>();
     shopProductRows.forEach((item) => {
       const current = shopBreakdownMap.get(item.shopId) || {
@@ -1916,13 +1951,8 @@ export async function GET(request: NextRequest) {
       productSales,
       orderTimeDistribution: orderTimeAnalysis.buckets,
       orderTimeBrushWithoutTime: orderTimeAnalysis.brushWithoutTime,
-      businessTrend: canViewProductCosts ? businessTrend : businessTrend.map(({ productCost: _productCost, ...point }) => point),
-      platformBusinessTrend: canViewProductCosts
-        ? platformBusinessTrend
-        : Object.fromEntries(Object.entries(platformBusinessTrend).map(([platform, points]) => [
-            platform,
-            points.map(({ productCost: _productCost, ...point }) => point),
-          ])),
+      businessTrend: visibleBusinessTrend,
+      platformBusinessTrend: visiblePlatformBusinessTrend,
       shopBreakdown: canViewProductCosts ? shopBreakdown : shopBreakdown.map(({ value: _value, ...shop }) => shop),
       alerts,
     }, {

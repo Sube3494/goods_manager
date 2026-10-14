@@ -701,7 +701,16 @@ export default function BrushCenterPage() {
   );
 
   if (userLoading || isLoading) {
-    return <div className="py-24 text-center text-muted-foreground">正在生成刷单看板...</div>;
+    return (
+      <div role="status" aria-label="正在加载刷单看板" className="space-y-5 animate-pulse motion-reduce:animate-none">
+        <div className="h-44 rounded-[28px] border border-border/60 bg-muted/20" />
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {Array.from({ length: 4 }, (_, index) => <div key={index} className="h-32 rounded-[22px] border border-border/60 bg-muted/20" />)}
+        </div>
+        <div className="h-80 rounded-[28px] border border-border/60 bg-muted/20" />
+        <span className="sr-only">正在加载刷单看板</span>
+      </div>
+    );
   }
 
   if (!hasAnyAccess) {

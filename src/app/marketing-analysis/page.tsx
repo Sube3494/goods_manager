@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import dynamic from "next/dynamic";
 import { AnimatePresence, motion } from "framer-motion";
 import { format, subDays } from "date-fns";
 import {
@@ -36,7 +37,12 @@ import { Pagination } from "@/components/ui/Pagination";
 import { useToast } from "@/components/ui/Toast";
 import type { AutoPickOrder, DashboardBusinessTrendPoint, DashboardProductSalesItem, Shop, StatsData } from "@/lib/types";
 import { cn, getPlatformMeta } from "@/lib/utils";
-import { OrderCard, OrderCardErrorBoundary } from "@/app/orders/OrderCard";
+
+const RelatedOrderCard = dynamic(() => import("@/components/MarketingAnalysis/RelatedOrderCard"), {
+  loading: () => <div role="status" className="rounded-xl bg-muted/30 p-4 text-xs text-muted-foreground">正在加载订单详情...</div>,
+});
+
+type MarketingStats = Pick<StatsData, "rangeStart" | "rangeEnd" | "rangeDays" | "userPaid" | "promotionExpense" | "platformMatrix" | "customerAnalysis" | "productSales" | "businessTrend" | "platformBusinessTrend">;
 
 const money = (value: number) => `¥${Number(value || 0).toLocaleString("zh-CN", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
 const integer = (value: number) => Math.round(Number(value || 0)).toLocaleString("zh-CN");
@@ -212,7 +218,7 @@ export default function MarketingAnalysisPage() {
   const [shopName, setShopName] = useState("");
   const [platform, setPlatform] = useState("");
   const [shops, setShops] = useState<Shop[]>([]);
-  const [data, setData] = useState<StatsData | null>(null);
+  const [data, setData] = useState<MarketingStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [productPage, setProductPage] = useState(1);
@@ -238,6 +244,7 @@ export default function MarketingAnalysisPage() {
       setLoading(true);
       try {
         const query = new URLSearchParams();
+        query.set("view", "marketing");
         if (!startDate && !endDate) {
           query.set("range", "all");
         } else {
@@ -1020,22 +1027,21 @@ export default function MarketingAnalysisPage() {
                       ) : visibleRelatedOrders.length ? (
                         <div className="grid gap-4">
                           {visibleRelatedOrders.map((order) => (
-                            <OrderCardErrorBoundary key={order.id} orderNo={order.orderNo || order.id}>
-                              <OrderCard
-                                order={order}
-                                expanded={expandedRelatedOrderIds.includes(order.id)}
-                                actingId=""
-                                readOnly
-                                onToggleExpanded={(orderId) =>
-                                  setExpandedRelatedOrderIds((current) =>
-                                    current.includes(orderId) ? current.filter((id) => id !== orderId) : [...current, orderId]
-                                  )
-                                }
-                                onRunAction={() => {}}
-                                onOpenCostBackfill={() => {}}
-                                onOpenMatchEditor={() => {}}
-                              />
-                            </OrderCardErrorBoundary>
+                            <RelatedOrderCard
+                              key={order.id}
+                              order={order}
+                              expanded={expandedRelatedOrderIds.includes(order.id)}
+                              actingId=""
+                              readOnly
+                              onToggleExpanded={(orderId) =>
+                                setExpandedRelatedOrderIds((current) =>
+                                  current.includes(orderId) ? current.filter((id) => id !== orderId) : [...current, orderId]
+                                )
+                              }
+                              onRunAction={() => {}}
+                              onOpenCostBackfill={() => {}}
+                              onOpenMatchEditor={() => {}}
+                            />
                           ))}
                         </div>
                       ) : (

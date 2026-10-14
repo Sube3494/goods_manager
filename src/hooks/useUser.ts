@@ -1,4 +1,6 @@
-import { useState, useEffect } from "react";
+"use client";
+
+import { createContext, createElement, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from "react";
 
 interface BrushShopItem {
   id: string;
@@ -40,27 +42,63 @@ interface User {
   permissions?: Record<string, boolean>;
 }
 
-export function useUser() {
+const UserContext = createContext<{ user: User | null; isLoading: boolean } | null>(null);
+
+function useUserRequest(enabled: boolean) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    async function fetchUser() {
+  const requestRef = useRef<Promise<void> | null>(null);
+  const lastFetchedRef = useRef(0);
+
+  const fetchUser = useCallback(() => {
+    if (requestRef.current) return requestRef.current;
+    const request = (async () => {
       try {
-        const res = await fetch("/api/auth/me");
+        const res = await fetch("/api/auth/me", { cache: "no-store" });
         if (res.ok) {
           const data = await res.json();
-          setUser(data.user);
+          setUser(data.user ?? null);
+        } else {
+          setUser(null);
         }
       } catch (error) {
         console.error("Failed to fetch user:", error);
       } finally {
+        lastFetchedRef.current = Date.now();
         setIsLoading(false);
       }
-    }
-
-    fetchUser();
+    })();
+    requestRef.current = request;
+    void request.finally(() => { requestRef.current = null; });
+    return request;
   }, []);
 
+  useEffect(() => {
+    if (!enabled) return;
+    void fetchUser();
+    // Refresh permissions in the background without hiding the current page.
+    const refresh = () => {
+      if (document.visibilityState === "visible" && Date.now() - lastFetchedRef.current >= 60_000) void fetchUser();
+    };
+    window.addEventListener("focus", refresh);
+    const timer = window.setInterval(refresh, 60_000);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      window.clearInterval(timer);
+    };
+  }, [enabled, fetchUser]);
+
   return { user, isLoading };
+}
+
+export function UserProvider({ children }: { children: ReactNode }) {
+  const session = useUserRequest(true);
+  return createElement(UserContext.Provider, { value: session }, children);
+}
+
+export function useUser() {
+  const shared = useContext(UserContext);
+  const standalone = useUserRequest(shared === null);
+  return shared ?? standalone;
 }

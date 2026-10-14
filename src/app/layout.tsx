@@ -11,6 +11,7 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { Geist } from "next/font/google";
 import { cn } from "@/lib/utils";
+import { UserProvider } from "@/hooks/useUser";
 
 const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
@@ -42,7 +43,9 @@ export default function RootLayout({
           disableTransitionOnChange
           enableColorScheme
         >
-          <MainLayout>{children}</MainLayout>
+          <UserProvider>
+            <MainLayout>{children}</MainLayout>
+          </UserProvider>
         </ThemeProvider>
       </body>
     </html>
