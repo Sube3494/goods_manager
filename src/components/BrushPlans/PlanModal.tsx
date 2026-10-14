@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Package, Plus, Trash2, Search, Circle, Store, ChevronDown, ChevronRight, LayoutGrid, Copy, ArrowUp, ArrowDown } from "lucide-react";
+import { X, Package, Plus, Trash2, Search, Circle, Store, ChevronDown, ChevronRight, LayoutGrid, Copy, ArrowUp, ArrowDown, ArrowRightLeft } from "lucide-react";
 import Image from "next/image";
 import { BrushOrderPlan, BrushOrderPlanItem, Product, AddressItem } from "@/lib/types";
 import { DatePicker } from "@/components/ui/DatePicker";
@@ -29,6 +29,7 @@ export function PlanModal({ isOpen, onClose, onSubmit, initialData, readOnly = f
     const { showToast } = useToast();
     const [mounted, setMounted] = useState(false);
     const [isSelectionModalOpen, setIsSelectionModalOpen] = useState(false);
+    const [replacementIndex, setReplacementIndex] = useState<number | null>(null);
     const [draggingItem, setDraggingItem] = useState<PlanSortTarget | null>(null);
     const [dropTarget, setDropTarget] = useState<PlanSortTarget | null>(null);
     const clearDrag = () => {
@@ -128,6 +129,36 @@ export function PlanModal({ isOpen, onClose, onSubmit, initialData, readOnly = f
                 });
             });
             return { ...prev, items: newItems };
+        });
+    };
+
+    const openReplacement = (index: number) => {
+        if (readOnly) return;
+        setReplacementIndex(index);
+        setIsSelectionModalOpen(true);
+    };
+
+    const handleProductSelection = (products: Product[], platform: string) => {
+        if (readOnly) return;
+        if (replacementIndex === null) {
+            handleBatchAdd(products, platform);
+            return;
+        }
+        const product = products[0] as BrushSelectableProduct | undefined;
+        if (!product) return;
+        setFormData(prev => {
+            const items = [...(prev.items || [])];
+            const current = items[replacementIndex];
+            if (!current || current.productId === product.id) return prev;
+            items[replacementIndex] = {
+                ...current,
+                productId: product.id,
+                product,
+                productName: product.name,
+                searchKeyword: product.brushKeyword || "",
+                done: false,
+            };
+            return { ...prev, items };
         });
     };
 
@@ -294,7 +325,7 @@ export function PlanModal({ isOpen, onClose, onSubmit, initialData, readOnly = f
                                             </h3>
                                             <button 
                                                 type="button" 
-                                                onClick={() => setIsSelectionModalOpen(true)}
+                                                onClick={() => { setReplacementIndex(null); setIsSelectionModalOpen(true); }}
                                                 className="text-xs sm:text-sm font-bold text-primary flex items-center gap-1.5 px-4 py-2 rounded-full bg-primary/10 hover:bg-primary/20 transition-all"
                                             >
                                                 <Plus size={16} /> 从刷单商品库选择
@@ -411,6 +442,11 @@ export function PlanModal({ isOpen, onClose, onSubmit, initialData, readOnly = f
                                                                                     </div>
 
                                                                                     <div className="contents sm:flex sm:items-center sm:gap-1 sm:shrink-0">
+                                                                                        {!readOnly && (
+                                                                                            <button type="button" onClick={() => openReplacement(originalIndex)} aria-label="替换商品" title="替换商品" className="hidden sm:inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary/10 px-2.5 text-[10px] font-bold text-primary hover:bg-primary/20 transition-colors whitespace-nowrap">
+                                                                                                <ArrowRightLeft size={14} /> 替换
+                                                                                            </button>
+                                                                                        )}
                                                                                         <button
                                                                                             type="button"
                                                                                             onClick={() => duplicateItem(originalIndex)}
@@ -491,7 +527,7 @@ export function PlanModal({ isOpen, onClose, onSubmit, initialData, readOnly = f
                                                                                     </div>
                                                                                 </div>
                                                                                 {!readOnly && (
-                                                                                    <div className="flex items-center justify-between gap-2 sm:hidden">
+                                                                                    <div className="flex flex-wrap items-center justify-between gap-1 sm:hidden">
                                                                                         <div className="flex items-center gap-1">
                                                                                             <button type="button" onClick={() => moveItemByButton(originalIndex, platform, -1)} disabled={visibleIndexes[0] === originalIndex} aria-label="上移商品" title="上移商品" className="inline-flex h-11 w-11 items-center justify-center rounded-lg bg-muted/50 text-muted-foreground active:bg-primary/10 disabled:opacity-25">
                                                                                                 <ArrowUp size={16} />
@@ -501,6 +537,9 @@ export function PlanModal({ isOpen, onClose, onSubmit, initialData, readOnly = f
                                                                                             </button>
                                                                                         </div>
                                                                                         <div className="flex items-center gap-1">
+                                                                                            <button type="button" onClick={() => openReplacement(originalIndex)} aria-label="替换商品" title="替换商品" className="inline-flex h-11 w-11 items-center justify-center rounded-lg bg-primary/10 text-primary active:bg-primary/20">
+                                                                                                <ArrowRightLeft size={16} />
+                                                                                            </button>
                                                                                             {canMergeToPreviousOrder && (
                                                                                                 <button type="button" onClick={() => {
                                                                                                     const previous = groupedOrders[orderIndex - 1]?.items[0];
@@ -582,16 +621,21 @@ export function PlanModal({ isOpen, onClose, onSubmit, initialData, readOnly = f
                 document.body
             )}
             <ProductSelectionModal
+                key={replacementIndex === null ? "add-products" : `replace-product-${replacementIndex}`}
                 isOpen={isSelectionModalOpen}
-                onClose={() => setIsSelectionModalOpen(false)}
-                onSelect={(products, platform) => handleBatchAdd(products, platform)}
-                selectedIds={[]}
+                onClose={() => { setIsSelectionModalOpen(false); setReplacementIndex(null); }}
+                onSelect={handleProductSelection}
+                selectedIds={replacementIndex !== null && formData.items?.[replacementIndex]?.productId ? [formData.items[replacementIndex].productId!] : []}
+                singleSelect={replacementIndex !== null}
+                disableAlreadySelected={false}
+                showPlatformSelector={replacementIndex === null}
+                confirmLabel={replacementIndex === null ? undefined : "确认替换"}
                 fetchPath="/api/brush-products/products"
                 query={{
                     ...(formData.shopName ? { shopName: formData.shopName } : {}),
                 }}
                 allowLibrarySwitch={false}
-                title="选择刷单商品"
+                title={replacementIndex === null ? "选择刷单商品" : "替换刷单商品"}
                 showStock={false}
                 showCategory={false}
                 hideUnselectedOnlyToggle
