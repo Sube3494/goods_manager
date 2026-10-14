@@ -912,15 +912,16 @@ export function ProductSelectionModal({
                   ))}
                 </div>
               )}
-              <div className="flex items-center gap-3 shrink-0">
-                 <div className="relative flex-1 group">
+              <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 sm:gap-3 shrink-0">
+                 <div className="relative w-full min-w-0 sm:w-auto sm:flex-1 group">
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" size={17} />
                   <input 
                     type="text"
                     placeholder="搜索商品名称或编号..."
+                    aria-label="搜索商品名称或编号"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full h-10.5 pl-10.5 pr-9 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 focus:border-primary/20 transition-all dark:hover:bg-white/10 text-sm"
+                    className="w-full min-w-0 h-11 sm:h-10.5 pl-10.5 pr-9 rounded-full bg-white dark:bg-white/5 border border-border dark:border-white/10 outline-none ring-1 ring-transparent focus:ring-2 focus:ring-primary/20 focus:border-primary/20 transition-all dark:hover:bg-white/10 text-base sm:text-sm text-foreground placeholder:text-muted-foreground"
                   />
                   {searchQuery && !isLoading && !isSearching && (
                     <button
@@ -938,7 +939,7 @@ export function ProductSelectionModal({
                  </div>
 
                 {shouldShowCategoryFilter && (
-                  <div className="w-32 sm:w-40 shrink-0">
+                  <div className="min-w-0 flex-1 sm:flex-none sm:w-40">
                     <CustomSelect
                       options={allCategoryOptions}
                       value={selectedCategoryName}
@@ -950,7 +951,7 @@ export function ProductSelectionModal({
                 )}
 
                 {showSortSelector && (
-                  <div className="w-32 sm:w-40 shrink-0">
+                  <div className="min-w-0 flex-1 sm:flex-none sm:w-40">
                     <CustomSelect
                       options={sortOptions}
                       value={sortBy}
