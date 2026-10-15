@@ -307,13 +307,14 @@ export async function GET(request: NextRequest) {
   const perf = createRequestPerfTracker(request);
   try {
     const isLeaderboardView = request.nextUrl.searchParams.get("view") === "leaderboard";
-    const user = isLeaderboardView
+    const isLeaderboardExpenses = request.nextUrl.searchParams.get("view") === "leaderboard-expenses";
+    const user = isLeaderboardView || isLeaderboardExpenses
       ? await getAuthorizedAdmin("members:orders")
       : await getAuthorizedUserAny("dashboard:read", "marketing:read");
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    if (isLeaderboardView && !canViewProfitLeaderboard(user)) {
+    if ((isLeaderboardView || isLeaderboardExpenses) && !canViewProfitLeaderboard(user)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
     if (isLeaderboardView) {
@@ -1349,6 +1350,14 @@ export async function GET(request: NextRequest) {
     };
 
     const businessTrend = buildTrendSeries(businessTrendMap);
+    if (isLeaderboardExpenses) {
+      const deductions = businessTrend.reduce((totals, point) => ({
+        promotionExpense: FinanceMath.add(totals.promotionExpense, point.promotionExpense),
+        brushExpense: FinanceMath.add(totals.brushExpense, point.brushExpense),
+        operatingExpense: FinanceMath.add(totals.operatingExpense, point.operatingExpense),
+      }), { promotionExpense: 0, brushExpense: 0, operatingExpense: 0 });
+      return NextResponse.json({ deductions }, { headers: { "Cache-Control": "private, no-store" } });
+    }
     const operatingExpense = businessTrend.reduce(
       (sum, point) => FinanceMath.add(sum, point.operatingExpense || 0),
       0

@@ -1,3 +1,5 @@
+import type { LeaderboardExpenses } from "./profitLeaderboardDeductions";
+
 export interface LeaderboardMember {
   id: string;
   name: string;
@@ -6,7 +8,7 @@ export interface LeaderboardMember {
 }
 
 export interface LeaderboardResult {
-  rows: Array<LeaderboardMember & { profit: number; rank: number }>;
+  rows: Array<LeaderboardMember & { profit: number; rank: number; pureProfit?: number; deductions?: LeaderboardExpenses }>;
   failed: boolean;
   updatedAt?: number;
 }

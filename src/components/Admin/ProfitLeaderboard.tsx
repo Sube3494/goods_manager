@@ -7,6 +7,7 @@ import { Crown, RefreshCw, Sparkles, Trophy, ChevronRight } from "lucide-react";
 import { formatLocalDate } from "@/lib/dateUtils";
 import { cn } from "@/lib/utils";
 import { DateRangePicker } from "@/components/ui/DateRangePicker";
+import { LEADERBOARD_DEDUCTIONS, rankLeaderboardProfits, type LeaderboardExpenses } from "@/lib/profitLeaderboardDeductions";
 import { presetDashboardDateRange, type DashboardDateRange } from "@/lib/dashboardDateRange";
 import { loadProfitLeaderboardCache, readProfitLeaderboardCache, type LeaderboardMember as Member, type LeaderboardResult } from "@/lib/profitLeaderboardCache";
 import styles from "./ProfitLeaderboard.module.css";
@@ -46,6 +47,8 @@ export function ProfitLeaderboard({ members, cacheScope, onSelect }: {
 }) {
   const [dateRange, setDateRange] = useState<DashboardDateRange>(() => presetDashboardDateRange("today", formatLocalDate(new Date())));
   const [refresh, setRefresh] = useState(0);
+  const [profitMode, setProfitMode] = useState<"order" | "total">("order");
+  const includeDeductions = profitMode === "total";
   const [result, setResult] = useState<(LeaderboardResult & { key: string }) | null>(null);
   const refreshRef = useRef(refresh);
   // A stable primitive keeps unrelated member status updates from refetching the entire board.
@@ -53,7 +56,7 @@ export function ProfitLeaderboard({ members, cacheScope, onSelect }: {
   const today = formatLocalDate(new Date());
   const resolvedRange = dateRange.rangePreset === "custom" ? dateRange : presetDashboardDateRange(dateRange.rangePreset, today);
   const { rangePreset, startDate, endDate } = resolvedRange;
-  const cacheKey = JSON.stringify(["order-pure-profit-v1", cacheScope, today, rangePreset, startDate, endDate, memberKey]);
+  const cacheKey = JSON.stringify(["order-profit-deductions-v1", includeDeductions, cacheScope, today, rangePreset, startDate, endDate, memberKey]);
   const requestKey = `${cacheKey}:${refresh}`;
   const cached = readProfitLeaderboardCache(cacheKey);
   const displayedResult = result?.key === requestKey ? result : cached;
@@ -66,7 +69,7 @@ export function ProfitLeaderboard({ members, cacheScope, onSelect }: {
     refreshRef.current = refresh;
     async function load(): Promise<LeaderboardResult> {
       const targets: Member[] = JSON.parse(memberKey);
-      const rows: Array<Member & { profit: number }> = [];
+      const rows: LeaderboardResult["rows"] = [];
       let cursor = 0;
       let failed = false;
       async function worker() {
@@ -81,28 +84,39 @@ export function ProfitLeaderboard({ members, cacheScope, onSelect }: {
             if (data.eligible === false) continue;
             if (data.eligible !== true) throw new Error("Eligibility unavailable");
             if (typeof data.pureProfit !== "number" || !Number.isFinite(data.pureProfit)) throw new Error("Invalid pure profit");
-            rows.push({ ...member, profit: data.pureProfit });
+            let deductions: LeaderboardExpenses | undefined;
+            if (includeDeductions) {
+              const expensesQuery = new URLSearchParams({ userId: member.id, view: "leaderboard-expenses", endDate });
+              if (rangePreset === "all") expensesQuery.set("range", "all");
+              else expensesQuery.set("startDate", startDate);
+              const expensesResponse = await fetch(`/api/stats?${expensesQuery}`, { cache: "no-store" });
+              if (!expensesResponse.ok) throw new Error("Expenses unavailable");
+              const expensesData = await expensesResponse.json();
+              if (!LEADERBOARD_DEDUCTIONS.every(({ key }) => typeof expensesData.deductions?.[key] === "number" && Number.isFinite(expensesData.deductions[key]))) throw new Error("Invalid expenses");
+              deductions = expensesData.deductions;
+            }
+            rows.push({ ...member, pureProfit: data.pureProfit, profit: data.pureProfit, rank: 0, deductions });
           } catch {
             failed = true;
           }
         }
       }
       await Promise.all(Array.from({ length: Math.min(3, targets.length) }, worker));
-      rows.sort((a, b) => b.profit - a.profit || a.id.localeCompare(b.id));
-      let rank = 1;
-      const ranked = rows.map((row, index) => {
-        if (index > 0 && row.profit !== rows[index - 1].profit) rank = index + 1;
-        return { ...row, rank };
-      });
-      return { rows: ranked, failed };
+      return { rows: rankLeaderboardProfits(rows, "order"), failed };
     }
     void loadProfitLeaderboardCache(cacheKey, load, force).then(data => {
       if (!cancelled) setResult({ ...data, key: requestKey });
     });
     return () => { cancelled = true; };
-  }, [cacheKey, memberKey, rangePreset, startDate, endDate, refresh, requestKey]);
+  }, [cacheKey, includeDeductions, memberKey, rangePreset, startDate, endDate, refresh, requestKey]);
 
-  const rows = displayedResult?.rows || [];
+  const rows = rankLeaderboardProfits(displayedResult?.rows || [], profitMode);
+  const profitLabel = includeDeductions ? "总纯利润" : "订单纯利润";
+  const profitDetails = (member: typeof rows[number]) => [
+    `订单纯利润：${currency.format(member.pureProfit ?? member.profit)}`,
+    ...(includeDeductions ? LEADERBOARD_DEDUCTIONS.map(item => `${item.label}：${currency.format(member.deductions?.[item.key] ?? 0)}`) : []),
+    ...(includeDeductions ? [`总纯利润：${currency.format(member.profit)}`] : []),
+  ].join("；");
   const podium = rows.slice(0, 3);
   const remainingMembers = rows.slice(3);
   const periodLabel = rangeLabels[rangePreset] || "区间";
@@ -128,6 +142,10 @@ export function ProfitLeaderboard({ members, cacheScope, onSelect }: {
           className="h-10 min-w-0 max-w-full"
           triggerClassName="h-10 w-full [&>div>span]:truncate rounded-full border border-black/8 bg-white/80 px-4 text-xs font-bold shadow-2xs dark:border-white/10 dark:bg-white/5"
         />
+        <div className={styles.metricSwitch} data-mode={profitMode} role="group" aria-label="利润计算口径">
+          <button type="button" className={styles.metricOption} aria-pressed={profitMode === "order"} onClick={() => setProfitMode("order")}>订单纯利润</button>
+          <button type="button" className={styles.metricOption} aria-pressed={profitMode === "total"} onClick={() => setProfitMode("total")}>总纯利润</button>
+        </div>
         <div className={styles.refreshControls}>
           <span className={styles.updatedTime}>
             <span><span className={styles.desktopOnly}>数据</span>更新于</span>
@@ -151,31 +169,31 @@ export function ProfitLeaderboard({ members, cacheScope, onSelect }: {
               <p className={styles.statisticsTime}>统计时间：{statisticsTime}<span>（北京时间）</span></p>
               <div className={styles.podium} data-count={podium.length}>
                 {podium.map((member, index) => (
-                  <button type="button" key={member.id} onClick={() => onSelect(member.id)} className={cn(styles.winner, [styles.gold, styles.silver, styles.bronze][Math.min(member.rank - 1, 2)])} data-position={index + 1} aria-label={`第 ${member.rank} 名 ${member.name}，订单纯利润 ${currency.format(member.profit)}，查看订单`}>
+                  <button type="button" key={member.id} onClick={() => onSelect(member.id)} className={cn(styles.winner, [styles.gold, styles.silver, styles.bronze][Math.min(member.rank - 1, 2)])} data-position={index + 1} aria-label={`第 ${member.rank} 名 ${member.name}，${profitLabel} ${currency.format(member.profit)}，查看订单`}>
                     <span className={styles.medallion}>
                       {member.rank === 1 && <Crown size={25} className={styles.crown} aria-hidden="true" />}
                       <LeaderboardAvatar key={member.email} member={member} />
                       <span className={styles.rankEmblem} aria-hidden="true">{member.rank}</span>
                     </span>
                     <span title={member.name} className={styles.winnerName}>{member.name}</span>
-                    <span className={cn(styles.profit, member.profit < 0 && styles.negative)}>{currency.format(member.profit)}</span>
-                    <span className={styles.place}>订单纯利润 · 第 {member.rank} 名</span>
+                    <span title={profitDetails(member)} className={cn(styles.profit, member.profit < 0 && styles.negative)}>{currency.format(member.profit)}</span>
+                    <span className={styles.place}>{profitLabel} · 第 {member.rank} 名</span>
                     <span className={styles.pedestal} aria-hidden="true"><span>{String(member.rank).padStart(2, "0")}</span></span>
                   </button>
                 ))}
               </div>
             </div>
             {remainingMembers.length > 0 && <div className={styles.standings}>
-              <div className={styles.listHeading}><h3>后续排名 <span>{remainingMembers.length}</span></h3><span>{periodLabel}纯利润</span></div>
-              <div className={styles.columnHeading}><span>排名 / 成员</span><span>订单纯利润（元）</span></div>
+              <div className={styles.listHeading}><h3>后续排名 <span>{remainingMembers.length}</span></h3><span>{periodLabel}{profitLabel}</span></div>
+              <div className={styles.columnHeading}><span>排名 / 成员</span><span>{profitLabel}（元）</span></div>
               <ol start={4} aria-label="后续成员利润排名" className={styles.list}>
                 {remainingMembers.map(member => (
                   <li key={member.id}>
-                    <button type="button" onClick={() => onSelect(member.id)} aria-label={`第 ${member.rank} 名 ${member.name}，订单纯利润 ${currency.format(member.profit)}，查看订单`} className={styles.row}>
+                    <button type="button" onClick={() => onSelect(member.id)} aria-label={`第 ${member.rank} 名 ${member.name}，${profitLabel} ${currency.format(member.profit)}，查看订单`} className={styles.row}>
                       <span className={cn(styles.rowRank, member.rank <= 3 && styles.topRank)}>{String(member.rank).padStart(2, "0")}</span>
                       <LeaderboardAvatar key={member.email} member={member} compact />
                       <span title={member.name} className={styles.rowName}>{member.name}</span>
-                      <span className={cn(styles.rowProfit, member.profit < 0 && styles.negative)}>{currency.format(member.profit)}</span>
+                      <span title={profitDetails(member)} className={cn(styles.rowProfit, member.profit < 0 && styles.negative)}>{currency.format(member.profit)}</span>
                       <ChevronRight size={14} className={styles.chevron} aria-hidden="true" />
                     </button>
                   </li>
