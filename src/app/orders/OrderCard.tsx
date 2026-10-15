@@ -3576,20 +3576,22 @@ export const OrderCard = memo(function OrderCard({
     }
   }, [meituanImageUpdateTarget, onProductImageUpdated, onRefresh, order.id, showToast]);
 
-  const handleUpdateBrush = useCallback(async (val: boolean) => {
-    if (val === order.isMainSystemSelfDelivery) return;
+  const handleUpdateBrush = useCallback(async (val: boolean, repairBrushReturn = false) => {
+    if (val === order.isMainSystemSelfDelivery && !repairBrushReturn) return;
     try {
       setIsUpdatingBrush(true);
       const res = await fetch(`/api/orders/${order.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isMainSystemSelfDelivery: val }),
+        body: JSON.stringify({ isMainSystemSelfDelivery: val, ...(repairBrushReturn ? { repairBrushReturn: true } : {}) }),
       });
       if (res.ok) {
         const data = await res.json().catch(() => ({}));
         const returnedOutboundCount = Array.isArray(data.returnedOutboundIds) ? data.returnedOutboundIds.length : 0;
         const returnedStockMessage = returnedOutboundCount > 0 ? `，已退回 ${returnedOutboundCount} 笔关联出库` : "";
-        if (val && data?.brushSync?.ok === false) {
+        if (repairBrushReturn) {
+          showToast("刷单退库记录已修复，已退回的库存不会重复入库", "success");
+        } else if (val && data?.brushSync?.ok === false) {
           showToast(`刷单标记已更新${returnedStockMessage}，但暂未同步到刷单列表：${getBrushSyncSkippedReasonText(data.brushSync.reason) || "当前订单不符合刷单同步条件"}`, "error");
         } else {
           showToast(val ? `刷单标记修改成功${returnedStockMessage}，已同步刷单列表` : "刷单标记已取消，刷单列表已同步清理", "success");
@@ -3775,6 +3777,9 @@ export const OrderCard = memo(function OrderCard({
         : "发起商家自配送";
   const hasOutbound = Boolean(order.hasOutbound);
   const showBrushMarker = !pickup && !showManualDeliveryMarker && order.isMainSystemSelfDelivery;
+  const canRepairBrushReturn = Boolean(order.isMainSystemSelfDelivery) && isFullyRefunded
+    && !isCancelledStatus(order.status) && !deleted
+    && !hasOrderRefundState({ status: order.status, rawPayload: order.rawPayload });
   const orderTypeLabel = getOrderTypeLabel(order);
   const platformMeta = getPlatformBadgeMeta(order.platform, order.rawPayload);
   const effectiveRawExpectedIncome = order.expectedIncome;
@@ -4568,6 +4573,11 @@ export const OrderCard = memo(function OrderCard({
                       否
                     </button>
                   </div>
+                  {canRepairBrushReturn && !readOnly && (
+                    <button type="button" disabled={isUpdatingBrush} onClick={() => void handleUpdateBrush(true, true)} title="仅用于刷单退库误记为退款：修正本地退货记录，保留已退库存，不改变平台真实状态" className="mt-2 rounded-xl border border-amber-500/20 bg-amber-500/10 px-2 py-2 text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-500/20 disabled:opacity-50 dark:text-amber-300">
+                      {isUpdatingBrush ? "正在修复…" : "修复刷单退库"}
+                    </button>
+                  )}
                 </div>
                 <DetailStat label="出库状态" value={hasOutbound ? (productCostStatusText ? `已出库 · ${productCostStatusText}` : "已出库") : (autoOutboundFailed ? "自动出库失败" : "未出库")} />
                 <DetailStat label="履约方式" value={getFulfillmentLabel(order)} />

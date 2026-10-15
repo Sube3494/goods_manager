@@ -10,7 +10,7 @@ const tx = {
     findFirst: async () => outbound,
     update: async ({ data }) => (outbound = { ...outbound, ...data }),
   },
-  purchaseOrderItem: { update: async ({ data }) => { remaining += data.remainingQuantity.increment; } },
+  purchaseOrderItem: { findMany: async () => [], update: async ({ data }) => { remaining += data.remainingQuantity.increment; } },
   productBatch: { updateMany: async ({ data }) => { physicalStock += data.remainingStock.increment; } },
 };
 mock.module("../src/lib/prisma", () => ({ default: { $transaction: async callback => callback(tx) } }));
@@ -39,4 +39,12 @@ test("刷单退库只归还未退的数量到原批次，重复操作不重复�
   await returnOutboundOrderById("user-1", "out-1", input, tx);
   expect(remaining).toBe(3);
   expect(physicalStock).toBe(3);
+});
+
+test("找不到可归还的采购批次时明确失败，不能虚假标记已退库", async () => {
+  outbound.items[0].costSnapshot = null;
+  await expect(returnOutboundOrderById("user-1", "out-1", { reason: "手动标记刷单，自动回滚旧出库" }, tx)).rejects.toThrow("无法归还原采购库存");
+  expect(outbound.status).toBe("PartialReturned");
+  expect(remaining).toBe(1);
+  expect(physicalStock).toBe(1);
 });

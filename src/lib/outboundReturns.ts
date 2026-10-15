@@ -221,14 +221,11 @@ export async function returnOutboundOrderById(
         }
       }
 
-      const fallbackCostPrice = Number(item.shopProduct?.costPrice) || 0;
       const missingQuantity = Math.max(0, amountToRestore);
-      const itemTotalAmount = FinanceMath.add(
-        restoredAmount,
-        FinanceMath.multiply(fallbackCostPrice, missingQuantity)
-      );
-
-      inboundTotalAmount = FinanceMath.add(inboundTotalAmount, itemTotalAmount);
+      if (missingQuantity > 0) {
+        throw new Error(`退库失败：商品「${item.shopProduct?.productName || item.productId || "未命名商品"}」还有 ${missingQuantity} 件无法归还原采购库存，已回滚本次操作`);
+      }
+      inboundTotalAmount = FinanceMath.add(inboundTotalAmount, restoredAmount);
       returnedItemCount += requestedQuantity;
       returnMetaItems.push({
         outboundOrderItemId: item.id,

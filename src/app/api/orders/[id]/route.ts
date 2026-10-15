@@ -6,6 +6,8 @@ import { Prisma } from "../../../../../prisma/generated-client";
 import { returnOutboundOrderById } from "@/lib/outboundReturns";
 import { cancelAutoCompleteJob } from "@/lib/autoPickAutoComplete";
 import { hasOrderRefundState } from "@/lib/orderFinancials";
+import { repairBrushInventoryReturnNote } from "@/lib/outboundReturnMeta";
+import { isAutoPickOrderCancelledStatus, isAutoPickOrderDeletedStatus, readMainSystemSelfDeliveryFlag } from "@/lib/autoPickOrderStatus";
 import {
   getAutoPickIntegrationConfigByUserId,
   normalizeAutoPickOrderPayload,
@@ -136,6 +138,10 @@ export async function PATCH(
     const body = await request.json().catch(() => ({}));
 
     const hasBrushToggle = body.isMainSystemSelfDelivery !== undefined;
+    const repairBrushReturn = body.repairBrushReturn === true;
+    if (repairBrushReturn && body.isMainSystemSelfDelivery !== true) {
+      return NextResponse.json({ error: "修复退库时必须保留刷单标记" }, { status: 400 });
+    }
     const nextExpectedIncome = Number(body.expectedIncome);
     const hasExpectedIncome = Number.isFinite(nextExpectedIncome);
     const hasOfflineEdit = body.offlineEdit && typeof body.offlineEdit === "object";
@@ -277,6 +283,14 @@ export async function PATCH(
     const mainSystemSelfDelivery = systemMeta.mainSystemSelfDelivery && typeof systemMeta.mainSystemSelfDelivery === "object" && !Array.isArray(systemMeta.mainSystemSelfDelivery)
       ? systemMeta.mainSystemSelfDelivery as Record<string, any>
       : {};
+    if (repairBrushReturn && (
+      !readMainSystemSelfDeliveryFlag(order.rawPayload, order.delivery)
+      || isAutoPickOrderCancelledStatus(order.status)
+      || isAutoPickOrderDeletedStatus(order.status)
+      || hasOrderRefundState(order)
+    )) {
+      return NextResponse.json({ error: "仅可修复刷单退库造成的本地误退款；平台真实取消或退款的订单不能恢复" }, { status: 409 });
+    }
 
     const manualAmountOverride = systemMeta.manualAmountOverride && typeof systemMeta.manualAmountOverride === "object" && !Array.isArray(systemMeta.manualAmountOverride)
       ? systemMeta.manualAmountOverride as Record<string, any>
@@ -404,18 +418,28 @@ export async function PATCH(
       if (hasBrushToggle && Boolean(body.isMainSystemSelfDelivery)) {
         // Keep inventory restoration and the brush marker in one transaction.
         await tx.$queryRaw`SELECT "id" FROM "AutoPickOrder" WHERE "id" = ${order.id} AND "userId" = ${user.id} FOR UPDATE`;
+        const linkedOutboundId = String(systemMeta.autoOutbound?.outboundOrderId || "").trim();
         const outbounds = await tx.outboundOrder.findMany({
           where: {
             userId: user.id,
-            status: { not: "Returned" },
-            note: { contains: `平台单号: ${order.orderNo}`, mode: "insensitive" },
+            OR: [
+              ...(linkedOutboundId ? [{ id: linkedOutboundId }] : []),
+              { note: { contains: `平台单号: ${order.orderNo}`, mode: "insensitive" } },
+            ],
           },
-          select: { id: true, note: true },
+          select: { id: true, note: true, status: true },
           orderBy: { id: "asc" },
         });
         for (const outbound of outbounds) {
           const linkedOrderNo = outbound.note?.match(/平台单号:\s*([^\s|]+)/)?.[1];
-          if (!linkedOrderNo || linkedOrderNo.toLowerCase() !== order.orderNo.toLowerCase()) continue;
+          if (outbound.id !== linkedOutboundId && (!linkedOrderNo || linkedOrderNo.toLowerCase() !== order.orderNo.toLowerCase())) continue;
+          if (repairBrushReturn && (outbound.status === "Returned" || outbound.status === "PartialReturned")) {
+            await tx.outboundOrder.update({
+              where: { id: outbound.id },
+              data: { note: repairBrushInventoryReturnNote(outbound.note, outbound.status) },
+            });
+          }
+          if (outbound.status === "Returned") continue;
           await returnOutboundOrderById(user.id, outbound.id, {
             reason: "手动标记刷单，自动回滚旧出库",
             skipAlreadyReturned: true,
@@ -556,6 +580,7 @@ export async function PATCH(
                     ...(Boolean(body.isMainSystemSelfDelivery)
                       ? {
                           autoOutbound: {
+                            ...systemMeta.autoOutbound,
                             status: "skipped",
                             error: "brush-order-no-auto-outbound",
                             resolvedAt: new Date().toISOString(),

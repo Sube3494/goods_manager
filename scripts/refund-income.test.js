@@ -1,6 +1,7 @@
 import { beforeEach, expect, mock, test } from "bun:test";
 import { NextRequest } from "next/server";
 import { hasOrderRefundState } from "../src/lib/orderFinancials";
+import { buildOutboundReturnMetaNote, parseOutboundReturnMeta, filterCustomerReturns } from "../src/lib/outboundReturnMeta";
 
 let authorized = true;
 let saved;
@@ -14,7 +15,10 @@ mock.module("../src/lib/auth", () => ({
 }));
 const db = {
   $queryRaw: async () => [],
-  outboundOrder: { findMany: async () => linkedOutbounds.filter(outbound => outbound.status !== "Returned") },
+  outboundOrder: {
+    findMany: async () => linkedOutbounds,
+    update: async ({ where, data }) => Object.assign(linkedOutbounds.find(outbound => outbound.id === where.id), data),
+  },
   brushOrder: { deleteMany: async () => ({ count: 1 }) },
   autoPickOrder: {
     findFirst: async () => order,
@@ -147,5 +151,44 @@ test("退库失败时不保存刷单标记", async () => {
     method: "PATCH", body: JSON.stringify({ isMainSystemSelfDelivery: true }), headers: { "Content-Type": "application/json" },
   }), { params: Promise.resolve({ id: "order-1" }) });
   expect(response.status).toBe(500);
+  expect(saved).toBeNull();
+});
+
+const markBrush = (repairBrushReturn = false) => PATCH(new NextRequest("http://localhost/api/orders/order-1", {
+  method: "PATCH", body: JSON.stringify({ isMainSystemSelfDelivery: true, repairBrushReturn }), headers: { "Content-Type": "application/json" },
+}), { params: Promise.resolve({ id: "order-1" }) });
+
+test("自动出库关联 ID 可找到缺失平台单号备注的记录，标记后仍保留关联 ID", async () => {
+  order.rawPayload = { systemMeta: { autoOutbound: { outboundOrderId: "linked" } } };
+  linkedOutbounds = [{ id: "linked", status: "Normal", note: "旧版出库备注" }];
+  expect((await markBrush()).status).toBe(200);
+  expect(returnCalls.map(call => call.id)).toEqual(["linked"]);
+  expect(saved.rawPayload.systemMeta.autoOutbound.outboundOrderId).toBe("linked");
+});
+
+test("误登记售后退款的刷单可修复，保留原退库数量且不再调用退库", async () => {
+  order.status = "已完成";
+  order.rawPayload = { systemMeta: { mainSystemSelfDelivery: { triggered: true, manuallyMarked: true } } };
+  linkedOutbounds = [{ id: "returned", status: "Returned", note: buildOutboundReturnMetaNote("平台单号: 1001", [{
+    id: "return-1", createdAt: "2026-10-15T10:23:50Z", reason: "售后退货", refundAmount: 181.6, extraExpense: 0, returnedCost: 42.2,
+    items: [{ outboundOrderItemId: "item-1", quantity: 1 }],
+  }], "Returned") }];
+  expect((await markBrush(true)).status).toBe(200);
+  const repairedNote = linkedOutbounds[0].note;
+  const meta = parseOutboundReturnMeta(repairedNote);
+  expect(filterCustomerReturns(meta.returns)).toEqual([]);
+  expect(meta.returns[0].items[0].quantity).toBe(1);
+  expect(returnCalls).toHaveLength(0);
+  expect((await markBrush(true)).status).toBe(200);
+  expect(linkedOutbounds[0].note).toBe(repairedNote);
+  expect(returnCalls).toHaveLength(0);
+});
+
+test("平台真实取消或退款不能通过退库修复恢复", async () => {
+  order.rawPayload.systemMeta = { mainSystemSelfDelivery: { triggered: true, manuallyMarked: true } };
+  expect((await markBrush(true)).status).toBe(409);
+  order.status = "已完成";
+  expect((await markBrush(true)).status).toBe(409);
+  expect(returnCalls).toHaveLength(0);
   expect(saved).toBeNull();
 });

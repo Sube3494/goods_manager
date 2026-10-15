@@ -160,6 +160,20 @@ export function filterCustomerReturns(entries: OutboundReturnMetaEntry[]): Outbo
   return entries.filter((entry) => !isRematchReturnReason(entry?.reason));
 }
 
+export function repairBrushInventoryReturnNote(note: string | null | undefined, status: string) {
+  const parsed = parseOutboundReturnMeta(note);
+  const returns = parsed.returns.map(entry => isRematchReturnReason(entry.reason) ? entry : ({
+    ...entry,
+    reason: `刷单退库修复，自动回滚旧出库（原原因：${entry.reason}；原登记退款：${entry.refundAmount}；原附加支出：${entry.extraExpense}）`,
+    refundAmount: 0,
+    extraExpense: 0,
+  }));
+  // Also identify legacy returned records that have no structured return entries.
+  const visibleNote = parsed.visibleNote.includes("刷单退库修复，自动回滚旧出库")
+    ? parsed.visibleNote : `${parsed.visibleNote} | 刷单退库修复，自动回滚旧出库`;
+  return buildOutboundReturnMetaNote(visibleNote, returns, status);
+}
+
 export function getOutboundReturnedQuantityMap(entries: OutboundReturnMetaEntry[]) {
   const map = new Map<string, number>();
   entries.forEach((entry) => {

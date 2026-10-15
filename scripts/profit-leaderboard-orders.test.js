@@ -1,10 +1,13 @@
 import { beforeEach, expect, mock, test } from "bun:test";
 import { NextRequest } from "next/server";
+import { buildOutboundReturnMetaNote, repairBrushInventoryReturnNote } from "../src/lib/outboundReturnMeta";
+import { getOrderGroup } from "../src/lib/orderGroups";
 
 let viewer;
 let cookieValid;
 let autoCompleteCalls;
 let orderReads;
+let outbounds;
 const order = {
   id: "order-1", userId: "member-1", orderNo: "TEST-PROFIT", platform: "线下交易", status: "已完成",
   orderTime: new Date("2026-10-15T04:00:00Z"), actualPaid: 100275, expectedIncome: 100275,
@@ -19,6 +22,7 @@ const db = new Proxy({
     findMany: async () => { orderReads++; return [order]; },
     count: async () => 1,
   },
+  outboundOrder: { findMany: async () => outbounds },
 }, { get: (target, name) => target[name] || dbModel });
 mock.module("../src/lib/prisma", () => ({ default: db }));
 mock.module("../src/lib/auth", () => ({
@@ -41,6 +45,9 @@ beforeEach(() => {
   cookieValid = true;
   autoCompleteCalls = 0;
   orderReads = 0;
+  outbounds = [];
+  order.rawPayload = {};
+  order.platform = "线下交易";
 });
 
 test("排行榜直接复用今日看板纯利润汇总，并将分转换为元", async () => {
@@ -73,4 +80,27 @@ test("凭证无效的成员不参与排名且无需读取订单", async () => {
   const response = await GET(new NextRequest("http://localhost/api/orders?_leaderboard=1&userId=member-1"));
   expect(await response.json()).toEqual({ eligible: false, status: "invalid" });
   expect(orderReads).toBe(0);
+});
+
+test("真实订单查询在刷单退库修复后归回刷单，清除虚假退款且不再显示已出库", async () => {
+  order.platform = "美团";
+  order.rawPayload = { systemMeta: { mainSystemSelfDelivery: { triggered: true, manuallyMarked: true }, autoOutbound: { status: "skipped", error: "brush-order-no-auto-outbound" } } };
+  outbounds = [{ id: "out-1", status: "Returned", note: buildOutboundReturnMetaNote("平台单号: TEST-PROFIT", [{
+    id: "return-1", createdAt: "2026-10-15T10:23:50Z", reason: "售后退货", refundAmount: 1002.75, extraExpense: 0, returnedCost: 42.2,
+    items: [{ outboundOrderItemId: "item-1", quantity: 1 }],
+  }], "Returned"), items: [{ id: "item-1", quantity: 1, productId: null, shopProductId: null, costSnapshot: null }] }];
+  const read = async () => {
+    const response = await GET(new NextRequest("http://localhost/api/orders?userId=member-1&startDate=2026-10-15&endDate=2026-10-15"));
+    expect(response.status).toBe(200);
+    return (await response.json()).items[0];
+  };
+  const before = await read();
+  expect(before.refundAmount).toBe(100275);
+  expect(getOrderGroup(before, true)).toBe("closed");
+  outbounds[0].note = repairBrushInventoryReturnNote(outbounds[0].note, "Returned");
+  const after = await read();
+  expect(after.refundAmount).toBe(0);
+  expect(after.status).toBe("已完成");
+  expect(after.hasOutbound).toBe(false);
+  expect(getOrderGroup(after, true)).toBe("brush");
 });
