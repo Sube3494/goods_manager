@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma";
+import type { Prisma } from "../../prisma/generated-client";
 import { InventoryService } from "@/services/inventoryService";
 import { FinanceMath } from "@/lib/math";
 import {
@@ -20,6 +21,7 @@ interface ReturnOutboundOrderInput {
   refundAmount?: number;
   extraExpense?: number;
   items?: ReturnOutboundItemInput[];
+  skipAlreadyReturned?: boolean;
 }
 
 function parseCostSnapshot(value: unknown) {
@@ -55,12 +57,15 @@ function parseCostSnapshot(value: unknown) {
 export async function returnOutboundOrderById(
   userId: string,
   outboundOrderId: string,
-  input: string | ReturnOutboundOrderInput = "退货入库"
+  input: string | ReturnOutboundOrderInput = "退货入库",
+  transaction?: Prisma.TransactionClient,
 ) {
   const payload = typeof input === "string" ? { reason: input } : input;
   const reason = String(payload.reason || "退货入库").trim() || "退货入库";
 
-  return prisma.$transaction(async (tx) => {
+  const restore = async (tx: Prisma.TransactionClient) => {
+    // Serialize competing returns before reading already-returned quantities.
+    await tx.$queryRaw`SELECT "id" FROM "OutboundOrder" WHERE "id" = ${outboundOrderId} AND "userId" = ${userId} FOR UPDATE`;
     const order = await tx.outboundOrder.findFirst({
       where: {
         id: outboundOrderId,
@@ -80,6 +85,7 @@ export async function returnOutboundOrderById(
     }
 
     if (order.status === "Returned") {
+      if (payload.skipAlreadyReturned) return order;
       throw new Error("Order already returned");
     }
 
@@ -267,5 +273,6 @@ export async function returnOutboundOrderById(
         note: buildOutboundReturnMetaNote(order.note, nextReturns, isFullyReturned ? "Returned" : "PartialReturned"),
       },
     });
-  });
+  };
+  return transaction ? restore(transaction) : prisma.$transaction(restore);
 }

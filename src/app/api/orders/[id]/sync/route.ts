@@ -31,6 +31,7 @@ import {
   isAutoPickOrderDeliveringStatus,
   readDeliveryFeeFromValue,
   readMainSystemSelfDeliveryFlag,
+  hasManualBrushMarker,
 } from "@/lib/autoPickOrderStatus";
 
 export const dynamic = "force-dynamic";
@@ -126,10 +127,12 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
     const refreshedLogisticName = String(refreshedDelivery?.logisticName || refreshedDelivery?.logistic_name || "").trim();
     const hasThirdPartyLogistic = Boolean(refreshedLogisticName && !/自配|自配送|商家自配|oneself/i.test(refreshedLogisticName));
 
-    if (hasThirdPartyLogistic) {
+    const manuallyMarkedBrush = hasManualBrushMarker(refreshedOrder.rawPayload);
+    if (hasThirdPartyLogistic && !manuallyMarkedBrush) {
       await clearAutoPickOrderMainSystemSelfDelivery(order.userId, refreshedOrder.id, "sync-detected-third-party-logistic");
     } else if (
-      !isRecentlySelfDelivered
+      !manuallyMarkedBrush
+      && !isRecentlySelfDelivered
       && !isAutoPickOrderDeliveringStatus(refreshedOrder.status)
       && !isAutoPickOrderCompletedStatus(refreshedOrder.status)
       && !isAutoPickOrderCancelledStatus(refreshedOrder.status)
@@ -233,9 +236,7 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
       || normalized?.customerType
       || null;
 
-    const isMainSystemSelfDelivery = hasThirdPartyLogistic
-      ? false
-      : readMainSystemSelfDeliveryFlag(refreshedOrder.rawPayload, refreshedOrder.delivery);
+    const isMainSystemSelfDelivery = readMainSystemSelfDeliveryFlag(refreshedOrder.rawPayload, refreshedOrder.delivery);
 
       const computedSendFee = readDeliveryFeeFromValue(refreshedOrder.delivery, refreshedOrder.rawPayload);
       const deliveryRecord = refreshedOrder.delivery && typeof refreshedOrder.delivery === "object"
@@ -244,7 +245,7 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
       const syncedDelivery = deliveryRecord
         ? {
             ...deliveryRecord,
-            sendFee: isMainSystemSelfDelivery
+            sendFee: isMainSystemSelfDelivery && !manuallyMarkedBrush
               ? 0
               : (computedSendFee > 0 ? computedSendFee : deliveryRecord.sendFee),
             riderPhone: readRiderPhoneFromDelivery(refreshedOrder.delivery) || readRiderPhoneFromRawPayload(refreshedOrder.rawPayload) || undefined,

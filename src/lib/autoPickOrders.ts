@@ -9,6 +9,7 @@ import { getMaiyatianFulfillmentItems, resolveMaiyatianRefundStatus, summarizeMa
 import {
   getBaseAutoPickStatusDisplay,
   hasAutoPickCompletionProof,
+  hasManualBrushMarker,
   isAutoPickOrderAbnormalStatus,
   isAutoPickOrderCancelledStatus,
   isAutoPickOrderCompletedStatus,
@@ -162,6 +163,7 @@ type AutoPickSystemMeta = {
   };
   mainSystemSelfDelivery?: {
     triggered: boolean;
+    manuallyMarked?: boolean;
     triggeredAt?: string;
     userId?: string;
     clearedAt?: string;
@@ -4145,7 +4147,8 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
       (Date.now() - new Date(nextSystemMeta.mainSystemSelfDelivery.triggeredAt).getTime() < 15 * 60 * 1000)
     );
 
-    if (hasThirdPartyLogistic && nextSystemMeta.mainSystemSelfDelivery?.triggered) {
+    const manuallyMarkedBrush = hasManualBrushMarker({ systemMeta: nextSystemMeta });
+    if (hasThirdPartyLogistic && nextSystemMeta.mainSystemSelfDelivery?.triggered && !manuallyMarkedBrush) {
       // 只有在不是近期发起的自配，或者麦芽田明确有新骑手接单（dispatcher）时，才清除自配标记
       const hasRealNewRider = Boolean((normalized.delivery as any)?.dispatcher);
       if (!isRecentSelfDeliveryTrigger || hasRealNewRider) {
@@ -4158,7 +4161,7 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
       }
     }
 
-    const mergedDelivery = (nextSystemMeta.mainSystemSelfDelivery?.triggered && mergedDeliveryRaw && typeof mergedDeliveryRaw === "object")
+    const mergedDelivery = (nextSystemMeta.mainSystemSelfDelivery?.triggered && !manuallyMarkedBrush && mergedDeliveryRaw && typeof mergedDeliveryRaw === "object")
       ? {
           ...(mergedDeliveryRaw as Record<string, unknown>),
           sendFee: 0,
@@ -6550,7 +6553,7 @@ export async function clearAutoPickOrderMainSystemSelfDelivery(
     : {};
   const existingSystemMeta = readAutoPickSystemMeta(order.rawPayload) || {};
   const currentMarker = existingSystemMeta.mainSystemSelfDelivery;
-  if (!currentMarker?.triggered) {
+  if (!currentMarker?.triggered || hasManualBrushMarker(order.rawPayload)) {
     return null;
   }
 

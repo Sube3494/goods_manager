@@ -3587,10 +3587,12 @@ export const OrderCard = memo(function OrderCard({
       });
       if (res.ok) {
         const data = await res.json().catch(() => ({}));
+        const returnedOutboundCount = Array.isArray(data.returnedOutboundIds) ? data.returnedOutboundIds.length : 0;
+        const returnedStockMessage = returnedOutboundCount > 0 ? `，已退回 ${returnedOutboundCount} 笔关联出库` : "";
         if (val && data?.brushSync?.ok === false) {
-          showToast(`刷单标记已更新，但暂未同步到刷单列表：${getBrushSyncSkippedReasonText(data.brushSync.reason) || "当前订单不符合刷单同步条件"}`, "error");
+          showToast(`刷单标记已更新${returnedStockMessage}，但暂未同步到刷单列表：${getBrushSyncSkippedReasonText(data.brushSync.reason) || "当前订单不符合刷单同步条件"}`, "error");
         } else {
-          showToast(val ? "刷单标记修改成功，已同步刷单列表" : "刷单标记已取消，刷单列表已同步清理", "success");
+          showToast(val ? `刷单标记修改成功${returnedStockMessage}，已同步刷单列表` : "刷单标记已取消，刷单列表已同步清理", "success");
         }
         onRefresh?.();
       } else {

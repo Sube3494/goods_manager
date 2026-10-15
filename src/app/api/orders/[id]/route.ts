@@ -401,6 +401,28 @@ export async function PATCH(
     }
 
     await prisma.$transaction(async (tx) => {
+      if (hasBrushToggle && Boolean(body.isMainSystemSelfDelivery)) {
+        // Keep inventory restoration and the brush marker in one transaction.
+        await tx.$queryRaw`SELECT "id" FROM "AutoPickOrder" WHERE "id" = ${order.id} AND "userId" = ${user.id} FOR UPDATE`;
+        const outbounds = await tx.outboundOrder.findMany({
+          where: {
+            userId: user.id,
+            status: { not: "Returned" },
+            note: { contains: `平台单号: ${order.orderNo}`, mode: "insensitive" },
+          },
+          select: { id: true, note: true },
+          orderBy: { id: "asc" },
+        });
+        for (const outbound of outbounds) {
+          const linkedOrderNo = outbound.note?.match(/平台单号:\s*([^\s|]+)/)?.[1];
+          if (!linkedOrderNo || linkedOrderNo.toLowerCase() !== order.orderNo.toLowerCase()) continue;
+          await returnOutboundOrderById(user.id, outbound.id, {
+            reason: "手动标记刷单，自动回滚旧出库",
+            skipAlreadyReturned: true,
+          }, tx);
+          returnedOutboundIds.push(outbound.id);
+        }
+      }
       if (offlineItems !== null) {
         // 同步 items：删除已移除的 item，更新已有的，创建新加的
         const incomingItemIds = new Set(
@@ -529,6 +551,7 @@ export async function PATCH(
                     mainSystemSelfDelivery: {
                       ...mainSystemSelfDelivery,
                       triggered: Boolean(body.isMainSystemSelfDelivery),
+                      manuallyMarked: Boolean(body.isMainSystemSelfDelivery),
                     },
                     ...(Boolean(body.isMainSystemSelfDelivery)
                       ? {
@@ -717,6 +740,7 @@ export async function PATCH(
       autoCompleteAt: hasBrushToggle && !Boolean(body.isMainSystemSelfDelivery) ? null : undefined,
       brushSync: brushSyncResult,
       removedBrushOrderCount: hasBrushToggle && !Boolean(body.isMainSystemSelfDelivery) ? removedBrushOrderCount : undefined,
+      ...(hasBrushToggle && Boolean(body.isMainSystemSelfDelivery) ? { returnedOutboundIds } : {}),
       actualPaid,
       expectedIncome,
       platformCommission,

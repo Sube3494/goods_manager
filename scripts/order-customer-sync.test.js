@@ -20,6 +20,8 @@ mock.module("../src/lib/prisma", () => ({ default: {
 mock.module("../src/lib/autoPickOrderEvents", () => ({ emitAutoPickOrderEvent() {} }));
 const { upsertAutoPickOrder } = await import("../src/lib/autoPickOrders");
 const { buildCustomerMemoryFields } = await import("../src/lib/customerMemoryStore");
+const { readMainSystemSelfDeliveryFlag } = await import("../src/lib/autoPickOrderStatus");
+const { getOrderGroup } = await import("../src/lib/orderGroups");
 
 beforeEach(() => {
   saved = { id: "local-order", userId: "user-1", sourceId: "source-order", orderNo: "order-31",
@@ -49,3 +51,31 @@ for (const status of ["completed", "cancelled"]) {
     expect(result.customerPhoneTail).toBe("1234");
   });
 }
+
+test("手工刷单标记在多次第三方配送同步后仍保留，配送信息不被改成自配", async () => {
+  saved.rawPayload.systemMeta = { mainSystemSelfDelivery: { triggered: true, manuallyMarked: true } };
+  const delivery = { logisticName: "闪送", dispatcher: "rider-1", sendFee: 1280 };
+  for (let index = 0; index < 3; index++) {
+    const result = await upsertAutoPickOrder("user-1", {
+      id: "source-order", orderNo: "order-31", platform: "抖店", shopId: "shop-1",
+      orderTime: "2026-10-01 08:00:00", status: "completed", actualPaid: 16200,
+      delivery, userAddress: address, rawPayload: { delivery }, items: [{ productName: "巧克力", quantity: 1 }],
+    });
+    expect(result.rawPayload.systemMeta.mainSystemSelfDelivery.triggered).toBe(true);
+    expect(result.delivery.logisticName).toBe("闪送");
+    expect(result.delivery.sendFee).toBe(1280);
+    expect(readMainSystemSelfDeliveryFlag(result.rawPayload, result.delivery)).toBe(true);
+    expect(getOrderGroup(result, readMainSystemSelfDeliveryFlag(result.rawPayload, result.delivery))).toBe("brush");
+  }
+});
+
+test("真正自配的过期标记仍可由第三方运力覆盖", async () => {
+  saved.rawPayload.systemMeta = { mainSystemSelfDelivery: { triggered: true, triggeredAt: "2020-01-01T00:00:00Z" } };
+  const delivery = { logisticName: "闪送", dispatcher: "rider-1" };
+  const result = await upsertAutoPickOrder("user-1", {
+    id: "source-order", orderNo: "order-31", platform: "抖店", shopId: "shop-1",
+    orderTime: "2026-10-01 08:00:00", status: "completed", delivery, userAddress: address, rawPayload: { delivery }, items: [{ productName: "巧克力", quantity: 1 }],
+  });
+  expect(result.rawPayload.systemMeta.mainSystemSelfDelivery.triggered).toBe(false);
+  expect(readMainSystemSelfDeliveryFlag(result.rawPayload, result.delivery)).toBe(false);
+});

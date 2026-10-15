@@ -769,6 +769,19 @@ export function readDeliveryFeeFromValue(delivery: unknown, rawPayloadOrFlag?: u
   return tip + premiumFee;
 }
 
+export function hasManualBrushMarker(rawPayload: unknown): boolean {
+  if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) return false;
+  const meta = (rawPayload as Record<string, unknown>).systemMeta;
+  if (!meta || typeof meta !== "object" || Array.isArray(meta)) return false;
+  const systemMeta = meta as Record<string, unknown>;
+  const marker = systemMeta.mainSystemSelfDelivery as Record<string, unknown> | undefined;
+  if (!marker || !marker.triggered) return false;
+  if (typeof marker.manuallyMarked === "boolean") return marker.manuallyMarked;
+  // Older manual toggles did not record triggeredAt, unlike actual self-delivery.
+  const autoOutbound = systemMeta.autoOutbound as Record<string, unknown> | undefined;
+  return !marker.triggeredAt && autoOutbound?.error === "brush-order-no-auto-outbound";
+}
+
 export function readMainSystemSelfDeliveryFlag(rawPayload: unknown, delivery?: unknown): boolean {
   if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
     return false;
@@ -788,6 +801,7 @@ export function readMainSystemSelfDeliveryFlag(rawPayload: unknown, delivery?: u
   if (!triggered) {
     return false;
   }
+  if (hasManualBrushMarker(rawPayload)) return true;
 
   if (delivery && typeof delivery === "object" && !Array.isArray(delivery)) {
     const d = delivery as Record<string, unknown>;
