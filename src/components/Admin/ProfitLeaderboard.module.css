@@ -98,9 +98,11 @@
 .listHeading > span, .columnHeading { font-size: 11px; color: var(--muted-foreground); }
 .columnHeading { display: flex; justify-content: space-between; margin: 0 20px; padding: 9px 0; border-bottom: 1px solid var(--border); }
 .list { padding: 0 20px; margin: 0; list-style: none; }
+.list li { padding: 3px 0; }
 .list li + li { border-top: 1px solid var(--border); }
-.row { display: flex; width: 100%; align-items: center; gap: 12px; padding: 16px 0; text-align: left; }
-.row:hover { background: color-mix(in srgb, var(--muted) 55%, transparent); }
+.row { display: flex; width: 100%; align-items: center; gap: 12px; padding: 13px 10px; border-radius: 12px; text-align: left; cursor: pointer; transition: background-color .2s ease; }
+.row:hover, .row:focus-visible { background: color-mix(in srgb, var(--muted) 55%, transparent); }
+.board .row:focus-visible { outline-offset: -2px; }
 .rowRank { flex-shrink: 0; width: 22px; font-size: 12px; color: var(--muted-foreground); font-weight: 700; font-variant-numeric: tabular-nums; }
 .topRank { color: #bf9136; }
 .rowName { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 600; }
@@ -128,7 +130,7 @@
   .listHeading { padding: 16px 14px 12px; }
   .columnHeading { margin: 0 14px; }
   .list { padding: 0 14px; }
-  .row { gap: 8px; padding: 14px 0; }
+  .row { gap: 8px; padding: 11px 8px; }
   .rowAvatar { width: 32px; height: 32px; }
   .rowProfit { font-size: 13px; }
   .chevron { display: none; }
@@ -138,6 +140,6 @@
   .reveal, .loadingPanel, .skeletonMember span, .skeletonMember i { animation: none; }
   .content { transition: none; }
   .crown, .pedestal::after { animation: none; }
-  .medallion, .refresh { transition: none; }
+  .medallion, .refresh, .row { transition: none; }
   .winner:hover .medallion { transform: none; }
 }
