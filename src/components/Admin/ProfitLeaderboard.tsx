@@ -44,7 +44,7 @@ export function ProfitLeaderboard({ members, cacheScope, onSelect }: {
   cacheScope: string;
   onSelect: (id: string) => void;
 }) {
-  const [dateRange, setDateRange] = useState<DashboardDateRange>(() => presetDashboardDateRange("month", formatLocalDate(new Date())));
+  const [dateRange, setDateRange] = useState<DashboardDateRange>(() => presetDashboardDateRange("today", formatLocalDate(new Date())));
   const [refresh, setRefresh] = useState(0);
   const [result, setResult] = useState<(LeaderboardResult & { key: string }) | null>(null);
   const refreshRef = useRef(refresh);
