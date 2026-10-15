@@ -53,7 +53,7 @@ export function ProfitLeaderboard({ members, cacheScope, onSelect }: {
   const today = formatLocalDate(new Date());
   const resolvedRange = dateRange.rangePreset === "custom" ? dateRange : presetDashboardDateRange(dateRange.rangePreset, today);
   const { rangePreset, startDate, endDate } = resolvedRange;
-  const cacheKey = JSON.stringify([cacheScope, today, rangePreset, startDate, endDate, memberKey]);
+  const cacheKey = JSON.stringify(["order-pure-profit-v1", cacheScope, today, rangePreset, startDate, endDate, memberKey]);
   const requestKey = `${cacheKey}:${refresh}`;
   const cached = readProfitLeaderboardCache(cacheKey);
   const displayedResult = result?.key === requestKey ? result : cached;
@@ -72,17 +72,16 @@ export function ProfitLeaderboard({ members, cacheScope, onSelect }: {
       async function worker() {
         while (cursor < targets.length) {
           const member = targets[cursor++];
-          const query = new URLSearchParams({ userId: member.id, view: "leaderboard", endDate });
-          if (rangePreset === "all") query.set("range", "all");
-          else query.set("startDate", startDate);
+          const query = new URLSearchParams({ userId: member.id, _leaderboard: "1", pageSize: "1", endDate });
+          if (rangePreset !== "all") query.set("startDate", startDate);
           try {
-            const response = await fetch(`/api/stats?${query}`, { cache: "no-store" });
+            const response = await fetch(`/api/orders?${query}`, { cache: "no-store" });
             if (!response.ok) throw new Error("Stats unavailable");
             const data = await response.json();
             if (data.eligible === false) continue;
             if (data.eligible !== true) throw new Error("Eligibility unavailable");
-            if (typeof data.netProfit !== "number" || !Number.isFinite(data.netProfit)) throw new Error("Invalid profit");
-            rows.push({ ...member, profit: data.netProfit });
+            if (typeof data.pureProfit !== "number" || !Number.isFinite(data.pureProfit)) throw new Error("Invalid pure profit");
+            rows.push({ ...member, profit: data.pureProfit });
           } catch {
             failed = true;
           }
@@ -142,7 +141,7 @@ export function ProfitLeaderboard({ members, cacheScope, onSelect }: {
       <div key={cacheKey} aria-live="polite" className={cn(styles.content, pending && !loading && styles.updating)}>
         {loading ? <div className={styles.loadingPanel} role="status">
             <div className={styles.skeletonPodium} aria-hidden="true">{[0, 1, 2].map(index => <div key={index} className={styles.skeletonMember}><span /><i /><i /></div>)}</div>
-            <p>正在校验麦芽田凭证并计算净利润…</p>
+            <p>正在校验麦芽田凭证并汇总订单纯利润…</p>
           </div>
           : displayedResult?.failed ? <div className={styles.message}>部分成员数据加载失败，暂无法生成完整排名。<button type="button" onClick={() => setRefresh(value => value + 1)} className="ml-2 underline underline-offset-4">重新加载</button></div>
           : !rows.length ? <div className={styles.message}>暂无麦芽田凭证校验有效的成员</div>
@@ -152,7 +151,7 @@ export function ProfitLeaderboard({ members, cacheScope, onSelect }: {
               <p className={styles.statisticsTime}>统计时间：{statisticsTime}<span>（北京时间）</span></p>
               <div className={styles.podium} data-count={podium.length}>
                 {podium.map((member, index) => (
-                  <button type="button" key={member.id} onClick={() => onSelect(member.id)} className={cn(styles.winner, [styles.gold, styles.silver, styles.bronze][Math.min(member.rank - 1, 2)])} data-position={index + 1} aria-label={`第 ${member.rank} 名 ${member.name}，净利润 ${currency.format(member.profit)}，查看订单`}>
+                  <button type="button" key={member.id} onClick={() => onSelect(member.id)} className={cn(styles.winner, [styles.gold, styles.silver, styles.bronze][Math.min(member.rank - 1, 2)])} data-position={index + 1} aria-label={`第 ${member.rank} 名 ${member.name}，订单纯利润 ${currency.format(member.profit)}，查看订单`}>
                     <span className={styles.medallion}>
                       {member.rank === 1 && <Crown size={25} className={styles.crown} aria-hidden="true" />}
                       <LeaderboardAvatar key={member.email} member={member} />
@@ -160,19 +159,19 @@ export function ProfitLeaderboard({ members, cacheScope, onSelect }: {
                     </span>
                     <span title={member.name} className={styles.winnerName}>{member.name}</span>
                     <span className={cn(styles.profit, member.profit < 0 && styles.negative)}>{currency.format(member.profit)}</span>
-                    <span className={styles.place}>第 {member.rank} 名</span>
+                    <span className={styles.place}>订单纯利润 · 第 {member.rank} 名</span>
                     <span className={styles.pedestal} aria-hidden="true"><span>{String(member.rank).padStart(2, "0")}</span></span>
                   </button>
                 ))}
               </div>
             </div>
             {remainingMembers.length > 0 && <div className={styles.standings}>
-              <div className={styles.listHeading}><h3>后续排名 <span>{remainingMembers.length}</span></h3><span>{periodLabel}净利润</span></div>
-              <div className={styles.columnHeading}><span>排名 / 成员</span><span>净利润（元）</span></div>
+              <div className={styles.listHeading}><h3>后续排名 <span>{remainingMembers.length}</span></h3><span>{periodLabel}纯利润</span></div>
+              <div className={styles.columnHeading}><span>排名 / 成员</span><span>订单纯利润（元）</span></div>
               <ol start={4} aria-label="后续成员利润排名" className={styles.list}>
                 {remainingMembers.map(member => (
                   <li key={member.id}>
-                    <button type="button" onClick={() => onSelect(member.id)} aria-label={`第 ${member.rank} 名 ${member.name}，净利润 ${currency.format(member.profit)}，查看订单`} className={styles.row}>
+                    <button type="button" onClick={() => onSelect(member.id)} aria-label={`第 ${member.rank} 名 ${member.name}，订单纯利润 ${currency.format(member.profit)}，查看订单`} className={styles.row}>
                       <span className={cn(styles.rowRank, member.rank <= 3 && styles.topRank)}>{String(member.rank).padStart(2, "0")}</span>
                       <LeaderboardAvatar key={member.email} member={member} compact />
                       <span title={member.name} className={styles.rowName}>{member.name}</span>

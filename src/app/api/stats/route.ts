@@ -5,10 +5,8 @@ import { getCustomerMemoryPlatform } from "@/lib/customerMemory";
 import { getAuthorizedAdmin, getAuthorizedUserAny } from "@/lib/auth";
 import { canViewProfitLeaderboard, hasAdminAccess } from "@/lib/permissions";
 import { FinanceMath } from "@/lib/math";
-import { checkMaiyatianCookieStatus } from "@/lib/maiyatianCookieStatus";
 import {
   normalizeAutoPickIntegrationConfig,
-  testMaiyatianCookieConnection,
   readCustomerTypeFromRawPayload,
   readDeliveryFeeFromValue,
   readOrderExtraExpensesFromRawPayload,
@@ -318,6 +316,14 @@ export async function GET(request: NextRequest) {
     if (isLeaderboardView && !canViewProfitLeaderboard(user)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
+    if (isLeaderboardView) {
+      const ordersUrl = request.nextUrl.clone();
+      ordersUrl.pathname = "/api/orders";
+      ordersUrl.searchParams.delete("view");
+      ordersUrl.searchParams.set("_leaderboard", "1");
+      ordersUrl.searchParams.set("pageSize", "1");
+      return NextResponse.redirect(ordersUrl);
+    }
 
     const requestedUserId = String(request.nextUrl.searchParams.get("userId") || request.nextUrl.searchParams.get("targetUserId") || "").trim();
     const canManageMembers = hasAdminAccess(user, "members:orders") || hasAdminAccess(user, "members:manage") || user.role === "SUPER_ADMIN";
@@ -335,12 +341,6 @@ export async function GET(request: NextRequest) {
       ? targetUserRecord.permissions as Record<string, unknown>
       : {};
     const integrationConfig = normalizeAutoPickIntegrationConfig(permissionsObj.autoPickIntegration);
-    if (isLeaderboardView) {
-      const status = await checkMaiyatianCookieStatus(integrationConfig, testMaiyatianCookieConnection);
-      if (status !== "valid") {
-        return NextResponse.json({ eligible: false, status }, { headers: { "Cache-Control": "private, no-store" } });
-      }
-    }
 
     const isMarketingView = request.nextUrl.searchParams.get("view") === "marketing";
     const [storage, settings, allUserShops] = await Promise.all([
@@ -1357,9 +1357,6 @@ export async function GET(request: NextRequest) {
       (sum, point) => FinanceMath.add(sum, point.netProfit || 0),
       0
     );
-    if (isLeaderboardView) {
-      return NextResponse.json({ eligible: true, netProfit }, { headers: { "Cache-Control": "private, no-store" } });
-    }
     const platformBusinessTrend = Object.fromEntries(
       DASHBOARD_PLATFORMS.map((platform) => [platform, buildTrendSeries(platformTrendMaps.get(platform)!)])
     );

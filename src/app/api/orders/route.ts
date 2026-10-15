@@ -3,14 +3,17 @@ import { parseOutboundCostSnapshot, resolvePurchaseBatchSnapshotCost } from "@/l
 import prisma from "@/lib/prisma";
 import { resolveRememberedCustomerTypes } from "@/lib/customerMemoryStore";
 import { resolveCustomerHistoryScope } from "@/lib/customerHistory";
-import { getAuthorizedUser, getAuthorizedUserAny } from "@/lib/auth";
-import { hasAdminAccess, hasPermission } from "@/lib/permissions";
+import { getAuthorizedAdmin, getAuthorizedUser, getAuthorizedUserAny } from "@/lib/auth";
+import { canViewProfitLeaderboard, hasAdminAccess, hasPermission } from "@/lib/permissions";
+import { checkMaiyatianCookieStatus } from "@/lib/maiyatianCookieStatus";
 import {
   backfillJdSkuIdForManualMatchedShopProducts,
   backfillMeituanSkuIdForManualMatchedShopProducts,
   backfillPlatformIdsForSyncedAutoPickOrder,
   normalizeAutoPickOrderPayload,
   normalizeAutoPickIntegrationConfig,
+  getAutoPickIntegrationConfigByUserId,
+  testMaiyatianCookieConnection,
   readCustomerMaskedPhoneFromRawPayload,
   readCustomerNameFromRawPayload,
   readCustomerPhoneFromRawPayload,
@@ -1045,11 +1048,17 @@ export async function GET(request: NextRequest) {
   const perf = createRequestPerfTracker(request);
   const searchParams = request.nextUrl.searchParams;
   const isMarketingLookup = searchParams.get("_marketing") === "1";
-  const session = isMarketingLookup
+  const isLeaderboard = searchParams.get("_leaderboard") === "1";
+  const session = isLeaderboard
+    ? await getAuthorizedAdmin("members:orders")
+    : isMarketingLookup
     ? await getAuthorizedUserAny("order:manage", "marketing:read")
     : await getAuthorizedUser("order:manage");
   if (!session) {
     return NextResponse.json({ error: "Permission denied" }, { status: 403 });
+  }
+  if (isLeaderboard && !canViewProfitLeaderboard(session)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const requestedOrderIds = Array.from(new Set(
@@ -1067,11 +1076,11 @@ export async function GET(request: NextRequest) {
 
   try {
     // 隐式触发已到期的订单自动送达/自动完成状态变更
-    void processDueAutoCompleteJobs(5).catch(() => {});
+    if (!isLeaderboard) void processDueAutoCompleteJobs(5).catch(() => {});
 
     const storage = await getStorageStrategy();
-    const liteMode = searchParams.get("_lite") === "1";
-    const includeMetrics = !liteMode && searchParams.get("_metrics") === "1";
+    const liteMode = !isLeaderboard && searchParams.get("_lite") === "1";
+    const includeMetrics = isLeaderboard || (!liteMode && searchParams.get("_metrics") === "1");
     const page = Math.max(1, Number(searchParams.get("page") || 1));
     const pageSize = Math.min(10000, Math.max(1, Number(searchParams.get("pageSize") || 20)));
     const query = String(searchParams.get("query") || "").trim();
@@ -1087,7 +1096,7 @@ export async function GET(request: NextRequest) {
     const mainSystemSelfDelivery = toBooleanFilter(searchParams.get("mainSystemSelfDelivery"));
 
     const requestedUserId = String(searchParams.get("userId") || "").trim();
-    const canManageMembers = session.role === "SUPER_ADMIN"
+    const canManageMembers = isLeaderboard || session.role === "SUPER_ADMIN"
       || hasAdminAccess(session, "members:manage")
       || hasAdminAccess(session, "members:status")
       || hasAdminAccess(session, "whitelist:manage")
@@ -1095,6 +1104,13 @@ export async function GET(request: NextRequest) {
       || String(session.roleProfile?.name || "").includes("管理")
       || hasPermission(session, "order:manage");
     const targetUserId = (canManageMembers && requestedUserId) ? requestedUserId : session.id;
+    if (isLeaderboard) {
+      const config = await getAutoPickIntegrationConfigByUserId(targetUserId);
+      const cookieStatus = await checkMaiyatianCookieStatus(config, testMaiyatianCookieConnection);
+      if (cookieStatus !== "valid") {
+        return NextResponse.json({ eligible: false, status: cookieStatus }, { headers: { "Cache-Control": "private, no-store" } });
+      }
+    }
     const canViewProductCosts = targetUserId === session.id || session.role === "SUPER_ADMIN";
     const customerHistoryOrderId = String(searchParams.get("customerHistoryOrderId") || "").trim();
     const customerHistoryScope = customerHistoryOrderId
@@ -2167,6 +2183,15 @@ export async function GET(request: NextRequest) {
             platformCount: Record<string, number>;
           }>,
         });
+
+    // Reuse the exact dashboard summary above (stored in cents), including refunds,
+    // cancelled delivery losses, brush commissions and missing-cost exclusions.
+    if (isLeaderboard) {
+      if (!summary) throw new Error("Leaderboard order summary is unavailable");
+      return NextResponse.json({ eligible: true, pureProfit: summary.pureProfit / 100 }, {
+        headers: { "Cache-Control": "private, no-store" },
+      });
+    }
 
     const truePlatformCounts: Record<string, number> = {};
     const brushPlatformCounts: Record<string, number> = {};
