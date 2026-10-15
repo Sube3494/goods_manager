@@ -8,7 +8,7 @@
  */
 "use client";
 
-import { Users, LayoutGrid, ShieldAlert, Loader2 } from "lucide-react";
+import { Users, ShieldAlert, Loader2 } from "lucide-react";
 import { UserManager } from "@/components/Admin/UserManager";
 import { useUser } from "@/hooks/useUser";
 import { hasAdminAccess, SessionUser } from "@/lib/permissions";
@@ -85,31 +85,6 @@ export default function MembersPage() {
         <UserManager />
       </div>
 
-      {/* 管理控制说明 */}
-      <div className="relative overflow-hidden rounded-[22px] sm:rounded-[28px] border border-border/60 bg-linear-to-br from-white/80 to-muted/20 dark:from-white/3 dark:to-transparent p-5 sm:p-6 backdrop-blur-xs">
-        <h3 className="text-xs sm:text-sm font-black text-foreground flex items-center gap-2 mb-3 tracking-wide">
-          <div className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-primary">
-            <LayoutGrid size={13} />
-          </div>
-          管理控制说明
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 text-xs text-muted-foreground leading-relaxed">
-          <div className="space-y-1.5 rounded-2xl bg-white/50 dark:bg-white/2 border border-border/40 p-3.5">
-            <p className="font-bold text-foreground/80 flex items-center gap-1.5">
-              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-primary/15 text-primary text-[10px] font-black">1</span>
-              入驻流程
-            </p>
-            <p className="text-muted-foreground">成员是否能被邀请、加入白名单或调整状态，都会按当前管理员的 Capability 实时决定，保障前后端口径严格对齐。</p>
-          </div>
-          <div className="space-y-1.5 rounded-2xl bg-white/50 dark:bg-white/2 border border-border/40 p-3.5">
-            <p className="font-bold text-foreground/80 flex items-center gap-1.5">
-              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-primary/15 text-primary text-[10px] font-black">2</span>
-              角色分工
-            </p>
-            <p className="text-muted-foreground">成员的权责由被分派的“角色模板”决定。如需创建或修改系统现有角色，请前往侧边栏的“角色管理”中心操作。</p>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

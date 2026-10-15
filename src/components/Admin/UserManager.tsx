@@ -3,16 +3,17 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import Image from "next/image";
 import md5 from "blueimp-md5";
-import { Shield, Settings2, Loader2, User as UserIcon, Mail, Plus, Trash2, AlertCircle, NotebookPen, Search, Check, UserCheck, Ban, MonitorSmartphone, Smartphone, FolderLock, ShoppingBag, X, Crown, ShieldAlert } from "lucide-react";
+import { Shield, Settings2, Loader2, User as UserIcon, Mail, Plus, Trash2, AlertCircle, NotebookPen, Search, Check, UserCheck, Ban, MonitorSmartphone, Smartphone, FolderLock, ShoppingBag, X, Crown, ShieldAlert, Users, Trophy } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { Switch } from "@/components/ui/Switch";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { ActionBar } from "@/components/ui/ActionBar";
 import { UserOrdersModal } from "@/components/Admin/UserOrdersModal";
+import { ProfitLeaderboard } from "@/components/Admin/ProfitLeaderboard";
 import { createPortal } from "react-dom";
 import { useUser } from "@/hooks/useUser";
-import { hasAdminAccess, hasDirectPermission, SessionUser, PAGE_PERMISSION_TREE, calculateMemberPermissionWeight } from "@/lib/permissions";
+import { hasAdminAccess, hasDirectPermission, canViewProfitLeaderboard, getEffectivePermissions, SessionUser, PAGE_PERMISSION_TREE, calculateMemberPermissionWeight } from "@/lib/permissions";
 import { pinyinMatch } from "@/lib/pinyin";
 import { formatLocalDateTime } from "@/lib/dateUtils";
 import { cn } from "@/lib/utils";
@@ -484,6 +485,7 @@ export function UserManager() {
   const canManageMembers = hasAdminAccess(sessionUser, "members:manage");
   const canManageMemberStatus = hasAdminAccess(sessionUser, "members:status");
   const canViewMemberOrders = hasAdminAccess(sessionUser, "members:orders");
+  const canViewLeaderboard = canViewProfitLeaderboard(sessionUser);
   const canManageMemberLibraries = hasAdminAccess(sessionUser, "members:libraries");
   const canManageWhitelist = hasDirectPermission(sessionUser, "whitelist:manage");
   const canViewEntries = canReadMembers || canManageWhitelist || canManageMembers || canManageMemberStatus || canViewMemberOrders || canManageMemberLibraries;
@@ -491,6 +493,8 @@ export function UserManager() {
   const [roles, setRoles] = useState<RoleProfile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedEmails, setSelectedEmails] = useState<string[]>([]);
+  const [activeSection, setActiveSection] = useState<"members" | "leaderboard">("members");
+  const showLeaderboard = canViewLeaderboard && activeSection === "leaderboard";
   
   // Invite State
   const [newEmail, setNewEmail] = useState("");
@@ -975,6 +979,42 @@ export function UserManager() {
 
   return (
     <div className="space-y-6">
+      {canViewLeaderboard && (
+        <nav aria-label="成员管理栏目" className="relative inline-flex w-full rounded-full border border-black/8 bg-black/3 p-1 dark:border-white/10 dark:bg-white/4 sm:w-auto">
+          <span aria-hidden="true" className={cn("pointer-events-none absolute bottom-1 left-1 top-1 w-[calc(50%-4px)] rounded-full bg-foreground shadow-xs transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none dark:bg-white", activeSection === "leaderboard" ? "translate-x-full" : "translate-x-0")} />
+          {([
+            { id: "members", label: "成员列表", icon: Users },
+            { id: "leaderboard", label: "利润排行榜", icon: Trophy },
+          ] as const).map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              type="button"
+              aria-pressed={activeSection === id}
+              onClick={() => setActiveSection(id)}
+              className={cn("relative z-10 flex flex-1 cursor-pointer select-none items-center justify-center gap-2 rounded-full px-5 py-2 text-center text-sm font-medium transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-primary motion-reduce:transition-none sm:min-w-35", activeSection === id ? "font-semibold text-background dark:text-black" : "text-muted-foreground hover:text-foreground")}
+            >
+              <Icon size={16} aria-hidden="true" />
+              {label}
+            </button>
+          ))}
+        </nav>
+      )}
+      {showLeaderboard ? (isLoading ? (
+        <div role="status" className="py-20 text-center text-muted-foreground">
+          <Loader2 className="mx-auto mb-4 animate-spin text-primary" size={32} />
+          正在整理成员数据...
+        </div>
+      ) : (
+        <ProfitLeaderboard
+          cacheScope={JSON.stringify([sessionUser?.id, getEffectivePermissions(sessionUser)])}
+          members={entries.flatMap(entry => entry.user ? [{ id: entry.user.id, name: entry.user.name?.trim() || entry.email.split("@")[0], email: entry.email, credentialVersion: entry.user.maiyatianCookieVersion }] : [])}
+          onSelect={id => {
+            const entry = entries.find(item => item.user?.id === id);
+            if (entry?.user) setViewOrdersUser({ id, name: entry.user.name || entry.email, email: entry.email, roleName: entry.user.roleProfile?.name || entry.roleProfile?.name });
+          }}
+        />
+      )) : (
+      <>
       {canManageWhitelist && (
         <div className="relative overflow-hidden rounded-[22px] sm:rounded-[28px] border border-border/60 bg-linear-to-br from-white/95 via-white/85 to-background p-5 sm:p-6 shadow-sm backdrop-blur-md dark:border-white/10 dark:from-white/[0.06] dark:via-white/[0.03] dark:to-transparent">
           <div className="pointer-events-none absolute -right-12 -top-12 hidden h-48 w-48 rounded-full bg-primary/5 blur-2xl sm:block" />
@@ -1417,6 +1457,9 @@ export function UserManager() {
         </div>
       </div>
  
+      </>
+      )}
+
        {/* Role Assignment Modal */}
        {editingUserId && canManageMembers && (
          <RoleAssignmentModal 
@@ -1541,7 +1584,7 @@ export function UserManager() {
       )}
 
        <ActionBar
-         selectedCount={shouldHideActionBar ? 0 : selectedEntries.length}
+         selectedCount={shouldHideActionBar || showLeaderboard ? 0 : selectedEntries.length}
          totalCount={filteredEntries.length}
          onToggleSelectAll={toggleSelectAllFiltered}
          onClear={() => setSelectedEmails([])}

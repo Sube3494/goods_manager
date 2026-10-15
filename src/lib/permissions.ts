@@ -201,7 +201,7 @@ export const PERMISSION_TREE = [
       { key: "members:read", label: "查看成员管理页" },
       { key: "members:manage", label: "编辑成员资料/角色" },
       { key: "members:status", label: "启用/禁用成员" },
-      { key: "members:orders", label: "查看成员麦芽田数据" },
+      { key: "members:orders", label: "查看成员麦芽田数据与利润排行榜" },
       { key: "members:libraries", label: "商品库授权" },
       { key: "whitelist:manage", label: "白名单与邀请管理" },
       { key: "roles:manage", label: "角色模板管理" },
@@ -464,7 +464,7 @@ export const PAGE_PERMISSION_TREE: PagePermissionGroup[] = [
         actions: [
           { key: "members:manage", label: "编辑成员资料/角色" },
           { key: "members:status", label: "启用/禁用成员" },
-          { key: "members:orders", label: "查看成员麦芽田数据" },
+          { key: "members:orders", label: "查看成员麦芽田数据与利润排行榜" },
           { key: "members:libraries", label: "商品库授权" },
           { key: "whitelist:manage", label: "白名单与邀请管理" },
         ],
@@ -549,7 +549,7 @@ export const ADMIN_ACCESS_MATRIX: Record<AdminCapability, {
   },
   "members:orders": {
     label: "成员麦芽田数据",
-    description: "查看成员的麦芽田订单和利润数据",
+    description: "查看成员的麦芽田订单、利润数据与利润排行榜",
     permission: "members:orders",
   },
   "members:libraries": {
@@ -702,6 +702,14 @@ export function hasDirectPermission(user: SessionUser | null, permission: Permis
 
   const effectivePermissions = getEffectivePermissions(user);
   return !!(effectivePermissions[permission] || effectivePermissions["all"]);
+}
+
+/** 排行榜须明确授予麦芽田数据权限，不继承成员管理等旧权限。 */
+export function canViewProfitLeaderboard(user: SessionUser | null): boolean {
+  if (!user) return false;
+  if (user.role === "SUPER_ADMIN") return true;
+  if (getEffectivePermissions(user)["members:orders"] === false) return false;
+  return hasDirectPermission(user, "members:orders");
 }
 
 export function canAccessDashboardPage(user: SessionUser | null): boolean {

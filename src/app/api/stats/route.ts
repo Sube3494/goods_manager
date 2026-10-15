@@ -2,11 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveRememberedCustomerTypes } from "@/lib/customerMemoryStore";
 import { getCustomerMemoryPlatform } from "@/lib/customerMemory";
-import { getAuthorizedUserAny } from "@/lib/auth";
-import { hasAdminAccess } from "@/lib/permissions";
+import { getAuthorizedAdmin, getAuthorizedUserAny } from "@/lib/auth";
+import { canViewProfitLeaderboard, hasAdminAccess } from "@/lib/permissions";
 import { FinanceMath } from "@/lib/math";
+import { checkMaiyatianCookieStatus } from "@/lib/maiyatianCookieStatus";
 import {
   normalizeAutoPickIntegrationConfig,
+  testMaiyatianCookieConnection,
   readCustomerTypeFromRawPayload,
   readDeliveryFeeFromValue,
   readOrderExtraExpensesFromRawPayload,
@@ -306,9 +308,15 @@ function resolveDashboardIncomeMetrics(
 export async function GET(request: NextRequest) {
   const perf = createRequestPerfTracker(request);
   try {
-    const user = await getAuthorizedUserAny("dashboard:read", "marketing:read");
+    const isLeaderboardView = request.nextUrl.searchParams.get("view") === "leaderboard";
+    const user = isLeaderboardView
+      ? await getAuthorizedAdmin("members:orders")
+      : await getAuthorizedUserAny("dashboard:read", "marketing:read");
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    if (isLeaderboardView && !canViewProfitLeaderboard(user)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const requestedUserId = String(request.nextUrl.searchParams.get("userId") || request.nextUrl.searchParams.get("targetUserId") || "").trim();
@@ -323,6 +331,17 @@ export async function GET(request: NextRequest) {
           select: { id: true, permissions: true },
         });
 
+    const permissionsObj = targetUserRecord?.permissions && typeof targetUserRecord.permissions === "object" && !Array.isArray(targetUserRecord.permissions)
+      ? targetUserRecord.permissions as Record<string, unknown>
+      : {};
+    const integrationConfig = normalizeAutoPickIntegrationConfig(permissionsObj.autoPickIntegration);
+    if (isLeaderboardView) {
+      const status = await checkMaiyatianCookieStatus(integrationConfig, testMaiyatianCookieConnection);
+      if (status !== "valid") {
+        return NextResponse.json({ eligible: false, status }, { headers: { "Cache-Control": "private, no-store" } });
+      }
+    }
+
     const isMarketingView = request.nextUrl.searchParams.get("view") === "marketing";
     const [storage, settings, allUserShops] = await Promise.all([
       getStorageStrategy(),
@@ -330,10 +349,6 @@ export async function GET(request: NextRequest) {
       prisma.shop.findMany({ where: { userId: targetUserId }, select: { id: true, name: true, address: true } }),
     ]);
 
-    const permissionsObj = targetUserRecord?.permissions && typeof targetUserRecord.permissions === "object" && !Array.isArray(targetUserRecord.permissions)
-      ? targetUserRecord.permissions as Record<string, unknown>
-      : {};
-    const integrationConfig = normalizeAutoPickIntegrationConfig(permissionsObj.autoPickIntegration);
     const defaultBrushCommission = integrationConfig.defaultBrushCommission || 0;
 
     const rangeMode = request.nextUrl.searchParams.get("range");
@@ -1342,6 +1357,9 @@ export async function GET(request: NextRequest) {
       (sum, point) => FinanceMath.add(sum, point.netProfit || 0),
       0
     );
+    if (isLeaderboardView) {
+      return NextResponse.json({ eligible: true, netProfit }, { headers: { "Cache-Control": "private, no-store" } });
+    }
     const platformBusinessTrend = Object.fromEntries(
       DASHBOARD_PLATFORMS.map((platform) => [platform, buildTrendSeries(platformTrendMaps.get(platform)!)])
     );
