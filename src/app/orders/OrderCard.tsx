@@ -3883,6 +3883,7 @@ export const OrderCard = memo(function OrderCard({
     );
   };
   const logisticPlatform = getDisplayText(order.delivery?.logisticName || "第三方平台");
+  const deliveryFeeLabel = pickup ? "自提" : isSelfDeliveryFeeExempt ? "自配" : (String(order.delivery?.logisticName || "").trim() || "配送");
   const riderName = getDisplayText(order.delivery?.riderName);
   const riderPhone = getDisplayText(order.delivery?.riderPhone);
   const expectedIncomeDisplay = hideDeletedOfflineIncome ? "-" : toCurrency(expectedIncome);
@@ -4198,12 +4199,12 @@ export const OrderCard = memo(function OrderCard({
                         title="点击修改配送费"
                         className="flex min-w-0 items-center justify-between gap-1.5 rounded-2xl border border-black/8 bg-black/2 px-3 py-2 text-left transition hover:border-black/12 hover:bg-black/3 dark:border-white/10 dark:bg-white/3 dark:hover:bg-white/4 cursor-pointer sm:inline-flex sm:h-8 sm:justify-start sm:rounded-full sm:px-2.5 sm:py-0"
                       >
-                        <span className="shrink-0 text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground sm:text-[11px]">配送费</span>
+                        <span className="shrink-0 text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground sm:text-[11px]">{deliveryFeeLabel}</span>
                         <span className="truncate text-xs font-semibold text-foreground sm:text-[13px]">{toCurrency(displayDeliveryFee)}</span>
                       </button>
                     ) : (
                       <div className="flex min-w-0 items-center justify-between gap-1.5 rounded-2xl border border-black/8 bg-black/2 px-3 py-2 dark:border-white/10 dark:bg-white/3 sm:inline-flex sm:h-8 sm:justify-start sm:rounded-full sm:px-2.5 sm:py-0">
-                        <span className="shrink-0 text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground sm:text-[11px]">配送费</span>
+                        <span className="shrink-0 text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground sm:text-[11px]">{deliveryFeeLabel}</span>
                         <span className="truncate text-xs font-semibold text-foreground sm:text-[13px]">{toCurrency(displayDeliveryFee)}</span>
                       </div>
                     )
@@ -4265,7 +4266,7 @@ export const OrderCard = memo(function OrderCard({
                     <div className="flex items-center justify-between border-t border-black/6 pt-2 dark:border-white/8">
                       <span className="flex items-center gap-1.5 text-muted-foreground">
                         <Truck size={12} className="shrink-0 text-slate-400 dark:text-zinc-500" />
-                        <span>配送费</span>
+                        <span>{deliveryFeeLabel}</span>
                       </span>
                       {canEditDeliveryFee ? (
                         <button
