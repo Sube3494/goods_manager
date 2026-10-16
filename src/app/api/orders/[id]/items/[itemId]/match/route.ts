@@ -21,6 +21,7 @@ import {
 } from "@/lib/autoPickOrders";
 import { returnOutboundOrderById } from "@/lib/outboundReturns";
 import { readShopIdFromRawPayload } from "@/lib/shopCommission";
+import { normalizeOrderBundleItems } from "@/lib/orderBundleItems";
 
 function readRawPayloadRecord(rawPayload: unknown) {
   return rawPayload && typeof rawPayload === "object" && !Array.isArray(rawPayload)
@@ -558,7 +559,7 @@ export async function PATCH(
 
       // 1. 如果请求体直接提供了前端当前实际展示的配件列表，最高优先级采信（避免后端二次猜测产生偏差）
       if (Array.isArray(body?.currentBundleItems) && body.currentBundleItems.length > 0) {
-        existingBundleItems = body.currentBundleItems.map((c: any) => ({
+        existingBundleItems = normalizeOrderBundleItems(body.currentBundleItems, orderItem.quantity).map((c: any) => ({
           id: c.shopProductId || c.id,
           productId: c.productId || null,
           name: c.name,
@@ -604,7 +605,7 @@ export async function PATCH(
         };
         if (existingBundleItems.length === 0) {
           if (Array.isArray(currentManual.bundleItems)) {
-            existingBundleItems = isLegacyCompositeBundle ? [] : [...currentManual.bundleItems];
+            existingBundleItems = isLegacyCompositeBundle ? [] : normalizeOrderBundleItems(currentManual.bundleItems, orderItem.quantity);
             hasManualBundleConfig = true;
           } else if (currentManual.isBundle === false) {
             hasManualBundleConfig = true;
@@ -726,12 +727,35 @@ export async function PATCH(
       return { mainProduct, existingBundleItems };
     };
 
+    // 兼容旧页面回传的无 ID 展示配件，在退回旧出库之前解析并校验关联。
+    const resolveBundleItemLinks = async (components: any[]) => {
+      for (const component of components) {
+        if (component.id || component.shopProductId || component.productId) continue;
+        const sku = String(component.sku || "").trim();
+        const candidates = sku && sku !== "-" ? await prisma.shopProduct.findMany({
+          where: {
+            ...(orderMatchedShopId ? { shopId: orderMatchedShopId } : { shop: { userId: targetUserId } }),
+            OR: [{ sku }, { jdSkuId: sku }],
+          },
+          select: { id: true, productId: true, sourceProductId: true },
+          take: 2,
+        }) : [];
+        if (candidates.length !== 1) {
+          throw new Error(`配件【${component.name || sku}】无法唯一关联店铺商品，请重新匹配该配件`);
+        }
+        component.id = candidates[0].id;
+        component.shopProductId = candidates[0].id;
+        component.productId = candidates[0].productId || candidates[0].sourceProductId || null;
+      }
+    };
+
     if (removeComponentIndex !== undefined) {
       const { mainProduct, existingBundleItems } = await resolveMainProductAndBundleItems();
       const nextBundleItems = [...existingBundleItems];
       if (removeComponentIndex >= 0 && removeComponentIndex < nextBundleItems.length) {
         nextBundleItems.splice(removeComponentIndex, 1);
       }
+      await resolveBundleItemLinks(nextBundleItems);
 
       const isMainProductUnmatched = Boolean(
         mainProduct?.isUnmatched
@@ -870,6 +894,7 @@ export async function PATCH(
       } else {
         nextBundleItems.push(newComponent);
       }
+      await resolveBundleItemLinks(nextBundleItems);
 
       const isMainProductUnmatched = Boolean(
         mainProduct?.isUnmatched

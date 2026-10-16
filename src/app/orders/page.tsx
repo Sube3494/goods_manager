@@ -2699,7 +2699,9 @@ export default function OrdersPage() {
       autoOutbound: Boolean(options?.autoOutbound),
       componentIndex: options?.componentIndex,
       componentDisplay: options?.componentDisplay,
-      currentBundleItems: options?.currentBundleItems,
+      currentBundleItems: Array.isArray(item.matchedProduct?.bundleItems)
+        ? item.matchedProduct.bundleItems
+        : options?.currentBundleItems,
       isAddingBundleItem: options?.isAddingBundleItem,
     });
     setIsMatchPickerOpen(true);
@@ -2875,7 +2877,10 @@ export default function OrdersPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           removeComponentIndex: componentIndex,
-          currentBundleItems: Array.isArray(currentBundleItems) ? currentBundleItems : undefined,
+          autoMatchedProduct: item.matchedProduct,
+          currentBundleItems: Array.isArray(item.matchedProduct?.bundleItems)
+            ? item.matchedProduct.bundleItems
+            : currentBundleItems,
         }),
       });
       const data = await response.json().catch(() => ({}));

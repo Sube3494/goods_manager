@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { parseOutboundCostSnapshot, resolvePurchaseBatchSnapshotCost } from "@/lib/outboundCostSnapshot";
 import prisma from "@/lib/prisma";
+import { normalizeOrderBundleItems } from "@/lib/orderBundleItems";
 import { resolveRememberedCustomerTypes } from "@/lib/customerMemoryStore";
 import { resolveCustomerHistoryScope } from "@/lib/customerHistory";
 import { getAuthorizedAdmin, getAuthorizedUser, getAuthorizedUserAny } from "@/lib/auth";
@@ -3044,7 +3045,7 @@ export async function GET(request: NextRequest) {
             manualMatchedProduct?.isCompositeMatch === true || compositeMatchIds.length > 1
           );
           const storedManualBundleItems = Array.isArray(manualMatchedProduct?.bundleItems)
-            ? manualMatchedProduct.bundleItems
+            ? normalizeOrderBundleItems(manualMatchedProduct.bundleItems, item.quantity)
             : [];
           const compositeIdSet = new Set(compositeMatchIds);
           const isLegacyCompositeBundle = isCompositeMatch
@@ -3065,7 +3066,7 @@ export async function GET(request: NextRequest) {
               ))
           );
           const rawBundleItems = hasExplicitManualBundleConfig
-            ? (isLegacyCompositeBundle ? [] : (manualMatchedProduct?.bundleItems || []))
+            ? (isLegacyCompositeBundle ? [] : storedManualBundleItems)
             : (manualMatchedProduct?.bundleItems
                 || (activeMatched as any)?.bundleItems
                 || (targetShopProduct as any)?.bundleItems);

@@ -32,6 +32,7 @@ import { AutoPickIntegrationConfig, AutoPickMaiyatianShop, AutoPickMaiyatianShop
 import { InventoryService } from "@/services/inventoryService";
 import { emitAutoPickOrderEvent } from "@/lib/autoPickOrderEvents";
 import { FinanceMath } from "@/lib/math";
+import { normalizeOrderBundleItems } from "@/lib/orderBundleItems";
 import { buildShopDedupeKey, findMatchingShopRecord, normalizeExternalId, normalizeShopAddress, normalizeShopAddressKey, normalizeShopNameKey, isShopNameMatch } from "@/lib/shopIdentity";
 import { getOutboundOrderItemSchemaErrorMessage } from "@/lib/prismaSchemaCompat";
 import { getStorageStrategy } from "@/lib/storage";
@@ -7201,14 +7202,17 @@ async function resolveOutboundItemsForAutoPickOrder(
 
         // 优先在当前出库店铺匹配该配件对应的店铺商品
         if (currentShopId) {
-          const currentShopSub = shopProducts.find((p) =>
+          const currentShopSubs = shopProducts.filter((p) =>
             p.shop?.id === currentShopId && (
               (b.shopProductId && p.id === b.shopProductId) ||
               (b.id && p.id === b.id) ||
               (b.productId && (p.productId === b.productId || p.sourceProductId === b.productId)) ||
-              (b.id && (p.productId === b.id || p.sourceProductId === b.id))
+              (b.id && (p.productId === b.id || p.sourceProductId === b.id)) ||
+              (!b.id && !b.shopProductId && !b.productId && b.sku && (p.sku === b.sku || p.jdSkuId === b.sku))
             )
           );
+          const isLegacyDisplay = !b.id && !b.shopProductId && !b.productId;
+          const currentShopSub = !isLegacyDisplay || currentShopSubs.length === 1 ? currentShopSubs[0] : null;
           if (currentShopSub) {
             bShopProductId = currentShopSub.id;
             bProductId = currentShopSub.productId || currentShopSub.sourceProductId || bProductId;
@@ -7230,6 +7234,9 @@ async function resolveOutboundItemsForAutoPickOrder(
         }
         if (!bProductId) {
           bProductId = b.productId || (b.sourceType === "product" && !b.shopProductId ? b.id : null);
+        }
+        if (!bShopProductId && !bProductId) {
+          throw new Error(`配件【${b.name || b.sku || "未命名配件"}】无法关联当前店铺商品，请重新匹配该配件`);
         }
 
         const bItemQty = Math.max(1, Math.trunc(Number(b.quantity) || 1));
@@ -7270,7 +7277,9 @@ async function resolveOutboundItemsForAutoPickOrder(
         .map((value) => value.trim())
         .filter(Boolean);
       const compositeIdSet = new Set(compositeIds);
-      const storedBundleItems = Array.isArray(manualMatchedProduct.bundleItems) ? manualMatchedProduct.bundleItems : [];
+      const storedBundleItems = Array.isArray(manualMatchedProduct.bundleItems)
+        ? normalizeOrderBundleItems(manualMatchedProduct.bundleItems, item.quantity)
+        : [];
       const isLegacyCompositeBundle = compositeIds.length > 1
         && storedBundleItems.length === compositeIds.length
         && storedBundleItems.every((bundleItem: any) => {
@@ -7418,7 +7427,7 @@ async function resolveOutboundItemsForAutoPickOrder(
         || Array.isArray(manualMatchedProduct.bundleItems)
         || manualMatchedProduct.isBundle === false;
       let manualIsBundle = Boolean(manualMatchedProduct.bundleItems && manualMatchedProduct.bundleItems.length > 0);
-      let manualBundleItems = manualMatchedProduct.bundleItems || null;
+      let manualBundleItems = Array.isArray(manualMatchedProduct.bundleItems) ? storedBundleItems : null;
 
       if (matchedShopProduct) {
         manualShopProductId = matchedShopProduct.id;
