@@ -7164,12 +7164,13 @@ async function resolveOutboundItemsForAutoPickOrder(
     shopId?: string | null;
     isBundle?: boolean;
     bundleItems?: any;
-  } | null, quantity: number, itemPriceShare: number) => {
+  } | null, quantity: number, itemPriceShare: number, hasExplicitBundleConfig = false) => {
     if (!target) return;
     let isBundle = Boolean(target.isBundle);
     let bundleItems = Array.isArray(target.bundleItems) ? target.bundleItems : null;
     const fullShopProduct = shopProducts.find((p) => p.id === target.id);
-    if (!isBundle || !bundleItems || bundleItems.length === 0) {
+    // 订单手动调整后的清单（包括空清单）优先于商品库的固定配置。
+    if (!hasExplicitBundleConfig && (!isBundle || !bundleItems || bundleItems.length === 0)) {
       if (fullShopProduct) {
         const rawBundle = fullShopProduct.bundleItems || fullShopProduct.product?.bundleItems;
         if (Array.isArray(rawBundle) && rawBundle.length > 0) {
@@ -7413,7 +7414,9 @@ async function resolveOutboundItemsForAutoPickOrder(
         });
       }
 
-      const hasExplicitManualBundleConfig = Array.isArray(manualMatchedProduct.bundleItems) || (manualMatchedProduct as any).isBundle === false;
+      const hasExplicitManualBundleConfig = itemRawPayload.manualBundleItemsOverride === true
+        || Array.isArray(manualMatchedProduct.bundleItems)
+        || manualMatchedProduct.isBundle === false;
       let manualIsBundle = Boolean(manualMatchedProduct.bundleItems && manualMatchedProduct.bundleItems.length > 0);
       let manualBundleItems = manualMatchedProduct.bundleItems || null;
 
@@ -7447,7 +7450,7 @@ async function resolveOutboundItemsForAutoPickOrder(
           sourceProductId: null,
           isBundle: manualIsBundle,
           bundleItems: manualBundleItems,
-        }, manualFulfillmentQuantity, priceShare);
+        }, manualFulfillmentQuantity, priceShare, hasExplicitManualBundleConfig);
       } else if (manualIsBundle && manualBundleItems && manualBundleItems.length > 0) {
         expandAndPushOutboundItem({
           id: manualMatchedProduct.id,
@@ -7455,7 +7458,7 @@ async function resolveOutboundItemsForAutoPickOrder(
           sourceProductId: null,
           isBundle: true,
           bundleItems: manualBundleItems,
-        }, manualFulfillmentQuantity, priceShare);
+        }, manualFulfillmentQuantity, priceShare, hasExplicitManualBundleConfig);
       } else {
         resolvedItems.push({
           productId: manualResolvedProductId,
