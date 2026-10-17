@@ -1822,7 +1822,17 @@ export function DataOverview({
                   wrapperStyle={{ zIndex: 1000, outline: "none", pointerEvents: "none", transition: "none" }}
                   content={<ChartTooltip valueFormatter={amountTooltip} nameMap={{ netProfit: "净利润" }} />}
                 />
-                <Area type="monotone" dataKey="netProfit" name="netProfit" stroke="url(#netProfitStroke)" fill="url(#netProfitFill)" strokeWidth={2.5} dot={<CustomizedDot />} activeDot={<CustomizedActiveDot />} />
+                <Area
+                  type="monotone"
+                  dataKey="netProfit"
+                  name="netProfit"
+                  stroke="url(#netProfitStroke)"
+                  fill="url(#netProfitFill)"
+                  strokeWidth={profitTrend.length > 31 ? 1.75 : 2.5}
+                  baseValue={0}
+                  dot={profitTrend.length > 31 ? false : <CustomizedDot />}
+                  activeDot={<CustomizedActiveDot />}
+                />
               </AreaChart>
             </ResponsiveContainer>
           </div>

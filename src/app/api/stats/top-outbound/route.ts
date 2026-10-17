@@ -4,6 +4,7 @@ import { getFreshSession } from "@/lib/auth";
 import { getStorageStrategy } from "@/lib/storage";
 import { getOutboundReturnedQuantityMap, parseOutboundReturnMeta } from "@/lib/outboundReturnMeta";
 import { isAccessoryProduct } from "@/lib/accessoryUtils";
+import { getOutboundSalesQuantityMap } from "@/lib/outboundSales";
 
 function getOutboundItemReturnedQuantity(
   order: { note?: string | null; status?: string | null },
@@ -64,9 +65,11 @@ export async function GET(request: NextRequest) {
         productId: true,
         shopProductId: true,
         quantity: true,
+        costSnapshot: true,
         outboundOrder: {
           select: {
             date: true,
+            id: true,
             status: true,
             note: true,
           },
@@ -77,6 +80,7 @@ export async function GET(request: NextRequest) {
             name: true,
             sku: true,
             image: true,
+            bundleItems: true,
             category: {
               select: {
                 name: true,
@@ -86,6 +90,7 @@ export async function GET(request: NextRequest) {
         },
         shopProduct: {
           include: {
+            product: { select: { id: true, sku: true, bundleItems: true } },
             shop: {
               select: {
                 id: true,
@@ -96,6 +101,15 @@ export async function GET(request: NextRequest) {
         },
       },
     });
+
+    const orderItems = new Map<string, typeof outboundItems>();
+    for (const item of outboundItems) {
+      const items = orderItems.get(item.outboundOrder.id) || [];
+      items.push(item);
+      orderItems.set(item.outboundOrder.id, items);
+    }
+    const salesQuantities = new Map(Array.from(orderItems.values()).flatMap((items) =>
+      Array.from(getOutboundSalesQuantityMap(items))));
 
     const aggregateMap = new Map<string, {
       productId: string;
@@ -113,7 +127,7 @@ export async function GET(request: NextRequest) {
 
     for (const item of outboundItems) {
       const returnedQty = getOutboundItemReturnedQuantity(item.outboundOrder, item);
-      const netQuantity = Math.max(0, item.quantity - returnedQty);
+      const netQuantity = Math.max(0, (salesQuantities.get(item.id) ?? item.quantity) - returnedQty);
       if (netQuantity <= 0) {
         continue;
       }

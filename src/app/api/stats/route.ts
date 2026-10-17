@@ -37,6 +37,7 @@ import { normalizeShopNameKey, isShopNameMatch, stripShopSuffix } from "@/lib/sh
 import { parseOutboundNote } from "@/lib/utils";
 import { readConfirmedRefundAmountFromRawPayload, resolveCancelledJDDeliveredCommissionLoss, resolveRefundAdjustedIncomeMetrics } from "@/lib/orderFinancials";
 import { isAccessoryProduct } from "@/lib/accessoryUtils";
+import { getOutboundSalesQuantityMap } from "@/lib/outboundSales";
 import { buildRecentInboundOrderWhere, resolveRecentInboundProduct } from "@/lib/recentInbound";
 import { resolveCompanyCommission } from "@/lib/companyCommission";
 import { getEffectivePromotionExpenses } from "@/services/promotionService";
@@ -550,10 +551,13 @@ export async function GET(request: NextRequest) {
                   productName: true,
                   sku: true,
                   productImage: true,
+                  shopId: true,
+                  bundleItems: true,
+                  product: { select: { id: true, sku: true, bundleItems: true } },
                   shop: { select: { name: true } },
                 },
               },
-              product: { select: { id: true, name: true, sku: true, image: true } },
+              product: { select: { id: true, name: true, sku: true, image: true, bundleItems: true } },
             },
           },
         },
@@ -1744,8 +1748,9 @@ export async function GET(request: NextRequest) {
       ).trim();
       const actualPaidYuan = Math.max(0, Number(salesOrder?.actualPaid || 0) / 100);
 
+      const salesQuantities = getOutboundSalesQuantityMap(outbound.items);
       outbound.items.forEach((item) => {
-        const netQuantity = Math.max(0, Number(item.quantity || 0) - Number(returnedQuantityMap.get(item.id) || 0));
+        const netQuantity = Math.max(0, (salesQuantities.get(item.id) ?? item.quantity) - Number(returnedQuantityMap.get(item.id) || 0));
         if (netQuantity <= 0) return;
         const productName = String(item.shopProduct?.productName || item.product?.name || "").trim();
         if (!productName || productName === "手工配送占位商品") return;

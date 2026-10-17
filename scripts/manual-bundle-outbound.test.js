@@ -89,12 +89,26 @@ test("移除部分固定配件后，只校验并扣减本体及保留配件", as
     { shopProductId: "main", quantity: 3 }, { shopProductId: "kept", quantity: 6 },
   ]);
   expect(created.items.create).toHaveLength(2);
+  expect(created.items.create.map((item) => item.costSnapshot.salesQuantity)).toEqual([3, 0]);
 });
 
 test("移除全部固定配件后，空清单不恢复商品库配置", async () => {
   expect(await createOutboundFromAutoPickOrder("user-1", "order-1")).toMatchObject({ ok: true });
   expect(deducted).toHaveLength(1);
   expect(created.items.create[0]).toMatchObject({ shopProductId: "main", quantity: 3 });
+  expect(created.items.create[0].costSnapshot.salesQuantity).toBe(3);
+});
+
+test("同商品同时作为配件和单品售出时，只记录单品销量", async () => {
+  Object.assign(order.items[0].rawPayload.manualMatchedProduct, { isBundle: true, bundleItems: [accessory("kept")] });
+  order.items.push({
+    id: "item-2", productName: "kept", productNo: "kept", quantity: 2,
+    rawPayload: { manualMatchedProduct: { id: "kept", shopProductId: "kept", sourceType: "shopProduct", isBundle: false, bundleItems: [] } },
+  });
+  expect(await createOutboundFromAutoPickOrder("user-1", "order-1")).toMatchObject({ ok: true });
+  expect(created.items.create.find((item) => item.shopProductId === "kept")).toMatchObject({
+    quantity: 8, costSnapshot: { salesQuantity: 2 },
+  });
 });
 
 test("历史订单显式保存空配件清单时，也不恢复固定配件", async () => {

@@ -6997,6 +6997,7 @@ type ResolvedAutoPickOutboundItem = {
   shopProductId: string | null;
   quantity: number;
   price: number;
+  salesQuantity?: number;
 };
 
 type InsufficientAutoPickStockItem = {
@@ -7193,6 +7194,7 @@ async function resolveOutboundItemsForAutoPickOrder(
         shopProductId: target.id || null,
         quantity: Math.max(1, Math.trunc(Number(quantity) || 1)),
         price: subPrice,
+        salesQuantity: Math.max(1, Math.trunc(Number(quantity) || 1)),
       });
 
       // 2. 依次推入附带的各个配件（扣除配件出库与库存）
@@ -7246,6 +7248,7 @@ async function resolveOutboundItemsForAutoPickOrder(
           shopProductId: bShopProductId ? String(bShopProductId).trim() : null,
           quantity: subQty,
           price: subPrice,
+          salesQuantity: 0,
         });
       }
     } else {
@@ -7671,6 +7674,7 @@ async function resolveOutboundItemsForAutoPickOrder(
     const key = `${item.shopProductId || ""}::${item.productId || ""}`;
     const existing = itemMap.get(key);
     if (existing) {
+      existing.salesQuantity = (existing.salesQuantity ?? existing.quantity) + (item.salesQuantity ?? item.quantity);
       existing.quantity += item.quantity;
       existing.price = FinanceMath.add(existing.price, item.price);
     } else {
@@ -8030,7 +8034,7 @@ export async function createOutboundFromAutoPickOrder(
               shopProductId: item.shopProductId,
               quantity: item.quantity,
               price: item.price,
-              costSnapshot: (costSnapshot || Prisma.JsonNull) as Prisma.InputJsonValue | Prisma.NullableJsonNullValueInput,
+              costSnapshot: { ...costSnapshot, salesQuantity: item.salesQuantity ?? item.quantity } as Prisma.InputJsonValue,
             };
           }),
         },

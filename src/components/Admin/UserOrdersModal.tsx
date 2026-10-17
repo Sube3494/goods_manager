@@ -570,8 +570,9 @@ function UserProfitTrendView({
                       name="净利润"
                       stroke="url(#userModalProfitStroke)"
                       fill="url(#userModalProfitFill)"
-                      strokeWidth={2.5}
-                      dot={<CustomizedDot />}
+                      strokeWidth={profitTrend.length > 31 ? 1.75 : 2.5}
+                      baseValue={0}
+                      dot={profitTrend.length > 31 ? false : <CustomizedDot />}
                       activeDot={<CustomizedActiveDot />}
                     />
                   </AreaChart>
