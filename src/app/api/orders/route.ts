@@ -1176,7 +1176,10 @@ export async function GET(request: NextRequest) {
 
     const baseWhereWithoutShop: Prisma.AutoPickOrderWhereInput = {
       userId: targetUserId,
-      ...(customerHistoryScope ? { AND: [customerHistoryScope.where] } : {}),
+      AND: [
+        ...(customerHistoryScope ? [customerHistoryScope.where] : []),
+        { NOT: buildStatusWhere("已删除")! },
+      ],
       ...(requestedOrderIds.length > 0
         ? {
             OR: [
@@ -1265,8 +1268,8 @@ export async function GET(request: NextRequest) {
       ...(deletedWhere ? [deletedWhere] : []),
     ];
 
-    const cancelledQueryWhere: Prisma.AutoPickOrderWhereInput = cancelledOrDeletedList.length > 0
-      ? { AND: [where, { OR: cancelledOrDeletedList }] }
+    const cancelledQueryWhere: Prisma.AutoPickOrderWhereInput = cancelledWhere
+      ? { AND: [where, cancelledWhere] }
       : { AND: [where, { id: "__impossible__" }] };
 
     const brushQueryWhere: Prisma.AutoPickOrderWhereInput = {
@@ -2200,11 +2203,11 @@ export async function GET(request: NextRequest) {
 
     if (includeMetrics) {
       for (const order of metricOrders) {
+        if (isAutoPickOrderDeletedStatus(order.status)) continue;
         const platform = normalizeOrderPlatformForSummary(order.platform);
         const outboundMeta = outboundByOrderNo.get(order.orderNo) || null;
         const refundAmount = readRefundAmountFromRawPayload(order.rawPayload, order.actualPaid, outboundMeta);
         const cancelled = isAutoPickOrderCancelledStatus(order.status)
-          || isAutoPickOrderDeletedStatus(order.status)
           || isFullyRefundedOrder(order.actualPaid, refundAmount)
           || outboundMeta?.isFullyReturned === true;
         if (cancelled) {

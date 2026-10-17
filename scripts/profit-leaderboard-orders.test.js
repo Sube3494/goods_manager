@@ -8,6 +8,7 @@ let cookieValid;
 let autoCompleteCalls;
 let orderReads;
 let outbounds;
+let orderQueries;
 const order = {
   id: "order-1", userId: "member-1", orderNo: "TEST-PROFIT", platform: "线下交易", status: "已完成",
   orderTime: new Date("2026-10-15T04:00:00Z"), actualPaid: 100275, expectedIncome: 100275,
@@ -19,8 +20,8 @@ const dbModel = new Proxy({}, { get: (_, method) => async () => method === "coun
 const db = new Proxy({
   user: { findUnique: async () => ({ permissions: { autoPickIntegration: integration }, shippingAddresses: [] }) },
   autoPickOrder: {
-    findMany: async () => { orderReads++; return [order]; },
-    count: async () => 1,
+    findMany: async (query) => { orderReads++; orderQueries.push(query); return [order]; },
+    count: async (query) => { orderQueries.push(query); return 1; },
   },
   outboundOrder: { findMany: async () => outbounds },
 }, { get: (target, name) => target[name] || dbModel });
@@ -45,9 +46,22 @@ beforeEach(() => {
   cookieValid = true;
   autoCompleteCalls = 0;
   orderReads = 0;
+  orderQueries = [];
   outbounds = [];
   order.rawPayload = {};
   order.platform = "线下交易";
+});
+
+test("订单列表、总数和汇总查询排除已删除订单，搜索筛选也不能重新带出", async () => {
+  const response = await GET(new NextRequest("http://localhost/api/orders?userId=member-1&_metrics=1&query=TEST&status=已取消"));
+  expect(response.status).toBe(200);
+  expect(orderQueries.length).toBeGreaterThan(0);
+  for (const query of orderQueries) {
+    const where = JSON.stringify(query.where);
+    expect(where).toContain('"NOT":{"OR":[{"status":{"contains":"删除"');
+    expect(where).toContain('"equals":"delete"');
+    expect(where).toContain('"equals":"deleted"');
+  }
 });
 
 test("排行榜直接复用今日看板纯利润汇总，并将分转换为元", async () => {

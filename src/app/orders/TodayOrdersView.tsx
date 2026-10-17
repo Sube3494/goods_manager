@@ -20,6 +20,7 @@ import {
   getBaseAutoPickStatusDisplay,
   getAutoPickStatusFilterLabel,
   isAutoPickOrderDeliveringStatus,
+  isAutoPickOrderDeletedStatus,
   isAutoPickOrderRiderAssigned,
   isAutoPickOrderSelfDeliveryActive,
   isAutoPickPickupOrder,
@@ -939,6 +940,9 @@ export function TodayOrdersView({
       const response = await fetch(`/api/orders?${params.toString()}`, { cache: "no-store" });
       const data = await response.json().catch(() => ({}));
       const refreshedOrder = Array.isArray(data?.items) ? data.items[0] : null;
+      if (response.ok && !refreshedOrder) {
+        setOrders((current) => current.filter((order) => order.id !== orderId));
+      }
       if (response.ok && refreshedOrder) {
         patchOrder(orderId, (order) => ({
           ...order,
@@ -1198,7 +1202,7 @@ export function TodayOrdersView({
 
   // 筛选和统计都交给后端；前端只对当前页做展示分组。
   const filteredOrders = useMemo(() => {
-    return orders;
+    return orders.filter((order) => !order.isDeleted && !isAutoPickOrderDeletedStatus(order.status));
   }, [orders]);
 
   const orderGroups = useMemo(() => {
