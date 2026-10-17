@@ -1775,6 +1775,10 @@ function parseMaiyatianStatusValue(rawValue: unknown) {
 }
 
 function resolveMaiyatianOrderStatus(rawOrder: Record<string, unknown>) {
+  // 删除状态优先于残留的完成提示及退款记录。
+  if (isAutoPickOrderDeletedStatus(String(rawOrder.status || ""))) {
+    return "已删除";
+  }
   const refund = summarizeMaiyatianRefund(rawOrder);
   if (refund.kind === "partial" || refund.kind === "full") {
     return resolveMaiyatianRefundStatus(rawOrder);
@@ -2676,7 +2680,9 @@ async function enrichMaiyatianOrderByCookie(cookie: string, order: AutoPickInbou
       }
     }
 
-    detailStatus = resolveMaiyatianRefundStatus(refundPayload, detailStatus, order.actualPaid) || detailStatus;
+    if (!isAutoPickOrderDeletedStatus(detailStatus)) {
+      detailStatus = resolveMaiyatianRefundStatus(refundPayload, detailStatus, order.actualPaid) || detailStatus;
+    }
 
     const cancelReason = resolveMaiyatianCancelReason(cancelDetails);
     order.cancelDetails = cancelDetails;
@@ -3445,16 +3451,16 @@ export async function deleteAutoPickOrderByIdentity(
     return { deleted: false, notFound: true };
   }
 
-  // 如果订单已是终态（如已完成、已取消、已删除），则跳过修改和删除，直接保留
-  if (isAutoPickOrderTerminalStatus(existing.status)) {
-    return { deleted: false, id: existing.id, terminalSkipped: true };
-  }
-
-  // 将进行中订单的状态更新为“已取消”，防止物理删除造成数据丢失
+  // 平台明确删除时，已完成/已取消的订单也必须作废。保留记录供审计及阻止旧推送复活。
   await prisma.autoPickOrder.update({
     where: { id: existing.id },
-    data: { status: "已取消" },
+    data: { status: "已删除", autoCompleteAt: null, lastSyncedAt: new Date() },
   });
+
+  const { cancelAutoCompleteJob } = await import("@/lib/autoPickAutoComplete");
+  await cancelAutoCompleteJob(existing.id, "platform-order-deleted");
+  // 重复删除也重试清理，避免上次回滚失败后留下库存扣减。
+  await returnAutoPickOrderOutbounds(userId, existing.orderNo, "平台订单删除自动回滚");
 
   emitAutoPickOrderEvent({
     type: "delete",
@@ -3466,6 +3472,25 @@ export async function deleteAutoPickOrderByIdentity(
   });
 
   return { deleted: true, id: existing.id };
+}
+
+async function returnAutoPickOrderOutbounds(userId: string, orderNo: string, reason: string) {
+  const outbounds = await prisma.outboundOrder.findMany({
+    where: {
+      userId,
+      status: { not: "Returned" },
+      note: { contains: `平台单号: ${orderNo}`, mode: "insensitive" },
+    },
+    select: { id: true, note: true },
+    orderBy: { createdAt: "desc" },
+  });
+
+  for (const outbound of outbounds) {
+    const match = outbound.note?.match(/平台单号:\s*([^\s|]+)/);
+    if (match?.[1].toLowerCase() === orderNo.toLowerCase()) {
+      await returnOutboundOrderById(userId, outbound.id, reason);
+    }
+  }
 }
 
 export function normalizeAutoPickOrderPayload(payload: unknown): AutoPickInboundOrder | null {
@@ -4063,7 +4088,9 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
       && existing?.status === "delivering"
       && !isAutoPickOrderTerminalStatus(normalized.status)
     );
-    const status = shouldKeepCompletedStatus
+    const status = isAutoPickOrderDeletedStatus(existing?.status)
+      ? "已删除"
+      : shouldKeepCompletedStatus
       ? existing?.status || null
       : isExistingCancelled && normalized.status && !isAutoPickOrderCancelledStatus(normalized.status)
         ? normalized.status
@@ -4364,7 +4391,7 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
     at: new Date().toISOString(),
   });
 
-  const becameCompleted = (
+  const becameCompleted = !isAutoPickOrderDeletedStatus(order.status) && !isAutoPickOrderCancelledStatus(order.status) && (
     isAutoPickOrderCompletedStatus(order.status)
     || hasAutoPickCompletionProof(order.rawPayload, order.delivery)
   ) && !isAutoPickOrderCompletedStatus(previousStatus);
@@ -4435,34 +4462,7 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
 
   if (becameCancelledOrDeleted) {
     try {
-      const relatedOutboundOrders = await prisma.outboundOrder.findMany({
-        where: {
-          status: {
-            not: "Returned",
-          },
-          note: {
-            contains: `平台单号: ${order.orderNo}`,
-            mode: "insensitive",
-          },
-        },
-        select: {
-          id: true,
-          note: true,
-        },
-        orderBy: {
-          createdAt: "desc",
-        },
-      });
-
-      const filteredOutboundOrders = relatedOutboundOrders.filter((outbound) => {
-        const match = outbound.note?.match(/平台单号:\s*([^\s|]+)/);
-        if (!match) return false;
-        return match[1].toLowerCase() === order.orderNo.toLowerCase();
-      });
-
-      for (const outbound of filteredOutboundOrders) {
-        await returnOutboundOrderById(userId, outbound.id, `平台订单取消/退货自动回滚：${order.status || "已取消"}`);
-      }
+      await returnAutoPickOrderOutbounds(userId, order.orderNo, `平台订单取消/退货自动回滚：${order.status || "已取消"}`);
     } catch (cancelError) {
       console.error("Failed to automatically return outbound order for cancelled auto-pick order:", cancelError);
     }
@@ -4484,6 +4484,9 @@ export async function enrichAutoPickInboundOrderIfNeeded(
     }
 
     const currentStatusDisplay = getBaseAutoPickStatusDisplay(current.status);
+    if (currentStatusDisplay === "已删除") {
+      return current;
+    }
     const isCancelled = currentStatusDisplay === "已取消" || isAutoPickOrderCancelledStatus(current.status);
     const canEnrich =
       options?.force || (
