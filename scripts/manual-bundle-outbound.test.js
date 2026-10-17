@@ -10,6 +10,7 @@ const accessory = (id) => ({ id, shopProductId: id, name: id, quantity: 2 });
 const tx = {
   autoPickOrderItem: { update: async ({ data }) => { order.items[0].rawPayload = data.rawPayload; } },
   user: { findUnique: async () => ({ permissions: [] }) },
+  product: { findMany: async () => [] },
   shopProduct: {
     findMany: async ({ where } = {}) => where?.OR
       ? products.filter((p) => where.OR.some((condition) => condition.sku === p.sku || condition.jdSkuId === p.jdSkuId && p.jdSkuId))
@@ -185,4 +186,52 @@ test("保留配件无法关联时，移除接口不保存且不退回旧出库",
   } finally {
     db.shopProduct.findMany = findMany;
   }
+});
+
+function setCopiedComposite(entry) {
+  products.unshift({
+    id: "original", shopId: "other-shop", productId: null, sourceProductId: "shared-source",
+    productName: "原商品", sku: "original", stock: 20,
+    shop: { id: "other-shop", name: "原店铺" },
+  });
+  products.find((p) => p.id === "kept").sourceProductId = "shared-source";
+  Object.assign(order.items[0].rawPayload.manualMatchedProduct, {
+    id: "main+kept", shopProductId: "main+kept", isCompositeMatch: true,
+    compositeItems: [entry], bundleItems: [],
+  });
+}
+
+test("复制商品重新组合匹配后，只扣当前店铺明确选择的商品", async () => {
+  setCopiedComposite({ id: "kept", shopProductId: "kept", productId: "shared-source", quantity: 2 });
+  expect(await createOutboundFromAutoPickOrder("user-1", "order-1")).toMatchObject({ ok: true });
+  expect(deducted).toEqual([expect.objectContaining({ shopProductId: "kept", quantity: 2 })]);
+});
+
+test("同店多个复制商品共享来源时，明确选择的 ID 优先于来源匹配", async () => {
+  setCopiedComposite({ shopProductId: "kept", productId: "shared-source", quantity: 2 });
+  products.find((p) => p.id === "main").sourceProductId = "shared-source";
+  expect(await createOutboundFromAutoPickOrder("user-1", "order-1")).toMatchObject({ ok: true });
+  expect(deducted[0].shopProductId).toBe("kept");
+});
+
+test("历史组合保留原店铺 ID 时，通过来源唯一关联当前店铺副本", async () => {
+  setCopiedComposite({ shopProductId: "original", quantity: 2 });
+  expect(await createOutboundFromAutoPickOrder("user-1", "order-1")).toMatchObject({ ok: true });
+  expect(deducted[0].shopProductId).toBe("kept");
+});
+
+test("当前店铺没有对应副本时，不回退扣减原店铺库存", async () => {
+  setCopiedComposite({ shopProductId: "original", quantity: 2 });
+  products.find((p) => p.id === "kept").sourceProductId = null;
+  await expect(createOutboundFromAutoPickOrder("user-1", "order-1")).rejects.toThrow("无法唯一关联当前店铺商品");
+  expect(deducted).toBeNull();
+  expect(created).toBeNull();
+});
+
+test("当前店铺有多个同来源副本时，要求重新选择具体商品", async () => {
+  setCopiedComposite({ shopProductId: "original", quantity: 2 });
+  products.find((p) => p.id === "main").sourceProductId = "shared-source";
+  await expect(createOutboundFromAutoPickOrder("user-1", "order-1")).rejects.toThrow("无法唯一关联当前店铺商品");
+  expect(deducted).toBeNull();
+  expect(created).toBeNull();
 });

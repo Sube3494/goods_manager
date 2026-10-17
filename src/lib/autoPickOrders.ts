@@ -7301,15 +7301,22 @@ async function resolveOutboundItemsForAutoPickOrder(
 
         const pushCompositeOrAccessory = (entry: any, quantity: number) => {
           const entryShopProductId = String(entry?.shopProductId || entry?.id || "").trim();
-          const matchedEntry = shopProducts.find((product) =>
-            (entryShopProductId && product.id === entryShopProductId)
-            || (entry?.productId && (product.productId === entry.productId || product.sourceProductId === entry.productId))
+          const candidates = shopProducts.filter((product) =>
+            (!internalShop?.id && !mappedShopNameText)
+            || isCandidateInMappedShop(product.shop?.id, product.shop?.name)
           );
-          expandAndPushOutboundItem(matchedEntry || {
-            id: entryShopProductId,
-            productId: String(entry?.productId || "").trim() || null,
-            sourceProductId: null,
-          }, quantity, entryPrice);
+          // 复制商品共享来源 ID，必须先按当前店铺内明确选择的 ID 匹配。
+          const exactEntry = candidates.find((product) => product.id === entryShopProductId);
+          const originalEntry = shopProducts.find((product) => product.id === entryShopProductId);
+          const sourceId = String(entry?.productId || originalEntry?.productId || originalEntry?.sourceProductId || "").trim();
+          const sourceCandidates = sourceId
+            ? candidates.filter((product) => product.productId === sourceId || product.sourceProductId === sourceId)
+            : [];
+          const matchedEntry = exactEntry || (sourceCandidates.length === 1 ? sourceCandidates[0] : null);
+          if (!matchedEntry) {
+            throw new Error(`商品【${entry?.name || entry?.sku || entryShopProductId || "未命名商品"}】无法唯一关联当前店铺商品，请重新匹配`);
+          }
+          expandAndPushOutboundItem(matchedEntry, quantity, entryPrice);
         };
 
         // 组合匹配选择的是最终实际数量，不再乘订单项数量。
