@@ -1561,7 +1561,7 @@ export function OrderStatusProfitPreview({ order, isProfitUpdating = false, canV
           }}
         >{children}</button>
       </HoverCardTrigger>
-      <HoverCardContent ref={contentRef} align="end" sideOffset={6} className="w-auto max-w-60 rounded-lg px-3 py-2" onClick={(event) => event.stopPropagation()}>
+      <HoverCardContent ref={contentRef} align="end" className="w-auto max-w-60" onClick={(event) => event.stopPropagation()}>
         <div className="flex items-center gap-2.5 whitespace-nowrap">
           <span className="text-xs text-muted-foreground">{isEstimate ? "预计利润" : "纯利润"}</span>
           <span className={cn("text-sm font-semibold tabular-nums", !isProfitUpdating && hasProfit ? (Number(profit) < 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400") : "text-xs text-muted-foreground")}>
