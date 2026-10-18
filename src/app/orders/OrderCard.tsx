@@ -1497,32 +1497,6 @@ export function OrderStatusProfitPreview({ order, isProfitUpdating = false, canV
   cancelReason?: string;
   children: ReactNode;
 }) {
-  const [open, setOpen] = useState(false);
-  const [pinned, setPinned] = useState(false);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const contentRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!pinned) return;
-    const close = () => {
-      setPinned(false);
-      setOpen(false);
-    };
-    const onPointerDown = (event: PointerEvent) => {
-      const target = event.target as Node;
-      if (!triggerRef.current?.contains(target) && !contentRef.current?.contains(target)) close();
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") close();
-    };
-    document.addEventListener("pointerdown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("pointerdown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [pinned]);
-
   const hasRecordedCost = order.productCostStatus === "ready"
     && typeof order.productCost === "number"
     && Number.isFinite(order.productCost);
@@ -1542,40 +1516,22 @@ export function OrderStatusProfitPreview({ order, isProfitUpdating = false, canV
   const estimatedProfit = Math.round(getExpectedIncome(order.expectedIncome, order.actualPaid, order.platformCommission, order.platform) * (1 - Number(order.serviceFeeRate || 0)))
     - getDeliveryFee(order.delivery, order) - estimatedCost - Number(order.returnExtraExpense || 0) - extraExpense;
   const profit = hasRecordedCost || typeof order.pureProfit === "number" ? order.pureProfit : estimatedProfit;
-  const hasProfit = typeof profit === "number" && Number.isFinite(profit);
   const isEstimate = !hasRecordedCost && typeof order.pureProfit !== "number";
-  const profitText = isProfitUpdating ? "正在计算利润..." : hasProfit ? toCurrency(profit) : "利润暂未计算";
+  const previewOrder: AutoPickOrder = isEstimate ? {
+    ...order,
+    pureProfit: profit,
+    productCost: estimatedCost,
+    productCostStatus: "ready",
+    productCostBreakdown: currentItems.map((item) => ({
+      name: item.name,
+      quantity: item.quantity,
+      unitCost: Math.round(Number(item.costPrice) * 100),
+      totalCost: Math.round(Number(item.costPrice) * item.quantity * 100),
+    })),
+  } : order;
+  if (isProfitUpdating) return <>{children}</>;
   return (
-    <HoverCard open={open} onOpenChange={(nextOpen) => { if (!pinned) setOpen(nextOpen); }} openDelay={200} closeDelay={120}>
-      <HoverCardTrigger asChild>
-        <button
-          ref={triggerRef}
-          type="button"
-          className="inline-flex cursor-pointer rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          aria-label="查看当前订单利润"
-          aria-expanded={open}
-          onClick={(event) => {
-            event.stopPropagation();
-            setPinned(!pinned);
-            setOpen(!pinned);
-          }}
-        >{children}</button>
-      </HoverCardTrigger>
-      <HoverCardContent ref={contentRef} align="end" className="w-auto max-w-60" onClick={(event) => event.stopPropagation()}>
-        <div className="flex items-center gap-2.5 whitespace-nowrap">
-          <span className="text-xs text-muted-foreground">{isEstimate ? "预计利润" : "纯利润"}</span>
-          <span className={cn("text-sm font-semibold tabular-nums", !isProfitUpdating && hasProfit ? (Number(profit) < 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400") : "text-xs text-muted-foreground")}>
-            {profitText}
-          </span>
-        </div>
-        {cancelReason ? (
-          <div className="mt-2 border-t border-border pt-2 text-xs">
-            <div className="font-medium">取消原因</div>
-            <div className="mt-1 whitespace-normal break-words text-muted-foreground">{cancelReason}</div>
-          </div>
-        ) : null}
-      </HoverCardContent>
-    </HoverCard>
+    <OrderProfitBadge order={previewOrder} readOnly canViewProductCosts={canViewProductCosts} trigger={children} estimated={isEstimate} cancelReason={cancelReason} />
   );
 }
 
@@ -3095,6 +3051,9 @@ export class OrderCardErrorBoundary extends Component<{ children: React.ReactNod
 }
 
 export interface OrderProfitBadgeProps {
+  trigger?: ReactNode;
+  estimated?: boolean;
+  cancelReason?: string;
   order: AutoPickOrder;
   readOnly?: boolean;
   canViewProductCosts?: boolean;
@@ -3116,6 +3075,9 @@ export const OrderProfitBadge = memo(function OrderProfitBadge({
   onOpenCostBackfill,
   onEditCommission,
   onEditExtraExpenses,
+  trigger,
+  estimated = false,
+  cancelReason,
 }: OrderProfitBadgeProps) {
   const [isProfitTooltipOpen, setIsProfitTooltipOpen] = useState(false);
   const [isProfitTooltipHovering, setIsProfitTooltipHovering] = useState(false);
@@ -3295,7 +3257,11 @@ export const OrderProfitBadge = memo(function OrderProfitBadge({
       onMouseEnter={openProfitTooltipHover}
       onMouseLeave={closeProfitTooltipHover}
     >
-      {hasPureProfit && !(canViewProductCosts && productCostStatusText) ? (
+      {trigger ? (
+        <button type="button" onClick={handleProfitTooltipTriggerClick} aria-expanded={isProfitTooltipVisible} aria-label="查看当前订单利润" className="inline-flex cursor-pointer rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          {trigger}
+        </button>
+      ) : hasPureProfit && !(canViewProductCosts && productCostStatusText) ? (
         compact ? (
           <button
             type="button"
@@ -3406,10 +3372,11 @@ export const OrderProfitBadge = memo(function OrderProfitBadge({
                     利润拆解
                   </div>
                   <div className="mt-0.5 text-[13px] font-semibold text-slate-900 dark:text-white">
-                    {hasPureProfit ? "这单的纯利润计算" : "这单的成本状态"}
+                    {estimated ? "这单的预计利润计算" : hasPureProfit ? "这单的纯利润计算" : "这单的成本状态"}
                   </div>
                 </div>
               </div>
+              {cancelReason ? <div className="mt-2 text-xs text-slate-600 dark:text-white/68">取消原因：{cancelReason}</div> : null}
               <div className="mt-3 space-y-2">
                 {pureProfitTooltipRows.map((row, index) => (
                   <div
@@ -3503,7 +3470,7 @@ export const OrderProfitBadge = memo(function OrderProfitBadge({
               )}>
                 <div className="flex items-center justify-between gap-4 text-[13px]">
                   <span className="whitespace-nowrap font-semibold text-slate-900 dark:text-white">
-                    {hasPureProfit ? "最终纯利润" : "当前状态"}
+                    {estimated ? "预计纯利润" : hasPureProfit ? "最终纯利润" : "当前状态"}
                   </span>
                   <span className={cn(
                     "whitespace-nowrap text-[15px] font-bold",
