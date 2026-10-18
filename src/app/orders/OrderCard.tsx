@@ -1497,6 +1497,32 @@ export function OrderStatusProfitPreview({ order, isProfitUpdating = false, canV
   cancelReason?: string;
   children: ReactNode;
 }) {
+  const [open, setOpen] = useState(false);
+  const [pinned, setPinned] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!pinned) return;
+    const close = () => {
+      setPinned(false);
+      setOpen(false);
+    };
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (!triggerRef.current?.contains(target) && !contentRef.current?.contains(target)) close();
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") close();
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [pinned]);
+
   const hasCost = order.productCostStatus === "ready"
     && typeof order.productCost === "number"
     && Number.isFinite(order.productCost);
@@ -1505,11 +1531,22 @@ export function OrderStatusProfitPreview({ order, isProfitUpdating = false, canV
   const hasProfit = typeof order.pureProfit === "number" && Number.isFinite(order.pureProfit);
   const profitText = isProfitUpdating ? "正在计算利润..." : hasProfit ? toCurrency(order.pureProfit) : (canViewProductCosts ? getProductCostStatusText(order) : "") || "利润暂未计算";
   return (
-    <HoverCard openDelay={200} closeDelay={120}>
+    <HoverCard open={open} onOpenChange={(nextOpen) => { if (!pinned) setOpen(nextOpen); }} openDelay={200} closeDelay={120}>
       <HoverCardTrigger asChild>
-        <span tabIndex={0} className="inline-flex rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="查看当前订单利润">{children}</span>
+        <button
+          ref={triggerRef}
+          type="button"
+          className="inline-flex cursor-pointer rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          aria-label="查看当前订单利润"
+          aria-expanded={open}
+          onClick={(event) => {
+            event.stopPropagation();
+            setPinned(!pinned);
+            setOpen(!pinned);
+          }}
+        >{children}</button>
       </HoverCardTrigger>
-      <HoverCardContent align="end" sideOffset={8} className="w-64 max-w-[calc(100vw-2rem)] rounded-xl p-4" onClick={(event) => event.stopPropagation()}>
+      <HoverCardContent ref={contentRef} align="end" sideOffset={8} className="w-64 max-w-[calc(100vw-2rem)] rounded-xl p-4" onClick={(event) => event.stopPropagation()}>
         <div className="text-xs font-medium text-muted-foreground">当前订单纯利润</div>
         <div className={cn("mt-1 text-xl font-semibold tabular-nums", !isProfitUpdating && hasProfit ? (Number(order.pureProfit) < 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400") : "text-sm text-muted-foreground")}>
           {profitText}
