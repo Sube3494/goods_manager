@@ -1561,14 +1561,15 @@ export function OrderStatusProfitPreview({ order, isProfitUpdating = false, canV
           }}
         >{children}</button>
       </HoverCardTrigger>
-      <HoverCardContent ref={contentRef} align="end" sideOffset={8} className="w-64 max-w-[calc(100vw-2rem)] rounded-xl p-4" onClick={(event) => event.stopPropagation()}>
-        <div className="text-xs font-medium text-muted-foreground">{isEstimate ? "当前订单预计利润" : "当前订单纯利润"}</div>
-        <div className={cn("mt-1 text-xl font-semibold tabular-nums", !isProfitUpdating && hasProfit ? (Number(profit) < 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400") : "text-sm text-muted-foreground")}>
-          {profitText}
+      <HoverCardContent ref={contentRef} align="end" sideOffset={6} className="w-auto max-w-60 rounded-lg px-3 py-2" onClick={(event) => event.stopPropagation()}>
+        <div className="flex items-center gap-2.5 whitespace-nowrap">
+          <span className="text-xs text-muted-foreground">{isEstimate ? "预计利润" : "纯利润"}</span>
+          <span className={cn("text-sm font-semibold tabular-nums", !isProfitUpdating && hasProfit ? (Number(profit) < 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400") : "text-xs text-muted-foreground")}>
+            {profitText}
+          </span>
         </div>
-        {isEstimate ? <div className="mt-2 text-xs text-muted-foreground">按商品当前成本预估，出库后以实际成本为准</div> : null}
         {cancelReason ? (
-          <div className="mt-3 border-t border-border pt-3 text-xs">
+          <div className="mt-2 border-t border-border pt-2 text-xs">
             <div className="font-medium">取消原因</div>
             <div className="mt-1 whitespace-normal break-words text-muted-foreground">{cancelReason}</div>
           </div>
