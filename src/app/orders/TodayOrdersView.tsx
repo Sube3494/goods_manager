@@ -51,6 +51,7 @@ import {
   shouldShowAutoOutboundRecovery,
   toCurrency,
   OrderProfitBadge,
+  OrderStatusProfitPreview,
 } from "./OrderCard";
 import { ORDER_GROUPS, getOrderGroup } from "@/lib/orderGroups";
 import { isRematchReturnReason } from "@/lib/outboundReturnMeta";
@@ -257,28 +258,11 @@ function CompactTodayOrderCard({
                   onEditExtraExpenses={readOnly || !onEditExtraExpenses ? undefined : () => onEditExtraExpenses(order)}
                 />
               ) : (
-                <span className="group/status relative inline-flex">
-                  <span
-                    title={cancelReason || undefined}
-                    className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${statusClassName}`}
-                  >
+                <OrderStatusProfitPreview order={order} isProfitUpdating={isProfitUpdating} canViewProductCosts={canViewProductCosts} cancelReason={cancelReason}>
+                  <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${statusClassName}`}>
                     {statusLabel}
                   </span>
-                  {cancelReason ? (
-                    <span className="pointer-events-none absolute top-full right-0 z-50 mt-2 w-64 max-w-[calc(100vw-2rem)] scale-95 opacity-0 transition-all duration-200 ease-out group-hover/status:pointer-events-auto group-hover/status:scale-100 group-hover/status:opacity-100">
-                      <span className="relative block rounded-xl border border-slate-200/90 bg-white/98 p-3 text-left shadow-[0_16px_40px_rgba(15,23,42,0.18)] dark:border-white/12 dark:bg-[#171b22]/98 dark:shadow-[0_18px_44px_rgba(0,0,0,0.38)] backdrop-blur-md">
-                        <span className="absolute right-4 bottom-full h-2 w-2 translate-y-[5px] rotate-45 border-l border-t border-slate-200/90 bg-white dark:border-white/12 dark:bg-[#171b22]" />
-                        <span className="flex items-center gap-1.5 border-b border-slate-200/80 pb-1.5 dark:border-white/8 text-[11px] font-semibold text-foreground">
-                          <span className="h-1.5 w-1.5 rounded-full bg-slate-500 shrink-0" />
-                          <span>取消原因</span>
-                        </span>
-                        <span className="mt-1.5 block whitespace-normal break-words text-[11.5px] font-medium leading-relaxed text-muted-foreground">
-                          {cancelReason}
-                        </span>
-                      </span>
-                    </span>
-                  ) : null}
-                </span>
+                </OrderStatusProfitPreview>
               )}
             </div>
           </div>

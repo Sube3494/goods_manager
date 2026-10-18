@@ -1490,36 +1490,54 @@ export function PromotionMetricCard({
 }
 
 
-export function StatusBadge({ order }: { order: Pick<AutoPickOrder, "isPickup" | "status" | "platform" | "isPickCompleted" | "cancelReason" | "rawPayload"> & { cancelDetails?: unknown; outboundMeta?: unknown; refundAmount?: unknown; actualPaid?: unknown; expectedIncome?: unknown; outboundReturnDetails?: unknown; items?: unknown } }) {
-  const display = getDisplayStatus(order as any);
+export function OrderStatusProfitPreview({ order, isProfitUpdating = false, canViewProductCosts = true, cancelReason, children }: {
+  order: AutoPickOrder;
+  isProfitUpdating?: boolean;
+  canViewProductCosts?: boolean;
+  cancelReason?: string;
+  children: ReactNode;
+}) {
+  const hasCost = order.productCostStatus === "ready"
+    && typeof order.productCost === "number"
+    && Number.isFinite(order.productCost);
+  if (!hasCost) return <>{children}</>;
+
+  const hasProfit = typeof order.pureProfit === "number" && Number.isFinite(order.pureProfit);
+  const profitText = isProfitUpdating ? "正在计算利润..." : hasProfit ? toCurrency(order.pureProfit) : (canViewProductCosts ? getProductCostStatusText(order) : "") || "利润暂未计算";
+  return (
+    <HoverCard openDelay={200} closeDelay={120}>
+      <HoverCardTrigger asChild>
+        <span tabIndex={0} className="inline-flex rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="查看当前订单利润">{children}</span>
+      </HoverCardTrigger>
+      <HoverCardContent align="end" sideOffset={8} className="w-64 max-w-[calc(100vw-2rem)] rounded-xl p-4" onClick={(event) => event.stopPropagation()}>
+        <div className="text-xs font-medium text-muted-foreground">当前订单纯利润</div>
+        <div className={cn("mt-1 text-xl font-semibold tabular-nums", !isProfitUpdating && hasProfit ? (Number(order.pureProfit) < 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400") : "text-sm text-muted-foreground")}>
+          {profitText}
+        </div>
+        {cancelReason ? (
+          <div className="mt-3 border-t border-border pt-3 text-xs">
+            <div className="font-medium">取消原因</div>
+            <div className="mt-1 whitespace-normal break-words text-muted-foreground">{cancelReason}</div>
+          </div>
+        ) : null}
+      </HoverCardContent>
+    </HoverCard>
+  );
+}
+
+export function StatusBadge({ order, isProfitUpdating = false, canViewProductCosts = true }: { order: AutoPickOrder; isProfitUpdating?: boolean; canViewProductCosts?: boolean }) {
+  const display = getDisplayStatus(order);
   const tone = getStatusTone(display);
-  const fullyRefunded = isOrderFullyRefunded(order as any);
+  const fullyRefunded = isOrderFullyRefunded(order);
   const isCancelled = display === "已取消" || isCancelledStatus(order.status) || fullyRefunded;
   const cancelReason = isCancelled ? (getCancelReason(order) || (fullyRefunded ? "全单退款" : "")) : "";
   return (
-    <span className="group/status relative inline-flex">
-      <span
-        title={cancelReason || undefined}
-        className={cn("inline-flex h-7 items-center gap-1.5 rounded-full border px-2 text-[11px] font-medium leading-none sm:h-8 sm:gap-1.5 sm:px-2.5 sm:text-[13px]", tone.badge)}
-      >
+    <OrderStatusProfitPreview order={order} isProfitUpdating={isProfitUpdating} canViewProductCosts={canViewProductCosts} cancelReason={cancelReason}>
+      <span className={cn("inline-flex h-7 items-center gap-1.5 rounded-full border px-2 text-[11px] font-medium leading-none sm:h-8 sm:gap-1.5 sm:px-2.5 sm:text-[13px]", tone.badge)}>
         <span className={cn("h-1.5 w-1.5 rounded-full shrink-0", tone.dot)} />
         {display}
       </span>
-      {cancelReason ? (
-        <span className="pointer-events-none absolute bottom-full left-1/2 z-40 mb-2 w-72 max-w-[calc(100vw-2rem)] -translate-x-1/2 scale-95 opacity-0 transition-all duration-200 ease-out group-hover/status:pointer-events-auto group-hover/status:scale-100 group-hover/status:opacity-100">
-          <span className="block rounded-xl border border-slate-200/90 bg-white/98 p-3 text-left shadow-[0_16px_40px_rgba(15,23,42,0.18)] dark:border-white/12 dark:bg-[#171b22]/96 dark:shadow-[0_18px_44px_rgba(0,0,0,0.38)]">
-            <span className="absolute left-1/2 top-full h-2.5 w-2.5 -translate-x-1/2 -translate-y-1.5 rotate-45 border-r border-b border-slate-200/90 bg-white dark:border-white/12 dark:bg-[#171b22]" />
-            <span className="flex items-center gap-2 border-b border-slate-200/80 pb-2 dark:border-white/8">
-              <span className={cn("h-1.5 w-1.5 rounded-full", tone.dot)} />
-              <span className="text-[11px] font-semibold text-slate-900 dark:text-white">取消原因</span>
-            </span>
-            <span className="mt-2 block whitespace-normal break-words text-[12px] font-medium leading-5 text-slate-600 dark:text-slate-300">
-              {cancelReason}
-            </span>
-          </span>
-        </span>
-      ) : null}
-    </span>
+    </OrderStatusProfitPreview>
   );
 }
 
@@ -4094,7 +4112,7 @@ export const OrderCard = memo(function OrderCard({
                       </span>
                     )
                   ) : null}
-                  <StatusBadge order={order} />
+                  <StatusBadge order={order} isProfitUpdating={isProfitUpdating} canViewProductCosts={canViewProductCosts} />
                   <OrderProfitBadge
                     order={order}
                     readOnly={readOnly}
