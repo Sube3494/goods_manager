@@ -1523,13 +1523,28 @@ export function OrderStatusProfitPreview({ order, isProfitUpdating = false, canV
     };
   }, [pinned]);
 
-  const hasCost = order.productCostStatus === "ready"
+  const hasRecordedCost = order.productCostStatus === "ready"
     && typeof order.productCost === "number"
     && Number.isFinite(order.productCost);
-  if (!hasCost) return <>{children}</>;
+  const currentItems = order.items.flatMap((item) => getExpandedOrderItemDisplays(item, order.platform));
+  const canEstimate = canViewProductCosts
+    && !order.hasOutbound
+    && order.productCostStatus !== "pending-backfill"
+    && !isCancelledStatus(order.status)
+    && getBaseAutoPickStatusDisplay(order.status) !== "已删除"
+    && !hasOrderRefundState(order)
+    && currentItems.length > 0
+    && currentItems.every((item) => typeof item.costPrice === "number" && Number.isFinite(item.costPrice) && item.costPrice > 0 && Number.isFinite(item.quantity) && item.quantity > 0);
+  if (!hasRecordedCost && !canEstimate) return <>{children}</>;
 
-  const hasProfit = typeof order.pureProfit === "number" && Number.isFinite(order.pureProfit);
-  const profitText = isProfitUpdating ? "正在计算利润..." : hasProfit ? toCurrency(order.pureProfit) : (canViewProductCosts ? getProductCostStatusText(order) : "") || "利润暂未计算";
+  const estimatedCost = Math.round(currentItems.reduce((sum, item) => sum + Number(item.costPrice || 0) * item.quantity, 0) * 100);
+  const extraExpense = typeof order.totalExtraExpense === "number" ? order.totalExtraExpense : (order.extraExpenses || []).reduce((sum, expense) => sum + (expense.type === "income" ? -expense.amount : expense.amount), 0);
+  const estimatedProfit = Math.round(getExpectedIncome(order.expectedIncome, order.actualPaid, order.platformCommission, order.platform) * (1 - Number(order.serviceFeeRate || 0)))
+    - getDeliveryFee(order.delivery, order) - estimatedCost - Number(order.returnExtraExpense || 0) - extraExpense;
+  const profit = hasRecordedCost || typeof order.pureProfit === "number" ? order.pureProfit : estimatedProfit;
+  const hasProfit = typeof profit === "number" && Number.isFinite(profit);
+  const isEstimate = !hasRecordedCost && typeof order.pureProfit !== "number";
+  const profitText = isProfitUpdating ? "正在计算利润..." : hasProfit ? toCurrency(profit) : "利润暂未计算";
   return (
     <HoverCard open={open} onOpenChange={(nextOpen) => { if (!pinned) setOpen(nextOpen); }} openDelay={200} closeDelay={120}>
       <HoverCardTrigger asChild>
@@ -1547,10 +1562,11 @@ export function OrderStatusProfitPreview({ order, isProfitUpdating = false, canV
         >{children}</button>
       </HoverCardTrigger>
       <HoverCardContent ref={contentRef} align="end" sideOffset={8} className="w-64 max-w-[calc(100vw-2rem)] rounded-xl p-4" onClick={(event) => event.stopPropagation()}>
-        <div className="text-xs font-medium text-muted-foreground">当前订单纯利润</div>
-        <div className={cn("mt-1 text-xl font-semibold tabular-nums", !isProfitUpdating && hasProfit ? (Number(order.pureProfit) < 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400") : "text-sm text-muted-foreground")}>
+        <div className="text-xs font-medium text-muted-foreground">{isEstimate ? "当前订单预计利润" : "当前订单纯利润"}</div>
+        <div className={cn("mt-1 text-xl font-semibold tabular-nums", !isProfitUpdating && hasProfit ? (Number(profit) < 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400") : "text-sm text-muted-foreground")}>
           {profitText}
         </div>
+        {isEstimate ? <div className="mt-2 text-xs text-muted-foreground">按商品当前成本预估，出库后以实际成本为准</div> : null}
         {cancelReason ? (
           <div className="mt-3 border-t border-border pt-3 text-xs">
             <div className="font-medium">取消原因</div>
