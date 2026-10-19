@@ -1,3 +1,4 @@
+import { mayReadMemberData } from "@/lib/memberDataVisibilityServer";
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveRememberedCustomerTypes } from "@/lib/customerMemoryStore";
@@ -330,6 +331,9 @@ export async function GET(request: NextRequest) {
     const requestedUserId = String(request.nextUrl.searchParams.get("userId") || request.nextUrl.searchParams.get("targetUserId") || "").trim();
     const canManageMembers = hasAdminAccess(user, "members:orders") || hasAdminAccess(user, "members:manage") || user.role === "SUPER_ADMIN";
     const targetUserId = (canManageMembers && requestedUserId) ? requestedUserId : user.id;
+    if (!await mayReadMemberData(user, targetUserId)) {
+      return NextResponse.json({ error: "该成员数据已隐藏" }, { status: 403 });
+    }
     const canViewProductCosts = targetUserId === user.id || user.role === "SUPER_ADMIN";
 
     const targetUserRecord = targetUserId === user.id

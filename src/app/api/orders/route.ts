@@ -1,3 +1,4 @@
+import { mayReadMemberData } from "@/lib/memberDataVisibilityServer";
 import { NextRequest, NextResponse } from "next/server";
 import { parseOutboundCostSnapshot, resolvePurchaseBatchSnapshotCost } from "@/lib/outboundCostSnapshot";
 import prisma from "@/lib/prisma";
@@ -1105,6 +1106,9 @@ export async function GET(request: NextRequest) {
       || String(session.roleProfile?.name || "").includes("管理")
       || hasPermission(session, "order:manage");
     const targetUserId = (canManageMembers && requestedUserId) ? requestedUserId : session.id;
+    if (!await mayReadMemberData(session, targetUserId)) {
+      return NextResponse.json({ error: "该成员数据已隐藏" }, { status: 403 });
+    }
     if (isLeaderboard) {
       const config = await getAutoPickIntegrationConfigByUserId(targetUserId);
       const cookieStatus = await checkMaiyatianCookieStatus(config, testMaiyatianCookieConnection);

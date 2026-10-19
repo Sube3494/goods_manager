@@ -1,3 +1,4 @@
+import { mayReadMemberData } from "@/lib/memberDataVisibilityServer";
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
@@ -47,6 +48,7 @@ export async function GET(request: NextRequest) {
       || hasAdminAccess(user, "roles:manage")
       || String(user.roleProfile?.name || "").includes("管理");
     const targetUserId = requestedUserId && canManageMembers ? requestedUserId : user.id;
+  if (!await mayReadMemberData(user, targetUserId)) return NextResponse.json({ error: "该成员数据已隐藏" }, { status: 403 });
 
     const startDateStr = request.nextUrl.searchParams.get("startDate");
     const endDateStr = request.nextUrl.searchParams.get("endDate");

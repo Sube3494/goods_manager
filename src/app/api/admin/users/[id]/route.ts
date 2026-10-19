@@ -18,11 +18,14 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-    const { role, permissions, roleProfileId, isInternal, libraryIds, resetPermissionOverrides } = await request.json();
+    const { role, permissions, roleProfileId, isInternal, libraryIds, resetPermissionOverrides, dataHidden } = await request.json();
     const session = await getAuthorizedAdminAny("members:manage", "members:libraries");
     if (!session) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
+
+    if (dataHidden !== undefined && typeof dataHidden !== "boolean") return NextResponse.json({ error: "隐藏设置必须为布尔值" }, { status: 400 });
+    if (dataHidden !== undefined && session.role !== "SUPER_ADMIN") return NextResponse.json({ error: "仅超级管理员可设置数据隐藏" }, { status: 403 });
 
     const updatesMemberProfile = role !== undefined || permissions !== undefined || roleProfileId !== undefined || isInternal !== undefined || resetPermissionOverrides === true;
     const updatesLibraries = libraryIds !== undefined;
@@ -46,7 +49,8 @@ export async function PATCH(
 
     const shouldResetPermissionOverrides = resetPermissionOverrides === true && roleProfileId !== undefined && permissions === undefined;
     const nextPermissionFlags = permissions !== undefined ? normalizePermissionMap(permissions) : undefined;
-    const mergedPermissions = shouldResetPermissionOverrides
+    if (nextPermissionFlags) delete nextPermissionFlags.memberDataVisibility;
+    let mergedPermissions = shouldResetPermissionOverrides
       ? clearUserPermissionOverrides(currentPermissions)
       : nextPermissionFlags !== undefined
       ? {
@@ -54,6 +58,11 @@ export async function PATCH(
           ...nextPermissionFlags,
         }
       : undefined;
+
+    if (!currentUser) return NextResponse.json({ error: "成员不存在" }, { status: 404 });
+    if (dataHidden !== undefined) {
+      mergedPermissions = { ...(mergedPermissions ?? currentPermissions), memberDataVisibility: { hidden: dataHidden } };
+    }
 
     const updatedUser = await prisma.user.update({
       where: { id },
@@ -68,7 +77,12 @@ export async function PATCH(
       },
     });
 
-    return NextResponse.json(updatedUser);
+    return NextResponse.json({
+      id: updatedUser.id,
+      role: updatedUser.role,
+      roleProfileId: updatedUser.roleProfileId,
+      isInternal: updatedUser.isInternal,
+    });
   } catch {
     return NextResponse.json({ error: "Failed to update user" }, { status: 500 });
   }

@@ -1,3 +1,4 @@
+import { mayReadMemberData } from "@/lib/memberDataVisibilityServer";
 import { NextResponse } from "next/server";
 import { getAuthorizedUser } from "@/lib/auth";
 import { getAddressDetail, isAddressDisabled } from "@/lib/addressBook";
@@ -34,6 +35,9 @@ export async function GET(request: Request) {
   const targetUserId = (isAdmin && requestedUserId) ? requestedUserId : session.id;
 
   try {
+    if (!await mayReadMemberData(session, targetUserId)) {
+      return NextResponse.json({ error: "该成员数据已隐藏" }, { status: 403 });
+    }
     const user = await prisma.user.findUnique({
       where: { id: targetUserId },
       select: { shippingAddresses: true },

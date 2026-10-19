@@ -1,3 +1,4 @@
+import { mayReadMemberData } from "@/lib/memberDataVisibilityServer";
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
@@ -15,6 +16,7 @@ export async function GET(request: NextRequest) {
   const requestedUserId = request.nextUrl.searchParams.get("userId");
   const canManageMembers = user.role === "SUPER_ADMIN" || (["members:orders", "members:manage", "members:status", "whitelist:manage", "roles:manage"] as const).some((permission) => hasAdminAccess(user, permission));
   const userId = canManageMembers && requestedUserId ? requestedUserId : user.id;
+  if (!await mayReadMemberData(user, userId)) return NextResponse.json({ error: "该成员数据已隐藏" }, { status: 403 });
   try {
     const rules = await getFixedPromotionRules(userId, parseAsShanghaiTime(`${date} 23:59:59`));
     return NextResponse.json({ items: getActiveFixedPromotionRules(rules, date) });

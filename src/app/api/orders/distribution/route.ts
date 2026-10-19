@@ -1,3 +1,4 @@
+import { mayReadMemberData } from "@/lib/memberDataVisibilityServer";
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
@@ -59,6 +60,7 @@ export async function GET(request: NextRequest) {
       || String(session.roleProfile?.name || "").includes("管理")
       || hasPermission(session, "order:manage");
     const targetUserId = (canManageMembers && requestedUserId) ? requestedUserId : session.id;
+  if (!await mayReadMemberData(session, targetUserId)) return NextResponse.json({ error: "该成员数据已隐藏" }, { status: 403 });
 
     // 1. 读取麦芽田映射配置 + 个人资料地址库（门店来源）
     const user = await prisma.user.findUnique({

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import Image from "next/image";
 import md5 from "blueimp-md5";
-import { Shield, Settings2, Loader2, User as UserIcon, Mail, Plus, Trash2, AlertCircle, NotebookPen, Search, Check, UserCheck, Ban, MonitorSmartphone, Smartphone, FolderLock, ShoppingBag, X, Crown, ShieldAlert, Users, Trophy } from "lucide-react";
+import { Shield, Settings2, Loader2, User as UserIcon, Mail, Plus, Trash2, AlertCircle, NotebookPen, Search, Check, UserCheck, Ban, MonitorSmartphone, Smartphone, FolderLock, ShoppingBag, X, Crown, ShieldAlert, Users, Trophy, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { Switch } from "@/components/ui/Switch";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
@@ -56,6 +56,8 @@ interface WhitelistEntry {
     roleProfileId: string | null;
     roleProfile?: RoleProfile;
     isInternal?: boolean;
+    dataHidden?: boolean;
+    canViewData?: boolean;
     hasMaiyatianCookie?: boolean;
     maiyatianCookieCount?: number;
     maiyatianCookieVersion?: string;
@@ -526,7 +528,7 @@ export function UserManager() {
   const cookieLabel = (id: string) => ({ valid: "可用", partial: "部分账号不可用", invalid: "Cookie 不可用，请更新或重试", missing: "未配置", checking: "检测中", error: "检测失败，请重试" }[cookieStatuses[id]] || "未检测");
   const cookieShortLabel = (id: string) => ({ valid: "可用", partial: "部分异常", invalid: "不可用", missing: "未配置", checking: "检测中", error: "失败" }[cookieStatuses[id]] || "未检测");
   const isMaiyatianConfigured = (user?: WhitelistEntry["user"]) => {
-    return Boolean(user?.hasMaiyatianCookie);
+    return Boolean(user?.hasMaiyatianCookie && user.canViewData !== false);
   };
   const cookieTone = (id: string) => cookieStatuses[id] === "valid"
     ? "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10"
@@ -536,7 +538,7 @@ export function UserManager() {
   useEffect(() => {
     if (!canViewMemberOrders || !entries.length) return;
     const controller = new AbortController();
-    const ids = [...new Set(entries.flatMap((entry) => entry.user ? [entry.user.id] : []))];
+    const ids = [...new Set(entries.flatMap((entry) => entry.user && entry.user.canViewData !== false ? [entry.user.id] : []))];
     const versions = new Map(entries.flatMap((entry) => entry.user
       ? [[entry.user.id, entry.user.maiyatianCookieVersion] as const] : []));
     const dayMs = 24 * 60 * 60 * 1000;
@@ -803,6 +805,42 @@ export function UserManager() {
     }
   };
 
+  const [visibilitySavingId, setVisibilitySavingId] = useState<string | null>(null);
+  const handleDataVisibilityToggle = async (member: NonNullable<WhitelistEntry["user"]>) => {
+    if (visibilitySavingId) return;
+    setVisibilitySavingId(member.id);
+    try {
+      const response = await fetch(`/api/admin/users/${member.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dataHidden: !member.dataHidden }),
+      });
+      if (!response.ok) throw new Error("更新失败");
+      setEntries((current) => current.map((entry) => entry.user?.id === member.id ? { ...entry, user: { ...entry.user, dataHidden: !member.dataHidden } } : entry));
+      showToast(member.dataHidden ? "已恢复数据可见" : "已隐藏数据，仅本人和超级管理员可见", "success");
+    } catch {
+      showToast("更新数据可见性失败，请重试", "error");
+    } finally {
+      setVisibilitySavingId(null);
+    }
+  };
+  const renderDataVisibilityToggle = (entry: WhitelistEntry, compact = false) => sessionUser?.role === "SUPER_ADMIN" && entry.user ? (
+    <button type="button" disabled={visibilitySavingId !== null} onClick={() => void handleDataVisibilityToggle(entry.user!)}
+      title={entry.user.dataHidden ? "取消隐藏数据" : "隐藏数据，仅本人和超级管理员可见"}
+      aria-label={entry.user.dataHidden ? "取消隐藏数据" : "隐藏数据"}
+      aria-pressed={Boolean(entry.user.dataHidden)}
+      className={cn(
+        "inline-flex h-8 shrink-0 items-center justify-center gap-1.5 transition-all disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+        compact ? "w-8 rounded-full hover:scale-110 active:scale-95" : "w-full rounded-xl border px-3 text-xs font-bold",
+        entry.user.dataHidden
+          ? "border-amber-500/20 bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 dark:text-amber-300"
+          : compact ? "text-muted-foreground hover:bg-primary/15 hover:text-primary" : "border-border text-muted-foreground hover:bg-muted"
+      )}>
+      {visibilitySavingId === entry.user.id ? <Loader2 size={compact ? 15 : 13} className="animate-spin" /> : entry.user.dataHidden ? <EyeOff size={compact ? 15 : 13} /> : <Eye size={compact ? 15 : 13} />}
+      {!compact ? (entry.user.dataHidden ? "取消隐藏" : "隐藏数据") : null}
+    </button>
+  ) : null;
+
   const handleInternalToggle = async (userId: string, isInternal: boolean) => {
     if (!canManageMembers) return;
     try {
@@ -1007,7 +1045,7 @@ export function UserManager() {
       ) : (
         <ProfitLeaderboard
           cacheScope={JSON.stringify([sessionUser?.id, getEffectivePermissions(sessionUser)])}
-          members={entries.flatMap(entry => entry.user ? [{ id: entry.user.id, name: entry.user.name?.trim() || entry.email.split("@")[0], email: entry.email, credentialVersion: entry.user.maiyatianCookieVersion }] : [])}
+          members={entries.flatMap(entry => entry.user && entry.user.canViewData !== false ? [{ id: entry.user.id, name: entry.user.name?.trim() || entry.email.split("@")[0], email: entry.email, credentialVersion: entry.user.maiyatianCookieVersion }] : [])}
           onSelect={id => {
             const entry = entries.find(item => item.user?.id === id);
             if (entry?.user) setViewOrdersUser({ id, name: entry.user.name || entry.email, email: entry.email, roleName: entry.user.roleProfile?.name || entry.roleProfile?.name });
@@ -1187,8 +1225,9 @@ export function UserManager() {
                       </td>
                        <td className="px-6 py-4 text-center">
                          <div className="flex justify-center">
-                            <div className="flex items-center gap-1 bg-muted/20 dark:bg-white/[0.02] p-1 rounded-full border border-border/40">
-                                {isRegistered && canViewMemberOrders ? (
+                            <div className="inline-flex shrink-0 items-center gap-1 bg-muted/20 dark:bg-white/[0.02] p-1 rounded-full border border-border/40">
+                                {renderDataVisibilityToggle(entry, true)}
+                                {isRegistered && canViewMemberOrders && entry.user?.canViewData !== false ? (
                                   (() => {
                                     const isConfigured = isMaiyatianConfigured(entry.user);
                                     return (
@@ -1364,8 +1403,10 @@ export function UserManager() {
                       </div>
                     </div>
 
+                    {entry.user?.dataHidden ? <div className="mt-2 text-xs text-muted-foreground">数据已隐藏 · 仅本人和超级管理员可见</div> : null}
                     {/* 操作按钮区 */}
                     <div className="mt-2.5 grid grid-cols-2 gap-1.5">
+                      {renderDataVisibilityToggle(entry)}
                       {canManageWhitelist && (
                         <button
                           onClick={() => setEditingRemarkEntry(entry)}
@@ -1389,7 +1430,7 @@ export function UserManager() {
                           角色分配
                         </button>
                       )}
-                      {isRegistered && canViewMemberOrders && (
+                      {isRegistered && canViewMemberOrders && entry.user?.canViewData !== false && (
                         (() => {
                           const isConfigured = isMaiyatianConfigured(entry.user);
                           return (

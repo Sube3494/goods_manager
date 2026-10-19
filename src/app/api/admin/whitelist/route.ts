@@ -1,3 +1,4 @@
+import { canViewMemberData, isMemberDataHidden } from "@/lib/memberDataVisibility";
 import { NextResponse } from "next/server";
 import { createHash } from "node:crypto";
 import prisma from "@/lib/prisma";
@@ -89,6 +90,9 @@ export async function GET() {
                 .digest("hex");
             userWithConfig = {
                 ...userRecord,
+                permissions: Object.fromEntries(Object.entries(rawPermissions).filter(([key]) => key !== "autoPickIntegration")),
+                dataHidden: isMemberDataHidden(userRecord.permissions),
+                canViewData: canViewMemberData(session, userRecord.id, userRecord.permissions),
                 hasMaiyatianCookie,
                 maiyatianCookieCount,
                 maiyatianCookieVersion,
