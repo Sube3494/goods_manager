@@ -1,6 +1,6 @@
 "use client";
 
-import { Component, memo, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { Component, memo, type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import Image from "next/image";
 import dynamic from "next/dynamic";
 import {
@@ -3106,6 +3106,8 @@ export const OrderProfitBadge = memo(function OrderProfitBadge({
   const [isProfitTooltipOpen, setIsProfitTooltipOpen] = useState(false);
   const [isProfitTooltipHovering, setIsProfitTooltipHovering] = useState(false);
   const profitTooltipRef = useRef<HTMLDivElement>(null);
+  const profitTooltipContentRef = useRef<HTMLDivElement>(null);
+  const [profitPlacement, setProfitPlacement] = useState({ above: false, maxHeight: 0 });
   const profitTooltipHoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const clearProfitTooltipHoverTimeout = useCallback(() => {
@@ -3165,6 +3167,35 @@ export const OrderProfitBadge = memo(function OrderProfitBadge({
   }, [clearProfitTooltipHoverTimeout]);
 
   const isProfitTooltipVisible = isProfitTooltipOpen || isProfitTooltipHovering;
+
+  useLayoutEffect(() => {
+    if (!isProfitTooltipVisible) return;
+    const updatePlacement = () => {
+      const anchor = profitTooltipRef.current;
+      const content = profitTooltipContentRef.current;
+      if (!anchor || !content) return;
+      if (window.innerWidth < 640) {
+        setProfitPlacement({ above: false, maxHeight: 0 });
+        return;
+      }
+      const rect = anchor.getBoundingClientRect();
+      const below = Math.max(0, window.innerHeight - rect.bottom - 24);
+      const aboveSpace = Math.max(0, rect.top - 24);
+      const above = content.scrollHeight > below && aboveSpace > below;
+      const maxHeight = above ? aboveSpace : below;
+      setProfitPlacement((current) => current.above === above && current.maxHeight === maxHeight ? current : { above, maxHeight });
+    };
+    updatePlacement();
+    const observer = new ResizeObserver(updatePlacement);
+    if (profitTooltipContentRef.current) observer.observe(profitTooltipContentRef.current);
+    window.addEventListener("resize", updatePlacement);
+    window.addEventListener("scroll", updatePlacement, true);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", updatePlacement);
+      window.removeEventListener("scroll", updatePlacement, true);
+    };
+  }, [isProfitTooltipVisible]);
 
   const isPureOffline = isPureManualOfflineOrder(order);
   const displayAsOfflineOrder = isPureOffline;
@@ -3345,7 +3376,8 @@ export const OrderProfitBadge = memo(function OrderProfitBadge({
         <>
           <div
             className={cn(
-              "pointer-events-none absolute top-full hidden h-4 w-70 sm:block",
+              "pointer-events-none absolute hidden h-4 w-70 sm:block",
+              profitPlacement.above ? "bottom-full" : "top-full",
               align === "right" ? "right-0" : "left-1/2 -translate-x-1/2"
             )}
           />
@@ -3361,19 +3393,16 @@ export const OrderProfitBadge = memo(function OrderProfitBadge({
           ) : null}
           {isProfitTooltipVisible ? (
             <div
+              ref={profitTooltipContentRef}
+              style={profitPlacement.maxHeight ? { maxHeight: profitPlacement.maxHeight } : undefined}
               className={cn(
-                "fixed left-1/2 top-1/2 z-50 w-[min(320px,calc(100vw-2rem))] max-h-[calc(100vh-2rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border border-slate-200/90 bg-white/98 p-3 text-left shadow-[0_22px_60px_rgba(15,23,42,0.22)] dark:border-white/12 dark:bg-[#171b22]/96 dark:shadow-[0_24px_60px_rgba(0,0,0,0.45)] sm:absolute sm:top-full sm:z-30 sm:mt-3 sm:w-70 sm:max-h-none sm:translate-y-0 sm:overflow-visible",
+                "fixed left-1/2 top-1/2 z-50 w-[min(320px,calc(100vw-2rem))] max-h-[calc(100vh-2rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border border-slate-200/90 bg-white/98 p-3 text-left shadow-[0_22px_60px_rgba(15,23,42,0.22)] dark:border-white/12 dark:bg-[#171b22]/96 dark:shadow-[0_24px_60px_rgba(0,0,0,0.45)] sm:absolute sm:z-30 sm:w-70 sm:translate-y-0",
+                profitPlacement.above ? "sm:top-auto sm:bottom-full sm:mb-3" : "sm:top-full sm:mt-3",
                 align === "right"
                   ? "sm:right-0 sm:left-auto sm:translate-x-0"
                   : "sm:left-1/2 sm:right-auto sm:-translate-x-1/2"
               )}
             >
-              <div
-                className={cn(
-                  "hidden absolute top-0 h-3 w-3 -translate-y-1/2 rotate-45 border-l border-t border-slate-200/90 bg-white/98 dark:border-white/12 dark:bg-[#171b22]/96 sm:block",
-                  align === "right" ? "right-6 sm:right-6" : "left-1/2 -translate-x-1/2"
-                )}
-              />
               <button
                 type="button"
                 onPointerDown={(event) => {
