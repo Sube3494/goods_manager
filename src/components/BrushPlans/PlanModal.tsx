@@ -628,6 +628,7 @@ export function PlanModal({ isOpen, onClose, onSubmit, initialData, readOnly = f
                 selectedIds={replacementIndex !== null && formData.items?.[replacementIndex]?.productId ? [formData.items[replacementIndex].productId!] : []}
                 singleSelect={replacementIndex !== null}
                 disableAlreadySelected={false}
+                pinSelected={false}
                 showPlatformSelector={replacementIndex === null}
                 confirmLabel={replacementIndex === null ? undefined : "确认替换"}
                 fetchPath="/api/brush-products/products"

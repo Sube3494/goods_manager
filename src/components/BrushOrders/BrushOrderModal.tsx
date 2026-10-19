@@ -535,6 +535,7 @@ export function BrushOrderModal({ isOpen, onClose, onSubmit, initialData, readOn
         onClose={() => setIsSelectionModalOpen(false)}
         onSelect={handleBatchAdd}
         selectedIds={formData.items.map(i => i.productId)}
+        pinSelected={false}
         showPrice={false}
         showSku
         fetchPath="/api/purchase-products"

@@ -124,6 +124,7 @@ interface ProductSelectionModalProps {
   onClose: () => void;
   onSelect: (products: Product[], platform: string) => void;
   selectedIds: string[];
+  pinSelected?: boolean;
   selectedBadgeLabel?: string;
   unselectedOnlyLabel?: string;
   unselectedOnlyTitle?: string;
@@ -194,6 +195,7 @@ export function ProductSelectionModal({
   onClose,
   onSelect,
   selectedIds,
+  pinSelected = true,
   selectedBadgeLabel = "已在计划中",
   singleSelect = false,
   showPrice = true,
@@ -697,8 +699,8 @@ export function ProductSelectionModal({
     const rawList = filterVisibleProducts(Array.isArray(products) ? products : [], displayCategoryName);
     const sortedRawList = sortProducts(rawList, sortBy);
 
-    // 搜索模式下保持原生搜索结果并保持排序
-    if (debouncedSearch.trim()) {
+    // 搜索或关闭选中置顶时，勾选不改变当前商品顺序。
+    if (!pinSelected || debouncedSearch.trim()) {
       return sortedRawList;
     }
 
@@ -738,7 +740,7 @@ export function ProductSelectionModal({
     }
 
     return [...selectedInList, ...unselectedInList];
-  }, [debouncedSearch, displayCategoryName, filterVisibleProducts, getSelectionKey, products, selectedProducts, sortBy, tempSelectedIds]);
+  }, [debouncedSearch, displayCategoryName, filterVisibleProducts, getSelectionKey, pinSelected, products, selectedProducts, sortBy, tempSelectedIds]);
 
   const hasMoreLocal = filteredProducts.length > localVisibleCount;
 
