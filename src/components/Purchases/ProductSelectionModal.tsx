@@ -90,9 +90,11 @@ function sortProducts(items: Product[], sortKey: string) {
     } else if (sortKey === "createdAt-desc") {
       const diff = new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
       if (diff !== 0) return diff;
+      return String(a.id || "").localeCompare(String(b.id || ""));
     } else if (sortKey === "createdAt-asc") {
       const diff = new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime();
       if (diff !== 0) return diff;
+      return String(a.id || "").localeCompare(String(b.id || ""));
     } else if (sortKey === "name-asc") {
       const cmp = naturalSortCollator.compare(String(a.name || "").trim(), String(b.name || "").trim());
       if (cmp !== 0) return cmp;
