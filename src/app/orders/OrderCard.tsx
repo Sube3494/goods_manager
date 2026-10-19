@@ -1492,10 +1492,16 @@ export function PromotionMetricCard({
 }
 
 
-export function OrderStatusProfitPreview({ order, isProfitUpdating = false, canViewProductCosts = true, cancelReason, children }: {
+export function shouldShowOrderProfitBadge(order: AutoPickOrder, canViewProductCosts = true, isProfitUpdating = false) {
+  const hasProfit = typeof order.pureProfit === "number" && Number.isFinite(order.pureProfit);
+  return !isProfitUpdating && (hasProfit || (canViewProductCosts && Boolean(getProductCostStatusText(order))));
+}
+
+export function OrderStatusProfitPreview({ order, isProfitUpdating = false, canViewProductCosts = true, profitBadgeVisible = false, cancelReason, children }: {
   order: AutoPickOrder;
   isProfitUpdating?: boolean;
   canViewProductCosts?: boolean;
+  profitBadgeVisible?: boolean;
   cancelReason?: string;
   children: ReactNode;
 }) {
@@ -1523,6 +1529,9 @@ export function OrderStatusProfitPreview({ order, isProfitUpdating = false, canV
       </HoverCard>
     );
   }
+
+  // 已有独立利润胶囊时，状态仅负责展示状态，避免同单出现两个利润浮窗。
+  if (profitBadgeVisible) return <>{children}</>;
 
   const hasRecordedCost = order.productCostStatus === "ready"
     && typeof order.productCost === "number"
@@ -1584,7 +1593,7 @@ export function StatusBadge({ order, isProfitUpdating = false, canViewProductCos
   const isCancelled = display === "已取消" || isCancelledStatus(order.status) || fullyRefunded;
   const cancelReason = isCancelled ? (getCancelReason(order) || (fullyRefunded ? "全单退款" : "")) : "";
   return (
-    <OrderStatusProfitPreview order={order} isProfitUpdating={isProfitUpdating} canViewProductCosts={canViewProductCosts} cancelReason={cancelReason}>
+    <OrderStatusProfitPreview order={order} isProfitUpdating={isProfitUpdating} canViewProductCosts={canViewProductCosts} profitBadgeVisible={shouldShowOrderProfitBadge(order, canViewProductCosts, isProfitUpdating)} cancelReason={cancelReason}>
       <span className={cn("inline-flex h-7 items-center gap-1.5 rounded-full border px-2 text-[11px] font-medium leading-none sm:h-8 sm:gap-1.5 sm:px-2.5 sm:text-[13px]", tone.badge)}>
         <span className={cn("h-1.5 w-1.5 rounded-full shrink-0", tone.dot)} />
         {display}
@@ -3253,11 +3262,7 @@ export const OrderProfitBadge = memo(function OrderProfitBadge({
     };
   });
 
-  if (isProfitUpdating) {
-    return null;
-  }
-
-  if (!hasPureProfit && (!canViewProductCosts || !productCostStatusText)) {
+  if (!shouldShowOrderProfitBadge(order, canViewProductCosts, isProfitUpdating)) {
     return null;
   }
 
