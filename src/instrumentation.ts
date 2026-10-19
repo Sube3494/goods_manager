@@ -2,6 +2,7 @@ export async function register() {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
     const { BackupService } = await import('@/lib/backup-service');
     const { startAutoCompleteScheduler } = await import('@/lib/autoPickAutoComplete');
+    const { startQueuedSelfDeliveryScheduler } = await import('@/lib/queuedSelfDelivery');
     
     console.log('--- Initializing Backup Service Watcher ---');
     
@@ -20,5 +21,6 @@ export async function register() {
 
     console.log('--- Initializing Auto Pick Auto Complete Scheduler ---');
     await startAutoCompleteScheduler();
+    startQueuedSelfDeliveryScheduler();
   }
 }

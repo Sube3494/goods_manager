@@ -352,6 +352,7 @@ export interface AutoPickOrder {
     }>;
   }> | null;
   pureProfit?: number | null;
+  queuedSelfDelivery?: unknown;
   productCostStatus?: "ready" | "pending-outbound" | "pending-backfill";
   missingCostItemCount?: number | null;
   firstMissingCostShopProductId?: string | null;

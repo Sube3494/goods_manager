@@ -1,4 +1,6 @@
 "use client";
+import { readQueuedSelfDelivery, isOrderReadyForQueuedSelfDelivery } from "@/lib/queuedSelfDeliveryRules";
+
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import Image from "next/image";
@@ -52,6 +54,7 @@ import {
   toCurrency,
   OrderProfitBadge,
   OrderStatusProfitPreview,
+  QueuedSelfDeliveryNotice,
 } from "./OrderCard";
 import { ORDER_GROUPS, getOrderGroup } from "@/lib/orderGroups";
 import { isRematchReturnReason } from "@/lib/outboundReturnMeta";
@@ -173,6 +176,15 @@ function CompactTodayOrderCard({
   const isLockedSubscribe = isLockedSubscribeOrder(order);
   const selfDeliveryActive = isAutoPickOrderSelfDeliveryActive(order);
   const cannotSelfDeliver = Boolean(actingId) || terminal || delivering || selfDeliveryActive || pickup || riderAssigned || isLockedSubscribe;
+  const selfDeliveryQueue = readQueuedSelfDelivery(order.queuedSelfDelivery);
+  const selfDeliveryQueued = selfDeliveryQueue?.status === "waiting";
+  const selfDeliveryRunning = selfDeliveryQueue?.status === "running";
+  const readyForSelfDelivery = isOrderReadyForQueuedSelfDelivery(order);
+  const selfDeliveryAction: OrderAction = selfDeliveryQueued || !readyForSelfDelivery ? "queue-self-delivery" : "self-delivery";
+  const selfDeliveryLabel = selfDeliveryRunning ? "正在自配…" : selfDeliveryQueued ? "取消自动自配" : readyForSelfDelivery ? "自配" : "拣货后自配";
+  const selfDeliveryDisabled = Boolean(order.isSubscribe) || selfDeliveryRunning || (selfDeliveryQueued ? Boolean(actingId) : cannotSelfDeliver);
+  const queuedSelfDeliveryTitle = selfDeliveryQueue?.error || (selfDeliveryQueued ? "已标记拣货后自动自配，点击取消" : "先标记，平台完成拣货后自动发起自配");
+
   const showAutoOutboundRecovery = shouldShowAutoOutboundRecovery(order);
   const syncing = actingId === `${order.id}:sync`;
   const shopName = order.matchedShopName || order.rawShopName || order.shopId || "未匹配店铺";
@@ -228,7 +240,8 @@ function CompactTodayOrderCard({
               {orderTypeLabel ? <span className="inline-flex h-5 shrink-0 items-center rounded-full border border-violet-500/20 bg-violet-500/10 px-1.5 text-[10px] font-semibold leading-none text-violet-700 dark:text-violet-300">{orderTypeLabel}</span> : null}
               {showBrushMarker ? <span className="inline-flex h-5 shrink-0 items-center rounded-full border border-rose-500/20 bg-rose-500/10 px-1.5 text-[10px] font-semibold leading-none text-rose-700 dark:text-rose-300">刷单</span> : null}
             </div>
-            <div className="flex shrink-0 items-center">
+            <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
+              <QueuedSelfDeliveryNotice order={order} />
               {showAutoOutboundRecovery ? (
                 readOnly ? (
                   <span title={order.autoOutboundError || "自动出库失败"} className="inline-flex items-center gap-1 rounded-full border border-rose-500/25 bg-rose-500/10 px-2.5 py-1 text-xs font-semibold text-rose-700 dark:text-rose-300">
@@ -366,19 +379,20 @@ function CompactTodayOrderCard({
                 label="叫配送"
                 icon={<Navigation size={12} />}
                 onClick={() => onRunAction("dispatch-delivery")}
-                disabled={cannotSelfDeliver}
+                disabled={cannotSelfDeliver || selfDeliveryQueued || selfDeliveryRunning}
                 title={isLockedSubscribe ? "预约单尚未到达配送时间，不能发起配送" : delivering || selfDeliveryActive ? "订单已有配送任务，不能重复呼叫配送" : "选择第三方运力并呼叫配送"}
                 iconOnly
               />
             ) : null}
             {showPlatformActions && !deleted && !order.isSubscribe && !isLockedSubscribe ? (
               <ActionButton
-                label="自配"
-                icon={actingId === `${order.id}:self-delivery` ? <Loader2 size={12} className="animate-spin" /> : <Truck size={12} />}
-                onClick={() => onRunAction("self-delivery")}
-                disabled={cannotSelfDeliver}
-                title={isLockedSubscribe ? "预约单尚未到达配送时间，不能发起自配" : terminal ? "订单已结束，不能发起自配" : delivering || selfDeliveryActive ? "订单已有配送任务，不能重复发起自配" : riderAssigned ? "骑手已接单，不能发起自配" : undefined}
-                iconOnly
+                label={selfDeliveryLabel}
+                variant={selfDeliveryQueued ? "primary" : "default"}
+                icon={actingId === `${order.id}:${selfDeliveryAction}` ? <Loader2 size={12} className="animate-spin" /> : <Truck size={12} />}
+                onClick={() => onRunAction(selfDeliveryAction)}
+                disabled={selfDeliveryDisabled}
+                title={selfDeliveryQueued || !readyForSelfDelivery ? queuedSelfDeliveryTitle : isLockedSubscribe ? "预约单尚未到达配送时间，不能发起自配" : terminal ? "订单已结束，不能发起自配" : delivering || selfDeliveryActive ? "订单已有配送任务，不能重复发起自配" : riderAssigned ? "骑手已接单，不能发起自配" : undefined}
+                iconOnly={!selfDeliveryQueued && readyForSelfDelivery}
               />
             ) : null}
             {showPlatformActions ? (
@@ -411,7 +425,7 @@ function CompactTodayOrderCard({
   );
 }
 
-type OrderAction = "self-delivery" | "dispatch-delivery" | "complete-delivery" | "pickup-complete" | "sync" | "outbound" | "sync-brush";
+type OrderAction = "self-delivery" | "queue-self-delivery" | "dispatch-delivery" | "complete-delivery" | "pickup-complete" | "sync" | "outbound" | "sync-brush";
 type TodayOrderLayout = "cards" | "list";
 type PurchaseDraftPayload = OrderPurchaseDraft;
 type ShopProfitInfo = {
@@ -1015,6 +1029,10 @@ export function TodayOrdersView({
           body: JSON.stringify({ ids: [orderId] }),
         };
       }
+      if (action === "queue-self-delivery") {
+        const current = orders.find((order) => order.id === orderId);
+        requestInit = { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled: readQueuedSelfDelivery(current?.queuedSelfDelivery)?.status !== "waiting" }) };
+      }
       const response = await fetch(`/api/orders/${orderId}/${action}`, requestInit);
       const data = await response.json().catch(() => ({}));
 
@@ -1124,7 +1142,7 @@ export function TodayOrdersView({
           } as AutoPickOrder;
         });
       } else {
-        showToast("操作成功", "success");
+        showToast(action === "queue-self-delivery" ? (data.message || "自动自配设置已更新") : "操作成功", "success");
         if (data.order) {
           patchOrder(orderId, (order) => {
             const rawShopName = String(data.order.rawShopName || order.rawShopName || "").trim();

@@ -1,4 +1,6 @@
 "use client";
+import { readQueuedSelfDelivery, isOrderReadyForQueuedSelfDelivery } from "@/lib/queuedSelfDeliveryRules";
+
 
 import { Component, memo, type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import Image from "next/image";
@@ -33,7 +35,7 @@ import { ProductSelectionModal } from "@/components/Purchases/ProductSelectionMo
 import { OrderExtraExpenseModal } from "@/components/Orders/OrderExtraExpenseModal";
 import { createPortal } from "react-dom";
 import { AutoPickOrder, AutoPickOrderItem, AutoPickIntegrationConfig, MaiyatianCookieAccount } from "@/lib/types";
-type OrderAction = "self-delivery" | "dispatch-delivery" | "complete-delivery" | "pickup-complete" | "sync" | "outbound" | "sync-brush";
+type OrderAction = "self-delivery" | "queue-self-delivery" | "dispatch-delivery" | "complete-delivery" | "pickup-complete" | "sync" | "outbound" | "sync-brush";
 import {
   getBaseAutoPickStatusDisplay,
   isAutoPickOrderAbnormalStatus,
@@ -1557,6 +1559,21 @@ export function OrderStatusProfitPreview({ order, isProfitUpdating = false, canV
   if (isProfitUpdating) return <>{children}</>;
   return (
     <OrderProfitBadge order={previewOrder} readOnly canViewProductCosts={canViewProductCosts} trigger={children} estimated={isEstimate} cancelReason={cancelReason} />
+  );
+}
+
+export function QueuedSelfDeliveryNotice({ order }: { order: AutoPickOrder }) {
+  const job = readQueuedSelfDelivery(order.queuedSelfDelivery);
+  if (!job?.error || (job.status !== "failed" && job.status !== "cancelled")) return null;
+  return (
+    <HoverCard openDelay={200}>
+      <HoverCardTrigger asChild>
+        <button type="button" onClick={(event) => event.stopPropagation()} className="inline-flex shrink-0 items-center gap-1 rounded-full border border-rose-500/20 bg-rose-500/10 px-2 py-1 text-[11px] text-rose-700 dark:text-rose-300">
+          <TriangleAlert size={12} />{job.status === "failed" ? "自动自配失败" : "自动自配已停止"}
+        </button>
+      </HoverCardTrigger>
+      <HoverCardContent className="w-64 text-xs leading-5">{job.error}</HoverCardContent>
+    </HoverCard>
   );
 }
 
@@ -3866,7 +3883,16 @@ export const OrderCard = memo(function OrderCard({
   const riderAssigned = !deliveryCancelled && isAutoPickOrderRiderAssigned(order);
   const isLockedSubscribe = isLockedSubscribeOrder(order);
   const selfDeliveryActive = isAutoPickOrderSelfDeliveryActive(order);
-  const cannotSelfDeliver = Boolean(actingId) || terminal || delivering || selfDeliveryActive || pickup || riderAssigned || Boolean(order.isSubscribe) || isLockedSubscribe;
+  const cannotSelfDeliver = Boolean(actingId) || terminal || delivering || selfDeliveryActive || pickup || riderAssigned || isLockedSubscribe;
+  const selfDeliveryQueue = readQueuedSelfDelivery(order.queuedSelfDelivery);
+  const selfDeliveryQueued = selfDeliveryQueue?.status === "waiting";
+  const selfDeliveryRunning = selfDeliveryQueue?.status === "running";
+  const readyForSelfDelivery = isOrderReadyForQueuedSelfDelivery(order);
+  const selfDeliveryAction: OrderAction = selfDeliveryQueued || !readyForSelfDelivery ? "queue-self-delivery" : "self-delivery";
+  const selfDeliveryLabel = selfDeliveryRunning ? "正在自配…" : selfDeliveryQueued ? "取消自动自配" : readyForSelfDelivery ? "自配" : "拣货后自配";
+  const selfDeliveryDisabled = Boolean(order.isSubscribe) || selfDeliveryRunning || (selfDeliveryQueued ? Boolean(actingId) : cannotSelfDeliver);
+  const queuedSelfDeliveryTitle = selfDeliveryQueue?.error || (selfDeliveryQueued ? "已标记拣货后自动自配，点击取消" : "先标记，平台完成拣货后自动发起自配");
+
   const selfDeliveryTitle = pickup
     ? "到店自取订单不需要发起自配送"
     : isLockedSubscribe
@@ -4197,6 +4223,7 @@ export const OrderCard = memo(function OrderCard({
                       </span>
                     )
                   ) : null}
+                  <QueuedSelfDeliveryNotice order={order} />
                   <StatusBadge order={order} isProfitUpdating={isProfitUpdating} canViewProductCosts={canViewProductCosts} />
                   <OrderProfitBadge
                     order={order}
@@ -4395,8 +4422,8 @@ export const OrderCard = memo(function OrderCard({
                         </span>
                       </div>
                       {showPlatformActions && !displayAsOfflineOrder && !deleted && !readOnly && !order.isSubscribe && !isLockedSubscribe ? (
-                        <button type="button" onClick={(e) => { e.stopPropagation(); onRunAction(order.id, "self-delivery"); }} disabled={cannotSelfDeliver} title={selfDeliveryTitle} className="ml-auto inline-flex h-6 shrink-0 items-center gap-1 rounded-full border border-sky-500/20 bg-sky-500/10 px-2 text-[11px] font-semibold text-sky-700 transition-all hover:bg-sky-500/15 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 dark:text-sky-300 sm:hidden">
-                          {actingId === `${order.id}:self-delivery` ? <Loader2 size={11} className="animate-spin" /> : <Truck size={11} />}<span>自配</span>
+                        <button type="button" onClick={(e) => { e.stopPropagation(); onRunAction(order.id, selfDeliveryAction); }} disabled={selfDeliveryDisabled} title={selfDeliveryQueued || !readyForSelfDelivery ? queuedSelfDeliveryTitle : selfDeliveryTitle} className="ml-auto inline-flex h-6 shrink-0 items-center gap-1 rounded-full border border-sky-500/20 bg-sky-500/10 px-2 text-[11px] font-semibold text-sky-700 transition-all hover:bg-sky-500/15 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 dark:text-sky-300 sm:hidden">
+                          {actingId === `${order.id}:${selfDeliveryAction}` ? <Loader2 size={11} className="animate-spin" /> : <Truck size={11} />}<span>{selfDeliveryLabel}</span>
                         </button>
                       ) : null}
                     </div>
@@ -4534,8 +4561,8 @@ export const OrderCard = memo(function OrderCard({
               </span>
             ) : null}
             {showPlatformActions && !displayAsOfflineOrder && !deleted && !readOnly && !order.isSubscribe && !isLockedSubscribe ? (
-              <button type="button" onClick={() => onRunAction(order.id, "self-delivery")} disabled={cannotSelfDeliver} title={selfDeliveryTitle} className="hidden h-7 sm:h-8 items-center gap-1.5 rounded-full border border-sky-500/20 bg-sky-500/10 px-2 text-[11px] font-medium leading-none text-sky-700 transition-all hover:bg-sky-500/15 disabled:cursor-not-allowed disabled:opacity-45 dark:text-sky-300 sm:inline-flex sm:px-2.5 sm:text-[13px]">
-                {actingId === `${order.id}:self-delivery` ? <Loader2 size={12} className="animate-spin" /> : <Truck size={12} />}自配
+              <button type="button" onClick={() => onRunAction(order.id, selfDeliveryAction)} disabled={selfDeliveryDisabled} title={selfDeliveryQueued || !readyForSelfDelivery ? queuedSelfDeliveryTitle : selfDeliveryTitle} className="hidden h-7 sm:h-8 items-center gap-1.5 rounded-full border border-sky-500/20 bg-sky-500/10 px-2 text-[11px] font-medium leading-none text-sky-700 transition-all hover:bg-sky-500/15 disabled:cursor-not-allowed disabled:opacity-45 dark:text-sky-300 sm:inline-flex sm:px-2.5 sm:text-[13px]">
+                {actingId === `${order.id}:${selfDeliveryAction}` ? <Loader2 size={12} className="animate-spin" /> : <Truck size={12} />}{selfDeliveryLabel}
               </button>
             ) : null}
           </div>
@@ -4574,7 +4601,7 @@ export const OrderCard = memo(function OrderCard({
                     title={isLockedSubscribe ? "预约单尚未到达配送时间，不能发起配送" : delivering || selfDeliveryActive ? "订单已有配送任务，不能重复呼叫配送" : "选择第三方运力并呼叫配送"}
                     icon={<Navigation size={14} />}
                     onClick={() => onRunAction(order.id, "dispatch-delivery")}
-                    disabled={cannotSelfDeliver}
+                    disabled={cannotSelfDeliver || selfDeliveryQueued || selfDeliveryRunning}
                     mobileIconOnly
                   />
                 ) : null}

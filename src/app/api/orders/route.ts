@@ -1316,6 +1316,7 @@ export async function GET(request: NextRequest) {
           customerPhoneTail: true,
           lastSyncedAt: true,
           autoCompleteAt: true,
+          queuedSelfDelivery: true,
           createdAt: true,
           updatedAt: true,
           items: {

@@ -1,4 +1,6 @@
 "use client";
+import { readQueuedSelfDelivery } from "@/lib/queuedSelfDeliveryRules";
+
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowUp, ChevronDown, Loader2, Package2, Search, X } from "lucide-react";
@@ -75,7 +77,7 @@ function OrderListSkeleton({ count = 3 }: { count?: number }) {
   );
 }
 
-type OrderAction = "self-delivery" | "dispatch-delivery" | "complete-delivery" | "pickup-complete" | "sync" | "outbound" | "sync-brush";
+type OrderAction = "self-delivery" | "queue-self-delivery" | "dispatch-delivery" | "complete-delivery" | "pickup-complete" | "sync" | "outbound" | "sync-brush";
 type PurchaseDraftPayload = OrderPurchaseDraft;
 type ShopProfitInfo = {
   id: string | null;
@@ -603,6 +605,10 @@ export function AllOrdersView({
           body: JSON.stringify({ ids: [orderId] }),
         };
       }
+      if (action === "queue-self-delivery") {
+        const current = orders.find((order) => order.id === orderId);
+        requestInit = { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled: readQueuedSelfDelivery(current?.queuedSelfDelivery)?.status !== "waiting" }) };
+      }
       const response = await fetch(`/api/orders/${orderId}/${action}`, requestInit);
       const data = await response.json().catch(() => ({}));
 
@@ -712,7 +718,7 @@ export function AllOrdersView({
           } as AutoPickOrder;
         });
       } else {
-        showToast("操作成功", "success");
+        showToast(action === "queue-self-delivery" ? (data.message || "自动自配设置已更新") : "操作成功", "success");
         if (data.order) {
           patchOrder(orderId, (order) => {
             const rawShopName = String(data.order.rawShopName || order.rawShopName || "").trim();
