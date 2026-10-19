@@ -64,6 +64,40 @@ async function main() {
   assert.equal((await patch({ dataHidden: true })).status, 200);
   assert.equal(await server.mayReadMemberData(admin, "target"), false);
   assert.equal(await server.mayReadMemberData(owner, "target"), true);
+  const listedUsers = [
+    { id: "target", email: "hidden@example.test", permissions: hidden },
+    { id: "hidden-only", email: "hidden-only@example.test", permissions: hidden },
+    { id: "visible", email: "visible@example.test", permissions: {} },
+  ];
+  const whitelistRoute = load("src/app/api/admin/whitelist/route.ts", {
+    "@/lib/memberDataVisibility": rules,
+    "next/server": { NextResponse: { json: (body, options) => ({ body, status: options?.status ?? 200 }) } },
+    "node:crypto": require("node:crypto"),
+    "@/lib/prisma": { default: {
+      emailWhitelist: { findMany: async () => [
+        { id: "whitelisted", email: "hidden@example.test" },
+        { id: "pending", email: "pending@example.test" },
+      ] },
+      invitation: { findMany: async () => [] },
+      user: { findMany: async () => listedUsers },
+      roleProfile: { findMany: async () => [] },
+    }, __esModule: true },
+    "@/lib/auth": { getAuthorizedAdminAny: async () => session, getOnlineDeviceCutoff: () => new Date() },
+    "@/lib/email": {},
+    "@/lib/utils": {},
+    "@/lib/autoPickOrders": { normalizeAutoPickIntegrationConfig: () => ({}) },
+    "@/lib/permissions": { calculateMemberPermissionWeight: () => 0 },
+  });
+  for (const viewer of [admin, owner, superAdmin]) {
+    session = viewer;
+    const response = await whitelistRoute.GET();
+    assert.equal(response.status, 200);
+    const emails = response.body.map((entry) => entry.email);
+    assert.equal(emails.includes("hidden@example.test"), viewer !== admin);
+    assert.equal(emails.includes("hidden-only@example.test"), viewer === superAdmin);
+    assert.equal(emails.includes("visible@example.test"), true);
+    assert.equal(emails.includes("pending@example.test"), true);
+  }
   console.log("成员数据隐藏：身份隔离、接口检查、恢复可见、防权限覆盖、保留既有配置均通过");
 }
 main().catch((error) => { console.error(error); process.exitCode = 1; });

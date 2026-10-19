@@ -150,7 +150,8 @@ export async function GET() {
       return a.email.localeCompare(b.email);
     });
 
-    return NextResponse.json(sortedEntries);
+    const visibleEntries = sortedEntries.filter((entry) => entry.user?.canViewData !== false);
+    return NextResponse.json(visibleEntries, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     console.error("Failed to fetch whitelist:", error);
     return NextResponse.json({ error: "Failed to fetch whitelist" }, { status: 500 });
