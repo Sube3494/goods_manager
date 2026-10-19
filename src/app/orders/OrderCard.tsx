@@ -25,7 +25,7 @@ import {
   Truck,
   X,
 } from "lucide-react";
-import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/hover-card";
+import { HoverCard, HoverCardTrigger, HoverCardContent, HoverCardArrow } from "@/components/ui/hover-card";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/Toast";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
@@ -1513,9 +1513,10 @@ export function OrderStatusProfitPreview({ order, isProfitUpdating = false, canV
             }}
           >{children}</button>
         </HoverCardTrigger>
-        <HoverCardContent align="end" className="w-auto max-w-72" onClick={(event) => event.stopPropagation()}>
+        <HoverCardContent align="end" sideOffset={8} className="w-auto max-w-72" onClick={(event) => event.stopPropagation()}>
           <div className="text-xs font-semibold">取消原因</div>
           <div className="mt-1 whitespace-normal break-words text-xs leading-5 text-muted-foreground">{cancelReason}</div>
+          <HoverCardArrow />
         </HoverCardContent>
       </HoverCard>
     );
