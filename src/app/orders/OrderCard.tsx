@@ -1497,6 +1497,30 @@ export function OrderStatusProfitPreview({ order, isProfitUpdating = false, canV
   cancelReason?: string;
   children: ReactNode;
 }) {
+  const [cancelReasonOpen, setCancelReasonOpen] = useState(false);
+  if (cancelReason) {
+    return (
+      <HoverCard open={cancelReasonOpen} onOpenChange={setCancelReasonOpen} openDelay={200}>
+        <HoverCardTrigger asChild>
+          <button
+            type="button"
+            className="inline-flex cursor-pointer rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            aria-label="查看取消原因"
+            aria-expanded={cancelReasonOpen}
+            onClick={(event) => {
+              event.stopPropagation();
+              setCancelReasonOpen((current) => !current);
+            }}
+          >{children}</button>
+        </HoverCardTrigger>
+        <HoverCardContent align="end" className="w-auto max-w-72" onClick={(event) => event.stopPropagation()}>
+          <div className="text-xs font-semibold">取消原因</div>
+          <div className="mt-1 whitespace-normal break-words text-xs leading-5 text-muted-foreground">{cancelReason}</div>
+        </HoverCardContent>
+      </HoverCard>
+    );
+  }
+
   const hasRecordedCost = order.productCostStatus === "ready"
     && typeof order.productCost === "number"
     && Number.isFinite(order.productCost);
