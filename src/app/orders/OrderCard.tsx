@@ -1513,7 +1513,7 @@ export function OrderStatusProfitPreview({ order, isProfitUpdating = false, canV
             }}
           >{children}</button>
         </HoverCardTrigger>
-        <HoverCardContent align="end" sideOffset={8} className="w-auto max-w-72" onClick={(event) => event.stopPropagation()}>
+        <HoverCardContent align="center" sideOffset={8} className="w-auto max-w-72" onClick={(event) => event.stopPropagation()}>
           <div className="text-xs font-semibold">取消原因</div>
           <div className="mt-1 whitespace-normal break-words text-xs leading-5 text-muted-foreground">{cancelReason}</div>
           <HoverCardArrow />
