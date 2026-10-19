@@ -1513,16 +1513,9 @@ export function OrderStatusProfitPreview({ order, isProfitUpdating = false, canV
             }}
           >{children}</button>
         </HoverCardTrigger>
-        <HoverCardContent
-          align="end"
-          sideOffset={12}
-          className="w-70 max-w-[calc(100vw-2rem)] rounded-2xl border border-slate-200/90 bg-white/98 p-3 text-left shadow-[0_22px_60px_rgba(15,23,42,0.22)] ring-0 dark:border-white/12 dark:bg-[#171b22]/96 dark:shadow-[0_24px_60px_rgba(0,0,0,0.45)]"
-          onClick={(event) => event.stopPropagation()}
-        >
-          <div className="border-b border-slate-200/80 pb-2 dark:border-white/8">
-            <div className="text-[13px] font-semibold text-slate-900 dark:text-white">取消原因</div>
-          </div>
-          <div className="mt-3 whitespace-normal break-words rounded-xl bg-slate-50 px-3 py-2 text-[12px] leading-5 text-slate-600 dark:bg-white/5 dark:text-white/68">{cancelReason}</div>
+        <HoverCardContent align="end" className="w-auto max-w-72" onClick={(event) => event.stopPropagation()}>
+          <div className="text-xs font-semibold">取消原因</div>
+          <div className="mt-1 whitespace-normal break-words text-xs leading-5 text-muted-foreground">{cancelReason}</div>
         </HoverCardContent>
       </HoverCard>
     );
