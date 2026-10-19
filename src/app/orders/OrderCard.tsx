@@ -3393,6 +3393,16 @@ export const OrderProfitBadge = memo(function OrderProfitBadge({
           ) : null}
           {isProfitTooltipVisible ? (
             <div
+              aria-hidden="true"
+              className={cn(
+                "pointer-events-none absolute z-40 hidden h-3 w-3 rotate-45 border-slate-200/90 bg-white/98 dark:border-white/12 dark:bg-[#171b22]/96 sm:block",
+                profitPlacement.above ? "bottom-full mb-1.5 border-r border-b" : "top-full mt-1.5 border-l border-t",
+                align === "right" ? "right-6" : "left-1/2 -translate-x-1/2"
+              )}
+            />
+          ) : null}
+          {isProfitTooltipVisible ? (
+            <div
               ref={profitTooltipContentRef}
               style={profitPlacement.maxHeight ? { maxHeight: profitPlacement.maxHeight } : undefined}
               className={cn(
