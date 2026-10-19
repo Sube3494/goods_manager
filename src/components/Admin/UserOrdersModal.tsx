@@ -29,7 +29,8 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { format, startOfMonth, endOfMonth } from "date-fns";
+import { format } from "date-fns";
+import { formatLocalDate } from "@/lib/dateUtils";
 import { cn, getPlatformMeta } from "@/lib/utils";
 import { simplifyShopName } from "@/lib/shopIdentity";
 import { toCurrency, getPlatformBadgeMeta } from "@/app/orders/OrderCard";
@@ -326,8 +327,9 @@ function UserProfitTrendView({
   localShops: Array<{ id: string; name: string; address: string }>;
   refreshTrigger?: number;
 }) {
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
+  const [defaultToday] = useState(() => formatLocalDate(new Date()));
+  const [startDate, setStartDate] = useState(() => `${defaultToday.slice(0, 7)}-01`);
+  const [endDate, setEndDate] = useState(defaultToday);
   const [selectedShopName, setSelectedShopName] = useState("");
   const [selectedPlatform, setSelectedPlatform] = useState("all");
   const [orderScope, setOrderScope] = useState<"all" | "true">("all");
@@ -1054,6 +1056,7 @@ export function UserOrdersModal({
               {activeTab === "profit-trend" ? (
                 userId ? (
                   <UserProfitTrendView
+                    key={userId}
                     userId={userId}
                     userName={userName}
                     localShops={localShops}
