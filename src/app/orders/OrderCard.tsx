@@ -3866,7 +3866,7 @@ export const OrderCard = memo(function OrderCard({
   const riderAssigned = !deliveryCancelled && isAutoPickOrderRiderAssigned(order);
   const isLockedSubscribe = isLockedSubscribeOrder(order);
   const selfDeliveryActive = isAutoPickOrderSelfDeliveryActive(order);
-  const cannotSelfDeliver = Boolean(actingId) || terminal || delivering || selfDeliveryActive || pickup || riderAssigned || isLockedSubscribe;
+  const cannotSelfDeliver = Boolean(actingId) || terminal || delivering || selfDeliveryActive || pickup || riderAssigned || Boolean(order.isSubscribe) || isLockedSubscribe;
   const selfDeliveryTitle = pickup
     ? "到店自取订单不需要发起自配送"
     : isLockedSubscribe
@@ -4394,7 +4394,7 @@ export const OrderCard = memo(function OrderCard({
                           {order.userAddress || "地址待同步"}
                         </span>
                       </div>
-                      {showPlatformActions && !displayAsOfflineOrder && !deleted && !readOnly && !isLockedSubscribe ? (
+                      {showPlatformActions && !displayAsOfflineOrder && !deleted && !readOnly && !order.isSubscribe && !isLockedSubscribe ? (
                         <button type="button" onClick={(e) => { e.stopPropagation(); onRunAction(order.id, "self-delivery"); }} disabled={cannotSelfDeliver} title={selfDeliveryTitle} className="ml-auto inline-flex h-6 shrink-0 items-center gap-1 rounded-full border border-sky-500/20 bg-sky-500/10 px-2 text-[11px] font-semibold text-sky-700 transition-all hover:bg-sky-500/15 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 dark:text-sky-300 sm:hidden">
                           {actingId === `${order.id}:self-delivery` ? <Loader2 size={11} className="animate-spin" /> : <Truck size={11} />}<span>自配</span>
                         </button>
@@ -4533,7 +4533,7 @@ export const OrderCard = memo(function OrderCard({
                 </span>
               </span>
             ) : null}
-            {showPlatformActions && !displayAsOfflineOrder && !deleted && !readOnly && !isLockedSubscribe ? (
+            {showPlatformActions && !displayAsOfflineOrder && !deleted && !readOnly && !order.isSubscribe && !isLockedSubscribe ? (
               <button type="button" onClick={() => onRunAction(order.id, "self-delivery")} disabled={cannotSelfDeliver} title={selfDeliveryTitle} className="hidden h-7 sm:h-8 items-center gap-1.5 rounded-full border border-sky-500/20 bg-sky-500/10 px-2 text-[11px] font-medium leading-none text-sky-700 transition-all hover:bg-sky-500/15 disabled:cursor-not-allowed disabled:opacity-45 dark:text-sky-300 sm:inline-flex sm:px-2.5 sm:text-[13px]">
                 {actingId === `${order.id}:self-delivery` ? <Loader2 size={12} className="animate-spin" /> : <Truck size={12} />}自配
               </button>

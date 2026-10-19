@@ -64,6 +64,14 @@ export async function POST(_: NextRequest, context: { params: Promise<{ id: stri
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
 
+    const rawOrder = order.rawPayload && typeof order.rawPayload === "object" && !Array.isArray(order.rawPayload)
+      ? order.rawPayload as Record<string, unknown>
+      : {};
+    const subscribeFlag = rawOrder.is_subscribe ?? rawOrder.isSubscribe;
+    if (subscribeFlag === true || subscribeFlag === 1 || subscribeFlag === "1") {
+      return NextResponse.json({ error: "预约单为真实订单，不支持发起自配，请使用叫配送" }, { status: 409 });
+    }
+
     if (isAutoPickOrderCompletedStatus(order.status)) {
       return NextResponse.json({ error: "Order already completed" }, { status: 409 });
     }

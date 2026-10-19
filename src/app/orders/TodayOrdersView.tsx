@@ -371,7 +371,7 @@ function CompactTodayOrderCard({
                 iconOnly
               />
             ) : null}
-            {showPlatformActions && !deleted && !isLockedSubscribe ? (
+            {showPlatformActions && !deleted && !order.isSubscribe && !isLockedSubscribe ? (
               <ActionButton
                 label="自配"
                 icon={actingId === `${order.id}:self-delivery` ? <Loader2 size={12} className="animate-spin" /> : <Truck size={12} />}
