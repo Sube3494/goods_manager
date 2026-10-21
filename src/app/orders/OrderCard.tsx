@@ -1573,6 +1573,8 @@ export function OrderStatusProfitPreview({ order, isProfitUpdating = false, canV
 
 export function QueuedSelfDeliveryNotice({ order }: { order: AutoPickOrder }) {
   const job = readQueuedSelfDelivery(order.queuedSelfDelivery);
+  // 订单完成后，历史自动自配任务的停止或失败已不再需要处理。
+  if (isAutoPickOrderCompletedStatus(order.status)) return null;
   if (!job?.error || (job.status !== "failed" && job.status !== "cancelled")) return null;
   return (
     <HoverCard openDelay={200}>
