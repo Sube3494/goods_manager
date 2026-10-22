@@ -1877,6 +1877,8 @@ export default function ShopGoodsPage() {
     setEditingShopId(latestItem.shopId || targetShopId);
     setEditingProduct({
       id: latestItem.id,
+      shopId: latestItem.shopId || targetShopId,
+      productId: latestItem.productId,
       sku: latestItem.sku || "",
       jdSkuId: latestItem.jdSkuId || "",
       meituanSkuId: latestItem.shopMeituanSkuId ?? latestItem.meituanSkuId ?? "",
