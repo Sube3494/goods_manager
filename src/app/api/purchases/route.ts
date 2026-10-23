@@ -12,6 +12,7 @@ import { InventoryService } from "@/services/inventoryService";
 import { allocateShippingToPurchaseItems, calculatePurchaseOrderTotalAmount } from "@/lib/purchaseCosting";
 import { parseAsShanghaiTime } from "@/lib/dateUtils";
 import { isAddressDisabled } from "@/lib/addressBook";
+import { buildShopProductPurchaseHistoryWhere } from "@/lib/purchaseHistory";
 
 export async function resolvePurchaseOrderResponse<T extends {
   status?: string;
@@ -171,43 +172,42 @@ export async function GET(request: Request) {
       });
     }
     if (productId) {
-      // 穿透关联主库与门店商品关系，确保入库记录双向无缝匹配，彻底解决因来源关联差异导致入库对不上的问题
+      // Resolve shop products first: a shared template does not identify a shop.
       const relatedProductIds = new Set<string>([productId]);
       const relatedShopProductIds = new Set<string>([productId]);
 
       const targetShopProduct = await prisma.shopProduct.findUnique({
         where: { id: productId },
-        select: { productId: true, sourceProductId: true },
+        select: { id: true, productId: true, sourceProductId: true, shop: { select: { name: true } } },
       });
       if (targetShopProduct) {
-        if (targetShopProduct.productId) relatedProductIds.add(targetShopProduct.productId);
-        if (targetShopProduct.sourceProductId) relatedProductIds.add(targetShopProduct.sourceProductId);
-      }
-
-      const linkedShopProducts = await prisma.shopProduct.findMany({
-        where: {
-          OR: [
-            { productId },
-            { sourceProductId: productId },
-          ],
-        },
-        select: { id: true, productId: true },
-      });
-      linkedShopProducts.forEach((sp) => {
-        relatedShopProductIds.add(sp.id);
-        if (sp.productId) relatedProductIds.add(sp.productId);
-      });
-
-      andWhere.push({
-        items: {
-          some: {
+        andWhere.push(buildShopProductPurchaseHistoryWhere(targetShopProduct));
+      } else {
+        const linkedShopProducts = await prisma.shopProduct.findMany({
+          where: {
             OR: [
-              { productId: { in: Array.from(relatedProductIds) } },
-              { shopProductId: { in: Array.from(relatedShopProductIds) } },
+              { productId },
+              { sourceProductId: productId },
             ],
           },
-        },
-      });
+          select: { id: true, productId: true },
+        });
+        linkedShopProducts.forEach((sp) => {
+          relatedShopProductIds.add(sp.id);
+          if (sp.productId) relatedProductIds.add(sp.productId);
+        });
+
+        andWhere.push({
+          items: {
+            some: {
+              OR: [
+                { productId: { in: Array.from(relatedProductIds) } },
+                { shopProductId: { in: Array.from(relatedShopProductIds) } },
+              ],
+            },
+          },
+        });
+      }
     }
     const where: Prisma.PurchaseOrderWhereInput = andWhere.length > 0 ? { AND: andWhere } : {};
 
@@ -461,7 +461,7 @@ export async function POST(request: Request) {
           }
         }
       }
-      
+
       return p;
     });
 
