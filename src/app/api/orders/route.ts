@@ -55,7 +55,7 @@ import {
 } from "@/lib/outboundReturnMeta";
 import { isAddressDisabled } from "@/lib/addressBook";
 import {
-  hasExplicitDeliveryPickupProof,
+  hasRealizedCancelledDeliveryCost,
   resolveCancelledJDDeliveredCommissionLoss,
   resolveCancelledOrderPureProfit,
   resolveOrderRefundAmount,
@@ -1000,45 +1000,6 @@ function normalizeOrderPlatformForSummary(platform?: string | null) {
   return raw;
 }
 
-function isRefundableMeituanDelivery(delivery: unknown) {
-  const deliveryObj = delivery && typeof delivery === "object" && !Array.isArray(delivery)
-    ? delivery as Record<string, unknown>
-    : {};
-  const haystack = [
-    deliveryObj.logisticName,
-    deliveryObj.logistic_name,
-    deliveryObj.track,
-    deliveryObj.deliveryName,
-    deliveryObj.delivery_name,
-    deliveryObj.deliveryTypeName,
-    deliveryObj.delivery_type_name,
-  ].map((value) => String(value || "").trim().toLowerCase()).join(" ");
-  return haystack.includes("美团") || haystack.includes("meituan");
-}
-
-function hasRealizedCancelledDeliveryCost(input: {
-  deliveryFee: number;
-  platform?: unknown;
-  delivery?: unknown;
-  rawPayload?: unknown;
-}) {
-  const isOffline = String(input.platform || "").trim() === "线下交易" || String(input.platform || "").toLowerCase() === "other";
-  if (isOffline) {
-    return false;
-  }
-  const d = (input.delivery && typeof input.delivery === "object" && !Array.isArray(input.delivery)) ? input.delivery as Record<string, unknown> : {};
-  const rawObj = (input.rawPayload && typeof input.rawPayload === "object" && !Array.isArray(input.rawPayload)) ? input.rawPayload as Record<string, unknown> : {};
-  const systemMeta = (rawObj.systemMeta && typeof rawObj.systemMeta === "object" && !Array.isArray(rawObj.systemMeta)) ? rawObj.systemMeta as Record<string, unknown> : null;
-  const hasManualFee = (typeof d.manualDeliveryFee === "number" && d.manualDeliveryFee >= 0)
-    || (systemMeta?.manualDeliveryFee && typeof (systemMeta.manualDeliveryFee as any)?.deliveryFee === "number");
-  if (hasManualFee) {
-    return input.deliveryFee > 0;
-  }
-  return input.deliveryFee > 0
-    && hasExplicitDeliveryPickupProof(input.delivery, input.rawPayload)
-    && !isRefundableMeituanDelivery(input.delivery);
-}
-
 function roundCurrency(value: number) {
   if (!Number.isFinite(value)) {
     return 0;
@@ -1864,6 +1825,7 @@ export async function GET(request: NextRequest) {
       const cancelledDeliveryLoss = (isAutoPickOrderCancelledStatus(order.status) || isAutoPickOrderDeletedStatus(order.status))
         && hasRealizedCancelledDeliveryCost({
           deliveryFee,
+          completedAt: (order as Record<string, unknown>).completedAt,
           platform: order.platform,
           delivery: order.delivery,
           rawPayload: order.rawPayload,
@@ -1984,6 +1946,7 @@ export async function GET(request: NextRequest) {
           };
           if ((cancelled || deleted) && hasRealizedCancelledDeliveryCost({
             deliveryFee,
+            completedAt: (order as Record<string, unknown>).completedAt,
             platform: order.platform,
             delivery: order.delivery,
             rawPayload: order.rawPayload,
@@ -2651,6 +2614,7 @@ export async function GET(request: NextRequest) {
       const cancelledDeliveryLoss = (cancelled || deleted)
         && hasRealizedCancelledDeliveryCost({
           deliveryFee,
+          completedAt: (order as Record<string, unknown>).completedAt,
           platform: order.platform,
           delivery: order.delivery,
           rawPayload: order.rawPayload,

@@ -140,7 +140,8 @@ export function isJDPlatformOrder(platform?: unknown, rawPayload?: unknown): boo
 }
 
 export function hasOrderDeliveredProof(delivery?: unknown, rawPayload?: unknown, completedAt?: unknown): boolean {
-  if (completedAt) return true;
+  const hasTime = (value: unknown) => Boolean(value) && !["", "0"].includes(String(value).trim());
+  if (hasTime(completedAt)) return true;
   const deliveryObj = delivery && typeof delivery === "object" && !Array.isArray(delivery)
     ? delivery as Record<string, unknown>
     : {};
@@ -148,21 +149,18 @@ export function hasOrderDeliveredProof(delivery?: unknown, rawPayload?: unknown,
     ? rawPayload as Record<string, unknown>
     : {};
 
-  const completedTime = String(
-    deliveryObj.completedTime
-    || deliveryObj.completed_time
-    || rawObj.completedTime
-    || rawObj.completed_time
-    || rawObj.finished_time
-    || rawObj.finishedTime
-    || ""
-  ).trim();
-  if (completedTime) return true;
+  const rawDelivery = rawObj.delivery && typeof rawObj.delivery === "object" && !Array.isArray(rawObj.delivery)
+    ? rawObj.delivery as Record<string, unknown> : {};
+  if ([deliveryObj, rawDelivery, rawObj].some((value) =>
+    [value.completedTime, value.completed_time, value.finished_time, value.finishedTime].some(hasTime)
+  )) return true;
 
   const track = String(deliveryObj.track || rawObj.track || "").trim();
   const statusText = [
     track,
     deliveryObj.status,
+    rawDelivery.track,
+    rawDelivery.status,
     rawObj.status,
     rawObj.orderStatus,
     rawObj.order_status,
@@ -211,5 +209,46 @@ export function resolveCancelledOrderPureProfit(
   const commission = Math.max(0, Number(platformCommissionLoss || 0));
   const netExpense = delivery + expense + commission;
   return netExpense !== 0 ? -netExpense : null;
+}
+function isRefundableMeituanDelivery(delivery: unknown) {
+  const deliveryObj = delivery && typeof delivery === "object" && !Array.isArray(delivery)
+    ? delivery as Record<string, unknown>
+    : {};
+  const haystack = [
+    deliveryObj.logisticName,
+    deliveryObj.logistic_name,
+    deliveryObj.track,
+    deliveryObj.deliveryName,
+    deliveryObj.delivery_name,
+    deliveryObj.deliveryTypeName,
+    deliveryObj.delivery_type_name,
+  ].map((value) => String(value || "").trim().toLowerCase()).join(" ");
+  return haystack.includes("美团") || haystack.includes("meituan");
+}
+
+export function hasRealizedCancelledDeliveryCost(input: {
+  deliveryFee: number;
+  completedAt?: unknown;
+  platform?: unknown;
+  delivery?: unknown;
+  rawPayload?: unknown;
+}) {
+  const isOffline = String(input.platform || "").trim() === "线下交易" || String(input.platform || "").toLowerCase() === "other";
+  if (isOffline) {
+    return false;
+  }
+  const d = (input.delivery && typeof input.delivery === "object" && !Array.isArray(input.delivery)) ? input.delivery as Record<string, unknown> : {};
+  const rawObj = (input.rawPayload && typeof input.rawPayload === "object" && !Array.isArray(input.rawPayload)) ? input.rawPayload as Record<string, unknown> : {};
+  const systemMeta = (rawObj.systemMeta && typeof rawObj.systemMeta === "object" && !Array.isArray(rawObj.systemMeta)) ? rawObj.systemMeta as Record<string, unknown> : null;
+  const hasManualFee = (typeof d.manualDeliveryFee === "number" && d.manualDeliveryFee >= 0)
+    || (systemMeta?.manualDeliveryFee && typeof (systemMeta.manualDeliveryFee as any)?.deliveryFee === "number");
+  if (hasManualFee) {
+    return input.deliveryFee > 0;
+  }
+  // 送达后取消，配送服务已完成，配送费不会返还（含美团配送）。
+  if (input.deliveryFee > 0 && hasOrderDeliveredProof(input.delivery, input.rawPayload, input.completedAt)) return true;
+  return input.deliveryFee > 0
+    && hasExplicitDeliveryPickupProof(input.delivery, input.rawPayload)
+    && !isRefundableMeituanDelivery(input.delivery);
 }
 

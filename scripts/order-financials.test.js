@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {
   hasExplicitDeliveryPickupProof,
+  hasRealizedCancelledDeliveryCost,
   hasOrderDeliveredProof,
   isJDPlatformOrder,
   readConfirmedRefundAmountFromRawPayload,
@@ -8,6 +9,24 @@ import {
   resolveCancelledOrderPureProfit,
   resolveOrderRefundAmount,
 } from "../src/lib/orderFinancials.ts";
+
+const cancelledMeituanDelivery = { platform: "美团", deliveryFee: 940, delivery: { logisticName: "美团·对点送", track: "已取消" } };
+for (const proof of [
+  { delivery: { ...cancelledMeituanDelivery.delivery, track: "配送完成" } },
+  { delivery: { ...cancelledMeituanDelivery.delivery, completedTime: "2026-10-24 21:00:00" } },
+  { rawPayload: { finished_time: 1792846800 } },
+  { rawPayload: { delivery: { finished_time: 1792846800 } } },
+  { completedAt: new Date("2026-10-24T13:00:00Z") },
+]) {
+  const realized = hasRealizedCancelledDeliveryCost({ ...cancelledMeituanDelivery, ...proof });
+  assert.equal(realized, true, "美团送达后取消仍扣配送费，包括取消覆盖轨迹但保留完成时间的订单");
+  assert.equal(resolveCancelledOrderPureProfit(realized ? 940 : 0, 0), -940, "9.40元配送费应计为取消损失");
+}
+assert.equal(hasRealizedCancelledDeliveryCost(cancelledMeituanDelivery), false, "缺少送达凭证时不强行认定配送费不退");
+assert.equal(hasRealizedCancelledDeliveryCost({ ...cancelledMeituanDelivery, delivery: { ...cancelledMeituanDelivery.delivery, track: "配送中" } }), false, "美团送达前取消沿用可退配送费规则");
+assert.equal(hasRealizedCancelledDeliveryCost({ ...cancelledMeituanDelivery, deliveryFee: 0, completedAt: new Date() }), false, "无配送费不能计为损失");
+assert.equal(hasRealizedCancelledDeliveryCost({ ...cancelledMeituanDelivery, delivery: { ...cancelledMeituanDelivery.delivery, manualDeliveryFee: 940 } }), true, "手工登记的实际配送费仍计入损失");
+assert.equal(hasOrderDeliveredProof(undefined, { finished_time: "0", delivery: { finished_time: "0" } }, "0"), false, "零完成时间不是送达凭证");
 
 assert.equal(
   hasExplicitDeliveryPickupProof(
