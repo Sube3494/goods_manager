@@ -1497,6 +1497,22 @@ export function shouldShowOrderProfitBadge(order: AutoPickOrder, canViewProductC
   return !isProfitUpdating && (hasProfit || (canViewProductCosts && Boolean(getProductCostStatusText(order))));
 }
 
+export function getOrderProfitPreviewItems(order: AutoPickOrder) {
+  // 展示保留原购买数量，利润预估只计入退款后仍需履约的商品成本。
+  return order.items.flatMap((item) => {
+    const originalQuantity = Math.max(0, Number(item.quantity || 0));
+    const refundedQuantity = readMaiyatianItemRefundQuantity({
+      ...((item.rawPayload && typeof item.rawPayload === "object") ? item.rawPayload : {}),
+      number: originalQuantity,
+      quantity: originalQuantity,
+    }, order.rawPayload);
+    const remainingRatio = originalQuantity > 0 ? Math.max(0, originalQuantity - refundedQuantity) / originalQuantity : 0;
+    return getExpandedOrderItemDisplays(item, order.platform)
+      .map((display) => ({ ...display, quantity: display.quantity * remainingRatio }))
+      .filter((display) => display.quantity > 0);
+  });
+}
+
 export function OrderStatusProfitPreview({ order, isProfitUpdating = false, canViewProductCosts = true, profitBadgeVisible = false, cancelReason, children }: {
   order: AutoPickOrder;
   isProfitUpdating?: boolean;
@@ -1536,13 +1552,13 @@ export function OrderStatusProfitPreview({ order, isProfitUpdating = false, canV
   const hasRecordedCost = order.productCostStatus === "ready"
     && typeof order.productCost === "number"
     && Number.isFinite(order.productCost);
-  const currentItems = order.items.flatMap((item) => getExpandedOrderItemDisplays(item, order.platform));
+  const currentItems = getOrderProfitPreviewItems(order);
   const canEstimate = canViewProductCosts
     && !order.hasOutbound
     && order.productCostStatus !== "pending-backfill"
     && !isCancelledStatus(order.status)
     && getBaseAutoPickStatusDisplay(order.status) !== "已删除"
-    && !hasOrderRefundState(order)
+    && !isOrderFullyRefunded(order)
     && currentItems.length > 0
     && currentItems.every((item) => typeof item.costPrice === "number" && Number.isFinite(item.costPrice) && item.costPrice > 0 && Number.isFinite(item.quantity) && item.quantity > 0);
   if (!hasRecordedCost && !canEstimate) return <>{children}</>;
