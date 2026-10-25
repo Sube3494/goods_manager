@@ -1632,6 +1632,7 @@ export function PurchaseOrderModal({
           unselectedOnlyLabel="显示未添加"
           unselectedOnlyTitle="切换是否只显示当前采购单未添加的商品"
           fetchPath={purchaseCatalogFetchPath}
+          respectPublicVisibility={false}
           showPlatformSelector={false}
           query={purchaseCatalogQuery}
           loadAllOnOpen
