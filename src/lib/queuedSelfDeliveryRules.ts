@@ -44,10 +44,24 @@ export function queuedSelfDeliveryBlockedReason(order: QueueOrder): string | nul
   const subscribe = raw.is_subscribe ?? raw.isSubscribe;
   if (order.isSubscribe || subscribe === true || subscribe === 1 || subscribe === "1") return "预约单不支持自配";
   if (order.platform === "线下交易" || String(order.platform).toLowerCase() === "other") return "线下订单不支持自动自配";
-  if (isAutoPickOrderTerminalStatus(order.status) || isAutoPickOrderAbnormalStatus(order.status) || hasOrderRefundState(order)) return "订单已结束、退款或状态异常";
+  if (isAutoPickOrderTerminalStatus(order.status) || hasOrderRefundState(order)) return "订单已结束或退款";
+  if (isAutoPickOrderAbnormalStatus(order.status) && !hasCancelledDeliveryProof(order)) return "订单状态异常，请先同步确认配送已取消";
   if (isAutoPickPickupOrder(order.rawPayload, order.userAddress, order.shopAddress)) return "自提订单不需要自配";
   if (isAutoPickOrderSelfDeliveryActive(order) || isAutoPickOrderDeliveringStatus(order.status) || isAutoPickOrderRiderAssigned(order) || !isDeliveryCancelledOrEmpty(order)) return "订单已有配送任务或骑手已接单";
   return null;
+}
+
+// 异常本身不等于配送已取消，恢复自动任务需要明确的运单取消凭据。
+export function hasCancelledDeliveryProof(order: QueueOrder): boolean {
+  const raw = asRecord(order.rawPayload);
+  const cancel = asRecord(raw.cancel);
+  if ([cancel.is_cancel, cancel.cancel_status, raw.is_cancel, raw.cancel_status].some(value => value === 1 || value === "1")) return true;
+  return [asRecord(order.delivery), asRecord(raw.delivery)].some(delivery => {
+    const time = delivery.cancel_time ?? delivery.cancelTime;
+    return Boolean(time && time !== "0")
+      || /取消|退单|失效/.test(String(delivery.track || ""))
+      || [delivery.status, delivery.delivery_status, delivery.deliveryStatus].some(value => /^(99|cancel|cancelled|canceled)$/i.test(String(value ?? "")));
+  });
 }
 
 export function isOrderReadyForQueuedSelfDelivery(order: QueueOrder & { isPickCompleted?: boolean }) {

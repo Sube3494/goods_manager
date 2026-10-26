@@ -9,7 +9,7 @@ function loader(mocks = {}) {
   function load(file) {
     file = path.resolve(file);
     if (cache.has(file)) return cache.get(file);
-    const context = { exports: {}, console, setInterval, Date, require(name) {
+    const context = { exports: {}, console, setInterval, setTimeout: (callback) => callback(), Date, require(name) {
       if (name in mocks) return mocks[name];
       if (name.startsWith("@/")) return load(`src/${name.slice(2)}.ts`);
       if (name.startsWith(".")) return load(path.resolve(path.dirname(file), `${name}.ts`));
@@ -33,6 +33,10 @@ async function main() {
     rawPayload: { delivery: false, pickProgress: { pickCompleted: false } }, delivery: null, queuedSelfDelivery: null,
   };
   assert.equal(rules.queuedSelfDeliveryBlockedReason(base), null);
+  const cancelledDelivery = { ...base, status: "异常", delivery: { logisticName: "闪送", track: "运单已取消", status: 99 } };
+  assert.equal(rules.queuedSelfDeliveryBlockedReason(cancelledDelivery), null);
+  assert.match(rules.queuedSelfDeliveryBlockedReason({ ...base, status: "异常" }), /异常/);
+  assert.match(rules.queuedSelfDeliveryBlockedReason({ ...cancelledDelivery, status: "已取消" }), /结束/);
   for (const value of [true, 1, "1"]) assert.match(rules.queuedSelfDeliveryBlockedReason({ ...base, rawPayload: { isSubscribe: value } }), /预约/);
   assert.equal(rules.isOrderReadyForQueuedSelfDelivery({ ...base, status: "拣货中" }), false);
   assert.equal(rules.isOrderReadyForQueuedSelfDelivery({ ...base, status: "已拣货" }), true);
@@ -137,6 +141,8 @@ async function main() {
   assert.equal((await route.POST(request, { params: Promise.resolve({ id: order.id }) })).status, 409);
 
   let actualCommands = 0;
+  let delayedStatus = false;
+  let scheduled = 0;
   const service = loader({ ...mocks,
     "next/server": { NextResponse: { json: (body, options) => ({ body, status: options?.status ?? 200 }) } },
     "@/lib/autoPickOrders": {
@@ -149,11 +155,15 @@ async function main() {
       markAutoPickOrderMainSystemSelfDelivery: async () => {
         order.rawPayload = { ...order.rawPayload, systemMeta: { mainSystemSelfDelivery: { triggered: true } } };
       },
-      refreshAutoPickOrderFromPlugin: async () => { order.status = "delivering"; return clone(order); },
-      getAutoPickIntegrationConfigByUserId: async () => null,
+      refreshAutoPickOrderFromPlugin: async () => { if (!delayedStatus) order.status = "delivering"; return clone(order); },
+      getAutoPickIntegrationConfigByUserId: async () => ({}),
+      resolveShopSelfDeliveryTiming: () => ({}),
+      readShopIdFromRawPayload: () => "",
+      readShopNameFromRawPayload: () => "",
+      readShopAddressFromRawPayload: () => "",
     },
-    "@/lib/autoPickAutoComplete": { cancelAutoCompleteJob: async () => {}, ensureAutoCompleteJob: async () => {} },
-    "@/lib/autoPickSchedule": {},
+    "@/lib/autoPickAutoComplete": { cancelAutoCompleteJob: async () => {}, ensureAutoCompleteJob: async () => { scheduled++; } },
+    "@/lib/autoPickSchedule": { getEstimatedAutoCompleteAt: () => new Date(Date.now() + 600000) },
   })("src/lib/executeOrderSelfDelivery.ts");
   order = clone(base);
   order.queuedSelfDelivery = { token: "test", status: "waiting" };
@@ -166,6 +176,22 @@ async function main() {
   assert.equal(actualCommands, 1);
   assert.equal(order.status, "delivering");
   assert.equal(order.delivery.sendFee, 0);
+  order = clone(cancelledDelivery);
+  order.rawPayload.pickProgress.pickCompleted = true;
+  order.queuedSelfDelivery = { token: "recovery", status: "running" };
+  delayedStatus = true;
+  assert.equal((await service.executeOrderSelfDelivery(order.id, { id: "owner" }, true)).status, 200);
+  assert.equal(actualCommands, 2);
+  assert.equal(scheduled, 2, "平台仍返回旧异常时，自配成功也必须创建自动完成任务");
+  assert.equal(order.status, "delivering");
+  assert.equal(rules.queuedSelfDeliveryBlockedReason(order), "订单已有配送任务或骑手已接单");
+  assert.equal(order.delivery.track, undefined, "不继承旧运单取消轨迹");
+  order = clone(cancelledDelivery);
+  commandOK = true;
+  remote = value => ({ ...value, rawPayload: { ...value.rawPayload, pickProgress: { pickCompleted: true } } });
+  await queue.setQueuedSelfDelivery(clone(order), true);
+  await queue.processQueuedSelfDeliveryOrder(order.id);
+  assert.equal(order.queuedSelfDelivery.status, "succeeded", "取消运单后的异常订单可等待拣货并执行自配");
   assert(events.length > 0);
   console.log("拣货后自配：等待、完成后触发、取消、预约单/配送拦截、并发去重、失败和重启保护、身份隔离通过");
 }

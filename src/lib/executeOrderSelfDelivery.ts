@@ -1,4 +1,5 @@
-import { readQueuedSelfDelivery, queuedSelfDeliveryBlockedReason, isOrderReadyForQueuedSelfDelivery } from "@/lib/queuedSelfDeliveryRules";
+import { asRecord, readQueuedSelfDelivery, queuedSelfDeliveryBlockedReason, isOrderReadyForQueuedSelfDelivery } from "@/lib/queuedSelfDeliveryRules";
+import { hasOrderRefundState } from "@/lib/orderFinancials";
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { callAutoPickCommand, getAutoPickIntegrationConfigByUserId, markAutoPickOrderMainSystemSelfDelivery, readShopAddressFromRawPayload, readShopIdFromRawPayload, readShopNameFromRawPayload, refreshAutoPickOrderFromPlugin, resolveAutoPickCommandPlatform, resolveShopSelfDeliveryTiming } from "@/lib/autoPickOrders";
@@ -10,6 +11,7 @@ import {
   isAutoPickOrderDeliveringStatus,
   isAutoPickOrderRiderAssigned,
   isAutoPickOrderSelfDeliveryActive,
+  isAutoPickOrderTerminalStatus,
   isAutoPickPickupOrder,
   isDeliveryCancelledOrEmpty,
 } from "@/lib/autoPickOrderStatus";
@@ -125,6 +127,9 @@ export async function executeOrderSelfDelivery(id: string, session: { id: string
     }
 
     const sourceId = String(commandOrder.sourceId || "").trim();
+    if (isAutoPickOrderTerminalStatus(commandOrder.status) || hasOrderRefundState(commandOrder)) {
+      return NextResponse.json({ error: "订单已结束或退款，不能发起自配" }, { status: 409 });
+    }
     if (!sourceId) {
       return NextResponse.json({
         error: "订单缺少自配所需信息，已尝试自动同步但仍未获取到订单标识，请先手动同步订单后再试。",
@@ -162,7 +167,8 @@ export async function executeOrderSelfDelivery(id: string, session: { id: string
 
       const schedulingOrder = latestOrder || commandOrder;
       const integrationConfig = await getAutoPickIntegrationConfigByUserId(order.userId);
-      const autoCompleteBlocked = isAutoPickOrderAbnormalStatus(schedulingOrder.status);
+      // 平台已接受新的自配命令；旧运单异常状态可能仍在同步延迟中。
+      const autoCompleteBlocked = isAutoPickOrderTerminalStatus(schedulingOrder.status) || hasOrderRefundState(schedulingOrder);
       const autoCompleteAt = !autoCompleteBlocked && integrationConfig
         ? getEstimatedAutoCompleteAt(schedulingOrder, resolveShopSelfDeliveryTiming(integrationConfig, {
             maiyatianShopId: readShopIdFromRawPayload(schedulingOrder.rawPayload),
@@ -171,24 +177,31 @@ export async function executeOrderSelfDelivery(id: string, session: { id: string
             rawPayload: schedulingOrder.rawPayload,
           }))
         : null;
-      const baseDelivery = (schedulingOrder.delivery && typeof schedulingOrder.delivery === "object" && !Array.isArray(schedulingOrder.delivery))
-        ? schedulingOrder.delivery as Record<string, unknown>
-        : (order.delivery && typeof order.delivery === "object" && !Array.isArray(order.delivery) ? order.delivery as Record<string, unknown> : {});
       const updatedDelivery = {
-        ...baseDelivery,
         sendFee: 0,
         logisticName: "自配送",
         riderName: "自配送",
         status: "delivering",
       };
+      const schedulingRaw = asRecord(schedulingOrder.rawPayload);
+      const recoveredRaw = {
+        ...schedulingRaw,
+        is_cancel: 0,
+        cancel_status: 0,
+        cancel: { ...asRecord(schedulingRaw.cancel), is_cancel: 0, cancel_status: 0 },
+        delivery: updatedDelivery,
+      };
       await prisma.autoPickOrder.update({
         where: { id },
         data: {
           // 自配命令已成功向平台下发，系统必须直接坚决进入 delivering（配送中）状态，绝不因为平台接口延迟而写回旧状态
-          status: "delivering",
+          status: autoCompleteBlocked ? schedulingOrder.status : "delivering",
           deliveryDeadline: schedulingOrder.deliveryDeadline || order.deliveryDeadline || null,
           autoCompleteAt: autoCompleteAt || null,
-          delivery: updatedDelivery,
+          ...(autoCompleteBlocked ? {} : {
+            delivery: updatedDelivery,
+            rawPayload: JSON.parse(JSON.stringify(recoveredRaw)),
+          }),
         },
       });
       // 2. 最终二次固化自配标记，确保无论刷新如何均保留
@@ -204,7 +217,7 @@ export async function executeOrderSelfDelivery(id: string, session: { id: string
         await cancelAutoCompleteJob(
           id,
           autoCompleteBlocked
-            ? "abnormal-status-no-auto-complete"
+            ? "terminal-or-refunded-no-auto-complete"
             : "missing-auto-complete-time"
         );
       }
@@ -223,7 +236,7 @@ export async function executeOrderSelfDelivery(id: string, session: { id: string
         ...result.data,
         order: finalOrder ? {
           ...finalOrder,
-          status: "delivering",
+          status: finalOrder.status,
           isMainSystemSelfDelivery: true,
           autoCompleteAt: finalOrder.autoCompleteAt || autoCompleteAt || null,
         } : undefined,
