@@ -2,7 +2,8 @@
 
 import { createPortal } from "react-dom";
 import { useEffect, useState } from "react";
-import { Loader2, X } from "lucide-react";
+import { Loader2, MapPin, X } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface Shop {
   id?: string;
@@ -10,7 +11,6 @@ interface Shop {
   externalId?: string | null;
   address?: string | null;
   isSource: boolean;
-  libraryId?: string | null;
 }
 
 interface StoreModalProps {
@@ -19,6 +19,7 @@ interface StoreModalProps {
   onSave: (shop: Partial<Shop>) => Promise<void>;
   initialData?: Partial<Shop> | null;
   title?: string;
+  libraryName?: string;
 }
 
 export function StoreModal({
@@ -26,17 +27,16 @@ export function StoreModal({
   onClose,
   onSave,
   initialData,
-  title = "店铺信息",
+  title = "网点信息",
+  libraryName,
 }: StoreModalProps) {
   const [mounted, setMounted] = useState(false);
-  const [libraries, setLibraries] = useState<any[]>([]);
   const [formData, setFormData] = useState<Partial<Shop>>({
     id: undefined,
     name: "",
     externalId: "",
     address: "",
     isSource: true,
-    libraryId: null,
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -47,29 +47,6 @@ export function StoreModal({
 
   useEffect(() => {
     if (isOpen) {
-      // 预先拉取当前用户有权限的商品库列表
-      void fetch("/api/product-libraries")
-        .then((res) => res.json())
-        .then((data) => {
-          const libs = Array.isArray(data) ? data : (data.libraries || []);
-          setLibraries(libs);
-          
-          if (libs.length > 0) {
-            setFormData((prev) => {
-              const hasValidLib = prev.libraryId && libs.some((l: any) => l.id === prev.libraryId);
-              if (!hasValidLib) {
-                return { ...prev, libraryId: libs[0].id };
-              }
-              return prev;
-            });
-          }
-        })
-        .catch((err) => console.error("Failed to load libraries:", err));
-    }
-  }, [isOpen]);
-
-  useEffect(() => {
-    if (isOpen) {
       if (initialData) {
         setFormData({
           id: initialData.id,
@@ -77,7 +54,6 @@ export function StoreModal({
           externalId: initialData.externalId || "",
           address: initialData.address || "",
           isSource: initialData.isSource ?? true,
-          libraryId: initialData.libraryId || null,
         });
       } else {
         setFormData({
@@ -86,7 +62,6 @@ export function StoreModal({
           externalId: "",
           address: "",
           isSource: true,
-          libraryId: null,
         });
       }
     }
@@ -97,7 +72,6 @@ export function StoreModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name || !formData.externalId || !formData.address) return;
-    if (libraries.length > 0 && !formData.libraryId) return;
 
     setIsSubmitting(true);
     try {
@@ -111,28 +85,40 @@ export function StoreModal({
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-110 flex items-center justify-center p-4">
-      <div 
-        className="absolute inset-0 bg-slate-900/40 dark:bg-[#020617]/75 backdrop-blur-md dark:backdrop-blur-2xl transition-all duration-300" 
-        onClick={onClose} 
+    <div className="fixed inset-0 z-110 flex items-center justify-center p-4 bg-slate-950/42 backdrop-blur-sm">
+      <div
+        className="absolute inset-0 transition-opacity duration-300"
+        onClick={() => { if (!isSubmitting) onClose(); }}
       />
-      
-      <div className="relative w-full max-w-[480px] overflow-hidden rounded-3xl border border-black/[0.08] dark:border-white/10 bg-white dark:bg-[#0c1322] shadow-2xl dark:shadow-[0_32px_64px_-16px_rgba(0,0,0,0.95)] animate-in fade-in zoom-in-95 duration-300">
+
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="dispatch-location-title"
+        className="relative flex max-h-[92dvh] w-full max-w-[480px] flex-col overflow-y-auto rounded-[32px] sm:rounded-[36px] border border-black/8 bg-white/95 dark:border-white/10 dark:bg-[#0b111e]/98 text-foreground shadow-2xl backdrop-blur-xl animate-in fade-in zoom-in-95 duration-200"
+      >
         <div className="pt-6 px-6 pb-2 sm:pt-7 sm:px-7 sm:pb-3 bg-transparent">
           <div className="flex items-start justify-between gap-4">
-            <div>
-              <h2 className="text-lg sm:text-xl font-black text-slate-900 dark:text-white tracking-wide">
-                {title !== "店铺信息" ? title : (initialData?.id ? "编辑店铺" : "新增店铺")}
-              </h2>
-              <p className="mt-1 text-xs text-muted-foreground leading-normal">
-                录入门店名称、POI_ID 和详细地址后即可加入调货测算。
-              </p>
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <MapPin size={20} />
+              </div>
+              <div>
+                <h2 id="dispatch-location-title" className="text-lg sm:text-xl font-bold tracking-tight text-foreground">
+                  {title !== "网点信息" ? title : (initialData?.id ? "编辑网点" : "新增网点")}
+                </h2>
+                <p className="mt-0.5 text-xs text-muted-foreground font-medium">
+                  {libraryName ? `保存至${libraryName}，获授权成员可查看和管理。` : "添加常用取货点，让每次调货更顺路。"}
+                </p>
+              </div>
             </div>
             <button
               onClick={onClose}
-              className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground bg-black/[0.04] dark:bg-white/[0.06] hover:bg-black/[0.08] dark:hover:bg-white/[0.12] transition-all duration-300 hover:rotate-90 active:scale-90"
+              aria-label="关闭网点编辑"
+              disabled={isSubmitting}
+              className="h-8 w-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground border border-black/8 bg-white/80 hover:bg-white dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8 transition-all active:scale-95 cursor-pointer shadow-xs"
             >
-              <X size={15} />
+              <X size={16} />
             </button>
           </div>
         </div>
@@ -141,97 +127,74 @@ export function StoreModal({
           <div className="space-y-4">
             <div className="grid gap-3.5">
               <div className="space-y-1.5">
-                <label className="text-xs sm:text-sm font-bold text-foreground">
-                  门店名称 <span className="text-rose-500 font-bold">*</span>
+                <label htmlFor="dispatch-name" className="text-xs sm:text-sm font-semibold text-foreground">
+                  网点名称 <span className="text-rose-500 font-bold">*</span>
                 </label>
                 <input
                   required
+                  id="dispatch-name"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="请输入门店名称"
-                  className="h-11 w-full rounded-2xl border border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.03] px-4 text-xs sm:text-sm text-foreground outline-none transition-all placeholder:text-muted-foreground focus:border-primary/40 focus:ring-2 focus:ring-primary/10"
+                  placeholder="请输入网点名称"
+                  className="h-10 w-full rounded-full border border-black/8 bg-white/80 dark:border-white/10 dark:bg-white/4 px-4 text-xs sm:text-sm text-foreground outline-none transition-all placeholder:text-muted-foreground focus:border-primary/50 focus:ring-2 focus:ring-primary/10 shadow-xs"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs sm:text-sm font-bold text-foreground">
+                <label htmlFor="dispatch-poi" className="text-xs sm:text-sm font-semibold text-foreground">
                   POI_ID <span className="text-rose-500 font-bold">*</span>
                 </label>
                 <input
                   required
+                  id="dispatch-poi"
                   value={formData.externalId || ""}
                   onChange={(e) => setFormData({ ...formData, externalId: e.target.value })}
                   placeholder="例如：27678090"
-                  className="h-11 w-full rounded-2xl border border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.03] px-4 text-xs sm:text-sm text-foreground outline-none transition-all placeholder:text-muted-foreground focus:border-primary/40 focus:ring-2 focus:ring-primary/10"
+                  className="h-10 w-full rounded-full border border-black/8 bg-white/80 dark:border-white/10 dark:bg-white/4 px-4 text-xs sm:text-sm text-foreground outline-none transition-all placeholder:text-muted-foreground focus:border-primary/50 focus:ring-2 focus:ring-primary/10 shadow-xs"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs sm:text-sm font-bold text-foreground">
+                <label htmlFor="dispatch-address" className="text-xs sm:text-sm font-semibold text-foreground">
                   详细地址 <span className="text-rose-500 font-bold">*</span>
                 </label>
                 <textarea
                   required
+                  id="dispatch-address"
                   value={formData.address || ""}
                   onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                   placeholder="例如：广东省广州市天河区广州大道中..."
                   rows={3}
-                  className="w-full resize-none rounded-2xl border border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.03] px-4 py-3 text-xs sm:text-sm text-foreground outline-none transition-all placeholder:text-muted-foreground focus:border-primary/40 focus:ring-2 focus:ring-primary/10"
+                  className="w-full resize-none rounded-2xl border border-black/8 bg-white/80 dark:border-white/10 dark:bg-white/4 px-4 py-3 text-xs sm:text-sm text-foreground outline-none transition-all placeholder:text-muted-foreground focus:border-primary/50 focus:ring-2 focus:ring-primary/10 shadow-xs"
                 />
               </div>
-
-              {libraries.length > 0 && (
-                <div className="space-y-1.5">
-                  <label className="text-xs sm:text-sm font-bold text-foreground">
-                    绑定商品库 <span className="text-rose-500 font-bold">*</span>
-                  </label>
-                  <div className="relative">
-                    <select
-                      required
-                      value={formData.libraryId || ""}
-                      onChange={(e) => setFormData({ ...formData, libraryId: e.target.value })}
-                      className="h-11 w-full appearance-none rounded-2xl border border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-[#0c1322] px-4 text-xs sm:text-sm text-foreground outline-none transition-all focus:border-primary/40 focus:ring-2 focus:ring-primary/10 cursor-pointer"
-                    >
-                      {libraries.map((lib) => (
-                        <option key={lib.id} value={lib.id} className="dark:bg-[#0c1322] dark:text-white">
-                          {lib.name}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-muted-foreground">
-                      <svg className="h-4 w-4 fill-current" viewBox="0 0 20 20">
-                        <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
-                      </svg>
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
 
-            <div className="rounded-2xl border border-border/50 bg-muted/30 px-3.5 py-2.5 text-xs text-muted-foreground font-medium leading-relaxed">
-              {libraries.length > 0 ? "四项均为必填，用于门店去重、定位、商品库隔离和路线测算。" : "三项均为必填，用于门店去重、定位和路线测算。"}
+            <div className="rounded-2xl border border-black/8 bg-black/3 dark:border-white/10 dark:bg-white/4 px-4 py-3 text-xs text-muted-foreground leading-relaxed font-medium">
+              此处仅管理调货网点，可放心编辑，不会修改个人收货地址。
             </div>
           </div>
 
-          <div className="mt-6 flex flex-col-reverse gap-2.5 border-t border-border/60 pt-5 sm:flex-row sm:justify-end">
+          <div className="sticky bottom-0 mt-6 flex gap-2.5 border-t border-black/8 dark:border-white/10 bg-transparent pb-[env(safe-area-inset-bottom)] pt-4 sm:justify-end">
             <button
               type="button"
               onClick={onClose}
-              className="h-10 px-5 flex items-center justify-center rounded-full border border-border/70 bg-muted/40 hover:bg-muted text-foreground text-xs sm:text-sm font-bold transition-all active:scale-95 cursor-pointer sm:min-w-[90px]"
+              className="h-10 flex-1 px-5 sm:flex-none flex items-center justify-center rounded-full border border-black/8 bg-white/80 hover:bg-white dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8 text-foreground text-xs sm:text-sm font-medium transition-all active:scale-95 cursor-pointer sm:min-w-[90px] shadow-xs"
             >
               取消
             </button>
             {(() => {
-              const isFormInvalid = !formData.name || !formData.externalId || !formData.address || (libraries.length > 0 && !formData.libraryId);
+              const isFormInvalid = !formData.name || !formData.externalId || !formData.address;
               return (
                 <button
                   type="submit"
                   disabled={isSubmitting || isFormInvalid}
-                  className={`h-10 flex items-center justify-center gap-1.5 rounded-full px-6 text-xs sm:text-sm font-black transition-all active:scale-95 cursor-pointer sm:min-w-[120px] ${
+                  className={cn(
+                    "h-10 flex flex-1 items-center sm:flex-none justify-center gap-1.5 rounded-full px-6 text-xs sm:text-sm font-medium transition-all active:scale-95 cursor-pointer sm:min-w-[120px] shadow-xs",
                     isFormInvalid
-                      ? "bg-muted text-muted-foreground/50 cursor-not-allowed border-transparent shadow-none"
-                      : "bg-primary text-primary-foreground hover:bg-primary/90 shadow-md shadow-primary/20"
-                  }`}
+                      ? "border border-black/8 bg-black/5 dark:border-white/10 dark:bg-white/5 text-muted-foreground/40 cursor-not-allowed shadow-none"
+                      : "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm shadow-primary/20"
+                  )}
                 >
                   {isSubmitting && <Loader2 size={14} className="animate-spin" />}
                   {initialData?.id ? "保存修改" : "确认新增"}

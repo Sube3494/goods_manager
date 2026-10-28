@@ -2,7 +2,8 @@
 "use client";
 
 import { createPortal } from "react-dom";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { motion, useReducedMotion } from "framer-motion";
 import {
   Check,
   Clock,
@@ -37,11 +38,6 @@ type Shop = {
   contactName?: string | null;
   contactPhone: string | null;
   remark?: string | null;
-  libraryId?: string | null;
-  library?: {
-    id: string;
-    name: string;
-  } | null;
 };
 
 type EditableShop = Partial<Shop>;
@@ -557,16 +553,16 @@ const MARKER_STYLES = `
   }
   .custom-infowindow-wrapper {
     position: relative;
-    padding: 12px 14px;
-    background: rgba(10, 15, 29, 0.94);
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    border-radius: 18px;
-    box-shadow: 0 18px 36px -8px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(59, 130, 246, 0.15);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
+    padding: 13px 15px;
+    background: rgba(15, 23, 42, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 16px;
+    box-shadow: 0 20px 35px -10px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
     color: #fff;
-    min-width: 210px;
-    max-width: 270px;
+    min-width: 220px;
+    max-width: 280px;
     pointer-events: auto !important;
     animation: infoWindowPop 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   }
@@ -691,10 +687,17 @@ function extractRidingResult(result: any) {
 
 export function StoreDispatchMap({
   initialStores = [],
+  switcherContainer,
 }: {
   initialStores?: Shop[];
+  switcherContainer?: HTMLDivElement | null;
 }) {
   const { showToast } = useToast();
+  const switcherLayoutId = useId();
+  const reducedMotion = useReducedMotion();
+  const [dispatchLibraries, setDispatchLibraries] = useState<Array<{ id: string; name: string }>>([]);
+  const [activeLibraryId, setActiveLibraryId] = useState("");
+  const libraryRequestRef = useRef(0);
   const mapRef = useRef<any>(null);
   const AMapRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
@@ -777,8 +780,8 @@ export function StoreDispatchMap({
   );
 
   const importButtonLabel = useMemo(() => {
-    if (!isImportingShops) return "导入店铺";
-    if (!importProgress || importProgress.total <= 0) return "导入店铺中...";
+    if (!isImportingShops) return "导入网点";
+    if (!importProgress || importProgress.total <= 0) return "导入网点中...";
     return `导入中 ${Math.min(importProgress.current, importProgress.total)}/${importProgress.total}`;
   }, [importProgress, isImportingShops]);
 
@@ -928,16 +931,22 @@ export function StoreDispatchMap({
   );
 
   const fetchShops = useCallback(async () => {
+    const requestId = ++libraryRequestRef.current;
     try {
-      const res = await fetch("/api/shops");
+      const res = await fetch(`/api/dispatch-locations${activeLibraryId ? `?libraryId=${encodeURIComponent(activeLibraryId)}` : ""}`, { cache: "no-store" });
       if (!res.ok) throw new Error("fetch shops failed");
       const data = await res.json();
+      if (requestId !== libraryRequestRef.current) return;
+      setDispatchLibraries(Array.isArray(data.libraries) ? data.libraries : []);
+      if (!activeLibraryId && data.libraryId) setActiveLibraryId(data.libraryId);
       setShops(Array.isArray(data.shops) ? data.shops : []);
     } catch (error) {
+      if (requestId !== libraryRequestRef.current) return;
+      setShops([]);
       console.error("Failed to fetch shops:", error);
-      showToast("加载店铺失败", "error");
+      showToast("加载调货网点失败，请刷新重试", "error");
     }
-  }, [showToast]);
+  }, [activeLibraryId, showToast]);
 
   useEffect(() => {
     void fetchShops();
@@ -1148,44 +1157,43 @@ export function StoreDispatchMap({
     const timeStr = result?.duration != null ? `${Math.ceil(result.duration / 60)}分钟` : null;
 
     container.innerHTML = `
-      <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 7px;">
+      <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 8px;">
         <div style="min-width: 0; flex: 1;">
           <div style="display: flex; align-items: center; gap: 6px;">
-            ${result?.rank ? `<span style="background: ${result.rank === 1 ? "#f59e0b" : "#3b82f6"}; color: #fff; min-width: 17px; height: 17px; padding: 0 4px; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; font-size: 10px; font-weight: 900;">${result.rank}</span>` : ""}
-            <div style="font-weight: 900; font-size: 13px; color: #fff; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${shop.name}">
+            ${result?.rank ? `<span style="background: ${result.rank === 1 ? "#f59e0b" : "#3b82f6"}; color: #fff; min-width: 18px; height: 18px; padding: 0 4px; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px; font-size: 10px; font-weight: 700;">${result.rank}</span>` : ""}
+            <div style="font-weight: 700; font-size: 13px; color: #fff; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${shop.name}">
               ${shop.name}
             </div>
           </div>
         </div>
-        <button class="iw-close-btn" style="background: rgba(255,255,255,0.08); border: none; color: #94a3b8; width: 20px; height: 20px; border-radius: 999px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; font-size: 14px; line-height: 1; flex-shrink: 0;">×</button>
+        <button class="iw-close-btn" style="background: rgba(255,255,255,0.08); border: none; color: #94a3b8; width: 22px; height: 22px; border-radius: 6px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.15s; font-size: 14px; line-height: 1; flex-shrink: 0;">×</button>
       </div>
 
-      <div style="display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 7px;">
-        ${shop.externalId ? `<span style="background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 999px; padding: 1px 7px; font-size: 9px; font-weight: 700;">POI: ${shop.externalId}</span>` : ""}
-        ${shop.library ? `<span style="background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); border-radius: 999px; padding: 1px 7px; font-size: 9px; font-weight: 700;">库: ${shop.library.name}</span>` : ""}
+      <div style="display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 8px;">
+        ${shop.externalId ? `<span style="background: rgba(59, 130, 246, 0.16); color: #93c5fd; border: 1px solid rgba(59, 130, 246, 0.28); border-radius: 6px; padding: 1.5px 6px; font-size: 10px; font-weight: 600; letter-spacing: 0.02em;">POI: ${shop.externalId}</span>` : ""}
       </div>
 
       ${shop.address ? `
-        <div style="font-size: 11px; color: rgba(255, 255, 255, 0.65); line-height: 1.4; margin-bottom: 8px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+        <div style="font-size: 11px; color: rgba(255, 255, 255, 0.7); line-height: 1.45; margin-bottom: 9px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
           ${shop.address}
         </div>
       ` : ""}
 
       ${distStr ? `
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 6px 10px; margin-bottom: 8px;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 7px 10px; margin-bottom: 9px;">
           <div>
-            <div style="font-size: 9px; color: rgba(255, 255, 255, 0.45); font-weight: 600;">骑行距离</div>
-            <div style="font-size: 12px; font-weight: 900; color: #38bdf8;">${distStr}</div>
+            <div style="font-size: 10px; color: rgba(255, 255, 255, 0.5); font-weight: 500;">骑行距离</div>
+            <div style="font-size: 13px; font-weight: 700; color: #38bdf8; margin-top: 1px;">${distStr}</div>
           </div>
           <div>
-            <div style="font-size: 9px; color: rgba(255, 255, 255, 0.45); font-weight: 600;">预计用时</div>
-            <div style="font-size: 12px; font-weight: 900; color: #fbbf24;">${timeStr || "测算中"}</div>
+            <div style="font-size: 10px; color: rgba(255, 255, 255, 0.5); font-weight: 500;">预计用时</div>
+            <div style="font-size: 13px; font-weight: 700; color: #fbbf24; margin-top: 1px;">${timeStr || "测算中"}</div>
           </div>
         </div>
       ` : ""}
 
       <div style="display: flex; align-items: center; justify-content: flex-end; gap: 6px; border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 8px;">
-        <button class="iw-edit-btn" style="background: rgba(37, 99, 235, 0.2); border: 1px solid rgba(37, 99, 235, 0.4); color: #60a5fa; border-radius: 999px; padding: 3px 10px; font-size: 11px; font-weight: 700; cursor: pointer; transition: all 0.2s;">编辑门店</button>
+        <button class="iw-edit-btn" style="background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.14); color: #fff; border-radius: 8px; padding: 3px 10px; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.15s;">编辑网点</button>
       </div>
     `;
 
@@ -1638,7 +1646,7 @@ export function StoreDispatchMap({
 
       const { location, components } = matched;
 
-      const res = await fetch(`/api/shops/${shop.id}`, {
+      const res = await fetch(`/api/dispatch-locations/${shop.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -2046,10 +2054,10 @@ export function StoreDispatchMap({
       setIsImportingShops(true);
       setImportProgress(null);
       try {
-        const res = await fetch("/api/shops/import", {
+        const res = await fetch("/api/dispatch-locations/import", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ shops: importedRows }),
+          body: JSON.stringify({ shops: importedRows, libraryId: activeLibraryId }),
         });
 
         const result = await res.json();
@@ -2088,7 +2096,7 @@ export function StoreDispatchMap({
 
           const { location, components } = matched;
 
-          const updateRes = await fetch(`/api/shops/${shop.id}`, {
+          const updateRes = await fetch(`/api/dispatch-locations/${shop.id}`, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -2129,19 +2137,19 @@ export function StoreDispatchMap({
         setImportProgress(null);
       }
     },
-    [fetchShops, resolveShopCoordinates, showToast]
+    [activeLibraryId, fetchShops, resolveShopCoordinates, showToast]
   );
 
   const handleSaveShop = useCallback(async (data: EditableShop) => {
     try {
       const isEditing = !!data.id;
-      const url = isEditing ? `/api/shops/${data.id}` : "/api/shops";
+      const url = isEditing ? `/api/dispatch-locations/${data.id}` : "/api/dispatch-locations";
       const method = isEditing ? "PUT" : "POST";
 
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify({ ...data, libraryId: activeLibraryId }),
       });
 
       if (!res.ok) {
@@ -2164,7 +2172,7 @@ export function StoreDispatchMap({
       console.error("Failed to save shop:", error);
       showToast(error instanceof Error ? error.message : "保存失败", "error");
     }
-  }, [fetchShops, handleLocateShop, showToast]);
+  }, [activeLibraryId, fetchShops, handleLocateShop, showToast]);
 
   const executeDeleteShops = useCallback(async (ids: string[]) => {
     if (!ids.length || isDeletingShops) return;
@@ -2172,7 +2180,7 @@ export function StoreDispatchMap({
     try {
       const results = await Promise.allSettled(
         ids.map((id) =>
-          fetch(`/api/shops/${id}`, {
+          fetch(`/api/dispatch-locations/${id}`, {
             method: "DELETE",
           })
         )
@@ -2222,24 +2230,24 @@ export function StoreDispatchMap({
     <section
       className={cn(
         mobile
-          ? "sm:hidden"
-          : "pointer-events-none absolute right-3 top-3 z-20 hidden w-[230px] sm:block"
+          ? "sm:hidden mt-3"
+          : "pointer-events-none absolute right-3 top-3 z-20 hidden w-[240px] sm:block"
       )}
     >
       <div className={cn(mobile ? "" : "pointer-events-auto relative")}>
         <div className={cn(
           "overflow-hidden backdrop-blur-xl transition-all",
           mobile
-            ? "rounded-2xl border border-border/70 bg-card/95 shadow-md"
-            : "rounded-2xl border border-border/60 bg-slate-950/85 shadow-2xl shadow-black/40"
+            ? "rounded-2xl border border-black/8 dark:border-white/10 bg-white/95 dark:bg-[#0b111e]/98 shadow-md"
+            : "rounded-2xl border border-black/8 dark:border-white/10 bg-white/95 dark:bg-[#0b111e]/98 shadow-xl dark:shadow-2xl"
         )}>
           {!mobile && results.length > 0 && (
-            <div className="flex items-center justify-between border-b border-white/10 px-3 py-2 bg-white/[0.03]">
+            <div className="flex items-center justify-between border-b border-black/8 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.02] px-3.5 py-2.5">
               <div className="flex items-center gap-1.5">
-                <Navigation size={12} className="text-primary animate-pulse" />
-                <span className="text-[11px] font-black tracking-tight text-white">调货路线推荐</span>
+                <Navigation size={13} className="text-primary" />
+                <span className="text-xs font-bold tracking-tight text-foreground">调货路线推荐</span>
               </div>
-              <span className="rounded-full bg-primary/20 px-2 py-0.5 text-[10px] font-bold text-primary">
+              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
                 {results.length} 方案
               </span>
             </div>
@@ -2249,7 +2257,7 @@ export function StoreDispatchMap({
             className={cn(
               mobile
                 ? "grid grid-cols-2 gap-1.5 px-2 py-2 min-[360px]:grid-cols-3"
-                : "flex max-h-[36dvh] flex-col gap-1.5 overflow-y-auto p-2 custom-scrollbar"
+                : "flex max-h-[38dvh] flex-col gap-1.5 overflow-y-auto p-2 custom-scrollbar"
             )}
           >
             {results.map((result, index) => {
@@ -2266,13 +2274,13 @@ export function StoreDispatchMap({
                   className={cn(
                     "group relative overflow-hidden border text-left transition-all active:scale-[0.98]",
                     mobile
-                      ? "w-full min-w-0 rounded-xl px-2 py-1.5"
-                      : "w-full rounded-xl px-2.5 py-2",
+                      ? "w-full min-w-0 rounded-xl px-2.5 py-1.5"
+                      : "w-full rounded-xl px-3 py-2",
                     isSelected
-                      ? "border-primary/80 bg-primary/15 ring-1 ring-inset ring-primary/40 shadow-sm shadow-primary/10"
+                      ? "border-primary bg-primary/10 ring-1 ring-inset ring-primary/30 shadow-xs"
                       : index === 0
-                        ? "border-amber-500/30 bg-amber-500/10 hover:border-amber-500/50"
-                        : "border-white/10 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.06]"
+                        ? "border-amber-500/40 bg-amber-500/10 dark:bg-amber-500/15 hover:border-amber-500/60"
+                        : "border-black/8 bg-white/60 dark:border-white/8 dark:bg-white/4 hover:bg-white dark:hover:bg-white/8"
                   )}
                 >
                   <div className="flex items-center gap-2">
@@ -2281,19 +2289,19 @@ export function StoreDispatchMap({
                         <div className="flex items-center gap-1.5 min-w-0 flex-1">
                           <span
                             className={cn(
-                              "flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[9px] font-black",
+                              "flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold",
                               isSelected
                                 ? "bg-primary text-primary-foreground"
                                 : index === 0
-                                  ? "bg-gradient-to-br from-amber-400 to-amber-600 text-white shadow-xs"
-                                  : "bg-white/10 text-white/70"
+                                  ? "bg-amber-500 text-white shadow-2xs"
+                                  : "bg-black/5 dark:bg-white/10 text-muted-foreground"
                             )}
                           >
                             {index + 1}
                           </span>
                           <div
                             className={cn(
-                              "truncate font-bold tracking-tight text-white",
+                              "truncate font-bold tracking-tight text-foreground",
                               mobile ? "text-[11px]" : "text-xs"
                             )}
                             title={shop.name}
@@ -2302,7 +2310,7 @@ export function StoreDispatchMap({
                           </div>
                         </div>
                         {index === 0 && (
-                          <span className="shrink-0 rounded-full bg-amber-500/20 px-1.5 py-0.2 text-[9px] font-black text-amber-300">
+                          <span className="shrink-0 rounded-full bg-amber-500/20 px-1.5 py-0.5 text-[9px] font-bold text-amber-700 dark:text-amber-300">
                             首选
                           </span>
                         )}
@@ -2311,15 +2319,15 @@ export function StoreDispatchMap({
                       <div className="mt-1.5 flex items-center gap-2.5 overflow-hidden">
                         <div
                           className={cn(
-                            "flex min-w-0 items-center gap-1 font-semibold whitespace-nowrap text-[10px]",
-                            isSelected ? "text-primary" : index === 0 ? "text-amber-200" : "text-white/90"
+                            "flex min-w-0 items-center gap-1 font-semibold whitespace-nowrap text-[11px]",
+                            isSelected ? "text-primary font-bold" : index === 0 ? "text-amber-700 dark:text-amber-200" : "text-foreground"
                           )}
                         >
-                          <Truck size={11} className="shrink-0 text-primary" />
+                          <Truck size={12} className="shrink-0 text-primary" />
                           {distanceMeta.distanceText}
                         </div>
                         {result.duration && (
-                          <div className="flex min-w-0 items-center gap-1 text-[10px] text-white/60 whitespace-nowrap">
+                          <div className="flex min-w-0 items-center gap-1 text-[10px] text-muted-foreground whitespace-nowrap">
                             <Clock size={11} className="shrink-0" />
                             {Math.max(1, Math.ceil(result.duration / 60))}分钟
                           </div>
@@ -2333,12 +2341,12 @@ export function StoreDispatchMap({
             {!results.length && (
               <div
                 className={cn(
-                  "rounded-xl border border-dashed border-white/10 bg-white/[0.02] text-center text-[11px] text-white/70",
+                  "rounded-2xl border border-dashed border-black/8 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.02] text-center text-xs text-muted-foreground",
                   mobile ? "col-span-full px-3 py-4" : "w-full px-3 py-4"
                 )}
               >
                 <div className="mb-2 flex justify-center text-primary">
-                  {isResolvingRoutes ? <Loader2 size={22} className="animate-spin" /> : <Navigation size={22} />}
+                  {isResolvingRoutes ? <Loader2 size={20} className="animate-spin" /> : <Navigation size={20} />}
                 </div>
                 {isResolvingRoutes ? (
                   <>
@@ -2350,7 +2358,7 @@ export function StoreDispatchMap({
                   <>
                     暂未获取到可用路线
                     <br />
-                    请搜索目标地址或缩小区域
+                    请搜索送达地址后查看推荐
                   </>
                 )}
               </div>
@@ -2363,9 +2371,46 @@ export function StoreDispatchMap({
 
   return (
     <>
+    {switcherContainer && createPortal(
+      <div role="group" aria-label="切换网点分组" className="isolate inline-flex max-w-full items-center gap-1 overflow-x-auto rounded-full border border-black/8 bg-black/3 dark:border-white/10 dark:bg-white/4 p-1 shadow-2xs">
+        {dispatchLibraries.map((library) => (
+          <button key={library.id} type="button"
+            aria-pressed={activeLibraryId === library.id}
+            disabled={isImportingShops || isDeletingShops || isShopModalOpen}
+            onClick={() => {
+              ++libraryRequestRef.current;
+              ++routeBatchIdRef.current;
+              setShops([]);
+              setResults([]);
+              setIsResolvingRoutes(false);
+              clearTargetArtifacts();
+              clearMarkers();
+              setActiveShopId(null);
+              setSelectedShopIds([]);
+              setIsBulkManageMode(false);
+              setActiveLibraryId(library.id);
+            }}
+            className={cn("relative inline-flex min-h-8 shrink-0 items-center rounded-full px-4 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50 cursor-pointer",
+              activeLibraryId === library.id ? "text-foreground font-semibold" : "text-muted-foreground hover:text-foreground font-medium")}
+          >
+            {activeLibraryId === library.id && (
+              <motion.span
+                layoutId={switcherLayoutId}
+                initial={false}
+                transition={reducedMotion ? { duration: 0 } : { type: "spring", stiffness: 420, damping: 35 }}
+                className="absolute inset-0 rounded-full bg-white dark:bg-white/10 text-foreground shadow-xs border border-black/8 dark:border-white/10"
+                aria-hidden="true"
+              />
+            )}
+            <span className="relative z-10">{library.name.replace("商品库", "网点")}</span>
+          </button>
+        ))}
+        {!dispatchLibraries.length && <span className="px-3 py-1.5 text-xs text-muted-foreground">暂无授权网点</span>}
+      </div>, switcherContainer
+    )}
     <div className="flex h-full min-h-0 w-full flex-1 flex-col bg-background text-foreground">
       <style>{markerStyles}</style>
-      <div className="shrink-0 border-b border-border/60 bg-card/60 px-3 py-2.5 backdrop-blur-xl sm:px-5">
+      <div className="shrink-0 border-b border-black/8 dark:border-white/10 bg-white/80 dark:bg-white/4 px-3 py-3 backdrop-blur-xl sm:px-5 sm:py-3.5">
         <div className="flex flex-wrap items-center gap-2">
           <div className="min-w-0 flex-1 sm:min-w-[124px] sm:flex-none">
             <CustomSelect
@@ -2382,7 +2427,7 @@ export function StoreDispatchMap({
                 setActiveCity(nextCity);
               }}
               placeholder="省份"
-              triggerClassName="h-10 rounded-full border border-border/70 bg-background/80 hover:bg-card px-3.5 text-xs sm:text-sm font-bold text-foreground transition-all shadow-2xs"
+              triggerClassName="h-10 rounded-full border border-black/8 bg-white/80 hover:bg-white dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8 px-4 text-xs sm:text-sm font-medium text-foreground transition-all shadow-xs"
             />
           </div>
 
@@ -2392,7 +2437,7 @@ export function StoreDispatchMap({
               options={citySelectOptions}
               onChange={setActiveCity}
               placeholder="城市"
-              triggerClassName="h-10 rounded-full border border-border/70 bg-background/80 hover:bg-card px-3.5 text-xs sm:text-sm font-bold text-foreground transition-all shadow-2xs"
+              triggerClassName="h-10 rounded-full border border-black/8 bg-white/80 hover:bg-white dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8 px-4 text-xs sm:text-sm font-medium text-foreground transition-all shadow-xs"
             />
           </div>
 
@@ -2414,8 +2459,8 @@ export function StoreDispatchMap({
                     void handleResolveTarget();
                   }
                 }}
-                placeholder="输入目标送达地址（按回车快速搜索）"
-                className="h-10 w-full rounded-full border border-border/70 bg-background/80 hover:bg-card pl-10 pr-24 text-xs sm:text-sm text-foreground outline-none transition-all placeholder:text-muted-foreground focus:border-primary/40 focus:ring-2 focus:ring-primary/15 shadow-2xs"
+                placeholder="搜索送达地址，查找附近调货网点"
+                className="h-10 w-full rounded-full border border-black/8 bg-white/80 dark:border-white/10 dark:bg-white/4 focus:bg-white dark:focus:bg-white/8 pl-10 pr-20 text-xs sm:text-sm text-foreground outline-none transition-all placeholder:text-muted-foreground focus:border-primary/50 focus:ring-2 focus:ring-primary/10 shadow-xs"
               />
               {targetQuery && (
                 <button
@@ -2427,22 +2472,22 @@ export function StoreDispatchMap({
                     clearTargetArtifacts();
                     drawShopMarkers();
                   }}
-                  className="absolute right-18 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1"
+                  className="absolute right-16 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1 rounded-full"
                 >
-                  <X size={15} />
+                  <X size={14} />
                 </button>
               )}
               <button
                 onClick={() => void handleResolveTarget()}
                 disabled={isSearchingTarget}
-                className="absolute right-1.5 top-1/2 -translate-y-1/2 h-7 px-3.5 flex items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold transition-all hover:bg-primary/90 active:scale-95 shadow-xs disabled:opacity-60 cursor-pointer"
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 h-7 px-3.5 flex items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-semibold transition-all hover:bg-primary/90 active:scale-95 shadow-xs disabled:opacity-60 cursor-pointer"
               >
                 {isSearchingTarget ? <Loader2 size={12} className="animate-spin" /> : "搜索"}
               </button>
             </div>
             {targetCandidates.length > 0 ? (
-              <div className="mt-2 overflow-hidden rounded-2xl border border-border/70 bg-card/95 backdrop-blur-xl shadow-xl shadow-black/10">
-                <div className="border-b border-border/60 px-3.5 py-2 text-[11px] font-bold text-muted-foreground">
+              <div className="mt-2 overflow-hidden rounded-2xl border border-black/8 dark:border-white/10 bg-white/95 dark:bg-[#0b111e]/98 backdrop-blur-xl shadow-xl">
+                <div className="border-b border-black/8 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.02] px-4 py-2.5 text-xs font-bold text-muted-foreground">
                   请选择最匹配的地点进行测距
                 </div>
                 <div className="max-h-64 overflow-y-auto p-1.5 custom-scrollbar">
@@ -2450,12 +2495,12 @@ export function StoreDispatchMap({
                     <button
                       key={candidate.id}
                       onClick={() => applyTargetCandidate(candidate)}
-                      className="w-full rounded-xl px-3 py-2 text-left transition-colors hover:bg-muted/70 flex flex-col gap-1 cursor-pointer"
+                      className="w-full rounded-xl px-3.5 py-2 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5 flex flex-col gap-0.5 cursor-pointer"
                     >
                       <div className="flex items-center gap-2">
                         <MapPin size={13} className="shrink-0 text-primary" />
                         <span className="truncate text-xs sm:text-sm font-bold text-foreground">{candidate.name}</span>
-                        <span className="shrink-0 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold text-primary">
+                        <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
                           {candidate.source === "poi" ? "POI" : "解析"}
                         </span>
                       </div>
@@ -2475,28 +2520,29 @@ export function StoreDispatchMap({
             <button
               onClick={() => setIsShopListOpen((prev) => !prev)}
               className={cn(
-                "inline-flex h-10 items-center justify-center gap-1.5 rounded-full border px-4 text-xs sm:text-sm font-bold transition-all max-sm:flex-1 shadow-2xs active:scale-95 cursor-pointer",
+                "inline-flex h-10 items-center justify-center gap-1.5 rounded-full border px-4 text-xs sm:text-sm font-medium transition-all max-sm:flex-1 shadow-xs active:scale-95 cursor-pointer",
                 isShopListOpen
-                  ? "border-primary/50 bg-primary/15 text-primary shadow-xs"
-                  : "border-border/70 bg-background/80 hover:bg-card text-foreground"
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-black/8 bg-white/80 hover:bg-white dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8 text-foreground"
               )}
             >
-              店铺列表 ({shops.length})
+              调货网点 ({shops.length})
             </button>
             <button
               onClick={() => {
                 setEditingShop(null);
                 setIsShopModalOpen(true);
               }}
-              className="inline-flex h-10 items-center justify-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 hover:bg-primary/20 text-primary px-4 text-xs sm:text-sm font-bold shadow-xs active:scale-95 transition-all max-sm:flex-1 cursor-pointer"
+              disabled={!activeLibraryId}
+              className="inline-flex h-10 items-center justify-center gap-1.5 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 px-4 text-xs sm:text-sm font-medium shadow-sm shadow-primary/20 active:scale-95 transition-all max-sm:flex-1 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Plus size={14} />
-              新增店铺
+              <Plus size={15} strokeWidth={2.5} />
+              新增网点
             </button>
             <button
               onClick={() => setIsImportModalOpen(true)}
-              disabled={isImportingShops}
-              className="inline-flex h-10 items-center justify-center gap-1.5 rounded-full border border-border/70 bg-background/80 hover:bg-card px-3.5 text-xs sm:text-sm font-bold text-foreground shadow-2xs active:scale-95 transition-all disabled:opacity-60 max-sm:flex-1 cursor-pointer"
+              disabled={isImportingShops || !activeLibraryId}
+              className="inline-flex h-10 items-center justify-center gap-1.5 rounded-full border border-black/8 bg-white/80 hover:bg-white dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8 px-4 text-xs sm:text-sm font-medium text-foreground shadow-xs active:scale-95 transition-all disabled:opacity-60 max-sm:flex-1 cursor-pointer"
             >
               {isImportingShops ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
               {importButtonLabel}
@@ -2505,7 +2551,7 @@ export function StoreDispatchMap({
         </div>
 
         {searchFeedback && (
-          <div className="mt-2 flex items-center gap-2 rounded-full border border-border/60 bg-muted/40 px-3.5 py-1.5 text-xs text-muted-foreground">
+          <div className="mt-2.5 flex items-center gap-2 rounded-full border border-blue-500/20 bg-blue-50/80 dark:bg-blue-950/50 dark:border-blue-500/30 px-4 py-2 text-xs text-foreground">
             <MapPin size={13} className="text-primary shrink-0" />
             <span className="truncate">{searchFeedback}</span>
           </div>
@@ -2516,7 +2562,7 @@ export function StoreDispatchMap({
       </div>
 
       <div className="min-h-0 flex-1 p-2.5 sm:p-4">
-        <div className="relative h-full min-h-[520px] overflow-hidden rounded-[22px] border border-border/60 bg-muted/20 shadow-xl shadow-black/10 sm:min-h-[calc(100dvh-15.5rem)] sm:rounded-[26px]">
+        <div className="relative h-full min-h-[520px] overflow-hidden rounded-[22px] border border-black/8 dark:border-white/10 bg-muted/20 shadow-xs sm:min-h-[calc(100dvh-15.5rem)] sm:rounded-[28px]">
           <BareAmapTest
             showDebug={false}
             center={DEFAULT_CENTER}
@@ -2525,38 +2571,38 @@ export function StoreDispatchMap({
             onReady={handleMapReady}
             onDestroy={handleMapDestroy}
             mapStyle={`amap://styles/${mapTheme}`}
-            className="h-full min-h-[520px] overflow-hidden rounded-[22px] border-0 bg-transparent sm:min-h-[calc(100dvh-15.5rem)] sm:rounded-[26px]"
+            className="h-full min-h-[520px] overflow-hidden rounded-[22px] border-0 bg-transparent sm:min-h-[calc(100dvh-15.5rem)] sm:rounded-[28px]"
           />
           {isShopListOpen &&
             createPortal(
-              <div className="fixed inset-0 z-100 flex items-center justify-center p-4">
+              <div className="fixed inset-0 z-100 flex items-end justify-center p-0 sm:items-center sm:p-5 bg-slate-950/42 backdrop-blur-sm">
                 <div
-                  className="absolute inset-0 bg-slate-900/40 dark:bg-[#020617]/75 backdrop-blur-md dark:backdrop-blur-2xl transition-all duration-300"
+                  className="absolute inset-0 transition-opacity duration-300"
                   onClick={() => setIsShopListOpen(false)}
                 />
-                <aside className="relative z-10 flex h-[min(85dvh,860px)] w-full max-w-[420px] flex-col overflow-hidden rounded-[24px] sm:rounded-[28px] border border-border/70 bg-card/95 backdrop-blur-3xl shadow-2xl dark:shadow-[0_32px_64px_-16px_rgba(0,0,0,0.9)] sm:max-w-[760px] animate-in fade-in zoom-in-95 duration-300">
+                <aside role="dialog" aria-modal="true" aria-label="调货网点" className="relative z-10 flex h-[min(90dvh,860px)] w-full max-w-[420px] flex-col overflow-hidden rounded-t-[28px] sm:rounded-[36px] border border-black/8 dark:border-white/10 bg-white/95 dark:bg-[#0b111e]/98 text-foreground shadow-2xl backdrop-blur-xl sm:max-w-[760px] animate-in fade-in zoom-in-95 duration-200">
                   
                   {/* Modal Header */}
-                  <div className="border-b border-border/60 px-5 py-4 sm:px-6 sm:py-5">
+                  <div className="border-b border-black/8 dark:border-white/10 px-5 py-4 sm:px-6 sm:py-5">
                     <div className="flex items-center justify-between gap-3">
                       <div>
-                        <h2 className="text-base sm:text-lg font-black text-foreground">店铺列表</h2>
-                        <p className="mt-1 text-[11px] sm:text-xs font-semibold text-muted-foreground">搜索、定位并修改门店信息以辅助路径调度</p>
+                        <h2 className="text-base sm:text-lg font-bold text-foreground">调货网点</h2>
+                        <p className="mt-0.5 text-xs text-muted-foreground font-medium">管理调货地址，快速定位与规划路线</p>
                       </div>
                       <div className="flex items-center gap-2">
                         {!isBulkManageMode && (
                           <button
                             onClick={() => setIsBulkManageMode(true)}
-                            className="inline-flex h-8 items-center justify-center rounded-full border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 px-3.5 text-xs font-bold transition-all active:scale-95 shadow-xs whitespace-nowrap cursor-pointer"
+                            className="inline-flex h-8 items-center justify-center rounded-full border border-rose-500/30 bg-rose-50/80 hover:bg-rose-100 text-rose-600 dark:bg-rose-500/10 dark:hover:bg-rose-500/20 dark:text-rose-400 dark:border-rose-500/30 px-3.5 text-xs font-medium transition-all active:scale-95 shadow-xs whitespace-nowrap cursor-pointer"
                           >
                             批量删除
                           </button>
                         )}
                         <button
                           onClick={() => setIsShopListOpen(false)}
-                          className="p-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-all duration-300 hover:rotate-90 active:scale-90 cursor-pointer"
+                          className="h-8 w-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground border border-black/8 bg-white/80 hover:bg-white dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8 transition-all active:scale-95 cursor-pointer shadow-xs"
                         >
-                          <X size={18} />
+                          <X size={16} />
                         </button>
                       </div>
                     </div>
@@ -2570,13 +2616,13 @@ export function StoreDispatchMap({
                       <input
                         value={shopSearchQuery}
                         onChange={(event) => setShopSearchQuery(event.target.value)}
-                        placeholder="搜索店名 / POI_ID / 详细地址"
-                        className="h-10 w-full rounded-full border border-border/70 bg-background/80 px-10 pr-4 text-xs sm:text-sm outline-none transition-all focus:border-primary/40 focus:ring-2 focus:ring-primary/15 text-foreground placeholder:text-muted-foreground shadow-2xs"
+                        placeholder="搜索网点名称、编号或地址"
+                        className="h-10 w-full rounded-full border border-black/8 bg-white/80 dark:border-white/10 dark:bg-white/4 focus:bg-white dark:focus:bg-white/8 pl-10 pr-4 text-xs sm:text-sm outline-none transition-all focus:border-primary/50 focus:ring-2 focus:ring-primary/10 text-foreground placeholder:text-muted-foreground shadow-xs"
                       />
                     </div>
 
                     {/* Filter Tabs & Stats Badge */}
-                    <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="mt-3.5 flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
                       <div className="flex flex-wrap items-center gap-1.5">
                         {[
                           { value: "all", label: "全部" },
@@ -2588,44 +2634,44 @@ export function StoreDispatchMap({
                             type="button"
                             onClick={() => setShopLocationFilter(filter.value as "all" | "resolved" | "pending")}
                             className={cn(
-                              "inline-flex h-7 items-center justify-center rounded-full px-3 text-xs font-bold transition-all active:scale-95 shadow-2xs cursor-pointer",
+                              "inline-flex h-7.5 items-center justify-center rounded-full px-3.5 text-xs font-medium transition-all active:scale-95 shadow-xs cursor-pointer",
                               shopLocationFilter === filter.value
                                 ? "bg-primary text-primary-foreground shadow-xs"
-                                : "border border-border/70 bg-background/80 text-muted-foreground hover:text-foreground hover:bg-muted"
+                                : "border border-black/8 bg-white/80 dark:border-white/10 dark:bg-white/5 text-muted-foreground hover:text-foreground hover:bg-white dark:hover:bg-white/8"
                             )}
                           >
                             {filter.label}
                           </button>
                         ))}
                       </div>
-                      <div className="flex flex-wrap items-center gap-2 text-[10px] sm:text-xs text-muted-foreground sm:justify-end">
-                        <div className="inline-flex h-7 items-center rounded-full border border-border/60 bg-muted/40 px-3 text-[11px] font-bold text-foreground">
+                      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground sm:justify-end">
+                        <div className="inline-flex h-7.5 items-center rounded-full border border-black/8 bg-white/80 dark:border-white/10 dark:bg-white/5 px-3 text-xs font-medium text-foreground shadow-xs">
                           当前 {searchedShops.length} 家
                         </div>
-                        <div className="inline-flex h-7 items-center rounded-full border border-border/60 bg-muted/40 px-3 text-[11px] font-bold text-muted-foreground">
+                        <div className="inline-flex h-7.5 items-center rounded-full border border-black/8 bg-white/80 dark:border-white/10 dark:bg-white/5 px-3 text-xs font-medium text-muted-foreground shadow-xs">
                           总计 {shops.length} 家
                         </div>
-                        <div className="flex items-center gap-1.5 font-bold">
+                        <div className="flex items-center gap-1.5 font-semibold text-xs">
                           <span className="relative flex h-2 w-2">
                             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500/70 opacity-75" />
                             <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
                           </span>
-                          <span className="text-emerald-500">已定位</span>
+                          <span className="text-emerald-600 dark:text-emerald-400">已定位</span>
                         </div>
-                        <div className="flex items-center gap-1.5 font-bold">
+                        <div className="flex items-center gap-1.5 font-semibold text-xs">
                           <span className="relative flex h-2 w-2">
                             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-rose-500/70 opacity-75" />
                             <span className="relative inline-flex h-2 w-2 rounded-full bg-rose-500" />
                           </span>
-                          <span className="text-rose-500">待处理</span>
+                          <span className="text-rose-600 dark:text-rose-400">待处理</span>
                         </div>
                       </div>
                     </div>
 
                     {/* Bulk Manage Bar */}
-                    <div className="mt-4">
+                    <div className="mt-3">
                       {isBulkManageMode && (
-                        <div className="flex flex-wrap items-center gap-2 bg-muted/30 p-2 rounded-2xl border border-border/60">
+                        <div className="flex flex-wrap items-center gap-2 bg-black/[0.03] dark:bg-white/[0.03] p-2 rounded-2xl border border-black/8 dark:border-white/10">
                           <button
                             onClick={() => {
                               const visibleIds = searchedShops.map((shop) => shop.id);
@@ -2633,30 +2679,30 @@ export function StoreDispatchMap({
                               setSelectedShopIds(allVisibleSelected ? [] : visibleIds);
                             }}
                             className={cn(
-                              "inline-flex h-8 items-center justify-center rounded-full px-3 text-xs font-bold transition-all active:scale-95 shadow-2xs cursor-pointer",
+                              "inline-flex h-8 items-center justify-center rounded-full px-3.5 text-xs font-medium transition-all active:scale-95 shadow-xs cursor-pointer",
                               searchedShops.length > 0 && searchedShops.every((shop) => selectedShopIds.includes(shop.id))
                                 ? "bg-primary text-primary-foreground shadow-xs"
-                                : "border border-border/70 bg-background/80 text-foreground hover:bg-muted"
+                                : "border border-black/8 bg-white/80 dark:border-white/10 dark:bg-white/5 text-foreground hover:bg-white dark:hover:bg-white/8"
                             )}
                           >
                             {searchedShops.length > 0 && searchedShops.every((shop) => selectedShopIds.includes(shop.id)) ? "取消全选" : "全选当前列表"}
                           </button>
-                          <div className="inline-flex h-8 items-center justify-center rounded-full bg-muted/50 px-3 text-xs font-bold text-muted-foreground">
-                            已选 <span className="mx-1 font-extrabold text-foreground">{selectedShopIds.length}</span> / 当前 {searchedShops.length}
+                          <div className="inline-flex h-8 items-center justify-center rounded-full bg-white/80 dark:bg-white/5 border border-black/8 dark:border-white/10 px-3 text-xs font-medium text-muted-foreground shadow-xs">
+                            已选 <span className="mx-1 font-bold text-foreground">{selectedShopIds.length}</span> / 当前 {searchedShops.length}
                           </div>
                           <button
                             onClick={() => {
                               setIsBulkManageMode(false);
                               setSelectedShopIds([]);
                             }}
-                            className="inline-flex h-8 items-center justify-center rounded-full px-2.5 text-xs font-bold text-muted-foreground transition-all hover:text-foreground active:scale-95 cursor-pointer"
+                            className="inline-flex h-8 items-center justify-center rounded-full px-3 text-xs font-medium text-muted-foreground transition-all hover:text-foreground active:scale-95 cursor-pointer"
                           >
                             退出
                           </button>
                           <button
                             onClick={() => void handleBulkDeleteShops()}
                             disabled={selectedShopIds.length === 0 || isDeletingShops}
-                            className="ml-auto inline-flex h-8 items-center justify-center gap-1.5 rounded-full bg-rose-600 hover:bg-rose-700 disabled:bg-rose-500/35 px-4 text-xs font-black text-white transition-all active:scale-95 disabled:cursor-not-allowed shadow-md shadow-rose-500/10 cursor-pointer"
+                            className="ml-auto inline-flex h-8 items-center justify-center gap-1.5 rounded-full bg-rose-600 hover:bg-rose-700 disabled:opacity-50 px-4 text-xs font-medium text-white transition-all active:scale-95 disabled:cursor-not-allowed shadow-xs cursor-pointer"
                           >
                             {isDeletingShops ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
                             删除 ({selectedShopIds.length})
@@ -2667,8 +2713,8 @@ export function StoreDispatchMap({
                   </div>
 
                   {/* Modal Body - Grid Cards List */}
-                  <div className="flex-1 overflow-y-auto p-4 sm:p-5 custom-scrollbar">
-                    <div className="grid gap-3.5 sm:grid-cols-2">
+                  <div className="min-h-0 flex-1 overflow-y-auto bg-black/[0.02] dark:bg-white/[0.02] p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:p-5 custom-scrollbar">
+                    <div className="grid gap-3 sm:grid-cols-2">
                       {searchedShops.map((shop) => {
                         const region = extractRegionParts(shop);
                         const isSelected = selectedShopIds.includes(shop.id);
@@ -2677,11 +2723,11 @@ export function StoreDispatchMap({
                           <div
                             key={shop.id}
                             className={cn(
-                              "rounded-2xl border p-4 transition-all duration-300 bg-background/70 hover:bg-background/90 border-border/60 hover:border-primary/40 shadow-xs hover:shadow-md group",
-                              isSelected ? "border-primary/60 bg-primary/10 ring-1 ring-primary/30 shadow-md shadow-primary/10" : ""
+                              "flex h-full flex-col rounded-2xl border border-black/8 bg-white/80 dark:border-white/10 dark:bg-white/4 p-4 shadow-xs transition-all duration-200 hover:border-primary/40 group",
+                              isSelected ? "border-primary bg-primary/5 ring-1 ring-primary/30" : ""
                             )}
                           >
-                            <div className="flex min-w-0 items-start gap-3">
+                            <div className="flex min-w-0 items-start gap-2.5">
                                 {isBulkManageMode && (
                                   <button
                                     onClick={() => {
@@ -2695,15 +2741,15 @@ export function StoreDispatchMap({
                                       "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-all active:scale-90 cursor-pointer",
                                       isSelected
                                         ? "border-primary bg-primary text-primary-foreground"
-                                        : "border-muted-foreground/30 bg-background text-transparent"
+                                        : "border-black/20 dark:border-white/20 bg-background text-transparent"
                                     )}
                                   >
-                                    <Check size={12} />
+                                    <Check size={12} strokeWidth={3} />
                                   </button>
                                 )}
                                 <div className="min-w-0 flex-1">
                                   <div className="flex items-start gap-2">
-                                    <span className="relative flex h-2.5 w-2.5 shrink-0 mt-1">
+                                    <span className="relative flex h-2 w-2 shrink-0 mt-1.5">
                                       <span
                                         className={cn(
                                           "absolute inline-flex h-full w-full animate-ping rounded-full opacity-75",
@@ -2712,21 +2758,21 @@ export function StoreDispatchMap({
                                       />
                                       <span
                                         className={cn(
-                                          "relative inline-flex h-2.5 w-2.5 rounded-full",
+                                          "relative inline-flex h-2 w-2 rounded-full",
                                           hasResolvedLocation ? "bg-emerald-500" : "bg-rose-500"
                                         )}
                                       />
                                     </span>
-                                    <div className="min-w-0">
-                                      <h3 className="truncate text-sm sm:text-base font-black text-foreground group-hover:text-primary transition-colors" title={shop.name}>
+                                    <div className="min-w-0 flex-1">
+                                      <h3 className="truncate text-sm sm:text-base font-bold text-foreground group-hover:text-primary transition-colors" title={shop.name}>
                                         {shop.name}
                                       </h3>
                                     </div>
                                   </div>
-                                  <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px] sm:text-xs font-bold text-muted-foreground">
-                                    <span>{region.regionLabel || "未分类"}</span>
+                                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                                    <span className="font-semibold">{region.regionLabel || "未分类"}</span>
                                     <span className={cn(
-                                      "rounded-full px-2 py-0.5 text-[9px] font-black tracking-wide",
+                                      "rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide",
                                       hasResolvedLocation
                                         ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
                                         : "bg-rose-500/10 text-rose-600 dark:text-rose-400"
@@ -2736,35 +2782,27 @@ export function StoreDispatchMap({
                                   </div>
                                   <div className="flex flex-wrap gap-1.5 mt-2">
                                     {shop.externalId && (
-                                      <div className="inline-flex rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 px-2.5 py-0.5 text-[10px] font-bold tracking-wide">
+                                      <div className="inline-flex rounded-full bg-blue-50 text-blue-600 border border-blue-200 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800/60 px-2.5 py-0.5 text-[10px] font-bold">
                                         POI_ID: {shop.externalId}
-                                      </div>
-                                    )}
-                                    {shop.library && (
-                                      <div className="inline-flex rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 px-2.5 py-0.5 text-[10px] font-bold tracking-wide gap-1.5 items-center">
-                                        <span className="relative flex h-1.5 w-1.5">
-                                          <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-purple-500" />
-                                        </span>
-                                        商品库: {shop.library.name}
                                       </div>
                                     )}
                                   </div>
                                   {shop.address && (
-                                    <p className="mt-2.5 min-h-[32px] text-xs leading-relaxed text-muted-foreground line-clamp-2 select-all" title={shop.address}>
+                                    <p className="mt-2 min-h-8 text-xs leading-relaxed text-muted-foreground line-clamp-2 select-all font-medium" title={shop.address}>
                                       {shop.address}
                                     </p>
                                   )}
                                 </div>
                             </div>
                             
-                            {/* Card Actions */}
+                            {/* Card Actions (胶囊按钮) */}
                             {!isBulkManageMode && (
-                              <div className="mt-3.5 flex items-center justify-end gap-2 border-t border-border/60 pt-3">
+                              <div className="mt-auto flex items-center justify-end gap-2 border-t border-black/6 dark:border-white/6 pt-3">
                                 <button
                                   onClick={() => {
                                     void handleLocateShop(shop);
                                   }}
-                                  className="h-7.5 px-3.5 flex items-center justify-center rounded-full border border-border/70 bg-muted/40 hover:bg-muted text-foreground text-xs font-bold transition-all active:scale-95 shadow-2xs cursor-pointer"
+                                  className="h-8 px-3.5 flex items-center justify-center rounded-full border border-black/8 bg-white/80 hover:bg-white dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8 text-foreground text-xs font-medium transition-all active:scale-95 shadow-xs cursor-pointer"
                                 >
                                   定位
                                 </button>
@@ -2773,7 +2811,7 @@ export function StoreDispatchMap({
                                     setEditingShop(shop);
                                     setIsShopModalOpen(true);
                                   }}
-                                  className="h-7.5 px-3.5 flex items-center justify-center rounded-full border border-primary/30 bg-primary/10 hover:bg-primary/20 text-primary text-xs font-bold transition-all active:scale-95 shadow-xs cursor-pointer"
+                                  className="h-8 px-3.5 flex items-center justify-center rounded-full border border-blue-500/30 bg-blue-50/80 hover:bg-blue-100 text-blue-600 dark:bg-blue-500/10 dark:hover:bg-blue-500/20 dark:text-blue-400 dark:border-blue-500/30 text-xs font-medium transition-all active:scale-95 shadow-xs cursor-pointer"
                                 >
                                   编辑
                                 </button>
@@ -2782,7 +2820,7 @@ export function StoreDispatchMap({
                                     void handleDeleteSingleShop(shop);
                                   }}
                                   disabled={isDeletingShops}
-                                  className="h-7.5 px-3 flex items-center justify-center rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 hover:bg-rose-500/20 text-xs font-bold transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+                                  className="h-8 px-3.5 flex items-center justify-center rounded-full border border-rose-500/30 bg-rose-50/80 hover:bg-rose-100 text-rose-600 dark:bg-rose-500/10 dark:hover:bg-rose-500/20 dark:text-rose-400 dark:border-rose-500/30 text-xs font-medium transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer shadow-xs"
                                 >
                                   删除
                                 </button>
@@ -2792,8 +2830,8 @@ export function StoreDispatchMap({
                         );
                       })}
                       {!searchedShops.length && (
-                        <div className="sm:col-span-2 rounded-2xl border border-dashed border-border/60 bg-muted/20 px-4 py-10 text-center text-xs sm:text-sm text-muted-foreground font-bold">
-                          没有找到匹配的店铺
+                        <div className="sm:col-span-2 rounded-2xl border border-dashed border-black/8 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.02] px-4 py-12 text-center text-xs sm:text-sm text-muted-foreground font-medium">
+                          没有找到匹配的网点
                         </div>
                       )}
                     </div>
@@ -2814,7 +2852,7 @@ export function StoreDispatchMap({
         }
       }}
       onImport={handleImportShops}
-      title="导入店铺"
+      title="导入网点"
       description="支持 Excel 或 CSV 导入。请至少包含“门店名称 / POI_ID / 详细地址”三列，也兼容 `POI ID`、`poi_id` 这类写法。"
       dropzoneText="点击上传或拖拽店铺表格"
       templateData={SHOP_IMPORT_TEMPLATE}
@@ -2825,6 +2863,7 @@ export function StoreDispatchMap({
       onClose={() => setIsShopModalOpen(false)}
       onSave={handleSaveShop}
       initialData={editingShop}
+      libraryName={dispatchLibraries.find((library) => library.id === activeLibraryId)?.name.replace("商品库", "网点")}
     />
     <ConfirmModal
       isOpen={!!pendingDeleteAction}
@@ -2837,10 +2876,10 @@ export function StoreDispatchMap({
         }
         void executeDeleteShops(pendingDeleteAction.ids);
       }}
-      title={pendingDeleteAction?.type === "single" ? "确认删除店铺" : "确认批量删除"}
+      title={pendingDeleteAction?.type === "single" ? "确认删除网点" : "确认批量删除"}
       message={
         pendingDeleteAction?.type === "single"
-          ? <>确认删除店铺“{pendingDeleteAction.shop.name}”吗？此操作不可撤销。</>
+          ? <>确认删除网点“{pendingDeleteAction.shop.name}”吗？此操作不可撤销。</>
           : <>确认删除已选中的 {pendingDeleteAction?.type === "bulk" ? pendingDeleteAction.ids.length : 0} 家店铺吗？此操作不可撤销。</>
       }
       confirmLabel="确认删除"
@@ -2851,7 +2890,7 @@ export function StoreDispatchMap({
       isOpen={importLocateFailures.length > 0}
       onClose={() => setImportLocateFailures([])}
       onConfirm={() => setImportLocateFailures([])}
-      title="部分店铺未定位"
+      title="部分网点未定位"
       message={
         <div className="space-y-3 text-left">
           <p>以下店铺本次导入后没有自动定位成功，你可以按名称逐个点“定位”继续处理。</p>
