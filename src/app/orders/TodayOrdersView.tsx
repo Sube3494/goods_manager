@@ -66,6 +66,63 @@ import { createOrderShortagePurchaseDraft, OrderPurchaseDraft, OrderShortageItem
 const CompactOrderRouteModal = dynamic(() => import("@/components/Orders/OrderRouteModal").then((module) => module.OrderRouteModal), { ssr: false });
 const CompactCustomerHistoryModal = dynamic(() => import("@/components/Orders/CustomerHistoryModal").then((module) => module.CustomerHistoryModal), { ssr: false });
 
+const ORDER_WORKFLOW_TIPS = [
+  "想减少手动补录？请先通过采购入库，增加库存并记录采购成本。",
+  "采购入库时，请核对店铺、商品、数量和单价，方便后续出库核算成本。",
+  "订单商品未匹配时，请先关联正确商品，方便系统处理库存和成本。",
+  "遇到库存不足或成本缺失，请先检查采购入库记录，再处理出库或补录成本。",
+];
+
+function OrderWorkflowTips() {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const reducedMotion = useReducedMotion();
+
+  useEffect(() => {
+    if (paused || reducedMotion) return;
+    const timer = window.setInterval(() => {
+      setActiveIndex((index) => (index + 1) % ORDER_WORKFLOW_TIPS.length);
+    }, 4000);
+    return () => window.clearInterval(timer);
+  }, [paused, reducedMotion]);
+
+  return (
+    <button
+      type="button"
+      aria-label={`操作提示：${ORDER_WORKFLOW_TIPS[activeIndex]}。点击查看下一条`}
+      title={`${ORDER_WORKFLOW_TIPS[activeIndex]}（点击切换，悬停暂停）`}
+      onClick={() => setActiveIndex((index) => (index + 1) % ORDER_WORKFLOW_TIPS.length)}
+      onPointerEnter={(event) => {
+        if (event.pointerType === "mouse") setPaused(true);
+      }}
+      onPointerLeave={(event) => {
+        if (event.pointerType === "mouse") setPaused(false);
+      }}
+      onFocus={(event) => {
+        if (event.currentTarget.matches(":focus-visible")) setPaused(true);
+      }}
+      onBlur={() => setPaused(false)}
+      className="flex min-h-11 w-full min-w-0 flex-1 items-start gap-2.5 rounded-lg px-0 py-1 text-left text-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary sm:min-h-0 sm:w-auto sm:items-center sm:px-2"
+    >
+      <FileText size={13} className="mt-[3px] shrink-0 text-primary/70 sm:mt-0" aria-hidden="true" />
+      <span className="relative block h-10 min-w-0 flex-1 overflow-hidden sm:h-5">
+        <AnimatePresence initial={false} mode="wait">
+          <motion.span
+            key={activeIndex}
+            initial={{ opacity: 0, y: reducedMotion ? 0 : 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: reducedMotion ? 0 : -12 }}
+            transition={{ duration: reducedMotion ? 0 : 0.25 }}
+            className="block line-clamp-2 break-words leading-5 sm:line-clamp-none sm:truncate"
+          >
+            {ORDER_WORKFLOW_TIPS[activeIndex]}
+          </motion.span>
+        </AnimatePresence>
+      </span>
+    </button>
+  );
+}
+
 function OrderListSkeleton({ count = 3, cardMode = false }: { count?: number; cardMode?: boolean }) {
   return (
     <div className={cardMode ? "grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 items-start animate-pulse" : "grid gap-4 animate-pulse"}>
@@ -1389,9 +1446,10 @@ export function TodayOrdersView({
             </div>
           </div>
 
-          <div className="hidden items-center justify-between gap-3 border-t border-black/6 pt-3 dark:border-white/8 sm:flex">
-            <span className="text-xs font-medium text-muted-foreground">{filteredOrders.length} 张订单</span>
-            <div className="inline-flex rounded-full border border-black/8 bg-white p-1 shadow-xs dark:border-white/10 dark:bg-white/4" role="group" aria-label="订单布局">
+          <div className="flex items-center justify-between gap-3 border-t border-black/6 pt-3 dark:border-white/8">
+            <span className="hidden shrink-0 text-xs font-medium text-muted-foreground sm:inline">{filteredOrders.length} 张订单</span>
+            <OrderWorkflowTips />
+            <div className="hidden shrink-0 rounded-full border border-black/8 bg-white p-1 shadow-xs dark:border-white/10 dark:bg-white/4 sm:inline-flex" role="group" aria-label="订单布局">
               <button
                 type="button"
                 onClick={() => changeLayoutMode("cards")}
