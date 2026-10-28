@@ -2047,8 +2047,7 @@ export function StoreDispatchMap({
     async (rows: Record<string, unknown>[] | Record<string, unknown[]>) => {
       const importedRows = Array.isArray(rows) ? rows : [];
       if (!importedRows.length) {
-        showToast("导入文件里没有可用数据", "info");
-        return;
+        throw new Error("导入文件里没有可用数据");
       }
 
       setIsImportingShops(true);
@@ -2058,11 +2057,15 @@ export function StoreDispatchMap({
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ shops: importedRows, libraryId: activeLibraryId }),
+          signal: AbortSignal.timeout(60000),
         });
 
         const result = await res.json();
         if (!res.ok) {
           throw new Error(result.error || "店铺导入失败");
+        }
+        if (!result.created && result.errors?.length) {
+          throw new Error(`没有导入新网点：${result.errors.slice(0, 3).join("；")}`);
         }
 
         const createdShops = Array.isArray(result.shops) ? (result.shops as ImportedShopPayload[]) : [];
@@ -2083,7 +2086,7 @@ export function StoreDispatchMap({
             continue;
           }
 
-          const matched = await resolveShopCoordinates(keyword);
+          const matched = await withTimeout(() => resolveShopCoordinates(keyword).catch(() => null), 15000, null);
           if (!matched) {
             locateFailures.push({
               name: shop.name,
@@ -2109,9 +2112,10 @@ export function StoreDispatchMap({
               longitude: location[0],
               isSource: true,
             }),
-          });
+            signal: AbortSignal.timeout(20000),
+          }).catch(() => null);
 
-          if (updateRes.ok) {
+          if (updateRes?.ok) {
             autoLocated += 1;
           } else {
             locateFailures.push({
@@ -2132,6 +2136,7 @@ export function StoreDispatchMap({
       } catch (error) {
         console.error("Failed to import shops:", error);
         showToast(error instanceof Error ? error.message : "店铺导入失败", "error");
+        throw error;
       } finally {
         setIsImportingShops(false);
         setImportProgress(null);
@@ -2852,6 +2857,13 @@ export function StoreDispatchMap({
         }
       }}
       onImport={handleImportShops}
+      importStatus={{
+        progress: importProgress && importProgress.total > 0 ? Math.round(importProgress.current / importProgress.total * 100) : null,
+        title: importProgress ? "正在定位调货网点…" : "正在保存调货网点…",
+        description: importProgress
+          ? `已处理 ${importProgress.current} / ${importProgress.total} 个网点，定位失败的网点仍会保留，可稍后重试。`
+          : "正在校验并保存至当前网点分组，请勿关闭窗口。",
+      }}
       title="导入网点"
       description="支持 Excel 或 CSV 导入。请至少包含“门店名称 / POI_ID / 详细地址”三列，也兼容 `POI ID`、`poi_id` 这类写法。"
       dropzoneText="点击上传或拖拽店铺表格"

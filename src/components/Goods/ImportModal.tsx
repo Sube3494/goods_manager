@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Upload, X, FileSpreadsheet, CheckCircle, AlertCircle, EyeOff, Ban, Trash2 } from "lucide-react";
+import { Upload, X, FileSpreadsheet, CheckCircle, AlertCircle, EyeOff, Ban, Trash2, Loader2 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { cn } from "@/lib/utils";
 
@@ -17,6 +17,7 @@ interface ImportModalProps {
   templateData?: Record<string, unknown>[];
   templateFileName?: string;
   multiSheet?: boolean;
+  importStatus?: { progress: number | null; title: string; description: string };
 }
 
 export function ImportModal({ 
@@ -28,7 +29,8 @@ export function ImportModal({
   dropzoneText = "点击上传或拖拽 Excel 文件",
   templateData,
   templateFileName = "导入模版.xlsx",
-  multiSheet = false
+  multiSheet = false,
+  importStatus,
 }: ImportModalProps) {
   const [dragActive, setDragActive] = useState(false);
   const [file, setFile] = useState<File | null>(null);
@@ -39,6 +41,7 @@ export function ImportModal({
   const [isImporting, setIsImporting] = useState(false);
   const [progress, setProgress] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const displayProgress = importStatus ? importStatus.progress : progress;
 
   const isRequiredColumn = (key: string) => {
     const norm = key.trim().toLowerCase();
@@ -135,7 +138,7 @@ export function ImportModal({
               return clean;
             };
 
-            let importData: any = null;
+            let importData: Record<string, unknown>[] | Record<string, unknown[]>;
             if (multiSheet) {
               const result: Record<string, unknown[]> = {};
               workbook.SheetNames.forEach(name => {
@@ -158,7 +161,7 @@ export function ImportModal({
             setProgress(0);
 
             // 模拟进度条平滑爬升
-            const progressTimer = setInterval(() => {
+            const progressTimer = importStatus ? undefined : setInterval(() => {
               setProgress((prev) => {
                 if (prev >= 95) {
                   clearInterval(progressTimer);
@@ -271,24 +274,26 @@ export function ImportModal({
                           strokeWidth="6"
                           fill="transparent"
                           strokeDasharray={251.2}
-                          strokeDashoffset={251.2 - (251.2 * progress) / 100}
+                          strokeDashoffset={251.2 - (251.2 * (displayProgress ?? 0)) / 100}
                           className="text-primary transition-all duration-300 ease-out"
                           strokeLinecap="round"
                         />
                       </svg>
-                      <span className="absolute text-2xl font-bold text-foreground font-number">{progress}%</span>
+                      <span className="absolute text-2xl font-bold text-foreground font-number">
+                        {displayProgress === null ? <Loader2 size={32} className="animate-spin text-primary" aria-label="正在处理" /> : `${displayProgress}%`}
+                      </span>
                     </div>
                   </div>
                   
                   <div className="text-center space-y-2">
-                    <p className="text-lg font-bold text-foreground">正在安全导入商品数据...</p>
-                    <p className="text-sm text-muted-foreground">正在写入库并生成关联关系，请勿关闭窗口</p>
+                    <p className="text-lg font-bold text-foreground">{importStatus?.title || "正在安全导入商品数据..."}</p>
+                    <p className="text-sm text-muted-foreground" role="status">{importStatus?.description || "正在写入库并生成关联关系，请勿关闭窗口"}</p>
                   </div>
                   
                   <div className="w-full max-w-md h-2 bg-muted dark:bg-white/5 rounded-full overflow-hidden border border-border/30">
                     <div 
-                      className="h-full bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 rounded-full transition-all duration-300 ease-out"
-                      style={{ width: `${progress}%` }}
+                      className={cn("h-full bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 rounded-full transition-all duration-300 ease-out", displayProgress === null && "animate-pulse")}
+                      style={{ width: displayProgress === null ? "100%" : `${displayProgress}%` }}
                     />
                   </div>
                 </div>
