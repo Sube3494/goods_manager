@@ -4444,7 +4444,7 @@ export const OrderCard = memo(function OrderCard({
                           {order.userAddress || "地址待同步"}
                         </span>
                       </div>
-                      {showPlatformActions && !displayAsOfflineOrder && !deleted && !readOnly && !order.isSubscribe && !isLockedSubscribe ? (
+                      {showPlatformActions && !displayAsOfflineOrder && !deleted && !completed && !readOnly && !order.isSubscribe && !isLockedSubscribe ? (
                         <button type="button" onClick={(e) => { e.stopPropagation(); onRunAction(order.id, selfDeliveryAction); }} disabled={selfDeliveryDisabled} title={selfDeliveryQueued || !readyForSelfDelivery ? queuedSelfDeliveryTitle : selfDeliveryTitle} className="ml-auto inline-flex h-6 shrink-0 items-center gap-1 rounded-full border border-sky-500/20 bg-sky-500/10 px-2 text-[11px] font-semibold text-sky-700 transition-all hover:bg-sky-500/15 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 dark:text-sky-300 sm:hidden">
                           {actingId === `${order.id}:${selfDeliveryAction}` ? <Loader2 size={11} className="animate-spin" /> : <Truck size={11} />}<span>{selfDeliveryLabel}</span>
                         </button>
@@ -4583,7 +4583,7 @@ export const OrderCard = memo(function OrderCard({
                 </span>
               </span>
             ) : null}
-            {showPlatformActions && !displayAsOfflineOrder && !deleted && !readOnly && !order.isSubscribe && !isLockedSubscribe ? (
+            {showPlatformActions && !displayAsOfflineOrder && !deleted && !completed && !readOnly && !order.isSubscribe && !isLockedSubscribe ? (
               <button type="button" onClick={() => onRunAction(order.id, selfDeliveryAction)} disabled={selfDeliveryDisabled} title={selfDeliveryQueued || !readyForSelfDelivery ? queuedSelfDeliveryTitle : selfDeliveryTitle} className="hidden h-7 sm:h-8 items-center gap-1.5 rounded-full border border-sky-500/20 bg-sky-500/10 px-2 text-[11px] font-medium leading-none text-sky-700 transition-all hover:bg-sky-500/15 disabled:cursor-not-allowed disabled:opacity-45 dark:text-sky-300 sm:inline-flex sm:px-2.5 sm:text-[13px]">
                 {actingId === `${order.id}:${selfDeliveryAction}` ? <Loader2 size={12} className="animate-spin" /> : <Truck size={12} />}{selfDeliveryLabel}
               </button>
@@ -4618,7 +4618,7 @@ export const OrderCard = memo(function OrderCard({
             ) : null}
             {showPlatformActions && !readOnly && (
               <>
-                {!deleted ? (
+                {!deleted && !completed ? (
                   <ActionButton
                     label="叫配送"
                     title={isLockedSubscribe ? "预约单尚未到达配送时间，不能发起配送" : delivering || selfDeliveryActive ? "订单已有配送任务，不能重复呼叫配送" : "选择第三方运力并呼叫配送"}
