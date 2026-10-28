@@ -13,21 +13,22 @@ function load(path, mocks = {}) {
   }, module, module.exports);
   return module.exports;
 }
-function fixture(role = "USER", grants = ["public"]) {
-  const libraries = [{ id: "public", name: "普通商品库" }, { id: "secret", name: "保密商品库" }];
+function fixture(userId = "owner") {
+  const groups = [{ id: "g1", userId: "owner", name: "本地" }, { id: "g2", userId: "other", name: "其他人的分组" }];
   const locations = [];
-  const user = { id: "member", role };
-  const accessible = (where, lib) => (!where.id || where.id === lib.id) && (!where.authorizedUsers || grants.includes(lib.id));
-  const matches = (item, where) => (!where.libraryId || item.libraryId === where.libraryId) && item.id !== where.id?.not;
+  const user = { id: userId, role: "USER" };
   const db = {
-    // Any accidental read/write of business shops fails the test immediately.
-    shop: new Proxy({}, { get() { throw new Error("Dispatch must never access shops"); } }),
-    productLibrary: {
-      findMany: async ({ where }) => libraries.filter((lib) => accessible(where, lib)),
-      findFirst: async ({ where }) => libraries.find((lib) => accessible(where, lib)) || null,
+    productLibrary: new Proxy({}, { get() { throw new Error("Dispatch must never read product libraries"); } }),
+    shop: new Proxy({}, { get() { throw new Error("Dispatch must never access business shops"); } }),
+    dispatchGroup: {
+      findMany: async ({ where }) => groups.filter((g) => g.userId === where.userId),
+      findFirst: async ({ where }) => groups.find((g) => g.id === where.id && g.userId === where.userId),
+      create: async ({ data }) => { const g = { id: "new-group", ...data }; groups.push(g); return g; },
+      updateMany: async ({ where, data }) => { const g=groups.find((g)=>g.id===where.id&&g.userId===where.userId); if(g)Object.assign(g,data); return {count:g?1:0}; },
+      deleteMany: async ({ where }) => {const i=groups.findIndex(g=>g.id===where.id&&g.userId===where.userId);if(i<0||locations.some(l=>l.groupId===where.id))return{count:0};groups.splice(i,1);return{count:1};},
     },
     dispatchLocation: {
-      findMany: async ({ where }) => locations.filter((item) => matches(item, where)),
+      findMany: async ({ where }) => locations.filter((item) => item.userId === where.userId && (!("groupId" in where) || item.groupId === where.groupId) && item.id !== where.id?.not),
       findUnique: async ({ where }) => locations.find((item) => item.id === where.id),
       create: async ({ data }) => { const item = { id: "loc-" + locations.length, ...data }; locations.push(item); return item; },
       update: async ({ where, data }) => Object.assign(locations.find((item) => item.id === where.id), data),
@@ -35,70 +36,63 @@ function fixture(role = "USER", grants = ["public"]) {
     },
   };
   const scope = load("src/lib/dispatchAddressBook.ts", { "@/lib/prisma": { default: db } });
-  const mocks = {
-    "@/lib/prisma": { default: db }, "@/lib/dispatchAddressBook": scope,
-    "@/lib/auth": { getAuthorizedUser: async () => user },
-    "@/lib/shopIdentity": load("src/lib/shopIdentity.ts"),
-    "next/server": { NextResponse: { json: (body, options) => ({ body, status: options?.status || 200 }) } },
-  };
-  return { locations, scope, user, mocks,
+  const mocks = { "@/lib/prisma": { default: db }, "@/lib/dispatchAddressBook": scope,
+    "@/lib/auth": { getAuthorizedUser: async () => user }, "@/lib/shopIdentity": load("src/lib/shopIdentity.ts"),
+    "next/server": { NextResponse: { json: (body, options) => ({ body, status: options?.status || 200 }) } }, };
+  return { groups, locations, user, scope,
     list: load("src/app/api/dispatch-locations/route.ts", mocks),
     item: load("src/app/api/dispatch-locations/[id]/route.ts", mocks),
-    import: load("src/app/api/dispatch-locations/import/route.ts", mocks) };
+    import: load("src/app/api/dispatch-locations/import/route.ts", mocks),
+    group: load("src/app/api/dispatch-groups/route.ts", mocks),
+    groupItem: load("src/app/api/dispatch-groups/[id]/route.ts", mocks), };
 }
 const request = (body) => ({ json: async () => body });
 const context = (id) => ({ params: Promise.resolve({ id }) });
-const entry = (libraryId) => ({ libraryId, name: "同名网点", externalId: "poi-1", address: "同一个地址" });
-
-test("first use is empty; unassigned public libraries are not implicitly accessible", async () => {
-  const f = fixture("USER", []);
-  const result = await f.list.GET({ url: "https://test/api/dispatch-locations" });
-  assert.deepEqual(result.body.shops, []);
-  assert.deepEqual(result.body.libraries, []);
-  assert.equal(await f.scope.canAccessDispatchLibrary(f.user, "public"), false);
+const entry = (groupId = null) => ({ groupId, name: "网点", externalId: "poi-1", address: "地址" });
+test("users can create and import ungrouped locations without product-library permission", async () => {
+  const f=fixture();
+  assert.equal((await f.list.POST(request(entry()))).status,200);
+  assert.equal(f.locations[0].groupId,null);
+  assert.equal(f.locations[0].scopeKey,"ungrouped");
+  const imported=await f.import.POST(request({shops:[{shopName:"导入网点",address:"地址2",poi_id:"poi-2"}]}));
+  assert.equal(imported.body.created,1);
 });
-test("library list and direct reads follow explicit member grants", async () => {
-  const f = fixture();
-  f.locations.push({ id: "visible", libraryId: "public", userId: "creator" }, { id: "hidden", libraryId: "secret", userId: "member" });
-  const result = await f.list.GET({ url: "https://test/api/dispatch-locations?libraryId=public" });
-  assert.deepEqual(result.body.shops.map((item) => item.id), ["visible"]);
-  assert.deepEqual(result.body.libraries.map((item) => item.id), ["public"]);
-  assert.equal((await f.list.GET({ url: "https://test/api/dispatch-locations?libraryId=secret" })).status, 403);
+test("list and groups belong only to current user, all is default", async () => {
+  const f=fixture();f.locations.push({id:"own",userId:"owner",groupId:null},{id:"foreign",userId:"other",groupId:null});
+  const result=await f.list.GET({url:"https://test/api/dispatch-locations"});
+  assert.deepEqual(result.body.shops.map(x=>x.id),["own"]);
+  assert.deepEqual(result.body.groups.map(x=>x.id),["g1"]);
 });
-test("same POI and address are independently accepted in separate libraries", async () => {
-  const f = fixture("SUPER_ADMIN", []);
-  assert.equal((await f.list.POST(request(entry("public")))).status, 200);
-  assert.equal((await f.list.POST(request(entry("secret")))).status, 200);
-  assert.equal((await f.list.POST(request(entry("public")))).status, 409);
-  assert.equal(f.locations.length, 2);
+test("duplicate checks are per user and optional group", async () => {
+  const f=fixture();assert.equal((await f.list.POST(request(entry()))).status,200);
+  assert.equal((await f.list.POST(request(entry("g1")))).status,200);
+  assert.equal((await f.list.POST(request(entry()))).status,409);
 });
-test("shared-library members can edit and delete each other's entries", async () => {
-  const f = fixture();
-  f.locations.push({ id: "shared", userId: "someone-else", libraryId: "public", ...entry("public") });
-  assert.equal((await f.item.PUT(request({ ...entry("public"), name: "已编辑" }), context("shared"))).status, 200);
-  assert.equal(f.locations[0].name, "已编辑");
-  assert.equal((await f.item.DELETE({}, context("shared"))).status, 200);
-  assert.equal(f.locations.length, 0);
-  assert.equal((await f.list.GET({ url: "https://test/api/dispatch-locations" })).body.shops.length, 0);
+test("foreign group IDs cannot be used to read, create or import", async () => {
+  const f=fixture();
+  assert.equal((await f.list.GET({url:"https://test/api/dispatch-locations?groupId=g2"})).status,403);
+  assert.equal((await f.list.POST(request(entry("g2")))).status,403);
+  assert.equal((await f.import.POST(request({groupId:"g2",shops:[entry()]}))).status,403);
 });
-test("unauthorized library denies create, import, update and delete, even for the entry creator", async () => {
-  const f = fixture();
-  f.locations.push({ id: "hidden", userId: "member", ...entry("secret") });
-  assert.equal((await f.list.POST(request(entry("secret")))).status, 403);
-  assert.equal((await f.import.POST(request({ libraryId: "secret", shops: [entry("secret")] }))).status, 403);
-  assert.equal((await f.item.PUT(request(entry("public")), context("hidden"))).status, 403);
-  assert.equal((await f.item.DELETE({}, context("hidden"))).status, 403);
-  assert.equal(f.locations.length, 1);
+test("only the owner can modify or delete locations, even super admins cannot cross scopes", async () => {
+  const f=fixture();f.user.role="SUPER_ADMIN";f.locations.push({id:"foreign",userId:"other",groupId:"g2"});
+  assert.equal((await f.item.PUT(request(entry()),context("foreign"))).status,403);
+  assert.equal((await f.item.DELETE({},context("foreign"))).status,403);
 });
-test("imports belong only to the selected authorized library", async () => {
-  const f = fixture();
-  const result = await f.import.POST(request({ libraryId: "public", shops: [{ shopName: "导入网点", address: "导入地址", poi_id: "poi-import" }] }));
-  assert.equal(result.status, 200);
-  assert.equal(result.body.created, 1);
-  assert.equal(f.locations[0].libraryId, "public");
+test("locations can move to own group or back to ungrouped", async () => {
+  const f=fixture();await f.list.POST(request(entry()));
+  assert.equal((await f.item.PUT(request(entry("g1")),context("loc-0"))).status,200);
+  assert.equal(f.locations[0].scopeKey,"g1");
+  assert.equal((await f.item.PUT(request(entry("g2")),context("loc-0"))).status,403);
+  assert.equal((await f.item.PUT(request(entry()),context("loc-0"))).status,200);
+  assert.equal(f.locations[0].scopeKey,"ungrouped");
 });
-test("super admin can access both libraries and unknown library IDs are rejected", async () => {
-  const f = fixture("SUPER_ADMIN", []);
-  assert.equal((await f.scope.getDispatchLibraries(f.user)).length, 2);
-  assert.equal(await f.scope.canAccessDispatchLibrary(f.user, "missing"), false);
+test("groups support create and rename; foreign or nonempty groups cannot be deleted", async () => {
+  const f=fixture();const created=await f.group.POST(request({name:" 新分组 "}));
+  assert.equal(created.body.group.name,"新分组");assert.equal(created.body.group.userId,"owner");
+  assert.equal((await f.groupItem.PATCH(request({name:"改名"}),context("g1"))).status,200);
+  assert.equal((await f.groupItem.PATCH(request({name:"越权"}),context("g2"))).status,404);
+  await f.list.POST(request(entry("g1")));
+  assert.equal((await f.groupItem.DELETE({},context("g1"))).status,409);
+  assert.equal((await f.groupItem.DELETE({},context("new-group"))).status,200);
 });

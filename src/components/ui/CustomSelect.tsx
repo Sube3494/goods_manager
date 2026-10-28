@@ -22,6 +22,7 @@ interface CustomSelectProps {
   triggerClassName?: string;
   onAddNew?: () => void;
   addNewLabel?: string;
+  alwaysShowAddNew?: boolean;
   searchable?: boolean;
   searchPlaceholder?: string;
   align?: "left" | "center" | "right";
@@ -38,6 +39,7 @@ export function CustomSelect({
   triggerClassName,
   onAddNew,
   addNewLabel,
+  alwaysShowAddNew = false,
   searchable,
   searchPlaceholder = "搜索...",
   align,
@@ -324,7 +326,7 @@ export function CustomSelect({
                 ) : (
                   <div className="py-6 text-center space-y-3">
                     <p className="text-xs text-muted-foreground">{searchable && searchQuery ? "暂无匹配结果" : "暂无选项"}</p>
-                    {onAddNew && (
+                    {onAddNew && !alwaysShowAddNew && (
                       <button
                         type="button"
                         onClick={(e) => {
@@ -341,6 +343,21 @@ export function CustomSelect({
                   </div>
                 )}
               </div>
+              {onAddNew && alwaysShowAddNew && (
+                <div className="border-t border-border/60 p-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleOpenChange(false);
+                      onAddNew();
+                    }}
+                    className="flex min-h-9 w-full items-center gap-2 rounded-xl px-2.5 text-left text-xs font-medium text-primary transition-colors hover:bg-primary/10"
+                  >
+                    <Plus size={14} />
+                    {addNewLabel || "新增"}
+                  </button>
+                </div>
+              )}
             </motion.div>
           )}
         </AnimatePresence>,

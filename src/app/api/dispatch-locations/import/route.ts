@@ -1,4 +1,4 @@
-import { canAccessDispatchLibrary } from "@/lib/dispatchAddressBook";
+import { normalizeDispatchGroupId, canAccessDispatchGroup } from "@/lib/dispatchAddressBook";
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
@@ -48,14 +48,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const { shops, libraryId } = await request.json();
-    if (typeof libraryId !== "string" || !await canAccessDispatchLibrary(user, libraryId)) return NextResponse.json({ error: "无权访问此调货库" }, { status: 403 });
+    const { shops, groupId: requestedGroupId } = await request.json();
+    const groupId = normalizeDispatchGroupId(requestedGroupId);
+    if (!await canAccessDispatchGroup(user, groupId)) return NextResponse.json({ error: "无权访问此分组" }, { status: 403 });
     if (!Array.isArray(shops) || shops.length === 0) {
       return NextResponse.json({ error: "导入数据不能为空" }, { status: 400 });
     }
 
     const existingShops = await prisma.dispatchLocation.findMany({
-      where: { libraryId },
+      where: { userId: user.id, groupId },
       select: { id: true, name: true, address: true, externalId: true },
     });
 
@@ -116,7 +117,8 @@ export async function POST(request: Request) {
           externalId: poiId,
           remark: null,
           userId: user.id,
-          libraryId,
+          groupId,
+          scopeKey: groupId || "ungrouped",
         },
       });
 

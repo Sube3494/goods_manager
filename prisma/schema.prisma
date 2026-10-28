@@ -597,11 +597,23 @@ model StoreOpeningItem {
 }
 
 // Independent address book for logistics planning; never linked to business shops.
+model DispatchGroup {
+  id String @id @default(cuid())
+  userId String
+  name String
+  locations DispatchLocation[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([userId, name])
+  @@index([userId])
+}
+
 model DispatchLocation {
   id           String @id @default(cuid())
   userId       String
-  libraryId    String
-  library      ProductLibrary @relation(fields: [libraryId], references: [id])
+  groupId      String?
+  group        DispatchGroup? @relation(fields: [groupId], references: [id])
+  scopeKey     String @default("ungrouped")
   name         String
   address      String?
   dedupeKey    String?
@@ -618,9 +630,9 @@ model DispatchLocation {
   updatedAt    DateTime @updatedAt
 
   @@index([userId])
-  @@index([libraryId])
-  @@unique([libraryId, externalId])
-  @@unique([libraryId, dedupeKey])
+  @@index([groupId])
+  @@unique([userId, scopeKey, externalId])
+  @@unique([userId, scopeKey, dedupeKey])
 }
 
 model Shop {
@@ -919,7 +931,6 @@ model OperatingCostMonthlyBill {
 }
 
 model ProductLibrary {
-  dispatchLocations DispatchLocation[]
   id        String    @id @default(cuid())
   name      String    @unique
   code      String    @unique // e.g., "public", "secret"

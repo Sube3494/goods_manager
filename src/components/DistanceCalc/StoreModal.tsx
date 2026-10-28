@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 
 interface Shop {
   id?: string;
+  groupId?: string | null;
   name: string;
   externalId?: string | null;
   address?: string | null;
@@ -19,7 +20,8 @@ interface StoreModalProps {
   onSave: (shop: Partial<Shop>) => Promise<void>;
   initialData?: Partial<Shop> | null;
   title?: string;
-  libraryName?: string;
+  groups?: Array<{ id: string; name: string }>;
+  defaultGroupId?: string | null;
 }
 
 export function StoreModal({
@@ -28,7 +30,8 @@ export function StoreModal({
   onSave,
   initialData,
   title = "网点信息",
-  libraryName,
+  groups = [],
+  defaultGroupId = null,
 }: StoreModalProps) {
   const [mounted, setMounted] = useState(false);
   const [formData, setFormData] = useState<Partial<Shop>>({
@@ -50,6 +53,7 @@ export function StoreModal({
       if (initialData) {
         setFormData({
           id: initialData.id,
+          groupId: initialData.groupId || null,
           name: initialData.name || "",
           externalId: initialData.externalId || "",
           address: initialData.address || "",
@@ -58,6 +62,7 @@ export function StoreModal({
       } else {
         setFormData({
           id: undefined,
+          groupId: defaultGroupId,
           name: "",
           externalId: "",
           address: "",
@@ -65,7 +70,7 @@ export function StoreModal({
         });
       }
     }
-  }, [isOpen, initialData]);
+  }, [isOpen, initialData, defaultGroupId]);
 
   if (!isOpen || !mounted) return null;
 
@@ -108,7 +113,7 @@ export function StoreModal({
                   {title !== "网点信息" ? title : (initialData?.id ? "编辑网点" : "新增网点")}
                 </h2>
                 <p className="mt-0.5 text-xs text-muted-foreground font-medium">
-                  {libraryName ? `保存至${libraryName}，获授权成员可查看和管理。` : "添加常用取货点，让每次调货更顺路。"}
+                  添加自己的调货网点，可按需要选择分组。
                 </p>
               </div>
             </div>
@@ -126,6 +131,14 @@ export function StoreModal({
         <form onSubmit={handleSubmit} className="px-6 pb-6 sm:px-7 sm:pb-7 pt-2">
           <div className="space-y-4">
             <div className="grid gap-3.5">
+              {groups.length > 0 && <div className="space-y-1.5">
+                <label htmlFor="dispatch-group" className="text-xs sm:text-sm font-medium text-foreground">网点分组</label>
+                <select id="dispatch-group" value={formData.groupId || ""} onChange={(event) => setFormData({ ...formData, groupId: event.target.value || null })}
+                  className="h-11 w-full rounded-2xl border border-border/60 bg-background px-4 text-sm text-foreground">
+                  <option value="">未分组</option>
+                  {groups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
+                </select>
+              </div>}
               <div className="space-y-1.5">
                 <label htmlFor="dispatch-name" className="text-xs sm:text-sm font-semibold text-foreground">
                   网点名称 <span className="text-rose-500 font-bold">*</span>

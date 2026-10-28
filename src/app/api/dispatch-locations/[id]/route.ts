@@ -1,4 +1,4 @@
-import { canAccessDispatchLibrary } from "@/lib/dispatchAddressBook";
+import { normalizeDispatchGroupId, canAccessDispatchGroup } from "@/lib/dispatchAddressBook";
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
@@ -30,14 +30,17 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
       return NextResponse.json({ error: "Shop not found" }, { status: 404 });
     }
 
-    if (!await canAccessDispatchLibrary(user, existingShop.libraryId)) {
+    if (existingShop.userId !== user.id) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
+    const groupId = body.groupId === undefined ? existingShop.groupId : normalizeDispatchGroupId(body.groupId);
+    if (!await canAccessDispatchGroup(user, groupId)) return NextResponse.json({ error: "无权访问此分组" }, { status: 403 });
     const siblingShops = await prisma.dispatchLocation.findMany({
       where: {
         id: { not: id },
-        libraryId: existingShop.libraryId,
+        userId: user.id,
+        groupId,
       },
       select: { id: true, name: true, address: true, externalId: true },
     });
@@ -57,6 +60,8 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     const updatedShop = await prisma.dispatchLocation.update({
       where: { id },
       data: {
+        groupId,
+        scopeKey: groupId || "ungrouped",
         name: normalizedName,
         dedupeKey: buildShopDedupeKey({ name: normalizedName, address: normalizedAddress }) || null,
         externalId: normalizedExternalId,
@@ -95,7 +100,7 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
       return NextResponse.json({ error: "Shop not found" }, { status: 404 });
     }
 
-    if (!await canAccessDispatchLibrary(user, existingShop.libraryId)) {
+    if (existingShop.userId !== user.id) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

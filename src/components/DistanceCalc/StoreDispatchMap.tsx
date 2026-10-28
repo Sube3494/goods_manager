@@ -2,8 +2,7 @@
 "use client";
 
 import { createPortal } from "react-dom";
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
-import { motion, useReducedMotion } from "framer-motion";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Check,
   Clock,
@@ -26,6 +25,7 @@ import { useToast } from "@/components/ui/Toast";
 import { cn } from "@/lib/utils";
 
 type Shop = {
+  groupId?: string | null;
   id: string;
   name: string;
   externalId?: string | null;
@@ -693,11 +693,12 @@ export function StoreDispatchMap({
   switcherContainer?: HTMLDivElement | null;
 }) {
   const { showToast } = useToast();
-  const switcherLayoutId = useId();
-  const reducedMotion = useReducedMotion();
-  const [dispatchLibraries, setDispatchLibraries] = useState<Array<{ id: string; name: string }>>([]);
-  const [activeLibraryId, setActiveLibraryId] = useState("");
-  const libraryRequestRef = useRef(0);
+  const [dispatchGroups, setDispatchGroups] = useState<Array<{ id: string; name: string }>>([]);
+  const [activeGroupId, setActiveGroupId] = useState("all");
+  const [groupEditor, setGroupEditor] = useState<{ id?: string; name: string } | null>(null);
+  const [savingGroup, setSavingGroup] = useState(false);
+  const [groupError, setGroupError] = useState("");
+  const groupRequestRef = useRef(0);
   const mapRef = useRef<any>(null);
   const AMapRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
@@ -931,26 +932,48 @@ export function StoreDispatchMap({
   );
 
   const fetchShops = useCallback(async () => {
-    const requestId = ++libraryRequestRef.current;
+    const requestId = ++groupRequestRef.current;
     try {
-      const res = await fetch(`/api/dispatch-locations${activeLibraryId ? `?libraryId=${encodeURIComponent(activeLibraryId)}` : ""}`, { cache: "no-store" });
+      const res = await fetch(`/api/dispatch-locations${activeGroupId ? `?groupId=${encodeURIComponent(activeGroupId)}` : ""}`, { cache: "no-store" });
       if (!res.ok) throw new Error("fetch shops failed");
       const data = await res.json();
-      if (requestId !== libraryRequestRef.current) return;
-      setDispatchLibraries(Array.isArray(data.libraries) ? data.libraries : []);
-      if (!activeLibraryId && data.libraryId) setActiveLibraryId(data.libraryId);
+      if (requestId !== groupRequestRef.current) return;
+      setDispatchGroups(Array.isArray(data.groups) ? data.groups : []);
       setShops(Array.isArray(data.shops) ? data.shops : []);
     } catch (error) {
-      if (requestId !== libraryRequestRef.current) return;
+      if (requestId !== groupRequestRef.current) return;
       setShops([]);
       console.error("Failed to fetch shops:", error);
       showToast("加载调货网点失败，请刷新重试", "error");
     }
-  }, [activeLibraryId, showToast]);
+  }, [activeGroupId, showToast]);
 
   useEffect(() => {
     void fetchShops();
   }, [fetchShops]);
+
+  const saveGroup = async (remove = false) => {
+    if (!groupEditor || savingGroup) return;
+    setSavingGroup(true);
+    setGroupError("");
+    try {
+      const response = await fetch(`/api/dispatch-groups${groupEditor.id ? `/${groupEditor.id}` : ""}`, {
+        method: remove ? "DELETE" : groupEditor.id ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: remove ? undefined : JSON.stringify({ name: groupEditor.name }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "保存分组失败");
+      setGroupEditor(null);
+      if (remove) setActiveGroupId("all");
+      else if (data.group) setActiveGroupId(data.group.id);
+      else await fetchShops();
+    } catch (error) {
+      setGroupError(error instanceof Error ? error.message : "保存分组失败");
+    } finally {
+      setSavingGroup(false);
+    }
+  };
 
   const clearMarkers = useCallback(() => {
     if (mapRef.current && markersRef.current.length) {
@@ -2056,7 +2079,7 @@ export function StoreDispatchMap({
         const res = await fetch("/api/dispatch-locations/import", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ shops: importedRows, libraryId: activeLibraryId }),
+          body: JSON.stringify({ shops: importedRows, groupId: activeGroupId }),
           signal: AbortSignal.timeout(60000),
         });
 
@@ -2142,7 +2165,7 @@ export function StoreDispatchMap({
         setImportProgress(null);
       }
     },
-    [activeLibraryId, fetchShops, resolveShopCoordinates, showToast]
+    [activeGroupId, fetchShops, resolveShopCoordinates, showToast]
   );
 
   const handleSaveShop = useCallback(async (data: EditableShop) => {
@@ -2154,7 +2177,7 @@ export function StoreDispatchMap({
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...data, libraryId: activeLibraryId }),
+        body: JSON.stringify(data),
       });
 
       if (!res.ok) {
@@ -2177,7 +2200,7 @@ export function StoreDispatchMap({
       console.error("Failed to save shop:", error);
       showToast(error instanceof Error ? error.message : "保存失败", "error");
     }
-  }, [activeLibraryId, fetchShops, handleLocateShop, showToast]);
+  }, [fetchShops, handleLocateShop, showToast]);
 
   const executeDeleteShops = useCallback(async (ids: string[]) => {
     if (!ids.length || isDeletingShops) return;
@@ -2376,42 +2399,71 @@ export function StoreDispatchMap({
 
   return (
     <>
+    {groupEditor && createPortal(
+      <div className="fixed inset-0 z-120 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+        <form role="dialog" aria-modal="true" aria-labelledby="dispatch-group-title" onSubmit={(event) => { event.preventDefault(); void saveGroup(); }}
+          className="w-full max-w-sm space-y-4 rounded-3xl border border-border/60 bg-card p-6 shadow-xl">
+          <div className="flex items-center justify-between">
+            <h2 id="dispatch-group-title" className="text-lg font-semibold">{groupEditor.id ? "管理分组" : "新建分组"}</h2>
+            <button type="button" aria-label="关闭分组编辑" disabled={savingGroup} onClick={() => { setGroupEditor(null); setGroupError(""); }}><X size={18} /></button>
+          </div>
+          <label htmlFor="dispatch-group-name" className="block text-sm text-muted-foreground">分组名称</label>
+          <input id="dispatch-group-name" autoFocus required maxLength={40} value={groupEditor.name}
+            onChange={(event) => setGroupEditor({ ...groupEditor, name: event.target.value })}
+            className="h-11 w-full rounded-xl border border-border bg-background px-3 text-base outline-none focus:border-primary" placeholder="例如：本地网点、备用仓库" />
+          {groupError && <p role="alert" className="text-sm text-destructive">{groupError}</p>}
+          <div className="flex justify-end gap-2">
+            {groupEditor.id && <button type="button" disabled={savingGroup} onClick={() => void saveGroup(true)} className="mr-auto rounded-full px-3 py-2 text-sm text-destructive">删除空分组</button>}
+            <button type="submit" disabled={savingGroup || !groupEditor.name.trim()} className="rounded-full bg-primary px-5 py-2 text-sm text-primary-foreground disabled:opacity-50">{savingGroup ? "保存中…" : "保存"}</button>
+          </div>
+        </form>
+      </div>, document.body
+    )}
     {switcherContainer && createPortal(
-      <div role="group" aria-label="切换网点分组" className="isolate inline-flex max-w-full items-center gap-1 overflow-x-auto rounded-full border border-black/8 bg-black/3 dark:border-white/10 dark:bg-white/4 p-1 shadow-2xs">
-        {dispatchLibraries.map((library) => (
-          <button key={library.id} type="button"
-            aria-pressed={activeLibraryId === library.id}
-            disabled={isImportingShops || isDeletingShops || isShopModalOpen}
-            onClick={() => {
-              ++libraryRequestRef.current;
-              ++routeBatchIdRef.current;
-              setShops([]);
-              setResults([]);
-              setIsResolvingRoutes(false);
-              clearTargetArtifacts();
-              clearMarkers();
-              setActiveShopId(null);
-              setSelectedShopIds([]);
-              setIsBulkManageMode(false);
-              setActiveLibraryId(library.id);
-            }}
-            className={cn("relative inline-flex min-h-8 shrink-0 items-center rounded-full px-4 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50 cursor-pointer",
-              activeLibraryId === library.id ? "text-foreground font-semibold" : "text-muted-foreground hover:text-foreground font-medium")}
-          >
-            {activeLibraryId === library.id && (
-              <motion.span
-                layoutId={switcherLayoutId}
-                initial={false}
-                transition={reducedMotion ? { duration: 0 } : { type: "spring", stiffness: 420, damping: 35 }}
-                className="absolute inset-0 rounded-full bg-white dark:bg-white/10 text-foreground shadow-xs border border-black/8 dark:border-white/10"
-                aria-hidden="true"
-              />
-            )}
-            <span className="relative z-10">{library.name.replace("商品库", "网点")}</span>
-          </button>
-        ))}
-        {!dispatchLibraries.length && <span className="px-3 py-1.5 text-xs text-muted-foreground">暂无授权网点</span>}
-      </div>, switcherContainer
+      <fieldset disabled={isImportingShops || isDeletingShops || isShopModalOpen} className="m-0 min-w-0 border-0 p-0 disabled:opacity-50">
+        <legend className="sr-only">网点分组</legend>
+        <CustomSelect
+          value={activeGroupId}
+          options={[
+            { value: "all", label: "全部网点" },
+            ...(dispatchGroups.length ? [{ value: "ungrouped", label: "未分组" }] : []),
+            ...dispatchGroups.map((group) => ({ value: group.id, label: group.name })),
+            ...(dispatchGroups.some((group) => group.id === activeGroupId) ? [{ value: "__manage", label: "管理当前分组…" }] : []),
+          ]}
+          onChange={(groupId) => {
+            if (isImportingShops || isDeletingShops || isShopModalOpen) return;
+            if (groupId === "__manage") {
+              setGroupError("");
+              setGroupEditor(dispatchGroups.find((group) => group.id === activeGroupId)!);
+              return;
+            }
+            if (groupId === activeGroupId) return;
+            ++groupRequestRef.current;
+            ++routeBatchIdRef.current;
+            setShops([]);
+            setResults([]);
+            setIsResolvingRoutes(false);
+            clearTargetArtifacts();
+            clearMarkers();
+            setActiveShopId(null);
+            setSelectedShopIds([]);
+            setIsBulkManageMode(false);
+            setActiveGroupId(groupId);
+          }}
+          onAddNew={() => {
+            if (isImportingShops || isDeletingShops || isShopModalOpen) return;
+            setGroupError("");
+            setGroupEditor({ name: "" });
+          }}
+          addNewLabel="新建分组"
+          alwaysShowAddNew
+          searchable
+          searchPlaceholder="搜索分组"
+          align="right"
+          className="w-44 sm:w-48"
+          triggerClassName="h-10 rounded-full border border-black/8 bg-white/80 px-4 text-xs font-medium shadow-xs dark:border-white/10 dark:bg-white/5"
+        />
+      </fieldset>, switcherContainer
     )}
     <div className="flex h-full min-h-0 w-full flex-1 flex-col bg-background text-foreground">
       <style>{markerStyles}</style>
@@ -2538,7 +2590,7 @@ export function StoreDispatchMap({
                 setEditingShop(null);
                 setIsShopModalOpen(true);
               }}
-              disabled={!activeLibraryId}
+              disabled={!activeGroupId}
               className="inline-flex h-10 items-center justify-center gap-1.5 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 px-4 text-xs sm:text-sm font-medium shadow-sm shadow-primary/20 active:scale-95 transition-all max-sm:flex-1 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Plus size={15} strokeWidth={2.5} />
@@ -2546,7 +2598,7 @@ export function StoreDispatchMap({
             </button>
             <button
               onClick={() => setIsImportModalOpen(true)}
-              disabled={isImportingShops || !activeLibraryId}
+              disabled={isImportingShops || !activeGroupId}
               className="inline-flex h-10 items-center justify-center gap-1.5 rounded-full border border-black/8 bg-white/80 hover:bg-white dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8 px-4 text-xs sm:text-sm font-medium text-foreground shadow-xs active:scale-95 transition-all disabled:opacity-60 max-sm:flex-1 cursor-pointer"
             >
               {isImportingShops ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
@@ -2875,7 +2927,8 @@ export function StoreDispatchMap({
       onClose={() => setIsShopModalOpen(false)}
       onSave={handleSaveShop}
       initialData={editingShop}
-      libraryName={dispatchLibraries.find((library) => library.id === activeLibraryId)?.name.replace("商品库", "网点")}
+      groups={dispatchGroups}
+      defaultGroupId={activeGroupId === "all" || activeGroupId === "ungrouped" ? null : activeGroupId}
     />
     <ConfirmModal
       isOpen={!!pendingDeleteAction}

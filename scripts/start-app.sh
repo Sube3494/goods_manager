@@ -4,6 +4,9 @@ set -e
 
 sh scripts/init-db.sh
 
+echo "→ Preserving dispatch locations before group schema update..."
+bun scripts/migrate-dispatch-groups.cjs
+
 PRISMA_BIN="bun ./node_modules/prisma/build/index.js"
 
 echo "→ Trying prisma db push..."
