@@ -50,9 +50,10 @@ export async function GET(request: NextRequest) {
     const skip = (page - 1) * pageSize;
 
     const canViewAllShops = user.role === "SUPER_ADMIN" && scope === "all";
+    const requestedUserId = request.nextUrl.searchParams.get("userId");
 
     const where: Prisma.ShopProductWhereInput = {
-      ...(canViewAllShops ? {} : { shop: { userId: user.id } }),
+      ...(canViewAllShops ? (requestedUserId ? { shop: { userId: requestedUserId } } : {}) : { shop: { userId: user.id } }),
       ...(explicitIds.length > 0 ? { id: { in: explicitIds } } : {}),
       ...(shopId !== "all" ? { shopId } : {}),
       ...(categoryName !== "all" ? { categoryName } : {}),

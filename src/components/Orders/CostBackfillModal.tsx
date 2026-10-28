@@ -36,6 +36,7 @@ type OutboundBreakdownItem = {
 };
 
 interface CostBackfillModalProps {
+  userId?: string;
   order: {
     id: string;
     orderNo: string;
@@ -69,6 +70,7 @@ type ReferencePrice = {
 };
 
 export default function CostBackfillModal({
+  userId,
   order,
   onClose,
   onSuccess,
@@ -205,7 +207,7 @@ export default function CostBackfillModal({
 
       setLoadingHistory((prev) => ({ ...prev, [targetId]: true }));
 
-      fetch(`/api/purchases?type=Inbound&productId=${targetId}&pageSize=8`)
+      fetch(`/api/purchases?type=Inbound&productId=${targetId}&pageSize=8${userId ? `&userId=${encodeURIComponent(userId)}` : ""}`)
         .then((res) => {
           if (!res.ok) throw new Error("Fetch failed");
           return res.json();
@@ -249,7 +251,7 @@ export default function CostBackfillModal({
           setLoadingHistory((prev) => ({ ...prev, [targetId]: false }));
         });
     });
-  }, [order.productCostBreakdown, loadingHistory, refPrices]);
+  }, [order.productCostBreakdown, loadingHistory, refPrices, userId]);
 
   const handleInputChange = (purchaseOrderItemId: string, val: string) => {
     val = val.replace(/[。．，]/g, '.');
@@ -270,7 +272,7 @@ export default function CostBackfillModal({
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ items: itemsToSubmit }),
+        body: JSON.stringify({ items: itemsToSubmit, userId }),
       });
 
       if (!res.ok) {

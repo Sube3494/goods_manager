@@ -177,7 +177,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Permission denied" }, { status: 403 });
     }
 
-    const { items } = await request.json();
+    const { items, userId: requestedUserId } = await request.json();
+    if (requestedUserId && requestedUserId !== session.id && session.role !== "SUPER_ADMIN") {
+      return NextResponse.json({ error: "Permission denied" }, { status: 403 });
+    }
+    const targetUserId = session.role === "SUPER_ADMIN" && typeof requestedUserId === "string" && requestedUserId ? requestedUserId : session.id;
     if (!Array.isArray(items) || items.length <= 0) {
       return NextResponse.json({ error: "Items must be a non-empty array" }, { status: 400 });
     }
@@ -209,7 +213,7 @@ export async function POST(request: Request) {
 
         if (
           !dbPurchaseItem ||
-          dbPurchaseItem.purchaseOrder.userId !== session.id ||
+          dbPurchaseItem.purchaseOrder.userId !== targetUserId ||
           dbPurchaseItem.purchaseOrder.status !== "Received"
         ) {
           throw new Error("部分入库批次未找到，或对应的单据未入库、不属于当前用户");
@@ -221,7 +225,7 @@ export async function POST(request: Request) {
           include: { outboundOrder: true },
         });
 
-        if (!dbOutboundItem || dbOutboundItem.outboundOrder.userId !== session.id) {
+        if (!dbOutboundItem || dbOutboundItem.outboundOrder.userId !== targetUserId) {
           throw new Error("对应的出库明细项未找到，或不属于当前用户");
         }
 
@@ -279,7 +283,7 @@ export async function POST(request: Request) {
           include: { outboundOrder: true },
         });
 
-        if (!dbOutboundItem || dbOutboundItem.outboundOrder.userId !== session.id) {
+        if (!dbOutboundItem || dbOutboundItem.outboundOrder.userId !== targetUserId) {
           throw new Error("对应的出库明细项未找到，或不属于当前用户");
         }
 
@@ -319,7 +323,7 @@ export async function POST(request: Request) {
           where: {
             id: { in: allPurchaseItemIds },
             purchaseOrder: {
-              userId: session.id,
+              userId: targetUserId,
               status: "Received",
             },
           },
@@ -371,7 +375,7 @@ export async function POST(request: Request) {
         // 统一更新和价格联动有关的出库快照数据
         await syncOutboundCostSnapshotsForPurchaseItems(
           tx,
-          session.id,
+          targetUserId,
           costPriceByPurchaseOrderItemId
         );
       }

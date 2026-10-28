@@ -1,3 +1,4 @@
+import { resolveOrderOperatorScope } from "@/lib/orderOperatorScope";
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveRememberedCustomerTypes } from "@/lib/customerMemoryStore";
@@ -129,12 +130,14 @@ export async function PATCH(
   context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const user = await getAuthorizedUser("order:manage");
-    if (!user) {
+    const operator = await getAuthorizedUser("order:manage");
+    if (!operator) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { id } = await context.params;
+    const user = await resolveOrderOperatorScope(operator, id);
+    if (!user) return NextResponse.json({ error: "订单不存在" }, { status: 404 });
     const body = await request.json().catch(() => ({}));
 
     const hasBrushToggle = body.isMainSystemSelfDelivery !== undefined;
@@ -785,12 +788,14 @@ export async function DELETE(
   context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const user = await getAuthorizedUserAny("order:manage", "outbound:manage");
-    if (!user) {
+    const operator = await getAuthorizedUserAny("order:manage", "outbound:manage");
+    if (!operator) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { id } = await context.params;
+    const user = await resolveOrderOperatorScope(operator, id);
+    if (!user) return NextResponse.json({ error: "订单不存在" }, { status: 404 });
     const body = await request.json().catch(() => ({}));
     const reason = String(body?.reason || "").trim() || "线下订单录入有误，已作废";
 

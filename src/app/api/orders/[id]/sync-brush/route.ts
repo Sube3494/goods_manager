@@ -1,3 +1,4 @@
+import { resolveOrderOperatorScope } from "@/lib/orderOperatorScope";
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthorizedUser } from "@/lib/auth";
 import { syncBrushOrderFromCompletedAutoPickOrder } from "@/lib/autoPickOrders";
@@ -8,13 +9,15 @@ import { Prisma } from "@/../prisma/generated-client";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
-  const session = await getAuthorizedUser("order:manage");
-  if (!session) {
+  const operator = await getAuthorizedUser("order:manage");
+  if (!operator) {
     return NextResponse.json({ error: "Permission denied" }, { status: 403 });
   }
 
   try {
     const { id } = await context.params;
+    const session = await resolveOrderOperatorScope(operator, id);
+    if (!session) return NextResponse.json({ error: "Order not found" }, { status: 404 });
     const body = await request.json().catch(() => ({}));
     const rawCommission = body?.commission;
     const parsedCommission = typeof rawCommission === "number"

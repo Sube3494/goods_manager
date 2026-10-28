@@ -105,11 +105,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "没有需要保存的数据" }, { status: 400 });
     }
 
-    const targetUserId = user.id;
-
     for (const item of itemsToProcess) {
       const cleanRequestedUserId = item.userId ? String(item.userId).trim() : "";
-      if (cleanRequestedUserId && cleanRequestedUserId !== user.id) {
+      if (cleanRequestedUserId && cleanRequestedUserId !== user.id && user.role !== "SUPER_ADMIN") {
         return NextResponse.json({ error: "不允许修改其他成员的推广费数据" }, { status: 403 });
       }
       if (!validPromotionDate(item.date)) {
@@ -126,6 +124,7 @@ export async function POST(request: NextRequest) {
     const results = await prisma.$transaction(async (tx) => {
       const records = [];
       for (const item of normalizedItems) {
+        const targetUserId = user.role === "SUPER_ADMIN" && item.userId ? String(item.userId).trim() || user.id : user.id;
         const targetDate = parseAsShanghaiTime(item.date);
         const finalShopName = String(item.shopName || "").trim();
         const meituan = Math.max(0, Number(item.amountMeituan) || 0);

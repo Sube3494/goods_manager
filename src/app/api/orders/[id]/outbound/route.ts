@@ -1,3 +1,4 @@
+import { resolveOrderOperatorScope } from "@/lib/orderOperatorScope";
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthorizedUserAny } from "@/lib/auth";
 import { createOutboundFromAutoPickOrder, updateAutoPickOrderAutoOutboundState } from "@/lib/autoPickOrders";
@@ -6,13 +7,15 @@ import { getOutboundOrderItemSchemaErrorMessage } from "@/lib/prismaSchemaCompat
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
-  const session = await getAuthorizedUserAny("order:manage", "outbound:manage");
-  if (!session) {
+  const operator = await getAuthorizedUserAny("order:manage", "outbound:manage");
+  if (!operator) {
     return NextResponse.json({ error: "Permission denied" }, { status: 403 });
   }
 
   try {
     const { id } = await context.params;
+    const session = await resolveOrderOperatorScope(operator, id);
+    if (!session) return NextResponse.json({ error: "Order not found" }, { status: 404 });
     const body = await request.json().catch(() => ({}));
     const preferredMappedShopName = String(body?.matchedShopName || "").trim() || null;
     const result = await createOutboundFromAutoPickOrder(session.id, id, {

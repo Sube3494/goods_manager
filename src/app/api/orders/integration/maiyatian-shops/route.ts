@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthorizedUser } from "@/lib/auth";
+import { resolveOrderOperatorScope } from "@/lib/orderOperatorScope";
 import { getAddressDetail, isAddressDisabled } from "@/lib/addressBook";
 import prisma from "@/lib/prisma";
 import {
@@ -22,13 +23,16 @@ type ShippingAddress = {
   isDisabled?: boolean;
 };
 
-export async function GET(_request: NextRequest) {
-  const session = await getAuthorizedUser("order:manage");
-  if (!session) {
+export async function GET(request: NextRequest) {
+  const operator = await getAuthorizedUser("order:manage");
+  if (!operator) {
     return NextResponse.json({ error: "Permission denied" }, { status: 403 });
   }
 
   try {
+    const orderId = request.nextUrl.searchParams.get("orderId");
+    const session = orderId ? await resolveOrderOperatorScope(operator, orderId) : operator;
+    if (!session) return NextResponse.json({ error: "Order not found" }, { status: 404 });
     const saved = await getAutoPickIntegrationConfigByUserId(session.id);
     const accounts = saved.maiyatianCookies && saved.maiyatianCookies.length > 0
       ? saved.maiyatianCookies

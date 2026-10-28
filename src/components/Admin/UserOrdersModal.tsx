@@ -40,6 +40,11 @@ import { PromotionCalendarModal } from "@/app/orders/PromotionCalendarModal";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import { StatsData } from "@/lib/types";
+import type { AutoPickOrder, Product } from "@/lib/types";
+import type { ComponentProps } from "react";
+import CostBackfillModal from "@/components/Orders/CostBackfillModal";
+import { ProductSelectionModal } from "@/components/Purchases/ProductSelectionModal";
+import { useToast } from "@/components/ui/Toast";
 
 interface UserOrdersModalProps {
   isOpen: boolean;
@@ -49,6 +54,7 @@ interface UserOrdersModalProps {
   userEmail?: string | null;
   roleName?: string | null;
   canViewProductCosts?: boolean;
+  canManageOrders?: boolean;
 }
 
 const money = (val: number | undefined | null) => {
@@ -667,7 +673,71 @@ export function UserOrdersModal({
   userEmail,
   roleName,
   canViewProductCosts = false,
+  canManageOrders = false,
 }: UserOrdersModalProps) {
+  const { showToast } = useToast();
+  const [backfillTarget, setBackfillTarget] = useState<AutoPickOrder | null>(null);
+  type OpenMatchEditor = ComponentProps<typeof TodayOrdersView>["onOpenMatchEditor"];
+  const [matchTarget, setMatchTarget] = useState<Parameters<OpenMatchEditor> | null>(null);
+  const [savingMatch, setSavingMatch] = useState(false);
+  const openMatchEditor: OpenMatchEditor = (...args) => {
+    if (canManageOrders) setMatchTarget(args);
+  };
+  const removeBundleComponent: NonNullable<ComponentProps<typeof TodayOrdersView>["onRemoveBundleComponent"]> = async (order, item, componentIndex, componentName, currentBundleItems) => {
+    if (!canManageOrders) return;
+    try {
+      const response = await fetch(`/api/orders/${order.id}/items/${item.id}/match`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ removeComponentIndex: componentIndex,
+          autoMatchedProduct: item.matchedProduct,
+          currentBundleItems: item.matchedProduct?.bundleItems || currentBundleItems }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "移除配件失败");
+      setRefreshTrigger((value) => value + 1);
+      showToast(`已移除配件${componentName || ""}`, "success");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "移除配件失败", "error");
+    }
+  };
+  const saveMatch = async (products: Product[], clear = false) => {
+    if (!canManageOrders || !matchTarget || savingMatch) return;
+    const [order, item, options] = matchTarget;
+    setSavingMatch(true);
+    try {
+      const items = products.map((product) => ({
+        id: product.shopProductId || product.id,
+        quantity: Math.max(1, Number((product as Product & { matchQuantity?: number }).matchQuantity) || 1),
+      }));
+      const response = await fetch(`/api/orders/${order.id}/items/${item.id}/match`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(clear ? { clear: true } : {
+          productId: items.map((entry) => entry.id).join("+"), items,
+          shopId: localShops.find((shop) => shop.name === order.matchedShopName)?.id,
+          componentIndex: options?.componentIndex,
+          currentBundleItems: item.matchedProduct?.bundleItems || options?.currentBundleItems,
+          isAddingComponent: options?.isAddingBundleItem,
+          autoMatchedProduct: item.matchedProduct,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "更新商品匹配失败");
+      if (options?.autoOutbound && !clear) {
+        const outbound = await fetch(`/api/orders/${order.id}/outbound`, { method: "POST" });
+        const result = await outbound.json();
+        if (!outbound.ok) throw new Error(result.error || "匹配已保存，但出库失败");
+      }
+      setMatchTarget(null);
+      showToast("商品匹配已更新", "success");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "更新失败", "error");
+    } finally {
+      setSavingMatch(false);
+      setRefreshTrigger((value) => value + 1);
+    }
+  };
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [isSpinning, setIsSpinning] = useState(false);
@@ -1898,11 +1968,12 @@ export function UserOrdersModal({
                     <TodayOrdersView
                       userId={userId}
                       refreshTrigger={refreshTrigger}
-                      onOpenCostBackfill={() => {}}
-                      onOpenMatchEditor={() => {}}
+                      onOpenCostBackfill={setBackfillTarget}
+                      onOpenMatchEditor={openMatchEditor}
+                      onRemoveBundleComponent={removeBundleComponent}
                       onDataLoad={handleTodayDataLoad}
                       localShops={localShops}
-                      readOnly={true}
+                      readOnly={!canManageOrders}
                       canExpandDetails={canViewProductCosts}
                       canViewProductCosts={canViewProductCosts}
                     />
@@ -1914,11 +1985,12 @@ export function UserOrdersModal({
                       <AllOrdersView
                         userId={userId}
                         refreshTrigger={refreshTrigger}
-                        onOpenCostBackfill={() => {}}
-                        onOpenMatchEditor={() => {}}
+                        onOpenCostBackfill={setBackfillTarget}
+                        onOpenMatchEditor={openMatchEditor}
+                        onRemoveBundleComponent={removeBundleComponent}
                         onDataLoad={handleAllDataLoad}
                         localShops={localShops}
-                        readOnly={true}
+                        readOnly={!canManageOrders}
                         canExpandDetails={canViewProductCosts}
                         canViewProductCosts={canViewProductCosts}
                       />
@@ -1931,6 +2003,24 @@ export function UserOrdersModal({
         </>
       )}
 
+      {canManageOrders && backfillTarget && (
+        <CostBackfillModal order={backfillTarget} userId={userId || undefined}
+          onClose={() => setBackfillTarget(null)}
+          onSuccess={() => { setBackfillTarget(null); setRefreshTrigger((value) => value + 1); }} />
+      )}
+      {canManageOrders && matchTarget && (
+        <ProductSelectionModal isOpen
+          onClose={() => { if (!savingMatch) setMatchTarget(null); }}
+          onSelect={(products) => { void saveMatch(products); }}
+          onClear={matchTarget[2]?.isAddingBundleItem || matchTarget[2]?.componentIndex !== undefined ? undefined : () => { void saveMatch([], true); }}
+          clearLabel="无需出库 / 解除绑定" selectedIds={[]} singleSelect showQuantityControls
+          allowMultipleToggle={!matchTarget[2]?.isAddingBundleItem && matchTarget[2]?.componentIndex === undefined}
+          loadAllOnOpen showPlatformSelector={false} fetchPath="/api/shop-products"
+          query={{ all: "true", scope: "all", userId: userId || "",
+            shopId: localShops.find((shop) => shop.name === matchTarget[0].matchedShopName)?.id || "all" }}
+          title={savingMatch ? "正在保存匹配…" : "修改商品匹配"} />
+      )}
+
       {/* 查看成员的历史推广费日历与趋势弹窗 */}
       {isPromotionModalOpen && (
         <PromotionCalendarModal
@@ -1938,7 +2028,7 @@ export function UserOrdersModal({
           localShops={localShops}
           userId={userId || undefined}
           userName={userName || undefined}
-          readOnly={true}
+          readOnly={!canManageOrders}
           onClose={() => {
             setIsPromotionModalOpen(false);
             void fetchPromotionExpense();

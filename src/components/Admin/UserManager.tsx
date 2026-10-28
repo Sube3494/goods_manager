@@ -1686,6 +1686,7 @@ export function UserManager() {
          userEmail={viewOrdersUser?.email}
          roleName={viewOrdersUser?.roleName}
          canViewProductCosts={sessionUser?.role === "SUPER_ADMIN" || sessionUser?.id === viewOrdersUser?.id}
+         canManageOrders={sessionUser?.role === "SUPER_ADMIN"}
        />
     </div>
   );

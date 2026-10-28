@@ -5211,7 +5211,7 @@ function OrderShopEditModal({
     let isMounted = true;
     async function loadMaiyatianShops() {
       try {
-        const res = await fetch("/api/orders/integration/maiyatian-shops");
+        const res = await fetch(`/api/orders/integration/maiyatian-shops?orderId=${encodeURIComponent(order.id)}`);
         const data = await res.json();
         if (isMounted) {
           if (res.ok) {
@@ -5238,7 +5238,7 @@ function OrderShopEditModal({
     return () => {
       isMounted = false;
     };
-  }, [order.shopId, order.matchedShopName]);
+  }, [order.id, order.shopId, order.matchedShopName]);
 
   const handleSave = async () => {
     setIsSaving(true);
