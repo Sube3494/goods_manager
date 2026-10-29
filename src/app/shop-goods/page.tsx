@@ -185,7 +185,7 @@ function ShopSortWorkbench({
   const [startNumber, setStartNumber] = useState("1001");
   const [categories, setCategories] = useState<SortWorkbenchCategory[]>([]);
   const [newCategoryName, setNewCategoryName] = useState("");
-  const [selectedCategoryName, setSelectedCategoryName] = useState("all");
+  const [selectedCategoryName, setSelectedCategoryName] = useState<string | null>("all");
   const [batchTargetCategoryName, setBatchTargetCategoryName] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
@@ -559,7 +559,9 @@ function ShopSortWorkbench({
 
       return [...rows]
         .filter((row) => {
-          const matchesCategory = selectedCategoryName === "all" || row.sortGroupNameInput === selectedCategoryName;
+          const groupName = row.sortGroupNameInput.trim();
+          const matchesCategory = selectedCategoryName === "all"
+            || (selectedCategoryName === null ? !groupName : groupName === selectedCategoryName.trim());
           if (!matchesCategory) return false;
 
           if (!normalizedQuery) return true;
@@ -688,11 +690,13 @@ function ShopSortWorkbench({
   const categoryCounts = useMemo(() => {
     const counts = new Map<string, number>();
     rows.forEach((row) => {
-      const name = (row.sortGroupNameInput || row.categoryName || "未分组").trim();
+      const name = row.sortGroupNameInput.trim();
       counts.set(name, (counts.get(name) || 0) + 1);
     });
     return counts;
   }, [rows]);
+
+  const unassignedCount = categoryCounts.get("") || 0;
 
   const visibleRowIds = useMemo(() => sortedPreview.map((row) => row.id), [sortedPreview]);
   const firstRowIdByGroup = useMemo(() => {
@@ -860,8 +864,25 @@ function ShopSortWorkbench({
                 selectedCategoryName === "all" ? "bg-primary text-primary-foreground" : "hover:bg-muted"
               )}
             >
-              <span>全部临时分类</span>
+              <span>全部商品</span>
               <span>{rows.length}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => { setSelectedCategoryName(null); setSearchQuery(""); }}
+              aria-pressed={selectedCategoryName === null}
+              className={cn(
+                "mb-3 flex w-full items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left text-sm font-bold transition-colors",
+                selectedCategoryName === null
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-amber-500/30 bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 dark:text-amber-400"
+              )}
+            >
+              <span>
+                未分配临时分类
+                <span className="mt-0.5 block text-[11px] font-normal opacity-80">点击查看，勾选后可批量分配</span>
+              </span>
+              <span>{unassignedCount}</span>
             </button>
             <div className="space-y-2">
               {categories.map((category, index) => (
@@ -1047,7 +1068,7 @@ function ShopSortWorkbench({
                 <div className="py-16 text-center text-sm text-muted-foreground">当前店铺还没有商品可排序</div>
               ) : sortedPreview.length === 0 ? (
                 <div className="py-16 text-center text-sm text-muted-foreground">
-                  未找到与「{searchQuery}」相关的商品
+                  {searchQuery ? `未找到与「${searchQuery}」相关的商品` : selectedCategoryName === null ? "所有商品均已分配临时分类" : "当前临时分类暂无商品"}
                   {searchQuery && (
                     <button
                       type="button"
@@ -1147,7 +1168,7 @@ function ShopSortWorkbench({
                 ) : sortedPreview.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="py-16 text-center text-sm text-muted-foreground">
-                      未找到与「{searchQuery}」相关的商品
+                      {searchQuery ? `未找到与「${searchQuery}」相关的商品` : selectedCategoryName === null ? "所有商品均已分配临时分类" : "当前临时分类暂无商品"}
                       {searchQuery && (
                         <button
                           type="button"
@@ -1429,7 +1450,6 @@ export default function ShopGoodsPage() {
     () => shops.find((shop) => shop.id === selectedShopId) || null,
     [selectedShopId, shops]
   );
-  const hasMultipleShops = filteredShops.length > 1;
 
   const templateCatalogQuery = useMemo(
     () => {
@@ -2051,7 +2071,7 @@ export default function ShopGoodsPage() {
     void fetchShopProducts(false);
   }, [fetchShopProducts]);
 
-  const handleStartPurchase = useCallback((displayProduct: any, rawItem?: ShopCatalogItem) => {
+  const handleStartPurchase = useCallback((displayProduct: ShopCatalogItem, rawItem?: ShopCatalogItem) => {
     const today = new Date();
     const targetShopName = rawItem?.shopName || selectedShop?.name || "";
     const targetShop = shops.find((s) => s.name === targetShopName || s.id === (rawItem?.shopId || selectedShopId));
@@ -2059,7 +2079,7 @@ export default function ShopGoodsPage() {
     const productId = rawItem?.productId || rawItem?.sourceProductId || null;
     const price = typeof displayProduct.costPrice === "number" ? displayProduct.costPrice : (rawItem?.costPrice || 0);
 
-    const draft: any = {
+    const draft: PurchaseOrder & { isDraft: boolean } = {
       id: `PO-${today.toISOString().slice(0, 10).replace(/-/g, "")}-${Math.floor(Math.random() * 1000).toString().padStart(3, "0")}`,
       status: "Confirmed",
       type: "Purchase",
@@ -2073,13 +2093,15 @@ export default function ShopGoodsPage() {
             id: shopProductId,
             name: displayProduct.name,
             sku: displayProduct.sku || "",
-            image: displayProduct.image || null,
+            image: displayProduct.image || undefined,
+            categoryId: displayProduct.categoryId || "",
+            stock: displayProduct.stock ?? 0,
             costPrice: price,
-            supplierId: displayProduct.supplierId || null,
-            supplier: displayProduct.supplier || null,
+            supplierId: displayProduct.supplierId || undefined,
+            supplier: displayProduct.supplier || undefined,
           },
-          image: displayProduct.image || null,
-          supplierId: displayProduct.supplierId || null,
+          image: displayProduct.image || undefined,
+          supplierId: displayProduct.supplierId || undefined,
           quantity: 1,
           costPrice: price,
         },
