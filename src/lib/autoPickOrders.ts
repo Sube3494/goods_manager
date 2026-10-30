@@ -3217,8 +3217,10 @@ async function fetchAutoPickPluginJson<T>(userId: string, pathname: string, init
 }> {
   const { baseUrl, apiKey } = await getAutoPickPluginConnectionForUser(userId);
   const url = new URL(pathname.replace(/^\//, ""), `${baseUrl.replace(/\/+$/, "")}/`);
+  const signal = init?.signal ?? AbortSignal.timeout(30_000);
   const response = await fetch(url.toString(), {
     ...init,
+    signal,
     headers: {
       Accept: "application/json",
       "X-API-Key": apiKey,
@@ -3228,7 +3230,11 @@ async function fetchAutoPickPluginJson<T>(userId: string, pathname: string, init
     cache: "no-store",
   });
 
-  const data = await response.json().catch(() => ({})) as T;
+  const data = await response.json().catch((error) => {
+    // 请求头已返回也不代表响应完整；读取超时不能被当成成功的空结果。
+    if (signal.aborted) throw error;
+    return {};
+  }) as T;
   return {
     ok: response.ok,
     status: response.status,

@@ -46,6 +46,7 @@ async function main() {
   let remote = (value) => value;
   let commands = 0;
   let commandOK = true;
+  let pendingCommand;
   const events = [];
   function matches(where) {
     if (where.id && where.id !== order.id || where.userId && where.userId !== order.userId) return false;
@@ -55,11 +56,13 @@ async function main() {
       const filter = where.queuedSelfDelivery;
       let value = order.queuedSelfDelivery;
       for (const key of filter.path) value = value?.[key];
-      if (value !== filter.equals) return false;
+      if ("equals" in filter && value !== filter.equals) return false;
+      if ("lt" in filter && !(value < filter.lt)) return false;
     }
     return true;
   }
   const prisma = { autoPickOrder: {
+    findMany: async ({ where }) => matches(where) ? [{ id: order.id }] : [],
     findUnique: async () => clone(order),
     findUniqueOrThrow: async () => clone(order),
     findFirst: async ({ where }) => matches(where) ? clone(order) : null,
@@ -80,6 +83,7 @@ async function main() {
     } },
     "@/lib/executeOrderSelfDelivery": { executeOrderSelfDelivery: async () => {
       commands++;
+      if (pendingCommand) await pendingCommand;
       return { ok: commandOK, json: async () => commandOK ? {} : { error: "平台超时，结果待确认" } };
     } },
     "@/lib/autoPickOrderEvents": { emitAutoPickOrderEvent: (event) => events.push(event) },
@@ -126,6 +130,21 @@ async function main() {
   await loader(mocks)("src/lib/queuedSelfDelivery.ts").processQueuedSelfDeliveryOrder(order.id);
   assert.equal(order.queuedSelfDelivery.status, "failed");
   assert.equal(commands, 2, "重启后不重发结果不明的任务");
+
+  order = clone(base); commandOK = true;
+  await queue.setQueuedSelfDelivery(clone(order), true);
+  let releaseCommand;
+  pendingCommand = new Promise(resolve => { releaseCommand = resolve; });
+  const activePoll = queue.processQueuedSelfDeliveries();
+  while (order.queuedSelfDelivery.status !== "running") await new Promise(resolve => setImmediate(resolve));
+  order.queuedSelfDelivery.updatedAt = new Date(Date.now() - 6 * 60_000).toISOString();
+  await queue.processQueuedSelfDeliveries();
+  assert.equal(order.queuedSelfDelivery.status, "failed", "平台调用挂起时，下一轮仍必须回收超时任务");
+  assert.equal(commands, 3, "超时回收不得重复发单");
+  releaseCommand();
+  await activePoll;
+  pendingCommand = null;
+  assert.equal(order.queuedSelfDelivery.status, "failed", "迟到的执行结果不得覆盖回收状态");
 
   let session = { id: "other", role: "USER" };
   const route = loader({ ...mocks,

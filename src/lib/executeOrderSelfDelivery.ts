@@ -247,7 +247,9 @@ export async function executeOrderSelfDelivery(id: string, session: { id: string
   } catch (error) {
     console.error("Failed to start self delivery:", error);
     return NextResponse.json({
-      error: error instanceof Error ? error.message : "Failed to start self delivery",
+      error: error instanceof Error && ["TimeoutError", "AbortError"].includes(error.name)
+        ? "自配请求超时，结果待确认，请先同步订单检查，避免重复发起"
+        : error instanceof Error ? error.message : "Failed to start self delivery",
     }, { status: 500 });
   }
 }

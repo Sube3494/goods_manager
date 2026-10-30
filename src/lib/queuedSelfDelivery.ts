@@ -9,7 +9,7 @@ import { isOrderReadyForQueuedSelfDelivery, queuedSelfDeliveryBlockedReason, rea
 const POLL_MS = 30_000;
 const STALE_MS = 5 * 60_000;
 const scope = globalThis as typeof globalThis & {
-  queuedSelfDeliveryScheduler?: { timer?: ReturnType<typeof setInterval>; running: boolean };
+  queuedSelfDeliveryScheduler?: { timer?: ReturnType<typeof setInterval>; running: boolean; recovering?: boolean };
 };
 
 function state() {
@@ -21,6 +21,13 @@ function json(value: QueuedSelfDelivery): Prisma.InputJsonValue {
 }
 
 type Order = NonNullable<Awaited<ReturnType<typeof prisma.autoPickOrder.findUnique>>>;
+
+async function recoverStaleSelfDelivery(order: Order, job: QueuedSelfDelivery) {
+  if (job.status === "running" && Date.now() - Date.parse(job.updatedAt) > STALE_MS) {
+    // 不能确定之前的命令是否成功时不自动重发，避免重复发单。
+    await transition(order, job, "failed", "自配结果未确认，请同步订单后检查；不会自动重复发起");
+  }
+}
 
 async function transition(order: Order, previous: QueuedSelfDelivery, status: QueuedSelfDelivery["status"], error?: string) {
   const next = { ...previous, status, error, updatedAt: new Date().toISOString() };
@@ -67,10 +74,7 @@ export async function processQueuedSelfDeliveryOrder(id: string) {
   let job = readQueuedSelfDelivery(order.queuedSelfDelivery);
   if (!job) return;
   if (job.status === "running") {
-    if (Date.now() - Date.parse(job.updatedAt) > STALE_MS) {
-      // 不能确定之前的命令是否成功时不自动重发，避免重复发单。
-      await transition(order, job, "failed", "自配结果未确认，请同步订单后检查；不会自动重复发起");
-    }
+    await recoverStaleSelfDelivery(order, job);
     return;
   }
   if (job.status !== "waiting") return;
@@ -110,17 +114,31 @@ export async function processQueuedSelfDeliveryOrder(id: string) {
 
 export async function processQueuedSelfDeliveries() {
   const scheduler = state();
+  // 超时回收独立于发单循环；某次平台调用挂起时仍须能结束旧的 running 状态。
+  if (!scheduler.recovering) {
+    scheduler.recovering = true;
+    try {
+      const staleOrders = await prisma.autoPickOrder.findMany({
+        where: { AND: [
+          { queuedSelfDelivery: { path: ["status"], equals: "running" } },
+          { queuedSelfDelivery: { path: ["updatedAt"], lt: new Date(Date.now() - STALE_MS).toISOString() } },
+        ] },
+        orderBy: { updatedAt: "asc" }, take: 100, select: { id: true },
+      });
+      for (const order of staleOrders) {
+        try {
+          const latest = await prisma.autoPickOrder.findUnique({ where: { id: order.id } });
+          const job = latest && readQueuedSelfDelivery(latest.queuedSelfDelivery);
+          if (latest && job) await recoverStaleSelfDelivery(latest, job);
+        } catch (error) { console.error("Queued self delivery recovery failed:", order.id, error); }
+      }
+    } finally { scheduler.recovering = false; }
+  }
   if (scheduler.running) return;
   scheduler.running = true;
   try {
     const orders = await prisma.autoPickOrder.findMany({
-      where: { OR: [
-        { queuedSelfDelivery: { path: ["status"], equals: "waiting" } },
-        { AND: [
-          { queuedSelfDelivery: { path: ["status"], equals: "running" } },
-          { queuedSelfDelivery: { path: ["updatedAt"], lt: new Date(Date.now() - STALE_MS).toISOString() } },
-        ] },
-      ] },
+      where: { queuedSelfDelivery: { path: ["status"], equals: "waiting" } },
       orderBy: { updatedAt: "asc" }, take: 20, select: { id: true },
     });
     for (const order of orders) {
