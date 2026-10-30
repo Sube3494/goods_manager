@@ -19,6 +19,7 @@ import {
   isAutoPickOtherPickupOrder,
   isAutoPickPickupOrder,
   isSelfDeliveryForFee,
+  preserveAutoPickPickProgress,
   readDeliveryFeeFromValue,
   resolveAutoPickBusinessStatus,
 } from "@/lib/autoPickOrderStatus";
@@ -1091,11 +1092,7 @@ function mergeAutoPickSystemMeta(
       : existingSystemMeta.extraExpenses,
   };
 
-  const nextPayload = { ...basePayload };
-
-  if (!("pickProgress" in nextPayload) && "pickProgress" in existingRecord) {
-    nextPayload.pickProgress = existingRecord.pickProgress;
-  }
+  const nextPayload = preserveAutoPickPickProgress(basePayload, existingRecord);
 
   // 继承旧的备注字段，防止一键同步（列表数据无备注）覆盖了旧有的备注数据
   const remarkKeys = ["customerRemark", "user_remark", "userRemark", "buyer_remark", "buyerRemark", "remark", "memo", "note"];
@@ -4138,12 +4135,12 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
       || undefined;
 
     const nextRawPayload = mergeAutoPickSystemMeta(
-      {
+      preserveAutoPickPickProgress({
         ...customerRawPayload,
         cancelReason: nextCancelReason,
         cancelDetails: nextCancelDetails,
         customerType,
-      },
+      }, existing?.rawPayload, existing?.status),
       existing?.rawPayload
     );
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -4878,7 +4875,7 @@ function normalizeAutoPickProgressPayload(payload: unknown): AutoPickProgressPay
   ).trim();
 
   const pickRemainingSeconds = Number(input.pickRemainingSeconds ?? nested?.pickRemainingSeconds);
-  const pickCompleted = Boolean(input.pickCompleted ?? nested?.pickCompleted) || msgParsed.statusHint === "meal";
+  let pickCompleted = Boolean(input.pickCompleted ?? nested?.pickCompleted) || msgParsed.statusHint === "meal";
 
   let rawStatusHint = String(
     input.statusHint
@@ -4897,6 +4894,7 @@ function normalizeAutoPickProgressPayload(payload: unknown): AutoPickProgressPay
   if (!rawStatusHint && pickCompleted) {
     rawStatusHint = "meal";
   }
+  pickCompleted = pickCompleted || rawStatusHint === "meal";
 
   if (!sourceId && !orderNo && !orderSequence) {
     return null;
@@ -6033,7 +6031,7 @@ export async function applyAutoPickProgress(userId: string, payload: unknown) {
     return existingOrder;
   }
 
-  const nextRawPayload = order.rawPayload && typeof order.rawPayload === "object" && !Array.isArray(order.rawPayload)
+  const progressRawPayload = order.rawPayload && typeof order.rawPayload === "object" && !Array.isArray(order.rawPayload)
     ? {
         ...(order.rawPayload as Record<string, unknown>),
         pickProgress: {
@@ -6052,6 +6050,7 @@ export async function applyAutoPickProgress(userId: string, payload: unknown) {
         wsStatusHint: progress.statusHint || null,
       };
 
+  const nextRawPayload = preserveAutoPickPickProgress(progressRawPayload, order.rawPayload, order.status);
   const progressStatusHint = String(progress.statusHint || "").trim().toLowerCase();
   if (progressStatusHint === "expect") {
     (nextRawPayload as Record<string, unknown>).hasArrivedExpect = true;

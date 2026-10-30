@@ -253,12 +253,32 @@ export function isAutoPickPickCompleted(rawPayload: unknown) {
   }
 
   const record = rawPayload as Record<string, unknown>;
+  if (String(record.wsStatusHint || "").trim().toLowerCase() === "meal") return true;
   const pickProgress = record.pickProgress;
   if (!pickProgress || typeof pickProgress !== "object" || Array.isArray(pickProgress)) {
     return false;
   }
 
   return Boolean((pickProgress as Record<string, unknown>).pickCompleted);
+}
+
+export function preserveAutoPickPickProgress(
+  incoming: Record<string, unknown>, previous: unknown, previousStatus?: string | null,
+): Record<string, unknown> {
+  const existing = previous && typeof previous === "object" && !Array.isArray(previous)
+    ? previous as Record<string, unknown> : {};
+  const completed = isAutoPickPickCompleted(existing) || isAutoPickPickCompleted(incoming)
+    || /^(已拣货|拣货完成|已完成拣货|picked|pick_completed)$/i.test(String(previousStatus || "").trim());
+  if (completed) {
+    const progress = (value: unknown) => value && typeof value === "object" && !Array.isArray(value)
+      ? value as Record<string, unknown> : {};
+    return { ...incoming, pickProgress: {
+      ...progress(existing.pickProgress), ...progress(incoming.pickProgress),
+      pickCompleted: true, pickRemainingSeconds: 0,
+    } };
+  }
+  return !("pickProgress" in incoming) && "pickProgress" in existing
+    ? { ...incoming, pickProgress: existing.pickProgress } : incoming;
 }
 
 export function isAutoPickSelfDeliveryStarted(order: {

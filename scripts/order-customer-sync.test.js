@@ -14,11 +14,17 @@ const tx = {
 };
 mock.module("../src/lib/prisma", () => ({ default: {
   ...tx, $transaction: async (callback) => callback(tx),
-  autoPickOrder: { findFirst: async () => null },
+  autoPickOrder: {
+    findFirst: async () => null,
+    findMany: async () => [saved],
+    update: tx.autoPickOrder.update,
+  },
   outboundOrder: { findMany: async () => [] },
 } }));
 mock.module("../src/lib/autoPickOrderEvents", () => ({ emitAutoPickOrderEvent() {} }));
-const { upsertAutoPickOrder } = await import("../src/lib/autoPickOrders");
+const { upsertAutoPickOrder, parseAutoPickProgressPayload, applyAutoPickProgress } = await import("../src/lib/autoPickOrders");
+const { isOrderReadyForQueuedSelfDelivery, queuedSelfDeliveryBlockedReason } = await import("../src/lib/queuedSelfDeliveryRules");
+const { preserveAutoPickPickProgress } = await import("../src/lib/autoPickOrderStatus");
 const { buildCustomerMemoryFields } = await import("../src/lib/customerMemoryStore");
 const { readMainSystemSelfDeliveryFlag } = await import("../src/lib/autoPickOrderStatus");
 const { getOrderGroup } = await import("../src/lib/orderGroups");
@@ -78,4 +84,44 @@ test("真正自配的过期标记仍可由第三方运力覆盖", async () => {
   });
   expect(result.rawPayload.systemMeta.mainSystemSelfDelivery.triggered).toBe(false);
   expect(readMainSystemSelfDeliveryFlag(result.rawPayload, result.delivery)).toBe(false);
+});
+
+test("已拣货后自动发单、取消运单回到待配送仍满足自配条件", async () => {
+  saved.status = "已拣货";
+  saved.rawPayload.pickProgress = { pickCompleted: true };
+  for (const status of ["delivery", "待配送"]) {
+    const delivery = status === "delivery"
+      ? { logisticName: "闪送", status: "waiting" }
+      : { logisticName: "闪送", status: 99, track: "运单已取消" };
+    await upsertAutoPickOrder("user-1", {
+      id: "source-order", orderNo: "order-31", platform: "抖店", shopId: "shop-1",
+      orderTime: "2026-10-01 08:00:00", status, delivery, userAddress: address,
+      rawPayload: { delivery, pickProgress: { pickCompleted: false }, wsStatusHint: "delivery" },
+      items: [{ productName: "巧克力", quantity: 1 }],
+    });
+    expect(saved.rawPayload.pickProgress.pickCompleted).toBe(true);
+  }
+  expect(isOrderReadyForQueuedSelfDelivery(saved)).toBe(true);
+  expect(queuedSelfDeliveryBlockedReason(saved)).toBe(null);
+});
+
+test("meal消息显式声明完成，后续不带拣货信息的配送消息不能抹掉完成记录", () => {
+  expect(parseAutoPickProgressPayload({ id: "source-order", statusHint: "meal" }).pickCompleted).toBe(true);
+  expect(parseAutoPickProgressPayload({ id: "source-order", type: "notify", msg: JSON.stringify({ type: "meal" }) }).pickCompleted).toBe(true);
+  const raw = preserveAutoPickPickProgress(
+    { pickProgress: { pickCompleted: false }, wsStatusHint: "delivery" },
+    { pickProgress: { pickCompleted: true }, wsStatusHint: "meal" },
+  );
+  expect(isOrderReadyForQueuedSelfDelivery({ status: "待配送", rawPayload: raw })).toBe(true);
+  expect(isOrderReadyForQueuedSelfDelivery({ status: "待配送", rawPayload: { wsStatusHint: "meal" } })).toBe(true);
+  expect(isOrderReadyForQueuedSelfDelivery({ status: "待配送", rawPayload: { pickProgress: { pickCompleted: false } } })).toBe(false);
+});
+
+test("进度写库不会用迟到的倒计时覆盖已完成拣货", async () => {
+  saved.status = "待配送";
+  saved.rawPayload.pickProgress = { pickCompleted: true };
+  await applyAutoPickProgress("user-1", { id: "source-order", pickRemainingSeconds: 120 });
+  expect(saved.rawPayload.pickProgress.pickCompleted).toBe(true);
+  expect(saved.rawPayload.pickProgress.pickRemainingSeconds).toBe(0);
+  expect(isOrderReadyForQueuedSelfDelivery(saved)).toBe(true);
 });
