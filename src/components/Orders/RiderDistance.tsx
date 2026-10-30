@@ -57,7 +57,7 @@ export function RiderDistance({ order }: { order: AutoPickOrder }) {
           className={summary.phase === "pickup" ? "text-orange-600 dark:text-orange-400" : "text-emerald-600 dark:text-emerald-400"}
           title={`骑手距离${summary.phase === "pickup" ? "门店" : "顾客"}，每30秒更新`}
         >
-          （{summary.label} {summary.distance}）
+          ({summary.label} {summary.distance})
         </span>
       ) : null}
     </span>
