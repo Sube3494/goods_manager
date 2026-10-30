@@ -1,4 +1,5 @@
 "use client";
+import { RiderDistance } from "@/components/Orders/RiderDistance";
 import { readQueuedSelfDelivery, isOrderReadyForQueuedSelfDelivery } from "@/lib/queuedSelfDeliveryRules";
 
 
@@ -4373,9 +4374,10 @@ export const OrderCard = memo(function OrderCard({
                     {formatLocalDateTime(order.orderTime)}
                   </span>
                   <span className="inline-flex items-center gap-1.5 max-w-[280px] md:max-w-[420px] lg:max-w-[560px] min-w-0 leading-[18px]">
-                    <button type="button" disabled={pickup} onClick={() => setRouteOpen(true)} title="查看配送地图" aria-label="查看配送地图" className="inline-flex shrink-0 items-center gap-1.5 rounded enabled:cursor-pointer enabled:hover:text-primary focus-visible:outline-2 focus-visible:outline-primary">
+                    <button type="button" disabled={pickup} onClick={() => setRouteOpen(true)} title="查看配送地图" aria-label="查看配送地图" className="relative inline-flex shrink-0 items-center gap-1.5 rounded enabled:cursor-pointer enabled:hover:text-primary focus-visible:outline-2 focus-visible:outline-primary">
                       <MapPin size={13} className="shrink-0 text-slate-400 dark:text-zinc-500" />
                       <span className="truncate shrink-0">{pickup ? "-" : (order.distanceKm != null ? formatDistanceKm(order.distanceKm) : "距离待同步")}</span>
+                      {!pickup && <RiderDistance order={order} />}
                     </button>
                     {renderCustomerTypeBadge()}
                     {!pickup && order.userAddress ? (
@@ -4402,15 +4404,16 @@ export const OrderCard = memo(function OrderCard({
                   </div>
                 ) : (
                   <div className="mt-2.5 rounded-2xl border border-black/5 bg-black/2 p-2.5 dark:border-white/5 dark:bg-white/3 space-y-2 text-xs font-medium sm:hidden">
-                    <div className="flex items-center justify-between text-muted-foreground">
-                      <span className="flex items-center gap-1.5">
+                    <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-2 gap-y-1.5 text-muted-foreground">
+                      <span className="flex shrink-0 items-center gap-1.5 whitespace-nowrap">
                         <Clock3 size={12} className="shrink-0 text-slate-400 dark:text-zinc-500" />
                         <span>{formatLocalDateTime(order.orderTime)}</span>
                       </span>
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <button type="button" onClick={() => setRouteOpen(true)} title="查看配送地图" aria-label="查看配送地图" className="flex cursor-pointer items-center gap-1.5 rounded hover:text-primary focus-visible:outline-2 focus-visible:outline-primary">
+                      <div className="flex min-w-0 max-w-full flex-wrap items-center gap-x-1.5 gap-y-1">
+                        <button type="button" onClick={() => setRouteOpen(true)} title="查看配送地图" aria-label="查看配送地图" className="relative flex max-w-full cursor-pointer flex-wrap items-center gap-x-1.5 gap-y-0.5 rounded hover:text-primary focus-visible:outline-2 focus-visible:outline-primary">
                           <MapPin size={12} className="shrink-0 text-slate-400 dark:text-zinc-500" />
-                          <span>{order.distanceKm != null ? formatDistanceKm(order.distanceKm) : "距离待同步"}</span>
+                          <span className="whitespace-nowrap">{order.distanceKm != null ? formatDistanceKm(order.distanceKm) : "距离待同步"}</span>
+                          <RiderDistance order={order} />
                         </button>
                         {renderCustomerTypeBadge()}
                       </div>

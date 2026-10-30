@@ -1,4 +1,5 @@
 "use client";
+import { RiderDistance } from "@/components/Orders/RiderDistance";
 import { readQueuedSelfDelivery, isOrderReadyForQueuedSelfDelivery } from "@/lib/queuedSelfDeliveryRules";
 
 
@@ -338,7 +339,7 @@ function CompactTodayOrderCard({
           </div>
 
           {/* 第二行（独立排布，占满整行宽度）：时间 · 距离 · 客人类型 · 取货方式 */}
-          <div className="flex items-center gap-2 text-[11px] font-medium text-muted-foreground">
+          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-medium text-muted-foreground">
             <span className="shrink-0 whitespace-nowrap">{formatCompactTime(order.orderTime)}</span>
             <span className="h-2 w-px shrink-0 bg-black/10 dark:bg-white/10" />
             <button
@@ -347,10 +348,11 @@ function CompactTodayOrderCard({
               onClick={() => setRouteOpen(true)}
               title="查看配送地图"
               aria-label="查看配送地图"
-              className="inline-flex shrink-0 items-center gap-1 rounded whitespace-nowrap transition enabled:cursor-pointer enabled:hover:text-primary disabled:cursor-default focus-visible:outline-2 focus-visible:outline-primary"
+              className="relative inline-flex max-w-full shrink-0 flex-wrap items-center gap-x-1 gap-y-0.5 rounded transition enabled:cursor-pointer enabled:hover:text-primary disabled:cursor-default focus-visible:outline-2 focus-visible:outline-primary"
             >
               <MapPin size={11} className="shrink-0" />
-              <span>{pickup ? "-" : (order.distanceKm != null ? `${order.distanceKm.toFixed(2)} km` : "距离待同步")}</span>
+              <span className="whitespace-nowrap">{pickup ? "-" : (order.distanceKm != null ? `${order.distanceKm.toFixed(2)} km` : "距离待同步")}</span>
+              {!pickup && <RiderDistance order={order} />}
             </button>
             {customerType === "new" ? (
               <span title={getCustomerMemoryPlatform(order.platform) ? "本店本平台暂无匹配的顾客历史记录，标记为新客（含刷单、取消及退款订单）" : "门店新客"} className="shrink-0 whitespace-nowrap rounded-full border border-orange-500/25 bg-orange-500/10 px-1.5 py-0.5 text-[9.5px] font-medium leading-none text-orange-600 dark:text-orange-400">新客</span>
