@@ -114,7 +114,7 @@ test("meal消息显式声明完成，后续不带拣货信息的配送消息不�
   );
   expect(isOrderReadyForQueuedSelfDelivery({ status: "待配送", rawPayload: raw })).toBe(true);
   expect(isOrderReadyForQueuedSelfDelivery({ status: "待配送", rawPayload: { wsStatusHint: "meal" } })).toBe(true);
-  expect(isOrderReadyForQueuedSelfDelivery({ status: "待配送", rawPayload: { pickProgress: { pickCompleted: false } } })).toBe(false);
+  expect(isOrderReadyForQueuedSelfDelivery({ status: "待配送", rawPayload: { pickProgress: { pickCompleted: false } } })).toBe(true);
 });
 
 test("进度写库不会用迟到的倒计时覆盖已完成拣货", async () => {

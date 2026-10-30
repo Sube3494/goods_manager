@@ -40,6 +40,9 @@ async function main() {
   for (const value of [true, 1, "1"]) assert.match(rules.queuedSelfDeliveryBlockedReason({ ...base, rawPayload: { isSubscribe: value } }), /预约/);
   assert.equal(rules.isOrderReadyForQueuedSelfDelivery({ ...base, status: "拣货中" }), false);
   assert.equal(rules.isOrderReadyForQueuedSelfDelivery({ ...base, status: "已拣货" }), true);
+  for (const status of ["待配送", "delivery", "pending_delivery", "pickup"]) {
+    assert.equal(rules.isOrderReadyForQueuedSelfDelivery({ ...base, status }), true, "待配送不依赖历史拣货标记");
+  }
   assert.equal(rules.isOrderReadyForQueuedSelfDelivery({ ...base, rawPayload: { pickProgress: { pickCompleted: true } } }), true);
 
   let order = clone(base);
@@ -211,6 +214,22 @@ async function main() {
   await queue.setQueuedSelfDelivery(clone(order), true);
   await queue.processQueuedSelfDeliveryOrder(order.id);
   assert.equal(order.queuedSelfDelivery.status, "succeeded", "取消运单后的异常订单可等待拣货并执行自配");
+
+  order = clone(base);
+  order.status = "待配送";
+  order.delivery = { logisticName: "闪送", status: 99, track: "运单已取消" };
+  remote = value => value;
+  const beforeRecoveryCommands = commands;
+  await queue.setQueuedSelfDelivery(clone(order), true);
+  await queue.processQueuedSelfDeliveryOrder(order.id);
+  assert.equal(commands, beforeRecoveryCommands + 1, "历史拣货标记丢失的待配送订单也会发起自配");
+  assert.equal(order.queuedSelfDelivery.status, "succeeded");
+
+  order = clone(base);
+  order.status = "待配送";
+  order.delivery = { logisticName: "闪送", track: "骑手已接单" };
+  order.rawPayload.delivery = order.delivery;
+  await assert.rejects(queue.setQueuedSelfDelivery(clone(order), true), /配送任务|骑手/);
   assert(events.length > 0);
   console.log("拣货后自配：等待、完成后触发、取消、预约单/配送拦截、并发去重、失败和重启保护、身份隔离通过");
 }

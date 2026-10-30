@@ -1,4 +1,5 @@
 import {
+  getBaseAutoPickStatusDisplay,
   isAutoPickOrderAbnormalStatus,
   isAutoPickOrderDeliveringStatus,
   isAutoPickOrderRiderAssigned,
@@ -65,7 +66,9 @@ export function hasCancelledDeliveryProof(order: QueueOrder): boolean {
 }
 
 export function isOrderReadyForQueuedSelfDelivery(order: QueueOrder & { isPickCompleted?: boolean }) {
-  // “拣货中”不代表完成，不能使用会将其归为“已拣货”的展示状态。
-  return order.isPickCompleted === true || isAutoPickPickCompleted(order.rawPayload)
+  // 待配送是拣货后的阶段，历史订单缺少拣货标记也可继续自配。
+  // “拣货中”不代表完成，不能用展示状态“已拣货”反推。
+  return getBaseAutoPickStatusDisplay(order.status) === "待配送"
+    || order.isPickCompleted === true || isAutoPickPickCompleted(order.rawPayload)
     || /^(已拣货|拣货完成|已完成拣货|picked|pick_completed)$/i.test(String(order.status || "").trim());
 }
