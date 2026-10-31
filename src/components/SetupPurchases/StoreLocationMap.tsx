@@ -465,6 +465,8 @@ export function StoreLocationMap({ userId }: { userId: string }) {
         "group relative flex flex-col items-center cursor-pointer select-none transition-all duration-200 hover:scale-105 active:scale-95";
       markerContent.style.transformOrigin = "bottom center";
 
+      const isPointNameVisible = showPointNames && !point.hideRing;
+
       if (markerIconStyle === "apple") {
         // Apple Maps 经典黄金流线水滴图钉：饱满圆润、纯白反白数字、底部轻量毛玻璃名牌
         markerContent.innerHTML = `
@@ -500,9 +502,9 @@ export function StoreLocationMap({ userId }: { userId: string }) {
             </div>
             <!-- 地面立体投影 -->
             <div class="w-3.5 h-1 bg-black/40 rounded-full blur-[1px] mt-0.5"></div>
-            <!-- 底部精致轻量店名微胶囊名牌（支持自由显示/隐藏） -->
+            <!-- 底部精致轻量店名微胶囊名牌（支持自由显示/隐藏，单点隐藏时同步隐藏店名） -->
             ${
-              showPointNames
+              isPointNameVisible
                 ? `<div class="mt-1 flex items-center px-2 py-0.5 rounded-full bg-slate-950/85 text-white border border-white/15 shadow-md backdrop-blur-md whitespace-nowrap">
                     <span class="text-[11px] font-bold tracking-tight truncate max-w-[120px] leading-none">${point.name}</span>
                   </div>`
@@ -514,12 +516,12 @@ export function StoreLocationMap({ userId }: { userId: string }) {
         // 曜石暗夜微胶囊（深色科技风）：一体式带针脚，深色半透明毛玻璃，与深色底图浑然一体
         markerContent.innerHTML = `
           <div class="flex flex-col items-center filter drop-shadow-[0_4px_10px_rgba(0,0,0,0.4)]">
-            <div class="flex items-center gap-1.5 ${showPointNames ? 'pl-1.5 pr-2.5 py-1' : 'p-1'} rounded-full bg-slate-900/90 text-white border border-white/20 backdrop-blur-md transition-all group-hover:border-primary/50">
+            <div class="flex items-center gap-1.5 ${isPointNameVisible ? 'pl-1.5 pr-2.5 py-1' : 'p-1'} rounded-full bg-slate-900/90 text-white border border-white/20 backdrop-blur-md transition-all group-hover:border-primary/50">
               <span class="flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-black text-white shrink-0 shadow-xs" style="background-color: ${color}">
                 ${index + 1}
               </span>
               ${
-                showPointNames
+                isPointNameVisible
                   ? `<span class="text-[11px] font-bold text-white truncate max-w-[130px] tracking-tight leading-none">${point.name}</span>`
                   : ""
               }
@@ -533,14 +535,14 @@ export function StoreLocationMap({ userId }: { userId: string }) {
         markerContent.innerHTML = `
           <div class="flex flex-col items-center filter drop-shadow-[0_4px_14px_rgba(0,0,0,0.35)]">
             <!-- 一体化纯白高质感胶囊 -->
-            <div class="flex items-center gap-1.5 ${showPointNames ? 'pl-1.5 pr-3 py-1.5' : 'p-1'} rounded-full bg-white text-slate-900 border border-black/10 shadow-sm transition-all group-hover:scale-105 group-hover:shadow-md">
+            <div class="flex items-center gap-1.5 ${isPointNameVisible ? 'pl-1.5 pr-3 py-1.5' : 'p-1'} rounded-full bg-white text-slate-900 border border-black/10 shadow-sm transition-all group-hover:scale-105 group-hover:shadow-md">
               <!-- 左侧彩色数字徽章 -->
               <span class="flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-black text-white shrink-0 shadow-xs" style="background-color: ${color}">
                 ${index + 1}
               </span>
               <!-- 右侧清晰加粗店名 -->
               ${
-                showPointNames
+                isPointNameVisible
                   ? `<span class="text-[12px] font-bold text-slate-900 truncate max-w-[150px] tracking-tight leading-none">${point.name}</span>`
                   : ""
               }
@@ -641,8 +643,8 @@ export function StoreLocationMap({ userId }: { userId: string }) {
               <span class="font-bold text-xs truncate text-foreground tracking-tight">${point.name}</span>
             </div>
             <div class="flex items-center gap-1 shrink-0">
-              <!-- 显隐当前点位覆盖轮廓圈 -->
-              <button id="toggle-ring-btn" title="${point.hideRing ? '点击显示此点位覆盖轮廓' : '点击隐藏此点位覆盖轮廓'}" type="button" class="h-6 w-6 rounded-lg flex items-center justify-center ${point.hideRing ? 'text-muted-foreground/40' : 'text-primary bg-primary/10'} transition-all cursor-pointer">
+              <!-- 显隐当前点位覆盖圈与店名 -->
+              <button id="toggle-ring-btn" title="${point.hideRing ? '点击显示此点位店名与覆盖圈' : '点击隐藏此点位店名与覆盖圈'}" type="button" class="h-6 w-6 rounded-lg flex items-center justify-center ${point.hideRing ? 'text-muted-foreground/40' : 'text-primary bg-primary/10'} transition-all cursor-pointer">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 0 20"/></svg>
               </button>
               <!-- 钉住 / 解锁锁定位置 -->
@@ -706,7 +708,7 @@ export function StoreLocationMap({ userId }: { userId: string }) {
             setPoints((prev) =>
               prev.map((p, i) => (i === index ? { ...p, hideRing: nextHide } : p))
             );
-            showToast(nextHide ? `已隐藏「${point.name}」的覆盖轮廓` : `已显示「${point.name}」的覆盖轮廓`, "info");
+            showToast(nextHide ? `已隐藏「${point.name}」的店名与覆盖圈` : `已恢复显示「${point.name}」的店名与覆盖圈`, "info");
             infoWindow.close();
             activeInfoWindowRef.current = null;
           });
@@ -1640,17 +1642,17 @@ export function StoreLocationMap({ userId }: { userId: string }) {
                       className="flex-1 min-w-0 bg-transparent text-xs font-bold text-foreground border border-transparent hover:border-black/10 dark:hover:border-white/10 focus:border-primary focus:bg-white dark:focus:bg-white/8 rounded-md px-1.5 py-0.5 outline-none transition-all truncate"
                     />
 
-                    {/* 单点辐射覆盖轮廓圈开关 */}
+                    {/* 单点显隐控制：同时控制店名与辐射覆盖圈 */}
                     <button
                       type="button"
-                      title={point.hideRing ? "点击显示此点位辐射覆盖轮廓" : "点击隐藏此点位辐射覆盖轮廓"}
+                      title={point.hideRing ? "点击显示此点位店名与覆盖圈" : "点击隐藏此点位店名与覆盖圈"}
                       onClick={(e) => {
                         e.stopPropagation();
                         const nextHide = !point.hideRing;
                         setPoints((prev) =>
                           prev.map((p, i) => (i === index ? { ...p, hideRing: nextHide } : p))
                         );
-                        showToast(nextHide ? `已隐藏「${point.name}」的覆盖轮廓` : `已显示「${point.name}」的覆盖轮廓`, "info");
+                        showToast(nextHide ? `已隐藏「${point.name}」的店名与覆盖圈` : `已恢复显示「${point.name}」的店名与覆盖圈`, "info");
                       }}
                       className={cn(
                         "flex h-6 w-6 items-center justify-center rounded-lg transition-all cursor-pointer shrink-0",
