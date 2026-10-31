@@ -86,6 +86,24 @@ test("真正自配的过期标记仍可由第三方运力覆盖", async () => {
   expect(readMainSystemSelfDeliveryFlag(result.rawPayload, result.delivery)).toBe(false);
 });
 
+test("取消后重新接单清除近期自配标记及旧运单取消信息", async () => {
+  saved.status = "delivering";
+  saved.delivery = { logisticName: "顺丰", track: "运单已取消", status: "99", cancel_time: "2026-10-31 13:20:00", riderName: "旧骑手" };
+  saved.rawPayload.systemMeta = { mainSystemSelfDelivery: { triggered: true, triggeredAt: new Date().toISOString() } };
+  const delivery = { logisticName: "顺丰独享专送", track: "骑手已接单", riderName: "新骑手", sendFee: 1414 };
+  const result = await upsertAutoPickOrder("user-1", {
+    id: "source-order", orderNo: "order-31", platform: "抖店", shopId: "shop-1",
+    orderTime: "2026-10-31 13:12:00", status: "delivering", delivery, userAddress: address,
+    rawPayload: { delivery }, items: [{ productName: "巧克力", quantity: 1 }],
+  });
+  expect(result.rawPayload.systemMeta.mainSystemSelfDelivery.triggered).toBe(false);
+  expect(result.delivery.riderName).toBe("新骑手");
+  expect(result.delivery.cancel_time).toBeUndefined();
+  expect(result.delivery.status).toBeUndefined();
+  expect(result.delivery.sendFee).toBe(1414);
+  expect(readMainSystemSelfDeliveryFlag(result.rawPayload, result.delivery)).toBe(false);
+});
+
 test("已拣货后自动发单、取消运单回到待配送仍满足自配条件", async () => {
   saved.status = "已拣货";
   saved.rawPayload.pickProgress = { pickCompleted: true };

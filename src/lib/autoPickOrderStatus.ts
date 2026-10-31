@@ -829,7 +829,7 @@ export function readMainSystemSelfDeliveryFlag(rawPayload: unknown, delivery?: u
     const hasThirdPartyLogistic = Boolean(logisticName && !/自配|自配送|商家自配|oneself/i.test(logisticName));
     const triggeredAt = (marker as Record<string, unknown>).triggeredAt;
     const isRecent = Boolean(triggeredAt && (Date.now() - new Date(String(triggeredAt)).getTime() < 15 * 60 * 1000));
-    const hasDispatcher = Boolean(d.dispatcher);
+    const hasDispatcher = Boolean(d.dispatcher) || isAutoPickOrderRiderAssigned({ delivery: d });
 
     // 只有在非近期发起的自配，或者已有明确的新骑手（dispatcher）接单时，第三方跑腿才能覆盖商家自配标记
     if (hasThirdPartyLogistic && (!isRecent || hasDispatcher)) {

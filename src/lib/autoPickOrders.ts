@@ -15,6 +15,7 @@ import {
   isAutoPickOrderCompletedStatus,
   isAutoPickOrderDeletedStatus,
   isAutoPickOrderDeliveringStatus,
+  isAutoPickOrderRiderAssigned,
   isAutoPickOrderTerminalStatus,
   isAutoPickOtherPickupOrder,
   isAutoPickPickupOrder,
@@ -4181,7 +4182,11 @@ export async function upsertAutoPickOrder(userId: string, payload: AutoPickInbou
     const manuallyMarkedBrush = hasManualBrushMarker({ systemMeta: nextSystemMeta });
     if (hasThirdPartyLogistic && nextSystemMeta.mainSystemSelfDelivery?.triggered && !manuallyMarkedBrush) {
       // 只有在不是近期发起的自配，或者麦芽田明确有新骑手接单（dispatcher）时，才清除自配标记
-      const hasRealNewRider = Boolean((normalized.delivery as any)?.dispatcher);
+      const hasRealNewRider = isAutoPickOrderRiderAssigned({
+        status: normalized.status,
+        delivery: normalized.delivery,
+        rawPayload: normalized.rawPayload,
+      });
       if (!isRecentSelfDeliveryTrigger || hasRealNewRider) {
         nextSystemMeta.mainSystemSelfDelivery = {
           ...nextSystemMeta.mainSystemSelfDelivery,
@@ -5089,6 +5094,14 @@ function mergeAutoPickDeliveryValue(incoming: unknown, existing: unknown) {
     return existingRecord;
   }
   if (!existingRecord) {
+    return incomingRecord;
+  }
+
+  // 新接单不能继承上一趟已取消运单的时间、状态和骑手信息。
+  if (isAutoPickOrderRiderAssigned({ delivery: incomingRecord })
+    && (/取消|退单|失效/.test(String(existingRecord.track || ""))
+      || ["99", "10"].includes(String(existingRecord.status || ""))
+      || Boolean(existingRecord.cancel_time || existingRecord.cancelTime))) {
     return incomingRecord;
   }
 
