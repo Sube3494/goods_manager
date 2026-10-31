@@ -8,7 +8,7 @@ export type Permission =
   | "supplier:manage" | "supplier:create" | "supplier:update" | "supplier:delete"
   | "order:manage" | "order:sync" | "order:delivery" | "order:match" | "order:cost" | "order:promotion"
   | "purchase:manage" | "purchase:create" | "purchase:update" | "purchase:delete" | "purchase:inbound" | "purchase:export"
-  | "setup_purchase:manage" | "setup_purchase:create" | "setup_purchase:update" | "setup_purchase:delete" | "setup_purchase:inbound"
+  | "setup_purchase:location" | "setup_purchase:manage" | "setup_purchase:create" | "setup_purchase:update" | "setup_purchase:delete" | "setup_purchase:inbound"
   | "inbound:manage" | "inbound:create" | "inbound:delete" | "inbound:export"
   | "outbound:manage" | "outbound:create" | "outbound:delete" | "outbound:analytics"
   | "brush:manage" | "brush:products" | "brush:plans" | "brush:orders"
@@ -117,9 +117,10 @@ export const PERMISSION_TREE = [
   },
   {
     key: "setup_purchases",
-    label: "开店进货",
+    label: "开店筹备",
     children: [
-      { key: "setup_purchase:manage", label: "开店进货管理" },
+      { key: "setup_purchase:manage", label: "开店筹备管理" },
+      { key: "setup_purchase:location", label: "选址分析" },
       { key: "setup_purchase:create", label: "创建开店批次" },
       { key: "setup_purchase:update", label: "编辑开店批次" },
       { key: "setup_purchase:delete", label: "删除开店批次" },
@@ -350,10 +351,11 @@ export const PAGE_PERMISSION_TREE: PagePermissionGroup[] = [
       },
       {
         key: "setup_purchases",
-        label: "开店进货",
-        description: "开店批次与商品准备",
+        label: "开店筹备",
+        description: "开店选址分析与进货准备",
         accessKey: "setup_purchase:manage",
         actions: [
+          { key: "setup_purchase:location", label: "选址分析" },
           { key: "setup_purchase:create", label: "创建开店批次" },
           { key: "setup_purchase:update", label: "编辑开店批次" },
           { key: "setup_purchase:delete", label: "删除开店批次" },
@@ -577,6 +579,18 @@ export function normalizePermissionMap(source: unknown): PermissionMap {
   }, {});
 }
 
+/** Show inherited legacy grants explicitly in the role editor, without changing saved roles. */
+export function expandSetupPurchasePermissions(source: unknown): PermissionMap {
+  const permissions = normalizePermissionMap(source);
+  if (permissions["setup_purchase:manage"] || permissions.all) {
+    for (const key of ["location", "create", "update", "delete", "inbound"]) {
+      const permission = `setup_purchase:${key}`;
+      if (permissions[permission] === undefined) permissions[permission] = true;
+    }
+  }
+  return permissions;
+}
+
 export function getRoleProfilePermissions(user: SessionUser | null): PermissionMap {
   return normalizePermissionMap(user?.roleProfile?.permissions);
 }
@@ -626,6 +640,7 @@ const PERMISSION_FALLBACKS: Partial<Record<Permission, Permission[]>> = {
   "purchase:delete": ["purchase:manage"],
   "purchase:inbound": ["purchase:manage"],
   "purchase:export": ["purchase:manage"],
+  "setup_purchase:location": ["setup_purchase:manage"],
   "setup_purchase:create": ["setup_purchase:manage"],
   "setup_purchase:update": ["setup_purchase:manage"],
   "setup_purchase:delete": ["setup_purchase:manage"],
@@ -682,6 +697,7 @@ export function hasPermission(user: SessionUser | null, permission: Permission):
   if (permission === "brush:simulate") return false;
 
   const effectivePermissions = getEffectivePermissions(user);
+  if (permission.startsWith("setup_purchase:") && effectivePermissions[permission] === false) return false;
   if (effectivePermissions[permission] || effectivePermissions["all"]) {
     return true;
   }

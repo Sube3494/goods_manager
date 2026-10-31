@@ -8,6 +8,9 @@ export async function GET() {
     const session = await getAuthorizedUser();
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
 
+    if (!hasPermission(session as SessionUser, "setup_purchase:manage")) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
     const batches = await prisma.storeOpeningBatch.findMany({
       where: { userId: session.id },
       orderBy: { date: 'desc' },
@@ -27,7 +30,7 @@ export async function POST(req: NextRequest) {
   try {
     const session = await getAuthorizedUser();
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-    if (!hasPermission(session as SessionUser, "setup_purchase:manage")) {
+    if (!hasPermission(session as SessionUser, "setup_purchase:manage") || !hasPermission(session as SessionUser, "setup_purchase:create")) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

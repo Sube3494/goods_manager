@@ -33,7 +33,7 @@ export const navItems: NavItem[] = [
     section: "workspace",
   },
   { name: "采购管理", href: "/purchases", icon: ShoppingCart, adminOnly: true, permission: "purchase:manage", description: "日常采购与到货记录", section: "workspace" },
-  { name: "开店进货", href: "/setup-purchases", icon: Store, adminOnly: true, permission: "setup_purchase:manage", description: "开店批次与商品准备", section: "workspace" },
+  { name: "开店筹备", href: "/setup-purchases", icon: Store, adminOnly: true, permission: "setup_purchase:manage", description: "开店选址分析与进货准备", section: "workspace" },
   { name: "智能调货", href: "/distance-calc", icon: Navigation2, permission: "logistics:manage", description: "地图测距与最优配送方案", section: "workspace" },
   { name: "入库管理", href: "/inbound", icon: PlusCircle, adminOnly: true, permission: "inbound:manage", description: "入库登记与批量导入", section: "workspace" },
   { name: "出库管理", href: "/outbound", icon: ArrowUpRight, adminOnly: true, permission: "outbound:manage", description: "销售、领用与损耗出库", section: "workspace" },

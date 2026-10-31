@@ -16,6 +16,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const session = await getAuthorizedUser();
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
 
+    if (!hasPermission(session as SessionUser, "setup_purchase:manage")) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
     const { id } = await params;
     const batch = await prisma.storeOpeningBatch.findUnique({
       where: { id, userId: session.id },
@@ -60,7 +63,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   try {
     const session = await getAuthorizedUser();
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-    if (!hasPermission(session as SessionUser, "setup_purchase:manage")) {
+    if (!hasPermission(session as SessionUser, "setup_purchase:manage") || !hasPermission(session as SessionUser, "setup_purchase:update")) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
     
@@ -83,7 +86,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   try {
     const session = await getAuthorizedUser();
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-    if (!hasPermission(session as SessionUser, "setup_purchase:manage")) {
+    if (!hasPermission(session as SessionUser, "setup_purchase:manage") || !hasPermission(session as SessionUser, "setup_purchase:delete")) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
     const { id } = await params;

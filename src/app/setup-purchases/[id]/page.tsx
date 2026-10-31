@@ -35,6 +35,9 @@ function SetupPurchaseDetailContent() {
   const { showToast, updateToast, removeToast } = useToast();
   const { user } = useUser();
   const canManage = hasPermission(user as SessionUser | null, "setup_purchase:manage");
+  const canCreate = hasPermission(user as SessionUser | null, "setup_purchase:create");
+  const canUpdate = hasPermission(user as SessionUser | null, "setup_purchase:update");
+  const canDelete = hasPermission(user as SessionUser | null, "setup_purchase:delete");
   
   const [items, setItems] = useState<StoreOpeningItem[]>([]);
   const [batchName, setBatchName] = useState("");
@@ -589,7 +592,7 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
               </button>
               <button 
                 onClick={() => setIsProductSelectOpen(true)}
-                disabled={isUploading}
+                disabled={isUploading || !canCreate}
                 className="h-9 w-9 sm:w-auto md:h-10 flex items-center justify-center sm:gap-2 rounded-full bg-primary p-0 sm:px-4 md:px-6 text-xs md:text-sm font-black text-primary-foreground shadow-md shadow-black/10 dark:shadow-none hover:-translate-y-0.5 transition-all active:scale-95 disabled:opacity-50"
                 title="添加库商品"
               >
@@ -604,7 +607,7 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
                    input.onchange = (e) => handleFileUpload(e as unknown as React.ChangeEvent<HTMLInputElement>);
                    input.click();
                 }}
-                disabled={isUploading}
+                disabled={isUploading || !canCreate}
                 className="h-9 w-9 sm:w-auto md:h-10 flex items-center justify-center sm:gap-2 rounded-full bg-muted/60 border border-border p-0 sm:px-3 md:px-4 text-xs md:text-sm font-bold text-muted-foreground hover:bg-muted hover:text-foreground transition-all active:scale-95 disabled:opacity-50"
                 title={isUploading ? "解析中..." : "导入Excel"}
               >
@@ -687,7 +690,7 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
                      <th className="px-3 py-4 text-xs font-semibold text-muted-foreground whitespace-nowrap text-center">单价</th>
                      <th className="px-3 py-4 text-xs font-semibold text-muted-foreground whitespace-nowrap text-center">运费</th>
                      <th className="px-3 py-4 text-xs font-bold text-foreground whitespace-nowrap text-right bg-primary/5">小计金额</th>
-                     {canManage && <th className="px-3 py-4 text-xs font-semibold text-muted-foreground whitespace-nowrap text-center w-20">操作</th>}
+                     {canDelete && <th className="px-3 py-4 text-xs font-semibold text-muted-foreground whitespace-nowrap text-center w-20">操作</th>}
                  </tr>
                  </thead>
                  <tbody className="divide-y divide-border">
@@ -695,7 +698,7 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
                         {filteredItems.map(item => (
                             <motion.tr key={item.id} className={cn("hover:bg-muted/30 group transition-all", item.checked && "opacity-60 bg-emerald-500/5")}>
                                  <td className="px-3 py-3 whitespace-nowrap text-center">
-                                      <button onClick={() => handleToggleCheck(item.id, item.checked)} className={cn("relative h-6 w-6 rounded-full border-2 transition-all duration-300 flex items-center justify-center m-auto", item.checked ? "bg-foreground border-foreground text-background scale-110 shadow-lg shadow-black/10" : "bg-white dark:bg-white/5 border-gray-300 dark:border-white/20 hover:border-gray-400 dark:hover:border-foreground/50 shadow-sm")}>
+                                      <button disabled={!canUpdate} onClick={() => handleToggleCheck(item.id, item.checked)} className={cn("relative h-6 w-6 rounded-full border-2 transition-all duration-300 flex items-center justify-center m-auto", item.checked ? "bg-foreground border-foreground text-background scale-110 shadow-lg shadow-black/10" : "bg-white dark:bg-white/5 border-gray-300 dark:border-white/20 hover:border-gray-400 dark:hover:border-foreground/50 shadow-sm")}>
                                          {item.checked && <Check size={14} strokeWidth={4} />}
                                       </button>
                                  </td>
@@ -728,7 +731,7 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
                                      </div>
                                  </td>
                                  
-                                 <td className="px-3 py-3 whitespace-nowrap text-center" onClick={() => canManage && setEditingCell({ id: item.id, field: "quantity" })}>
+                                 <td className="px-3 py-3 whitespace-nowrap text-center" onClick={() => canUpdate && setEditingCell({ id: item.id, field: "quantity" })}>
                                      {editingCell?.id === item.id && editingCell.field === "quantity" ? (
                                          <input 
                                            autoFocus
@@ -744,7 +747,7 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
                                      )}
                                  </td>
 
-                                 <td className="px-3 py-3 whitespace-nowrap text-center" onClick={() => canManage && setEditingCell({ id: item.id, field: "unitPrice" })}>
+                                 <td className="px-3 py-3 whitespace-nowrap text-center" onClick={() => canUpdate && setEditingCell({ id: item.id, field: "unitPrice" })}>
                                      {editingCell?.id === item.id && editingCell.field === "unitPrice" ? (
                                          <input 
                                            autoFocus
@@ -761,7 +764,7 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
                                      )}
                                  </td>
 
-                                 <td className="px-3 py-3 whitespace-nowrap text-center" onClick={() => canManage && setEditingCell({ id: item.id, field: "shippingFee" })}>
+                                 <td className="px-3 py-3 whitespace-nowrap text-center" onClick={() => canUpdate && setEditingCell({ id: item.id, field: "shippingFee" })}>
                                      {editingCell?.id === item.id && editingCell.field === "shippingFee" ? (
                                          <input
                                            autoFocus
@@ -780,7 +783,7 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
                                      )}
                                  </td>
 
-                                 <td className="px-3 py-3 whitespace-nowrap text-right font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/5" onClick={() => canManage && setEditingCell({ id: item.id, field: "totalAmount" })}>
+                                 <td className="px-3 py-3 whitespace-nowrap text-right font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/5" onClick={() => canUpdate && setEditingCell({ id: item.id, field: "totalAmount" })}>
                                      {editingCell?.id === item.id && editingCell.field === "totalAmount" ? (
                                          <input 
                                            autoFocus
@@ -799,7 +802,7 @@ async function loadAndConvertImageForExcel(imageUrl: string): Promise<{ buffer: 
                                      )}
                                  </td>
                                  
-                                 {canManage && (
+                                 {canDelete && (
                                      <td className="px-3 py-3 text-center">
                                           <div className="flex items-center justify-center gap-1">
                                              <button onClick={(e) => { e.stopPropagation(); handleDeleteItem(item.id); }} className="p-1.5 text-red-500/70 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"><Trash2 size={16} /></button>

@@ -17,7 +17,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
-import { PAGE_PERMISSION_TREE, PagePermissionGroup, PagePermissionNode } from "@/lib/permissions";
+import { PAGE_PERMISSION_TREE, PagePermissionGroup, PagePermissionNode, expandSetupPurchasePermissions } from "@/lib/permissions";
 import { useToast } from "@/components/ui/Toast";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 
@@ -139,7 +139,8 @@ export const RoleManager = forwardRef<RoleManagerHandle>((props, ref) => {
     try {
       const res = await fetch("/api/admin/roles");
       if (res.ok) {
-        setRoles(await res.json());
+        const roles: RoleProfile[] = await res.json();
+        setRoles(roles.map(role => ({ ...role, permissions: expandSetupPurchasePermissions(role.permissions) })));
       }
     } catch {
       showToast("获取角色列表失败", "error");
@@ -214,6 +215,11 @@ export const RoleManager = forwardRef<RoleManagerHandle>((props, ref) => {
     updatePermissions((permissions) => {
       const nextValue = !permissions[page.accessKey];
       permissions[page.accessKey] = nextValue;
+      if (nextValue && page.key === "setup_purchases") {
+        page.actions.forEach(action => {
+          if (permissions[action.key] === undefined) permissions[action.key] = false;
+        });
+      }
       if (!nextValue) {
         page.actions.forEach((action) => {
           permissions[action.key] = false;
@@ -226,6 +232,11 @@ export const RoleManager = forwardRef<RoleManagerHandle>((props, ref) => {
   const toggleAction = (page: PagePermissionNode, actionKey: string) => {
     updatePermissions((permissions) => {
       const nextValue = !permissions[actionKey];
+      if (page.key === "setup_purchases") {
+        page.actions.forEach(action => {
+          if (permissions[action.key] === undefined) permissions[action.key] = false;
+        });
+      }
       permissions[actionKey] = nextValue;
       if (nextValue) {
         permissions[page.accessKey] = true;

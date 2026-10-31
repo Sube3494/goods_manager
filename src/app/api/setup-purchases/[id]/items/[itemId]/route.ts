@@ -7,17 +7,20 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   try {
     const session = await getAuthorizedUser();
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-    if (!hasPermission(session as SessionUser, "setup_purchase:manage")) {
+    if (!hasPermission(session as SessionUser, "setup_purchase:manage") || !hasPermission(session as SessionUser, "setup_purchase:delete")) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
-    const { itemId } = await params;
+    const { id, itemId } = await params;
     
     await prisma.storeOpeningItem.delete({
-      where: { id: itemId }
+      where: { id: itemId, batchId: id, batch: { userId: session.id } }
     });
 
     return NextResponse.json({ success: true });
   } catch (error) {
+    if (error && typeof error === "object" && "code" in error && error.code === "P2025") {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
     console.error("DELETE Error:", error);
     return NextResponse.json({ 
       error: "Server Error", 
@@ -30,16 +33,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   try {
     const session = await getAuthorizedUser();
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-    if (!hasPermission(session as SessionUser, "setup_purchase:manage")) {
+    if (!hasPermission(session as SessionUser, "setup_purchase:manage") || !hasPermission(session as SessionUser, "setup_purchase:update")) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
-    const { itemId } = await params;
+    const { id, itemId } = await params;
 
     const data = await req.json();
-    console.log("PATCH Item:", itemId, "Data:", data);
+
 
     const updated = await prisma.storeOpeningItem.update({
-      where: { id: itemId },
+      where: { id: itemId, batchId: id, batch: { userId: session.id } },
       data: {
         checked: typeof data.checked === 'boolean' ? data.checked : undefined
       }
@@ -47,6 +50,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     return NextResponse.json(updated);
   } catch (error) {
+    if (error && typeof error === "object" && "code" in error && error.code === "P2025") {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
     console.error("PATCH Error:", error);
     return NextResponse.json({ 
       error: "Server Error", 
@@ -59,13 +65,13 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   try {
     const session = await getAuthorizedUser();
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-    if (!hasPermission(session as SessionUser, "setup_purchase:manage")) {
+    if (!hasPermission(session as SessionUser, "setup_purchase:manage") || !hasPermission(session as SessionUser, "setup_purchase:update")) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
-    const { itemId } = await params;
+    const { id, itemId } = await params;
 
     const data = await req.json();
-    console.log("PUT Item:", itemId, "Data:", data);
+
 
     // Safer number conversion
     const parseNum = (val: unknown) => {
@@ -92,7 +98,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     }
 
     const updated = await prisma.storeOpeningItem.update({
-      where: { id: itemId },
+      where: { id: itemId, batchId: id, batch: { userId: session.id } },
       data: {
         productName: data.productName !== undefined ? data.productName : undefined,
         productCode: data.productCode !== undefined ? data.productCode : undefined,
@@ -106,6 +112,9 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
     return NextResponse.json(updated);
   } catch (error) {
+    if (error && typeof error === "object" && "code" in error && error.code === "P2025") {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
     console.error("PUT Error:", error);
     return NextResponse.json({ 
       error: "Server Error", 

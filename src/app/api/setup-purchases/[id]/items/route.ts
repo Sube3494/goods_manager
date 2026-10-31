@@ -7,12 +7,27 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   try {
     const session = await getAuthorizedUser();
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-    if (!hasPermission(session as SessionUser, "setup_purchase:manage")) {
+    if (!hasPermission(session as SessionUser, "setup_purchase:manage") || !hasPermission(session as SessionUser, "setup_purchase:create")) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
     const { id } = await params;
     
+    const batch = await prisma.storeOpeningBatch.findFirst({
+      where: { id, userId: session.id }, select: { id: true },
+    });
+    if (!batch) return NextResponse.json({ error: "Batch not found" }, { status: 404 });
+
     const data = await req.json();
+    const submittedItems = Array.isArray(data) ? data : [data];
+    const productIds = [...new Set<string>(submittedItems.map(item => item.productId).filter((value): value is string => typeof value === "string" && value.length > 0))];
+    if (productIds.length) {
+      const products = await prisma.product.findMany({
+        where: { id: { in: productIds }, userId: session.id }, select: { id: true },
+      });
+      if (products.length !== productIds.length) {
+        return NextResponse.json({ error: "Product not found" }, { status: 404 });
+      }
+    }
     
     interface ItemInput {
       productCode?: string;
