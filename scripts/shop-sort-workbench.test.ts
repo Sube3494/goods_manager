@@ -1,6 +1,28 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { getShopSortGroupName, reconcileShopSortCategories, renumberShopSortRows } from "../src/lib/shopSortWorkbench";
+import { buildShopSortUpdate, setShopSortExcluded, getShopSortGroupName, reconcileShopSortCategories, renumberShopSortRows } from "../src/lib/shopSortWorkbench";
+
+test("排除商品清空编码，不占用编号和临时分类；恢复后可以重新编号", () => {
+  const rows = makeRows();
+  const excluded = setShopSortExcluded({ ...rows[0], skuInput: "1001", sortGroupNameInput: "专用分类" }, true);
+  assert.equal(excluded.skuInput, "");
+  assert.equal(excluded.sortGroupNameInput, "");
+  const numbered = renumberShopSortRows([excluded, rows[1], rows[2]], [], "1001");
+  assert.deepEqual(numbered.map(row => row.skuInput), ["", "1001", "1002"]);
+  assert.deepEqual(buildShopSortUpdate(numbered[0], 1), {
+    id: "1", sku: "", sortNumber: 0, sortGroupName: "", sortCategoryName: "",
+  });
+  const restored = setShopSortExcluded(numbered[0], false);
+  assert.equal(restored.sortExcluded, false);
+  assert.equal(renumberShopSortRows([restored], [], "1001")[0].skuInput, "1001");
+});
+
+test("已排除商品残留编码和分类也不会保存或进入分类列表", () => {
+  const row = { ...makeRows()[0], sortExcluded: true, skuInput: "9999", sortGroupNameInput: "排除分类" };
+  assert.deepEqual(reconcileShopSortCategories([row], [], createCategory), []);
+  assert.equal(buildShopSortUpdate(row, null).sku, "");
+  assert.equal(buildShopSortUpdate(row, null).sortNumber, 0);
+});
 
 const createCategory = (name: string) => ({ name, rangeSize: "" });
 

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/catalogPrisma";
 import { getAuthorizedUser } from "@/lib/auth";
 import { handlePrismaError } from "@/lib/api-errors";
+import { EXCLUDED_SHOP_SORT_NUMBER } from "@/lib/shopSortWorkbench";
 
 function normalizeSku(sku: unknown) {
   if (typeof sku !== "string") {
@@ -159,6 +160,11 @@ export async function PUT(
           if ("sortNumber" in item) data.sortNumber = normalizeSortNumber(item.sortNumber);
           if ("sortGroupName" in item) data.sortGroupName = normalizeText(item.sortGroupName);
           if ("sortCategoryName" in item) data.sortCategoryName = normalizeText(item.sortCategoryName);
+          if (data.sortNumber === EXCLUDED_SHOP_SORT_NUMBER) {
+            data.sku = null;
+            data.sortGroupName = null;
+            data.sortCategoryName = null;
+          }
 
           return prisma.shopProduct.update({
             where: { id: item.id },

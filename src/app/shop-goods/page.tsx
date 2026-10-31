@@ -24,7 +24,7 @@ import { useDebounce } from "@/hooks/useDebounce";
 import { ExportProgressModal } from "@/components/ui/ExportProgressModal";
 import { Category, Product, Shop, ShopCatalogItem, Supplier, PurchaseOrder } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { getShopSortGroupName, reconcileShopSortCategories, renumberShopSortRows } from "@/lib/shopSortWorkbench";
+import { EXCLUDED_SHOP_SORT_NUMBER, buildShopSortUpdate, setShopSortExcluded, getShopSortGroupName, reconcileShopSortCategories, renumberShopSortRows } from "@/lib/shopSortWorkbench";
 
 interface ShopProductsResponse {
   items?: ShopCatalogItem[];
@@ -33,6 +33,7 @@ interface ShopProductsResponse {
 }
 
 type SortWorkbenchRow = ShopCatalogItem & {
+  sortExcluded: boolean;
   skuInput: string;
   sortGroupNameInput: string;
   sortCategoryNameInput: string;
@@ -48,6 +49,7 @@ type ShopSortDraft = {
   startNumber: string;
   categories: SortWorkbenchCategory[];
   rows: Array<{
+    sortExcluded?: boolean;
     id: string;
     skuInput: string;
     sortGroupNameInput: string;
@@ -206,7 +208,8 @@ function ShopSortWorkbench({
       }
       const loadedRows = (Array.isArray(data.items) ? data.items : []).map((item) => ({
         ...item,
-        skuInput: item.sku || "",
+        sortExcluded: item.sortNumber === EXCLUDED_SHOP_SORT_NUMBER,
+        skuInput: item.sortNumber === EXCLUDED_SHOP_SORT_NUMBER ? "" : item.sku || "",
         sortGroupNameInput: item.sortGroupName || "",
         sortCategoryNameInput: item.sortGroupName || "",
       }));
@@ -233,6 +236,7 @@ function ShopSortWorkbench({
             return draftRow
               ? {
                   ...row,
+                  sortExcluded: draftRow.sortExcluded ?? row.sortExcluded,
                   skuInput: draftRow.skuInput,
                   sortGroupNameInput: draftRow.sortGroupNameInput,
                   sortCategoryNameInput: draftRow.sortCategoryNameInput,
@@ -247,6 +251,7 @@ function ShopSortWorkbench({
         console.warn("Failed to restore shop sort draft:", error);
       }
 
+      nextRows = nextRows.map(row => row.sortExcluded ? setShopSortExcluded(row, true) : row);
       nextCategories = reconcileShopSortCategories(nextRows, nextCategories, (name) => ({
         id: `${name}-${crypto.randomUUID()}`, name, rangeSize: "",
       }));
@@ -286,6 +291,7 @@ function ShopSortWorkbench({
       categories,
       rows: rows.map((row) => ({
         id: row.id,
+        sortExcluded: row.sortExcluded,
         skuInput: row.skuInput,
         sortGroupNameInput: row.sortGroupNameInput,
         sortCategoryNameInput: row.sortCategoryNameInput,
@@ -298,7 +304,7 @@ function ShopSortWorkbench({
   const updateRow = useCallback((id: string, field: "skuInput" | "sortGroupNameInput", value: string) => {
     setRows((prev) =>
       prev.map((row) =>
-        row.id === id
+        row.id === id && !row.sortExcluded
           ? {
               ...row,
               [field]: value,
@@ -431,7 +437,7 @@ function ShopSortWorkbench({
     const count = selectedRowIds.length;
     setRows((prev) => {
       const nextRows = prev.map((row) =>
-        selectedRowIds.includes(row.id)
+        !row.sortExcluded && selectedRowIds.includes(row.id)
           ? { ...row, sortGroupNameInput: categoryName, sortCategoryNameInput: categoryName }
           : row
       );
@@ -453,6 +459,7 @@ function ShopSortWorkbench({
   const fillGroupsFromOriginalCategory = useCallback(() => {
     setRows((prev) => {
       const nextRows = prev.map((row) => {
+        if (row.sortExcluded) return row;
         const groupName = row.categoryName || "未分类";
         return {
           ...row,
@@ -478,6 +485,10 @@ function ShopSortWorkbench({
 
       return [...rows]
         .filter((row) => {
+          if (selectedCategoryName === "__excluded") {
+            return row.sortExcluded && (!normalizedQuery || String(row.name || row.productName || "").toLowerCase().includes(normalizedQuery));
+          }
+          if (row.sortExcluded) return false;
           const groupName = getShopSortGroupName(row);
           const matchesCategory = selectedCategoryName === "all"
             || (selectedCategoryName === null ? !groupName : groupName === selectedCategoryName.trim());
@@ -508,6 +519,7 @@ function ShopSortWorkbench({
   );
 
   const handleRowDrop = useCallback((targetId: string) => {
+    if (selectedCategoryName === "__excluded") return;
     if (!draggingRowId || draggingRowId === targetId) return;
     let blockedByCategory = false;
     setRows((prev) => {
@@ -540,11 +552,11 @@ function ShopSortWorkbench({
       showToast("只能在同一个临时分类内调整商品顺序", "error");
     }
     setDraggingRowId(null);
-  }, [categories, draggingRowId, renumberRowsByCategoryOrder, showToast, sortedPreview]);
+  }, [categories, draggingRowId, renumberRowsByCategoryOrder, showToast, sortedPreview, selectedCategoryName]);
 
   const pinRowToCategoryTop = useCallback((rowId: string) => {
     const targetRow = rows.find((row) => row.id === rowId);
-    if (!targetRow) return;
+    if (!targetRow || targetRow.sortExcluded) return;
     const targetGroup = getShopSortGroupName(targetRow);
     const groupRows = sortedPreview.filter((row) => getShopSortGroupName(row) === targetGroup);
     if (groupRows[0]?.id === rowId) return;
@@ -568,7 +580,7 @@ function ShopSortWorkbench({
 
   const moveRowInCategory = useCallback((rowId: string, direction: 'up' | 'down') => {
     const targetRow = rows.find((row) => row.id === rowId);
-    if (!targetRow) return;
+    if (!targetRow || targetRow.sortExcluded) return;
     const targetGroup = getShopSortGroupName(targetRow);
     const groupRows = sortedPreview.filter((row) => getShopSortGroupName(row) === targetGroup);
     const currentIndex = groupRows.findIndex((row) => row.id === rowId);
@@ -599,6 +611,7 @@ function ShopSortWorkbench({
   const changedCount = useMemo(
     () =>
       rows.filter((row) =>
+        row.sortExcluded !== (row.sortNumber === EXCLUDED_SHOP_SORT_NUMBER) ||
         (row.skuInput || "") !== (row.sku || "") ||
         (row.sortGroupNameInput || "") !== (row.sortGroupName || "") ||
         (row.sortCategoryNameInput || "") !== (row.sortGroupName || "")
@@ -609,6 +622,7 @@ function ShopSortWorkbench({
   const categoryCounts = useMemo(() => {
     const counts = new Map<string, number>();
     rows.forEach((row) => {
+      if (row.sortExcluded) return;
       const name = getShopSortGroupName(row);
       counts.set(name, (counts.get(name) || 0) + 1);
     });
@@ -646,7 +660,7 @@ function ShopSortWorkbench({
     setIsSaving(true);
     try {
       const categoryOrderByName = new Map(categories.map((category, index) => [category.name.trim(), index]));
-      const orderedRows = [...rows].sort((a, b) => {
+      const orderedRows = rows.filter(row => !row.sortExcluded).sort((a, b) => {
         const groupA = getShopSortGroupName(a);
         const groupB = getShopSortGroupName(b);
         const categoryOrderA = categoryOrderByName.get(groupA) ?? Number.MAX_SAFE_INTEGER;
@@ -659,12 +673,7 @@ function ShopSortWorkbench({
       });
       const sortNumberById = new Map(orderedRows.map((row, index) => [row.id, index + 1]));
       const updates = rows.map((row) => ({
-        id: row.id,
-        sku: row.skuInput.trim(),
-        costPrice: Number(row.costPrice || 0),
-        sortNumber: sortNumberById.get(row.id) ?? null,
-        sortGroupName: getShopSortGroupName(row),
-        sortCategoryName: getShopSortGroupName(row),
+        ...buildShopSortUpdate(row, sortNumberById.get(row.id) ?? null),
       }));
       const res = await fetch(`/api/shops/${shop.id}/products/batch`, {
         method: "PUT",
@@ -721,7 +730,7 @@ function ShopSortWorkbench({
                 </span>
               )}
             </div>
-            <p className="text-xs text-muted-foreground">{shop?.name || "当前店铺"} · 分类、数量及排序均以临时分类为准，原分类仅供参考；点击“应用到店铺”保存</p>
+            <p className="text-xs text-muted-foreground">{shop?.name || "当前店铺"} · 以临时分类排序；不参与排序的商品会清空店内码；点击“应用到店铺”保存</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <button type="button" onClick={fillGroupsFromOriginalCategory} className="h-9 rounded-xl border border-border px-3 text-xs font-bold text-foreground hover:bg-muted/60">用原分类初始化</button>
@@ -783,8 +792,8 @@ function ShopSortWorkbench({
                 selectedCategoryName === "all" ? "bg-primary text-primary-foreground" : "hover:bg-muted"
               )}
             >
-              <span>全部商品</span>
-              <span>{rows.length}</span>
+              <span>参与排序</span>
+              <span>{rows.filter(row => !row.sortExcluded).length}</span>
             </button>
             <button
               type="button"
@@ -802,6 +811,9 @@ function ShopSortWorkbench({
                 <span className="mt-0.5 block text-[11px] font-normal opacity-80">点击查看，勾选后可批量分配</span>
               </span>
               <span>{unassignedCount}</span>
+            </button>
+            <button type="button" onClick={() => { setSelectedCategoryName("__excluded"); setSearchQuery(""); setSelectedRowIds([]); }} className={cn("mb-3 flex h-10 w-full items-center justify-between rounded-xl px-3 text-sm font-bold", selectedCategoryName === "__excluded" ? "bg-primary text-primary-foreground" : "bg-muted/50 text-muted-foreground")}>
+              <span>不参与排序（无编码）</span><span>{rows.filter(row => row.sortExcluded).length}</span>
             </button>
             <div className="space-y-2">
               {categories.map((category, index) => (
@@ -946,7 +958,7 @@ function ShopSortWorkbench({
                       <button
                         type="button"
                         onClick={() => moveRowInCategory(row.id, 'up')}
-                        disabled={firstRowIdByGroup.get(getShopSortGroupName(row)) === row.id}
+                        disabled={row.sortExcluded || firstRowIdByGroup.get(getShopSortGroupName(row)) === row.id}
                         className="inline-flex h-8 w-7 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted active:scale-95 disabled:cursor-not-allowed disabled:opacity-30"
                         title="上移一位"
                       >
@@ -963,7 +975,7 @@ function ShopSortWorkbench({
                       <button
                         type="button"
                         onClick={() => pinRowToCategoryTop(row.id)}
-                        disabled={firstRowIdByGroup.get(getShopSortGroupName(row)) === row.id}
+                        disabled={row.sortExcluded || firstRowIdByGroup.get(getShopSortGroupName(row)) === row.id}
                         className="inline-flex h-8 w-7 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted active:scale-95 disabled:cursor-not-allowed disabled:opacity-30"
                         title="置顶到当前分类"
                       >
@@ -974,11 +986,11 @@ function ShopSortWorkbench({
                   <div className="grid grid-cols-2 gap-2">
                     <label className="text-[11px] font-bold text-muted-foreground">
                       店内码
-                      <input value={row.skuInput} onChange={(e) => updateRow(row.id, "skuInput", e.target.value)} placeholder="店内码" className="mt-1 h-10 w-full rounded-xl border border-border bg-background px-3 font-mono text-sm text-foreground outline-none focus:border-primary" />
+                      <input value={row.skuInput} disabled={row.sortExcluded} onChange={(e) => updateRow(row.id, "skuInput", e.target.value)} placeholder="店内码" className="mt-1 h-10 w-full rounded-xl border border-border bg-background px-3 font-mono text-sm text-foreground outline-none focus:border-primary" />
                     </label>
                     <label className="text-[11px] font-bold text-muted-foreground">
                       临时分类
-                      <input value={row.sortGroupNameInput} onBlur={completeTemporaryCategories} onChange={(e) => updateRow(row.id, "sortGroupNameInput", e.target.value)} placeholder="临时分类" className="mt-1 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-primary" />
+                      <input value={row.sortGroupNameInput} disabled={row.sortExcluded} onBlur={completeTemporaryCategories} onChange={(e) => updateRow(row.id, "sortGroupNameInput", e.target.value)} placeholder="临时分类" className="mt-1 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-primary" />
                     </label>
                   </div>
                 </div>
@@ -1023,7 +1035,7 @@ function ShopSortWorkbench({
                       <button
                         type="button"
                         onClick={() => pinRowToCategoryTop(row.id)}
-                        disabled={firstRowIdByGroup.get(getShopSortGroupName(row)) === row.id}
+                        disabled={row.sortExcluded || firstRowIdByGroup.get(getShopSortGroupName(row)) === row.id}
                         className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-35"
                         title="置顶到当前分类"
                       >
@@ -1060,10 +1072,10 @@ function ShopSortWorkbench({
                     </td>
                     <td className="px-3 py-2 text-center text-xs font-bold text-muted-foreground">{index + 1}</td>
                     <td className="px-3 py-2">
-                      <input value={row.skuInput} onChange={(e) => updateRow(row.id, "skuInput", e.target.value)} placeholder="店内码" className="h-9 w-full rounded-xl border border-border bg-background px-3 font-mono text-sm outline-none focus:border-primary" />
+                      <input value={row.skuInput} disabled={row.sortExcluded} onChange={(e) => updateRow(row.id, "skuInput", e.target.value)} placeholder="店内码" className="h-9 w-full rounded-xl border border-border bg-background px-3 font-mono text-sm outline-none focus:border-primary" />
                     </td>
                     <td className="px-3 py-2">
-                      <input value={row.sortGroupNameInput} onBlur={completeTemporaryCategories} onChange={(e) => updateRow(row.id, "sortGroupNameInput", e.target.value)} placeholder="临时分类" className="h-9 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-primary" />
+                      <input value={row.sortGroupNameInput} disabled={row.sortExcluded} onBlur={completeTemporaryCategories} onChange={(e) => updateRow(row.id, "sortGroupNameInput", e.target.value)} placeholder="临时分类" className="h-9 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-primary" />
                     </td>
                     <td className="px-3 py-2">
                       <div className="flex items-center gap-3">
@@ -1136,7 +1148,15 @@ function ShopSortWorkbench({
                   </span>
                   <span className="hidden text-[10px] font-bold uppercase tracking-widest text-black/40 dark:text-white/40 md:inline">批量转移</span>
                 </div>
-                <div className="h-9 w-44 sm:h-8 sm:w-52">
+                <button type="button" onClick={() => {
+                  const excluded = selectedCategoryName !== "__excluded";
+                  setRows(previous => previous.map(row => selectedRowIds.includes(row.id) ? setShopSortExcluded(row, excluded) : row));
+                  setSelectedRowIds([]);
+                  showToast(excluded ? "已排除排序并清空编码，点击应用到店铺保存" : "已恢复参与排序，可重新分配分类和编码", "success");
+                }} className="h-9 shrink-0 rounded-full border border-border px-3 text-xs font-bold sm:h-8">
+                  {selectedCategoryName === "__excluded" ? "恢复参与排序" : "不参与排序并清空编码"}
+                </button>
+                {selectedCategoryName !== "__excluded" && <div className="h-9 w-44 sm:h-8 sm:w-52">
                   <CustomSelect
                     value={batchTargetCategoryName}
                     onChange={setBatchTargetCategoryName}
@@ -1147,14 +1167,15 @@ function ShopSortWorkbench({
                     className="h-full"
                     triggerClassName="h-full rounded-full border border-border bg-background/90 px-3 text-xs font-bold text-foreground hover:bg-muted/40"
                   />
-                </div>
+                </div>}
+                {selectedCategoryName !== "__excluded" &&
                 <button
                   type="button"
                   onClick={applyBatchTargetCategory}
                   className="h-9 shrink-0 whitespace-nowrap rounded-full bg-primary px-4 text-xs font-black text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 active:scale-[0.98] sm:h-8 sm:px-5"
                 >
                   转移
-                </button>
+                </button>}
                 <button
                   type="button"
                   onClick={() => setSelectedRowIds([])}

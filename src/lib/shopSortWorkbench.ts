@@ -3,19 +3,38 @@ type ShopSortRow = {
   sku?: string | null;
   skuInput: string;
   sortGroupNameInput: string;
+  sortExcluded?: boolean;
 };
+
+// 正常排序从 1 开始，0 表示明确排除；null 仍表示尚未排序。
+export const EXCLUDED_SHOP_SORT_NUMBER = 0;
+
+export function setShopSortExcluded<T extends ShopSortRow>(row: T, excluded: boolean): T & { sortExcluded: boolean } {
+  return { ...row, sortExcluded: excluded, skuInput: "", sortGroupNameInput: "", sortCategoryNameInput: "" };
+}
+
+export function buildShopSortUpdate(row: ShopSortRow, sortNumber: number | null) {
+  return {
+    id: row.id,
+    sku: row.sortExcluded ? "" : row.skuInput.trim(),
+    sortNumber: row.sortExcluded ? EXCLUDED_SHOP_SORT_NUMBER : sortNumber,
+    sortGroupName: row.sortExcluded ? "" : getShopSortGroupName(row),
+    sortCategoryName: row.sortExcluded ? "" : getShopSortGroupName(row),
+  };
+}
 
 type ShopSortCategory = { name: string; rangeSize: string };
 
 // 草稿可能缺少新商品的临时分类，保留已有顺序并补齐实际使用的分类。
 export function reconcileShopSortCategories<T extends ShopSortCategory>(
-  rows: Pick<ShopSortRow, "sortGroupNameInput">[],
+  rows: Pick<ShopSortRow, "sortGroupNameInput" | "sortExcluded">[],
   categories: T[],
   createCategory: (name: string) => T,
 ): T[] {
   const names = new Set(categories.map(category => category.name.trim()));
   const result = [...categories];
   for (const row of rows) {
+    if (row.sortExcluded) continue;
     const name = getShopSortGroupName(row);
     if (name && !names.has(name)) {
       names.add(name);
@@ -60,7 +79,8 @@ export function renumberShopSortRows<T extends ShopSortRow>(
   const template = parseIncrementingCode(startNumber);
   const safeBase = template.number;
   const rowCountByName = new Map<string, number>();
-  sourceRows.forEach((row) => {
+  const activeRows = sourceRows.filter(row => !row.sortExcluded);
+  activeRows.forEach((row) => {
     const groupName = getShopSortGroupName(row);
     rowCountByName.set(groupName, (rowCountByName.get(groupName) || 0) + 1);
   });
@@ -76,7 +96,7 @@ export function renumberShopSortRows<T extends ShopSortRow>(
     cursor += safeCategoryRange;
   });
   const orderByName = new Map(orderedCategories.map((category, index) => [category.name.trim(), index]));
-  const sorted = [...sourceRows].sort((a, b) => {
+  const sorted = [...activeRows].sort((a, b) => {
     const groupA = getShopSortGroupName(a);
     const groupB = getShopSortGroupName(b);
     const orderA = orderByName.has(groupA) ? orderByName.get(groupA)! : Number.MAX_SAFE_INTEGER;
