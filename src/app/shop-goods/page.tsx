@@ -24,7 +24,7 @@ import { useDebounce } from "@/hooks/useDebounce";
 import { ExportProgressModal } from "@/components/ui/ExportProgressModal";
 import { Category, Product, Shop, ShopCatalogItem, Supplier, PurchaseOrder } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { getShopSortGroupName, renumberShopSortRows } from "@/lib/shopSortWorkbench";
+import { getShopSortGroupName, reconcileShopSortCategories, renumberShopSortRows } from "@/lib/shopSortWorkbench";
 
 interface ShopProductsResponse {
   items?: ShopCatalogItem[];
@@ -199,23 +199,16 @@ function ShopSortWorkbench({
         all: "true",
         sortBy: "sortNumber-asc",
       });
-      const [productsRes, categoriesRes] = await Promise.all([
-        fetch(`/api/shop-products?${query.toString()}`, { cache: "no-store" }),
-        fetch("/api/categories", { cache: "no-store" }),
-      ]);
+      const productsRes = await fetch(`/api/shop-products?${query.toString()}`, { cache: "no-store" });
       const data: ShopProductsResponse = await productsRes.json().catch(() => ({}));
-      const categoryData: Category[] = await categoriesRes.json().catch(() => []);
       if (!productsRes.ok) {
         throw new Error("加载排序商品失败");
       }
-      const fetchedOriginalNames = Array.isArray(categoryData)
-        ? categoryData.map((category) => String(category.name || "").trim()).filter(Boolean)
-        : [];
       const loadedRows = (Array.isArray(data.items) ? data.items : []).map((item) => ({
         ...item,
         skuInput: item.sku || "",
         sortGroupNameInput: item.sortGroupName || "",
-        sortCategoryNameInput: item.sortCategoryName || item.categoryName || "",
+        sortCategoryNameInput: item.sortGroupName || "",
       }));
       let nextRows = loadedRows;
       let nextStartNumber = "1001";
@@ -225,7 +218,6 @@ function ShopSortWorkbench({
             ...loadedRows
               .map((row) => getShopSortGroupName(row))
               .filter(Boolean),
-            ...fetchedOriginalNames,
           ]
         )
       ).map((name) => ({ id: `${name}-${crypto.randomUUID()}`, name, rangeSize: "" }));
@@ -254,6 +246,10 @@ function ShopSortWorkbench({
       } catch (error) {
         console.warn("Failed to restore shop sort draft:", error);
       }
+
+      nextCategories = reconcileShopSortCategories(nextRows, nextCategories, (name) => ({
+        id: `${name}-${crypto.randomUUID()}`, name, rangeSize: "",
+      }));
 
       if (activeShopIdRef.current !== currentShopId) return;
       setStartNumber(nextStartNumber);
@@ -316,6 +312,12 @@ function ShopSortWorkbench({
   const renumberRowsByCategoryOrder = useCallback((sourceRows: SortWorkbenchRow[], orderedCategories: SortWorkbenchCategory[]) => {
     return renumberShopSortRows(sourceRows, orderedCategories, startNumber);
   }, [startNumber]);
+
+  const completeTemporaryCategories = useCallback(() => {
+    setCategories((previous) => reconcileShopSortCategories(rows, previous, (name) => ({
+      id: `${name}-${crypto.randomUUID()}`, name, rangeSize: "",
+    })));
+  }, [rows]);
 
   const syncCategoriesFromRows = useCallback((nextRows: SortWorkbenchRow[], preferredOrder = categories) => {
     const names = Array.from(
@@ -599,7 +601,7 @@ function ShopSortWorkbench({
       rows.filter((row) =>
         (row.skuInput || "") !== (row.sku || "") ||
         (row.sortGroupNameInput || "") !== (row.sortGroupName || "") ||
-        (row.sortCategoryNameInput || "") !== (row.sortCategoryName || row.categoryName || "")
+        (row.sortCategoryNameInput || "") !== (row.sortGroupName || "")
       ).length,
     [rows]
   );
@@ -719,7 +721,7 @@ function ShopSortWorkbench({
                 </span>
               )}
             </div>
-            <p className="text-xs text-muted-foreground">{shop?.name || "当前店铺"} · 只有点击“应用到店铺”才会改正式店内码</p>
+            <p className="text-xs text-muted-foreground">{shop?.name || "当前店铺"} · 分类、数量及排序均以临时分类为准，原分类仅供参考；点击“应用到店铺”保存</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <button type="button" onClick={fillGroupsFromOriginalCategory} className="h-9 rounded-xl border border-border px-3 text-xs font-bold text-foreground hover:bg-muted/60">用原分类初始化</button>
@@ -976,7 +978,7 @@ function ShopSortWorkbench({
                     </label>
                     <label className="text-[11px] font-bold text-muted-foreground">
                       临时分类
-                      <input value={row.sortGroupNameInput} onChange={(e) => updateRow(row.id, "sortGroupNameInput", e.target.value)} placeholder="临时分类" className="mt-1 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-primary" />
+                      <input value={row.sortGroupNameInput} onBlur={completeTemporaryCategories} onChange={(e) => updateRow(row.id, "sortGroupNameInput", e.target.value)} placeholder="临时分类" className="mt-1 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-primary" />
                     </label>
                   </div>
                 </div>
@@ -1061,7 +1063,7 @@ function ShopSortWorkbench({
                       <input value={row.skuInput} onChange={(e) => updateRow(row.id, "skuInput", e.target.value)} placeholder="店内码" className="h-9 w-full rounded-xl border border-border bg-background px-3 font-mono text-sm outline-none focus:border-primary" />
                     </td>
                     <td className="px-3 py-2">
-                      <input value={row.sortGroupNameInput} onChange={(e) => updateRow(row.id, "sortGroupNameInput", e.target.value)} placeholder="临时分类" className="h-9 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-primary" />
+                      <input value={row.sortGroupNameInput} onBlur={completeTemporaryCategories} onChange={(e) => updateRow(row.id, "sortGroupNameInput", e.target.value)} placeholder="临时分类" className="h-9 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-primary" />
                     </td>
                     <td className="px-3 py-2">
                       <div className="flex items-center gap-3">

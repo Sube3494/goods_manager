@@ -1,6 +1,23 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { getShopSortGroupName, renumberShopSortRows } from "../src/lib/shopSortWorkbench";
+import { getShopSortGroupName, reconcileShopSortCategories, renumberShopSortRows } from "../src/lib/shopSortWorkbench";
+
+const createCategory = (name: string) => ({ name, rangeSize: "" });
+
+test("分类列表仅取临时分类，原分类不影响归属和未分配数量", () => {
+  const rows = makeRows();
+  const result = reconcileShopSortCategories(rows, [], createCategory);
+  assert.deepEqual(result.map(category => category.name), ["玩具"]);
+  assert.equal(rows.filter(row => !getShopSortGroupName(row)).length, 3);
+});
+
+test("草稿缺失的临时分类会补齐，保留已有分类顺序、空分类和编号区间", () => {
+  const draft = [{ name: "空分类", rangeSize: "100" }, { name: "食品", rangeSize: "50" }];
+  const rows = [...makeRows(), { id: "5", skuInput: "", sortGroupNameInput: "新分类" }];
+  const result = reconcileShopSortCategories(rows, draft, createCategory);
+  assert.deepEqual(result, [...draft, createCategory("玩具"), createCategory("新分类")]);
+  assert.deepEqual(reconcileShopSortCategories(rows, result, createCategory), result);
+});
 
 const categories = [{ name: "玩具", rangeSize: "" }, { name: "食品", rangeSize: "" }];
 const makeRows = () => [

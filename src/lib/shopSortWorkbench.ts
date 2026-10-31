@@ -7,6 +7,24 @@ type ShopSortRow = {
 
 type ShopSortCategory = { name: string; rangeSize: string };
 
+// 草稿可能缺少新商品的临时分类，保留已有顺序并补齐实际使用的分类。
+export function reconcileShopSortCategories<T extends ShopSortCategory>(
+  rows: Pick<ShopSortRow, "sortGroupNameInput">[],
+  categories: T[],
+  createCategory: (name: string) => T,
+): T[] {
+  const names = new Set(categories.map(category => category.name.trim()));
+  const result = [...categories];
+  for (const row of rows) {
+    const name = getShopSortGroupName(row);
+    if (name && !names.has(name)) {
+      names.add(name);
+      result.push(createCategory(name));
+    }
+  }
+  return result;
+}
+
 export function getShopSortGroupName(row: Pick<ShopSortRow, "sortGroupNameInput">) {
   return row.sortGroupNameInput.trim();
 }
