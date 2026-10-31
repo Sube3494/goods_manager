@@ -700,7 +700,7 @@ export function StoreLocationMap({ userId }: { userId: string }) {
           autoMove: true,
         });
 
-        // 绑定事件：显隐当前点位辐射轮廓
+        // 绑定事件：显隐当前点位辐射轮廓与店名
         const toggleRingBtn = infoEl.querySelector("#toggle-ring-btn");
         if (toggleRingBtn) {
           toggleRingBtn.addEventListener("click", () => {
@@ -708,7 +708,6 @@ export function StoreLocationMap({ userId }: { userId: string }) {
             setPoints((prev) =>
               prev.map((p, i) => (i === index ? { ...p, hideRing: nextHide } : p))
             );
-            showToast(nextHide ? `已隐藏「${point.name}」的店名与覆盖圈` : `已恢复显示「${point.name}」的店名与覆盖圈`, "info");
             infoWindow.close();
             activeInfoWindowRef.current = null;
           });
@@ -722,7 +721,6 @@ export function StoreLocationMap({ userId }: { userId: string }) {
             setPoints((prev) =>
               prev.map((p, i) => (i === index ? { ...p, isPinned: nextPinned } : p))
             );
-            showToast(nextPinned ? `已钉住锁定「${point.name}」，已禁止拖动` : `已解锁「${point.name}」拖动`, "info");
             infoWindow.close();
             activeInfoWindowRef.current = null;
           });
@@ -1514,7 +1512,6 @@ export function StoreLocationMap({ userId }: { userId: string }) {
                   onClick={() => {
                     const next = !showRings;
                     setShowRings(next);
-                    showToast(next ? "已开启点位覆盖轮廓显示" : "已隐藏点位覆盖轮廓", "info");
                   }}
                   title={showRings ? "点击隐藏所有点位的辐射覆盖轮廓圈" : "点击显示所有点位的辐射覆盖轮廓圈"}
                   className={cn(
@@ -1537,7 +1534,6 @@ export function StoreLocationMap({ userId }: { userId: string }) {
                     try {
                       localStorage.setItem("store-location:show-point-names", String(next));
                     } catch {}
-                    showToast(next ? "已显示点位名称名牌" : "已隐藏点位名称，仅保留图钉", "info");
                   }}
                   title={showPointNames ? "点击隐藏地图点位的店名胶囊名牌（更清爽）" : "点击显示地图点位的店名胶囊名牌"}
                   className={cn(
@@ -1652,7 +1648,6 @@ export function StoreLocationMap({ userId }: { userId: string }) {
                         setPoints((prev) =>
                           prev.map((p, i) => (i === index ? { ...p, hideRing: nextHide } : p))
                         );
-                        showToast(nextHide ? `已隐藏「${point.name}」的店名与覆盖圈` : `已恢复显示「${point.name}」的店名与覆盖圈`, "info");
                       }}
                       className={cn(
                         "flex h-6 w-6 items-center justify-center rounded-lg transition-all cursor-pointer shrink-0",
@@ -1674,7 +1669,6 @@ export function StoreLocationMap({ userId }: { userId: string }) {
                         setPoints((prev) =>
                           prev.map((p, i) => (i === index ? { ...p, isPinned: nextPinned } : p))
                         );
-                        showToast(nextPinned ? `已钉住锁定「${point.name}」，已禁止拖动防误触` : `已解锁「${point.name}」拖动`, "info");
                       }}
                       className={cn(
                         "flex h-6 w-6 items-center justify-center rounded-lg transition-all cursor-pointer shrink-0",
@@ -1800,6 +1794,38 @@ export function StoreLocationMap({ userId }: { userId: string }) {
 
         {/* 右侧地图区 */}
         <section className="relative flex-1 min-h-0 min-w-0 bg-muted/20">
+          {/* 地图左上角快捷工具（定位点位） */}
+          <div
+            className={cn(
+              "absolute top-3 z-20 flex items-center gap-2 pointer-events-auto transition-all",
+              isSidebarCollapsed ? "left-14" : "left-3"
+            )}
+          >
+            <button
+              type="button"
+              onClick={() => {
+                const map = mapInstanceRef.current;
+                if (!map) return;
+                if (points.length === 0) return;
+                if (circlesRef.current.length > 0) {
+                  map.setFitView(circlesRef.current, false, [60, 60, 60, 60], 15);
+                } else if (markersRef.current.length > 0) {
+                  map.setFitView(markersRef.current, false, [60, 60, 60, 60], 15);
+                }
+              }}
+              title={points.length > 0 ? "自动平移缩放视野聚焦当前所有选址点位" : "当前城市暂无选址点位"}
+              className="inline-flex h-8 items-center gap-1.5 rounded-full border border-black/8 bg-white/95 dark:border-white/10 dark:bg-[#0b111e]/98 px-3 text-xs font-semibold shadow-md backdrop-blur-xl transition-all active:scale-95 cursor-pointer hover:border-primary/40 text-foreground shrink-0 select-none"
+            >
+              <Navigation size={12} className="text-primary rotate-45 shrink-0" />
+              <span>定位点位</span>
+              {points.length > 0 && (
+                <span className="font-mono text-[10px] text-primary bg-primary/10 px-1.5 py-0.2 rounded-full font-bold">
+                  {points.length}
+                </span>
+              )}
+            </button>
+          </div>
+
           {/* 地图右上角悬浮工具栏（主题胶囊与地图图层面板右对齐，远离缩放控件杜绝遮挡） */}
           <div className="absolute top-3 right-3 z-10 flex items-center gap-2 pointer-events-auto">
             {/* 城市底图与主题状态胶囊（改到右侧） */}
@@ -1961,7 +1987,6 @@ export function StoreLocationMap({ userId }: { userId: string }) {
                             try {
                               localStorage.setItem("store-location:show-point-names", String(next));
                             } catch {}
-                            showToast(next ? "已显示点位店名名牌" : "已隐藏点位店名名牌", "info");
                           }}
                           className="accent-primary"
                         />
