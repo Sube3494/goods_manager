@@ -24,6 +24,7 @@ import { useDebounce } from "@/hooks/useDebounce";
 import { ExportProgressModal } from "@/components/ui/ExportProgressModal";
 import { Category, Product, Shop, ShopCatalogItem, Supplier, PurchaseOrder } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { getShopSortGroupName, renumberShopSortRows } from "@/lib/shopSortWorkbench";
 
 interface ShopProductsResponse {
   items?: ShopCatalogItem[];
@@ -57,30 +58,6 @@ type ShopSortDraft = {
 
 function getShopSortDraftKey(shopId: string) {
   return `shop-sort-draft:${shopId}`;
-}
-
-function parseIncrementingCode(value: string) {
-  const trimmed = value.trim();
-  const match = trimmed.match(/^(.*?)(\d+)(\D*)$/);
-  if (!match) {
-    return {
-      prefix: "",
-      number: Number(trimmed) || 1,
-      suffix: "",
-      width: 0,
-    };
-  }
-  return {
-    prefix: match[1] || "",
-    number: Number(match[2]) || 1,
-    suffix: match[3] || "",
-    width: match[2].length,
-  };
-}
-
-function formatIncrementingCode(template: ReturnType<typeof parseIncrementingCode>, number: number) {
-  const numericPart = template.width > 0 ? String(number).padStart(template.width, "0") : String(number);
-  return `${template.prefix}${numericPart}${template.suffix}`;
 }
 
 function getIncrementingCodeNumber(value: string | null | undefined) {
@@ -246,7 +223,7 @@ function ShopSortWorkbench({
         new Set(
           [
             ...loadedRows
-              .map((row) => (row.sortGroupNameInput || row.categoryName || "未分组").trim())
+              .map((row) => getShopSortGroupName(row))
               .filter(Boolean),
             ...fetchedOriginalNames,
           ]
@@ -337,72 +314,12 @@ function ShopSortWorkbench({
   }, []);
 
   const renumberRowsByCategoryOrder = useCallback((sourceRows: SortWorkbenchRow[], orderedCategories: SortWorkbenchCategory[]) => {
-    const template = parseIncrementingCode(startNumber);
-    const safeBase = template.number;
-    const rowCountByName = new Map<string, number>();
-    sourceRows.forEach((row) => {
-      const groupName = (row.sortGroupNameInput || row.categoryName || "未分组").trim();
-      rowCountByName.set(groupName, (rowCountByName.get(groupName) || 0) + 1);
-    });
-    const sourceOrderById = new Map(sourceRows.map((row, index) => [row.id, index]));
-    const categoryMetaByName = new Map(orderedCategories.map((category) => [category.name.trim(), category]));
-    const categoryStartByName = new Map<string, number>();
-    let cursor = safeBase;
-    orderedCategories.forEach((category) => {
-      const name = category.name.trim();
-      categoryStartByName.set(name, cursor);
-      const numericRange = Number(category.rangeSize);
-      const actualCount = rowCountByName.get(name) || 0;
-      const safeCategoryRange = Number.isFinite(numericRange) && numericRange > 0 ? Math.trunc(numericRange) : actualCount;
-      cursor += safeCategoryRange;
-    });
-    const orderByName = new Map(orderedCategories.map((category, index) => [category.name.trim(), index]));
-    const sorted = [...sourceRows].sort((a, b) => {
-      const groupA = (a.sortGroupNameInput || a.categoryName || "未分组").trim();
-      const groupB = (b.sortGroupNameInput || b.categoryName || "未分组").trim();
-      const orderA = orderByName.has(groupA) ? orderByName.get(groupA)! : Number.MAX_SAFE_INTEGER;
-      const orderB = orderByName.has(groupB) ? orderByName.get(groupB)! : Number.MAX_SAFE_INTEGER;
-      if (orderA !== orderB) return orderA - orderB;
-      if (groupA !== groupB) return groupA.localeCompare(groupB, "zh-CN");
-      const sourceOrderA = sourceOrderById.get(a.id) ?? Number.MAX_SAFE_INTEGER;
-      const sourceOrderB = sourceOrderById.get(b.id) ?? Number.MAX_SAFE_INTEGER;
-      if (sourceOrderA !== sourceOrderB) return sourceOrderA - sourceOrderB;
-      return (a.sku || "").localeCompare(b.sku || "", "zh-CN", { numeric: true, sensitivity: "base" });
-    });
-
-    const groupIndexByName = new Map<string, number>();
-    const offsetByName = new Map<string, number>();
-    const numbered = new Map<string, string>();
-
-    for (const row of sorted) {
-      const groupName = (row.sortGroupNameInput || row.categoryName || "未分组").trim();
-      const groupIndex = orderByName.has(groupName)
-        ? orderByName.get(groupName)!
-        : groupIndexByName.has(groupName)
-        ? groupIndexByName.get(groupName)!
-        : orderedCategories.length + groupIndexByName.size;
-      if (!groupIndexByName.has(groupName)) groupIndexByName.set(groupName, groupIndex);
-      const offset = offsetByName.get(groupName) || 0;
-      const fallbackStart = cursor + groupIndex;
-      const categoryStart = categoryMetaByName.has(groupName) ? categoryStartByName.get(groupName) ?? fallbackStart : fallbackStart;
-      numbered.set(row.id, formatIncrementingCode(template, categoryStart + offset));
-      offsetByName.set(groupName, offset + 1);
-    }
-
-    return sourceRows.map((row) => {
-      const groupName = (row.sortGroupNameInput || row.categoryName || "未分组").trim();
-      return {
-        ...row,
-        skuInput: numbered.get(row.id) || "",
-        sortGroupNameInput: groupName,
-        sortCategoryNameInput: groupName,
-      };
-    });
+    return renumberShopSortRows(sourceRows, orderedCategories, startNumber);
   }, [startNumber]);
 
   const syncCategoriesFromRows = useCallback((nextRows: SortWorkbenchRow[], preferredOrder = categories) => {
     const names = Array.from(
-      new Set(nextRows.map((row) => (row.sortGroupNameInput || row.categoryName || "未分组").trim()).filter(Boolean))
+      new Set(nextRows.map((row) => getShopSortGroupName(row)).filter(Boolean))
     );
     const existingByName = new Map(preferredOrder.map((category) => [category.name, category]));
     return [
@@ -559,7 +476,7 @@ function ShopSortWorkbench({
 
       return [...rows]
         .filter((row) => {
-          const groupName = row.sortGroupNameInput.trim();
+          const groupName = getShopSortGroupName(row);
           const matchesCategory = selectedCategoryName === "all"
             || (selectedCategoryName === null ? !groupName : groupName === selectedCategoryName.trim());
           if (!matchesCategory) return false;
@@ -570,12 +487,12 @@ function ShopSortWorkbench({
           const sku = String(row.sku || "").toLowerCase();
           const jdSku = String(row.jdSkuId || "").toLowerCase();
           const mtSku = String(row.meituanSkuId || "").toLowerCase();
-          const group = String(row.sortGroupNameInput || row.categoryName || "").toLowerCase();
+          const group = getShopSortGroupName(row).toLowerCase();
           return name.includes(normalizedQuery) || skuInput.includes(normalizedQuery) || sku.includes(normalizedQuery) || jdSku.includes(normalizedQuery) || mtSku.includes(normalizedQuery) || group.includes(normalizedQuery);
         })
         .sort((a, b) => {
-          const groupA = (a.sortGroupNameInput || a.categoryName || "未分组").trim();
-          const groupB = (b.sortGroupNameInput || b.categoryName || "未分组").trim();
+          const groupA = getShopSortGroupName(a);
+          const groupB = getShopSortGroupName(b);
           const orderA = orderByName.has(groupA) ? orderByName.get(groupA)! : Number.MAX_SAFE_INTEGER;
           const orderB = orderByName.has(groupB) ? orderByName.get(groupB)! : Number.MAX_SAFE_INTEGER;
           if (orderA !== orderB) return orderA - orderB;
@@ -595,8 +512,8 @@ function ShopSortWorkbench({
       const fromRow = prev.find((row) => row.id === draggingRowId);
       const targetRow = prev.find((row) => row.id === targetId);
       if (!fromRow || !targetRow) return prev;
-      const fromGroup = (fromRow.sortGroupNameInput || fromRow.categoryName || "未分组").trim();
-      const targetGroup = (targetRow.sortGroupNameInput || targetRow.categoryName || "未分组").trim();
+      const fromGroup = getShopSortGroupName(fromRow);
+      const targetGroup = getShopSortGroupName(targetRow);
       if (fromGroup !== targetGroup) {
         blockedByCategory = true;
         return prev;
@@ -626,8 +543,8 @@ function ShopSortWorkbench({
   const pinRowToCategoryTop = useCallback((rowId: string) => {
     const targetRow = rows.find((row) => row.id === rowId);
     if (!targetRow) return;
-    const targetGroup = (targetRow.sortGroupNameInput || targetRow.categoryName || "未分组").trim();
-    const groupRows = sortedPreview.filter((row) => (row.sortGroupNameInput || row.categoryName || "未分组").trim() === targetGroup);
+    const targetGroup = getShopSortGroupName(targetRow);
+    const groupRows = sortedPreview.filter((row) => getShopSortGroupName(row) === targetGroup);
     if (groupRows[0]?.id === rowId) return;
 
     const nextGroupIds = [rowId, ...groupRows.map((row) => row.id).filter((id) => id !== rowId)];
@@ -636,8 +553,8 @@ function ShopSortWorkbench({
     setRows((prev) => {
       const sourceOrderById = new Map(prev.map((row, index) => [row.id, index]));
       const nextRows = [...prev].sort((a, b) => {
-        const groupA = (a.sortGroupNameInput || a.categoryName || "未分组").trim();
-        const groupB = (b.sortGroupNameInput || b.categoryName || "未分组").trim();
+        const groupA = getShopSortGroupName(a);
+        const groupB = getShopSortGroupName(b);
         if (groupA === targetGroup && groupB === targetGroup) {
           return (groupOrderById.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (groupOrderById.get(b.id) ?? Number.MAX_SAFE_INTEGER);
         }
@@ -650,8 +567,8 @@ function ShopSortWorkbench({
   const moveRowInCategory = useCallback((rowId: string, direction: 'up' | 'down') => {
     const targetRow = rows.find((row) => row.id === rowId);
     if (!targetRow) return;
-    const targetGroup = (targetRow.sortGroupNameInput || targetRow.categoryName || "未分组").trim();
-    const groupRows = sortedPreview.filter((row) => (row.sortGroupNameInput || row.categoryName || "未分组").trim() === targetGroup);
+    const targetGroup = getShopSortGroupName(targetRow);
+    const groupRows = sortedPreview.filter((row) => getShopSortGroupName(row) === targetGroup);
     const currentIndex = groupRows.findIndex((row) => row.id === rowId);
     if (currentIndex < 0) return;
     const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
@@ -666,8 +583,8 @@ function ShopSortWorkbench({
     setRows((prev) => {
       const sourceOrderById = new Map(prev.map((row, index) => [row.id, index]));
       const nextRows = [...prev].sort((a, b) => {
-        const groupA = (a.sortGroupNameInput || a.categoryName || "未分组").trim();
-        const groupB = (b.sortGroupNameInput || b.categoryName || "未分组").trim();
+        const groupA = getShopSortGroupName(a);
+        const groupB = getShopSortGroupName(b);
         if (groupA === targetGroup && groupB === targetGroup) {
           return (groupOrderById.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (groupOrderById.get(b.id) ?? Number.MAX_SAFE_INTEGER);
         }
@@ -690,7 +607,7 @@ function ShopSortWorkbench({
   const categoryCounts = useMemo(() => {
     const counts = new Map<string, number>();
     rows.forEach((row) => {
-      const name = row.sortGroupNameInput.trim();
+      const name = getShopSortGroupName(row);
       counts.set(name, (counts.get(name) || 0) + 1);
     });
     return counts;
@@ -702,7 +619,7 @@ function ShopSortWorkbench({
   const firstRowIdByGroup = useMemo(() => {
     const next = new Map<string, string>();
     sortedPreview.forEach((row) => {
-      const groupName = (row.sortGroupNameInput || row.categoryName || "未分组").trim();
+      const groupName = getShopSortGroupName(row);
       if (!next.has(groupName)) next.set(groupName, row.id);
     });
     return next;
@@ -728,8 +645,8 @@ function ShopSortWorkbench({
     try {
       const categoryOrderByName = new Map(categories.map((category, index) => [category.name.trim(), index]));
       const orderedRows = [...rows].sort((a, b) => {
-        const groupA = (a.sortGroupNameInput || a.categoryName || "未分组").trim();
-        const groupB = (b.sortGroupNameInput || b.categoryName || "未分组").trim();
+        const groupA = getShopSortGroupName(a);
+        const groupB = getShopSortGroupName(b);
         const categoryOrderA = categoryOrderByName.get(groupA) ?? Number.MAX_SAFE_INTEGER;
         const categoryOrderB = categoryOrderByName.get(groupB) ?? Number.MAX_SAFE_INTEGER;
         if (categoryOrderA !== categoryOrderB) return categoryOrderA - categoryOrderB;
@@ -744,8 +661,8 @@ function ShopSortWorkbench({
         sku: row.skuInput.trim(),
         costPrice: Number(row.costPrice || 0),
         sortNumber: sortNumberById.get(row.id) ?? null,
-        sortGroupName: row.sortGroupNameInput.trim(),
-        sortCategoryName: row.sortGroupNameInput.trim(),
+        sortGroupName: getShopSortGroupName(row),
+        sortCategoryName: getShopSortGroupName(row),
       }));
       const res = await fetch(`/api/shops/${shop.id}/products/batch`, {
         method: "PUT",
@@ -923,7 +840,7 @@ function ShopSortWorkbench({
                           className="absolute inset-0 h-8 w-full bg-transparent text-sm font-semibold text-foreground outline-none"
                         />
                       </div>
-                      <span className="shrink-0 rounded-lg bg-muted px-2 py-1 text-xs font-bold text-muted-foreground">{categoryCounts.get(category.name) || 0}</span>
+                      <span className="shrink-0 rounded-lg bg-muted px-2 py-1 text-xs font-bold text-muted-foreground">{categoryCounts.get(category.name.trim()) || 0}</span>
                     </div>
                     <label className="flex h-8 w-24 shrink-0 items-center gap-1 rounded-lg border border-border bg-background px-2 text-[10px] font-bold text-muted-foreground">
                       <span>占</span>
@@ -1027,7 +944,7 @@ function ShopSortWorkbench({
                       <button
                         type="button"
                         onClick={() => moveRowInCategory(row.id, 'up')}
-                        disabled={firstRowIdByGroup.get((row.sortGroupNameInput || row.categoryName || "未分组").trim()) === row.id}
+                        disabled={firstRowIdByGroup.get(getShopSortGroupName(row)) === row.id}
                         className="inline-flex h-8 w-7 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted active:scale-95 disabled:cursor-not-allowed disabled:opacity-30"
                         title="上移一位"
                       >
@@ -1044,7 +961,7 @@ function ShopSortWorkbench({
                       <button
                         type="button"
                         onClick={() => pinRowToCategoryTop(row.id)}
-                        disabled={firstRowIdByGroup.get((row.sortGroupNameInput || row.categoryName || "未分组").trim()) === row.id}
+                        disabled={firstRowIdByGroup.get(getShopSortGroupName(row)) === row.id}
                         className="inline-flex h-8 w-7 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted active:scale-95 disabled:cursor-not-allowed disabled:opacity-30"
                         title="置顶到当前分类"
                       >
@@ -1104,7 +1021,7 @@ function ShopSortWorkbench({
                       <button
                         type="button"
                         onClick={() => pinRowToCategoryTop(row.id)}
-                        disabled={firstRowIdByGroup.get((row.sortGroupNameInput || row.categoryName || "未分组").trim()) === row.id}
+                        disabled={firstRowIdByGroup.get(getShopSortGroupName(row)) === row.id}
                         className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-35"
                         title="置顶到当前分类"
                       >
