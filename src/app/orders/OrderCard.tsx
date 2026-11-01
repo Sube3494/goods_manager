@@ -3317,9 +3317,10 @@ export const OrderProfitBadge = memo(function OrderProfitBadge({
       : order.isMainSystemSelfDelivery
       ? [
           { label: "扣平台佣金", value: toCurrency(order.platformCommission) },
+          ...(deliveryFee > 0 ? [{ label: "扣配送费", value: toCurrency(-deliveryFee) }] : []),
           {
             label: "扣刷单佣金",
-            value: toCurrency(- (typeof order.brushCommission === "number" ? Math.round(order.brushCommission * 100) : -pureProfit - Number(order.platformCommission || 0))),
+            value: toCurrency(- (typeof order.brushCommission === "number" ? Math.round(order.brushCommission * 100) : -pureProfit - Number(order.platformCommission || 0) - deliveryFee)),
             editable: !readOnly && Boolean(onEditCommission),
             onEdit: readOnly || !onEditCommission ? undefined : () => {
               closeProfitTooltip();

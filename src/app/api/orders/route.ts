@@ -2094,7 +2094,7 @@ export async function GET(request: NextRequest) {
               : isManualDeliveryLoss
               ? -deliveryFee - totalExtraExpense
               : isBrush
-              ? -Number(adjustedMetrics.platformCommission || 0) - orderBrushCommission - returnExtraExpense - totalExtraExpense
+              ? -Number(adjustedMetrics.platformCommission || 0) - deliveryFee - orderBrushCommission - returnExtraExpense - totalExtraExpense
               : (productCostStatus === "ready"
                 ? Math.round(Number(safeExpectedIncome || 0) * (1 - serviceFeeRate)) - deliveryFee - productCost - returnExtraExpense - totalExtraExpense
                 : null);
@@ -2677,7 +2677,7 @@ export async function GET(request: NextRequest) {
         : manualDeliveryLoss
         ? -deliveryFee - totalExtraExpense
         : order.isMainSystemSelfDelivery
-        ? -Number(order.platformCommission || 0) - orderBrushCommission - returnExtraExpense - totalExtraExpense
+        ? -Number(order.platformCommission || 0) - deliveryFee - orderBrushCommission - returnExtraExpense - totalExtraExpense
         : (productCostStatus === "ready"
           ? Math.round(Number(adjustedMetrics.expectedIncome || 0) * (1 - serviceFeeRate)) - deliveryFee - productCost - returnExtraExpense - totalExtraExpense
           : null);

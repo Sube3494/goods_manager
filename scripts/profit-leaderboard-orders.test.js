@@ -50,6 +50,24 @@ beforeEach(() => {
   outbounds = [];
   order.rawPayload = {};
   order.platform = "线下交易";
+  order.delivery = null;
+});
+
+test("正常配送单标记刷单后，订单、看板和排行榜均扣配送费", async () => {
+  order.platform = "美团";
+  order.rawPayload = { systemMeta: { mainSystemSelfDelivery: { triggered: true, manuallyMarked: true } } };
+  const read = async () => {
+    const response = await GET(new NextRequest("http://localhost/api/orders?userId=member-1&_metrics=1"));
+    expect(response.status).toBe(200);
+    return response.json();
+  };
+  const withoutDelivery = await read();
+  order.delivery = { logisticName: "第三方配送", sendFee: 550 };
+  const withDelivery = await read();
+  expect(withDelivery.items[0].pureProfit).toBe(withoutDelivery.items[0].pureProfit - 550);
+  expect(withDelivery.summary.pureProfit).toBe(withoutDelivery.summary.pureProfit - 550);
+  const leaderboard = await GET(new NextRequest("http://localhost/api/orders?_leaderboard=1&userId=member-1"));
+  expect((await leaderboard.json()).pureProfit).toBe(withDelivery.summary.pureProfit / 100);
 });
 
 test("订单列表、总数和汇总查询排除已删除订单，搜索筛选也不能重新带出", async () => {

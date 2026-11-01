@@ -1217,7 +1217,7 @@ export async function GET(request: NextRequest) {
           const orderBrushCommissionCents = Math.round(orderBrushCommission * 100);
           const extraExpenses = readOrderExtraExpensesFromRawPayload(order.rawPayload);
           const extraExpensesCents = calculateOrderTotalExtraExpense(extraExpenses);
-          const brushPureProfitCents = -Math.round(commissionYuan * 100) - orderBrushCommissionCents - Math.round(returnExtraExpenseYuan * 100) - extraExpensesCents;
+          const brushPureProfitCents = -Math.round(commissionYuan * 100) - deliveryFee - orderBrushCommissionCents - Math.round(returnExtraExpenseYuan * 100) - extraExpensesCents;
           const brushPureProfit = brushPureProfitCents / 100;
           if (point) {
             point.brushPaid = FinanceMath.add(point.brushPaid, adjustedPaidYuan);
