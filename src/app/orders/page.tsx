@@ -2756,6 +2756,7 @@ export default function OrdersPage() {
           setProfitUpdatingOrderIds((prev) => Array.from(new Set([...prev, targetOrder.id])));
           setTargetRefreshOrder({ id: targetOrder.id, timestamp: Date.now() });
         }
+        triggerParentRefresh();
         showToast(isAddingComponent ? "配件添加成功！已自动重新计算出库与成本" : "配件更换成功！已自动重新计算出库与成本", "success");
         return;
       }
@@ -2889,11 +2890,12 @@ export default function OrdersPage() {
       }
       setProfitUpdatingOrderIds((prev) => Array.from(new Set([...prev, order.id])));
       setTargetRefreshOrder({ id: order.id, timestamp: Date.now() });
+      triggerParentRefresh();
       showToast(`已移除配件${componentName ? `【${componentName}】` : ""}，已自动重新核算出库与成本`, "success");
     } catch (err: any) {
       showToast(err.message || "移除配件失败", "error");
     }
-  }, [showToast]);
+  }, [showToast, triggerParentRefresh]);
 
   // 刷单同步确认
   const syncBrushOrders = async (targetIds?: string[], commission?: number) => {
