@@ -26,7 +26,8 @@ import { ExportProgressModal } from "@/components/ui/ExportProgressModal";
 import { Category, Product, Shop, ShopCatalogItem, Supplier, PurchaseOrder } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { EXCLUDED_SHOP_SORT_NUMBER, buildShopSortUpdate, setShopSortExcluded, getShopSortGroupName, reconcileShopSortCategories, renumberShopSortRows, restoreShopSortDraftRows } from "@/lib/shopSortWorkbench";
-import { parseShopSortDraft, type ShopSortDraft } from "@/lib/shopSortDraft";
+import { parseShopSortDraft, shopSortDraftFingerprint, type ShopSortDraft } from "@/lib/shopSortDraft";
+import { saveAccountShopSortDraft } from "@/lib/shopSortDraftClient";
 
 interface ShopProductsResponse {
   items?: ShopCatalogItem[];
@@ -167,37 +168,50 @@ function ShopSortWorkbench({
   const activeShopIdRef = useRef<string | null>(null);
   const draftSaveQueueRef = useRef<Promise<void>>(Promise.resolve());
   const latestDraftRef = useRef<{ shopId: string; draft: ShopSortDraft } | null>(null);
+  const loadedDraftFingerprintRef = useRef("");
+  const hasEditedDraftRef = useRef(false);
   const draftSaveSequenceRef = useRef(0);
-  const [draftSaveStatus, setDraftSaveStatus] = useState<"loading" | "saving" | "saved" | "error">("loading");
+  const [draftSaveStatus, setDraftSaveStatus] = useState<"loading" | "ready" | "saving" | "saved" | "error">("loading");
+  const [draftSaveError, setDraftSaveError] = useState("");
 
   const persistDraft = useCallback((shopId: string, draft: ShopSortDraft) => {
     const sequence = ++draftSaveSequenceRef.current;
     setDraftSaveStatus("saving");
+    setDraftSaveError("");
     const pending = draftSaveQueueRef.current.catch(() => undefined).then(async () => {
-      const body = JSON.stringify({ draft });
-      const response = await fetch(`/api/shops/${shopId}/sort-draft`, {
-        method: "PUT", headers: { "Content-Type": "application/json" }, body,
-        keepalive: new Blob([body]).size < 60000,
-      });
-      if (!response.ok) throw new Error("账户排序记忆保存失败");
+      await saveAccountShopSortDraft(shopId, draft);
     });
     draftSaveQueueRef.current = pending;
     void pending.then(() => {
       if (sequence === draftSaveSequenceRef.current) setDraftSaveStatus("saved");
-    }, () => {
-      if (sequence === draftSaveSequenceRef.current) setDraftSaveStatus("error");
+    }, (error: unknown) => {
+      if (sequence === draftSaveSequenceRef.current) {
+        setDraftSaveStatus("error");
+        setDraftSaveError(error instanceof Error ? error.message : "账户排序记忆保存失败");
+      }
     });
     return pending;
   }, []);
 
+  const retryDraftSave = useCallback(async () => {
+    const latest = latestDraftRef.current;
+    if (!latest || latest.shopId !== shop?.id) return;
+    try {
+      await persistDraft(latest.shopId, latest.draft);
+      showToast("当前排序已保存到账户", "success");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "保存失败，请重试", "error");
+    }
+  }, [persistDraft, shop?.id, showToast]);
+
   const closeWorkbench = useCallback(async () => {
     try {
       const latest = latestDraftRef.current;
-      if (latest && latest.shopId === shop?.id) await persistDraft(latest.shopId, latest.draft);
+      if (latest && latest.shopId === shop?.id && hasEditedDraftRef.current) await persistDraft(latest.shopId, latest.draft);
       else await draftSaveQueueRef.current;
       onClose();
-    } catch {
-      showToast("排序记忆尚未保存到账户，请检查网络后重试关闭", "error");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "排序记忆尚未保存到账户，请重试", "error");
     }
   }, [onClose, persistDraft, shop?.id, showToast]);
 
@@ -220,6 +234,8 @@ function ShopSortWorkbench({
     setIsDraftReady(false);
     setLoadError("");
     latestDraftRef.current = null;
+    loadedDraftFingerprintRef.current = "";
+    hasEditedDraftRef.current = false;
     setDraftSaveStatus("loading");
     setDraftShopId("");
     setRows([]);
@@ -277,7 +293,7 @@ function ShopSortWorkbench({
             if (!migrationResponse.ok) throw new Error("旧排序草稿导入账户失败");
             draft = parseShopSortDraft((await migrationResponse.json()).draft);
             if (!draft) throw new Error("旧排序草稿导入账户失败");
-            try { localStorage.removeItem(getShopSortDraftKey(currentShopId)); } catch { /* 已保存到账户。 */ }
+            // 导入成功也保留原浏览器草稿，供恢复核对；账户记录仍是正常读取来源。
           }
         }
         if (draft) {
@@ -294,6 +310,16 @@ function ShopSortWorkbench({
       }));
 
       if (activeShopIdRef.current !== currentShopId) return;
+      const loadedDraft: ShopSortDraft = {
+        startNumber: nextStartNumber, categories: nextCategories, updatedAt: Date.now(),
+        rows: nextRows.map(row => ({
+          id: row.id, sortExcluded: row.sortExcluded, skuInput: row.skuInput,
+          sortGroupNameInput: row.sortGroupNameInput, sortCategoryNameInput: row.sortCategoryNameInput,
+        })),
+      };
+      loadedDraftFingerprintRef.current = shopSortDraftFingerprint(loadedDraft);
+      latestDraftRef.current = { shopId: currentShopId, draft: loadedDraft };
+      setDraftSaveStatus(restoredDraft ? "saved" : "ready");
       setStartNumber(nextStartNumber);
       setRows(nextRows);
       setSelectedRowIds([]);
@@ -339,6 +365,11 @@ function ShopSortWorkbench({
       updatedAt: Date.now(),
     };
     latestDraftRef.current = { shopId: shop.id, draft };
+    // 打开窗口或读取默认商品不属于编辑，不能因此覆盖服务器上的记忆。
+    const fingerprint = shopSortDraftFingerprint(draft);
+    if (fingerprint === loadedDraftFingerprintRef.current) return;
+    hasEditedDraftRef.current = true;
+    loadedDraftFingerprintRef.current = fingerprint;
     void persistDraft(shop.id, draft).catch(() => undefined);
   }, [categories, draftShopId, isDraftReady, isOpen, persistDraft, rows, shop?.id, startNumber]);
 
@@ -764,7 +795,7 @@ function ShopSortWorkbench({
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-lg font-bold text-foreground">店铺商品排序</h2>
               <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
-                {draftSaveStatus === "loading" ? "正在读取账户记忆" : draftSaveStatus === "saving" ? "正在保存到账户" : draftSaveStatus === "error" ? "账户保存失败，请重试" : "已保存到账户"}
+                {draftSaveStatus === "loading" ? "正在读取账户记忆" : draftSaveStatus === "ready" ? "修改后保存到账户" : draftSaveStatus === "saving" ? "正在保存到账户" : draftSaveStatus === "error" ? "账户保存失败，请重试" : "已保存到账户"}
               </span>
               {hasRestoredDraft && (
                 <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[11px] font-bold text-amber-600 dark:text-amber-400">
@@ -773,8 +804,10 @@ function ShopSortWorkbench({
               )}
             </div>
             <p className="text-xs text-muted-foreground">{shop?.name || "当前店铺"} · 以临时分类排序；不参与排序的商品会清空店内码；点击“应用到店铺”保存</p>
+            {draftSaveStatus === "error" && draftSaveError && <p className="mt-1 text-xs text-red-500">{draftSaveError}</p>}
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            {draftSaveStatus === "error" && isDraftReady && <button type="button" onClick={() => { void retryDraftSave(); }} className="h-9 rounded-xl border border-red-500/40 px-3 text-xs font-bold text-red-500">重试保存到账户</button>}
             <button type="button" onClick={fillGroupsFromOriginalCategory} className="h-9 rounded-xl border border-border px-3 text-xs font-bold text-foreground hover:bg-muted/60">用原分类初始化</button>
             <button type="button" onClick={autoNumberByGroup} className="inline-flex h-9 items-center gap-2 rounded-xl bg-primary px-3 text-xs font-bold text-primary-foreground hover:opacity-90"><ListOrdered size={15} />生成店内码</button>
             <button type="button" onClick={() => { void saveRows(); }} disabled={isSaving || rows.length === 0} className="inline-flex h-9 items-center gap-2 rounded-xl bg-emerald-600 px-3 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"><Save size={15} />{isSaving ? "应用中" : `应用到店铺${changedCount ? ` ${changedCount}` : ""}`}</button>

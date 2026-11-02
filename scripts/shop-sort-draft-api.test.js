@@ -1,5 +1,6 @@
 import { beforeEach, expect, mock, test } from "bun:test";
-import { parseShopSortDraft } from "../src/lib/shopSortDraft";
+import { parseShopSortDraft, shopSortDraftFingerprint } from "../src/lib/shopSortDraft";
+import { saveAccountShopSortDraft } from "../src/lib/shopSortDraftClient";
 
 let user;
 let shopOwner;
@@ -19,6 +20,7 @@ mock.module("../src/lib/prisma", () => ({ default: {
     upsert: async ({ create }) => {
       if (failed) throw new Error("database unavailable");
       records.set(recordKey(create), create.data);
+      return { data: create.data };
     },
     createMany: async ({ data }) => {
       if (!records.has(recordKey(data[0]))) records.set(recordKey(data[0]), data[0].data);
@@ -52,6 +54,18 @@ test("同一账户跨域名、端口、HTTP 和 IPv6 读取完整排序记忆", 
     const response = await read(origin);
     expect(response.headers.get("Cache-Control")).toBe("no-store");
     expect((await response.json()).draft).toEqual(draft);
+  }
+});
+
+test("完整保存请求经过客户端、真实路由校验和存储后可再次读取", async () => {
+  const previousFetch = globalThis.fetch;
+  const fullDraft = { ...draft, rows: Array.from({ length: 356 }, (_, index) => ({ ...draft.rows[0], id: `item-${index}` })) };
+  globalThis.fetch = (url, options) => PUT(new Request(`http://localhost${url}`, options), context);
+  try {
+    expect(await saveAccountShopSortDraft("shop-1", fullDraft)).toEqual(fullDraft);
+    expect((await (await read()).json()).draft).toEqual(fullDraft);
+  } finally {
+    globalThis.fetch = previousFetch;
   }
 });
 
@@ -103,4 +117,12 @@ test("兼容旧草稿没有排除标记，保留空分类和编号区间", () =>
   const parsed = parseShopSortDraft({ ...draft, rows: [legacyRow] });
   expect(parsed?.rows[0]).toEqual(legacyRow);
   expect(parsed?.categories).toEqual(draft.categories);
+});
+
+test("仅刷新读取时间不触发覆盖，手动顺序和区间变更可以识别", () => {
+  const fingerprint = shopSortDraftFingerprint(draft);
+  expect(shopSortDraftFingerprint({ ...draft, updatedAt: 999 })).toBe(fingerprint);
+  expect(shopSortDraftFingerprint({ ...draft, rows: [...draft.rows].reverse() })).not.toBe(fingerprint);
+  expect(shopSortDraftFingerprint({ ...draft, startNumber: "A001" })).not.toBe(fingerprint);
+  expect(shopSortDraftFingerprint({ ...draft, categories: draft.categories.map(c => ({ ...c, rangeSize: "100" })) })).not.toBe(fingerprint);
 });

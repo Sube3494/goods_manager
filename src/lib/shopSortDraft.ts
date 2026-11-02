@@ -11,6 +11,14 @@ export type ShopSortDraft = {
   updatedAt: number;
 };
 
+export function shopSortDraftFingerprint(draft: ShopSortDraft) {
+  return JSON.stringify({
+    startNumber: draft.startNumber,
+    categories: draft.categories.map(category => [category.id, category.name, category.rangeSize]),
+    rows: draft.rows.map(row => [row.id, row.skuInput, row.sortGroupNameInput, row.sortCategoryNameInput, row.sortExcluded ?? null]),
+  });
+}
+
 export function parseShopSortDraft(value: unknown): ShopSortDraft | null {
   if (!value || typeof value !== "object") return null;
   const draft = value as ShopSortDraft;
