@@ -9,6 +9,21 @@ type ShopSortRow = {
 // 正常排序从 1 开始，0 表示明确排除；null 仍表示尚未排序。
 export const EXCLUDED_SHOP_SORT_NUMBER = 0;
 
+// 按草稿顺序恢复仍存在的商品，新商品追加，已删除商品忽略。
+export function restoreShopSortDraftRows<T extends ShopSortRow, D extends Partial<ShopSortRow> & { id: string }>(
+  loadedRows: T[], draftRows: D[],
+): T[] {
+  const loadedById = new Map(loadedRows.map(row => [row.id, row]));
+  const restored: T[] = [];
+  for (const draftRow of draftRows) {
+    const row = loadedById.get(draftRow.id);
+    if (!row) continue;
+    restored.push({ ...row, ...draftRow, sortExcluded: draftRow.sortExcluded ?? row.sortExcluded });
+    loadedById.delete(row.id);
+  }
+  return [...restored, ...loadedById.values()];
+}
+
 export function setShopSortExcluded<T extends ShopSortRow>(row: T, excluded: boolean): T & { sortExcluded: boolean } {
   return { ...row, sortExcluded: excluded, skuInput: "", sortGroupNameInput: "", sortCategoryNameInput: "" };
 }

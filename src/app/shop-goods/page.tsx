@@ -24,7 +24,7 @@ import { useDebounce } from "@/hooks/useDebounce";
 import { ExportProgressModal } from "@/components/ui/ExportProgressModal";
 import { Category, Product, Shop, ShopCatalogItem, Supplier, PurchaseOrder } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { EXCLUDED_SHOP_SORT_NUMBER, buildShopSortUpdate, setShopSortExcluded, getShopSortGroupName, reconcileShopSortCategories, renumberShopSortRows } from "@/lib/shopSortWorkbench";
+import { EXCLUDED_SHOP_SORT_NUMBER, buildShopSortUpdate, setShopSortExcluded, getShopSortGroupName, reconcileShopSortCategories, renumberShopSortRows, restoreShopSortDraftRows } from "@/lib/shopSortWorkbench";
 
 interface ShopProductsResponse {
   items?: ShopCatalogItem[];
@@ -230,19 +230,7 @@ function ShopSortWorkbench({
         const draftRaw = localStorage.getItem(getShopSortDraftKey(currentShopId));
         const draft = draftRaw ? JSON.parse(draftRaw) as ShopSortDraft : null;
         if (draft && Array.isArray(draft.rows) && Array.isArray(draft.categories)) {
-          const draftRowsById = new Map(draft.rows.map((row) => [row.id, row]));
-          nextRows = loadedRows.map((row) => {
-            const draftRow = draftRowsById.get(row.id);
-            return draftRow
-              ? {
-                  ...row,
-                  sortExcluded: draftRow.sortExcluded ?? row.sortExcluded,
-                  skuInput: draftRow.skuInput,
-                  sortGroupNameInput: draftRow.sortGroupNameInput,
-                  sortCategoryNameInput: draftRow.sortCategoryNameInput,
-                }
-              : row;
-          });
+          nextRows = restoreShopSortDraftRows(loadedRows, draft.rows);
           nextStartNumber = draft.startNumber || nextStartNumber;
           nextCategories = draft.categories.length > 0 ? draft.categories : nextCategories;
           restoredDraft = true;

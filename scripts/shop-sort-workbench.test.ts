@@ -1,6 +1,26 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buildShopSortUpdate, setShopSortExcluded, getShopSortGroupName, reconcileShopSortCategories, renumberShopSortRows } from "../src/lib/shopSortWorkbench";
+import { buildShopSortUpdate, setShopSortExcluded, getShopSortGroupName, reconcileShopSortCategories, renumberShopSortRows, restoreShopSortDraftRows } from "../src/lib/shopSortWorkbench";
+
+test("重新打开草稿保留手动顺序，之后重新编号仍保持该顺序", () => {
+  const loaded = makeRows();
+  const draft = [loaded[3], loaded[1], loaded[0], loaded[2]].map(row => ({
+    ...row, sortGroupNameInput: "玩具",
+  }));
+  const restored = restoreShopSortDraftRows(loaded, draft);
+  assert.deepEqual(restored.map(row => row.id), ["4", "2", "1", "3"]);
+  const numbered = renumberShopSortRows(restored, categories, "N001");
+  assert.deepEqual(numbered.map(row => row.skuInput), ["N001", "N002", "N003", "N004"]);
+  assert.equal(buildShopSortUpdate(numbered[0], 1).id, "4");
+});
+
+test("恢复顺序时忽略已删除和重复商品，新商品追加且保留最新商品信息", () => {
+  const loaded = makeRows().map(row => ({ ...row, name: "最新名称" }));
+  const restored = restoreShopSortDraftRows(loaded, [{ id: "2", skuInput: "N001" }, { id: "已删除" }, { id: "2" }]);
+  assert.deepEqual(restored.map(row => row.id), ["2", "1", "3", "4"]);
+  assert.equal(restored[0].name, "最新名称");
+  assert.equal(restored[0].skuInput, "N001");
+});
 
 test("排除商品清空编码，不占用编号和临时分类；恢复后可以重新编号", () => {
   const rows = makeRows();
