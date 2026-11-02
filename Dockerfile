@@ -79,7 +79,8 @@ USER nextjs
 
 EXPOSE 3000
 ENV PORT=3000
-ENV HOSTNAME="0.0.0.0"
+# 监听 IPv6，接收 Docker 双栈网络转发的连接。
+ENV HOSTNAME="::"
 
 # 启动顺序：自动建库 → 尝试 db push → 启动应用
 CMD ["sh", "scripts/start-app.sh"]
