@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { createPortal } from "react-dom";
+import { nanoid } from "nanoid/non-secure";
 import { AnimatePresence, motion } from "framer-motion";
 import { Search, Plus, Store, X, ArrowUp, Trash2, AlertCircle, ListOrdered, Save, Check, Link2, ArrowRightLeft, ChevronUp, ChevronDown, Boxes, Upload, Download, CopyPlus } from "lucide-react";
 import Link from "next/link";
@@ -223,7 +224,7 @@ function ShopSortWorkbench({
               .filter(Boolean),
           ]
         )
-      ).map((name) => ({ id: `${name}-${crypto.randomUUID()}`, name, rangeSize: "" }));
+      ).map((name) => ({ id: `${name}-${nanoid()}`, name, rangeSize: "" }));
       let restoredDraft = false;
 
       try {
@@ -241,7 +242,7 @@ function ShopSortWorkbench({
 
       nextRows = nextRows.map(row => row.sortExcluded ? setShopSortExcluded(row, true) : row);
       nextCategories = reconcileShopSortCategories(nextRows, nextCategories, (name) => ({
-        id: `${name}-${crypto.randomUUID()}`, name, rangeSize: "",
+        id: `${name}-${nanoid()}`, name, rangeSize: "",
       }));
 
       if (activeShopIdRef.current !== currentShopId) return;
@@ -309,7 +310,7 @@ function ShopSortWorkbench({
 
   const completeTemporaryCategories = useCallback(() => {
     setCategories((previous) => reconcileShopSortCategories(rows, previous, (name) => ({
-      id: `${name}-${crypto.randomUUID()}`, name, rangeSize: "",
+      id: `${name}-${nanoid()}`, name, rangeSize: "",
     })));
   }, [rows]);
 
@@ -322,7 +323,7 @@ function ShopSortWorkbench({
       ...preferredOrder.filter((category) => names.includes(category.name)),
       ...names
         .filter((name) => !existingByName.has(name))
-        .map((name) => ({ id: `${name}-${crypto.randomUUID()}`, name, rangeSize: "" })),
+        .map((name) => ({ id: `${name}-${nanoid()}`, name, rangeSize: "" })),
     ];
   }, [categories]);
 
@@ -336,7 +337,7 @@ function ShopSortWorkbench({
       showToast("这个临时分类已存在", "error");
       return;
     }
-    setCategories((prev) => [...prev, { id: `${name}-${crypto.randomUUID()}`, name, rangeSize: "" }]);
+    setCategories((prev) => [...prev, { id: `${name}-${nanoid()}`, name, rangeSize: "" }]);
     setSelectedCategoryName(name);
     setNewCategoryName("");
   }, [categories, newCategoryName, showToast]);
@@ -361,7 +362,7 @@ function ShopSortWorkbench({
       const nextBase = prev.filter((item) => item.id !== category.id);
       const needsUngrouped = productCount > 0 && !nextBase.some((item) => item.name === "未分组");
       const next = needsUngrouped
-        ? [...nextBase, { id: `未分组-${crypto.randomUUID()}`, name: "未分组", rangeSize: category.rangeSize || "" }]
+        ? [...nextBase, { id: `未分组-${nanoid()}`, name: "未分组", rangeSize: category.rangeSize || "" }]
         : nextBase;
       setRows((prevRows) => {
         const movedRows = prevRows.map((row) =>
