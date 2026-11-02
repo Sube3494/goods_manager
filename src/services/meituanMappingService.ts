@@ -539,22 +539,14 @@ export class MeituanMappingService {
   /**
    * 导出回写 Excel（适配 meituan-sku-sync.user.js 油猴脚本格式）
    */
-  static async exportBatchExcel(userId: string, batchId: string): Promise<{ buffer: Buffer; fileName: string }> {
+  static async exportBatchExcel(userId: string, batchId: string, shopId: string): Promise<{ buffer: Buffer; fileName: string }> {
+    if (!shopId || shopId === "ALL") throw new Error("请先选择要导出店内码的店铺");
+    const shop = await prisma.shop.findFirst({ where: { id: shopId, userId }, select: { id: true, name: true } });
+    if (!shop) throw new Error("店铺不存在或无权访问");
     const batch = await prisma.meituanImportBatch.findFirst({
-      where: { id: batchId, userId },
+      where: { id: batchId, userId, platform: "meituan" },
       include: {
         items: {
-          include: {
-            bindProduct: {
-              select: {
-                id: true,
-                name: true,
-                sku: true,
-                costPrice: true,
-                specs: true,
-              },
-            },
-          },
           orderBy: { createdAt: "asc" },
         },
       },
@@ -562,6 +554,24 @@ export class MeituanMappingService {
 
     if (!batch) {
       throw new Error("批次不存在");
+    }
+
+    // 以当前店铺的平台字段为配对依据，导入池的全局 bindProduct 不能代表该店铺。
+    const shopProducts = await prisma.shopProduct.findMany({
+      where: { shopId, shop: { userId }, deletedAt: null },
+      select: { id: true, sku: true, meituanSkuId: true, productName: true, product: { select: { name: true } } },
+    });
+    const exportedIds = new Set(batch.items.map(item => item.meituanSkuId));
+    const shopProductByMeituanId = new Map<string, typeof shopProducts[number]>();
+    for (const product of shopProducts) {
+      for (const id of normalizeMeituanSkuIds(product.meituanSkuId)) {
+        if (!exportedIds.has(id)) continue;
+        const existing = shopProductByMeituanId.get(id);
+        if (existing && existing.id !== product.id) {
+          throw new Error(`美团 ID ${id} 在当前店铺配对了多个商品，请先修正配对后导出`);
+        }
+        shopProductByMeituanId.set(id, product);
+      }
     }
 
     const workbook = new ExcelJS.Workbook();
@@ -586,7 +596,8 @@ export class MeituanMappingService {
 
     for (let i = 0; i < batch.items.length; i++) {
       const item = batch.items[i];
-      const boundSku = item.bindProduct?.sku || "";
+      const shopProduct = shopProductByMeituanId.get(item.meituanSkuId);
+      const boundSku = shopProduct?.sku ?? "";
       const rowNum = i + 2;
 
       sheet.addRow({
@@ -600,7 +611,7 @@ export class MeituanMappingService {
         图库图片: "",
         公开状态: "公开",
         商品参数: "",
-        备注: item.bindProduct?.name ? `系统品名: ${item.bindProduct.name}` : "",
+        备注: shopProduct ? `店铺品名: ${shopProduct.productName || shopProduct.product?.name || ""}` : "",
       });
 
       const row = sheet.getRow(rowNum);
@@ -610,7 +621,8 @@ export class MeituanMappingService {
 
     const buffer = (await workbook.xlsx.writeBuffer()) as unknown as Buffer;
     const baseName = batch.fileName.replace(/\.[^/.]+$/, "");
-    const exportFileName = `${baseName}_已配对SKU回写_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    const shopName = shop.name.replace(/[\\/:*?"<>|\r\n]/g, "_");
+    const exportFileName = `${baseName}_${shopName}_已配对SKU回写_${new Date().toISOString().slice(0, 10)}.xlsx`;
 
     return {
       buffer: Buffer.from(buffer),

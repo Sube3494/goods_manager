@@ -509,6 +509,10 @@ export function MeituanMappingModal({
 
   // 导出回写 Excel
   const handleExportExcel = async () => {
+    if (!selectedShop?.id) {
+      showToast("请先选择要导出的店铺", "error");
+      return;
+    }
     if (batches.length === 0) {
       showToast("尚未导入任何美团数据表，无法导出回写表格", "error");
       return;
@@ -519,11 +523,13 @@ export function MeituanMappingModal({
 
     try {
       setIsExporting(true);
+      const exportParams = new URLSearchParams({ batchId: batchIdToExport, shopId: selectedShop.id });
       const res = await fetch(
-        `/api/meituan-mapping/export?batchId=${batchIdToExport}`
+        `/api/meituan-mapping/export?${exportParams.toString()}`
       );
       if (!res.ok) {
-        throw new Error("导出失败");
+        const result = await res.json().catch(() => ({}));
+        throw new Error(result.error || "导出失败");
       }
 
       const blob = await res.blob();
@@ -548,7 +554,7 @@ export function MeituanMappingModal({
       showToast("已成功导出回写表格！可使用油猴助手在美团后台批量回填店内码", "success");
     } catch (err: any) {
       console.error("导出异常", err);
-      showToast("导出表格失败", "error");
+      showToast(err instanceof Error ? err.message : "导出表格失败", "error");
     } finally {
       setIsExporting(false);
     }

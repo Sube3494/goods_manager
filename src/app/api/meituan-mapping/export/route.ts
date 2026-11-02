@@ -11,16 +11,21 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const batchId = searchParams.get("batchId");
+    const shopId = searchParams.get("shopId");
 
     if (!batchId) {
       return NextResponse.json({ error: "缺少 batchId 参数" }, { status: 400 });
     }
+    if (!shopId || shopId === "ALL") {
+      return NextResponse.json({ error: "请先选择要导出店内码的店铺" }, { status: 400 });
+    }
 
-    const { buffer, fileName } = await MeituanMappingService.exportBatchExcel(user.id, batchId);
+    const { buffer, fileName } = await MeituanMappingService.exportBatchExcel(user.id, batchId, shopId);
 
     const headers = new Headers();
     headers.set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     headers.set("Content-Disposition", `attachment; filename="${encodeURIComponent(fileName)}"`);
+    headers.set("Cache-Control", "no-store");
 
     return new NextResponse(new Uint8Array(buffer), {
       status: 200,
