@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
       pageSize,
     });
 
-    return NextResponse.json(result);
+    return NextResponse.json(result, { headers: { "Cache-Control": "no-store" } });
   } catch (error: any) {
     console.error("GET /api/meituan-mapping/shop-products 失败:", error);
     return NextResponse.json(

@@ -40,6 +40,48 @@ test("平台统计在分页前计算，抖店字段独立于美团", async () =>
   expect(result.statusCounts.BOUND).toBe(1);
 });
 
+test("配对搜索按实际显示的店铺名称和店内码匹配，隐藏的主库名称不会误命中", async () => {
+  const originalName = fixtures[0].name;
+  const firstShop = { ...fixtures[0].shopProducts[0] };
+  const secondShop = { ...fixtures[1].shopProducts[0] };
+  try {
+    fixtures[0].name = "玉兰旧主库名称";
+    Object.assign(fixtures[0].shopProducts[0], { productName: "红茶礼盒", sku: "N100" });
+    Object.assign(fixtures[1].shopProducts[0], { productName: "玉兰香薰礼盒", sku: "N564" });
+    for (const search of ["玉兰", " n564 ", "yulan", "YL"]) {
+      const result = await MeituanMappingService.getShopProductsWithMeituanMapping({
+        userId: "user", shopId: "shop-a", search, pageSize: 1,
+      });
+      expect(result.items.map(item => item.id)).toEqual(["product-2"]);
+      expect(result.total).toBe(1);
+      expect(result.statusCounts).toEqual({ TOTAL: 1, UNBOUND: 1, BOUND: 0, HAS_SUGGESTION: 0 });
+    }
+    const hiddenSku = await MeituanMappingService.getShopProductsWithMeituanMapping({
+      userId: "user", shopId: "shop-a", search: "B07",
+    });
+    expect(hiddenSku.total).toBe(0);
+    const bound = await MeituanMappingService.getShopProductsWithMeituanMapping({
+      userId: "user", shopId: "shop-a", search: "玉兰", status: "BOUND",
+    });
+    expect(bound.total).toBe(0);
+  } finally {
+    fixtures[0].name = originalName;
+    fixtures[0].shopProducts[0] = firstShop;
+    fixtures[1].shopProducts[0] = secondShop;
+  }
+});
+
+test("搜索支持当前平台 ID、空搜索和没有独立名称时的主库回退", async () => {
+  const query = (search, platform = "meituan") => MeituanMappingService.getShopProductsWithMeituanMapping({
+    userId: "user", shopId: "shop-a", search, platform,
+  });
+  expect((await query("玩具")).items.map(item => item.id)).toEqual(["product-1"]);
+  expect((await query("200", "jd")).total).toBe(1);
+  expect((await query("200", "meituan")).total).toBe(0);
+  expect((await query("   ")).total).toBe(2);
+  expect((await query("不存在的商品")).total).toBe(0);
+});
+
 test("替换或清空美团映射仅更新美团导入池，其他平台同号 ID 不受影响", async () => {
   const tx = {
     productMeituanSku: { deleteMany: async () => {}, createMany: async () => {} },

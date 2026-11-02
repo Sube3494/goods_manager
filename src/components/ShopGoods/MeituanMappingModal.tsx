@@ -228,6 +228,8 @@ export function MeituanMappingModal({
     "ALL" | "UNBOUND" | "HAS_SUGGESTION" | "BOUND"
   >("ALL");
   const [searchQuery, setSearchQuery] = useState("");
+  const productRequestIdRef = useRef(0);
+  const productAbortRef = useRef<AbortController | null>(null);
   const [statusCounts, setStatusCounts] = useState<Record<string, number>>({
     TOTAL: 0,
     UNBOUND: 0,
@@ -267,6 +269,10 @@ export function MeituanMappingModal({
   // 获取系统店铺商品正向配对列表
   const fetchShopProducts = useCallback(async () => {
     if (!isOpen) return;
+    const requestId = ++productRequestIdRef.current;
+    productAbortRef.current?.abort();
+    const controller = new AbortController();
+    productAbortRef.current = controller;
     try {
       setIsLoading(true);
       const params = new URLSearchParams({
@@ -284,21 +290,28 @@ export function MeituanMappingModal({
       }
 
       const res = await fetch(
-        `/api/meituan-mapping/shop-products?${params.toString()}`
+        `/api/meituan-mapping/shop-products?${params.toString()}`,
+        { signal: controller.signal, cache: "no-store" }
       );
-      if (res.ok) {
-        const data = await res.json();
-        setProducts(data.items || []);
-        setTotal(data.total || 0);
-        setTotalPages(data.totalPages || 1);
-        setStatusCounts(data.statusCounts || {});
-      }
+      const data = await res.json();
+      if (requestId !== productRequestIdRef.current) return;
+      if (!res.ok) throw new Error(data.error || "加载店铺商品配对列表失败");
+      setProducts(data.items || []);
+      setTotal(data.total || 0);
+      setTotalPages(data.totalPages || 1);
+      setStatusCounts(data.statusCounts || {});
     } catch (err) {
+      if (controller.signal.aborted || requestId !== productRequestIdRef.current) return;
       console.error("加载店铺商品配对列表失败", err);
+      setProducts([]);
+      setTotal(0);
+      setTotalPages(1);
+      setStatusCounts({});
+      showToast(err instanceof Error ? err.message : "搜索失败，请重试", "error");
     } finally {
-      setIsLoading(false);
+      if (requestId === productRequestIdRef.current) setIsLoading(false);
     }
-  }, [isOpen, selectedShop?.id, currentBatchId, activePlatform, statusFilter, searchQuery, page, pageSize]);
+  }, [isOpen, selectedShop?.id, currentBatchId, activePlatform, statusFilter, searchQuery, page, pageSize, showToast]);
 
   useEffect(() => {
     if (isOpen) {
@@ -315,6 +328,10 @@ export function MeituanMappingModal({
     if (isOpen) {
       fetchShopProducts();
     }
+    return () => {
+      productRequestIdRef.current += 1;
+      productAbortRef.current?.abort();
+    };
   }, [isOpen, fetchShopProducts]);
 
   useEffect(() => {

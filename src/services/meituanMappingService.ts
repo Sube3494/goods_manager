@@ -3,6 +3,7 @@ import ExcelJS from "exceljs";
 import prisma from "@/lib/prisma";
 import { getStorageStrategy } from "@/lib/storage";
 import { normalizeMeituanSkuIds } from "@/lib/productMeituanSku";
+import { matchesShopMappingSearch } from "@/lib/shopMappingSearch";
 
 export interface ParsedMeituanItem {
   meituanSkuId: string;
@@ -655,17 +656,7 @@ export class MeituanMappingService {
       };
     }
 
-    if (search.trim()) {
-      const q = search.trim();
-      productWhere.OR = [
-        { name: { contains: q, mode: "insensitive" } },
-        { sku: { contains: q, mode: "insensitive" } },
-        { pinyin: { contains: q, mode: "insensitive" } },
-        { pinyinFirst: { contains: q, mode: "insensitive" } },
-      ];
-    }
-
-    // 获取所有符合基础搜索条件的商品
+    // 先限定账户和店铺；搜索在店铺独立字段合并后执行，避免主库字段与显示内容不一致。
     const rawProducts = await prisma.product.findMany({
       where: productWhere,
       select: {
@@ -878,18 +869,20 @@ export class MeituanMappingService {
       };
     });
 
-    // 4. 统计状态数量
+    const searchedProducts = enrichedProducts.filter(product => matchesShopMappingSearch(product, search, platform));
+
+    // 4. 统计搜索结果中的状态数量
     const statusCounts = {
-      TOTAL: enrichedProducts.length,
-      UNBOUND: enrichedProducts.filter((p) => !p.isBound).length,
-      BOUND: enrichedProducts.filter((p) => p.isBound).length,
-      HAS_SUGGESTION: enrichedProducts.filter(
+      TOTAL: searchedProducts.length,
+      UNBOUND: searchedProducts.filter((p) => !p.isBound).length,
+      BOUND: searchedProducts.filter((p) => p.isBound).length,
+      HAS_SUGGESTION: searchedProducts.filter(
         (p) => !p.isBound && p.suggestedMeituanItem
       ).length,
     };
 
     // 5. 过滤状态
-    let filtered = enrichedProducts;
+    let filtered = searchedProducts;
     if (status === "UNBOUND") {
       filtered = filtered.filter((p) => !p.isBound);
     } else if (status === "BOUND") {
