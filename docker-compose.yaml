@@ -15,7 +15,7 @@ services:
       - .env
     environment:
       # 覆盖镜像或 .env 中的 IPv4 监听地址，支持容器 IPv6 端口转发。
-      - HOSTNAME=::
+      - "HOSTNAME=::"
       - NO_PROXY=localhost,127.0.0.1,::1,host.docker.internal,192.168.1.105,192.168.0.0/16,10.0.0.0/8,172.16.0.0/12,.local
       - no_proxy=localhost,127.0.0.1,::1,host.docker.internal,192.168.1.105,192.168.0.0/16,10.0.0.0/8,172.16.0.0/12,.local
     volumes:
