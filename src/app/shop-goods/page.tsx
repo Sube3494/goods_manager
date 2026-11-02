@@ -26,6 +26,7 @@ import { ExportProgressModal } from "@/components/ui/ExportProgressModal";
 import { Category, Product, Shop, ShopCatalogItem, Supplier, PurchaseOrder } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { EXCLUDED_SHOP_SORT_NUMBER, buildShopSortUpdate, setShopSortExcluded, getShopSortGroupName, reconcileShopSortCategories, renumberShopSortRows, restoreShopSortDraftRows } from "@/lib/shopSortWorkbench";
+import { parseShopSortDraft, type ShopSortDraft } from "@/lib/shopSortDraft";
 
 interface ShopProductsResponse {
   items?: ShopCatalogItem[];
@@ -44,19 +45,6 @@ type SortWorkbenchCategory = {
   id: string;
   name: string;
   rangeSize: string;
-};
-
-type ShopSortDraft = {
-  startNumber: string;
-  categories: SortWorkbenchCategory[];
-  rows: Array<{
-    sortExcluded?: boolean;
-    id: string;
-    skuInput: string;
-    sortGroupNameInput: string;
-    sortCategoryNameInput: string;
-  }>;
-  updatedAt: number;
 };
 
 function getShopSortDraftKey(shopId: string) {
@@ -161,6 +149,7 @@ function ShopSortWorkbench({
   const { showToast } = useToast();
   const [rows, setRows] = useState<SortWorkbenchRow[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [loadError, setLoadError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [startNumber, setStartNumber] = useState("1001");
   const [categories, setCategories] = useState<SortWorkbenchCategory[]>([]);
@@ -176,6 +165,41 @@ function ShopSortWorkbench({
   const [draftShopId, setDraftShopId] = useState("");
   const [deleteCategoryTarget, setDeleteCategoryTarget] = useState<SortWorkbenchCategory | null>(null);
   const activeShopIdRef = useRef<string | null>(null);
+  const draftSaveQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const latestDraftRef = useRef<{ shopId: string; draft: ShopSortDraft } | null>(null);
+  const draftSaveSequenceRef = useRef(0);
+  const [draftSaveStatus, setDraftSaveStatus] = useState<"loading" | "saving" | "saved" | "error">("loading");
+
+  const persistDraft = useCallback((shopId: string, draft: ShopSortDraft) => {
+    const sequence = ++draftSaveSequenceRef.current;
+    setDraftSaveStatus("saving");
+    const pending = draftSaveQueueRef.current.catch(() => undefined).then(async () => {
+      const body = JSON.stringify({ draft });
+      const response = await fetch(`/api/shops/${shopId}/sort-draft`, {
+        method: "PUT", headers: { "Content-Type": "application/json" }, body,
+        keepalive: new Blob([body]).size < 60000,
+      });
+      if (!response.ok) throw new Error("账户排序记忆保存失败");
+    });
+    draftSaveQueueRef.current = pending;
+    void pending.then(() => {
+      if (sequence === draftSaveSequenceRef.current) setDraftSaveStatus("saved");
+    }, () => {
+      if (sequence === draftSaveSequenceRef.current) setDraftSaveStatus("error");
+    });
+    return pending;
+  }, []);
+
+  const closeWorkbench = useCallback(async () => {
+    try {
+      const latest = latestDraftRef.current;
+      if (latest && latest.shopId === shop?.id) await persistDraft(latest.shopId, latest.draft);
+      else await draftSaveQueueRef.current;
+      onClose();
+    } catch {
+      showToast("排序记忆尚未保存到账户，请检查网络后重试关闭", "error");
+    }
+  }, [onClose, persistDraft, shop?.id, showToast]);
 
   useEffect(() => {
     if (!isOpen || typeof document === "undefined") return;
@@ -194,9 +218,15 @@ function ShopSortWorkbench({
     const currentShopId = shop.id;
     activeShopIdRef.current = currentShopId;
     setIsDraftReady(false);
+    setLoadError("");
+    latestDraftRef.current = null;
+    setDraftSaveStatus("loading");
     setDraftShopId("");
+    setRows([]);
+    setCategories([]);
     setIsLoading(true);
     try {
+      await draftSaveQueueRef.current.catch(() => undefined);
       const query = new URLSearchParams({
         shopId: currentShopId,
         all: "true",
@@ -227,17 +257,35 @@ function ShopSortWorkbench({
       ).map((name) => ({ id: `${name}-${nanoid()}`, name, rangeSize: "" }));
       let restoredDraft = false;
 
-      try {
-        const draftRaw = localStorage.getItem(getShopSortDraftKey(currentShopId));
-        const draft = draftRaw ? JSON.parse(draftRaw) as ShopSortDraft : null;
-        if (draft && Array.isArray(draft.rows) && Array.isArray(draft.categories)) {
+      {
+        const draftResponse = await fetch(`/api/shops/${currentShopId}/sort-draft`, { cache: "no-store" });
+        if (!draftResponse.ok) throw new Error("加载账户排序记忆失败");
+        const draftData = await draftResponse.json();
+        let draft = parseShopSortDraft(draftData.draft);
+        if (draftData.draft !== null && !draft) throw new Error("账户排序记忆格式不正确");
+        if (!draft) {
+          let legacyDraft: ShopSortDraft | null = null;
+          try {
+            const draftRaw = localStorage.getItem(getShopSortDraftKey(currentShopId));
+            legacyDraft = draftRaw ? parseShopSortDraft(JSON.parse(draftRaw)) : null;
+          } catch { /* 旧浏览器草稿不可读时仍可使用账户存储。 */ }
+          if (legacyDraft) {
+            const migrationResponse = await fetch(`/api/shops/${currentShopId}/sort-draft`, {
+              method: "PUT", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ draft: legacyDraft, importOnly: true }),
+            });
+            if (!migrationResponse.ok) throw new Error("旧排序草稿导入账户失败");
+            draft = parseShopSortDraft((await migrationResponse.json()).draft);
+            if (!draft) throw new Error("旧排序草稿导入账户失败");
+            try { localStorage.removeItem(getShopSortDraftKey(currentShopId)); } catch { /* 已保存到账户。 */ }
+          }
+        }
+        if (draft) {
           nextRows = restoreShopSortDraftRows(loadedRows, draft.rows);
           nextStartNumber = draft.startNumber || nextStartNumber;
-          nextCategories = draft.categories.length > 0 ? draft.categories : nextCategories;
+          nextCategories = draft.categories;
           restoredDraft = true;
         }
-      } catch (error) {
-        console.warn("Failed to restore shop sort draft:", error);
       }
 
       nextRows = nextRows.map(row => row.sortExcluded ? setShopSortExcluded(row, true) : row);
@@ -257,11 +305,13 @@ function ShopSortWorkbench({
       setDraftShopId(currentShopId);
       setIsDraftReady(true);
       if (restoredDraft) {
-        showToast("已恢复上次未保存的排序草稿", "info");
+        showToast("已恢复账户保存的排序记忆", "info");
       }
     } catch (error) {
       console.error("Failed to load shop sort rows:", error);
-      showToast("加载排序商品失败", "error");
+      setLoadError(error instanceof Error ? error.message : "加载排序商品失败");
+      setDraftSaveStatus("error");
+      showToast(error instanceof Error ? error.message : "加载排序商品失败", "error");
     } finally {
       if (activeShopIdRef.current === currentShopId) {
         setIsLoading(false);
@@ -271,6 +321,7 @@ function ShopSortWorkbench({
 
   useEffect(() => {
     if (isOpen) void loadRows();
+    return () => { activeShopIdRef.current = null; };
   }, [isOpen, loadRows]);
 
   useEffect(() => {
@@ -287,8 +338,9 @@ function ShopSortWorkbench({
       })),
       updatedAt: Date.now(),
     };
-    localStorage.setItem(getShopSortDraftKey(shop.id), JSON.stringify(draft));
-  }, [categories, draftShopId, isDraftReady, isOpen, rows, shop?.id, startNumber]);
+    latestDraftRef.current = { shopId: shop.id, draft };
+    void persistDraft(shop.id, draft).catch(() => undefined);
+  }, [categories, draftShopId, isDraftReady, isOpen, persistDraft, rows, shop?.id, startNumber]);
 
   const updateRow = useCallback((id: string, field: "skuInput" | "sortGroupNameInput", value: string) => {
     setRows((prev) =>
@@ -645,9 +697,11 @@ function ShopSortWorkbench({
   }, [allVisibleSelected, visibleRowIds]);
 
   const saveRows = useCallback(async () => {
-    if (!shop?.id) return;
+    if (!shop?.id || !isDraftReady) return;
     setIsSaving(true);
     try {
+      const latest = latestDraftRef.current;
+      if (latest?.shopId === shop.id) await persistDraft(shop.id, latest.draft);
       const categoryOrderByName = new Map(categories.map((category, index) => [category.name.trim(), index]));
       const orderedRows = rows.filter(row => !row.sortExcluded).sort((a, b) => {
         const groupA = getShopSortGroupName(a);
@@ -674,7 +728,6 @@ function ShopSortWorkbench({
         showToast(data?.error || "应用排序失败", "error");
         return;
       }
-      localStorage.removeItem(getShopSortDraftKey(shop.id));
       setHasRestoredDraft(false);
       showToast(`已应用 ${updates.length} 件店铺商品排序`, "success");
       await onSaved();
@@ -685,7 +738,7 @@ function ShopSortWorkbench({
     } finally {
       setIsSaving(false);
     }
-  }, [categories, onClose, onSaved, rows, shop?.id, showToast]);
+  }, [categories, isDraftReady, onClose, onSaved, persistDraft, rows, shop?.id, showToast]);
 
   if (!isOpen || typeof document === "undefined") return null;
 
@@ -697,7 +750,7 @@ function ShopSortWorkbench({
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         className="fixed inset-0 z-9998 bg-black/45 backdrop-blur-sm"
-        onClick={onClose}
+        onClick={() => { void closeWorkbench(); }}
       />
       <motion.div
         key="shop-sort-panel"
@@ -711,7 +764,7 @@ function ShopSortWorkbench({
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-lg font-bold text-foreground">店铺商品排序</h2>
               <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
-                草稿自动保存
+                {draftSaveStatus === "loading" ? "正在读取账户记忆" : draftSaveStatus === "saving" ? "正在保存到账户" : draftSaveStatus === "error" ? "账户保存失败，请重试" : "已保存到账户"}
               </span>
               {hasRestoredDraft && (
                 <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[11px] font-bold text-amber-600 dark:text-amber-400">
@@ -725,7 +778,7 @@ function ShopSortWorkbench({
             <button type="button" onClick={fillGroupsFromOriginalCategory} className="h-9 rounded-xl border border-border px-3 text-xs font-bold text-foreground hover:bg-muted/60">用原分类初始化</button>
             <button type="button" onClick={autoNumberByGroup} className="inline-flex h-9 items-center gap-2 rounded-xl bg-primary px-3 text-xs font-bold text-primary-foreground hover:opacity-90"><ListOrdered size={15} />生成店内码</button>
             <button type="button" onClick={() => { void saveRows(); }} disabled={isSaving || rows.length === 0} className="inline-flex h-9 items-center gap-2 rounded-xl bg-emerald-600 px-3 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"><Save size={15} />{isSaving ? "应用中" : `应用到店铺${changedCount ? ` ${changedCount}` : ""}`}</button>
-            <button type="button" onClick={onClose} className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border text-muted-foreground hover:bg-muted/60" title="关闭"><X size={16} /></button>
+            <button type="button" onClick={() => { void closeWorkbench(); }} className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border text-muted-foreground hover:bg-muted/60" title="关闭"><X size={16} /></button>
           </div>
         </div>
 
@@ -873,6 +926,11 @@ function ShopSortWorkbench({
           <div className="custom-scrollbar shop-sort-scrollbar min-h-0 overflow-auto">
           {isLoading ? (
             <div className="flex h-full items-center justify-center text-sm text-muted-foreground">正在加载排序商品...</div>
+          ) : loadError ? (
+            <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-sm text-muted-foreground">
+              <p>{loadError}，已有排序记忆不会被覆盖。</p>
+              <button type="button" onClick={() => { void loadRows(); }} className="rounded-xl border border-border px-4 py-2 text-foreground">重新加载</button>
+            </div>
           ) : (
             <>
             <div className="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-2 border-b border-border bg-background/95 px-3 py-2 backdrop-blur">

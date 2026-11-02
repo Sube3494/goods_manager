@@ -286,6 +286,7 @@ model User {
   meituanImportBatches  MeituanImportBatch[]
   meituanImportItems    MeituanImportItem[]
   shopTransfers         ShopTransferRecord[]
+  shopSortDrafts        ShopSortDraft[]
 }
 
 model UserDeviceSession {
@@ -658,6 +659,7 @@ model Shop {
   library     ProductLibrary?     @relation(fields: [libraryId], references: [id])
   transfersOut ShopTransferRecord[] @relation("TransferSourceShop")
   transfersIn  ShopTransferRecord[] @relation("TransferTargetShop")
+  sortDrafts   ShopSortDraft[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -667,6 +669,18 @@ model Shop {
   @@index([libraryId])
   @@unique([userId, externalId])
   @@unique([userId, dedupeKey])
+}
+
+model ShopSortDraft {
+  userId    String
+  shopId    String
+  data      Json
+  updatedAt DateTime @updatedAt
+  user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shop      Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@id([userId, shopId])
+  @@index([shopId])
 }
 
 model ShopProduct {
