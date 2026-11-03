@@ -4082,6 +4082,9 @@ export default function FactoryShipmentsPage() {
       startDate,
       endDate,
     }, customerGroupByIdentity)).sort((a, b) => {
+      const pendingPriority = Number(deriveFactoryShipmentStatusFromOrder(b) === "待发货")
+        - Number(deriveFactoryShipmentStatusFromOrder(a) === "待发货");
+      if (pendingPriority) return pendingPriority;
       const latest = (order: OutboundOrder) => Math.max(0, ...getVisibleShipmentItems(order)
         .map((item) => Date.parse(getShipmentItemTime(order, item) || "") || 0));
       return latest(b) - latest(a) || a.id.localeCompare(b.id);
