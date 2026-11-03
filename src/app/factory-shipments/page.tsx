@@ -5297,7 +5297,7 @@ export default function FactoryShipmentsPage() {
               <section>
                 <h3 className="mb-3 text-lg font-bold text-foreground">发货明细</h3>
                 <div className="space-y-2">
-                  {summaryViewData.records.map(({ order, parsed, items }) => (
+                  {summaryViewData.records.slice((currentPage - 1) * pageSize, currentPage * pageSize).map(({ order, parsed, items }) => (
                     <article key={order.id} className="rounded-2xl border border-border bg-white/80 p-3 shadow-sm dark:border-white/10 dark:bg-white/[0.04]">
                       <div className="mb-2 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                         <div className="min-w-0">
@@ -5340,6 +5340,14 @@ export default function FactoryShipmentsPage() {
                     </article>
                   ))}
                 </div>
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  totalItems={totalItems}
+                  pageSize={pageSize}
+                  onPageChange={setCurrentPage}
+                  onPageSizeChange={setPageSize}
+                />
               </section>
             </div>
           ) : (
