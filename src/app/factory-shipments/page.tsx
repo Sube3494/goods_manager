@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import Image from "next/image";
+import { matchesShipmentDate, shipmentTimeText } from "@/lib/shipmentTime";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -1300,6 +1301,15 @@ function getShipmentProductFilterLabel(item: Parameters<typeof getShipmentProduc
   return [split.baseName, split.variantLabel].filter(Boolean).join(" ");
 }
 
+function getShipmentItemTime(order: OutboundOrder, item: OutboundOrder["items"][number]) {
+  const entries = parseFactoryShipmentNote(order.note).trackingEntries;
+  return entries.find((entry) => entry.itemKey === getItemKey(item) || entry.itemKey === getStableShipmentActionKey(item))?.shippedAt;
+}
+
+function shipmentOrderTimeText(order: OutboundOrder, items = order.items) {
+  return Array.from(new Set(items.map((item) => shipmentTimeText(getShipmentItemTime(order, item))))).sort().join(" / ");
+}
+
 function matchesFactoryShipmentFilters(
   order: OutboundOrder,
   filters: ShipmentFilterInput,
@@ -1307,7 +1317,6 @@ function matchesFactoryShipmentFilters(
 ) {
   const parsed = parseFactoryShipmentNote(order.note);
   const derivedStatus = deriveFactoryShipmentStatusFromOrder(order, parsed);
-  const orderDate = order.date ? format(parseSafeDate(order.date), "yyyy-MM-dd") : "";
   const query = filters.searchQuery.trim();
   const itemNames = order.items.map(
     (item) => item.shopProduct?.name || item.product?.name || ""
@@ -1341,9 +1350,11 @@ function matchesFactoryShipmentFilters(
   })) || "";
   const matchesCustomerGroup = filters.customerGroupFilter.includes("all") || filters.customerGroupFilter.length === 0
     || filters.customerGroupFilter.some((group) => group === "__ungrouped" ? !recipientGroup : recipientGroup === group);
-  const matchesStart = !filters.startDate || orderDate >= filters.startDate;
-  const matchesEnd = !filters.endDate || orderDate <= filters.endDate;
-  return matchesSearch && matchesShipping && matchesProduct && matchesPayment && matchesCompensation && matchesCustomerGroup && matchesStart && matchesEnd;
+  const matchesDate = order.items.some((item) =>
+    (filters.productFilter.length === 0 || productFilterSet.has(getShipmentProductFilterKey(item))) &&
+    matchesShipmentDate(getShipmentItemTime(order, item), filters.startDate, filters.endDate)
+  );
+  return matchesSearch && matchesShipping && matchesProduct && matchesPayment && matchesCompensation && matchesCustomerGroup && matchesDate;
 }
 
 function getOrderTotalAmount(order: OutboundOrder) {
@@ -1812,7 +1823,7 @@ function FactoryShipmentFilters({
             value={startDate}
             onChange={onStartDateChange}
             maxDate={endDate}
-            placeholder="开始日期"
+            placeholder="发货开始日期"
             className="h-10 lg:h-11"
             triggerClassName="h-full rounded-full border-border bg-white shadow-sm dark:bg-white/5"
             isCompact
@@ -1821,7 +1832,7 @@ function FactoryShipmentFilters({
             value={endDate}
             onChange={onEndDateChange}
             minDate={startDate}
-            placeholder="结束日期"
+            placeholder="发货结束日期"
             className="h-10 lg:h-11"
             triggerClassName="h-full rounded-full border-border bg-white shadow-sm dark:bg-white/5"
             isCompact
@@ -2417,12 +2428,12 @@ function FactoryShipmentDetailModal({
             </div>
 
             <div className="flex-1 space-y-4 overflow-y-auto p-4 sm:p-5">
-              <div className="grid gap-3 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+              <div className="grid grid-cols-1 gap-3">
                 <div className="rounded-[22px] border border-border/50 bg-linear-to-br from-zinc-50 via-white to-zinc-50/70 p-4 shadow-sm dark:border-white/10 dark:from-white/7 dark:via-white/4 dark:to-white/2">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">发货安排</div>
-                      <div className="mt-1 text-xs text-muted-foreground">单据与创建时间</div>
+                      <div className="mt-1 text-xs text-muted-foreground">单据与发货时间</div>
                     </div>
                     <span className="inline-flex h-7 shrink-0 items-center rounded-full border border-border/60 bg-white/80 px-3 text-[11px] text-muted-foreground shadow-xs dark:border-white/10 dark:bg-white/6">
                       {editItems.length || order.items.length} 项货品
@@ -2448,12 +2459,17 @@ function FactoryShipmentDetailModal({
                       </div>
                     </div>
                   </div>
-                  <div className="mt-3">
-                    {/* 创建时间 */}
+                  <div className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                     <div className="rounded-2xl border border-border/60 bg-white/80 px-3.5 py-3 dark:border-white/10 dark:bg-white/5">
                       <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">创建时间</div>
                       <div className="mt-1.5 font-mono text-[15px] font-semibold tracking-tight text-foreground/90">
-                        {format(parseSafeDate(order.createdAt), "yyyy-MM-dd HH:mm")}
+                        {order.createdAt ? shipmentTimeText(order.createdAt) : "未记录创建时间"}
+                      </div>
+                    </div>
+                    <div className="rounded-2xl border border-border/60 bg-white/80 px-3.5 py-3 dark:border-white/10 dark:bg-white/5">
+                      <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">发货时间</div>
+                      <div className="mt-1.5 font-mono text-[15px] font-semibold tracking-tight text-foreground/90">
+                        {shipmentOrderTimeText(order)}
                       </div>
                     </div>
                   </div>
@@ -4050,6 +4066,11 @@ export default function FactoryShipmentsPage() {
     }
   }, [shipmentOrders, selectedOrderIds, fetchOrders, showToast]);
 
+  const getVisibleShipmentItems = useCallback((order: OutboundOrder) => order.items.filter((item) =>
+    (productFilter.length === 0 || productFilter.includes(getShipmentProductFilterKey(item))) &&
+    matchesShipmentDate(getShipmentItemTime(order, item), startDate, endDate)
+  ), [productFilter, startDate, endDate]);
+
   const filteredOrders = useMemo(() => {
     return shipmentOrders.filter((order) => matchesFactoryShipmentFilters(order, {
       searchQuery,
@@ -4060,34 +4081,39 @@ export default function FactoryShipmentsPage() {
       compensationFilter,
       startDate,
       endDate,
-    }, customerGroupByIdentity));
-  }, [compensationFilter, customerGroupByIdentity, customerGroupFilter, endDate, paymentFilter, productFilter, searchQuery, shipmentOrders, shippingFilter, startDate]);
+    }, customerGroupByIdentity)).sort((a, b) => {
+      const latest = (order: OutboundOrder) => Math.max(0, ...getVisibleShipmentItems(order)
+        .map((item) => Date.parse(getShipmentItemTime(order, item) || "") || 0));
+      return latest(b) - latest(a) || a.id.localeCompare(b.id);
+    });
+  }, [getVisibleShipmentItems, compensationFilter, customerGroupByIdentity, customerGroupFilter, endDate, paymentFilter, productFilter, searchQuery, shipmentOrders, shippingFilter, startDate]);
 
   const stats = useMemo(() => {
-    const totalQuantity = shipmentOrders.reduce((sum, order) => sum + formatQuantity(order), 0);
-    const totalAmount = shipmentOrders
+    const visibleOrders = filteredOrders.map((order) => ({ ...order, items: getVisibleShipmentItems(order) }));
+    const totalQuantity = visibleOrders.reduce((sum, order) => sum + formatQuantity(order), 0);
+    const totalAmount = visibleOrders
       .filter((order) => order.status !== "Returned" && order.status !== "已退回")
       .reduce((sum, order) => sum + getOrderTotalAmount(order), 0);
-    const unpaidCount = shipmentOrders.filter((order) => {
+    const unpaidCount = visibleOrders.filter((order) => {
       const parsed = parseFactoryShipmentNote(order.note);
       return parsed.paymentStatus !== "已支付";
     }).length;
-    const unpaidAmount = shipmentOrders
+    const unpaidAmount = visibleOrders
       .filter((order) => {
         const parsed = parseFactoryShipmentNote(order.note);
         return parsed.paymentStatus !== "已支付";
       })
       .reduce((sum, order) => sum + getOrderTotalAmount(order), 0);
-    const pendingCompensation = shipmentOrders.filter((order) => {
+    const pendingCompensation = visibleOrders.filter((order) => {
       const parsed = parseFactoryShipmentNote(order.note);
       return parsed.compensationStatus === "待补偿";
     }).length;
     const recipientCount = new Set(
-      shipmentOrders.map((order) => parseFactoryShipmentNote(order.note).recipientName).filter(Boolean)
+      visibleOrders.map((order) => parseFactoryShipmentNote(order.note).recipientName).filter(Boolean)
     ).size;
 
     return {
-      totalCount: shipmentOrders.length,
+      totalCount: visibleOrders.length,
       totalQuantity,
       totalAmount,
       unpaidCount,
@@ -4095,7 +4121,7 @@ export default function FactoryShipmentsPage() {
       pendingCompensation,
       recipientCount,
     };
-  }, [shipmentOrders]);
+  }, [filteredOrders, getVisibleShipmentItems]);
 
   const getShipmentCustomerGroup = useCallback((order: OutboundOrder) => {
     const parsed = parseFactoryShipmentNote(order.note);
@@ -4187,7 +4213,7 @@ export default function FactoryShipmentsPage() {
 
       const summaryHeaders = [
         "序号",
-        "单号创建时间",
+        "货品发货时间（分批列出）",
         "单号",
         "发货状态",
         "收件人",
@@ -4363,10 +4389,9 @@ export default function FactoryShipmentsPage() {
         shopProductId: item.shopProductId || item.shopProduct?.id || undefined,
         shopProductVariantId: item.shopProductVariantId || item.shopProductVariant?.id || undefined,
       });
-      const getExportOrderItems = (order: OutboundOrder) => (
-        shouldFilterExportItems
-          ? order.items.filter((item) => exportProductFilterSet.has(getShipmentProductFilterKey(item)))
-          : order.items
+      const getExportOrderItems = (order: OutboundOrder) => order.items.filter((item) =>
+        (!shouldFilterExportItems || exportProductFilterSet.has(getShipmentProductFilterKey(item))) &&
+        matchesShipmentDate(getShipmentItemTime(order, item), exportStartDate, exportEndDate)
       );
 
       exportOrders.forEach((order) => {
@@ -4499,7 +4524,7 @@ export default function FactoryShipmentsPage() {
 
         const summaryRow = summarySheet.addRow([
           summarySheet.rowCount,
-          formattedDate,
+          shipmentOrderTimeText(order, exportItems),
           order.id,
           displayStatus,
           parsed.recipientName || "",
@@ -4553,9 +4578,7 @@ export default function FactoryShipmentsPage() {
             0;
           const shippingFee = Number(trackingEntry?.shippingFee) || 0;
           const subtotal = item.quantity * itemPrice + shippingFee;
-          const itemShippedAtText = trackingEntry?.shippedAt
-            ? format(parseSafeDate(trackingEntry.shippedAt), "yyyy-MM-dd HH:mm")
-            : (trackingEntry?.trackingNumber?.trim() ? "已填单" : "尚未发货");
+          const itemShippedAtText = shipmentTimeText(getShipmentItemTime(order, item));
 
           const detailRow = detailSheet.addRow([
             detailIndex++,
@@ -4819,9 +4842,10 @@ export default function FactoryShipmentsPage() {
       const customerName = parsed.recipientName || "未命名客户";
       const customerStat = customerMap.get(customerKey) || { key: customerKey, name: customerName, orderIds: new Set<string>(), quantity: 0 };
       customerStat.orderIds.add(order.id);
-      const visibleItems = productFilter.length === 0
-        ? order.items
-        : order.items.filter((item) => selectedProductKeySet.has(getShipmentProductFilterKey(item)));
+      const visibleItems = order.items.filter((item) =>
+        (productFilter.length === 0 || selectedProductKeySet.has(getShipmentProductFilterKey(item))) &&
+        matchesShipmentDate(getShipmentItemTime(order, item), startDate, endDate)
+      );
       const items = visibleItems.map((item) => {
         const key = getShipmentProductFilterKey(item);
         const label = getShipmentProductFilterLabel(item);
@@ -4848,7 +4872,7 @@ export default function FactoryShipmentsPage() {
       records,
       totalQuantity: records.reduce((sum, record) => sum + record.items.reduce((itemSum, item) => itemSum + item.quantity, 0), 0),
     };
-  }, [filteredOrders, productFilter]);
+  }, [filteredOrders, productFilter, startDate, endDate]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -5057,14 +5081,14 @@ export default function FactoryShipmentsPage() {
                   <DatePicker
                     value={exportStartDate}
                     onChange={setExportStartDate}
-                    placeholder="开始日期"
+                    placeholder="发货开始日期"
                     className="h-12"
                     triggerClassName="rounded-full border-border bg-zinc-50 px-4 text-sm font-semibold shadow-none dark:border-white/10 dark:bg-white/[0.06]"
                   />
                   <DatePicker
                     value={exportEndDate}
                     onChange={setExportEndDate}
-                    placeholder="结束日期"
+                    placeholder="发货结束日期"
                     className="h-12"
                     triggerClassName="rounded-full border-border bg-zinc-50 px-4 text-sm font-semibold shadow-none dark:border-white/10 dark:bg-white/[0.06]"
                   />
@@ -5276,7 +5300,9 @@ export default function FactoryShipmentsPage() {
                         <div className="min-w-0">
                           <div className="truncate text-sm font-semibold text-foreground">{order.id}</div>
                           <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                            <span>{format(parseSafeDate(order.createdAt), "yyyy/M/d HH:mm", { locale: zhCN })}</span>
+                            <span>发货时间：{shipmentOrderTimeText(order, order.items.filter((item) =>
+                              (productFilter.length === 0 || productFilter.includes(getShipmentProductFilterKey(item))) &&
+                              matchesShipmentDate(getShipmentItemTime(order, item), startDate, endDate)))}</span>
                             <span>{formatRecipientWithRegion(parsed.recipientName, parsed.recipientAddress)}</span>
                           </div>
                         </div>
@@ -5298,11 +5324,11 @@ export default function FactoryShipmentsPage() {
                             <span className="shrink-0 tabular-nums text-primary">x{item.quantity}</span>
                             {item.shippedAt ? (
                               <span className="shrink-0 text-[10px] font-mono text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 bg-emerald-500/10 px-1.5 py-0.5 rounded-full">
-                                {format(parseSafeDate(item.shippedAt), "MM-dd HH:mm")}
+                                {shipmentTimeText(item.shippedAt)}
                               </span>
                             ) : item.trackingNumber?.trim() ? (
                               <span className="shrink-0 text-[10px] font-mono text-amber-600 dark:text-amber-400 border border-amber-500/20 bg-amber-500/10 px-1.5 py-0.5 rounded-full">
-                                已填单
+                                未记录发货时间
                               </span>
                             ) : null}
                           </span>
@@ -5371,7 +5397,7 @@ export default function FactoryShipmentsPage() {
                     </div>
                   </th>
                   <th className="px-4 py-4 text-center text-xs font-normal uppercase tracking-wider text-muted-foreground">序号</th>
-                  <th className="px-4 py-4 text-center text-xs font-normal uppercase tracking-wider text-muted-foreground">创建时间</th>
+                  <th className="px-4 py-4 text-center text-xs font-normal uppercase tracking-wider text-muted-foreground">发货时间</th>
                   <th className="px-4 py-4 text-center text-xs font-normal uppercase tracking-wider text-muted-foreground">收件人</th>
                   <th className="px-4 py-4 text-center text-xs font-normal uppercase tracking-wider text-muted-foreground">货品概览</th>
                   <th className="px-4 py-4 text-center text-xs font-normal uppercase tracking-wider text-muted-foreground">发货状态</th>
@@ -5414,7 +5440,7 @@ export default function FactoryShipmentsPage() {
                       <td className="px-4 py-4 text-center text-xs text-muted-foreground">
                         <div className="flex items-center justify-center gap-2 whitespace-nowrap">
                           <Calendar size={14} className="shrink-0 text-muted-foreground/75" />
-                          <span className="font-mono tabular-nums">{format(parseSafeDate(order.createdAt), "yyyy-MM-dd HH:mm", { locale: zhCN })}</span>
+                          <span className="font-mono tabular-nums">{shipmentOrderTimeText(order, getVisibleShipmentItems(order))}</span>
                         </div>
                       </td>
                       <td className="px-4 py-4 text-center text-sm font-normal text-foreground">
@@ -5447,7 +5473,7 @@ export default function FactoryShipmentsPage() {
                                     isShipped: parsed.compensationStatus === "已补偿",
                                   };
                                 })
-                              : order.items.map((item) => ({
+                              : getVisibleShipmentItems(order).map((item) => ({
                                   id: item.id,
                                   name: resolveShipmentSummaryItemName(item),
                                   image: item.shopProduct?.image || item.product?.image || "",
@@ -5501,7 +5527,7 @@ export default function FactoryShipmentsPage() {
                         <div onClick={(e) => e.stopPropagation()} className="inline-flex justify-center w-full">
                           <CustomSelect
                             value={parsed.paymentStatus || "未支付"}
-                            displayValue={`${parsed.paymentStatus || "未支付"} ￥${getOrderTotalAmount(order).toFixed(2)}`}
+                            displayValue={`${parsed.paymentStatus || "未支付"} ￥${getOrderTotalAmount({ ...order, items: getVisibleShipmentItems(order) }).toFixed(2)}`}
                             onChange={(val) => handleQuickUpdateStatus(order, "paymentStatus", val)}
                             options={paymentStatusOptions}
                             disabled={updatingOrderId === order.id}
@@ -5600,8 +5626,7 @@ export default function FactoryShipmentsPage() {
                         {(currentPage - 1) * pageSize + index + 1}
                       </span>
                       <span className="inline-flex h-6 shrink-0 items-center gap-1 rounded-full border border-border/50 bg-muted/40 px-2 text-[10px] font-normal leading-none text-muted-foreground dark:border-white/8 dark:bg-white/6">
-                        <span>{format(parseSafeDate(order.createdAt), "MM-dd")}</span>
-                        <span>{format(parseSafeDate(order.createdAt), "HH:mm")}</span>
+                        <span className="whitespace-normal">{shipmentOrderTimeText(order, getVisibleShipmentItems(order))}</span>
                       </span>
                       <div className="min-w-0">
                         <div className="truncate text-sm font-normal text-foreground" title={[parsed.recipientName, parsed.recipientAddress].filter(Boolean).join(" ")}>
@@ -5645,7 +5670,7 @@ export default function FactoryShipmentsPage() {
                               isShipped: parsed.compensationStatus === "已补偿",
                             };
                           })
-                        : order.items.map((item) => ({
+                        : getVisibleShipmentItems(order).map((item) => ({
                             id: item.id,
                             name: resolveShipmentSummaryItemName(item),
                             image: item.shopProduct?.image || item.product?.image || "",
@@ -5694,13 +5719,13 @@ export default function FactoryShipmentsPage() {
                   <div className="flex h-11 min-w-0 items-center justify-center rounded-2xl border border-border/40 bg-muted/25 px-2.5 dark:border-white/6 dark:bg-white/4">
                     <div className="flex items-center gap-1 text-xs text-muted-foreground whitespace-nowrap">
                       <span>合计</span>
-                      <span className="font-normal text-foreground">{formatQuantity(order)}件</span>
+                      <span className="font-normal text-foreground">{formatQuantity({ ...order, items: getVisibleShipmentItems(order) })}件</span>
                     </div>
                   </div>
                   <div className="min-w-0" onClick={(e) => e.stopPropagation()}>
                     <CustomSelect
                       value={parsed.paymentStatus || "未支付"}
-                      displayValue={`${parsed.paymentStatus || "未支付"} ￥${getOrderTotalAmount(order).toFixed(2)}`}
+                      displayValue={`${parsed.paymentStatus || "未支付"} ￥${getOrderTotalAmount({ ...order, items: getVisibleShipmentItems(order) }).toFixed(2)}`}
                       onChange={(val) => handleQuickUpdateStatus(order, "paymentStatus", val)}
                       options={paymentStatusOptions}
                       disabled={updatingOrderId === order.id}
