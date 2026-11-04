@@ -4082,9 +4082,14 @@ export default function FactoryShipmentsPage() {
       startDate,
       endDate,
     }, customerGroupByIdentity)).sort((a, b) => {
-      const pendingPriority = Number(deriveFactoryShipmentStatusFromOrder(b) === "待发货")
-        - Number(deriveFactoryShipmentStatusFromOrder(a) === "待发货");
+      const aPending = deriveFactoryShipmentStatusFromOrder(a) === "待发货";
+      const bPending = deriveFactoryShipmentStatusFromOrder(b) === "待发货";
+      const pendingPriority = Number(bPending) - Number(aPending);
       if (pendingPriority) return pendingPriority;
+      if (aPending && bPending) {
+        return (Date.parse(b.createdAt || "") || 0) - (Date.parse(a.createdAt || "") || 0)
+          || a.id.localeCompare(b.id);
+      }
       const latest = (order: OutboundOrder) => Math.max(0, ...getVisibleShipmentItems(order)
         .map((item) => Date.parse(getShipmentItemTime(order, item) || "") || 0));
       return latest(b) - latest(a) || a.id.localeCompare(b.id);
