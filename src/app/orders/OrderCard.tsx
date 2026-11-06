@@ -29,6 +29,7 @@ import {
   X,
 } from "lucide-react";
 import { HoverCard, HoverCardTrigger, HoverCardContent, HoverCardArrow } from "@/components/ui/hover-card";
+import { Popover } from "radix-ui";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/Toast";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
@@ -1594,14 +1595,25 @@ export function QueuedSelfDeliveryNotice({ order }: { order: AutoPickOrder }) {
   if (isAutoPickOrderCompletedStatus(order.status)) return null;
   if (!job?.error || (job.status !== "failed" && job.status !== "cancelled")) return null;
   return (
-    <HoverCard openDelay={200}>
-      <HoverCardTrigger asChild>
-        <button type="button" onClick={(event) => event.stopPropagation()} className="inline-flex shrink-0 items-center gap-1 rounded-full border border-rose-500/20 bg-rose-500/10 px-2 py-1 text-[11px] text-rose-700 dark:text-rose-300">
+    <Popover.Root>
+      <Popover.Trigger asChild>
+        <button type="button" title={job.error} onClick={(event) => event.stopPropagation()} className="inline-flex shrink-0 items-center gap-1 rounded-full border border-rose-500/20 bg-rose-500/10 px-2 py-1 text-[11px] text-rose-700 dark:text-rose-300">
           <TriangleAlert size={12} />{job.status === "failed" ? "自动自配失败" : "自动自配已停止"}
         </button>
-      </HoverCardTrigger>
-      <HoverCardContent className="w-64 text-xs leading-5">{job.error}</HoverCardContent>
-    </HoverCard>
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Content
+          aria-label="自动自配详情"
+          sideOffset={6}
+          collisionPadding={12}
+          onClick={(event) => event.stopPropagation()}
+          className="z-[100] w-64 max-w-[calc(100vw-24px)] rounded-lg bg-popover p-2.5 text-xs leading-5 text-popover-foreground shadow-md ring-1 ring-foreground/10"
+        >
+          <p className="font-semibold">自动自配详情</p>
+          <p className="mt-1 whitespace-pre-wrap wrap-break-word">{job.error}</p>
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
   );
 }
 
