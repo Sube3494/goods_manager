@@ -66,6 +66,7 @@ export function StoreLocationMap({ userId }: { userId: string }) {
   // 状态：城市、点位与存储
   const [cities, setCities] = useState<Record<string, CityConfig>>(DEFAULT_RADIUS_CITIES);
   const [activeCityId, setActiveCityId] = useState<string>("nationwide");
+  const [loadedCityId, setLoadedCityId] = useState<string | null>(null);
   const [points, setPoints] = useState<Point[]>([]);
   const [isAddingPoint, setIsAddingPoint] = useState<boolean>(false);
 
@@ -136,10 +137,14 @@ export function StoreLocationMap({ userId }: { userId: string }) {
 
   // 城市选择项数据适配 CustomSelect
   const citySelectOptions = useMemo(() => {
-    return Object.entries(cities).map(([key, item]) => ({
-      value: key,
-      label: item.name,
-    }));
+    const { nationwide, ...regions } = cities;
+    return [
+      { value: "nationwide", label: nationwide.name },
+      ...Object.entries(regions).map(([key, item]) => ({
+        value: key,
+        label: item.provinceName ? `${item.provinceName} · ${item.name}` : item.name,
+      })),
+    ];
   }, [cities]);
 
   // 读取当前账号的城市缓存；旧版未归属账号的缓存保持原样，不自动迁移。
@@ -168,7 +173,11 @@ export function StoreLocationMap({ userId }: { userId: string }) {
         localStorage.setItem("store-location:marker-style", "airbnb");
       }
       const lastCity = localStorage.getItem("store-location:last-city");
+      const lastRegion = JSON.parse(localStorage.getItem("store-location:last-region") || "null") as CityConfig | null;
       if (lastCity && (DEFAULT_RADIUS_CITIES[lastCity] || savedCities.some((c: any) => c.code === lastCity))) {
+        setActiveCityId(lastCity);
+      } else if (lastRegion && lastCity === lastRegion.code) {
+        setCities((prev) => ({ ...prev, [lastCity]: lastRegion }));
         setActiveCityId(lastCity);
       }
     } catch {
@@ -176,35 +185,88 @@ export function StoreLocationMap({ userId }: { userId: string }) {
     }
   }, [localStorage]);
 
+  useEffect(() => {
+    const AMap = amapSdkRef.current;
+    if (!isMapReady || !AMap) return;
+
+    type District = {
+      adcode: string;
+      name: string;
+      center?: { getLat(): number; getLng(): number };
+      districtList?: District[];
+    };
+    let cancelled = false;
+    const searcher = new AMap.DistrictSearch({ level: "country", subdistrict: 3, extensions: "base" });
+    searcher.search("中国", (status: string, result: { districtList?: District[] }) => {
+      const provinces = result?.districtList?.[0]?.districtList;
+      if (cancelled || status !== "complete" || !provinces?.length) return;
+
+      const entries = provinces.flatMap((province) => [
+        { district: province, provinceName: undefined, zoom: 7 },
+        ...(province.districtList || [])
+          .filter((city) => city.adcode !== province.adcode)
+          .flatMap((city) => [
+            { district: city, provinceName: province.name, zoom: 12 },
+            ...(city.districtList || [])
+              .filter((district) => district.adcode !== city.adcode && district.name.endsWith("市"))
+              .map((district) => ({ district, provinceName: province.name, zoom: 12 })),
+          ]),
+      ]);
+      setCities((previous) => {
+        const next = { ...previous };
+        const existingIds = new Map(Object.entries(previous).map(([id, city]) => [city.code, id]));
+        for (const { district, provinceName, zoom } of entries) {
+          const code = String(district.adcode);
+          if (!/^\d{6}$/.test(code) || !district.name || !district.center) continue;
+          const id = existingIds.get(code) ?? code;
+          const existing = next[id];
+          if (existing) {
+            next[id] = { ...existing, provinceName };
+            continue;
+          }
+          const { lat, lng } = gcj02ToWgs84(district.center.getLat(), district.center.getLng());
+          if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+          next[id] = { code, name: district.name, shortName: district.name, provinceName, center: [lat, lng], zoom, points: [] };
+        }
+        return next;
+      });
+    });
+    return () => { cancelled = true; };
+  }, [isMapReady]);
+
   // 切换城市时读取当前城市点位
   useEffect(() => {
     if (!activeCityId) return;
     try {
       localStorage.setItem("store-location:last-city", activeCityId);
+      if (!DEFAULT_RADIUS_CITIES[activeCityId]) {
+        localStorage.setItem("store-location:last-region", JSON.stringify(activeCity));
+      }
       const saved = localStorage.getItem(`store-location:points:${activeCityId}`);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) {
           setPoints(parsed);
+          setLoadedCityId(activeCityId);
           return;
         }
       }
     } catch {
       // 容错
     }
-    const defaultCity = cities[activeCityId];
-    setPoints(defaultCity ? [...defaultCity.points] : []);
-  }, [activeCityId, cities, localStorage]);
+    setPoints([...activeCity.points]);
+    setLoadedCityId(activeCityId);
+  }, [activeCityId, activeCity, localStorage]);
 
   // 点位更新时自动持久化到当前城市
   useEffect(() => {
-    if (!activeCityId) return;
+    if (loadedCityId !== activeCityId) return;
     try {
       localStorage.setItem(`store-location:points:${activeCityId}`, JSON.stringify(points));
     } catch {
       // 容错
     }
-  }, [points, activeCityId, localStorage]);
+  }, [points, activeCityId, loadedCityId, localStorage]);
 
   // 点击外部自动收起搜索候选浮层
   useEffect(() => {
@@ -786,7 +848,7 @@ export function StoreLocationMap({ userId }: { userId: string }) {
   // 加载当前城市的下辖行政区列表
   const loadCityDistricts = useCallback(() => {
     const AMap = amapSdkRef.current;
-    if (!AMap || !activeCity || activeCity.code === "nationwide") {
+    if (!AMap || !activeCity || activeCity.code === "100000") {
       setAvailableDistricts([]);
       setSelectedDistrictCodes([]);
       clearDistrictPolygons();
@@ -800,10 +862,9 @@ export function StoreLocationMap({ userId }: { userId: string }) {
     const searcher = new AMap.DistrictSearch({
       subdistrict: 1,
       extensions: "base",
-      level: "city",
     });
 
-    searcher.search(activeCity.name, (status: string, result: any) => {
+    searcher.search(activeCity.code, (status: string, result: any) => {
       setIsLoadingDistricts(false);
       if (status === "complete" && result?.districtList?.[0]) {
         const subList = result.districtList[0].districtList || [];
@@ -916,7 +977,6 @@ export function StoreLocationMap({ userId }: { userId: string }) {
         const boundarySearcher = new AMap.DistrictSearch({
           subdistrict: 0,
           extensions: "all",
-          level: "district",
         });
         boundarySearcher.search(district.adcode, (status: string, result: any) => {
           if (status === "complete" && result?.districtList?.[0]?.boundaries) {
@@ -1051,33 +1111,30 @@ export function StoreLocationMap({ userId }: { userId: string }) {
             if (dStatus === "complete" && dResult?.districtList?.length) {
               const district = dResult.districtList[0];
               const { lat, lng } = gcj02ToWgs84(district.center.getLat(), district.center.getLng());
-              const code = district.adcode || String(Date.now());
+              const code = String(district.adcode || Date.now());
               const name = district.name;
 
-              // 自动将新城市加入列表并切换视野
-              setCities((prev) => {
-                if (prev[code]) return prev;
-                const next = {
-                  ...prev,
-                  [code]: {
-                    name,
-                    shortName: name.replace(/[市县省区]/g, "") || name,
-                    code,
-                    center: [lat, lng] as [number, number],
-                    zoom: 12,
-                    points: [],
-                  },
+              const existingId = Object.keys(cities).find((id) => cities[id].code === code);
+              if (!existingId) {
+                const region: CityConfig = {
+                  name,
+                  shortName: name,
+                  code,
+                  center: [lat, lng],
+                  zoom: 12,
+                  points: [],
                 };
+                setCities((prev) => prev[code] ? prev : { ...prev, [code]: region });
                 try {
-                  const customOnly = (Object.values(next) as CityConfig[]).filter((c) => !DEFAULT_RADIUS_CITIES[c.code]);
-                  localStorage.setItem("store-location:custom-cities", JSON.stringify(customOnly));
+                  const saved = JSON.parse(localStorage.getItem("store-location:custom-cities") || "[]") as CityConfig[];
+                  const custom = Array.isArray(saved) ? saved.filter((item) => item.code !== code) : [];
+                  localStorage.setItem("store-location:custom-cities", JSON.stringify([...custom, region]));
                 } catch {
                   // 容错
                 }
-                return next;
-              });
+              }
 
-              setActiveCityId(code);
+              setActiveCityId(existingId ?? code);
               if (mapInstanceRef.current) {
                 mapInstanceRef.current.setZoomAndCenter(12, [district.center.getLng(), district.center.getLat()]);
               }
@@ -1214,7 +1271,7 @@ export function StoreLocationMap({ userId }: { userId: string }) {
                 setSearchResults([]);
               }}
               searchable
-              searchPlaceholder="输入城市名或拼音搜索..."
+              searchPlaceholder="输入省市名称或拼音搜索..."
               placeholder="选择分析地区"
               triggerClassName="h-9 rounded-full border border-black/8 bg-white/80 hover:bg-white dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8 px-4 text-xs font-semibold text-foreground transition-all shadow-xs"
             />
