@@ -38,6 +38,7 @@ import { CustomSelect } from "@/components/ui/CustomSelect";
 import { useToast } from "@/components/ui/Toast";
 import { cn } from "@/lib/utils";
 import { createLocationStorage } from "./locationStorage";
+import { exportLocationWorkbook, parseLocationRows, readLocationWorkbook, type ImportPoint } from "./locationSpreadsheet";
 import {
   Point,
   CityConfig,
@@ -69,6 +70,13 @@ export function StoreLocationMap({ userId }: { userId: string }) {
   const [loadedCityId, setLoadedCityId] = useState<string | null>(null);
   const [points, setPoints] = useState<Point[]>([]);
   const [isAddingPoint, setIsAddingPoint] = useState<boolean>(false);
+  const [isImportOpen, setIsImportOpen] = useState(false);
+  const [importText, setImportText] = useState("");
+  const [importProgress, setImportProgress] = useState("");
+  const [importError, setImportError] = useState("");
+  const importController = useRef<AbortController | null>(null);
+
+  useEffect(() => () => importController.current?.abort(), [activeCityId, points]);
 
   // 状态：地点搜索
   const [locationSearchQuery, setLocationSearchQuery] = useState("");
@@ -1214,47 +1222,107 @@ export function StoreLocationMap({ userId }: { userId: string }) {
     setLocationSearchQuery("");
   };
 
-  // 导出分析 JSON
-  const handleExportJson = () => {
-    const payload = {
-      city: activeCity.name,
-      cityCode: activeCity.code,
-      exportedAt: new Date().toISOString(),
-      points,
-      analysis,
-    };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `${activeCity.shortName}_开店选址覆盖分析.json`;
-    link.click();
-    URL.revokeObjectURL(url);
-    showToast("选址分析文件已成功导出", "success");
+  const handleExportExcel = async () => {
+    try {
+      await exportLocationWorkbook(activeCity.name, points, analysis);
+      showToast("选址分析 Excel 已导出", "success");
+    } catch {
+      showToast("Excel 导出失败，请重试", "error");
+    }
   };
 
-  // 导入点位 JSON
-  const handleImportJson = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const data = JSON.parse(event.target?.result as string);
-        const importedPoints = Array.isArray(data) ? data : data.points;
-        if (!Array.isArray(importedPoints)) {
-          throw new Error("JSON 格式不符");
-        }
-        setPoints(importedPoints.slice(0, 20));
-        showToast("点位数据导入成功", "success");
-      } catch {
-        showToast("导入失败，文件格式有误", "error");
+  const importPoints = async (readRows: () => ImportPoint[] | Promise<ImportPoint[]>) => {
+    if (importController.current) return;
+    const controller = new AbortController();
+    importController.current = controller;
+    setImportError("");
+    setImportProgress("正在读取点位…");
+    try {
+      const rows = await readRows();
+      if (controller.signal.aborted) return;
+      const needsLocation = rows.some(({ lat, lng }) => lat === undefined || lng === undefined);
+      const AMap = amapSdkRef.current;
+      if (needsLocation && (!isMapReady || !AMap)) {
+        throw new Error("高德地图尚未就绪，请等待地图加载后再导入地名。");
       }
-      e.target.value = "";
-    };
-    reader.readAsText(file);
+
+      const nationwide = activeCityId === "nationwide";
+      const city = nationwide ? "全国" : activeCity.code;
+      const search = needsLocation ? new AMap.PlaceSearch({
+        city, citylimit: !nationwide, pageSize: 5, extensions: "base",
+      }) : null;
+      const geocoder = needsLocation ? new AMap.Geocoder({ city }) : null;
+      const resolved: Point[] = [];
+      const failures: string[] = [];
+      for (const [index, { row, lat, lng, ...point }] of rows.entries()) {
+        if (controller.signal.aborted) return;
+        if (lat !== undefined && lng !== undefined) {
+          resolved.push({ ...point, lat, lng });
+          continue;
+        }
+
+        setImportProgress(`正在定位 ${index + 1}/${rows.length}：${point.name}`);
+        const match = await new Promise<SearchCandidate | null>((resolve) => {
+          let finished = false;
+          const finish = (candidate: SearchCandidate | null) => {
+            finished = true;
+            clearTimeout(timeout);
+            controller.signal.removeEventListener("abort", cancel);
+            resolve(candidate);
+          };
+          const cancel = () => finish(null);
+          const timeout = setTimeout(cancel, 8000);
+          controller.signal.addEventListener("abort", cancel, { once: true });
+          const acceptLocation = (location: any, address?: string) => {
+            if (finished || !location) return false;
+            const coordinates = gcj02ToWgs84(location.getLat(), location.getLng());
+            if (!Number.isFinite(coordinates.lat) || !Number.isFinite(coordinates.lng)) return false;
+            finish({ name: point.name, address: address || point.address, ...coordinates });
+            return true;
+          };
+          const query = point.address || point.name;
+          search.search(query, (status: string, result: any) => {
+            if (finished) return;
+            const candidates = status === "complete" ? result?.poiList?.pois || [] : [];
+            const poi = candidates.find((item: any) => item.location && item.name === point.name)
+              || candidates.find((item: any) => item.location);
+            if (acceptLocation(poi?.location, [poi?.pname, poi?.cityname, poi?.adname, poi?.address].filter(Boolean).join(""))) return;
+            geocoder.getLocation(query, (geoStatus: string, geoResult: any) => {
+              if (finished) return;
+              const geocode = geoStatus === "complete" ? geoResult?.geocodes?.[0] : null;
+              if (!acceptLocation(geocode?.location, geocode?.formattedAddress)) finish(null);
+            });
+          });
+        });
+        if (controller.signal.aborted) return;
+        if (match) {
+          resolved.push({ ...point, ...match });
+        } else {
+          failures.push(`第 ${row} 行：${point.name}`);
+        }
+      }
+
+      if (failures.length) {
+        throw new Error(`以下地名定位失败，请补充城市或详细地址后重试。当前点位已保留。\n${failures.join("\n")}`);
+      }
+      clearPreviewMarker();
+      setPoints(resolved);
+      setImportText("");
+      setIsImportOpen(false);
+      const map = mapInstanceRef.current;
+      if (map) map.panTo(wgs84ToGcj02(resolved[0].lat, resolved[0].lng));
+      showToast(`已导入 ${resolved.length} 个点位`, "success");
+    } catch (error) {
+      if (!controller.signal.aborted) {
+        setImportError(error instanceof Error ? error.message : "导入失败，请检查内容后重试。");
+      }
+    } finally {
+      importController.current = null;
+      setImportProgress("");
+      if (controller.signal.aborted) setImportError("地区或点位已变更，本次导入已取消。");
+    }
   };
+
 
   return (
     <div className="flex h-full w-full flex-col bg-background text-foreground overflow-hidden">
@@ -1518,11 +1586,11 @@ export function StoreLocationMap({ userId }: { userId: string }) {
           </button>
           <button
             type="button"
-            onClick={handleExportJson}
+            onClick={handleExportExcel}
             className="inline-flex h-9 items-center gap-1.5 rounded-full border border-black/8 bg-white/80 hover:bg-white dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8 px-4 text-xs font-semibold text-foreground transition-all active:scale-95 shadow-xs cursor-pointer"
           >
             <Download size={13} />
-            <span>导出</span>
+            <span>导出 Excel</span>
           </button>
         </div>
       </header>
@@ -1813,13 +1881,55 @@ export function StoreLocationMap({ userId }: { userId: string }) {
           )}
           </div>
 
+          {isImportOpen && (
+            <section className="shrink-0 space-y-2 border-t border-black/8 pt-2.5 text-xs dark:border-white/10">
+              <p className="text-muted-foreground">
+                每行一个地名，最多 20 个。Excel 第一列可直接填地名。导入成功后会覆盖「{activeCity.name}」的现有点位。
+              </p>
+              <textarea
+                aria-label="粘贴地名列表"
+                rows={4}
+                value={importText}
+                onChange={(event) => setImportText(event.target.value)}
+                disabled={!!importProgress}
+                placeholder={"福州三坊七巷\n福州东百中心"}
+                className="w-full resize-y rounded-lg border border-black/10 bg-background p-2 dark:border-white/15"
+              />
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => void importPoints(() => parseLocationRows(importText.split(/\r\n|\n|\r/).map((line) => line.split("\t"))))}
+                  disabled={!importText.trim() || !!importProgress}
+                  className="rounded-full bg-primary px-3 py-1.5 font-semibold text-primary-foreground disabled:opacity-50"
+                >
+                  导入粘贴内容
+                </button>
+                <label className="cursor-pointer rounded-full border border-black/10 px-3 py-1.5 font-semibold dark:border-white/15">
+                  上传 Excel
+                  <input
+                    type="file"
+                    accept=".xlsx,.xls"
+                    className="sr-only"
+                    disabled={!!importProgress}
+                    onChange={(event) => {
+                      const file = event.currentTarget.files?.[0];
+                      event.currentTarget.value = "";
+                      if (file) void importPoints(() => readLocationWorkbook(file));
+                    }}
+                  />
+                </label>
+              </div>
+              {importProgress && <p role="status" className="text-muted-foreground">{importProgress}</p>}
+              {importError && <p role="alert" className="max-h-24 overflow-y-auto whitespace-pre-line text-destructive">{importError}</p>}
+            </section>
+          )}
+
           {/* 底部导入/重置操作栏 */}
           <div className="flex items-center gap-2 pt-2.5 border-t border-black/8 dark:border-white/10">
-            <label className="flex-1 h-8 flex items-center justify-center gap-1.5 rounded-full border border-black/8 bg-white/80 hover:bg-white dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8 text-xs font-medium transition-all active:scale-95 shadow-xs cursor-pointer">
+            <button type="button" aria-expanded={isImportOpen} onClick={() => setIsImportOpen((open) => !open)} className="flex-1 h-8 flex items-center justify-center gap-1.5 rounded-full border border-black/8 bg-white/80 hover:bg-white dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8 text-xs font-medium transition-all active:scale-95 shadow-xs cursor-pointer">
               <Upload size={12} />
-              <span>导入点位</span>
-              <input type="file" accept=".json" onChange={handleImportJson} className="hidden" />
-            </label>
+              <span>{isImportOpen ? "收起导入" : "导入点位"}</span>
+            </button>
             <button
               type="button"
               onClick={() => {
