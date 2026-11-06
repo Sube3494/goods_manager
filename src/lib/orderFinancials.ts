@@ -199,16 +199,28 @@ export function resolveCancelledJDDeliveredCommissionLoss(order: {
   return 0;
 }
 
+export function resolveOfflineReturnRetainedIncome(input: {
+  platform?: string | null;
+  actualPaid?: number | null;
+  refundAmount: number;
+  fullyReturned: boolean;
+}) {
+  if (!input.fullyReturned || !["线下交易", "other"].includes(String(input.platform || "").toLowerCase())) return 0;
+  const paid = Number(input.actualPaid || 0);
+  return input.refundAmount > 0 && input.refundAmount < paid ? paid - input.refundAmount : 0;
+}
+
 export function resolveCancelledOrderPureProfit(
   deliveryFeeLoss: unknown,
   returnExtraExpense: unknown,
   platformCommissionLoss?: unknown,
+  retainedIncome = 0,
 ) {
   const delivery = Math.max(0, Number(deliveryFeeLoss || 0));
   const expense = Number(returnExtraExpense || 0);
   const commission = Math.max(0, Number(platformCommissionLoss || 0));
   const netExpense = delivery + expense + commission;
-  return netExpense !== 0 ? -netExpense : null;
+  return retainedIncome !== 0 || netExpense !== 0 ? retainedIncome - netExpense : null;
 }
 function isRefundableMeituanDelivery(delivery: unknown) {
   const deliveryObj = delivery && typeof delivery === "object" && !Array.isArray(delivery)

@@ -1622,7 +1622,7 @@ export function StatusBadge({ order, isProfitUpdating = false, canViewProductCos
   const tone = getStatusTone(display);
   const fullyRefunded = isOrderFullyRefunded(order);
   const isCancelled = display === "已取消" || isCancelledStatus(order.status) || fullyRefunded;
-  const cancelReason = isCancelled ? (getCancelReason(order) || (fullyRefunded ? "全单退款" : "")) : "";
+  const cancelReason = isCancelled ? (getCancelReason(order) || (order.retainedRefundIncome ? "已退货，部分退款" : fullyRefunded ? "全单退款" : "")) : "";
   return (
     <OrderStatusProfitPreview order={order} isProfitUpdating={isProfitUpdating} canViewProductCosts={canViewProductCosts} profitBadgeVisible={shouldShowOrderProfitBadge(order, canViewProductCosts, isProfitUpdating)} cancelReason={cancelReason}>
       <span className={cn("inline-flex h-7 items-center gap-1.5 rounded-full border px-2 text-[11px] font-medium leading-none sm:h-8 sm:gap-1.5 sm:px-2.5 sm:text-[13px]", tone.badge)}>
@@ -3314,7 +3314,8 @@ export const OrderProfitBadge = memo(function OrderProfitBadge({
   const pureProfitTooltipRows: Array<{ label: string; value: string; editable?: boolean; onEdit?: () => void }> = hasPureProfit
     ? (cancelled
       ? [
-          { label: "订单状态", value: isFullyRefunded ? "全单已退款" : "订单已取消" },
+          { label: "订单状态", value: order.retainedRefundIncome ? "已退货，部分退款" : isFullyRefunded ? "全单已退款" : "订单已取消" },
+          ...(order.retainedRefundIncome ? [{ label: "退款后保留收入", value: toCurrency(order.retainedRefundIncome) }] : []),
           ...(deliveryFee > 0 ? [{ label: "配送费损失", value: toCurrency(-deliveryFee) }] : []),
           ...(cancelledCommissionLoss > 0 ? [{ label: "平台佣金损失（送达不退）", value: toCurrency(-cancelledCommissionLoss) }] : []),
           ...(hasReturnExtraExpense ? [{ label: "退货支出", value: toCurrency(-returnExtraExpense) }] : []),

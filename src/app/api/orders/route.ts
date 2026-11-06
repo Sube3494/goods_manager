@@ -60,6 +60,7 @@ import {
   resolveCancelledOrderPureProfit,
   resolveOrderRefundAmount,
   resolveRefundAdjustedIncomeMetrics,
+  resolveOfflineReturnRetainedIncome,
 } from "@/lib/orderFinancials";
 
 export const dynamic = "force-dynamic";
@@ -1909,6 +1910,9 @@ export async function GET(request: NextRequest) {
           const refundAmount = readRefundAmountFromRawPayload(order.rawPayload, actualPaid, outboundMeta);
           const fullyRefunded = isFullyRefundedOrder(actualPaid, refundAmount) || outboundMeta?.isFullyReturned === true;
           const cancelled = rawCancelled || fullyRefunded;
+          const retainedRefundIncome = deleted ? 0 : resolveOfflineReturnRetainedIncome({
+            platform: order.platform, actualPaid, refundAmount, fullyReturned: outboundMeta?.isFullyReturned === true,
+          });
           const lockedResolvedShop = readResolvedAutoPickShop(order.rawPayload);
           const mappingDebug = resolveMappedShopDebug(
             order.shopId,
@@ -1944,13 +1948,13 @@ export async function GET(request: NextRequest) {
             }
             return acc.shopProfit[shopProfitKey];
           };
-          if ((cancelled || deleted) && hasRealizedCancelledDeliveryCost({
+          if ((cancelled || deleted) && (retainedRefundIncome > 0 || hasRealizedCancelledDeliveryCost({
             deliveryFee,
             completedAt: (order as Record<string, unknown>).completedAt,
             platform: order.platform,
             delivery: order.delivery,
             rawPayload: order.rawPayload,
-          })) {
+          }))) {
             acc.totalDeliveryFee += deliveryFee;
             acc.platformDelivery[platform] = (acc.platformDelivery[platform] || 0) + deliveryFee;
             acc.pureProfit -= deliveryFee;
@@ -1964,6 +1968,21 @@ export async function GET(request: NextRequest) {
             shopProfit.platformProfit[platform] = (shopProfit.platformProfit[platform] || 0) - deliveryFee;
           }
           if (cancelled || deleted) {
+            if (retainedRefundIncome > 0) {
+              const shopProfit = ensureShopProfit();
+              const retainedAfterReturn = retainedRefundIncome - (outboundMeta?.extraExpense || 0);
+              acc.pureProfit += retainedAfterReturn;
+              acc.receivedAmount += retainedRefundIncome;
+              acc.realReceivedAmount += retainedRefundIncome;
+              shopProfit.amount += retainedAfterReturn;
+              shopProfit.receivedAmount += retainedRefundIncome;
+              shopProfit.realReceivedAmount += retainedRefundIncome;
+              acc.platformProfit[platform] ??= { amount: 0, count: 0 };
+              acc.platformProfit[platform].amount += retainedAfterReturn;
+              shopProfit.platformProfit[platform] = (shopProfit.platformProfit[platform] || 0) + retainedAfterReturn;
+              acc.platformReceived[platform] ??= { amount: 0, count: 0 };
+              acc.platformReceived[platform].amount += retainedRefundIncome;
+            }
             const cancelledCommissionLoss = resolveCancelledJDDeliveredCommissionLoss({
               platform,
               delivery: order.delivery,
@@ -1988,7 +2007,7 @@ export async function GET(request: NextRequest) {
 
             const cancelledExtraExpenses = readOrderExtraExpensesFromRawPayload(order.rawPayload);
             const cancelledTotalExtraExpense = calculateOrderTotalExtraExpense(cancelledExtraExpenses);
-            if (cancelledTotalExtraExpense > 0) {
+            if (cancelledTotalExtraExpense > 0 || (retainedRefundIncome > 0 && cancelledTotalExtraExpense < 0)) {
               acc.pureProfit -= cancelledTotalExtraExpense;
               if (!acc.platformProfit[platform]) {
                 acc.platformProfit[platform] = { amount: 0, count: 0 };
@@ -2593,6 +2612,9 @@ export async function GET(request: NextRequest) {
       const refundAmount = readRefundAmountFromRawPayload(order.rawPayload, order.actualPaid, outboundMeta);
       const isFullyRefunded = isFullyRefundedOrder(order.actualPaid, refundAmount) || outboundMeta?.isFullyReturned === true;
       const cancelled = rawCancelled || isFullyRefunded;
+      const retainedRefundIncome = deleted ? 0 : resolveOfflineReturnRetainedIncome({
+        platform: order.platform, actualPaid: order.actualPaid, refundAmount, fullyReturned: outboundMeta?.isFullyReturned === true,
+      });
       const returnExtraExpense = outboundMeta?.extraExpense || 0;
       const adjustedMetrics = resolveRefundAdjustedIncomeMetrics({
         platform: order.platform,
@@ -2612,13 +2634,13 @@ export async function GET(request: NextRequest) {
       const hasOutbound = Boolean(outboundMeta);
       const hasFulfillmentItems = hasAutoPickFulfillmentItems(order.items);
       const cancelledDeliveryLoss = (cancelled || deleted)
-        && hasRealizedCancelledDeliveryCost({
+        && (retainedRefundIncome > 0 || hasRealizedCancelledDeliveryCost({
           deliveryFee,
           completedAt: (order as Record<string, unknown>).completedAt,
           platform: order.platform,
           delivery: order.delivery,
           rawPayload: order.rawPayload,
-        });
+        }));
       const manualDeliveryLoss = isOfflineManualDeliveryLossOrder({
         platform: order.platform,
         actualPaid: order.actualPaid,
@@ -2668,6 +2690,7 @@ export async function GET(request: NextRequest) {
         cancelledDeliveryLoss ? deliveryFee : 0,
         returnExtraExpense + totalExtraExpense,
         cancelledCommissionLoss,
+        retainedRefundIncome,
       );
 
       const pureProfit = hiddenDeletedOfflineIncome
@@ -2698,6 +2721,7 @@ export async function GET(request: NextRequest) {
         actualPaid: order.actualPaid,
         expectedIncome: safeExpectedIncome,
         refundAmount,
+        retainedRefundIncome,
         cancelReason: readCancelReasonFromRawPayload(order.rawPayload),
         returnExtraExpense,
         cancelledCommissionLoss: cancelledCommissionLoss > 0 ? cancelledCommissionLoss : null,

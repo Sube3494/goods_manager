@@ -7,8 +7,19 @@ import {
   readConfirmedRefundAmountFromRawPayload,
   resolveCancelledJDDeliveredCommissionLoss,
   resolveCancelledOrderPureProfit,
+  resolveOfflineReturnRetainedIncome,
   resolveOrderRefundAmount,
 } from "../src/lib/orderFinancials.ts";
+
+const offlineReturn = { platform: "线下交易", actualPaid: 47000, refundAmount: 46000, fullyReturned: true };
+const retainedIncome = resolveOfflineReturnRetainedIncome(offlineReturn);
+assert.equal(retainedIncome, 1000);
+assert.equal(resolveCancelledOrderPureProfit(882, 0, 0, retainedIncome), 118);
+assert.equal(resolveCancelledOrderPureProfit(882, 118, 0, retainedIncome), 0);
+assert.equal(resolveOfflineReturnRetainedIncome({ ...offlineReturn, refundAmount: 47000 }), 0);
+assert.equal(resolveOfflineReturnRetainedIncome({ ...offlineReturn, refundAmount: 0 }), 0);
+assert.equal(resolveOfflineReturnRetainedIncome({ ...offlineReturn, fullyReturned: false }), 0);
+assert.equal(resolveOfflineReturnRetainedIncome({ ...offlineReturn, platform: "京东" }), 0);
 
 const cancelledMeituanDelivery = { platform: "美团", deliveryFee: 940, delivery: { logisticName: "美团·对点送", track: "已取消" } };
 for (const proof of [
