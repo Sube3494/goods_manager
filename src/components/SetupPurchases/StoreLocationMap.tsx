@@ -31,7 +31,7 @@ import {
   EyeOff,
   Disc,
   CircleDot,
-  Map,
+  Map as MapIcon,
   Tag,
 } from "lucide-react";
 import { CustomSelect } from "@/components/ui/CustomSelect";
@@ -1291,7 +1291,7 @@ export function StoreLocationMap({ userId }: { userId: string }) {
                   : "border-black/8 bg-white/80 hover:bg-white dark:border-white/10 dark:bg-white/4 dark:hover:bg-white/8 text-foreground"
               )}
             >
-              <Map
+              <MapIcon
                 size={13}
                 className={cn("shrink-0", selectedDistrictCodes.length > 0 ? "text-primary-foreground" : "text-primary")}
               />
