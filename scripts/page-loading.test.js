@@ -139,6 +139,32 @@ test.each([
   }
 });
 
+test.each([
+  { name: 'zero-cost batch', snapshot: { batches: [{ purchaseOrderItemId: 'free-batch', quantity: 1, unitCost: 0 }] }, pureProfit: 75 },
+  { name: 'manual zero cost', snapshot: { manualCostRecorded: true, averageUnitCost: 0, batches: [] }, pureProfit: 75 },
+  { name: 'missing batch cost', snapshot: { batches: [{ purchaseOrderItemId: 'unknown-batch', quantity: 1 }] }, pureProfit: 0 },
+])('dashboard distinguishes $name in mixed-cost orders', async ({ snapshot, pureProfit }) => {
+  const originalOrder = orders[0];
+  orders[0] = { ...originalOrder, items: [{ productName: '玩偶', quantity: 1 }, { productName: '专人配送', quantity: 1 }] };
+  outboundOrders.push({
+    id: 'outbound-1', type: '销售出库', date, status: 'Confirmed', note: '平台单号:test-1',
+    items: [
+      { id: 'paid-item', quantity: 1, costSnapshot: { batches: [{ purchaseOrderItemId: 'paid-batch', quantity: 1, unitCost: 25 }] } },
+      { id: 'service-item', quantity: 1, costSnapshot: snapshot },
+    ],
+  });
+  try {
+    const response = await stats(new NextRequest('http://localhost/api/stats?range=all'));
+    expect(response.status).toBe(200);
+    const point = (await response.json()).businessTrend.at(-1);
+    expect(point.pureProfit).toBe(pureProfit);
+    expect(point.shopPureProfit['南山店'] ?? 0).toBe(pureProfit);
+  } finally {
+    orders[0] = originalOrder;
+    outboundOrders.pop();
+  }
+});
+
 test('brush dashboard limits plan reads to the current Shanghai day',async()=>{
  calls.length=0;
  const response=await brush();

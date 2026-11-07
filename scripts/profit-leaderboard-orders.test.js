@@ -9,6 +9,8 @@ let autoCompleteCalls;
 let orderReads;
 let outbounds;
 let orderQueries;
+let shopProducts;
+let purchaseItems;
 const order = {
   id: "order-1", userId: "member-1", orderNo: "TEST-PROFIT", platform: "线下交易", status: "已完成",
   orderTime: new Date("2026-10-15T04:00:00Z"), actualPaid: 100275, expectedIncome: 100275,
@@ -24,6 +26,13 @@ const db = new Proxy({
     count: async (query) => { orderQueries.push(query); return 1; },
   },
   outboundOrder: { findMany: async () => outbounds },
+  shop: { findMany: async () => shopProducts.map(product => product.shop) },
+  shopProduct: { findMany: async () => shopProducts },
+  purchaseOrderItem: { findMany: async ({ where }) => purchaseItems.filter(item => {
+    if (where.costPrice?.gt !== undefined) return item.costPrice > where.costPrice.gt;
+    if (where.costPrice?.gte !== undefined) return item.costPrice >= where.costPrice.gte;
+    return true;
+  }) },
 }, { get: (target, name) => target[name] || dbModel });
 mock.module("../src/lib/prisma", () => ({ default: db }));
 mock.module("../src/lib/auth", () => ({
@@ -48,9 +57,12 @@ beforeEach(() => {
   orderReads = 0;
   orderQueries = [];
   outbounds = [];
+  shopProducts = [];
+  purchaseItems = [];
   order.rawPayload = {};
   order.platform = "线下交易";
   order.delivery = null;
+  order.items = [];
 });
 
 test("正常配送单标记刷单后，订单、看板和排行榜均扣配送费", async () => {
@@ -80,6 +92,33 @@ test("订单列表、总数和汇总查询排除已删除订单，搜索筛选�
     expect(where).toContain('"equals":"delete"');
     expect(where).toContain('"equals":"deleted"');
   }
+});
+
+test("订单接口从可用采购批次读取零成本，并在出库后保留零成本", async () => {
+  const shop = { id: "shop-1", name: "南山店" };
+  order.rawPayload = { systemMeta: { resolvedShop: shop } };
+  order.items = [{ id: "service-item", productName: "专人配送", productNo: "S001", quantity: 1, rawPayload: {} }];
+  shopProducts = [{ id: "shop-product-1", sku: "S001", productName: "专人配送", stock: 10, shop }];
+  purchaseItems = [{
+    id: "zero-batch", purchaseOrderId: "PO-test", shopProductId: "shop-product-1",
+    quantity: 10, remainingQuantity: 10, costPrice: 0, shopProduct: { shopId: shop.id },
+  }];
+  const read = async () => {
+    const response = await GET(new NextRequest("http://localhost/api/orders?userId=member-1"));
+    expect(response.status).toBe(200);
+    return (await response.json()).items[0];
+  };
+  const before = await read();
+  expect(before.items[0].matchedProduct).toMatchObject({ costPrice: 0, costSource: "current" });
+
+  outbounds = [{ id: "out-1", status: "Confirmed", note: "平台单号:TEST-PROFIT", items: [{
+    id: "out-item-1", quantity: 1, productId: null, shopProductId: "shop-product-1",
+    costSnapshot: { batches: [{ purchaseOrderItemId: "zero-batch", quantity: 1, unitCost: 0 }] },
+  }] }];
+  const after = await read();
+  expect(after.items[0].matchedProduct).toMatchObject({ costPrice: 0, costSource: "outbound" });
+  expect(after.productCostStatus).toBe("ready");
+  expect(after.pureProfit).toBe(100275);
 });
 
 test("排行榜直接复用今日看板纯利润汇总，并将分转换为元", async () => {

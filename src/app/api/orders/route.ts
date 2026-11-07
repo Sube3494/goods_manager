@@ -1,6 +1,6 @@
 import { mayReadMemberData } from "@/lib/memberDataVisibilityServer";
 import { NextRequest, NextResponse } from "next/server";
-import { parseOutboundCostSnapshot, resolvePurchaseBatchSnapshotCost } from "@/lib/outboundCostSnapshot";
+import { parseOutboundCostSnapshot, readRecordedCost, resolvePurchaseBatchSnapshotCost } from "@/lib/outboundCostSnapshot";
 import prisma from "@/lib/prisma";
 import { normalizeOrderBundleItems } from "@/lib/orderBundleItems";
 import { resolveRememberedCustomerTypes } from "@/lib/customerMemoryStore";
@@ -1539,6 +1539,7 @@ export async function GET(request: NextRequest) {
         quantity: number;
         unitCost: number;
         totalCost: number;
+        hasBackfilled: boolean;
         shopProductId: string | null;
         productId: string | null;
         image?: string | null;
@@ -2406,7 +2407,7 @@ export async function GET(request: NextRequest) {
               userId: targetUserId,
               status: "Received",
             },
-            costPrice: { gt: 0 },
+            costPrice: { gte: 0 },
             OR: [
               { shopProductId: { in: mappedShopProducts.map((item) => item.shopProductId) } },
               {
@@ -2467,8 +2468,8 @@ export async function GET(request: NextRequest) {
           }
           return true;
         });
-        const shopCost = Number(availableInShop?.costPrice || 0);
-        if (Number.isFinite(shopCost) && shopCost > 0) {
+        const shopCost = readRecordedCost(availableInShop?.costPrice);
+        if (shopCost !== null) {
           return shopCost;
         }
       }
@@ -2485,10 +2486,7 @@ export async function GET(request: NextRequest) {
           }
           return true;
         });
-        const productCost = Number(availableInProduct?.costPrice || 0);
-        if (Number.isFinite(productCost) && productCost > 0) {
-          return productCost;
-        }
+        return readRecordedCost(availableInProduct?.costPrice);
       }
 
       return null;
@@ -2815,15 +2813,14 @@ export async function GET(request: NextRequest) {
               (shopProductId && entry.shopProductId === shopProductId)
               || (productId && entry.productId === productId)
             )) || fallbackOutboundCostItem;
-            const outboundCostCents = Number(outboundCostItem?.unitCost || 0);
-            if (Number.isFinite(outboundCostCents) && outboundCostCents > 0) {
-              return { ...inventory, costPrice: roundCurrency(outboundCostCents / 100), costSource: "outbound" as const };
+            if (outboundCostItem?.hasBackfilled) {
+              return { ...inventory, costPrice: roundCurrency(outboundCostItem.unitCost / 100), costSource: "outbound" as const };
             }
             if (outboundBreakdown.length > 0) {
               return { ...inventory, costPrice: null, costSource: undefined };
             }
             const purchaseCost = resolvePurchaseDisplayCost(shopProductId, productId, matchedShopId);
-            return purchaseCost
+            return purchaseCost !== null
               ? { ...inventory, costPrice: purchaseCost, costSource: "current" as const }
               : { ...inventory, costPrice: null, costSource: undefined };
           };
@@ -3188,9 +3185,8 @@ export async function GET(request: NextRequest) {
                 const bFallbackImg = foundBShopProduct?.image || null;
                 const bResolvedImg = bOutbound.image ? storage.resolveUrl(bOutbound.image) : bFallbackImg;
                 const bSourceId = getProductSourceIdByPlatform(foundBShopProduct, order.platform, parentPlatformSkuId);
-                const outboundCostCents = Number(bOutbound.unitCost || 0);
-                const displayCost = Number.isFinite(outboundCostCents) && outboundCostCents > 0
-                  ? { ...resolveDisplayCost(bOutbound.shopProductId, bOutbound.productId, bOutbound), costPrice: roundCurrency(outboundCostCents / 100), costSource: "outbound" as const }
+                const displayCost = bOutbound.hasBackfilled
+                  ? { ...resolveDisplayCost(bOutbound.shopProductId, bOutbound.productId, bOutbound), costPrice: roundCurrency(bOutbound.unitCost / 100), costSource: "outbound" as const }
                   : resolveDisplayCost(bOutbound.shopProductId, bOutbound.productId, bOutbound);
                 return {
                   name: bOutbound.name || foundBShopProduct?.name || "未命名配件",

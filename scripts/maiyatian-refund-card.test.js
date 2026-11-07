@@ -24,6 +24,21 @@ test("买两件退一件仍可悬停预估利润，成本仅计剩余一件", ()
   expect(bundle.map((item) => item.quantity)).toEqual([1, 2]);
 });
 
+test("确认的零成本商品参与订单利润预估，缺失成本仍阻止预估", () => {
+  const order = {
+    status: "待配送", platform: "美团", actualPaid: 10000, expectedIncome: 9400, hasOutbound: false,
+    items: [
+      { quantity: 1, displayItems: [{ name: "玩偶", quantity: 1, costPrice: 26.51 }] },
+      { quantity: 1, matchedProduct: { name: "专人配送", costPrice: 0 } },
+    ],
+  };
+  const render = () => renderToStaticMarkup(React.createElement(OrderStatusProfitPreview, { order }, React.createElement("span", null, "待配送")));
+  expect(getOrderProfitPreviewItems(order).map(item => item.costPrice)).toEqual([26.51, 0]);
+  expect(render()).toContain("查看当前订单利润");
+  order.items[1].matchedProduct.costPrice = null;
+  expect(render()).not.toContain("查看当前订单利润");
+});
+
 test("退款订单卡片保留原实付，展示退款后到手及商品退款原因", () => {
   const item = { productName: "保温杯", productNo: "B31", quantity: 5, rawPayload: { id: "10469227", number: 5, part_refund_title: "已退款2件" } };
   const order = { id: "order-1", platform: "美团", orderNo: "test-order", dailyPlatformSequence: 2,

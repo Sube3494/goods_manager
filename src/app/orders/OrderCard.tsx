@@ -827,7 +827,7 @@ export function getOrderItemDisplay(item: AutoPickOrderItem, platform?: string |
       ? (matchedProduct?.image || null)
       : (platformThumbnail || matchedProduct?.image || item.thumb || rawThumbCandidate),
     quantity: Math.max(1, Number((matchedProduct as any)?.quantity || item.quantity || 1) || 1),
-    costPrice: matchedProduct?.costPrice || null,
+    costPrice: matchedProduct?.costPrice ?? null,
     costSource: matchedProduct?.costSource,
     stock: matchedProduct?.stock,
     stockShopName: matchedProduct?.stockShopName,
@@ -855,7 +855,7 @@ export function getExpandedOrderItemDisplays(item: AutoPickOrderItem, platform?:
         ? (displayItem.image || null)
         : (displayItem.image || (index === 0 ? platformThumbnail : null) || null),
       quantity: displayItem.quantity,
-      costPrice: displayItem.costPrice || null,
+      costPrice: displayItem.costPrice ?? null,
       costSource: displayItem.costSource,
       stock: displayItem.stock,
       stockShopName: displayItem.stockShopName,
@@ -1562,7 +1562,7 @@ export function OrderStatusProfitPreview({ order, isProfitUpdating = false, canV
     && getBaseAutoPickStatusDisplay(order.status) !== "已删除"
     && !isOrderFullyRefunded(order)
     && currentItems.length > 0
-    && currentItems.every((item) => typeof item.costPrice === "number" && Number.isFinite(item.costPrice) && item.costPrice > 0 && Number.isFinite(item.quantity) && item.quantity > 0);
+    && currentItems.every((item) => typeof item.costPrice === "number" && Number.isFinite(item.costPrice) && item.costPrice >= 0 && Number.isFinite(item.quantity) && item.quantity > 0);
   if (!hasRecordedCost && !canEstimate) return <>{children}</>;
 
   const estimatedCost = Math.round(currentItems.reduce((sum, item) => sum + Number(item.costPrice || 0) * item.quantity, 0) * 100);
@@ -2519,7 +2519,7 @@ export function ProductStripItem({
               <span className="shrink-0 font-mono">{display.sku}</span>
             ) : null}
             <span className="shrink-0">x{display.quantity}</span>
-            {typeof display.costPrice === "number" && Number.isFinite(display.costPrice) && display.costPrice > 0 ? (
+            {typeof display.costPrice === "number" && Number.isFinite(display.costPrice) && display.costPrice >= 0 ? (
               <HoverCard open={inventoryOpen} onOpenChange={setInventoryOpen} openDelay={150}>
                 <HoverCardTrigger asChild>
                   <button
