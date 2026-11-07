@@ -30,13 +30,13 @@ import { createRequestPerfTracker } from "@/lib/perf";
 import { getStorageStrategy } from "@/lib/storage";
 import { formatLocalDate, parseAsShanghaiTime } from "@/lib/dateUtils";
 import { isPrismaMissingColumnError } from "@/lib/prismaSchemaCompat";
-import { getOutboundReturnTotals, getOutboundReturnedQuantityMap, parseOutboundReturnMeta } from "@/lib/outboundReturnMeta";
+import { filterCustomerReturns, getOutboundReturnTotals, getOutboundReturnedQuantityMap, parseOutboundReturnMeta } from "@/lib/outboundReturnMeta";
 import { getDailyOperatingCostAfterFirstOrder, normalizeMonthKey } from "@/lib/operatingCosts";
 import { AUTO_INBOUND_NOTE_KEYWORD, AUTO_INBOUND_TYPE, ORDER_SHORTAGE_PURCHASE_NOTE_KEYWORD } from "@/lib/purchaseOrderTypes";
 import { isAddressDisabled } from "@/lib/addressBook";
 import { normalizeShopNameKey, isShopNameMatch, stripShopSuffix } from "@/lib/shopIdentity";
 import { parseOutboundNote } from "@/lib/utils";
-import { readConfirmedRefundAmountFromRawPayload, resolveCancelledJDDeliveredCommissionLoss, resolveRefundAdjustedIncomeMetrics } from "@/lib/orderFinancials";
+import { readConfirmedRefundAmountFromRawPayload, resolveCancelledJDDeliveredCommissionLoss, resolveOfflineReturnRetainedIncome, resolveOrderRefundAmount, resolveRefundAdjustedIncomeMetrics } from "@/lib/orderFinancials";
 import { isAccessoryProduct } from "@/lib/accessoryUtils";
 import { getOutboundSalesQuantityMap } from "@/lib/outboundSales";
 import { buildRecentInboundOrderWhere, resolveRecentInboundProduct } from "@/lib/recentInbound";
@@ -812,14 +812,17 @@ export async function GET(request: NextRequest) {
 
     const outboundOrdersForCost: OutboundCostLookupRow[] = allOutboundOrders as unknown as OutboundCostLookupRow[];
     perf.lap("outbound-indexing");
-    const outboundMetaByOrderNo = new Map<string, {
+    type OrderCostMeta = {
       itemCount: number;
       productCost: number;
       missingCostItemCount: number;
       refundAmount: number;
       extraExpense: number;
       returnedCost: number;
-    }>();
+      isFullyReturned: boolean;
+      hasReturnedGoods: boolean;
+    };
+    const outboundMetaByOrderNo = new Map<string, OrderCostMeta>();
     outboundOrdersForCost.forEach((outbound) => {
       const orderNo = extractOrderNoFromNote(outbound.note);
       if (!orderNo) return;
@@ -830,7 +833,13 @@ export async function GET(request: NextRequest) {
       if (existing && existing.itemCount > 0 && outbound.items.length === 0) return;
 
       let missingCostItemCount = 0;
-      const returnTotals = getOutboundReturnTotals(parseOutboundReturnMeta(outbound.note).returns);
+      const { returns, visibleNote } = parseOutboundReturnMeta(outbound.note);
+      const customerReturns = filterCustomerReturns(returns);
+      if ((isCurrentReturned || outbound.status === "PartialReturned") && (
+        /自动回滚旧出库|自动重建出库单/.test(visibleNote)
+        || (returns.length > 0 && customerReturns.length === 0)
+      )) return;
+      const returnTotals = getOutboundReturnTotals(customerReturns);
       const outboundCost = outbound.items.reduce((sum, item) => {
         const snapshot = parseOutboundCostSnapshot(item.costSnapshot);
         const quantity = Math.max(0, Number(item.quantity || 0));
@@ -859,8 +868,33 @@ export async function GET(request: NextRequest) {
         refundAmount: returnTotals.refundAmount,
         extraExpense: returnTotals.extraExpense,
         returnedCost: returnTotals.returnedCost,
+        isFullyReturned: isCurrentReturned,
+        hasReturnedGoods: customerReturns.some((entry) => entry.items.some((item) => item.quantity > 0)),
       });
     });
+
+    function resolveOfflineReturn(order: (typeof filteredAutoPickOrdersInRange)[number], meta: OrderCostMeta | undefined) {
+      const isOffline = order.platform === "线下交易" || String(order.platform || "").toLowerCase() === "other";
+      if (!isOffline || !meta?.isFullyReturned) return null;
+
+      const actualPaid = Number(order.actualPaid) > 0
+        ? order.actualPaid
+        : readManualAmountOverride(order.rawPayload)?.expectedIncome ?? order.expectedIncome;
+      const refundAmount = resolveOrderRefundAmount({
+        rawPayload: order.rawPayload,
+        actualPaid,
+        recordedRefundAmount: Math.round(meta.refundAmount * 100),
+        hasReturnedGoods: meta.hasReturnedGoods,
+      });
+      const retainedIncome = isVoidedOfflineOrder(order) || isAutoPickOrderDeletedStatus(order.status)
+        ? 0
+        : resolveOfflineReturnRetainedIncome({ platform: order.platform, actualPaid, refundAmount, fullyReturned: true }) / 100;
+      return {
+        retainedIncome,
+        deliveryExpense: retainedIncome > 0 ? getDeliveryFee(order.delivery, order.rawPayload) / 100 : 0,
+        extraExpense: retainedIncome > 0 ? meta.extraExpense : 0,
+      };
+    }
 
     let userPaid = 0;
     let platformCommission = 0;
@@ -874,6 +908,13 @@ export async function GET(request: NextRequest) {
         || isAutoPickOrderDeletedStatus(order.status)
         || isVoidedOfflineOrder(order);
       const orderCostMeta = outboundMetaByOrderNo.get(String(order.orderNo || "").trim());
+      const offlineReturn = resolveOfflineReturn(order, orderCostMeta);
+      if (offlineReturn) {
+        userPaid = FinanceMath.add(userPaid, offlineReturn.retainedIncome);
+        deliveryExpense = FinanceMath.add(deliveryExpense, offlineReturn.deliveryExpense);
+        returnExtraExpense = FinanceMath.add(returnExtraExpense, offlineReturn.extraExpense);
+        return;
+      }
       if (!isCancelled) {
         const manualAmountOverride = readManualAmountOverride(order.rawPayload);
         const isOffline = order.platform === "线下交易" || String(order.platform || "").toLowerCase() === "other";
@@ -1029,17 +1070,18 @@ export async function GET(request: NextRequest) {
       const current = platformBuckets.get(platform) || { trueOrderCount: 0, brushOrderCount: 0 };
       const isBrush = readMainSystemSelfDeliveryFlag(order.rawPayload, order.delivery);
       const orderCostMeta = outboundMetaByOrderNo.get(String(order.orderNo || "").trim());
+      const offlineReturn = resolveOfflineReturn(order, orderCostMeta);
       const isFullyRefunded = isOrderFullyRefunded({
         actualPaid: order.actualPaid,
         expectedIncome: order.expectedIncome,
         refundAmount: Math.round(Math.max(orderCostMeta?.refundAmount || 0, readRefundAmountFromRawPayload(order.rawPayload) / 100) * 100),
         status: order.status,
-        outboundMeta: orderCostMeta ? { isFullyReturned: (orderCostMeta as any).isFullyReturned } : null,
       });
       const isOther = isAutoPickOrderCancelledStatus(order.status)
         || isAutoPickOrderDeletedStatus(order.status)
         || isVoidedOfflineOrder(order)
-        || isFullyRefunded;
+        || isFullyRefunded
+        || offlineReturn !== null;
       const matchedShopName = resolveExistingMatchedShopName(order) || "未匹配店铺";
       const addShopPureProfit = (target: ReturnType<typeof createTrendBucket> | undefined, amount: number) => {
         if (!target || amount === 0) return;
@@ -1081,6 +1123,17 @@ export async function GET(request: NextRequest) {
       const hasOutbound = Boolean(orderCostMeta);
 
       if (isOther) {
+        if (offlineReturn && offlineReturn.retainedIncome > 0) {
+          const profit = FinanceMath.add(offlineReturn.retainedIncome, -offlineReturn.deliveryExpense - offlineReturn.extraExpense);
+          for (const target of [point, platformPoint]) {
+            if (!target) continue;
+            target.userPaid = FinanceMath.add(target.userPaid, offlineReturn.retainedIncome);
+            target.deliveryExpense = FinanceMath.add(target.deliveryExpense, offlineReturn.deliveryExpense);
+            target.pureProfit = FinanceMath.add(target.pureProfit, profit);
+            target.platformPureProfit[platform] = FinanceMath.add(target.platformPureProfit[platform] || 0, profit);
+            addShopPureProfit(target, profit);
+          }
+        }
         const isOffline = order.platform === "线下交易" || String(order.platform || "").toLowerCase() === "other";
         const hasRealizedDeliveryCost = !isOffline
           && deliveryFee > 0
@@ -1126,7 +1179,7 @@ export async function GET(request: NextRequest) {
         const cancelledExtraExpenses = readOrderExtraExpensesFromRawPayload(order.rawPayload);
         const cancelledExtraExpensesCents = calculateOrderTotalExtraExpense(cancelledExtraExpenses);
         const cancelledExtraExpensesYuan = cancelledExtraExpensesCents / 100;
-        if (cancelledExtraExpensesYuan > 0) {
+        if (cancelledExtraExpensesYuan > 0 || ((offlineReturn?.retainedIncome || 0) > 0 && cancelledExtraExpensesYuan < 0)) {
           if (point) {
             point.pureProfit = FinanceMath.add(point.pureProfit, -cancelledExtraExpensesYuan);
             point.platformPureProfit[platform] = FinanceMath.add(point.platformPureProfit[platform] || 0, -cancelledExtraExpensesYuan);
