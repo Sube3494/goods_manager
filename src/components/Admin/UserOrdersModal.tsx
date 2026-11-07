@@ -929,6 +929,9 @@ export function UserOrdersModal({
   const matchShopName = matchTarget?.[0].matchedShopName;
   const matchShopId = matchTarget?.[0].matchedShopId || localShops.find((shop) => shop.name === matchShopName)?.id;
   const isOrderOnlyReplacement = matchTarget?.[2]?.orderOnlyReplacement === true;
+  const accessoryMain = matchTarget?.[2]?.isAddingBundleItem && matchTarget[1].matchedProduct?.orderOnlyReplacement
+    ? matchTarget[1].matchedProduct
+    : null;
 
   const handleTodayDataLoad = useCallback((data: {
     summary: typeof todaySummary;
@@ -2025,7 +2028,7 @@ export function UserOrdersModal({
           loadAllOnOpen showPlatformSelector={false} allowLibrarySwitch={false} fetchPath="/api/shop-products"
           query={{ all: "true", scope: "all", userId, shopId: matchShopId || "all" }}
           emptyStateText={matchShopId && matchShopName ? `当前店铺“${matchShopName}”下没有找到候选商品` : "该成员的店铺下没有找到候选商品"}
-          title={savingMatch ? "正在保存匹配…" : isOrderOnlyReplacement ? `仅本单换货 · ${matchTarget[1].productName}` : matchShopName ? `修改商品匹配 · ${matchShopName}` : "修改商品匹配"} />
+          title={savingMatch ? "正在保存匹配…" : accessoryMain ? `添加配件 · ${accessoryMain.name}` : isOrderOnlyReplacement ? `仅本单换货 · ${matchTarget[1].productName}` : matchShopName ? `修改商品匹配 · ${matchShopName}` : "修改商品匹配"} />
       )}
 
       {/* 查看成员的历史推广费日历与趋势弹窗 */}

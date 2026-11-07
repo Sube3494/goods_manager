@@ -124,6 +124,27 @@ test("本单换货拦截错误门店、库存不足和已出库订单", async ()
   expect(returned).toBe(0);
 });
 
+test("换货后添加配件沿用替代品，过期门店参数不会把主商品切回原商品", async () => {
+  order.status = "待配送";
+  order.items[0].platformSkuId = "123456789012";
+  products.push({ id: "extra", shopId: "shop-1", productName: "新配件", sku: "extra", stock: 20, shop: { id: "shop-1", name: "测试店" } });
+  expect((await replace("kept", 1)).status).toBe(200);
+
+  const result = await PATCH(new Request("http://localhost/api/orders/order-1/items/item-1/match", {
+    method: "PATCH", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ isAddingComponent: true, productId: "extra", shopId: "old-shop", quantity: 2 }),
+  }), { params: Promise.resolve({ id: "order-1", itemId: "item-1" }) });
+  expect(result.status).toBe(200);
+  expect((await result.json()).matchedProduct).toMatchObject({ shopProductId: "kept", orderOnlyReplacement: true, quantity: 1 });
+  expect(order.items[0].rawPayload.manualMatchedProduct.bundleItems).toEqual([
+    expect.objectContaining({ shopProductId: "extra", quantity: 2 }),
+  ]);
+  expect(await createOutboundFromAutoPickOrder("user-1", "order-1")).toMatchObject({ ok: true });
+  expect(deducted.map(({ shopProductId, quantity }) => ({ shopProductId, quantity }))).toEqual([
+    { shopProductId: "kept", quantity: 1 }, { shopProductId: "extra", quantity: 2 },
+  ]);
+});
+
 test("移除全部固定配件后，空清单不恢复商品库配置", async () => {
   expect(await createOutboundFromAutoPickOrder("user-1", "order-1")).toMatchObject({ ok: true });
   expect(deducted).toHaveLength(1);

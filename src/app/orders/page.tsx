@@ -2680,16 +2680,17 @@ export default function OrdersPage() {
       (mapping) => mapping.localShopName === resolvedShopName
     )?.libraryId || "";
     const resolvedLibraryId = resolvedShop?.libraryId || mappedLibraryId || "";
+    const replacement = item.matchedProduct?.orderOnlyReplacement ? item.matchedProduct : null;
+    const isEditingAccessory = options?.isAddingBundleItem || options?.componentIndex !== undefined;
+    const accessoryMain = isEditingAccessory ? replacement : null;
     setMatchEditorTarget({
       orderId: order.id,
       itemId: String(item.id || "").trim(),
-      itemName: item.productName || "未命名商品",
-      sku: item.productNo || "",
+      itemName: accessoryMain?.name || item.productName || "未命名商品",
+      sku: accessoryMain ? accessoryMain.sku || "" : item.productNo || "",
       platformSkuId: item.platformSkuId || "",
-      thumb: item.thumb || "",
-      quantity: options?.orderOnlyReplacement && item.matchedProduct?.orderOnlyReplacement
-        ? item.matchedProduct.quantity || item.quantity || 1
-        : item.quantity || 1,
+      thumb: accessoryMain ? accessoryMain.image || "" : item.thumb || "",
+      quantity: (accessoryMain || (options?.orderOnlyReplacement ? replacement : null))?.quantity || item.quantity || 1,
       shopName: resolvedShopName,
       shopId: resolvedShopId,
       libraryId: options?.orderOnlyReplacement ? "" : resolvedLibraryId,

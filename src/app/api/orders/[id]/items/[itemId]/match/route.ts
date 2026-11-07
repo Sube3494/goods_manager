@@ -364,6 +364,9 @@ export async function PATCH(
     const removeComponentIndex = typeof body?.removeComponentIndex === "number" && body.removeComponentIndex >= 0
       ? body.removeComponentIndex
       : undefined;
+    const replaceComponentIndex = typeof body?.componentIndex === "number" && body.componentIndex >= 0
+      ? body.componentIndex
+      : undefined;
     const isAddingComponent = Boolean(body?.isAddingComponent);
 
     if (isOrderOnlyReplacement && (!productId || /[+＋]/.test(productId) || shouldClear
@@ -508,6 +511,20 @@ export async function PATCH(
       }
     };
     const basePayload = readRawPayloadRecord(orderItem.rawPayload);
+    const storedMatch = readRawPayloadRecord(basePayload.manualMatchedProduct);
+    const hasOrderReplacement = storedMatch.orderOnlyReplacement === true;
+    const bundleShopId = hasOrderReplacement ? orderMatchedShopId : body?.shopId || orderMatchedShopId;
+    const bundleMainQuantity = hasOrderReplacement ? Number(storedMatch.quantity) || orderItem.quantity : orderItem.quantity;
+    if (hasOrderReplacement && (isAddingComponent || replaceComponentIndex !== undefined || removeComponentIndex !== undefined)) {
+      const replacementId = String(storedMatch.shopProductId || "").trim();
+      const replacement = bundleShopId && replacementId && await prisma.shopProduct.findFirst({
+        where: { id: replacementId, shopId: bundleShopId, shop: { userId: targetUserId }, deletedAt: null, isDiscontinued: false },
+        select: { id: true },
+      });
+      if (!replacement) {
+        return NextResponse.json({ error: "本单替代商品在当前店铺已不可用，请重新选择" }, { status: 409 });
+      }
+    }
     const fallbackItemPayload = findOrderRawPayloadItemPayload(orderItem.order.rawPayload, orderItem);
     const {
       manualMatchedProduct: _removedManualMatchedProduct,
@@ -586,7 +603,7 @@ export async function PATCH(
 
       // 1. 如果请求体直接提供了前端当前实际展示的配件列表，最高优先级采信（避免后端二次猜测产生偏差）
       if (Array.isArray(body?.currentBundleItems) && body.currentBundleItems.length > 0) {
-        existingBundleItems = normalizeOrderBundleItems(body.currentBundleItems, orderItem.quantity).map((c: any) => ({
+        existingBundleItems = normalizeOrderBundleItems(body.currentBundleItems, bundleMainQuantity).map((c: any) => ({
           id: c.shopProductId || c.id,
           productId: c.productId || null,
           name: c.name,
@@ -633,7 +650,7 @@ export async function PATCH(
         };
         if (existingBundleItems.length === 0) {
           if (Array.isArray(currentManual.bundleItems)) {
-            existingBundleItems = isLegacyCompositeBundle ? [] : normalizeOrderBundleItems(currentManual.bundleItems, orderItem.quantity);
+            existingBundleItems = isLegacyCompositeBundle ? [] : normalizeOrderBundleItems(currentManual.bundleItems, bundleMainQuantity);
             hasManualBundleConfig = true;
           } else if (currentManual.isBundle === false) {
             hasManualBundleConfig = true;
@@ -659,14 +676,13 @@ export async function PATCH(
         };
       }
 
-      const effectiveShopId = body?.shopId || orderMatchedShopId;
-      let needReResolveMainProduct = !mainProduct || (!mainProduct.orderOnlyReplacement && !hasManualBundleConfig && existingBundleItems.length === 0);
-      if (effectiveShopId && mainProduct?.shopProductId) {
+      let needReResolveMainProduct = !mainProduct || (!hasOrderReplacement && !hasManualBundleConfig && existingBundleItems.length === 0);
+      if (!hasOrderReplacement && bundleShopId && mainProduct?.shopProductId) {
         const currentShopOfMain = await prisma.shopProduct.findUnique({
           where: { id: mainProduct.shopProductId },
           select: { shopId: true },
         });
-        if (currentShopOfMain && currentShopOfMain.shopId !== effectiveShopId) {
+        if (currentShopOfMain && currentShopOfMain.shopId !== bundleShopId) {
           needReResolveMainProduct = true;
         }
       }
@@ -685,7 +701,7 @@ export async function PATCH(
         }
         const matchedCandidate = await prisma.shopProduct.findFirst({
           where: {
-            ...(effectiveShopId ? { shopId: effectiveShopId } : { shop: { userId: targetUserId } }),
+            ...(bundleShopId ? { shopId: bundleShopId } : { shop: { userId: targetUserId } }),
             OR: [
               ...(targetShopProductId ? [{ id: targetShopProductId }, { productId: targetShopProductId }] : []),
               ...(orderItem.platformSkuId ? [
@@ -834,10 +850,6 @@ export async function PATCH(
       });
     }
 
-    const replaceComponentIndex = typeof body?.componentIndex === "number" && body.componentIndex >= 0
-      ? body.componentIndex
-      : undefined;
-
     if (isAddingComponent || replaceComponentIndex !== undefined) {
       const targetShopProduct = await prisma.shopProduct.findFirst({
         where: {
@@ -866,12 +878,12 @@ export async function PATCH(
         return NextResponse.json({ error: "选择的配件商品不存在或无权访问" }, { status: 404 });
       }
 
-      const effectiveShopId = body?.shopId || orderMatchedShopId;
       let resolvedShopProductForBundle = targetShopProduct;
-      if (effectiveShopId && targetShopProduct.shopId !== effectiveShopId) {
+      if (bundleShopId && targetShopProduct.shopId !== bundleShopId) {
         const sameInCurrentShop = await prisma.shopProduct.findFirst({
           where: {
-            shopId: effectiveShopId,
+            shopId: bundleShopId,
+            ...(hasOrderReplacement ? { shop: { userId: targetUserId }, deletedAt: null, isDiscontinued: false } : {}),
             OR: [
               ...(targetShopProduct.productId ? [{ productId: targetShopProduct.productId }, { sourceProductId: targetShopProduct.productId }] : []),
               ...(targetShopProduct.sourceProductId ? [{ productId: targetShopProduct.sourceProductId }, { sourceProductId: targetShopProduct.sourceProductId }] : []),
@@ -897,6 +909,8 @@ export async function PATCH(
         });
         if (sameInCurrentShop) {
           resolvedShopProductForBundle = sameInCurrentShop;
+        } else if (hasOrderReplacement) {
+          return NextResponse.json({ error: "请选择订单所属店铺的配件" }, { status: 409 });
         }
       }
 

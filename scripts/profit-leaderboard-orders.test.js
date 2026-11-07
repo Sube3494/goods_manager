@@ -128,10 +128,12 @@ test("本单替代品优先展示，其他订单仍走平台商品匹配", async
   shopProducts = [
     { id: "original", sku: "S001", meituanSkuId: "123456789012", productName: "原商品", shop },
     { id: "replacement", sku: "S002", productName: "替代品", shop },
+    { id: "accessory", sku: "S003", productName: "礼袋", shop },
   ];
   order.items = [
     { id: "replaced", productName: "原商品", productNo: "S001", platformSkuId: "123456789012", quantity: 3, rawPayload: {
-      manualMatchedProduct: { id: "replacement", shopProductId: "replacement", sourceType: "shopProduct", name: "替代品", quantity: 1, orderOnlyReplacement: true },
+      manualMatchedProduct: { id: "replacement", shopProductId: "replacement", sourceType: "shopProduct", name: "替代品", quantity: 1,
+        orderOnlyReplacement: true, isBundle: true, bundleItems: [{ id: "accessory", shopProductId: "accessory", name: "礼袋", quantity: 2 }] },
     } },
     { id: "normal", productName: "原商品", productNo: "S001", platformSkuId: "123456789012", quantity: 1, rawPayload: {} },
   ];
@@ -139,6 +141,10 @@ test("本单替代品优先展示，其他订单仍走平台商品匹配", async
   expect(response.status).toBe(200);
   const [replaced, normal] = (await response.json()).items[0].items;
   expect(replaced).toMatchObject({ productName: "原商品", matchedProduct: { id: "replacement", quantity: 1, orderOnlyReplacement: true } });
+  expect(replaced.displayItems).toEqual([
+    expect.objectContaining({ name: "替代品", quantity: 1 }),
+    expect.objectContaining({ name: "礼袋", quantity: 2 }),
+  ]);
   expect(normal.matchedProduct).toMatchObject({ id: "original", matchMethod: "id" });
 });
 

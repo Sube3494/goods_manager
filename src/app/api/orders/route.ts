@@ -3040,8 +3040,9 @@ export async function GET(request: NextRequest) {
           const isCompositeMatch = Boolean(
             manualMatchedProduct?.isCompositeMatch === true || compositeMatchIds.length > 1
           );
+          const bundleMainQuantity = (isOrderOnlyReplacement ? manualMatchedProduct?.quantity : item.quantity) || item.quantity || 1;
           const storedManualBundleItems = Array.isArray(manualMatchedProduct?.bundleItems)
-            ? normalizeOrderBundleItems(manualMatchedProduct.bundleItems, item.quantity)
+            ? normalizeOrderBundleItems(manualMatchedProduct.bundleItems, bundleMainQuantity)
             : [];
           const compositeIdSet = new Set(compositeMatchIds);
           const isLegacyCompositeBundle = isCompositeMatch
@@ -3090,7 +3091,7 @@ export async function GET(request: NextRequest) {
           const bundleDisplayItems = bundleItems
             ? bundleItems.map((bItem: any) => {
                 const perPackQty = typeof bItem.quantity === "number" && bItem.quantity > 0 ? bItem.quantity : 1;
-                const bQty = perPackQty * Math.max(1, Number(item.quantity || 1) || 1);
+                const bQty = perPackQty * Math.max(1, Number(bundleMainQuantity) || 1);
                 const foundBShopProduct = (matchedShopId
                   ? mappedShopProducts.find((p) =>
                       p.shopId === matchedShopId && (
