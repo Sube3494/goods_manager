@@ -55,6 +55,8 @@ import {
   toCurrency,
   OrderProfitBadge,
   OrderStatusProfitPreview,
+  OrderAmountEditModal,
+  canEditOrderExpectedIncome,
   QueuedSelfDeliveryNotice,
 } from "./OrderCard";
 import { ORDER_GROUPS, getOrderGroup } from "@/lib/orderGroups";
@@ -193,6 +195,7 @@ function CompactTodayOrderCard({
   canViewProductCosts = true,
   isProfitUpdating = false,
   onExpand,
+  onRefresh,
   onRunAction,
   onOpenMatchEditor,
   onRemoveBundleComponent,
@@ -206,6 +209,7 @@ function CompactTodayOrderCard({
   canViewProductCosts?: boolean;
   isProfitUpdating?: boolean;
   onExpand: () => void;
+  onRefresh: () => void;
   onRunAction: (action: OrderAction) => void;
   onOpenMatchEditor: (item: AutoPickOrderItem, options?: { autoOutbound?: boolean; componentIndex?: number; componentDisplay?: any; currentBundleItems?: any[]; isAddingBundleItem?: boolean; orderOnlyReplacement?: boolean }) => void;
   onRemoveBundleComponent?: (order: AutoPickOrder, item: AutoPickOrderItem, componentIndex: number, componentName?: string, currentBundleItems?: any[]) => void;
@@ -214,6 +218,8 @@ function CompactTodayOrderCard({
 }) {
   const [routeOpen, setRouteOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [isAmountEditorOpen, setIsAmountEditorOpen] = useState(false);
+  const canEditExpectedIncome = canEditOrderExpectedIncome(order, readOnly);
   const platformBadge = getPlatformBadgeMeta(order.platform, order.rawPayload);
   const isFullyRefunded = isOrderFullyRefunded(order);
   const returned = Boolean(order.outboundReturnDetails?.some((entry) => !isRematchReturnReason(entry?.reason) && entry.items?.some((item) => Number(item.quantity || 0) > 0)));
@@ -406,7 +412,14 @@ function CompactTodayOrderCard({
 
         <div className={`mt-3 grid items-center divide-x divide-black/6 rounded-xl border border-black/6 bg-black/[0.018] px-1 py-2.5 text-[11px] dark:divide-white/8 dark:border-white/8 dark:bg-white/[0.025] ${Number(order.refundAmount || 0) > 0 ? "grid-cols-4" : "grid-cols-3"}`}>
           <div className="flex min-w-0 items-center gap-1.5 px-2"><span className="shrink-0 text-muted-foreground">实付</span><span className="truncate font-bold tabular-nums text-foreground">{toCurrency(order.actualPaid)}</span></div>
-          <div className="flex min-w-0 items-center justify-center gap-1.5 px-2"><span className="shrink-0 text-muted-foreground">到手</span><span className="truncate font-bold tabular-nums text-foreground">{toCurrency(order.expectedIncome)}</span></div>
+          {canEditExpectedIncome ? (
+            <button type="button" aria-label="修改商家到手" onClick={() => setIsAmountEditorOpen(true)} className="flex min-w-0 items-center justify-center gap-1.5 px-2 hover:text-primary">
+              <span className="shrink-0 text-muted-foreground">到手</span>
+              <span className="truncate font-bold tabular-nums">{toCurrency(order.expectedIncome)}</span>
+            </button>
+          ) : (
+            <div className="flex min-w-0 items-center justify-center gap-1.5 px-2"><span className="shrink-0 text-muted-foreground">到手</span><span className="truncate font-bold tabular-nums text-foreground">{toCurrency(order.expectedIncome)}</span></div>
+          )}
           {Number(order.refundAmount || 0) > 0 ? (
             <div className="flex min-w-0 items-center justify-center gap-1.5 px-2"><span className="shrink-0 text-muted-foreground">退款</span><span className="truncate font-bold tabular-nums text-rose-600 dark:text-rose-400">{toCurrency(order.refundAmount)}</span></div>
           ) : null}
@@ -480,6 +493,9 @@ function CompactTodayOrderCard({
           </div>
         ) : null}
       </article>
+      {isAmountEditorOpen && canEditExpectedIncome ? (
+        <OrderAmountEditModal order={order} onClose={() => setIsAmountEditorOpen(false)} onSaved={onRefresh} />
+      ) : null}
     </>
   );
 }
@@ -1365,6 +1381,7 @@ export function TodayOrdersView({
                   canViewProductCosts={canViewProductCosts}
                   isProfitUpdating={profitUpdatingOrderIds.includes(order.id)}
                   onExpand={() => setDetailOrderId(order.id)}
+                  onRefresh={handleRefreshOrder}
                   onRunAction={(action) => runAction(order.id, action)}
                   onOpenMatchEditor={(item, options) => onOpenMatchEditor(order, item, options)}
                   onRemoveBundleComponent={onRemoveBundleComponent}

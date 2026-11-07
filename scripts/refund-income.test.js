@@ -4,13 +4,15 @@ import { hasOrderRefundState } from "../src/lib/orderFinancials";
 import { buildOutboundReturnMetaNote, parseOutboundReturnMeta, filterCustomerReturns } from "../src/lib/outboundReturnMeta";
 
 let authorized = true;
+let operator;
 let saved;
 let order;
 let linkedOutbounds;
 let returnCalls;
 let failReturn;
+let amountSyncs;
 mock.module("../src/lib/auth", () => ({
-  getAuthorizedUser: async () => authorized ? { id: "user-1", name: "tester", permissions: [] } : null,
+  getAuthorizedUser: async () => authorized ? operator : null,
   getAuthorizedUserAny: async () => null,
 }));
 const db = {
@@ -21,7 +23,7 @@ const db = {
   },
   brushOrder: { deleteMany: async () => ({ count: 1 }) },
   autoPickOrder: {
-    findFirst: async () => order,
+    findFirst: async ({ where }) => where.id === order.id && (!where.userId || where.userId === order.userId) ? order : null,
     update: async ({ data }) => { saved = data; return { ...order, ...data }; },
   },
   $transaction: async (callback) => callback(db),
@@ -46,7 +48,7 @@ mock.module("../src/lib/autoPickOrders", () => ({
   resolveAutoPickMatchedShopName: () => "",
   createOutboundFromAutoPickOrder: async () => ({ ok: false }),
   updateAutoPickOrderAutoOutboundState: async () => {},
-  syncAutoOutboundFromCompletedAutoPickOrder: async () => {},
+  syncAutoOutboundFromCompletedAutoPickOrder: async (userId, orderId) => { amountSyncs.push({ userId, orderId }); },
   syncBrushOrderFromCompletedAutoPickOrder: async () => {},
 }));
 mock.module("../src/lib/outboundReturns", () => ({ returnOutboundOrderById: async (userId, id, input, tx) => {
@@ -63,11 +65,13 @@ const patch = (expectedIncome) => PATCH(new NextRequest("http://localhost/api/or
 
 beforeEach(() => {
   authorized = true;
+  operator = { id: "user-1", name: "tester", permissions: [] };
   saved = null;
   linkedOutbounds = [];
   returnCalls = [];
   failReturn = false;
-  order = { id: "order-1", orderNo: "1001", platform: "京东", status: "已取消",
+  amountSyncs = [];
+  order = { id: "order-1", userId: "user-1", orderNo: "1001", platform: "京东", status: "已取消",
     actualPaid: 10000, expectedIncome: 8500, platformCommission: 1500, items: [],
     rawPayload: { cancelDetails: [{ status: 1, title: "确认退款", total_price: 0 }] } };
 });
@@ -93,6 +97,22 @@ test("原有线下金额编辑权限保留", async () => {
   expect((await patch(6500)).status).toBe(200);
   expect(saved?.expectedIncome).toBe(6500);
   expect(saved?.actualPaid).toBe(6500);
+});
+test.each(["线下交易", "other"])("超管修改成员的 %s 订单时按订单归属保存实付与到手", async (platform) => {
+  operator = { id: "admin-1", role: "SUPER_ADMIN" };
+  order.platform = platform;
+  order.status = "已完成";
+  order.rawPayload = {};
+  expect((await patch(6500)).status).toBe(200);
+  expect(saved).toMatchObject({ actualPaid: 6500, expectedIncome: 6500, platformCommission: 0 });
+  expect(saved.rawPayload.systemMeta.manualAmountOverride.updatedBy).toBe("admin-1");
+  expect(amountSyncs).toEqual([{ userId: "user-1", orderId: "order-1" }]);
+});
+test("普通用户不能修改别人的线下订单金额", async () => {
+  operator = { id: "other-user", role: "USER" };
+  order.platform = "线下交易";
+  expect((await patch(6500)).status).toBe(404);
+  expect(saved).toBeNull();
 });
 test("普通京东订单仍保留自动抓取限制", async () => {
   order.rawPayload = {};

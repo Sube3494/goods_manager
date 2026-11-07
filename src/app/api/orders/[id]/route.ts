@@ -221,7 +221,8 @@ export async function PATCH(
       return NextResponse.json({ error: "订单不存在" }, { status: 404 });
     }
 
-    if (offlineEdit && order.platform !== "线下交易") {
+    const isOfflineOrder = order.platform === "线下交易" || String(order.platform || "").toLowerCase() === "other";
+    if (offlineEdit && !isOfflineOrder) {
       return NextResponse.json({ error: "当前只支持修改线下订单" }, { status: 400 });
     }
 
@@ -309,7 +310,6 @@ export async function PATCH(
           || String(item.productName || "").trim() === "手工配送占位商品";
       });
 
-    const isOfflineOrder = order.platform === "线下交易";
     if (hasAmountEdit && hasOrderRefundState(order)
       && !isOfflineOrder && !/抖店|抖音|doudian|douyin/i.test(String(order.platform || ""))) {
       return NextResponse.json({ error: "退款订单到手金额由系统自动计算，不支持手动修改" }, { status: 400 });
@@ -623,7 +623,7 @@ export async function PATCH(
                       platformCommission,
                       onlyExpectedIncome: isOfflineOrder || isManualDeliveryPlaceholderOrder || manualAmountOverride.onlyExpectedIncome === true,
                       updatedAt: new Date().toISOString(),
-                      updatedBy: String(user.name || user.email || user.id),
+                      updatedBy: String(operator.name || operator.email || operator.id),
                     },
                   }
                 : {}),

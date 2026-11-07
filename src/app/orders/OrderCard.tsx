@@ -1073,8 +1073,10 @@ function readCustomerTypeFromOrderPayload(rawPayload: unknown): "new" | "returni
   return null;
 }
 
-function isLegacyManualDeliveryPlaceholderOrder(order: AutoPickOrder) {
-  return order.platform === "线下交易" && order.items.some(isManualDeliveryPlaceholderItem);
+export function canEditOrderExpectedIncome(order: Pick<AutoPickOrder, "platform" | "status">, readOnly: boolean) {
+  const isOffline = order.platform === "线下交易" || String(order.platform || "").toLowerCase() === "other";
+  return !readOnly && getBaseAutoPickStatusDisplay(order.status) !== "已删除"
+    && !isJdOrder(order.platform) && (isOffline || isDoudianOrder(order.platform));
 }
 
 function getMatchedProductIds(item: AutoPickOrderItem) {
@@ -1755,14 +1757,14 @@ function DeliveryFeeEditModal({
   );
 }
 
-function OrderAmountEditModal({
+export function OrderAmountEditModal({
   order,
   onClose,
-  onSave,
+  onSaved,
 }: {
   order: AutoPickOrder;
   onClose: () => void;
-  onSave: (values: { expectedIncome: number }) => Promise<boolean>;
+  onSaved?: () => void;
 }) {
   const { showToast } = useToast();
   const isOffline = order.platform === "线下交易" || String(order.platform || "").toLowerCase() === "other";
@@ -1779,12 +1781,25 @@ function OrderAmountEditModal({
     }
 
     setIsSaving(true);
-    const ok = await onSave({
-      expectedIncome: nextExpectedIncome,
-    });
-    setIsSaving(false);
-    if (ok) {
+    try {
+      const response = await fetch(`/api/orders/${order.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ expectedIncome: nextExpectedIncome }),
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        showToast(data.error || "修改失败", "error");
+        return;
+      }
+      showToast("到手金额修改成功", "success");
+      onSaved?.();
       onClose();
+    } catch (error) {
+      console.error("更新订单到手金额失败", error);
+      showToast("网络请求失败，请稍后重试", "error");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -2487,7 +2502,7 @@ export function ProductStripItem({
           )}
         </div>
         <div className="min-w-0 flex-1">
-          <div 
+          <div
             title={display.name}
             className={cn(
               "break-all wrap-break-word font-medium text-foreground line-clamp-1",
@@ -3684,7 +3699,6 @@ export const OrderCard = memo(function OrderCard({
   const [isAmountEditorOpen, setIsAmountEditorOpen] = useState(false);
   const [isDeliveryFeeEditorOpen, setIsDeliveryFeeEditorOpen] = useState(false);
   const [isSavingDeliveryFee, setIsSavingDeliveryFee] = useState(false);
-  const [isSavingAmount, setIsSavingAmount] = useState(false);
   const [isOfflineEditorOpen, setIsOfflineEditorOpen] = useState(false);
   const [isSavingOfflineEdit, setIsSavingOfflineEdit] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
@@ -3823,31 +3837,6 @@ export const OrderCard = memo(function OrderCard({
     }
   }, [order.id, onRefresh, showToast]);
 
-  const handleSaveExpectedIncome = useCallback(async ({ expectedIncome: nextExpectedIncome }: { expectedIncome: number }) => {
-    try {
-      setIsSavingAmount(true);
-      const res = await fetch(`/api/orders/${order.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ expectedIncome: nextExpectedIncome }),
-      });
-      if (res.ok) {
-        showToast("到手金额修改成功", "success");
-        onRefresh?.();
-        return true;
-      }
-      const data = await res.json().catch(() => ({}));
-      showToast(data.error || "修改失败", "error");
-      return false;
-    } catch (err) {
-      console.error("更新订单到手金额失败", err);
-      showToast("网络请求失败，请稍后重试", "error");
-      return false;
-    } finally {
-      setIsSavingAmount(false);
-    }
-  }, [order.id, showToast, onRefresh]);
-
   const handleSaveOfflineOrder = useCallback(async (values: {
     actualPaid: number;
     deliveryFee: number;
@@ -3914,7 +3903,6 @@ export const OrderCard = memo(function OrderCard({
     }
   }, [order.id, showToast, onRefresh]);
 
-  const legacyManualDeliveryPlaceholderOrder = isLegacyManualDeliveryPlaceholderOrder(order);
   const visibleItems = getVisibleOrderItems(order.items);
   const unmatchedPlaceholderItem = (order.items || []).find(isUnmatchedOrIgnoredItem);
   const itemCount = getItemCount(visibleItems);
@@ -3979,7 +3967,6 @@ export const OrderCard = memo(function OrderCard({
   const orderTypeLabel = getOrderTypeLabel(order);
   const platformMeta = getPlatformBadgeMeta(order.platform, order.rawPayload);
   const effectiveRawExpectedIncome = order.expectedIncome;
-  const isIncomeLoading = isSavingAmount;
   const expectedIncome = getExpectedIncome(effectiveRawExpectedIncome, order.actualPaid, order.platformCommission, order.platform);
   const effectiveActualPaid = (displayAsOfflineOrder || String(order.platform || "").toLowerCase() === "other")
     && (!order.actualPaid || Number(order.actualPaid) <= 0)
@@ -4133,7 +4120,7 @@ export const OrderCard = memo(function OrderCard({
   const isJdPlatformOrder = isJdOrder(order.platform);
   const isDoudianPlatformOrder = isDoudianOrder(order.platform);
   const isMeituanPlatformOrder = isMeituanOrder(order.platform);
-  const canEditExpectedIncome = !readOnly && !isJdPlatformOrder && (isDoudianPlatformOrder || legacyManualDeliveryPlaceholderOrder);
+  const canEditExpectedIncome = canEditOrderExpectedIncome(order, readOnly);
   const isCancelledOrRefunded = cancelled || deleted || abnormal || Boolean(order.refundAmount && order.refundAmount > 0) || Boolean(order.status && /退|消|cancel|refund/i.test(order.status)) || Boolean(order.delivery?.track && /取消|退单/.test(String(order.delivery.track)));
   const canEditDeliveryFee = !readOnly && isCancelledOrRefunded;
   const displayDeliveryFee = effectiveSendFee != null
@@ -4332,7 +4319,7 @@ export const OrderCard = memo(function OrderCard({
                         <button
                           type="button"
                           onClick={() => setIsAmountEditorOpen(true)}
-                          disabled={isIncomeLoading}
+                          aria-label="修改商家到手"
                           className="flex w-full flex-col items-end rounded-xl p-1 -mr-1 -my-0.5 text-right transition hover:opacity-85 disabled:cursor-not-allowed cursor-pointer"
                         >
                           <div className="flex items-center justify-end gap-1.5">
@@ -4368,7 +4355,7 @@ export const OrderCard = memo(function OrderCard({
                     <button
                       type="button"
                       onClick={() => setIsAmountEditorOpen(true)}
-                      disabled={isIncomeLoading}
+                      aria-label="修改商家到手"
                       className="flex min-w-0 items-center justify-between gap-1.5 rounded-2xl border border-black/8 bg-black/2 px-3 py-2 text-left transition hover:border-black/12 hover:bg-black/3 dark:border-white/10 dark:bg-white/3 dark:hover:bg-white/4 disabled:cursor-not-allowed cursor-pointer sm:inline-flex sm:h-8 sm:justify-start sm:rounded-full sm:px-2.5 sm:py-0"
                     >
                       <span className="shrink-0 text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground sm:text-[11px]">
@@ -5021,12 +5008,8 @@ export const OrderCard = memo(function OrderCard({
       {isAmountEditorOpen && canEditExpectedIncome ? (
         <OrderAmountEditModal
           order={order}
-          onClose={() => {
-            if (!isSavingAmount) {
-              setIsAmountEditorOpen(false);
-            }
-          }}
-          onSave={handleSaveExpectedIncome}
+          onClose={() => setIsAmountEditorOpen(false)}
+          onSaved={onRefresh}
         />
       ) : null}
       {isDeliveryFeeEditorOpen && canEditDeliveryFee ? (

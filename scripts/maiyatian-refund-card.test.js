@@ -56,3 +56,18 @@ test("退款订单卡片保留原实付，展示退款后到手及商品退款�
   expect(html).toContain("改数量 · 退款 ¥264.40");
   expect(html).toContain("2/5 件");
 });
+
+test("线下订单卡片直接提供到手编辑，保留只读、作废和京东限制", () => {
+  const order = { id: "order-1", orderNo: "OFFLINE-1", platform: "线下交易", status: "已完成",
+    orderTime: "2026-10-11T05:21:00Z", actualPaid: 10000, expectedIncome: 10000, items: [] };
+  const noop = () => {};
+  const render = (value, readOnly = false) => renderToStaticMarkup(React.createElement(OrderCard, {
+    order: value, readOnly, expanded: false, actingId: "", onToggleExpanded: noop,
+    onRunAction: noop, onOpenCostBackfill: noop, onOpenMatchEditor: noop,
+  }));
+  expect(render(order)).toContain('aria-label="修改商家到手"');
+  expect(render({ ...order, platform: "other" })).toContain('aria-label="修改商家到手"');
+  expect(render(order, true)).not.toContain('aria-label="修改商家到手"');
+  expect(render({ ...order, status: "已删除" })).not.toContain('aria-label="修改商家到手"');
+  expect(render({ ...order, platform: "京东" })).not.toContain('aria-label="修改商家到手"');
+});
