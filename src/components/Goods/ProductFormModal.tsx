@@ -21,6 +21,7 @@ import { SupplierModal } from "@/components/Suppliers/SupplierModal";
 import { PurchaseOrderModal } from "@/components/Purchases/PurchaseOrderModal";
 
 import { useUser } from "@/hooks/useUser";
+import { readRecordedCost } from "@/lib/outboundCostSnapshot";
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -815,7 +816,7 @@ export function ProductFormModal({
           taobaoSkuId: formatInitialTaobaoSkuValue(initialData),
           doudianSkuId: formatInitialDoudianSkuValue(initialData),
           name: initialData.name,
-          costPrice: String(initialData.costPrice || ""),
+          costPrice: String(initialData.costPrice ?? ""),
           stock: String(initialData.stock || ""),
           categoryId: initialData.categoryId || "",
           supplierId: initialData.supplierId || "",
@@ -2181,23 +2182,26 @@ export function ProductFormModal({
                                         const hasOutbound = remainingQty < originalQty;
 
                                         const itemQty = Math.max(0, originalQty);
+                                        const recordedCost = readRecordedCost(item.costPrice);
+                                        const baseUnitCost = recordedCost ?? 0;
                                         const totalAdditionalFees = Number(order.shippingFees || 0) + Number(order.extraFees || 0);
-                                        let allocatedUnitCost = item.costPrice;
+                                        let allocatedUnitCost = baseUnitCost;
                                         if (totalAdditionalFees > 0 && Array.isArray(order.items)) {
                                             const totalItemValue = order.items.reduce((sum, it) => sum + (Number(it.costPrice || 0) * Number(it.quantity || 0)), 0);
                                             const totalQuantity = order.items.reduce((sum, it) => sum + Number(it.quantity || 0), 0);
                                             if (totalItemValue > 0 && itemQty > 0) {
-                                                const itemValue = Number(item.costPrice || 0) * itemQty;
+                                                const itemValue = baseUnitCost * itemQty;
                                                 const allocatedFee = totalAdditionalFees * (itemValue / totalItemValue);
-                                                allocatedUnitCost = Number(item.costPrice || 0) + (allocatedFee / itemQty);
+                                                allocatedUnitCost = baseUnitCost + (allocatedFee / itemQty);
                                             } else if (totalQuantity > 0) {
-                                                allocatedUnitCost = Number(item.costPrice || 0) + (totalAdditionalFees / totalQuantity);
+                                                allocatedUnitCost = baseUnitCost + (totalAdditionalFees / totalQuantity);
                                             }
                                         }
-                                        const hasShippingDiff = allocatedUnitCost > item.costPrice && Math.abs(allocatedUnitCost - item.costPrice) >= 0.001;
-                                        const itemSubtotal = (item.costPrice * originalQty).toFixed(2).replace(/\.00$/, '');
+                                        const shippingCostDiff = allocatedUnitCost - baseUnitCost;
+                                        const hasShippingDiff = recordedCost !== null && shippingCostDiff >= 0.001;
+                                        const itemSubtotal = (baseUnitCost * originalQty).toFixed(2).replace(/\.00$/, '');
                                         const orderTotalNum = Number(order.totalAmount || 0);
-                                        const hasOrderTotalDiff = order.totalAmount !== undefined && order.totalAmount !== null && Math.abs(orderTotalNum - (item.costPrice * originalQty)) > 0.01;
+                                        const hasOrderTotalDiff = order.totalAmount !== undefined && order.totalAmount !== null && Math.abs(orderTotalNum - (baseUnitCost * originalQty)) > 0.01;
 
                                         return (
                                             <div key={order.id} className="flex flex-col gap-2.5 p-3 rounded-xl bg-white dark:bg-white/5 border border-border/40 dark:border-white/5 hover:border-primary/20 transition-colors shadow-xs">
@@ -2341,7 +2345,7 @@ export function ProductFormModal({
                                                         <div className="flex items-center justify-between gap-2 flex-wrap">
                                                             {/* 左侧进价与实摊 */}
                                                             <div className="flex items-center gap-1.5 flex-wrap">
-                                                                {order.status === "Received" && item.costPrice === 0 ? (
+                                                                {order.status === "Received" && recordedCost === null ? (
                                                                     <>
                                                                         <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium bg-amber-500/10 px-2 py-0.5 rounded-full">无进价</span>
                                                                         <button 
@@ -2359,7 +2363,7 @@ export function ProductFormModal({
                                                                     </>
                                                                 ) : (
                                                                     <>
-                                                                        <span className="text-foreground font-medium">进价: ￥{item.costPrice}</span>
+                                                                        <span className="text-foreground font-medium">进价: ￥{recordedCost ?? "—"}</span>
                                                                         {order.status === "Received" && (
                                                                             <button 
                                                                                 type="button"
@@ -2367,7 +2371,7 @@ export function ProductFormModal({
                                                                                     e.preventDefault();
                                                                                     e.stopPropagation();
                                                                                     setEditingItemId(itemId);
-                                                                                    setEditingCostValue(String(item.costPrice));
+                                                                                    setEditingCostValue(String(recordedCost ?? ""));
                                                                                 }}
                                                                                 className="text-muted-foreground hover:text-primary transition-colors inline-flex items-center cursor-pointer p-1 rounded-full hover:bg-black/5 dark:hover:bg-white/10"
                                                                                 title="修改进价"
@@ -2376,7 +2380,7 @@ export function ProductFormModal({
                                                                             </button>
                                                                         )}
                                                                         {hasShippingDiff && (
-                                                                            <span className="text-amber-600 dark:text-amber-400 font-medium text-[10px]" title={`包含整单运费/附加费平摊(+￥${(allocatedUnitCost - item.costPrice).toFixed(2)}/件)`}>
+                                                                            <span className="text-amber-600 dark:text-amber-400 font-medium text-[10px]" title={`包含整单运费/附加费平摊(+￥${shippingCostDiff.toFixed(2)}/件)`}>
                                                                                 (实摊: ￥{allocatedUnitCost.toFixed(2).replace(/\.00$/, '')})
                                                                             </span>
                                                                         )}
