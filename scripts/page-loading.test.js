@@ -39,12 +39,13 @@ const db = {
   },
   operatingCostMonthlyBill: { findMany: record('operatingBill',[]), findUnique: record('operatingBill.findUnique', null) },
 };
+const { readOrderExtraExpensesFromRawPayload, calculateOrderTotalExtraExpense } = await import('../src/lib/autoPickOrders');
 mock.module('@/lib/prisma',()=>({default:db}));
 mock.module('@/lib/auth',()=>({getAuthorizedUserAny:async()=>allowed?user:null,getAuthorizedUser:async()=>allowed?user:null,getAuthorizedAdmin:async()=>allowed?user:null}));
 mock.module('@/lib/storage',()=>({getStorageStrategy:async()=>({resolveUrl:value=>value})}));
 mock.module('@/lib/customerMemoryStore',()=>({resolveRememberedCustomerTypes:async()=>new Map()}));
 mock.module('@/services/promotionService',()=>({getEffectivePromotionExpenses:async()=>[{amount:10,date,shopName:'南山店',platform:'线下交易'}]}));
-mock.module('@/lib/autoPickOrders',()=>({normalizeAutoPickIntegrationConfig:()=>({}),readCustomerTypeFromRawPayload:()=>null,readDeliveryFeeFromValue,readOrderExtraExpensesFromRawPayload:()=>[],calculateOrderTotalExtraExpense:()=>0,resolveAutoPickMatchedShopName:order=>order.shopId==='shop-1'?'南山店':''}));
+mock.module('@/lib/autoPickOrders',()=>({normalizeAutoPickIntegrationConfig:()=>({}),readCustomerTypeFromRawPayload:()=>null,readDeliveryFeeFromValue,readOrderExtraExpensesFromRawPayload,calculateOrderTotalExtraExpense,resolveAutoPickMatchedShopName:order=>order.shopId==='shop-1'?'南山店':''}));
 const { NextRequest } = await import('next/server');
 const { GET:stats } = await import('../src/app/api/stats/route');
 const { GET:brush } = await import('../src/app/api/brush/dashboard/route');
@@ -136,6 +137,58 @@ test.each([
   } finally {
     orders[0] = originalOrder;
     outboundOrders.pop();
+  }
+});
+
+test.each([
+  { status: '已删除', voided: undefined },
+  { status: '已完成', voided: { reason: '录入有误' } },
+])('dashboard excludes the original offline order after deletion or voiding ($status)', async ({ status, voided }) => {
+  const [originalOrder] = orders;
+  const replacement = { ...originalOrder, id: 'order-2', orderNo: 'test-2' };
+  const items = [{ productName: '玩偶', quantity: 1 }];
+  const delivery = { sendFee: 4900, isOffline: true };
+  orders[0] = {
+    ...originalOrder,
+    status, items, delivery, actualPaid: 40000, expectedIncome: 40000,
+    rawPayload: { systemMeta: {
+      manualOfflineVoided: voided,
+      extraExpenses: [{ id: 'old-expense', name: '额外支出', amount: 20000, type: 'expense' }],
+    } },
+  };
+  orders.push({ ...replacement, items, delivery, actualPaid: 40000, expectedIncome: 40000 });
+  const outboundItem = {
+    id: 'item-1', quantity: 1,
+    costSnapshot: { batches: [{ purchaseOrderItemId: 'purchase-1', quantity: 1, unitCost: 200 }] },
+  };
+  outboundOrders.push({
+    id: 'outbound-1', type: 'Sale', date, status: 'Returned', items: [outboundItem],
+    note: buildOutboundReturnMetaNote('平台单号:test-1', [{
+      id: 'return-1', createdAt: date.toISOString(), reason: '售后退货',
+      refundAmount: 0, extraExpense: 0, returnedCost: 200,
+      items: [{ outboundOrderItemId: 'item-1', quantity: 1 }],
+    }], 'Returned'),
+  }, {
+    id: 'outbound-2', type: 'Sale', date, status: 'Confirmed', note: '平台单号:test-2',
+    items: [{ ...outboundItem, id: 'item-2' }],
+  });
+
+  try {
+    const response = await stats(new NextRequest('http://localhost/api/stats?range=all'));
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    const point = data.businessTrend.at(-1);
+    expect(point.pureProfit).toBe(151);
+    expect(point.platformPureProfit['线下交易']).toBe(151);
+    expect(point.shopPlatformPureProfit['南山店']['线下交易']).toBe(151);
+    expect(data.platformBusinessTrend['线下交易'].at(-1).pureProfit).toBe(151);
+    expect(point.productCost).toBe(200);
+    expect(data.productCost).toBe(200);
+    expect(point.orderCount).toBe(1);
+  } finally {
+    orders[0] = originalOrder;
+    orders.pop();
+    outboundOrders.splice(-2);
   }
 });
 

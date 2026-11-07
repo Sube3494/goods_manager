@@ -717,6 +717,7 @@ export async function GET(request: NextRequest) {
     }
 
     const filteredAutoPickOrdersInRange = autoPickOrdersInRange.filter((order) => {
+      if (isAutoPickOrderDeletedStatus(order.status) || isVoidedOfflineOrder(order)) return false;
       if (shopName && resolveExistingMatchedShopName(order) !== shopName) return false;
       if (platformFilter && normalizePlatform(order.platform) !== platformFilter) return false;
       return true;
@@ -853,9 +854,7 @@ export async function GET(request: NextRequest) {
         recordedRefundAmount: Math.round(meta.refundAmount * 100),
         hasReturnedGoods: meta.hasReturnedGoods,
       });
-      const retainedIncome = isVoidedOfflineOrder(order) || isAutoPickOrderDeletedStatus(order.status)
-        ? 0
-        : resolveOfflineReturnRetainedIncome({ platform: order.platform, actualPaid, refundAmount, fullyReturned: true }) / 100;
+      const retainedIncome = resolveOfflineReturnRetainedIncome({ platform: order.platform, actualPaid, refundAmount, fullyReturned: true }) / 100;
       return {
         retainedIncome,
         deliveryExpense: retainedIncome > 0 ? getDeliveryFee(order.delivery, order.rawPayload) / 100 : 0,
@@ -871,9 +870,7 @@ export async function GET(request: NextRequest) {
     let returnExtraExpense = 0;
 
     filteredAutoPickOrdersInRange.forEach((order) => {
-      const isCancelled = isAutoPickOrderCancelledStatus(order.status)
-        || isAutoPickOrderDeletedStatus(order.status)
-        || isVoidedOfflineOrder(order);
+      const isCancelled = isAutoPickOrderCancelledStatus(order.status);
       const orderCostMeta = outboundMetaByOrderNo.get(String(order.orderNo || "").trim());
       const offlineReturn = resolveOfflineReturn(order, orderCostMeta);
       if (offlineReturn) {
@@ -1045,8 +1042,6 @@ export async function GET(request: NextRequest) {
         status: order.status,
       });
       const isOther = isAutoPickOrderCancelledStatus(order.status)
-        || isAutoPickOrderDeletedStatus(order.status)
-        || isVoidedOfflineOrder(order)
         || isFullyRefunded
         || offlineReturn !== null;
       const matchedShopName = resolveExistingMatchedShopName(order) || "未匹配店铺";
@@ -1450,12 +1445,10 @@ export async function GET(request: NextRequest) {
 
     filteredAutoPickOrdersInRange.forEach((order) => {
       const isBrush = readMainSystemSelfDeliveryFlag(order.rawPayload, order.delivery);
-      const isOffline = isVoidedOfflineOrder(order)
-        || String(order.platform || "").trim() === "线下交易"
+      const isOffline = String(order.platform || "").trim() === "线下交易"
         || String(order.platform || "").includes("线下")
         || String(order.platform || "").toLowerCase() === "other";
-      const isOther = isAutoPickOrderCancelledStatus(order.status)
-        || isAutoPickOrderDeletedStatus(order.status);
+      const isOther = isAutoPickOrderCancelledStatus(order.status);
       if (isOffline || (!getCustomerMemoryPlatform(order.platform) && (isBrush || isOther))) return;
 
       const manualAmountOverride = readManualAmountOverride(order.rawPayload);
