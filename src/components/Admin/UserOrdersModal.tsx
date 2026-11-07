@@ -702,7 +702,7 @@ export function UserOrdersModal({
     }
   };
   const saveMatch = async (products: Product[], clear = false) => {
-    if (!canManageOrders || !matchTarget || savingMatch) return;
+    if (!canManageOrders || !userId || !matchTarget || savingMatch) return;
     const [order, item, options] = matchTarget;
     setSavingMatch(true);
     try {
@@ -715,7 +715,7 @@ export function UserOrdersModal({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(clear ? { clear: true } : {
           productId: items.map((entry) => entry.id).join("+"), items,
-          shopId: localShops.find((shop) => shop.name === order.matchedShopName)?.id,
+          shopId: matchShopId,
           componentIndex: options?.componentIndex,
           currentBundleItems: item.matchedProduct?.bundleItems || options?.currentBundleItems,
           isAddingComponent: options?.isAddingBundleItem,
@@ -925,6 +925,8 @@ export function UserOrdersModal({
   }, [activeSummary.platformProfit]);
 
   const [localShops, setLocalShops] = useState<Array<{ id: string; name: string; address: string }>>([]);
+  const matchShopName = matchTarget?.[0].matchedShopName;
+  const matchShopId = matchTarget?.[0].matchedShopId || localShops.find((shop) => shop.name === matchShopName)?.id;
 
   const handleTodayDataLoad = useCallback((data: {
     summary: typeof todaySummary;
@@ -2008,17 +2010,17 @@ export function UserOrdersModal({
           onClose={() => setBackfillTarget(null)}
           onSuccess={() => { setBackfillTarget(null); setRefreshTrigger((value) => value + 1); }} />
       )}
-      {canManageOrders && matchTarget && (
+      {canManageOrders && userId && matchTarget && (
         <ProductSelectionModal isOpen
           onClose={() => { if (!savingMatch) setMatchTarget(null); }}
           onSelect={(products) => { void saveMatch(products); }}
           onClear={matchTarget[2]?.isAddingBundleItem || matchTarget[2]?.componentIndex !== undefined ? undefined : () => { void saveMatch([], true); }}
           clearLabel="无需出库 / 解除绑定" selectedIds={[]} singleSelect showQuantityControls
           allowMultipleToggle={!matchTarget[2]?.isAddingBundleItem && matchTarget[2]?.componentIndex === undefined}
-          loadAllOnOpen showPlatformSelector={false} fetchPath="/api/shop-products"
-          query={{ all: "true", scope: "all", userId: userId || "",
-            shopId: localShops.find((shop) => shop.name === matchTarget[0].matchedShopName)?.id || "all" }}
-          title={savingMatch ? "正在保存匹配…" : "修改商品匹配"} />
+          loadAllOnOpen showPlatformSelector={false} allowLibrarySwitch={false} fetchPath="/api/shop-products"
+          query={{ all: "true", scope: "all", userId, shopId: matchShopId || "all" }}
+          emptyStateText={matchShopId && matchShopName ? `当前店铺“${matchShopName}”下没有找到候选商品` : "该成员的店铺下没有找到候选商品"}
+          title={savingMatch ? "正在保存匹配…" : matchShopName ? `修改商品匹配 · ${matchShopName}` : "修改商品匹配"} />
       )}
 
       {/* 查看成员的历史推广费日历与趋势弹窗 */}

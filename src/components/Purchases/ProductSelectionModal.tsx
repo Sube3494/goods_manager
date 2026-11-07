@@ -1212,7 +1212,7 @@ export function ProductSelectionModal({
                             {emptyStateText || "未找到相关候选商品"}
                           </div>
                           <p className="text-xs text-muted-foreground max-w-sm leading-relaxed">
-                            {searchQuery ? "当前搜索条件下未匹配到商品，您可以尝试缩短关键词或清空搜索。" : "当前库中暂无可用的商品数据。"}
+                            {searchQuery ? "当前搜索条件下未匹配到商品，您可以尝试缩短关键词或清空搜索。" : allowLibrarySwitch ? "当前库中暂无可用的商品数据。" : "当前范围内暂无可用的商品数据。"}
                           </p>
                           {searchQuery && (
                             <button
