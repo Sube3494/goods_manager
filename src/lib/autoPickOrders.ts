@@ -203,6 +203,7 @@ type AutoPickManualMatchedProductMeta = {
   shopProductId?: string | null;
   shopName?: string | null;
   isManual?: boolean;
+  orderOnlyReplacement?: boolean;
   matchMethod?: "manual" | "id" | "sku" | "outbound";
   isCompositeMatch?: boolean;
   compositeItems?: any[];
@@ -5158,6 +5159,7 @@ function readManualMatchedProductFromOrderItemRawPayload(rawPayload: unknown) {
     shopProductId,
     shopName: String(manual.shopName || "").trim() || null,
     isManual: typeof manual.isManual === "boolean" ? manual.isManual : undefined,
+    ...(manual.orderOnlyReplacement === true ? { orderOnlyReplacement: true } : {}),
     matchMethod:
       manual.matchMethod === "id" || manual.matchMethod === "sku" || manual.matchMethod === "outbound"
         ? manual.matchMethod
@@ -5574,6 +5576,8 @@ export async function backfillPlatformIdsForSyncedAutoPickOrder(userId: string, 
   let count = 0;
 
   for (const item of order.items) {
+    const manualMatchedProduct = readManualMatchedProductFromOrderItemRawPayload(item.rawPayload);
+    if (manualMatchedProduct?.orderOnlyReplacement) continue;
     const platformProductId = normalizeAutoPickSkuForMatch(item.platformSkuId) || readAutoPickPlatformProductIdForMatch(order.platform, item.rawPayload, item.productNo);
     const skuFallbacks = splitCompositeAutoPickSku(item.productNo);
     const matchKeys = Array.from(new Set([platformProductId, ...skuFallbacks].filter(Boolean)));
@@ -5598,7 +5602,6 @@ export async function backfillPlatformIdsForSyncedAutoPickOrder(userId: string, 
       continue;
     }
 
-    const manualMatchedProduct = readManualMatchedProductFromOrderItemRawPayload(item.rawPayload);
     const manualShopProductId = String(manualMatchedProduct?.shopProductId || "").trim() || null;
     let matchedShopProductId = manualShopProductId && !manualShopProductId.includes("+")
       ? manualShopProductId
@@ -7363,12 +7366,14 @@ async function resolveOutboundItemsForAutoPickOrder(
         matchedShopProduct = await tx.shopProduct.findFirst({
           where: {
             shopId: internalShop.id,
-            OR: [
-              ...(storedManualShopProductId ? [{ id: storedManualShopProductId }] : []),
-              { id: manualMatchedProduct.id },
-              { productId: manualMatchedProduct.id },
-              { sourceProductId: manualMatchedProduct.id },
-            ],
+            ...(manualMatchedProduct.orderOnlyReplacement
+              ? { id: storedManualShopProductId || manualMatchedProduct.id, deletedAt: null, isDiscontinued: false, shop: { userId } }
+              : { OR: [
+                  ...(storedManualShopProductId ? [{ id: storedManualShopProductId }] : []),
+                  { id: manualMatchedProduct.id },
+                  { productId: manualMatchedProduct.id },
+                  { sourceProductId: manualMatchedProduct.id },
+                ] }),
           },
           select: {
             id: true,
@@ -7387,7 +7392,7 @@ async function resolveOutboundItemsForAutoPickOrder(
           orderBy: { updatedAt: "desc" },
         });
 
-        if (!matchedShopProduct) {
+        if (!matchedShopProduct && !manualMatchedProduct.orderOnlyReplacement) {
           const originalTargetProduct = (storedManualShopProductId || manualMatchedProduct.id)
             ? await tx.shopProduct.findUnique({
                 where: { id: storedManualShopProductId || manualMatchedProduct.id },
@@ -7454,6 +7459,10 @@ async function resolveOutboundItemsForAutoPickOrder(
         });
       }
 
+      if (manualMatchedProduct.orderOnlyReplacement && !matchedShopProduct) {
+        throw new Error("本单换货商品在当前店铺已不可用，请重新选择");
+      }
+
       const hasExplicitManualBundleConfig = itemRawPayload.manualBundleItemsOverride === true
         || Array.isArray(manualMatchedProduct.bundleItems)
         || manualMatchedProduct.isBundle === false;
@@ -7480,7 +7489,7 @@ async function resolveOutboundItemsForAutoPickOrder(
       const orderItemQuantity = Math.max(1, Number(item.quantity || 1) || 1);
       const manualFulfillmentQuantity = typeof itemRawPayload.refundAdjustedManualQuantity === "number"
         ? itemRawPayload.refundAdjustedManualQuantity
-        : (manualQuantity > 1 ? Math.max(1, manualQuantity) : orderItemQuantity);
+        : (manualMatchedProduct.orderOnlyReplacement || manualQuantity > 1 ? Math.max(1, manualQuantity) : orderItemQuantity);
       if (manualFulfillmentQuantity <= 0) continue;
 
       if (manualShopProductId) {

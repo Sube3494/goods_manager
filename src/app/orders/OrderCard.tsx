@@ -7,6 +7,7 @@ import { Component, memo, type ReactNode, useCallback, useEffect, useLayoutEffec
 import Image from "next/image";
 import dynamic from "next/dynamic";
 import {
+  ArrowLeftRight,
   Check,
   CheckCheck,
   ChevronDown,
@@ -823,7 +824,7 @@ export function getOrderItemDisplay(item: AutoPickOrderItem, platform?: string |
   return {
     name: realResolvedName || (isManualDeliveryPlaceholder ? "可添加发货货品" : item.productName) || "未命名商品",
     sku: matchedProduct?.sku || (isManualDeliveryPlaceholder && !realResolvedName ? "不加则只记配送费" : item.productNo) || "-",
-    image: (/[+＋]/.test(String(item.productNo || "")) || /[+＋]/.test(String(matchedProduct?.sku || "")) || matchedProduct?.isCompositeMatch === true)
+    image: (matchedProduct?.orderOnlyReplacement || /[+＋]/.test(String(item.productNo || "")) || /[+＋]/.test(String(matchedProduct?.sku || "")) || matchedProduct?.isCompositeMatch === true)
       ? (matchedProduct?.image || null)
       : (platformThumbnail || matchedProduct?.image || item.thumb || rawThumbCandidate),
     quantity: Math.max(1, Number((matchedProduct as any)?.quantity || item.quantity || 1) || 1),
@@ -2326,6 +2327,8 @@ export function ProductStripItem({
   display,
   previewImage,
   onEditMatch,
+  onReplaceForOrder,
+  originalOrderedName,
   showEditMatch = false,
   compact = false,
   matchedProduct,
@@ -2349,6 +2352,8 @@ export function ProductStripItem({
   display: { name: string; sku: string; image: string | null; quantity: number; costPrice?: number | null; costSource?: "outbound" | "current"; stock?: number | null; stockShopName?: string | null; sourceId?: string; optionalMatch?: boolean };
   previewImage?: string | null;
   onEditMatch?: () => void;
+  onReplaceForOrder?: () => void;
+  originalOrderedName?: string;
   onAddBundleItem?: () => void;
   onRemoveComponent?: () => void;
   onAdoptPlatformImage?: () => void;
@@ -2511,6 +2516,7 @@ export function ProductStripItem({
             ) : null}
             <span>{display.name}</span>
           </div>
+          {originalOrderedName ? <p className="truncate text-[10px] text-muted-foreground" title={originalOrderedName}>本单换货 · 原下单 {originalOrderedName}</p> : null}
           <div className={cn(
             "mt-0.5 flex flex-wrap items-center font-medium text-muted-foreground",
             compact ? "gap-x-1.5 gap-y-0.5 text-[10px]" : "gap-x-1.5 sm:gap-x-2.5 gap-y-0.5 text-[11px] sm:mt-1"
@@ -2519,6 +2525,18 @@ export function ProductStripItem({
               <span className="shrink-0 font-mono">{display.sku}</span>
             ) : null}
             <span className="shrink-0">x{display.quantity}</span>
+            {onReplaceForOrder ? (
+              <button
+                type="button"
+                onClick={onReplaceForOrder}
+                title="仅本单换货"
+                aria-label="仅本单换货"
+                className="inline-flex min-h-5 shrink-0 cursor-pointer items-center gap-1 rounded-sm px-0.5 font-semibold leading-none text-sky-700 underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-sky-500 dark:text-sky-300"
+              >
+                <ArrowLeftRight size={11} aria-hidden="true" />
+                <span>换货</span>
+              </button>
+            ) : null}
             {typeof display.costPrice === "number" && Number.isFinite(display.costPrice) && display.costPrice >= 0 ? (
               <HoverCard open={inventoryOpen} onOpenChange={setInventoryOpen} openDelay={150}>
                 <HoverCardTrigger asChild>
@@ -2739,6 +2757,7 @@ export function OrderItemBundleGroup({
     componentDisplay?: any;
     currentBundleItems?: any[];
     isAddingBundleItem?: boolean;
+    orderOnlyReplacement?: boolean;
   }) => void;
   onRemoveBundleComponent?: (order: AutoPickOrder, item: AutoPickOrderItem, componentIndex: number, componentName?: string, currentBundleItems?: any[]) => void;
   returnedItemQuantityMap?: Map<string, number>;
@@ -2765,6 +2784,11 @@ export function OrderItemBundleGroup({
   const rawReturnedQuantity = returnedItemQuantityMap?.get(getReturnedProductKey(item)) || 0;
   const platformRefundQuantity = readMaiyatianItemRefundQuantity(item.rawPayload, order.rawPayload);
   const isItemReturned = platformRefundQuantity > 0 || rawReturnedQuantity > 0 || isOrderFullyReturned || (isSingleItemOrder && (hasOutboundReturn || Number(order.refundAmount || 0) > 0));
+  const canReplaceForOrder = !readOnly && !deleted && !order.hasOutbound && !isCancelledStatus(order.status)
+    && !hasOrderRefundState(order) && !isItemReturned && Boolean(order.matchedShopId)
+    && Boolean(item.matchedProduct?.shopProductId && item.matchedProduct.sourceType === "shopProduct") && !isCompositeMatch;
+  const onReplaceForOrder = canReplaceForOrder ? () => onOpenMatchEditor(order, item, { orderOnlyReplacement: true }) : undefined;
+  const originalOrderedName = item.matchedProduct?.orderOnlyReplacement ? item.productName : undefined;
   const returnedQuantity = platformRefundQuantity > 0
     ? platformRefundQuantity
     : rawReturnedQuantity > 0
@@ -2902,7 +2926,9 @@ export function OrderItemBundleGroup({
       <ProductStripItem
         key={`${item.productNo || item.productName}-${index}-${display.sku}-0`}
         display={display}
-        previewImage={isMeituan ? item.platformImage : undefined}
+        previewImage={isMeituan && !originalOrderedName ? item.platformImage : undefined}
+        onReplaceForOrder={onReplaceForOrder}
+        originalOrderedName={originalOrderedName}
         compact={compact}
         showEditMatch={!deleted && !readOnly}
         onEditMatch={() => onOpenMatchEditor(order, item)}
@@ -2931,7 +2957,9 @@ export function OrderItemBundleGroup({
       {/* 主商品（本体） */}
       <ProductStripItem
         display={mainDisplay}
-        previewImage={isMeituan ? item.platformImage : undefined}
+        previewImage={isMeituan && !originalOrderedName ? item.platformImage : undefined}
+        onReplaceForOrder={onReplaceForOrder}
+        originalOrderedName={originalOrderedName}
         compact={compact}
         isBundleMain={true}
         bundleComponentCount={componentDisplays.length}
@@ -3645,6 +3673,7 @@ export const OrderCard = memo(function OrderCard({
     componentDisplay?: any;
     currentBundleItems?: any[];
     isAddingBundleItem?: boolean;
+    orderOnlyReplacement?: boolean;
   }) => void;
   onRemoveBundleComponent?: (order: AutoPickOrder, item: AutoPickOrderItem, componentIndex: number, componentName?: string, currentBundleItems?: any[]) => void;
   onRefresh?: () => void;

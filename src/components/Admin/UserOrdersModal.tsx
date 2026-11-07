@@ -720,6 +720,7 @@ export function UserOrdersModal({
           currentBundleItems: item.matchedProduct?.bundleItems || options?.currentBundleItems,
           isAddingComponent: options?.isAddingBundleItem,
           autoMatchedProduct: item.matchedProduct,
+          orderOnlyReplacement: options?.orderOnlyReplacement,
         }),
       });
       const data = await response.json();
@@ -730,7 +731,7 @@ export function UserOrdersModal({
         if (!outbound.ok) throw new Error(result.error || "匹配已保存，但出库失败");
       }
       setMatchTarget(null);
-      showToast("商品匹配已更新", "success");
+      showToast(options?.orderOnlyReplacement ? "已保存本单换货" : "商品匹配已更新", "success");
     } catch (error) {
       showToast(error instanceof Error ? error.message : "更新失败", "error");
     } finally {
@@ -927,6 +928,7 @@ export function UserOrdersModal({
   const [localShops, setLocalShops] = useState<Array<{ id: string; name: string; address: string }>>([]);
   const matchShopName = matchTarget?.[0].matchedShopName;
   const matchShopId = matchTarget?.[0].matchedShopId || localShops.find((shop) => shop.name === matchShopName)?.id;
+  const isOrderOnlyReplacement = matchTarget?.[2]?.orderOnlyReplacement === true;
 
   const handleTodayDataLoad = useCallback((data: {
     summary: typeof todaySummary;
@@ -2014,13 +2016,16 @@ export function UserOrdersModal({
         <ProductSelectionModal isOpen
           onClose={() => { if (!savingMatch) setMatchTarget(null); }}
           onSelect={(products) => { void saveMatch(products); }}
-          onClear={matchTarget[2]?.isAddingBundleItem || matchTarget[2]?.componentIndex !== undefined ? undefined : () => { void saveMatch([], true); }}
+          onClear={matchTarget[2]?.isAddingBundleItem || matchTarget[2]?.componentIndex !== undefined || isOrderOnlyReplacement ? undefined : () => { void saveMatch([], true); }}
           clearLabel="无需出库 / 解除绑定" selectedIds={[]} singleSelect showQuantityControls
-          allowMultipleToggle={!matchTarget[2]?.isAddingBundleItem && matchTarget[2]?.componentIndex === undefined}
+          defaultProductQuantity={isOrderOnlyReplacement ? (matchTarget[1].matchedProduct?.orderOnlyReplacement ? matchTarget[1].matchedProduct.quantity || matchTarget[1].quantity : matchTarget[1].quantity) : undefined}
+          closeOnSelect={!isOrderOnlyReplacement}
+          confirmLabel={isOrderOnlyReplacement ? "确认本单换货" : undefined}
+          allowMultipleToggle={!matchTarget[2]?.isAddingBundleItem && matchTarget[2]?.componentIndex === undefined && !isOrderOnlyReplacement}
           loadAllOnOpen showPlatformSelector={false} allowLibrarySwitch={false} fetchPath="/api/shop-products"
           query={{ all: "true", scope: "all", userId, shopId: matchShopId || "all" }}
           emptyStateText={matchShopId && matchShopName ? `当前店铺“${matchShopName}”下没有找到候选商品` : "该成员的店铺下没有找到候选商品"}
-          title={savingMatch ? "正在保存匹配…" : matchShopName ? `修改商品匹配 · ${matchShopName}` : "修改商品匹配"} />
+          title={savingMatch ? "正在保存匹配…" : isOrderOnlyReplacement ? `仅本单换货 · ${matchTarget[1].productName}` : matchShopName ? `修改商品匹配 · ${matchShopName}` : "修改商品匹配"} />
       )}
 
       {/* 查看成员的历史推广费日历与趋势弹窗 */}

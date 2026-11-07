@@ -22,6 +22,8 @@ import {
 import { returnOutboundOrderById } from "@/lib/outboundReturns";
 import { readShopIdFromRawPayload } from "@/lib/shopCommission";
 import { normalizeOrderBundleItems } from "@/lib/orderBundleItems";
+import { isAutoPickOrderCancelledStatus, isAutoPickOrderDeletedStatus } from "@/lib/autoPickOrderStatus";
+import { hasOrderRefundState } from "@/lib/orderFinancials";
 
 function readRawPayloadRecord(rawPayload: unknown) {
   return rawPayload && typeof rawPayload === "object" && !Array.isArray(rawPayload)
@@ -356,12 +358,18 @@ export async function PATCH(
     const { id, itemId } = await context.params;
     const body = await request.json().catch(() => ({}));
     const shouldClear = Boolean(body?.clear);
-        const productId = String(body?.productId || "").trim();
+    const productId = String(body?.productId || "").trim();
+    const isOrderOnlyReplacement = body?.orderOnlyReplacement === true;
 
     const removeComponentIndex = typeof body?.removeComponentIndex === "number" && body.removeComponentIndex >= 0
       ? body.removeComponentIndex
       : undefined;
     const isAddingComponent = Boolean(body?.isAddingComponent);
+
+    if (isOrderOnlyReplacement && (!productId || /[+＋]/.test(productId) || shouldClear
+      || isAddingComponent || removeComponentIndex !== undefined || body?.componentIndex !== undefined)) {
+      return NextResponse.json({ error: "本单换货请选择一件替代商品" }, { status: 400 });
+    }
 
     if (!shouldClear && removeComponentIndex === undefined && !productId) {
       return NextResponse.json({ error: "请选择要匹配的商品" }, { status: 400 });
@@ -375,12 +383,13 @@ export async function PATCH(
             user.permissions.includes("members:manage") ||
             user.permissions.includes("admin")))
     );
+    const canManageOtherOrders = isOrderOnlyReplacement ? user.role === "SUPER_ADMIN" : isAdmin;
 
     const orderItem = await prisma.autoPickOrderItem.findFirst({
       where: {
         id: itemId,
         orderId: id,
-        ...(isAdmin ? {} : { order: { userId: user.id } }),
+        ...(canManageOtherOrders ? {} : { order: { userId: user.id } }),
       },
       select: {
         id: true,
@@ -394,6 +403,7 @@ export async function PATCH(
           select: {
             orderNo: true,
             platform: true,
+            status: true,
             rawPayload: true,
             userId: true,
             shopId: true,
@@ -429,6 +439,23 @@ export async function PATCH(
         if (localShop) {
           orderMatchedShopId = localShop.id;
         }
+      }
+    }
+    if (isOrderOnlyReplacement) {
+      if (!orderMatchedShopId) {
+        return NextResponse.json({ error: "请先确认订单所属店铺" }, { status: 400 });
+      }
+      if (isAutoPickOrderDeletedStatus(orderItem.order.status) || isAutoPickOrderCancelledStatus(orderItem.order.status)
+        || hasOrderRefundState(orderItem.order)) {
+        return NextResponse.json({ error: "已取消、作废或退款的订单不能换货" }, { status: 409 });
+      }
+      const orderNo = orderItem.order.orderNo.trim().toLowerCase();
+      const outbounds = await prisma.outboundOrder.findMany({
+        where: { userId: targetUserId, status: { not: "Returned" }, note: { contains: orderNo, mode: "insensitive" } },
+        select: { note: true },
+      });
+      if (outbounds.some((outbound) => outbound.note?.match(/平台单号:\s*([^\s|]+)/)?.[1].toLowerCase() === orderNo)) {
+        return NextResponse.json({ error: "订单已出库，无法在这里换货" }, { status: 409 });
       }
     }
     if (!orderMatchedShopId) {
@@ -596,6 +623,7 @@ export async function PATCH(
           shopProductId: currentManual.shopProductId || currentManual.id,
           shopName: currentManual.shopName,
           isManual: typeof currentManual.isManual === "boolean" ? currentManual.isManual : true,
+          ...(currentManual.orderOnlyReplacement === true ? { orderOnlyReplacement: true } : {}),
           matchMethod: currentManual.matchMethod || (currentManual.isManual === false ? "id" : "manual"),
           isCompositeMatch: currentManual.isCompositeMatch === true || currentCompositeIds.length > 1,
           compositeItems: Array.isArray(currentManual.compositeItems)
@@ -632,7 +660,7 @@ export async function PATCH(
       }
 
       const effectiveShopId = body?.shopId || orderMatchedShopId;
-      let needReResolveMainProduct = !mainProduct || (!hasManualBundleConfig && existingBundleItems.length === 0);
+      let needReResolveMainProduct = !mainProduct || (!mainProduct.orderOnlyReplacement && !hasManualBundleConfig && existingBundleItems.length === 0);
       if (effectiveShopId && mainProduct?.shopProductId) {
         const currentShopOfMain = await prisma.shopProduct.findUnique({
           where: { id: mainProduct.shopProductId },
@@ -1053,6 +1081,7 @@ export async function PATCH(
       where: {
         id: productId,
         shop: { userId: targetUserId },
+        ...(isOrderOnlyReplacement ? { shopId: orderMatchedShopId, deletedAt: null, isDiscontinued: false } : {}),
       },
       select: {
         id: true,
@@ -1066,9 +1095,11 @@ export async function PATCH(
         categoryName: true,
         supplierId: true,
         costPrice: true,
+        isBundle: true,
         product: {
           select: {
             image: true,
+            isBundle: true,
           },
         },
         shop: {
@@ -1084,9 +1115,25 @@ export async function PATCH(
     }
 
     const rawSingleQty = itemsQtyMap.get(shopProduct.id) || (body?.quantity ? Number(body.quantity) : undefined);
-    const singleQty = rawSingleQty && rawSingleQty > 0 ? rawSingleQty : undefined;
+    const singleQty = isOrderOnlyReplacement
+      ? Number(rawItems.find((item) => item?.id === shopProduct.id)?.quantity ?? body.quantity ?? orderItem.quantity)
+      : rawSingleQty && rawSingleQty > 0 ? rawSingleQty : undefined;
+    if (isOrderOnlyReplacement) {
+      if (!Number.isSafeInteger(singleQty) || Number(singleQty) < 1) {
+        return NextResponse.json({ error: "换货数量必须为正整数" }, { status: 400 });
+      }
+      if (!shopProduct.isBundle && !shopProduct.product?.isBundle) {
+        const { _sum } = await prisma.purchaseOrderItem.aggregate({
+          where: { shopProductId: shopProduct.id, remainingQuantity: { gt: 0 }, purchaseOrder: { userId: targetUserId, status: "Received" } },
+          _sum: { remainingQuantity: true },
+        });
+        if ((_sum.remainingQuantity || 0) < Number(singleQty)) {
+          return NextResponse.json({ error: "替代商品的可出库库存不足，请重新选择" }, { status: 409 });
+        }
+      }
+    }
     const rawSingleImage = shopProduct.productImage || shopProduct.product?.image || null;
-    const hasPlatformSkuBinding = Boolean(currentPlatformSkuId && !/[+＋]/.test(String(orderItem.productNo || "")));
+    const hasPlatformSkuBinding = !isOrderOnlyReplacement && Boolean(currentPlatformSkuId && !/[+＋]/.test(String(orderItem.productNo || "")));
     const matchedProduct = {
       id: shopProduct.id,
       productId: shopProduct.productId || shopProduct.sourceProductId || null,
@@ -1097,7 +1144,8 @@ export async function PATCH(
       shopProductId: shopProduct.id,
       shopName: shopProduct.shop?.name || null,
       isManual: !hasPlatformSkuBinding,
-      matchMethod: hasPlatformSkuBinding ? ("id" as const) : undefined,
+      matchMethod: isOrderOnlyReplacement ? "manual" as const : hasPlatformSkuBinding ? "id" as const : undefined,
+      ...(isOrderOnlyReplacement ? { orderOnlyReplacement: true } : {}),
       ...(singleQty && singleQty > 0 ? { quantity: singleQty } : {}),
     };
 
@@ -1111,7 +1159,7 @@ export async function PATCH(
           ""
       ).trim();
 
-      if (targetJdSkuId && !orderItem.productNo) {
+      if (!isOrderOnlyReplacement && targetJdSkuId && !orderItem.productNo) {
         await tx.autoPickOrderItem.update({
           where: { id: orderItem.id },
           data: { productNo: targetJdSkuId },
@@ -1126,7 +1174,7 @@ export async function PATCH(
       await tx.autoPickOrderItem.update({
         where: { id: orderItem.id },
         data: {
-          ...(isPlaceholderItem && matchedProduct.name ? {
+          ...(!isOrderOnlyReplacement && isPlaceholderItem && matchedProduct.name ? {
             productName: matchedProduct.name,
             productNo: matchedProduct.sku || orderItem.productNo,
             ...(!isMeituanPlatform(orderItem.order.platform) ? {
@@ -1145,6 +1193,7 @@ export async function PATCH(
               shopName: matchedProduct.shopName,
               isManual: matchedProduct.isManual,
               matchMethod: matchedProduct.matchMethod,
+              ...(isOrderOnlyReplacement ? { orderOnlyReplacement: true } : {}),
               ...(singleQty && singleQty > 0 ? { quantity: singleQty } : {}),
               ...(autoMatchedProduct ? { autoMatchedProduct } : {}),
             },
@@ -1152,6 +1201,11 @@ export async function PATCH(
         },
       });
     });
+
+    if (isOrderOnlyReplacement) {
+      await rebuildOutbound();
+      return NextResponse.json({ ok: true, matchedProduct });
+    }
 
     await returnLegacyOutbound(orderItem.order.orderNo);
 

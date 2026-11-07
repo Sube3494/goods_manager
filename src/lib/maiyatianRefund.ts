@@ -59,14 +59,15 @@ export function getMaiyatianFulfillmentItems<T extends { quantity: number; rawPa
     if (refundedQuantity === 0) return [item];
     const raw = record(item.rawPayload);
     const manual = record(raw.manualMatchedProduct);
+    const hasExplicitQuantity = manual.orderOnlyReplacement === true || Number(manual.quantity) > 1;
     const scaleQuantity = (value: unknown) => Math.max(0, Math.floor(Number(value || 0) * quantity / originalQuantity));
     const nextManual = Object.keys(manual).length ? {
       ...manual,
-      ...(Number(manual.quantity) > 1 ? { quantity: scaleQuantity(manual.quantity) } : {}),
+      ...(hasExplicitQuantity ? { quantity: scaleQuantity(manual.quantity) } : {}),
       ...(Array.isArray(manual.compositeItems) ? { compositeItems: manual.compositeItems.map((entry) => ({ ...record(entry), quantity: scaleQuantity(record(entry).quantity || 1) })) } : {}),
     } : undefined;
     return [{ ...item, quantity, rawPayload: { ...raw,
-      ...(Number(manual.quantity) > 1 ? { refundAdjustedManualQuantity: scaleQuantity(manual.quantity) } : {}),
+      ...(hasExplicitQuantity ? { refundAdjustedManualQuantity: scaleQuantity(manual.quantity) } : {}),
       ...(nextManual ? { manualMatchedProduct: nextManual } : {}) } }];
   });
 }

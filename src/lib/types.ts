@@ -209,6 +209,8 @@ export interface AutoPickOrderItem {
     costSource?: "outbound" | "current";
     shopName?: string | null;
     isManual?: boolean;
+    orderOnlyReplacement?: boolean;
+    quantity?: number;
     isCompositeMatch?: boolean;
     isBundle?: boolean;
     bundleItems?: any[];

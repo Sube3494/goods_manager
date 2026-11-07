@@ -152,6 +152,8 @@ interface ProductSelectionModalProps {
   lockLibraryId?: string;
   allowLibrarySwitch?: boolean;
   showQuantityControls?: boolean;
+  defaultProductQuantity?: number;
+  closeOnSelect?: boolean;
   disableAlreadySelected?: boolean;
   defaultViewMode?: "grid" | "list";
   onClear?: () => void;
@@ -219,6 +221,8 @@ export function ProductSelectionModal({
   lockLibraryId,
   allowLibrarySwitch = true,
   showQuantityControls = false,
+  defaultProductQuantity = 1,
+  closeOnSelect = true,
   disableAlreadySelected = true,
   showSortSelector = true,
   defaultViewMode,
@@ -861,14 +865,14 @@ export function ProductSelectionModal({
   const handleConfirm = () => {
     const productsWithQty = selectedProducts.map(p => {
       const key = getSelectionKey(p);
-      const qty = productQuantities[key] || 1;
+      const qty = productQuantities[key] || defaultProductQuantity;
       return {
         ...p,
         matchQuantity: qty,
       };
     });
     onSelect(productsWithQty, targetPlatform);
-    onClose();
+    if (closeOnSelect) onClose();
   };
 
   if (!mounted || !isOpen) return null;
@@ -1282,7 +1286,7 @@ export function ProductSelectionModal({
                    <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 max-h-24 sm:max-h-28 overflow-y-auto pr-0.5">
                      {selectedProducts.map((product) => {
                        const key = getSelectionKey(product);
-                       const currentQty = productQuantities[key] || 1;
+                       const currentQty = productQuantities[key] || defaultProductQuantity;
                        return (
                          <div key={key} className="flex items-center gap-1.5 sm:gap-2 bg-white dark:bg-gray-800 border border-border/70 rounded-xl px-2 py-1 sm:px-2.5 sm:py-1.5 shadow-xs">
                            {product.image && (
@@ -1294,7 +1298,7 @@ export function ProductSelectionModal({
                            <div className="flex items-center gap-0.5 sm:gap-1 bg-muted/60 rounded-lg p-0.5 border border-border/40 shrink-0">
                              <button
                                type="button"
-                               onClick={() => setProductQuantities(prev => ({ ...prev, [key]: Math.max(1, (prev[key] || 1) - 1) }))}
+                               onClick={() => setProductQuantities(prev => ({ ...prev, [key]: Math.max(1, (prev[key] || defaultProductQuantity) - 1) }))}
                                className="w-5 h-5 flex items-center justify-center rounded text-xs font-bold hover:bg-white dark:hover:bg-white/10 active:scale-90"
                              >
                                -
@@ -1311,7 +1315,7 @@ export function ProductSelectionModal({
                              />
                              <button
                                type="button"
-                               onClick={() => setProductQuantities(prev => ({ ...prev, [key]: (prev[key] || 1) + 1 }))}
+                               onClick={() => setProductQuantities(prev => ({ ...prev, [key]: (prev[key] || defaultProductQuantity) + 1 }))}
                                className="w-5 h-5 flex items-center justify-center rounded text-xs font-bold hover:bg-white dark:hover:bg-white/10 active:scale-90"
                              >
                                +

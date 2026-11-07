@@ -197,6 +197,7 @@ type MatchedCatalogProduct = {
   shopId?: string | null;
   shopName?: string | null;
   isManual?: boolean;
+  orderOnlyReplacement?: boolean;
   matchMethod?: "manual" | "id" | "sku" | "outbound";
   isCompositeMatch?: boolean;
   compositeItems?: any[];
@@ -397,6 +398,7 @@ function readManualMatchedProduct(rawPayload: unknown): MatchedCatalogProduct | 
     shopProductId: shopProductId || id,
     shopName: String(record.shopName || "").trim() || null,
     isManual: typeof record.isManual === "boolean" ? record.isManual : true,
+    ...(record.orderOnlyReplacement === true ? { orderOnlyReplacement: true } : {}),
     matchMethod:
       record.matchMethod === "id" || record.matchMethod === "sku" || record.matchMethod === "outbound"
         ? record.matchMethod
@@ -2791,8 +2793,9 @@ export async function GET(request: NextRequest) {
             sku,
             (product, key) => doesShopProductMatchLocalSku(product, key),
           );
-          const platformStrictMatch = platformProductId ? resolveStrictPlatformMatch(platformProductId) : null;
-          const shouldTrySkuFallback = !platformStrictMatch;
+          const isOrderOnlyReplacement = manualMatchedProduct?.orderOnlyReplacement === true;
+          const platformStrictMatch = platformProductId && !isOrderOnlyReplacement ? resolveStrictPlatformMatch(platformProductId) : null;
+          const shouldTrySkuFallback = !platformStrictMatch && !isOrderOnlyReplacement;
           const fallbackStrictMatches = shouldTrySkuFallback ? normalizedSkuCandidates
             .map((candidate) => resolveStrictLocalSkuMatch(candidate))
             .filter((product): product is typeof mappedShopProducts[number] => Boolean(product)) : [];
@@ -2983,7 +2986,7 @@ export async function GET(request: NextRequest) {
           
           const matchedSkuToSplit = manualMatchedProduct?.sku || item.productNo;
           const segmentsFromSku = splitCompositeSkuSegments(matchedSkuToSplit);
-          const hasStrictMatchForAllSegmentsFromSku = segmentsFromSku.length > 1
+          const hasStrictMatchForAllSegmentsFromSku = !isOrderOnlyReplacement && segmentsFromSku.length > 1
             && segmentsFromSku.every((candidate) => Boolean(resolveStrictLocalSkuMatch(candidate)));
           if (matchedProduct && hasStrictMatchForAllSegmentsFromSku) {
             (matchedProduct as MatchedCatalogProduct).isCompositeMatch = true;
@@ -3219,7 +3222,7 @@ export async function GET(request: NextRequest) {
               : (targetShopProduct?.image
                 ? storage.resolveUrl(targetShopProduct.image)
                 : (outboundItem?.image ? storage.resolveUrl(outboundItem.image) : (item.thumb ? storage.resolveUrl(item.thumb) : null))),
-            quantity: Math.max(1, Number(item.quantity || 1) || 1),
+            quantity: isOrderOnlyReplacement ? (manualMatchedProduct?.quantity || item.quantity || 1) : Math.max(1, Number(item.quantity || 1) || 1),
             ...resolveDisplayCost(
               targetShopProduct?.shopProductId || (matchedProduct as any)?.shopProductId || outboundItem?.shopProductId,
               targetShopProduct?.productId || (matchedProduct as any)?.productId || outboundItem?.productId,

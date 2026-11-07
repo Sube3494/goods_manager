@@ -2163,6 +2163,7 @@ export default function OrdersPage() {
     componentDisplay?: any;
     currentBundleItems?: any[];
     isAddingBundleItem?: boolean;
+    orderOnlyReplacement?: boolean;
   } | null>(null);
 
   const [brushSyncPool, setBrushSyncPool] = useState<AutoPickOrder[]>([]);
@@ -2670,10 +2671,11 @@ export default function OrdersPage() {
     componentDisplay?: any;
     currentBundleItems?: any[];
     isAddingBundleItem?: boolean;
+    orderOnlyReplacement?: boolean;
   }) => {
     const resolvedShopName = order.matchedShopName || "";
     const resolvedShop = localShops.find((s) => s.name === resolvedShopName);
-    const resolvedShopId = resolvedShop?.id || "";
+    const resolvedShopId = order.matchedShopId || resolvedShop?.id || "";
     const mappedLibraryId = integrationConfig.maiyatianShopMappings.find(
       (mapping) => mapping.localShopName === resolvedShopName
     )?.libraryId || "";
@@ -2685,10 +2687,12 @@ export default function OrdersPage() {
       sku: item.productNo || "",
       platformSkuId: item.platformSkuId || "",
       thumb: item.thumb || "",
-      quantity: item.quantity || 1,
+      quantity: options?.orderOnlyReplacement && item.matchedProduct?.orderOnlyReplacement
+        ? item.matchedProduct.quantity || item.quantity || 1
+        : item.quantity || 1,
       shopName: resolvedShopName,
       shopId: resolvedShopId,
-      libraryId: resolvedLibraryId,
+      libraryId: options?.orderOnlyReplacement ? "" : resolvedLibraryId,
       currentMatchedProductId: options?.isAddingBundleItem
         ? ""
         : options?.componentIndex !== undefined
@@ -2703,6 +2707,7 @@ export default function OrdersPage() {
         ? item.matchedProduct.bundleItems
         : options?.currentBundleItems,
       isAddingBundleItem: options?.isAddingBundleItem,
+      orderOnlyReplacement: options?.orderOnlyReplacement,
     });
     setIsMatchPickerOpen(true);
   }, [integrationConfig.maiyatianShopMappings, localShops]);
@@ -2718,7 +2723,7 @@ export default function OrdersPage() {
     items?: Array<{ id: string; quantity: number }>,
     options?: { clear?: boolean; componentIndex?: number; currentBundleItems?: any[]; isAddingComponent?: boolean }
   ) => {
-    if (!matchEditorTarget?.orderId || !matchEditorTarget.itemId) return;
+    if (isSavingMatch || !matchEditorTarget?.orderId || !matchEditorTarget.itemId) return;
 
     setIsSavingMatch(true);
     try {
@@ -2737,12 +2742,21 @@ export default function OrdersPage() {
           isAddingComponent,
           shopId: matchEditorTarget.shopId,
           autoMatchedProduct: matchEditorTarget.currentMatchedProduct,
+          orderOnlyReplacement: matchEditorTarget.orderOnlyReplacement,
         }),
       });
       const data = await response.json().catch(() => ({}));
 
       if (!response.ok) {
         throw new Error(data?.error || (isClear ? "解除商品匹配失败" : "更新商品匹配失败"));
+      }
+
+      if (matchEditorTarget.orderOnlyReplacement) {
+        setIsMatchPickerOpen(false);
+        setMatchEditorTarget(null);
+        triggerParentRefresh();
+        showToast("已保存本单换货", "success");
+        return;
       }
 
       const targetOrder = matchEditorTarget.order;
@@ -2862,7 +2876,7 @@ export default function OrdersPage() {
     } finally {
       setIsSavingMatch(false);
     }
-  }, [matchEditorTarget, openMatchEditor, localShops, showToast, triggerParentRefresh]);
+  }, [isSavingMatch, matchEditorTarget, openMatchEditor, localShops, showToast, triggerParentRefresh]);
 
   const handleRemoveBundleComponent = useCallback(async (
     order: AutoPickOrder,
@@ -4133,10 +4147,14 @@ export default function OrdersPage() {
         isOpen={isMatchPickerOpen}
         onClose={closeMatchEditor}
         showQuantityControls={true}
-        onClear={() => void saveManualMatch("", [], { clear: true })}
+        defaultProductQuantity={matchEditorTarget?.orderOnlyReplacement ? matchEditorTarget.quantity || 1 : undefined}
+        closeOnSelect={!matchEditorTarget?.orderOnlyReplacement}
+        onClear={matchEditorTarget?.orderOnlyReplacement ? undefined : () => void saveManualMatch("", [], { clear: true })}
         clearLabel={matchEditorTarget?.componentIndex !== undefined || matchEditorTarget?.isAddingBundleItem ? undefined : "无需出库 / 解除绑定"}
         confirmLabel={
-          matchEditorTarget?.isAddingBundleItem
+          matchEditorTarget?.orderOnlyReplacement
+            ? "确认本单换货"
+            : matchEditorTarget?.isAddingBundleItem
             ? "确认添加配件"
             : matchEditorTarget?.componentIndex !== undefined
             ? "确认更换配件"
@@ -4151,6 +4169,7 @@ export default function OrdersPage() {
 
           const resolvedIds = items.map((item) => item.id);
           if (resolvedIds.length === 0) {
+            if (matchEditorTarget?.orderOnlyReplacement) return;
             if (matchEditorTarget?.componentIndex !== undefined || matchEditorTarget?.isAddingBundleItem) {
               closeMatchEditor();
               return;
@@ -4158,7 +4177,7 @@ export default function OrdersPage() {
             void saveManualMatch("", [], { clear: true });
             return;
           }
-          const shouldSendItemQuantities = items.length > 1 || items.some((item) => item.quantity > 1);
+          const shouldSendItemQuantities = matchEditorTarget?.orderOnlyReplacement || items.length > 1 || items.some((item) => item.quantity > 1);
           void saveManualMatch(
             resolvedIds.join("+"),
             shouldSendItemQuantities ? items : undefined,
@@ -4169,10 +4188,10 @@ export default function OrdersPage() {
             }
           );
         }}
-        selectedIds={matchEditorTarget?.isAddingBundleItem ? [] : (matchEditorTarget?.currentMatchedProductId ? matchEditorTarget.currentMatchedProductId.split("+").filter(Boolean) : [])}
+        selectedIds={matchEditorTarget?.isAddingBundleItem || matchEditorTarget?.orderOnlyReplacement ? [] : (matchEditorTarget?.currentMatchedProductId ? matchEditorTarget.currentMatchedProductId.split("+").filter(Boolean) : [])}
         singleSelect={true}
         disableAlreadySelected={false}
-        allowMultipleToggle={matchEditorTarget?.componentIndex === undefined && !matchEditorTarget?.isAddingBundleItem}
+        allowMultipleToggle={matchEditorTarget?.componentIndex === undefined && !matchEditorTarget?.isAddingBundleItem && !matchEditorTarget?.orderOnlyReplacement}
         loadAllOnOpen
         showPlatformSelector={false}
         showCategoryFilter={true}
@@ -4184,7 +4203,9 @@ export default function OrdersPage() {
         showPrice={false}
         allowLibrarySwitch={false}
         title={
-          matchEditorTarget?.isAddingBundleItem
+          matchEditorTarget?.orderOnlyReplacement
+            ? `仅本单换货 · ${matchEditorTarget.itemName}`
+            : matchEditorTarget?.isAddingBundleItem
             ? `添加配件 · 为【${matchEditorTarget.itemName}】配发配件（礼袋/赠品）`
             : matchEditorTarget?.componentIndex !== undefined
             ? `更换配件 · ${matchEditorTarget.componentDisplay?.name || "当前配件"}`
@@ -4275,7 +4296,7 @@ export default function OrdersPage() {
               ) : (
                 /* 普通主商品匹配原有视图 */
                 <>
-              {matchEditorTarget.order?.items && matchEditorTarget.order.items.length > 1 && (() => {
+              {!matchEditorTarget.orderOnlyReplacement && matchEditorTarget.order?.items && matchEditorTarget.order.items.length > 1 && (() => {
                 const items = matchEditorTarget.order.items;
                 const currentIndex = items.findIndex((it) => String(it.id || "") === matchEditorTarget.itemId);
                 const hasPrev = currentIndex > 0;

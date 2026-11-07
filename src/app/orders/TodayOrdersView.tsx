@@ -207,7 +207,7 @@ function CompactTodayOrderCard({
   isProfitUpdating?: boolean;
   onExpand: () => void;
   onRunAction: (action: OrderAction) => void;
-  onOpenMatchEditor: (item: AutoPickOrderItem, options?: { autoOutbound?: boolean; componentIndex?: number; componentDisplay?: any; currentBundleItems?: any[]; isAddingBundleItem?: boolean }) => void;
+  onOpenMatchEditor: (item: AutoPickOrderItem, options?: { autoOutbound?: boolean; componentIndex?: number; componentDisplay?: any; currentBundleItems?: any[]; isAddingBundleItem?: boolean; orderOnlyReplacement?: boolean }) => void;
   onRemoveBundleComponent?: (order: AutoPickOrder, item: AutoPickOrderItem, componentIndex: number, componentName?: string, currentBundleItems?: any[]) => void;
   onOpenCostBackfill?: (order: AutoPickOrder) => void;
   onEditExtraExpenses?: (order: AutoPickOrder) => void;
@@ -526,6 +526,7 @@ interface TodayOrdersViewProps {
     componentDisplay?: any;
     currentBundleItems?: any[];
     isAddingBundleItem?: boolean;
+    orderOnlyReplacement?: boolean;
   }) => void;
   onRemoveBundleComponent?: (order: AutoPickOrder, item: AutoPickOrderItem, componentIndex: number, componentName?: string, currentBundleItems?: any[]) => void;
   onOpenPurchaseDraft?: (draft: PurchaseDraftPayload) => void;

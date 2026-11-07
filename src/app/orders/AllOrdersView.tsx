@@ -118,6 +118,7 @@ export interface AllOrdersViewProps {
     componentDisplay?: any;
     currentBundleItems?: any[];
     isAddingBundleItem?: boolean;
+    orderOnlyReplacement?: boolean;
   }) => void;
   onRemoveBundleComponent?: (order: AutoPickOrder, item: AutoPickOrderItem, componentIndex: number, componentName?: string, currentBundleItems?: any[]) => void;
   onOpenPurchaseDraft?: (draft: PurchaseDraftPayload) => void;

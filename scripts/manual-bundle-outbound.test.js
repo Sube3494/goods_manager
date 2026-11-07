@@ -15,7 +15,9 @@ const tx = {
     findMany: async ({ where } = {}) => where?.OR
       ? products.filter((p) => where.OR.some((condition) => condition.sku === p.sku || condition.jdSkuId === p.jdSkuId && p.jdSkuId))
       : products,
-    findFirst: async () => products[0],
+    findFirst: async ({ where } = {}) => where?.id
+      ? products.find((p) => p.id === where.id && (!where.shopId || p.shopId === where.shopId))
+      : products[0],
     findUnique: async ({ where }) => products.find((p) => p.id === where.id),
   },
   purchaseOrderItem: {
@@ -51,11 +53,15 @@ mock.module("../src/services/inventoryService", () => ({ InventoryService: {
   },
 } }));
 mock.module("../src/lib/storage", () => ({ getStorageStrategy: async () => ({ resolveUrl: (url) => url }) }));
-const { createOutboundFromAutoPickOrder } = await import("../src/lib/autoPickOrders");
+const { backfillPlatformIdsForSyncedAutoPickOrder, createOutboundFromAutoPickOrder } = await import("../src/lib/autoPickOrders");
 const { PATCH } = await import("../src/app/api/orders/[id]/items/[itemId]/match/route");
 const remove = (currentBundleItems) => PATCH(new Request("http://localhost/api/orders/order-1/items/item-1/match", {
   method: "PATCH", headers: { "Content-Type": "application/json" },
   body: JSON.stringify({ removeComponentIndex: 1, currentBundleItems }),
+}), { params: Promise.resolve({ id: "order-1", itemId: "item-1" }) });
+const replace = (productId, quantity) => PATCH(new Request("http://localhost/api/orders/order-1/items/item-1/match", {
+  method: "PATCH", headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ orderOnlyReplacement: true, productId, items: [{ id: productId, quantity }] }),
 }), { params: Promise.resolve({ id: "order-1", itemId: "item-1" }) });
 
 beforeEach(() => {
@@ -91,6 +97,31 @@ test("移除部分固定配件后，只校验并扣减本体及保留配件", as
   ]);
   expect(created.items.create).toHaveLength(2);
   expect(created.items.create.map((item) => item.costSnapshot.salesQuantity)).toEqual([3, 0]);
+});
+
+test("本单换货保留原下单商品和平台规格，仅按选择的替代品和数量出库", async () => {
+  order.status = "待配送";
+  order.items[0].platformSkuId = "123456789012";
+  const result = await replace("kept", 1);
+  expect(result.status).toBe(200);
+  expect(order.items[0]).toMatchObject({ productName: "main", productNo: "main", platformSkuId: "123456789012", quantity: 3 });
+  expect(order.items[0].rawPayload.manualMatchedProduct).toMatchObject({ shopProductId: "kept", quantity: 1, orderOnlyReplacement: true });
+  expect(await backfillPlatformIdsForSyncedAutoPickOrder("user-1", "order-1")).toEqual({ count: 0, details: [] });
+  expect(deducted).toBeNull();
+  expect(await createOutboundFromAutoPickOrder("user-1", "order-1")).toMatchObject({ ok: true });
+  expect(deducted).toEqual([expect.objectContaining({ shopProductId: "kept", quantity: 1 })]);
+  expect(created.items.create[0].costSnapshot.salesQuantity).toBe(1);
+});
+
+test("本单换货拦截错误门店、库存不足和已出库订单", async () => {
+  const original = order.items[0].rawPayload;
+  products.find((product) => product.id === "kept").shopId = "other-shop";
+  expect((await replace("kept", 1)).status).toBe(404);
+  expect((await replace("removed", 1)).status).toBe(409);
+  hasOldOutbound = true;
+  expect((await replace("main", 1)).status).toBe(409);
+  expect(order.items[0].rawPayload).toBe(original);
+  expect(returned).toBe(0);
 });
 
 test("移除全部固定配件后，空清单不恢复商品库配置", async () => {
