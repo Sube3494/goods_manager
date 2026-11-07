@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 type OperatingCostProfile = {
   shopName?: string;
   monthlyRent: number;
+  rentStartDate?: string | null;
   monthlyLabor: number;
   allocationBaseDays: number;
 };
@@ -171,12 +172,9 @@ export default function OperatingCostsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isSavingBill, setIsSavingBill] = useState(false);
-  const [, setProfile] = useState<OperatingCostProfile>({
-    monthlyRent: 0,
-    monthlyLabor: 0,
-    allocationBaseDays: 30,
-  });
+  const [loadedShop, setLoadedShop] = useState("");
   const [rentInput, setRentInput] = useState("");
+  const [rentStartDate, setRentStartDate] = useState("");
   const [laborInput, setLaborInput] = useState("");
   const [waterInput, setWaterInput] = useState("");
   const [electricInput, setElectricInput] = useState("");
@@ -201,7 +199,7 @@ export default function OperatingCostsPage() {
     });
   }, [shops]);
 
-  const fetchData = useCallback(async (targetMonth: string) => {
+  const fetchData = useCallback(async (targetMonth: string, signal?: AbortSignal) => {
     if (!activeShop) {
       setIsLoading(false);
       return;
@@ -210,13 +208,16 @@ export default function OperatingCostsPage() {
     try {
       const response = await fetch(`/api/operating-costs?month=${encodeURIComponent(targetMonth)}&shopName=${encodeURIComponent(activeShop)}`, {
         cache: "no-store",
+        signal,
       });
       if (!response.ok) {
         throw new Error("Failed to fetch operating costs");
       }
       const data = (await response.json()) as OperatingCostsResponse;
-      setProfile(data.profile);
+      if (signal?.aborted) return;
+      setLoadedShop(activeShop);
       setRentInput(data.profile.monthlyRent > 0 ? String(data.profile.monthlyRent) : "");
+      setRentStartDate(data.profile.rentStartDate || "");
       setLaborInput(data.profile.monthlyLabor > 0 ? String(data.profile.monthlyLabor) : "");
       setWaterInput(data.selectedMonthBill.waterAmount > 0 ? String(data.selectedMonthBill.waterAmount) : "");
       setElectricInput(data.selectedMonthBill.electricAmount > 0 ? String(data.selectedMonthBill.electricAmount) : "");
@@ -224,16 +225,19 @@ export default function OperatingCostsPage() {
       setPropertyFeeInput(data.selectedMonthBill.propertyFeeAmount > 0 ? String(data.selectedMonthBill.propertyFeeAmount) : "");
       setRecentBills(Array.isArray(data.recentBills) ? data.recentBills : []);
     } catch (error) {
+      if (signal?.aborted) return;
       console.error("Failed to load operating costs:", error);
       showToast("经营成本加载失败", "error");
     } finally {
-      setIsLoading(false);
+      if (!signal?.aborted) setIsLoading(false);
     }
   }, [activeShop, showToast]);
 
   useEffect(() => {
     if (!activeShop) return;
-    void fetchData(monthKey);
+    const controller = new AbortController();
+    void fetchData(monthKey, controller.signal);
+    return () => controller.abort();
   }, [activeShop, fetchData, monthKey]);
 
   const monthlyRent = Number(rentInput || 0);
@@ -281,14 +285,13 @@ export default function OperatingCostsPage() {
         body: JSON.stringify({
           shopName: activeShop,
           monthlyRent,
+          rentStartDate: rentStartDate || null,
           monthlyLabor,
         }),
       });
       if (!response.ok) {
         throw new Error("Failed to save profile");
       }
-      const nextProfile = await response.json();
-      setProfile(nextProfile);
       showToast(`${activeShop} 固定成本已保存`, "success");
     } catch (error) {
       console.error("Failed to save operating cost profile:", error);
@@ -427,7 +430,7 @@ export default function OperatingCostsPage() {
         <MetricCard label="月度固定成本" value={toCurrency(monthlyRent + monthlyLabor)} hint={`房租 ${toCurrency(monthlyRent)} + 人工 ${toCurrency(monthlyLabor)}`} icon={<Building2 size={18} />} />
         <MetricCard label="月度浮动账单" value={toCurrency(waterAmount + electricAmount + sharedElectricAmount + propertyFeeAmount)} hint={activeShop ? `${activeShop} ${monthKey} 水电物业总额` : `${monthKey} 水电物业总额`} icon={<ReceiptText size={18} />} />
         <MetricCard label="历史浮动月均" value={toCurrency(historicalMonthlyUtilityAverage)} hint={recentBills.length > 0 ? `最近 ${recentBills.length} 个月账单均值` : "暂无历史账单数据"} icon={<WalletCards size={18} />} />
-        <MetricCard label="每日运营成本" value={toCurrency(dailyFixedCost + dailyUtilityCost)} hint={`固定日成本 ${toCurrency(dailyFixedCost)} + 日均摊 ${toCurrency(dailyUtilityCost)}`} icon={<Calculator size={18} />} />
+        <MetricCard label="每日运营成本标准" value={toCurrency(dailyFixedCost + dailyUtilityCost)} hint={`固定日成本 ${toCurrency(dailyFixedCost)} + 日均摊 ${toCurrency(dailyUtilityCost)}`} icon={<Calculator size={18} />} />
       </div>
 
       {/* 第二层：录入配置单独一行 */}
@@ -577,8 +580,19 @@ export default function OperatingCostsPage() {
                     <p className="mt-1 text-xs sm:text-sm text-muted-foreground">维护房租和人工，系统自动折算每日固定成本。</p>
                   </div>
 
-                  <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
+                  <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
                     <NumberField label="每月房租" value={rentInput} onChange={setRentInput} placeholder="0.00" />
+                    <div className="space-y-1.5">
+                      <div className="text-[11px] font-black uppercase tracking-[0.14em] text-muted-foreground/80">始租日期</div>
+                      <DatePicker
+                        value={rentStartDate}
+                        onChange={setRentStartDate}
+                        placeholder="选择始租日期"
+                        className="h-11 w-full"
+                        triggerClassName="rounded-full border border-border/60 bg-white/70 px-4 text-sm font-bold text-foreground transition-all focus:border-primary/50 focus:ring-4 focus:ring-primary/10 dark:border-white/10 dark:bg-white/[0.05] dark:focus:border-primary/40"
+                      />
+                      <p className="text-xs text-muted-foreground">始租当天起计租。留空时从首单当天计租。</p>
+                    </div>
                     <NumberField label="每月人工" value={laborInput} onChange={setLaborInput} placeholder="0.00" />
                   </div>
                 </div>
@@ -586,7 +600,7 @@ export default function OperatingCostsPage() {
                 <div className="mt-6 flex flex-col gap-4 rounded-[24px] border border-border/60 bg-muted/30 p-5 dark:border-white/10 dark:bg-white/[0.03] backdrop-blur-md sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex flex-wrap items-center gap-6 sm:gap-8">
                     <div className="space-y-1">
-                      <div className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground/80">固定日成本</div>
+                      <div className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground/80">计租后固定日成本</div>
                       <div className="text-3xl font-black tabular-nums leading-none text-foreground tracking-tight">
                         {toCurrency(dailyFixedCost)}
                       </div>
@@ -604,7 +618,7 @@ export default function OperatingCostsPage() {
                   </div>
                   <button
                     onClick={handleSaveProfile}
-                    disabled={isSavingProfile}
+                    disabled={isSavingProfile || isLoading || !activeShop || loadedShop !== activeShop}
                     className="group relative flex h-11 sm:h-12 items-center justify-center gap-2 rounded-full bg-primary px-7 text-sm font-black text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:shadow-primary/40 hover:-translate-y-0.5 active:scale-95 disabled:pointer-events-none disabled:opacity-50 shrink-0"
                   >
                     {isSavingProfile ? (

@@ -10,6 +10,10 @@ const day = formatLocalDate(new Date());
 const date = parseAsShanghaiTime(`${day} 12:00:00`);
 const orders = [{ id:'order-1', orderNo:'test-1', platform:'线下交易', status:'已完成', orderTime:date, shopId:'shop-1', shopAddress:'', rawPayload:{}, actualPaid:10000, expectedIncome:10000, platformCommission:0, delivery:{}, items:[] }];
 const outboundOrders = [];
+const operatingProfiles = [
+  { shopName: '南山店', monthlyRent: 3000, monthlyLabor: 0, allocationBaseDays: 30 },
+  { shopName: '未开店', monthlyRent: 3000, monthlyLabor: 0, allocationBaseDays: 30 },
+];
 const record = (name, result) => async args => { calls.push({ name, args }); return typeof result === 'function' ? result(args) : result; };
 const db = {
   shop: { findMany: record('shop.findMany',[{id:'shop-1',name:'南山店',address:''}]), count: record('shop.count',1) },
@@ -24,8 +28,16 @@ const db = {
   brushOrder: { findMany: record('brushOrder',[]) },
   brushProduct: { findMany: record('brushProduct',[]) },
   brushOrderPlan: { findMany: record('plans',[{date,shopName:'南山店',items:[{quantity:2}]}]) },
-  operatingCostProfile: { findMany: record('operatingProfile',[{shopName:'南山店',monthlyRent:3000,monthlyLabor:0,allocationBaseDays:30},{shopName:'未开店',monthlyRent:3000,monthlyLabor:0,allocationBaseDays:30}]) },
-  operatingCostMonthlyBill: { findMany: record('operatingBill',[]) },
+  operatingCostProfile: {
+    findMany: record('operatingProfile', operatingProfiles),
+    findUnique: record('operatingProfile.findUnique', ({ where }) => operatingProfiles.find(profile => profile.shopName === where.userId_shopName.shopName)),
+    upsert: record('operatingProfile.upsert', ({ where, update }) => {
+      const profile = operatingProfiles.find(profile => profile.shopName === where.userId_shopName.shopName);
+      Object.assign(profile, Object.fromEntries(Object.entries(update).filter(([, value]) => value !== undefined)));
+      return profile;
+    }),
+  },
+  operatingCostMonthlyBill: { findMany: record('operatingBill',[]), findUnique: record('operatingBill.findUnique', null) },
 };
 mock.module('@/lib/prisma',()=>({default:db}));
 mock.module('@/lib/auth',()=>({getAuthorizedUserAny:async()=>allowed?user:null,getAuthorizedUser:async()=>allowed?user:null,getAuthorizedAdmin:async()=>allowed?user:null}));
@@ -36,6 +48,8 @@ mock.module('@/lib/autoPickOrders',()=>({normalizeAutoPickIntegrationConfig:()=>
 const { NextRequest } = await import('next/server');
 const { GET:stats } = await import('../src/app/api/stats/route');
 const { GET:brush } = await import('../src/app/api/brush/dashboard/route');
+const { GET:readCosts } = await import('../src/app/api/operating-costs/route');
+const { POST:saveProfile } = await import('../src/app/api/operating-costs/profile/route');
 const fields = ['rangeStart','rangeEnd','rangeDays','userPaid','promotionExpense','platformMatrix','customerAnalysis','productSales','businessTrend','platformBusinessTrend'];
 
 test('marketing preserves summary fields and skips unused dashboard queries',async()=>{
@@ -50,6 +64,40 @@ test('marketing preserves summary fields and skips unused dashboard queries',asy
  expect(actual.userPaid).toBeGreaterThan(0);
  expect(calls.some(call=>['settings','shop.count','inbound','purchase'].includes(call.name))).toBe(false);
  expect(calls.filter(call=>call.name==='autoPick'&&call.args.take===200)).toHaveLength(1);
+});
+
+test('saved rent start dates control the operating cost in the profit trend', async () => {
+  const originalProfile = { ...operatingProfiles[0] };
+  const priorDay = formatLocalDate(new Date(date.getTime() - 86_400_000));
+  const save = (rentStartDate) => saveProfile(new Request('http://localhost/api/operating-costs/profile', {
+    method: 'POST',
+    body: JSON.stringify({ ...originalProfile, monthlyLabor: 6000, rentStartDate }),
+  }));
+  const getTrend = async (query) => {
+    const response = await stats(new NextRequest(`http://localhost/api/stats?${query}&endDate=${day}`));
+    expect(response.status).toBe(200);
+    return (await response.json()).businessTrend;
+  };
+
+  try {
+    expect((await save('2026-02-30')).status).toBe(400);
+    expect((await save(priorDay)).status).toBe(200);
+    expect((await save(undefined)).status).toBe(200);
+    const read = await readCosts(new NextRequest(`http://localhost/api/operating-costs?shopName=${encodeURIComponent(originalProfile.shopName)}`));
+    expect(read.status).toBe(200);
+    expect((await read.json()).profile.rentStartDate).toBe(priorDay);
+    const allTrend = await getTrend('range=all');
+    expect(allTrend.map(point => [point.date, point.operatingExpense])).toEqual([[priorDay, 100], [day, 300]]);
+
+    const nextDay = formatLocalDate(new Date(date.getTime() + 86_400_000));
+    expect((await save(nextDay)).status).toBe(200);
+    expect((await getTrend(`startDate=${priorDay}`)).map(point => point.operatingExpense)).toEqual([0, 200]);
+
+    expect((await save(null)).status).toBe(200);
+    expect((await getTrend('range=all')).map(point => point.operatingExpense)).toEqual([300]);
+  } finally {
+    operatingProfiles[0] = originalProfile;
+  }
 });
 
 test.each([

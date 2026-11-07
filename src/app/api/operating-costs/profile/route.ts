@@ -22,14 +22,21 @@ export async function POST(request: Request) {
     if (!shopName) {
       return NextResponse.json({ error: "Missing shop name" }, { status: 400 });
     }
+    const rentStartDate = body.rentStartDate === "" ? null : body.rentStartDate;
+    if (rentStartDate != null) {
+      const validFormat = typeof rentStartDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(rentStartDate);
+      const date = validFormat ? new Date(`${rentStartDate}T00:00:00Z`) : null;
+      if (!date || Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== rentStartDate) {
+        return NextResponse.json({ error: "始租日期无效" }, { status: 400 });
+      }
+    }
+
+    const profileData = { shopName, monthlyRent, rentStartDate, monthlyLabor, allocationBaseDays: 30 };
     const operatingCostProfileClient = getOperatingCostProfileClient();
     if (!operatingCostProfileClient) {
       const profile = await saveStoredOperatingCostProfile({
         userId: user.id,
-        shopName,
-        monthlyRent,
-        monthlyLabor,
-        allocationBaseDays: 30,
+        ...profileData,
       });
       return NextResponse.json(profile);
     }
@@ -41,18 +48,10 @@ export async function POST(request: Request) {
           shopName,
         },
       },
-      update: {
-        shopName,
-        monthlyRent,
-        monthlyLabor,
-        allocationBaseDays: 30,
-      },
+      update: profileData,
       create: {
         userId: user.id,
-        shopName,
-        monthlyRent,
-        monthlyLabor,
-        allocationBaseDays: 30,
+        ...profileData,
       },
     });
 

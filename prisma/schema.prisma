@@ -917,6 +917,7 @@ model OperatingCostProfile {
   userId            String
   shopName          String
   monthlyRent       Float    @default(0)
+  rentStartDate     String?
   monthlyLabor      Float    @default(0)
   allocationBaseDays Int     @default(30)
   createdAt         DateTime @default(now())

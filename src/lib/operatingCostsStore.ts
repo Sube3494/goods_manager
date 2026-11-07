@@ -5,6 +5,7 @@ type StoredProfile = {
   userId: string;
   shopName: string;
   monthlyRent: number;
+  rentStartDate?: string | null;
   monthlyLabor: number;
   allocationBaseDays: number;
 };
@@ -59,10 +60,16 @@ export async function getStoredOperatingCostProfile(userId: string, shopName: st
 
 export async function saveStoredOperatingCostProfile(profile: StoredProfile) {
   const store = await readStore();
-  const nextProfiles = store.profiles.filter((item) => !(item.userId === profile.userId && item.shopName === profile.shopName));
-  nextProfiles.push(profile);
+  const matchesProfile = (item: StoredProfile) => item.userId === profile.userId && item.shopName === profile.shopName;
+  const previousProfile = store.profiles.find(matchesProfile);
+  const savedProfile = {
+    ...profile,
+    rentStartDate: profile.rentStartDate === undefined ? previousProfile?.rentStartDate ?? null : profile.rentStartDate,
+  };
+  const nextProfiles = store.profiles.filter((item) => !matchesProfile(item));
+  nextProfiles.push(savedProfile);
   await writeStore({ ...store, profiles: nextProfiles });
-  return profile;
+  return savedProfile;
 }
 
 export async function getStoredOperatingCostBill(userId: string, shopName: string, monthKey: string) {

@@ -50,3 +50,12 @@ test("首单后无订单日期仍扣日成本，水电只分摊对应账单月�
   expect(getDailyOperatingCostAfterFirstOrder("2026-07-01", "2026-06-15", profile, bill)).toBe(300);
   expect(getDailyOperatingCostAfterFirstOrder("2026-06-30", "2026-06-15", null, bill)).toBe(30);
 });
+
+test("始租日期独立于首单，且只影响房租", () => {
+  const rentProfile = { ...profile, rentStartDate: "2026-06-15" };
+  expect(getDailyOperatingCostAfterFirstOrder("2026-06-14", "2026-06-01", rentProfile, bill)).toBe(230);
+  expect(getDailyOperatingCostAfterFirstOrder("2026-06-15", "2026-06-01", rentProfile, bill)).toBe(330);
+  expect(getDailyOperatingCostAfterFirstOrder("2026-06-15", "2026-06-20", rentProfile, bill)).toBe(100);
+  expect(getDailyOperatingCostAfterFirstOrder("2026-06-15", null, rentProfile, bill)).toBe(100);
+  expect(getDailyOperatingCostAfterFirstOrder("2026-06-14", "2026-06-01", { ...rentProfile, rentStartDate: null }, bill)).toBe(330);
+});

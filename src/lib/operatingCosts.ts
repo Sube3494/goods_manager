@@ -1,6 +1,7 @@
 export type OperatingCostProfileLike = {
   shopName?: string | null;
   monthlyRent?: number | null;
+  rentStartDate?: string | null;
   monthlyLabor?: number | null;
   allocationBaseDays?: number | null;
 };
@@ -67,7 +68,16 @@ export function getDailyOperatingCostAfterFirstOrder(
   profile?: OperatingCostProfileLike | null,
   bill?: OperatingCostMonthlyBillLike | null,
 ) {
-  if (!firstOrderDateKey || dateKey < firstOrderDateKey) return 0;
-  return getDailyFixedOperatingCost(profile)
-    + (bill && normalizeMonthKey(dateKey) === normalizeMonthKey(bill.monthKey) ? getDailyUtilityCost(bill) : 0);
+  const operating = Boolean(firstOrderDateKey && dateKey >= firstOrderDateKey);
+  const rentStartDate = profile?.rentStartDate || firstOrderDateKey;
+  const rentActive = Boolean(rentStartDate && dateKey >= rentStartDate);
+  const fixedCost = getDailyFixedOperatingCost({
+    monthlyRent: rentActive ? profile?.monthlyRent : 0,
+    monthlyLabor: operating ? profile?.monthlyLabor : 0,
+    allocationBaseDays: profile?.allocationBaseDays,
+  });
+  const utilityCost = operating && bill && normalizeMonthKey(dateKey) === normalizeMonthKey(bill.monthKey)
+    ? getDailyUtilityCost(bill)
+    : 0;
+  return fixedCost + utilityCost;
 }

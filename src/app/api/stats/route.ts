@@ -395,9 +395,17 @@ export async function GET(request: NextRequest) {
         && (!targetShopName || isShopNameMatch(resolveAutoPickMatchedShopName(order, permissionsObj) || "", targetShopName)),
       normalizeShopNameKey,
     );
+    const operatingCostProfilesQuery = prisma.operatingCostProfile.findMany({
+      where: { userId: targetUserId, ...(shopName ? { shopName } : {}) },
+    });
     if (rangeMode === "all") {
-      const firstOrderDate = await getFirstOrderDate(shopName);
-      startDate = parseAsShanghaiTime(firstOrderDate ? formatDateKey(firstOrderDate) : endDateKey);
+      const [firstOrderDate, profiles] = await Promise.all([getFirstOrderDate(shopName), operatingCostProfilesQuery]);
+      const firstOrderDateKey = firstOrderDate ? formatDateKey(firstOrderDate) : endDateKey;
+      const firstCostDateKey = profiles.reduce((earliest, profile) => {
+        const rentStartDate = profile.rentStartDate;
+        return profile.monthlyRent > 0 && rentStartDate && rentStartDate < earliest ? rentStartDate : earliest;
+      }, firstOrderDateKey);
+      startDate = parseAsShanghaiTime(firstCostDateKey);
     }
     perf.lap("range-bootstrap");
 
@@ -641,9 +649,7 @@ export async function GET(request: NextRequest) {
         orderBy: { date: "asc" },
       }),
       getEffectivePromotionExpenses(targetUserId, startDate, endDate, shopName || undefined),
-      prisma.operatingCostProfile.findMany({
-        where: { userId: targetUserId, ...(shopName ? { shopName } : {}) },
-      }),
+      operatingCostProfilesQuery,
       prisma.operatingCostMonthlyBill.findMany({
         where: { userId: targetUserId, ...(shopName ? { shopName } : {}) },
       }),

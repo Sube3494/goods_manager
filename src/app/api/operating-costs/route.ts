@@ -46,6 +46,7 @@ export async function GET(request: NextRequest) {
         profile: profile || {
           shopName,
           monthlyRent: 0,
+          rentStartDate: null,
           monthlyLabor: 0,
           allocationBaseDays: 30,
         },
@@ -101,6 +102,7 @@ export async function GET(request: NextRequest) {
       profile: profile || {
         shopName,
         monthlyRent: 0,
+        rentStartDate: null,
         monthlyLabor: 0,
         allocationBaseDays: 30,
       },
