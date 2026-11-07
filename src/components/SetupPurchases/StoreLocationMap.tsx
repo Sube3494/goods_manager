@@ -387,6 +387,16 @@ export function StoreLocationMap({ userId }: { userId: string }) {
     };
   }, [localStorage]);
 
+  useEffect(() => {
+    const container = mapContainerRef.current;
+    const map = mapInstanceRef.current;
+    if (!isMapReady || !container || !map) return;
+
+    const observer = new ResizeObserver(() => map.resize?.());
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [isMapReady]);
+
   // 监听系统主题变化并同步地图样式
   useEffect(() => {
     if (!mapInstanceRef.current) return;

@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { MapPin, X } from "lucide-react";
+import { MapPin, Maximize, Minimize, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StoreLocationMap } from "./StoreLocationMap";
 import { useUser } from "@/hooks/useUser";
@@ -10,8 +10,25 @@ import { hasPermission, type SessionUser } from "@/lib/permissions";
 
 export function LocationDialog({ triggerClassName }: { triggerClassName?: string }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const { user } = useUser();
+
+  useEffect(() => {
+    if (!isOpen || !isFullscreen) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !event.defaultPrevented) setIsFullscreen(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, isFullscreen]);
+
   if (!user || (!hasPermission(user as SessionUser, "setup_purchase:manage") || !hasPermission(user as SessionUser, "setup_purchase:location"))) return null;
+
+  const close = () => {
+    setIsOpen(false);
+    setIsFullscreen(false);
+  };
+  const fullscreenLabel = isFullscreen ? "退出全屏" : "全屏";
 
   return (
     <>
@@ -30,19 +47,25 @@ export function LocationDialog({ triggerClassName }: { triggerClassName?: string
 
       {isOpen &&
         createPortal(
-          <div className="fixed inset-0 z-100 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-slate-950/45 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className={cn(
+            "fixed inset-0 z-100 flex items-center justify-center bg-slate-950/45 backdrop-blur-sm animate-in fade-in duration-200",
+            !isFullscreen && "p-2 sm:p-4 md:p-6",
+          )}>
             <div
               className="absolute inset-0 transition-opacity"
-              onClick={() => setIsOpen(false)}
+              onClick={close}
             />
             <div
               role="dialog"
               aria-modal="true"
               aria-label="开店选址分析"
-              className="relative z-10 flex flex-col overflow-hidden rounded-[24px] sm:rounded-[32px] md:rounded-[36px] border border-black/8 bg-white/95 dark:border-white/10 dark:bg-[#0b111e]/98 text-foreground shadow-2xl backdrop-blur-2xl animate-in zoom-in-95 duration-200"
+              className={cn(
+                "relative z-10 flex flex-col overflow-hidden bg-white/95 dark:bg-[#0b111e]/98 text-foreground shadow-2xl backdrop-blur-2xl animate-in zoom-in-95 duration-200 transition-none",
+                !isFullscreen && "rounded-[24px] sm:rounded-[32px] md:rounded-[36px] border border-black/8 dark:border-white/10",
+              )}
               style={{
-                width: "min(1600px, calc(100vw - 24px))",
-                height: "min(960px, calc(100dvh - 24px))",
+                width: isFullscreen ? "100vw" : "min(1600px, calc(100vw - 24px))",
+                height: isFullscreen ? "100dvh" : "min(960px, calc(100dvh - 24px))",
               }}
             >
               {/* 弹窗顶部标头 */}
@@ -68,8 +91,18 @@ export function LocationDialog({ triggerClassName }: { triggerClassName?: string
                 <div className="flex items-center gap-2 shrink-0">
                   <button
                     type="button"
+                    onClick={() => setIsFullscreen((value) => !value)}
+                    aria-label={fullscreenLabel}
+                    title={fullscreenLabel}
+                    className="inline-flex h-8 min-w-8 items-center justify-center gap-1.5 rounded-full border border-black/8 bg-white/80 px-2 text-xs font-medium text-muted-foreground shadow-xs transition-all hover:bg-white hover:text-foreground active:scale-95 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8 cursor-pointer"
+                  >
+                    {isFullscreen ? <Minimize size={15} /> : <Maximize size={15} />}
+                    <span className="hidden sm:inline">{fullscreenLabel}</span>
+                  </button>
+                  <button
+                    type="button"
                     autoFocus
-                    onClick={() => setIsOpen(false)}
+                    onClick={close}
                     aria-label="关闭选址"
                     className="h-8 w-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground border border-black/8 bg-white/80 hover:bg-white dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8 transition-all active:scale-95 cursor-pointer shadow-xs"
                   >
