@@ -234,15 +234,15 @@ export async function GET(request: NextRequest) {
       touchedShopIds.add(created.id);
     }
 
-    const shops = source === "shipping-addresses"
-      ? existingShops
-          .filter((shop) => touchedShopIds.has(shop.id))
-          .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
-      : await prisma.shop.findMany({
-          where: { userId: user.id },
-          include: { library: { select: { id: true, name: true } } },
-          orderBy: { createdAt: "desc" },
-        });
+    const defaultAddressBookId = normalizedAddresses.find((address) => address.isDefault)?.addressBookId;
+    const shops = existingShops
+      .filter((shop) => touchedShopIds.has(shop.id))
+      .sort((left, right) => {
+        const leftIsDefault = left.addressBookId === defaultAddressBookId;
+        const rightIsDefault = right.addressBookId === defaultAddressBookId;
+        return Number(rightIsDefault) - Number(leftIsDefault)
+          || right.createdAt.getTime() - left.createdAt.getTime();
+      });
 
     return NextResponse.json({
       shops,

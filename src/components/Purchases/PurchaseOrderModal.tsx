@@ -1280,6 +1280,7 @@ export function PurchaseOrderModal({
                                             }}
                                             options={addressList
                                                 .filter((item) => !!item.address)
+                                                .sort((left, right) => Number(Boolean(right.isDefault)) - Number(Boolean(left.isDefault)))
                                                 .map((item) => ({
                                                     value: item.address || "",
                                                     label: item.label || item.address || "未命名地址"
