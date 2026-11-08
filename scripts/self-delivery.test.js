@@ -1,4 +1,6 @@
 import { beforeEach, expect, mock, test } from "bun:test";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { isAutoPickOrderSelfDeliveryActive, isAutoPickOrderRiderAssigned, isDeliveryCancelledOrEmpty } from "../src/lib/autoPickOrderStatus";
 
 let order;
@@ -34,6 +36,7 @@ mock.module("../src/lib/autoPickAutoComplete", () => ({
 mock.module("../src/lib/autoPickOrderEvents", () => ({ emitAutoPickOrderEvent: () => {} }));
 const { POST } = await import("../src/app/api/orders/[id]/self-delivery/route");
 const { POST: completeDelivery } = await import("../src/app/api/orders/[id]/complete-delivery/route");
+const { QueuedSelfDeliveryNotice } = await import("../src/app/orders/OrderCard");
 beforeEach(() => {
   platformCalls = 0;
   order = { id: "order-1", userId: "user-1", status: "delivering", sourceId: "source-1",
@@ -44,6 +47,15 @@ test("screenshot self-delivery remains active and is not a third-party rider", (
   expect(isDeliveryCancelledOrEmpty(order)).toBe(false);
   expect(isAutoPickOrderSelfDeliveryActive(order)).toBe(true);
   expect(isAutoPickOrderRiderAssigned(order)).toBe(false);
+});
+test("active self-delivery hides old automatic self-delivery alerts", () => {
+  const render = (value) => renderToStaticMarkup(createElement(QueuedSelfDeliveryNotice, { order: value }));
+  for (const [status, label] of [["failed", "自动自配失败"], ["cancelled", "自动自配已停止"]]) {
+    const active = { ...order, queuedSelfDelivery: { status, error: "平台请求超时" } };
+    expect(render(active)).toBe("");
+    expect(render({ ...active, status: "待配送", delivery: null })).toContain(label);
+    expect(render({ ...active, delivery: { ...active.delivery, status: 99 } })).toContain(label);
+  }
 });
 test("duplicate self-delivery is rejected before contacting the platform", async () => {
   const response = await POST(new Request("http://localhost"), { params: Promise.resolve({ id: order.id }) });
