@@ -1,8 +1,6 @@
-import { mayReadMemberData } from "@/lib/memberDataVisibilityServer";
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthorizedUser } from "@/lib/auth";
-import { hasAdminAccess, hasPermission } from "@/lib/permissions";
 import { parseAsShanghaiTime } from "@/lib/dateUtils";
 import { isAddressDisabled, getAddressDetail } from "@/lib/addressBook";
 import { Prisma } from "@prisma/client";
@@ -52,22 +50,20 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const requestedUserId = String(searchParams.get("userId") || "").trim();
-    const canManageMembers = session.role === "SUPER_ADMIN"
-      || hasAdminAccess(session, "members:manage")
-      || hasAdminAccess(session, "members:status")
-      || hasAdminAccess(session, "whitelist:manage")
-      || hasAdminAccess(session, "roles:manage")
-      || String(session.roleProfile?.name || "").includes("管理")
-      || hasPermission(session, "order:manage");
-    const targetUserId = (canManageMembers && requestedUserId) ? requestedUserId : session.id;
-  if (!await mayReadMemberData(session, targetUserId)) return NextResponse.json({ error: "该成员数据已隐藏" }, { status: 403 });
+    if (requestedUserId && requestedUserId !== session.id && session.role !== "SUPER_ADMIN") {
+      return NextResponse.json({ error: "仅超级管理员可查看其他成员的订单分布" }, { status: 403 });
+    }
+    const targetUserId = requestedUserId || session.id;
 
     // 1. 读取麦芽田映射配置 + 个人资料地址库（门店来源）
     const user = await prisma.user.findUnique({
       where: { id: targetUserId },
       select: { permissions: true, shippingAddresses: true },
     });
-    const permissions = (user?.permissions && typeof user.permissions === "object") ? (user.permissions as Record<string, unknown>) : {};
+    if (!user) {
+      return NextResponse.json({ error: "成员不存在" }, { status: 404 });
+    }
+    const permissions = (user.permissions && typeof user.permissions === "object") ? (user.permissions as Record<string, unknown>) : {};
     const integrationConfig = normalizeAutoPickIntegrationConfig(permissions.autoPickIntegration);
     const mappings = integrationConfig.maiyatianShopMappings || [];
 
@@ -158,7 +154,7 @@ export async function GET(request: NextRequest) {
     );
     const hasMaiyatianFilter = mappedShopNames.size > 0;
 
-    const rawAddresses = Array.isArray(user?.shippingAddresses) ? (user?.shippingAddresses as unknown[]) : [];
+    const rawAddresses = Array.isArray(user.shippingAddresses) ? user.shippingAddresses : [];
     for (const rawAddr of rawAddresses) {
       const addr = (rawAddr && typeof rawAddr === "object") ? (rawAddr as Record<string, unknown>) : null;
       if (!addr) continue;

@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { useEffect, useRef, useState, useMemo, useCallback } from "react";
+import { useEffect, useRef, useState, useMemo, useCallback, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import {
   MapPin,
@@ -24,6 +24,7 @@ import { CustomSelect } from "@/components/ui/CustomSelect";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { loadBareAmap } from "@/components/DistanceCalc/BareAmapTest";
 import { formatLocalDate, formatLocalDateTime } from "@/lib/dateUtils";
+import { useUser } from "@/hooks/useUser";
 import { useTheme } from "next-themes";
 
 interface DistributionOrder {
@@ -82,7 +83,12 @@ interface OrderDistributionModalProps {
   onClose: () => void;
   initialShopName?: string;
   localShops?: Array<{ id: string; name: string; address?: string; isDefault?: boolean }>;
-  userId?: string | null;
+}
+
+interface DistributionMember {
+  id: string;
+  name: string | null;
+  email: string;
 }
 
 const PLATFORM_COLOR_MAP: Record<string, { bg: string; border: string; text: string; pinBg: string; icon: string }> = {
@@ -200,7 +206,66 @@ function createOrderMarkerDom(order: DistributionOrder, platformTheme: ReturnTyp
   return markerDom;
 }
 
-export function OrderDistributionModal({ onClose, initialShopName, localShops, userId }: OrderDistributionModalProps) {
+export function OrderDistributionModal(props: OrderDistributionModalProps) {
+  const { user } = useUser();
+  const isSuperAdmin = user?.role === "SUPER_ADMIN";
+  const [selectedMemberId, setSelectedMemberId] = useState("");
+  const [members, setMembers] = useState<DistributionMember[] | null>(null);
+  const [memberError, setMemberError] = useState("");
+  const userId = isSuperAdmin ? selectedMemberId : "";
+
+  useEffect(() => {
+    if (!isSuperAdmin) return;
+    const controller = new AbortController();
+    async function loadMembers() {
+      try {
+        const res = await fetch("/api/orders/distribution/members", { signal: controller.signal });
+        if (!res.ok) throw new Error("读取成员列表失败");
+        const data = await res.json();
+        if (!controller.signal.aborted) setMembers(data.members);
+      } catch {
+        if (!controller.signal.aborted) setMemberError("读取成员列表失败");
+      }
+    }
+    void loadMembers();
+    return () => controller.abort();
+  }, [isSuperAdmin]);
+
+  const memberPicker = isSuperAdmin && (
+    <select
+      aria-label="查看成员的订单分布"
+      className="h-8 w-32 shrink-0 cursor-pointer rounded-full border border-black/8 bg-white/80 px-2.5 text-xs text-foreground sm:h-9 sm:w-40 sm:text-sm dark:border-white/10 dark:bg-background"
+      value={userId}
+      onChange={(event) => setSelectedMemberId(event.target.value)}
+    >
+      <option value="">我的订单</option>
+      {members?.map((member) => (
+        <option key={member.id} value={member.id}>
+          {member.name?.trim() ? `${member.name.trim()}（${member.email}）` : member.email}
+        </option>
+      ))}
+      {!members?.length && (
+        <option disabled>{memberError || (members ? "暂无其他成员订单" : "正在读取成员…")}</option>
+      )}
+    </select>
+  );
+
+  return (
+    <OrderDistributionView
+      key={userId}
+      onClose={props.onClose}
+      initialShopName={userId ? undefined : props.initialShopName}
+      localShops={userId ? undefined : props.localShops}
+      userId={userId}
+      memberPicker={memberPicker}
+    />
+  );
+}
+
+function OrderDistributionView({ onClose, initialShopName, localShops, userId, memberPicker }: OrderDistributionModalProps & {
+  userId: string;
+  memberPicker: ReactNode;
+}) {
   const [mounted, setMounted] = useState(false);
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark" || (typeof document !== "undefined" && document.documentElement.classList.contains("dark"));
@@ -415,7 +480,7 @@ export function OrderDistributionModal({ onClose, initialShopName, localShops, u
   };
 
   // 请求后端分布数据
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (signal: AbortSignal) => {
     setIsLoading(true);
     setError("");
     setSelectedOrder(null);
@@ -428,8 +493,9 @@ export function OrderDistributionModal({ onClose, initialShopName, localShops, u
       if (endDate) params.set("endDate", endDate);
       if (userId) params.set("userId", userId);
 
-      const res = await fetch(`/api/orders/distribution?${params.toString()}`);
+      const res = await fetch(`/api/orders/distribution?${params.toString()}`, { signal });
       const data = await res.json();
+      if (signal.aborted) return;
       if (!res.ok) {
         throw new Error(data.error || "获取订单分布数据失败");
       }
@@ -470,16 +536,19 @@ export function OrderDistributionModal({ onClose, initialShopName, localShops, u
         platformStats: {},
       });
     } catch (err) {
+      if (signal.aborted) return;
       console.error("加载订单分布失败:", err);
       setError(err instanceof Error ? err.message : "加载失败");
     } finally {
-      setIsLoading(false);
+      if (!signal.aborted) setIsLoading(false);
     }
   }, [selectedShop, selectedPlatform, orderType, startDate, endDate, userId, initialShopName]);
 
   // 依赖变化重新拉取
   useEffect(() => {
-    fetchData();
+    const controller = new AbortController();
+    void fetchData(controller.signal);
+    return () => controller.abort();
   }, [fetchData]);
 
   // 地图初始化与点位绘制
@@ -708,7 +777,7 @@ export function OrderDistributionModal({ onClose, initialShopName, localShops, u
                 pointer-events: none;
               ">
                 <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${labelDot};box-shadow: 0 0 6px rgba(147, 197, 253, 0.8);"></span>
-                <span>${shopItem.name}</span>
+                <span data-shop-label></span>
               </div>
               <svg width="22" height="28" viewBox="0 0 22 28" fill="none" xmlns="http://www.w3.org/2000/svg"
                 style="filter: ${pinDropShadow}; transition: transform 0.2s;">
@@ -717,6 +786,8 @@ export function OrderDistributionModal({ onClose, initialShopName, localShops, u
                 <circle cx="11" cy="11" r="2.2" fill="${pinInnerDot}"/>
               </svg>
             `;
+            const shopLabel = shopDom.querySelector("[data-shop-label]");
+            if (shopLabel) shopLabel.textContent = shopItem.name;
             const shopMarker = new sdk.Marker({
               position: finalCoord,
               content: shopDom,
@@ -827,6 +898,11 @@ export function OrderDistributionModal({ onClose, initialShopName, localShops, u
     };
   }, [orders, currentShop, availableShops, selectedShop, isDark, getSmartFitTargets, enableCluster]);
 
+  useEffect(() => () => {
+    mapInstanceRef.current?.destroy?.();
+    mapInstanceRef.current = null;
+  }, []);
+
   const shopOptions = useMemo(() => {
     return availableShops.map((s) => ({
       value: s.name,
@@ -877,7 +953,7 @@ export function OrderDistributionModal({ onClose, initialShopName, localShops, u
       />
       <div className="relative z-10 flex flex-col w-full h-full max-w-full max-h-full sm:max-w-[96vw] sm:max-h-[92vh] rounded-none sm:rounded-[28px] border-0 sm:border border-black/8 bg-background dark:border-white/10 dark:bg-[#0c1220] overflow-hidden shadow-2xl">
         {/* 顶部控制栏 */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 sm:gap-3 border-b border-black/8 px-3 py-2.5 sm:px-6 sm:py-3 bg-white/76 backdrop-blur-xl dark:border-white/10 dark:bg-white/4 shrink-0">
+        <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-2.5 sm:gap-3 border-b border-black/8 px-3 py-2.5 sm:px-6 sm:py-3 bg-white/76 backdrop-blur-xl dark:border-white/10 dark:bg-white/4 shrink-0">
           {/* 标题区（移动端整行带关闭，桌面端单行左侧） */}
           <div className="flex items-center justify-between sm:justify-start gap-2.5 shrink-0 w-full sm:w-auto">
             <div className="flex items-center gap-2 sm:gap-3 shrink-0">
@@ -914,7 +990,8 @@ export function OrderDistributionModal({ onClose, initialShopName, localShops, u
           </div>
 
           {/* 筛选控制器行（桌面端单行靠右，移动端流畅横向滑动） */}
-          <div className="flex items-center justify-start sm:justify-end gap-2 overflow-x-auto sm:overflow-visible no-scrollbar pb-1 sm:pb-0 shrink-0 w-full sm:w-auto sm:ml-auto">
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 sm:pb-0 shrink-0 w-full sm:w-auto sm:max-w-full sm:ml-auto">
+            {memberPicker}
             {/* 店铺筛选 */}
             <div className="w-28 sm:w-36 h-8 sm:h-9 shrink-0">
               <CustomSelect
