@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CustomSelect } from "@/components/ui/CustomSelect";
-import { DatePicker } from "@/components/ui/DatePicker";
+import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import { loadBareAmap } from "@/components/DistanceCalc/BareAmapTest";
 import { formatLocalDate, formatLocalDateTime } from "@/lib/dateUtils";
 import { useUser } from "@/hooks/useUser";
@@ -90,6 +90,8 @@ interface DistributionMember {
   name: string | null;
   email: string;
 }
+
+const FILTER_TRIGGER_CLASS = "h-full rounded-full border border-black/8 bg-white/80 px-2.5 sm:px-3 text-xs sm:text-sm shadow-none dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8";
 
 const PLATFORM_COLOR_MAP: Record<string, { bg: string; border: string; text: string; pinBg: string; icon: string }> = {
   美团: { bg: "bg-amber-500/15", border: "border-amber-500/30", text: "text-amber-600 dark:text-amber-400", pinBg: "#f59e0b", icon: "/platform/美团.svg" },
@@ -232,22 +234,30 @@ export function OrderDistributionModal(props: OrderDistributionModalProps) {
   }, [isSuperAdmin]);
 
   const memberPicker = isSuperAdmin && (
-    <select
-      aria-label="查看成员的订单分布"
-      className="h-8 w-32 shrink-0 cursor-pointer rounded-full border border-black/8 bg-white/80 px-2.5 text-xs text-foreground sm:h-9 sm:w-40 sm:text-sm dark:border-white/10 dark:bg-background"
-      value={userId}
-      onChange={(event) => setSelectedMemberId(event.target.value)}
-    >
-      <option value="">我的订单</option>
-      {members?.map((member) => (
-        <option key={member.id} value={member.id}>
-          {member.name?.trim() ? `${member.name.trim()}（${member.email}）` : member.email}
-        </option>
-      ))}
-      {!members?.length && (
-        <option disabled>{memberError || (members ? "暂无其他成员订单" : "正在读取成员…")}</option>
+    <div className="h-8 w-32 shrink-0 sm:h-9 sm:w-40">
+      {members?.length ? (
+        <CustomSelect
+          value={userId}
+          onChange={setSelectedMemberId}
+          options={[
+            { value: "", label: "成员 · 我的订单" },
+            ...members.map(({ id, name, email }) => ({
+              value: id,
+              label: name?.trim() ? `${name.trim()}（${email}）` : email,
+            })),
+          ]}
+          searchPlaceholder="搜索成员"
+          align="left"
+          matchTriggerWidth={false}
+          className="h-full w-full"
+          triggerClassName={FILTER_TRIGGER_CLASS}
+        />
+      ) : (
+        <span role="status" className={cn(FILTER_TRIGGER_CLASS, "flex items-center justify-center text-muted-foreground")}>
+          {memberError || (members ? "暂无其他成员订单" : "正在读取成员…")}
+        </span>
       )}
-    </select>
+    </div>
   );
 
   return (
@@ -305,9 +315,10 @@ function OrderDistributionView({ onClose, initialShopName, localShops, userId, m
   });
   const [selectedPlatform, setSelectedPlatform] = useState<string>("all");
   const [orderType, setOrderType] = useState<"all" | "real" | "brush">("all");
-  const [datePreset, setDatePreset] = useState<"all" | "today" | "yesterday" | "7d" | "30d" | "custom">("today");
-  const [startDate, setStartDate] = useState<string>(() => formatLocalDate(new Date()));
-  const [endDate, setEndDate] = useState<string>(() => formatLocalDate(new Date()));
+  const [{ startDate, endDate }, setDateRange] = useState(() => {
+    const today = formatLocalDate(new Date());
+    return { startDate: today, endDate: today };
+  });
 
   // 数据状态
   const [currentShop, setCurrentShop] = useState<CurrentShopInfo | null>(null);
@@ -451,33 +462,6 @@ function OrderDistributionView({ onClose, initialShopName, localShops, userId, m
       }
     }
   }, [isDark]);
-
-  // 预设日期切换
-  const handleDatePresetChange = (preset: "all" | "today" | "yesterday" | "7d" | "30d" | "custom") => {
-    setDatePreset(preset);
-    const now = new Date();
-    if (preset === "all") {
-      setStartDate("");
-      setEndDate("");
-    } else if (preset === "today") {
-      const todayStr = formatLocalDate(now);
-      setStartDate(todayStr);
-      setEndDate(todayStr);
-    } else if (preset === "yesterday") {
-      const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-      const yesterdayStr = formatLocalDate(yesterday);
-      setStartDate(yesterdayStr);
-      setEndDate(yesterdayStr);
-    } else if (preset === "7d") {
-      const start = new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000);
-      setStartDate(formatLocalDate(start));
-      setEndDate(formatLocalDate(now));
-    } else if (preset === "30d") {
-      const start = new Date(now.getTime() - 29 * 24 * 60 * 60 * 1000);
-      setStartDate(formatLocalDate(start));
-      setEndDate(formatLocalDate(now));
-    }
-  };
 
   // 请求后端分布数据
   const fetchData = useCallback(async (signal: AbortSignal) => {
@@ -922,20 +906,6 @@ function OrderDistributionView({ onClose, initialShopName, localShops, userId, m
     return base;
   }, [summary.platformStats]);
 
-  const datePresetOptions = useMemo(() => {
-    const base = [
-      { value: "today", label: "今日" },
-      { value: "yesterday", label: "昨日" },
-      { value: "7d", label: "近7天" },
-      { value: "30d", label: "近30天" },
-      { value: "all", label: "全部日期" },
-    ];
-    if (datePreset === "custom") {
-      return [{ value: "custom", label: "自定义" }, ...base];
-    }
-    return base;
-  }, [datePreset]);
-
   const orderTypeOptions = useMemo(() => [
     { value: "all", label: "全部类型" },
     { value: "real", label: "真单" },
@@ -1031,43 +1001,14 @@ function OrderDistributionView({ onClose, initialShopName, localShops, userId, m
               />
             </div>
 
-            {/* 日期预设下拉选择器 */}
-            <div className="w-19 sm:w-22 h-8 sm:h-9 shrink-0">
-              <CustomSelect
-                value={datePreset}
-                onChange={(val) => handleDatePresetChange(val as any)}
-                options={datePresetOptions}
-                placeholder="日期"
-                align="center"
-                className="h-full w-full"
-                triggerClassName="h-full rounded-full border border-black/8 bg-white/80 px-2 text-xs sm:text-sm text-center shadow-none dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8"
-              />
-            </div>
-
-            {/* 日期选择器（充分拓宽，确保年月日完整显示不截断，文字居中） */}
-            <div className="flex items-center gap-1.5 h-8 sm:h-9 shrink-0">
-              <DatePicker
-                value={startDate}
-                placeholder="开始日期"
-                onChange={(val) => {
-                  setStartDate(val);
-                  setDatePreset("custom");
-                }}
-                className="h-full w-29 sm:w-34"
-                triggerClassName="h-full rounded-full border border-black/8 bg-white/80 px-2.5 sm:px-3 text-xs justify-center text-center shadow-none dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8"
-              />
-              <span className="text-xs text-muted-foreground font-medium select-none">至</span>
-              <DatePicker
-                value={endDate}
-                placeholder="结束日期"
-                onChange={(val) => {
-                  setEndDate(val);
-                  setDatePreset("custom");
-                }}
-                className="h-full w-29 sm:w-34"
-                triggerClassName="h-full rounded-full border border-black/8 bg-white/80 px-2.5 sm:px-3 text-xs justify-center text-center shadow-none dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8"
-              />
-            </div>
+            <DateRangePicker
+              startDate={startDate}
+              endDate={endDate}
+              onChange={setDateRange}
+              includeLast7Days
+              className="h-8 shrink-0 sm:h-9"
+              triggerClassName={FILTER_TRIGGER_CLASS}
+            />
 
             {/* 桌面端专属的关闭（无轮廓） */}
             <div className="hidden sm:flex items-center shrink-0 ml-1">

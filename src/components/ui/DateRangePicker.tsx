@@ -49,6 +49,7 @@ export interface DateRangePickerProps {
   maxDate?: string;
   isCompact?: boolean;
   includeToday?: boolean;
+  includeLast7Days?: boolean;
   hasAllPreset?: boolean;
 }
 
@@ -65,6 +66,7 @@ export function DateRangePicker({
   maxDate,
   isCompact,
   includeToday = true,
+  includeLast7Days = false,
   hasAllPreset = true,
 }: DateRangePickerProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -128,25 +130,18 @@ export function DateRangePicker({
       const windowHeight = window.innerHeight;
       const windowWidth = window.innerWidth;
       const dropdownHeight = 420;
-      const dropdownMinWidth = 320;
       const spaceBelow = windowHeight - rect.bottom - 16;
       const spaceAbove = rect.top - 16;
       const showAbove = spaceBelow < dropdownHeight && spaceAbove > spaceBelow;
 
       const maxHeight = Math.max(showAbove ? spaceAbove : spaceBelow, 240);
-      let left = rect.left;
-
-      if (left + dropdownMinWidth > windowWidth - 16) {
-        left = windowWidth - dropdownMinWidth - 16;
-      }
-      if (left < 16) {
-        left = 16;
-      }
+      const width = Math.min(Math.max(rect.width, 320), windowWidth - 32);
+      const left = Math.max(16, Math.min(rect.left, windowWidth - width - 16));
 
       setDropdownPosition({
         top: showAbove ? rect.top - 8 : rect.bottom + 8,
         left,
-        width: Math.max(rect.width, dropdownMinWidth),
+        width,
         maxHeight,
         showAbove,
       });
@@ -274,19 +269,21 @@ export function DateRangePicker({
         : []),
       { label: "昨天", preset: "yesterday", start: yesterday, end: yesterday },
       ...(hasAllPreset ? [{ label: "全部", preset: "all", isAll: true }] : []),
+      ...(includeLast7Days ? [{ label: "近7天", preset: "7d", start: subDays(today, 6), end: today }] : []),
       { label: "近30天", preset: "30d", start: last30Days, end: today },
       { label: "本月", preset: "month", start: currentMonthStart, end: today },
       { label: "上月", preset: "lastMonth", start: prevMonthStart, end: prevMonthEnd },
     ];
 
     return list;
-  }, [includeToday, hasAllPreset]);
+  }, [includeToday, includeLast7Days, hasAllPreset]);
 
   return (
     <div className={cn("relative inline-flex", className)} ref={containerRef}>
       <button
         type="button"
         onClick={toggleOpen}
+        aria-expanded={isOpen}
         title={hasValue ? (startDate && endDate ? `${startDate} ~ ${endDate}` : displayLabel) : ""}
         className={cn(
           "flex w-full h-full items-center justify-center rounded-full bg-white dark:bg-white/5 border border-black/8 dark:border-white/10 px-3.5 text-xs transition-all outline-none whitespace-nowrap",
@@ -332,7 +329,6 @@ export function DateRangePicker({
                   bottom: dropdownPosition.showAbove ? `${window.innerHeight - dropdownPosition.top}px` : "auto",
                   left: `${dropdownPosition.left}px`,
                   width: `${dropdownPosition.width}px`,
-                  minWidth: "320px",
                   maxWidth: "calc(100vw - 2rem)",
                   maxHeight: `${dropdownPosition.maxHeight}px`,
                   overflowY: "auto",
