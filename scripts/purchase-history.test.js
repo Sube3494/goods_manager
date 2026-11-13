@@ -34,6 +34,7 @@ test("共享模板的门店商品只关联自身入库，不串到其他店铺",
 test("独立商品及无门店名称的商品不会扩大到模板入库", () => {
   for (const product of [
     { ...target, productId: null, sourceProductId: null },
+    { ...target, productId: null },
     { ...target, shop: { name: "" } },
   ]) {
     expect(buildShopProductPurchaseHistoryWhere(product)).toEqual({

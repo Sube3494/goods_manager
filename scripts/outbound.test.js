@@ -57,6 +57,7 @@ mock.module("../src/lib/prisma", () => ({ default: {
   },
 } }));
 const { POST } = await import("../src/app/api/outbound/route");
+const { InventoryService } = await import("../src/services/inventoryService");
 const submit = (overrides = {}) => POST(new Request("http://localhost/api/outbound", {
   method: "POST", headers: { "Content-Type": "application/json" },
   body: JSON.stringify({ shopId: "shop-1", note: "[店铺:错误店名] 测试", items: [{
@@ -84,6 +85,25 @@ test("cross-shop submission is rejected before inventory changes", async () => {
   expect((await response.json()).error).toContain("禁止跨店");
   expect(transactionCalls).toBe(0);
   expect(remaining).toBe(30);
+});
+test("an imported shop product synchronizes only its own stock even with an old catalog ID", async () => {
+  const writes = [];
+  await InventoryService.syncStockFromBatches({
+    ...tx,
+    shopProduct: {
+      ...tx.shopProduct,
+      findMany: async () => { throw new Error("must not query peer shops"); },
+      update: async ({ where, data }) => writes.push([where.id, data.stock]),
+    },
+    product: { update: async () => { throw new Error("must not update the source catalog"); } },
+    purchaseOrderItem: {
+      aggregate: async ({ where }) => {
+        expect(where.OR).toEqual([{ shopProductId: "sp-1" }, { productId: "sp-1", shopProductId: null }]);
+        return { _sum: { remainingQuantity: 4 } };
+      },
+    },
+  }, "source-catalog-id", "sp-1");
+  expect(writes).toEqual([["sp-1", 4]]);
 });
 test("unknown shop product cannot fall back to a client-supplied master ID", async () => {
   const response = await submit({ items: [{ shopProductId: "missing", productId: "sp-1", quantity: 30 }] });

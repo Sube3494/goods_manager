@@ -403,7 +403,7 @@ export class InventoryService {
     const targetProductIds = new Set<string>();
 
     const rawShopProductId = String(shopProductId || "").trim();
-    const rawProductId = String(productId || "").trim();
+    let rawProductId = String(productId || "").trim();
 
     if (rawShopProductId) {
       targetShopProductIds.add(rawShopProductId);
@@ -414,6 +414,9 @@ export class InventoryService {
       if (sp?.productId) {
         targetProductIds.add(sp.productId);
       }
+      // An independent shop product has its own ledger. A caller may still
+      // supply its old catalog source as productId.
+      if (sp && !sp.productId) rawProductId = "";
     }
 
     if (rawProductId) {
@@ -450,7 +453,7 @@ export class InventoryService {
         where: {
           OR: [
             { shopProductId: spId },
-            { productId: spId },
+            { productId: spId, shopProductId: null },
           ],
           remainingQuantity: { gt: 0 },
           purchaseOrder: { status: "Received" },

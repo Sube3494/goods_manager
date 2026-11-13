@@ -4,6 +4,7 @@ import { getAuthorizedUser } from "@/lib/auth";
 import { addDays, parseISO, startOfDay } from "date-fns";
 import { getStorageStrategy } from "@/lib/storage";
 import { InventoryService } from "@/services/inventoryService";
+import type { Prisma } from "../../../../../prisma/generated-client";
 
 export async function GET(request: NextRequest) {
   try {
@@ -41,13 +42,15 @@ export async function GET(request: NextRequest) {
         };
 
     // 构建查询条件
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const where: Record<string, any> = {
+    const filters: Prisma.ProductBatchWhereInput[] = [{
+      OR: [
+        { shopProduct: { deletedAt: null } },
+        { shopProductId: null, product: { deletedAt: null } },
+      ],
+    }];
+    const where: Prisma.ProductBatchWhereInput = {
       remainingStock: { gt: 0 },
-        AND: [
-          { product: { deletedAt: null } },
-          { OR: [{ shopProductId: null }, { shopProduct: { deletedAt: null } }] },
-        ],
+      AND: filters,
       ...userScope,
     };
 
@@ -58,12 +61,14 @@ export async function GET(request: NextRequest) {
     }
 
     if (search) {
-      where.OR = [
-        { product: { name: { contains: search, mode: "insensitive" } } },
-        { product: { pinyin: { contains: search.toLowerCase(), mode: "insensitive" } } },
-        { shopProduct: { productName: { contains: search, mode: "insensitive" } } },
-        { shopProduct: { sku: { contains: search, mode: "insensitive" } } }
-      ];
+      filters.push({
+        OR: [
+          { product: { name: { contains: search, mode: "insensitive" } } },
+          { product: { pinyin: { contains: search.toLowerCase(), mode: "insensitive" } } },
+          { shopProduct: { productName: { contains: search, mode: "insensitive" } } },
+          { shopProduct: { sku: { contains: search, mode: "insensitive" } } },
+        ],
+      });
     }
 
     // 根据过期状态过滤
@@ -218,7 +223,7 @@ export async function POST(request: NextRequest) {
         }
       });
 
-      if (!orderItem) {
+      if (!orderItem || (user.role !== "SUPER_ADMIN" && orderItem.purchaseOrder.userId !== user.id)) {
         return NextResponse.json({ error: "找不到指定的到货记录" }, { status: 404 });
       }
 
@@ -239,7 +244,7 @@ export async function POST(request: NextRequest) {
           data: { isShelfLife: true, shelfLifeDays }
         }).catch(() => null);
       }
-      if (orderItem.product && (!orderItem.product.isShelfLife || !orderItem.product.shelfLifeDays)) {
+      if (!orderItem.shopProductId && orderItem.product && (!orderItem.product.isShelfLife || !orderItem.product.shelfLifeDays)) {
         await prisma.product.update({
           where: { id: orderItem.product.id },
           data: { isShelfLife: true, shelfLifeDays }
@@ -253,12 +258,15 @@ export async function POST(request: NextRequest) {
         where: { purchaseOrderItemId }
       });
 
+      const batchProductId = orderItem.shopProductId ? orderItem.shopProduct?.productId ?? null : orderItem.productId;
       let savedBatch;
       if (existingBatch) {
         // 更新现有批次
         savedBatch = await prisma.productBatch.update({
           where: { id: existingBatch.id },
           data: {
+            productId: batchProductId,
+            shopProductId: orderItem.shopProductId,
             productionDate,
             expirationDate,
             remark,
@@ -270,7 +278,7 @@ export async function POST(request: NextRequest) {
         // 创建新批次
         savedBatch = await prisma.productBatch.create({
           data: {
-            productId: orderItem.productId || orderItem.shopProduct?.productId || String(body?.productId || "").trim(),
+            productId: batchProductId,
             shopProductId: orderItem.shopProductId || null,
             batchNo: orderItem.purchaseOrder?.id || `BATCH-${Date.now()}`,
             productionDate,
@@ -291,16 +299,15 @@ export async function POST(request: NextRequest) {
     }
 
     // 如果是直接手动创建/补录批次（兼容历史和初始化）
-    const productId = body?.productId ? String(body.productId).trim() : "";
     const shopProductId = body?.shopProductId ? String(body.shopProductId).trim() : "";
     const quantity = parseInt(body?.quantity || "0", 10);
 
-    if (!productId || !shopProductId || quantity <= 0) {
+    if (!shopProductId || quantity <= 0) {
       return NextResponse.json({ error: "缺少必要的商品参数或数量不合法" }, { status: 400 });
     }
 
-    const shopProduct = await prisma.shopProduct.findUnique({
-      where: { id: shopProductId }
+    const shopProduct = await prisma.shopProduct.findFirst({
+      where: { id: shopProductId, ...(user.role === "SUPER_ADMIN" ? {} : { shop: { userId: user.id } }) },
     });
 
     if (!shopProduct || !shopProduct.isShelfLife || !shopProduct.shelfLifeDays) {
@@ -311,7 +318,7 @@ export async function POST(request: NextRequest) {
 
     const savedBatch = await prisma.productBatch.create({
       data: {
-        productId,
+        productId: shopProduct.productId,
         shopProductId,
         batchNo: `INIT-${new Date().toISOString().split("T")[0].replace(/-/g, "")}`,
         productionDate,
@@ -355,9 +362,10 @@ export async function PUT(request: NextRequest) {
       const oldBatch = await tx.productBatch.findFirst({
         where: {
           id: batchId,
-          product: {
-            userId: user.id
-          }
+          OR: [
+            { shopProduct: { shop: { userId: user.id } } },
+            { shopProductId: null, product: { userId: user.id } },
+          ],
         }
       });
 

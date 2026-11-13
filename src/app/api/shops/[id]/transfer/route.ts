@@ -380,7 +380,7 @@ export async function POST(
           userId: user.id,
           items: {
             create: [{
-              productId: targetProduct.productId || sourceProduct.productId || null,
+              productId: targetProduct.productId || null,
               shopProductId: targetProduct.id,
               supplierId: targetProduct.supplierId || sourceProduct.supplierId || null,
               quantity,
@@ -432,7 +432,7 @@ export async function POST(
           } else {
             await tx.productBatch.create({
               data: {
-                productId: batch.productId,
+                productId: targetProduct.productId,
                 shopProductId: targetProduct.id,
                 purchaseOrderItemId: purchaseOrderItem?.id || null,
                 batchNo: batch.batchNo,

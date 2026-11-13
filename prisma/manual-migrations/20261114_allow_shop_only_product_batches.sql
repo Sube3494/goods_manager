@@ -1,0 +1,1 @@
+ALTER TABLE "ProductBatch" ALTER COLUMN "productId" DROP NOT NULL;

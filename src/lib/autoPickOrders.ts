@@ -7207,6 +7207,7 @@ async function resolveOutboundItemsForAutoPickOrder(
     }
 
     const currentShopId = target.shopId || fullShopProduct?.shop?.id || internalShop?.id || null;
+    const catalogProductId = fullShopProduct ? fullShopProduct.productId : target.productId;
 
     if (isBundle && bundleItems && bundleItems.length > 0) {
       const totalCount = 1 + bundleItems.length;
@@ -7214,7 +7215,7 @@ async function resolveOutboundItemsForAutoPickOrder(
 
       // 1. 保留本体商品自身（扣除本体自身出库与库存）
       resolvedItems.push({
-        productId: String(target.productId || target.sourceProductId || fullShopProduct?.productId || fullShopProduct?.sourceProductId || "").trim() || null,
+        productId: catalogProductId || null,
         shopProductId: target.id || null,
         quantity: Math.max(1, Math.trunc(Number(quantity) || 1)),
         price: subPrice,
@@ -7241,7 +7242,7 @@ async function resolveOutboundItemsForAutoPickOrder(
           const currentShopSub = !isLegacyDisplay || currentShopSubs.length === 1 ? currentShopSubs[0] : null;
           if (currentShopSub) {
             bShopProductId = currentShopSub.id;
-            bProductId = currentShopSub.productId || currentShopSub.sourceProductId || bProductId;
+            bProductId = currentShopSub.productId;
           }
         }
 
@@ -7258,10 +7259,10 @@ async function resolveOutboundItemsForAutoPickOrder(
             bShopProductId = anySub.id;
           }
         }
-        if (!bProductId) {
+        if (!bShopProductId && !bProductId) {
           bProductId = b.productId || (b.sourceType === "product" && !b.shopProductId ? b.id : null);
         }
-        if (!bShopProductId && !bProductId) {
+        if (!bShopProductId && (!bProductId || (currentShopId && (b.shopProductId || (fullShopProduct && !catalogProductId))))) {
           throw new Error(`配件【${b.name || b.sku || "未命名配件"}】无法关联当前店铺商品，请重新匹配该配件`);
         }
 
@@ -7277,7 +7278,7 @@ async function resolveOutboundItemsForAutoPickOrder(
       }
     } else {
       resolvedItems.push({
-        productId: String(target.productId || target.sourceProductId || "").trim() || null,
+        productId: catalogProductId || null,
         shopProductId: target.id || null,
         quantity: Math.max(1, Math.trunc(Number(quantity) || 1)),
         price: itemPriceShare,

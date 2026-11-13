@@ -187,7 +187,7 @@ export async function GET(request: Request) {
           where: {
             OR: [
               { productId },
-              { sourceProductId: productId },
+              { sourceProductId: productId, productId: { not: null } },
             ],
           },
           select: { id: true, productId: true },

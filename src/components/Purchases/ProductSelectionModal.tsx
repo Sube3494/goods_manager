@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import Image from "next/image";
 import { createPortal } from "react-dom";
-import { X, Search, Check, Loader2, Package, LayoutGrid, List } from "lucide-react";
+import { X, Search, Loader2, Package, LayoutGrid, List } from "lucide-react";
+import { ProductSelectionIndicator, ProductSelectionThumbnail } from "@/components/Goods/ProductSelectionVisuals";
 import { Category, Product } from "@/lib/types";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { useToast } from "@/components/ui/Toast";
@@ -1070,41 +1070,15 @@ export function ProductSelectionModal({
                                : "border-border/60 shadow-xs hover:border-foreground/30 hover:bg-zinc-50/50 dark:hover:bg-white/[0.07]"
                            )}
                         >
-                          <div className={cn(
-                            isGridView
-                              ? "absolute top-1.5 right-1.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-all z-10"
-                              : "order-last ml-auto flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-all",
-                            isSelected 
-                              ? "bg-foreground border-foreground text-background dark:bg-white dark:border-white dark:text-black shadow-xs opacity-100 scale-100" 
-                              : isAlreadySelected
-                              ? "bg-emerald-500 border-emerald-500 text-white opacity-100 scale-100"
-                              : "opacity-0 group-hover:opacity-100 bg-black/40 backdrop-blur-xs border-white/60 text-transparent hover:border-white scale-90 group-hover:scale-100"
-                          )}>
-                            {(isSelected || isAlreadySelected) && <Check size={11} strokeWidth={3.5} />}
-                          </div>
-
-                          <div 
+                          <ProductSelectionIndicator
+                            selected={isSelected}
+                            alreadySelected={isAlreadySelected}
                             className={cn(
-                              isGridView
-                                ? "w-full aspect-square overflow-hidden bg-muted relative"
-                                : "h-10 w-10 shrink-0 rounded-lg overflow-hidden bg-muted border border-border/50 relative"
+                              isGridView ? "absolute top-1.5 right-1.5 z-10" : "order-last ml-auto",
+                              !isSelected && !isAlreadySelected && "scale-90 border-white/60 bg-black/40 text-transparent opacity-0 backdrop-blur-xs group-hover:scale-100 group-hover:border-white group-hover:opacity-100",
                             )}
-                          >
-                            {product.image ? (
-                                <Image 
-                                   src={product.image} 
-                                   alt={product.name} 
-                                    width={isGridView ? 220 : 40} 
-                                    height={isGridView ? 220 : 40} 
-                                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" 
-                                    unoptimized
-                                />
-                            ) : (
-                                <div className="h-full w-full flex items-center justify-center text-muted-foreground">
-                                    <Package size={isGridView ? 24 : 18} />
-                                </div>
-                            )}
-                          </div>
+                          />
+                          <ProductSelectionThumbnail image={product.image} name={product.name} grid={isGridView} />
                           
                           {!imageOnly && (
                             isGridView ? (

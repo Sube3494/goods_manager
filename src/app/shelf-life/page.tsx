@@ -25,7 +25,7 @@ import { hasPermission, SessionUser } from "@/lib/permissions";
 
 interface BatchItem {
   id: string;
-  productId: string;
+  productId: string | null;
   shopProductId: string;
   batchNo: string;
   productionDate: string | null;

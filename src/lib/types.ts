@@ -552,7 +552,7 @@ export interface PurchaseOrder {
 
 export interface ProductBatch {
   id: string;
-  productId: string;
+  productId: string | null;
   shopProductId?: string | null;
   batchNo?: string | null;
   productionDate?: string | Date | null;

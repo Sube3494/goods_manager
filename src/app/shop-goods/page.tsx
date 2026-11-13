@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { createPortal } from "react-dom";
 import { nanoid } from "nanoid/non-secure";
 import { AnimatePresence, motion } from "framer-motion";
-import { Search, Plus, Store, X, ArrowUp, Trash2, AlertCircle, ListOrdered, Save, Check, Link2, ArrowRightLeft, ChevronUp, ChevronDown, Boxes, Upload, Download, CopyPlus } from "lucide-react";
+import { Search, Plus, Store, X, ArrowUp, Trash2, AlertCircle, ListOrdered, Save, Check, Link2, ArrowRightLeft, ChevronUp, ChevronDown, Boxes, Upload, Download, CopyPlus, FileSpreadsheet } from "lucide-react";
 import Link from "next/link";
 import { ImportModal } from "@/components/Goods/ImportModal";
 import { GoodsCard } from "@/components/Goods/GoodsCard";
@@ -18,7 +18,9 @@ import { PurchaseOrderModal } from "@/components/Purchases/PurchaseOrderModal";
 import { ProductSelectionModal } from "@/components/Purchases/ProductSelectionModal";
 import { MeituanMappingModal } from "@/components/ShopGoods/MeituanMappingModal";
 import { TransferStockModal, TransferItem } from "@/components/ShopGoods/TransferStockModal";
+import { ImportFromShopDialog } from "@/components/ShopGoods/ImportFromShopDialog";
 import { CustomSelect } from "@/components/ui/CustomSelect";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ActionBar } from "@/components/ui/ActionBar";
 import { useToast } from "@/components/ui/Toast";
 import { useDebounce } from "@/hooks/useDebounce";
@@ -1443,6 +1445,7 @@ export default function ShopGoodsPage() {
   const [assignedTemplateIds, setAssignedTemplateIds] = useState<string[]>([]);
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
+  const [isImportFromShopOpen, setIsImportFromShopOpen] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isSortOpen, setIsSortOpen] = useState(false);
   const [isMeituanMappingOpen, setIsMeituanMappingOpen] = useState(false);
@@ -2093,10 +2096,10 @@ export default function ShopGoodsPage() {
 
   const handleStartPurchase = useCallback((displayProduct: ShopCatalogItem, rawItem?: ShopCatalogItem) => {
     const today = new Date();
-    const targetShopName = rawItem?.shopName || selectedShop?.name || "";
-    const targetShop = shops.find((s) => s.name === targetShopName || s.id === (rawItem?.shopId || selectedShopId));
+    const targetShop = shops.find((shop) => shop.id === (rawItem?.shopId || selectedShopId));
+    const targetShopName = targetShop?.name || rawItem?.shopName || selectedShop?.name || "";
     const shopProductId = rawItem?.id || displayProduct.id;
-    const productId = rawItem?.productId || rawItem?.sourceProductId || null;
+    const productId = rawItem?.productId || null;
     const price = typeof displayProduct.costPrice === "number" ? displayProduct.costPrice : (rawItem?.costPrice || 0);
 
     const draft: PurchaseOrder & { isDraft: boolean } = {
@@ -2220,31 +2223,16 @@ export default function ShopGoodsPage() {
 
   const handleItemStockChange = useCallback((targetId: string, newStock: number) => {
     setItems((prev) =>
-      prev.map((item) => {
-        const matches =
-          item.id === targetId ||
-          item.sourceProductId === targetId ||
-          item.productId === targetId;
-        return matches ? { ...item, stock: newStock } : item;
-      })
+      prev.map((item) => item.id === targetId ? { ...item, stock: newStock } : item)
     );
-    setEditingProduct((prev) => {
-      if (!prev) return prev;
-      const matches =
-        prev.id === targetId ||
-        (prev as { sourceProductId?: string }).sourceProductId === targetId ||
-        (prev as { productId?: string }).productId === targetId;
-      return matches ? { ...prev, stock: newStock } : prev;
-    });
+    setEditingProduct((prev) => prev?.id === targetId ? { ...prev, stock: newStock } : prev);
   }, []);
 
   useEffect(() => {
     const handleGlobalStockUpdate = (event: Event) => {
       const customEvent = event as CustomEvent<{ productId?: string; shopProductId?: string; stock?: number }>;
-      const { productId, shopProductId, stock } = customEvent.detail || {};
-      if (typeof stock !== "number") return;
-      if (shopProductId) handleItemStockChange(shopProductId, stock);
-      if (productId && productId !== shopProductId) handleItemStockChange(productId, stock);
+      const { shopProductId, stock } = customEvent.detail || {};
+      if (shopProductId && typeof stock === "number") handleItemStockChange(shopProductId, stock);
     };
 
     window.addEventListener("product-stock-updated", handleGlobalStockUpdate);
@@ -2602,7 +2590,19 @@ export default function ShopGoodsPage() {
         {filteredShops.length > 0 && (
           <div className="flex items-center justify-end gap-1 sm:gap-2 overflow-x-auto no-scrollbar py-0.5 ml-auto">
             <button onClick={() => setIsMeituanMappingOpen(true)} title="商品配对" className="flex items-center justify-center gap-2 rounded-full border border-border/60 bg-white dark:bg-white/5 h-8.5 w-8.5 sm:w-auto sm:h-11 px-0 sm:px-5 text-sm font-bold text-foreground hover:bg-white/80 dark:hover:bg-white/10 transition-all shrink-0 shadow-xs"><Link2 size={16} className="sm:size-[18px] shrink-0 text-amber-500" /><span className="hidden sm:inline truncate">商品配对</span></button>
-            <button onClick={() => selectedShop ? setIsImportOpen(true) : showToast("先选择一个目标店铺再导入", "error")} title="导入" className={cn("flex items-center justify-center gap-2 rounded-full border border-border/60 h-8.5 w-8.5 sm:w-auto sm:h-11 px-0 sm:px-4 text-sm font-bold transition-all shrink-0 shadow-xs", selectedShop ? "bg-white dark:bg-white/5 text-foreground hover:bg-white/80 dark:hover:bg-white/10" : "bg-muted/60 text-muted-foreground cursor-not-allowed")}><Upload size={16} className="sm:size-[18px] shrink-0 text-sky-500" /><span className="hidden sm:inline truncate">导入</span></button>
+            <DropdownMenu modal={false}>
+              <DropdownMenuTrigger asChild>
+                <button type="button" title="导入" aria-label="导入" disabled={!selectedShop} className="flex h-8.5 w-8.5 shrink-0 items-center justify-center gap-2 rounded-full border border-border/60 bg-white px-0 text-sm font-bold text-foreground shadow-xs transition-all hover:bg-white/80 disabled:cursor-not-allowed disabled:opacity-50 sm:h-11 sm:w-auto sm:px-4 dark:bg-white/5 dark:hover:bg-white/10">
+                  <Upload size={16} className="shrink-0 text-sky-500 sm:size-[18px]" />
+                  <span className="hidden sm:inline">导入</span>
+                  <ChevronDown size={14} className="hidden text-muted-foreground sm:block" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-40">
+                <DropdownMenuItem onSelect={() => setIsImportOpen(true)}><FileSpreadsheet />从 Excel 导入</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setIsImportFromShopOpen(true)}><Store />从其他店铺导入</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <button onClick={handleExport} title="导出" className="flex items-center justify-center gap-2 rounded-full border border-border/60 bg-white dark:bg-white/5 h-8.5 w-8.5 sm:w-auto sm:h-11 px-0 sm:px-4 text-sm font-bold text-foreground hover:bg-white/80 dark:hover:bg-white/10 transition-all shrink-0 shadow-xs"><Download size={16} className="sm:size-[18px] shrink-0 text-emerald-500" /><span className="hidden sm:inline truncate">导出</span></button>
             <button onClick={() => selectedShop ? setIsSortOpen(true) : showToast("先选择一个目标店铺再排序", "error")} title="排序" className={cn("flex items-center justify-center gap-2 rounded-full border border-border/60 h-8.5 w-8.5 sm:w-auto sm:h-11 px-0 sm:px-5 text-sm font-bold transition-all shrink-0 shadow-xs", selectedShop ? "bg-white dark:bg-white/5 text-foreground hover:bg-white/80 dark:hover:bg-white/10" : "bg-muted/60 text-muted-foreground cursor-not-allowed")}><ListOrdered size={16} className="sm:size-[18px] shrink-0 text-indigo-500 dark:text-indigo-400" /><span className="hidden sm:inline truncate">排序</span></button>
             <button onClick={() => selectedShop ? setIsCreateOpen(true) : showToast("先选择一个目标店铺再新建商品", "error")} title="新建店铺商品" className={cn("flex items-center justify-center gap-2 rounded-full border border-border/60 h-8.5 w-8.5 sm:w-auto sm:h-11 px-0 sm:px-5 text-sm font-bold transition-all shrink-0 shadow-xs", selectedShop ? "bg-white dark:bg-white/5 text-foreground hover:bg-white/80 dark:hover:bg-white/10" : "bg-muted/60 text-muted-foreground cursor-not-allowed")}><Plus size={16} className="sm:size-[18px] shrink-0 text-primary" /><span className="hidden sm:inline truncate">新建店铺商品</span></button>
@@ -2767,6 +2767,19 @@ export default function ShopGoodsPage() {
         defaultLibraryId={selectedShop?.libraryId || undefined}
       />
       <ImportModal isOpen={isImportOpen} onClose={() => setIsImportOpen(false)} onImport={handleImport} title={selectedShop ? `导入到 ${selectedShop.name}` : "导入店铺商品"} description="导入结果只会落到当前选中的目标店铺。已存在的店铺商品会更新，未存在的会按公开商品匹配后加入该店铺。" templateFileName="店铺商品导入模板.xlsx" templateData={[{ "*商品名称": "示例商品", "SKU/店内码": "SHOP-001", "JD SKU ID": "100234,100235 (选填)", "美团商品 ID": "MT-001,MT-002 (选填)", "*分类": "默认分类", 供应商: "默认供应商", 进货单价: 19.9, 主图: "https://example.com/cover.jpg", 备注: "店铺自定义备注" }]} />
+      {isImportFromShopOpen && selectedShop && (
+        <ImportFromShopDialog
+          key={selectedShop.id}
+          targetShop={selectedShop}
+          shops={shops}
+          onClose={() => setIsImportFromShopOpen(false)}
+          onImported={({ imported, skipped }) => {
+            setIsImportFromShopOpen(false);
+            showToast(`导入 ${imported} 件商品${skipped ? `，跳过 ${skipped} 件` : ""}`, imported ? "success" : "info");
+            void fetchShopProducts(true);
+          }}
+        />
+      )}
       <ProductFormModal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} onSubmit={async (data) => { await handleCreateStandaloneProduct(data); }} title={selectedShop ? `新建 ${selectedShop.name} 商品` : "新建店铺商品"} hideVisibilityControl={true} hideProductionControl={true} hideGallerySection={true} hideSpecsSection={true} disableHistorySection={true} showCoverSection={true} showJdSkuField={true} showMeituanSkuField={true} mainImageUploadEndpoint={selectedShopId ? `/api/shops/${selectedShopId}/products/cover-upload` : undefined} defaultLibraryId={selectedShop?.libraryId || undefined} />
       <ProductFormModal key={editingProduct?.id || 'shop-edit'} isOpen={isEditOpen} onClose={closeEditModal} onSubmit={async (data) => { await handleSaveEdit(data); }} initialData={editingProduct} title="编辑店铺商品" hideVisibilityControl={true} hideProductionControl={true} hideGallerySection={true} hideSpecsSection={true} showCoverSection={true} showJdSkuField={true} showMeituanSkuField={true} mainImageUploadEndpoint={editingShopId ? `/api/shops/${editingShopId}/products/cover-upload` : undefined} onStockChange={handleItemStockChange} defaultLibraryId={selectedShop?.libraryId || undefined} />
       <BatchEditModal isOpen={isBatchEditOpen} onClose={() => setIsBatchEditOpen(false)} onConfirm={handleBatchUpdate} categories={categories} suppliers={suppliers} selectedCount={selectedIds.length} hideProductionStatus={true} />

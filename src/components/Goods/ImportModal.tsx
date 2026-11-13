@@ -1,10 +1,9 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { createPortal } from "react-dom";
-import { motion, AnimatePresence } from "framer-motion";
-import { Upload, X, FileSpreadsheet, CheckCircle, AlertCircle, EyeOff, Ban, Trash2, Loader2 } from "lucide-react";
+import { useState, useRef } from "react";
+import { Upload, FileSpreadsheet, CheckCircle, AlertCircle, EyeOff, Ban, Trash2, Loader2 } from "lucide-react";
 import * as XLSX from "xlsx";
+import { ImportModalLayout, importCancelClassName, importConfirmClassName } from "./ImportModalLayout";
 import { cn } from "@/lib/utils";
 
 interface ImportModalProps {
@@ -37,7 +36,6 @@ export function ImportModal({
   const [previewData, setPreviewData] = useState<Record<string, unknown>[]>([]);
   const [ignoredColumns, setIgnoredColumns] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
-  const [mounted, setMounted] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [progress, setProgress] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -68,11 +66,6 @@ export function ImportModal({
     XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
     XLSX.writeFile(wb, templateFileName);
   };
-
-  useEffect(() => {
-    const handle = requestAnimationFrame(() => setMounted(true));
-    return () => cancelAnimationFrame(handle);
-  }, []);
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -192,16 +185,6 @@ export function ImportModal({
      }
   };
 
-  useEffect(() => {
-    if (isOpen) {
-      const originalStyle = document.body.style.overflow;
-      document.body.style.overflow = 'hidden';
-      return () => { document.body.style.overflow = originalStyle; };
-    }
-  }, [isOpen]);
-
-  if (!mounted) return null;
-
   const colCount = previewData.length > 0 ? Object.keys(previewData[0] || {}).length : 0;
   const dynamicMaxWidth = colCount >= 7 
     ? "max-w-5xl md:max-w-5xl lg:max-w-6xl" 
@@ -209,46 +192,45 @@ export function ImportModal({
     ? "max-w-3xl md:max-w-4xl" 
     : "max-w-2xl";
 
-  return createPortal(
-    <AnimatePresence>
-      {isOpen && (
+  return (
+    <ImportModalLayout
+      isOpen={isOpen}
+      isImporting={isImporting}
+      title={title}
+      description={description}
+      onClose={onClose}
+      className={dynamicMaxWidth}
+      footer={(
         <>
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-60000 bg-black/60 backdrop-blur-sm"
+          <button
+            type="button"
+            disabled={isImporting}
             onClick={onClose}
-          />
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className={cn(
-              "fixed left-1/2 top-1/2 z-60000 w-[calc(100%-32px)] sm:w-full -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-3xl bg-card/95 backdrop-blur-2xl p-0 shadow-2xl border border-border/70 flex flex-col max-h-safe-modal transition-all duration-300 ease-out",
-              dynamicMaxWidth
-            )}
+            className={importCancelClassName}
           >
-            {/* Header */}
-            <div className="flex flex-col border-b border-border/60 p-6 md:p-8 shrink-0">
-              <div className="flex items-center justify-between">
-                <h2 className="text-xl md:text-2xl font-bold text-foreground">{title}</h2>
-                <button 
-                  disabled={isImporting}
-                  onClick={onClose} 
-                  className="rounded-full p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                >
-                  <X size={20} className="md:size-6" />
-                </button>
-              </div>
-              {description && (
-                <p className="text-sm text-muted-foreground mt-3 leading-relaxed">
-                  {description}
-                </p>
-              )}
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-6 md:p-8 min-h-0">
+            取消
+          </button>
+          <button
+            type="button"
+            disabled={!file || isImporting}
+            onClick={handleConfirm}
+            className={importConfirmClassName}
+          >
+            {isImporting ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                正在导入...
+              </>
+            ) : (
+              <>
+                <CheckCircle size={18} />
+                确认导入
+              </>
+            )}
+          </button>
+        </>
+      )}
+    >
               {/* Drop Zone / Progress / Preview */}
               {isImporting ? (
                 <div className="flex flex-col items-center justify-center py-12 px-6 space-y-6 animate-in fade-in-50 duration-300">
@@ -493,41 +475,6 @@ export function ImportModal({
                   </div>
                 </div>
               )}
-            </div>
-
-            {/* Footer */}
-            <div className="flex justify-end gap-3 border-t border-border/50 p-6 md:p-8 shrink-0">
-              <button
-                type="button"
-                disabled={isImporting}
-                onClick={onClose}
-                className="h-11 px-6 rounded-full text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                取消
-              </button>
-              <button
-                type="button"
-                disabled={!file || isImporting}
-                onClick={handleConfirm}
-                className="flex items-center gap-2 h-11 px-8 rounded-full bg-primary text-sm font-medium text-primary-foreground shadow-xl shadow-primary/20 transition-all hover:opacity-90 active:scale-95 disabled:opacity-50 disabled:grayscale shrink-0 disabled:cursor-not-allowed"
-              >
-                {isImporting ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-                    正在导入...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle size={18} />
-                    确认导入
-                  </>
-                )}
-              </button>
-            </div>
-          </motion.div>
-        </>
-      )}
-    </AnimatePresence>,
-    document.body
+    </ImportModalLayout>
   );
 }

@@ -2163,12 +2163,11 @@ export function ProductFormModal({
                                 ) : inboundHistory.length > 0 ? (
                                     inboundHistory.map((order) => {
                                         // Find the specific item to get quantity/price for this product
-                                        const item = order.items.find((i: PurchaseOrderItem) =>
-                                            i.productId === initialData.id ||
-                                            i.shopProductId === initialData.id ||
-                                            (Boolean(initialData.productId) && i.productId === initialData.productId) ||
-                                            (Boolean(initialData.sourceProductId) && (i.productId === initialData.sourceProductId || i.shopProductId === initialData.sourceProductId))
-                                        );
+                                        const item = order.items.find((i: PurchaseOrderItem) => i.shopProductId === initialData.id)
+                                            ?? order.items.find((i: PurchaseOrderItem) => !i.shopProductId && (
+                                                i.productId === initialData.id ||
+                                                (Boolean(initialData.productId) && (i.productId === initialData.productId || i.productId === initialData.sourceProductId))
+                                            ));
                                         if (!item) return null;
 
                                         const itemId = item.id || "";

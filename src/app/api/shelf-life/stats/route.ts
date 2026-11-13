@@ -31,8 +31,10 @@ export async function GET() {
       where: {
         remainingStock: { gt: 0 },
         AND: [
-          { product: { deletedAt: null } },
-          { OR: [{ shopProductId: null }, { shopProduct: { deletedAt: null } }] },
+          { OR: [
+            { shopProduct: { deletedAt: null } },
+            { shopProductId: null, product: { deletedAt: null } },
+          ] },
         ],
         ...userScope,
       },

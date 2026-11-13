@@ -853,7 +853,7 @@ model AutoPickApiKey {
 
 model ProductBatch {
   id                  String             @id @default(cuid())
-  productId           String
+  productId           String?
   shopProductId       String?
   batchNo             String?            // 批次号
   productionDate      DateTime?          // 生产日期
@@ -866,7 +866,7 @@ model ProductBatch {
   remark              String?
   userId              String?
   
-  product             Product            @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product             Product?           @relation(fields: [productId], references: [id], onDelete: Cascade)
   shopProduct         ShopProduct?       @relation(fields: [shopProductId], references: [id], onDelete: SetNull)
   purchaseOrderItem   PurchaseOrderItem? @relation(fields: [purchaseOrderItemId], references: [id], onDelete: SetNull)
   user                User?              @relation(fields: [userId], references: [id])
